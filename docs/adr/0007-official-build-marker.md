@@ -10,8 +10,12 @@ Releases are not code-signed yet (GOVERNANCE.md).
 
 ## Decision
 
-- `Provenance::current()` reads `RONGROI_OFFICIAL_BUILD` at compile time. Only the exact value `1` marks a
-  build as official. Only the release workflow sets it.
+- `rongroi-core`'s build script writes `RONGROI_OFFICIAL_BUILD` and `RONGROI_COMMIT` into one text, the build
+  marker `aeterna-rongroi build marker: official=<flag>;commit=<sha>;`, which is embedded in every binary.
+  `Provenance::current()` reads the flag and the commit back from that text, so the marker in the file and the
+  report header cannot disagree. Only the exact value `1` marks a build as official. Only the release workflow
+  sets it. The release workflow checks the desktop app, which cannot run headless, by searching it for the
+  marker (ADR 0008).
 - Every other build shows **UNOFFICIAL BUILD** in the CLI header, the GUI and the report. The token stays in
   English in every language so it is recognisable and searchable.
 - The report also carries the executable's SHA-256 and, for releases, the commit.

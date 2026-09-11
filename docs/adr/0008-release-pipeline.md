@@ -121,7 +121,7 @@ Each gate stops the workflow; no release is created.
 | `xtask release-check` | the tag is not `vYYYY.MM.DD-X.Y.Z` or `vYYYY.MM.DD-X.Y.Z-rc.N`, or its date is not a real calendar date; `X.Y.Z` differs from any of the three manifests; `CHANGELOG.md` has no `## [X.Y.Z] - YYYY-MM-DD` section, the section is empty, or its date differs from the tag's date; the tag commit is not on `main` |
 | Build | `Cargo.lock` or `pnpm-lock.yaml` would change (every cargo command uses `--locked`, `pnpm install` uses `--frozen-lockfile`) |
 | CLI check (`xtask release-verify`) | `aeterna-rongroi-cli … scan --json` reports `provenance.official` not `true`, a version other than `X.Y.Z`, a commit other than the tag commit, or an `exe_sha256` different from `Get-FileHash` of the file |
-| Desktop app check (`xtask release-verify`) | the desktop executable does not contain the tag commit SHA as a string — evidence that the build step's environment reached the desktop app's compilation. The app cannot be started headless on the runner. This check must be shown to fail for a build without `RONGROI_COMMIT` before the first real release; if it cannot tell the two apart, a check that can must replace it first. |
+| Desktop app check (`xtask release-verify`) | the desktop executable does not contain the build marker `aeterna-rongroi build marker: official=1;commit=<tag commit SHA>;` (ADR 0007) — the text its report header is read from, so a desktop build that lacks either variable fails. The app cannot be started headless on the runner. This check must be shown to fail for desktop builds without `RONGROI_OFFICIAL_BUILD` and without `RONGROI_COMMIT` before the first real release. |
 | Publish | `sha256sum -c --strict` fails, an attached executable is not listed in `SHA256SUMS`, or the tag does not exist on the remote |
 
 The logic of `release-check` and `release-notes` is unit- and snapshot-tested, and those tests run in the
@@ -153,8 +153,9 @@ Before the first release: merge the changelog pull request, push `vYYYY.MM.DD-0.
 verify the downloaded files with
 `gh attestation verify <file> --repo aeterna/aeterna-rongroi --signer-workflow aeterna/aeterna-rongroi/.github/workflows/release.yml`,
 run both executables on a real Windows machine (hash matches, no UNOFFICIAL BUILD banner, desktop app starts
-under a standard-user token), and show that the desktop-app gate fails for a desktop build without
-`RONGROI_COMMIT` (build the desktop app on Windows without that variable and run `release-verify` against it).
+under a standard-user token), and show that the desktop-app gate fails for desktop builds without
+`RONGROI_OFFICIAL_BUILD` and without `RONGROI_COMMIT` (build the desktop app for Windows without each variable
+and run `release-verify` against it).
 Then delete the draft and the rehearsal tag, and push `vYYYY.MM.DD-0.1.0` on the same commit.
 
 ## Consequences
@@ -169,6 +170,4 @@ Then delete the draft and the rehearsal tag, and push `vYYYY.MM.DD-0.1.0` on the
 - Windows will keep warning about unsigned files until code signing through SignPath is in place.
 - Not verified when this ADR was written, to be checked in the rehearsal: the exact SmartScreen wording on
   Windows 10 and 11, whether the desktop-app gate tells official and unofficial builds apart, the file names
-  `cargo cyclonedx` writes, and `pnpm sbom` output on the Windows runner; and the desktop-app gate cannot detect
-  a desktop build that carries the commit but not the official-build flag — a follow-up must close this before
-  the first rehearsal (for example by embedding one literal with both values in `rongroi-core`).
+  `cargo cyclonedx` writes, and `pnpm sbom` output on the Windows runner.
