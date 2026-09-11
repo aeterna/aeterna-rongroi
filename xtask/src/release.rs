@@ -152,9 +152,11 @@ pub fn format_sums(sums: &[Checksum]) -> String {
     out
 }
 
-/// Parses `SHA256SUMS` as written by [`format_sums`].
+/// Parses `SHA256SUMS` as written by [`format_sums`]. An empty file with no checksum lines is an
+/// error.
 pub fn parse_sums(text: &str) -> anyhow::Result<Vec<Checksum>> {
-    text.lines()
+    let result: Vec<Checksum> = text
+        .lines()
         .filter(|line| !line.trim().is_empty())
         .map(|line| {
             let (sha256, name) = line
@@ -174,7 +176,11 @@ pub fn parse_sums(text: &str) -> anyhow::Result<Vec<Checksum>> {
                 name: name.to_owned(),
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+    if result.is_empty() {
+        bail!("SHA256SUMS lists no files");
+    }
+    Ok(result)
 }
 
 /// The JSON report the built CLI printed with `scan --json`.
@@ -288,5 +294,21 @@ mod tests {
         for line in &lines {
             assert!(parse_sums(line).is_err(), "{line}");
         }
+    }
+
+    #[test]
+    fn an_empty_sums_file_is_an_error() {
+        let err = parse_sums("").unwrap_err();
+        assert!(
+            err.to_string().contains("lists no files"),
+            "{}",
+            err.to_string()
+        );
+        let err = parse_sums("\n  \n").unwrap_err();
+        assert!(
+            err.to_string().contains("lists no files"),
+            "{}",
+            err.to_string()
+        );
     }
 }
