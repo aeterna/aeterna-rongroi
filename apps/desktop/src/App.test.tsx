@@ -102,6 +102,13 @@ describe("App", () => {
     expect(calls).toContain("report_view");
   });
 
+  it("shows the program version in the report header, which the release notes ask people to check", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Version")).toBeTruthy();
+    expect(screen.getByText(selfView.header.provenance.version)).toBeTruthy();
+  });
+
   it("switches to Thai, keeping the UNOFFICIAL BUILD token in English", async () => {
     render(<App />);
     await act(async () => {

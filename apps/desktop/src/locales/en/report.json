@@ -2,6 +2,7 @@
   "header": {
     "mode_self": "Self check",
     "mode_ss": "SS mode",
+    "version": "Version",
     "platform": "Platform",
     "rights": "Rights",
     "elevated_yes": "administrator",

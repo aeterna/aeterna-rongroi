@@ -41,6 +41,8 @@ export function Report({ mode, onBack }: Props) {
       <dl className="facts">
         <dt>{mode === "ss" ? t("header.mode_ss") : t("header.mode_self")}</dt>
         <dd />
+        <dt>{t("header.version")}</dt>
+        <dd>{header.provenance.version}</dd>
         <dt>{t("header.platform")}</dt>
         <dd>{[header.platform, header.os_build].filter(Boolean).join(" ")}</dd>
         <dt>{t("header.rights")}</dt>

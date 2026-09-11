@@ -2,6 +2,7 @@
   "header": {
     "mode_self": "ตรวจเครื่องตัวเอง",
     "mode_ss": "โหมด SS",
+    "version": "เวอร์ชัน",
     "platform": "ระบบ",
     "rights": "สิทธิ์",
     "elevated_yes": "ผู้ดูแลระบบ",
