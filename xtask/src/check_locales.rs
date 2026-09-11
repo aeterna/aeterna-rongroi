@@ -14,12 +14,38 @@ use rongroi_core::rules::is_lang;
 
 const LOCALES: &str = "apps/desktop/src/locales";
 
+/// Everything `run` needs to print or bail on, computed without touching stdout/stderr so tests
+/// can assert on the exact error text instead of only on pass/fail.
+struct CheckLocalesOutcome {
+    errors: Vec<String>,
+    warnings: usize,
+    languages: usize,
+}
+
 pub fn run(root: &Path) -> anyhow::Result<()> {
     let dir = root.join(LOCALES);
     if !dir.is_dir() {
         println!("check-locales: {LOCALES} does not exist yet, nothing to check");
         return Ok(());
     }
+
+    let outcome = check(root)?;
+    if outcome.errors.is_empty() {
+        println!(
+            "check-locales: en + {} language(s) ok, {} untranslated key(s)",
+            outcome.languages, outcome.warnings
+        );
+        Ok(())
+    } else {
+        for error in &outcome.errors {
+            eprintln!("error: {error}");
+        }
+        bail!("check-locales: {} problem(s)", outcome.errors.len())
+    }
+}
+
+fn check(root: &Path) -> anyhow::Result<CheckLocalesOutcome> {
+    let dir = root.join(LOCALES);
     let english_dir = dir.join("en");
     let english_files = json_file_names(&english_dir)?;
     if english_files.is_empty() {
@@ -69,15 +95,11 @@ pub fn run(root: &Path) -> anyhow::Result<()> {
         }
     }
 
-    if errors.is_empty() {
-        println!("check-locales: en + {languages} language(s) ok, {warnings} untranslated key(s)");
-        Ok(())
-    } else {
-        for error in &errors {
-            eprintln!("error: {error}");
-        }
-        bail!("check-locales: {} problem(s)", errors.len())
-    }
+    Ok(CheckLocalesOutcome {
+        errors,
+        warnings,
+        languages,
+    })
 }
 
 fn json_file_names(dir: &Path) -> anyhow::Result<BTreeSet<String>> {
@@ -118,5 +140,88 @@ fn flatten(prefix: &str, value: &serde_json::Value, out: &mut BTreeSet<String>) 
         }
     } else {
         out.insert(prefix.to_owned());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::*;
+
+    /// A directory under the OS temp dir, unique per test, deleted on drop (even on panic) so a
+    /// failed assertion never leaves a fixture tree behind.
+    struct TempRoot(PathBuf);
+
+    impl TempRoot {
+        fn new(label: &str) -> Self {
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock is after the epoch")
+                .as_nanos();
+            let dir = std::env::temp_dir().join(format!(
+                "aeterna-rongroi-xtask-check-locales-{}-{label}-{n}-{nanos}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&dir).expect("create temp root");
+            Self(dir)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn write_locale(root: &Path, lang: &str, file: &str, json: &str) {
+        let path = root.join(LOCALES).join(lang).join(file);
+        fs::create_dir_all(path.parent().expect("path has a parent")).expect("create parent dirs");
+        fs::write(path, json).expect("write locale file");
+    }
+
+    #[test]
+    fn valid_locales_pass() {
+        let tmp = TempRoot::new("valid");
+        write_locale(tmp.path(), "en", "common.json", r#"{"app":{"name":"x"}}"#);
+        write_locale(tmp.path(), "th", "common.json", r#"{"app":{"name":"y"}}"#);
+
+        let outcome = check(tmp.path()).expect("check-locales should run to completion");
+
+        assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
+        assert_eq!(outcome.languages, 1);
+        assert_eq!(outcome.warnings, 0);
+    }
+
+    /// Gate (4): a non-English locale key that does not exist in English must be rejected.
+    #[test]
+    fn key_not_in_english_is_rejected() {
+        let tmp = TempRoot::new("extra-key");
+        write_locale(tmp.path(), "en", "common.json", r#"{"app":{"name":"x"}}"#);
+        write_locale(
+            tmp.path(),
+            "th",
+            "common.json",
+            r#"{"app":{"name":"y","tagline":"z"}}"#,
+        );
+
+        let outcome = check(tmp.path()).expect("check-locales should run to completion");
+
+        assert_eq!(outcome.errors.len(), 1, "{:?}", outcome.errors);
+        assert!(
+            outcome.errors[0].contains(
+                "apps/desktop/src/locales/th/common.json: key `app.tagline` does not exist in English"
+            ),
+            "{:?}",
+            outcome.errors
+        );
     }
 }
