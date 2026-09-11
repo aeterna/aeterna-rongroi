@@ -19,7 +19,7 @@ body:
     id: exe-hash
     attributes:
       label: Executable SHA-256
-      description: "`Get-FileHash .\\aeterna-rongroi.exe` or the `exe sha256` line of the CLI."
+      description: "`Get-FileHash .\\aeterna-rongroi-*-windows-x64.exe` or the `exe sha256` line of the CLI."
     validations:
       required: true
   - type: input

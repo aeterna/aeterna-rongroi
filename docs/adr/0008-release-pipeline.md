@@ -72,34 +72,43 @@ GitHub adds source-code archives on its own.
 ### Workflow
 
 Trigger: a pushed tag matching `v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-*`; `release-check` then enforces
-the exact format. Concurrency group `release`, never cancelled in progress. Every action
-is pinned by commit SHA, like the other workflows.
+the exact format. Concurrency group `release-<tag ref>`, never cancelled in progress, so runs for different tags
+never cancel each other. Every action is pinned by commit SHA, like the other workflows.
 
-**Job `build`** — `windows-latest`; permissions `contents: read`, `id-token: write`, `attestations: write`.
+**Job `build`** — `windows-latest`; permissions `contents: read` only.
 
 1. Check out the tag with full history, without persisted credentials.
-2. `cargo xtask release-check <tag>` (gates below).
-3. Install the pinned toolchain and `pnpm install --frozen-lockfile`. **No build caches** (`rust-cache`,
-   `setup-node` cache): a cache written by another workflow must not reach an official build.
-4. Build with `RONGROI_OFFICIAL_BUILD=1` and `RONGROI_COMMIT=<tag commit SHA>` set for the whole step:
+2. Install the pinned toolchain.
+3. `cargo run --locked -p xtask -- release-check <tag>` (gates below).
+4. `pnpm install --frozen-lockfile`. **No build caches** (`rust-cache`, `setup-node` cache): a cache written by
+   another workflow must not reach an official build. Every cargo command in the job uses `--locked`.
+5. Build with `RONGROI_OFFICIAL_BUILD=1` and `RONGROI_COMMIT=<tag commit SHA>` set for the whole step:
    `cargo build --release --locked -p rongroi-cli` and `pnpm -C apps/desktop tauri build --no-bundle -- --locked`.
-5. Copy the two executables to their release names.
-6. Run `aeterna-rongroi-cli-X.Y.Z-windows-x64.exe scan --json` into `report.json`, then
-   `cargo xtask release-verify <tag> --report report.json --cli <exe> --desktop <exe> --commit <sha> --sums SHA256SUMS`
+6. Copy the two executables to their release names.
+7. Run the CLI `scan --json` into `report.json`, then
+   `cargo run --locked -p xtask -- release-verify <tag> --report report.json --cli <exe> --desktop <exe> --commit <sha> --sums SHA256SUMS`
    checks the built files (gates below) and, only if they pass, writes `SHA256SUMS`.
-7. Write the three SBOM files.
-8. `cargo xtask release-notes <tag> --report report.json --sums SHA256SUMS --commit <sha> --run-url <url> --out notes.md`
+8. Write the three SBOM files.
+9. `cargo run --locked -p xtask -- release-notes <tag> --report report.json --sums SHA256SUMS --commit <sha> --run-url <url> --out notes.md`
    writes the release notes.
-9. `actions/attest`: one build-provenance attestation with `subject-checksums: SHA256SUMS`, and one SBOM
-   attestation per SBOM file (`subject-path` + `sbom-path`); both desktop SBOMs — Rust and UI — are attested
-   against the desktop executable.
-10. Upload the executables, `SHA256SUMS`, the SBOM files and `notes.md` as one workflow artifact.
+10. Upload the executables, `SHA256SUMS`, the SBOM files and `notes.md` as one workflow artifact, kept for one
+    day.
 
-**Job `publish`** — `ubuntu-latest`; needs `build`; permission `contents: write` only. It does not check out or
-compile anything.
+**Job `attest`** — `ubuntu-latest`; needs `build`; permissions `contents: read`, `id-token: write`,
+`attestations: write`. It does not check out or compile anything, so no dependency build script runs in a job
+that can sign.
 
 1. Download the artifact.
-2. `sha256sum -c SHA256SUMS`.
+2. `sha256sum -c --strict SHA256SUMS`.
+3. `actions/attest`: one build-provenance attestation with `subject-checksums: SHA256SUMS`, and one SBOM
+   attestation per SBOM file (`subject-path` + `sbom-path`); both desktop SBOMs — Rust and UI — are attested
+   against the desktop executable.
+
+**Job `publish`** — `ubuntu-latest`; needs `build` and `attest`; permission `contents: write` only. It does not
+check out or compile anything.
+
+1. Download the artifact.
+2. `sha256sum -c --strict SHA256SUMS`, and every attached executable must be listed in `SHA256SUMS`.
 3. `gh release create <tag> --draft --verify-tag --title "aeterna-rongroi X.Y.Z" --notes-file notes.md`, plus
    `--prerelease` when the rule above applies, with the executables, `SHA256SUMS` and the SBOM files attached.
 
@@ -110,10 +119,10 @@ Each gate stops the workflow; no release is created.
 | Gate | Fails when |
 |---|---|
 | `xtask release-check` | the tag is not `vYYYY.MM.DD-X.Y.Z` or `vYYYY.MM.DD-X.Y.Z-rc.N`, or its date is not a real calendar date; `X.Y.Z` differs from any of the three manifests; `CHANGELOG.md` has no `## [X.Y.Z] - YYYY-MM-DD` section, the section is empty, or its date differs from the tag's date; the tag commit is not on `main` |
-| Build | `Cargo.lock` or `pnpm-lock.yaml` would change |
+| Build | `Cargo.lock` or `pnpm-lock.yaml` would change (every cargo command uses `--locked`, `pnpm install` uses `--frozen-lockfile`) |
 | CLI check (`xtask release-verify`) | `aeterna-rongroi-cli … scan --json` reports `provenance.official` not `true`, a version other than `X.Y.Z`, a commit other than the tag commit, or an `exe_sha256` different from `Get-FileHash` of the file |
 | Desktop app check (`xtask release-verify`) | the desktop executable does not contain the tag commit SHA as a string — evidence that the build step's environment reached the desktop app's compilation. The app cannot be started headless on the runner. This check must be shown to fail for a build without `RONGROI_COMMIT` before the first real release; if it cannot tell the two apart, a check that can must replace it first. |
-| Publish | `sha256sum -c` fails, or the tag does not exist on the remote |
+| Publish | `sha256sum -c --strict` fails, an attached executable is not listed in `SHA256SUMS`, or the tag does not exist on the remote |
 
 The logic of `release-check` and `release-notes` is unit- and snapshot-tested, and those tests run in the
 existing required `rust (ubuntu)` check. Before merge, each gate is shown to fail on purpose: a version mismatch,
@@ -129,8 +138,9 @@ a missing changelog section, and the CLI check against an unofficial build.
 4. **Rules bundle** — schema version, rule count and SHA-256, taken from the report header, which shows the
    same values when the program runs.
 5. **Verify before you trust a result** — `Get-FileHash` against `SHA256SUMS`;
-   `gh attestation verify <file> --repo aeterna/aeterna-rongroi`; the program shows version `X.Y.Z` and no
-   **UNOFFICIAL BUILD** banner. If any check fails, do not rely on the result.
+   `gh attestation verify <file> --repo aeterna/aeterna-rongroi --signer-workflow aeterna/aeterna-rongroi/.github/workflows/release.yml`;
+   the program shows version `X.Y.Z` and no **UNOFFICIAL BUILD** banner. If any check fails, do not rely on the
+   result.
 6. **Windows SmartScreen** — the files are not code-signed yet (GOVERNANCE.md), so Windows may warn; check the
    hash before running.
 7. **ภาษาไทย** — the same download, verification and SmartScreen points, and that a result is evidence for a
@@ -139,10 +149,13 @@ a missing changelog section, and the CLI check against an unofficial build.
 
 ### Rehearsal before the first release
 
-Before the first release: merge the changelog pull request, push `vYYYY.MM.DD-0.1.0-rc.1`, inspect the draft, run
-`gh attestation verify` on the downloaded files, and run both executables on a real Windows machine (hash
-matches, no UNOFFICIAL BUILD banner, desktop app starts under a standard-user token). Then delete the draft and
-the rehearsal tag, and push `vYYYY.MM.DD-0.1.0` on the same commit.
+Before the first release: merge the changelog pull request, push `vYYYY.MM.DD-0.1.0-rc.1`, inspect the draft,
+verify the downloaded files with
+`gh attestation verify <file> --repo aeterna/aeterna-rongroi --signer-workflow aeterna/aeterna-rongroi/.github/workflows/release.yml`,
+run both executables on a real Windows machine (hash matches, no UNOFFICIAL BUILD banner, desktop app starts
+under a standard-user token), and show that the desktop-app gate fails for a desktop build without
+`RONGROI_COMMIT` (build the desktop app on Windows without that variable and run `release-verify` against it).
+Then delete the draft and the rehearsal tag, and push `vYYYY.MM.DD-0.1.0` on the same commit.
 
 ## Consequences
 
@@ -156,4 +169,6 @@ the rehearsal tag, and push `vYYYY.MM.DD-0.1.0` on the same commit.
 - Windows will keep warning about unsigned files until code signing through SignPath is in place.
 - Not verified when this ADR was written, to be checked in the rehearsal: the exact SmartScreen wording on
   Windows 10 and 11, whether the desktop-app gate tells official and unofficial builds apart, the file names
-  `cargo cyclonedx` writes, and `pnpm sbom` output on the Windows runner.
+  `cargo cyclonedx` writes, and `pnpm sbom` output on the Windows runner; and the desktop-app gate cannot detect
+  a desktop build that carries the commit but not the official-build flag — a follow-up must close this before
+  the first rehearsal (for example by embedding one literal with both values in `rongroi-core`).
