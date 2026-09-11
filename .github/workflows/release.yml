@@ -14,7 +14,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -27,8 +27,6 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     outputs:
       version: ${{ steps.check.outputs.version }}
       prerelease: ${{ steps.check.outputs.prerelease }}
@@ -46,7 +44,7 @@ jobs:
       - name: Check the tag against the manifests and CHANGELOG.md
         id: check
         run: |
-          cargo xtask release-check "$env:GITHUB_REF_NAME" --github-output "$env:GITHUB_OUTPUT"
+          cargo run --locked --quiet -p xtask -- release-check "$env:GITHUB_REF_NAME" --github-output "$env:GITHUB_OUTPUT"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
         with:
@@ -87,7 +85,7 @@ jobs:
         env:
           VERSION: ${{ steps.check.outputs.version }}
         run: |
-          cargo xtask release-verify "$env:GITHUB_REF_NAME" --report report.json `
+          cargo run --locked --quiet -p xtask -- release-verify "$env:GITHUB_REF_NAME" --report report.json `
             --cli "out/aeterna-rongroi-cli-$env:VERSION-windows-x64.exe" `
             --desktop "out/aeterna-rongroi-$env:VERSION-windows-x64.exe" `
             --commit (git rev-parse HEAD) --sums out/SHA256SUMS
@@ -104,11 +102,35 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Write the release notes
         run: |
-          cargo xtask release-notes "$env:GITHUB_REF_NAME" --report report.json --sums out/SHA256SUMS `
+          cargo run --locked --quiet -p xtask -- release-notes "$env:GITHUB_REF_NAME" --report report.json --sums out/SHA256SUMS `
             --commit (git rev-parse HEAD) `
             --run-url "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" `
             --repo "$env:GITHUB_REPOSITORY" --out out/notes.md
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release
+          path: out/
+          if-no-files-found: error
+          retention-days: 1
+
+  attest:
+    name: attest
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: out
+      - name: Check the hashes before signing
+        working-directory: out
+        run: sha256sum -c --strict SHA256SUMS
       - name: Attest build provenance of both executables
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -116,28 +138,22 @@ jobs:
       - name: Attest the desktop app's Rust SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: out/aeterna-rongroi-${{ steps.check.outputs.version }}-windows-x64.exe
-          sbom-path: out/aeterna-rongroi-${{ steps.check.outputs.version }}-windows-x64.cdx.json
+          subject-path: out/aeterna-rongroi-${{ needs.build.outputs.version }}-windows-x64.exe
+          sbom-path: out/aeterna-rongroi-${{ needs.build.outputs.version }}-windows-x64.cdx.json
       - name: Attest the desktop app's UI SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: out/aeterna-rongroi-${{ steps.check.outputs.version }}-windows-x64.exe
-          sbom-path: out/aeterna-rongroi-${{ steps.check.outputs.version }}-ui.cdx.json
+          subject-path: out/aeterna-rongroi-${{ needs.build.outputs.version }}-windows-x64.exe
+          sbom-path: out/aeterna-rongroi-${{ needs.build.outputs.version }}-ui.cdx.json
       - name: Attest the CLI's SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: out/aeterna-rongroi-cli-${{ steps.check.outputs.version }}-windows-x64.exe
-          sbom-path: out/aeterna-rongroi-cli-${{ steps.check.outputs.version }}-windows-x64.cdx.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: release
-          path: out/
-          if-no-files-found: error
-          retention-days: 7
+          subject-path: out/aeterna-rongroi-cli-${{ needs.build.outputs.version }}-windows-x64.exe
+          sbom-path: out/aeterna-rongroi-cli-${{ needs.build.outputs.version }}-windows-x64.cdx.json
 
   publish:
     name: draft release
-    needs: build
+    needs: [build, attest]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -149,7 +165,7 @@ jobs:
           path: out
       - name: Check the hashes again
         working-directory: out
-        run: sha256sum -c SHA256SUMS
+        run: sha256sum -c --strict SHA256SUMS
       - name: Create the draft release
         working-directory: out
         env:
@@ -160,6 +176,13 @@ jobs:
           PRERELEASE: ${{ needs.build.outputs.prerelease }}
         run: |
           set -euo pipefail
+          for exe in ./*.exe; do
+            name="${exe#./}"
+            if ! awk '{print $2}' SHA256SUMS | grep -qxF "$name"; then
+              echo "::error::$name is not listed in SHA256SUMS"
+              exit 1
+            fi
+          done
           flags=(--draft --verify-tag --title "aeterna-rongroi $VERSION" --notes-file notes.md)
           if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
           gh release create "$TAG" "${flags[@]}" ./*.exe SHA256SUMS ./*.cdx.json
