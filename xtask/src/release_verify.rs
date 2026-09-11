@@ -138,7 +138,7 @@ fn read(path: &Path) -> anyhow::Result<Vec<u8>> {
 
 fn file_name(path: &Path) -> anyhow::Result<String> {
     path.file_name()
-        .and_then(|name| name.to_str())
+        .and_then(std::ffi::OsStr::to_str)
         .map(str::to_owned)
         .with_context(|| format!("{} has no file name", path.display()))
 }
