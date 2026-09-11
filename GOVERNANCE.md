@@ -38,8 +38,11 @@ Before the first release, enable **immutable releases** in the repository settin
    `git tag -a vYYYY.MM.DD-X.Y.Z -m "aeterna-rongroi X.Y.Z" <commit>`, then `git push origin vYYYY.MM.DD-X.Y.Z`.
    A rehearsal uses `vYYYY.MM.DD-X.Y.Z-rc.N`.
 4. Wait for the `release` workflow. It creates a **draft** release with both executables, `SHA256SUMS`, the SBOMs
-   and the notes. It never publishes.
-5. Open the draft, read the notes and the file list, and publish it. With immutable releases enabled, a published
+   and the notes. It never publishes. Do not re-run its `draft release` job: a re-run creates a second draft for
+   the same tag; delete a stray draft instead.
+5. Download the draft's files and check them on a real Windows machine (hash, no **UNOFFICIAL BUILD** banner,
+   version). Builds are not byte-for-byte reproducible, so a check of an earlier `-rc.N` build does not carry over.
+6. Open the draft, read the notes and the file list, and publish it. With immutable releases enabled, a published
    release cannot have its tag or files changed; a wrong file needs a new version.
 
 ## Becoming a maintainer

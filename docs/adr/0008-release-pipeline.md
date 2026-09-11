@@ -169,6 +169,16 @@ Then delete the draft and the rehearsal tag, and push `vYYYY.MM.DD-0.1.0` on the
 - README.md and README.th.md show `Get-FileHash` with the versioned file names.
 - GOVERNANCE.md gains a "How to release" list that points here.
 - Windows will keep warning about unsigned files until code signing through SignPath is in place.
-- Not verified when this ADR was written, to be checked in the rehearsal: the exact SmartScreen wording on
-  Windows 10 and 11, whether the desktop-app gate tells official and unofficial builds apart, the file names
-  `cargo cyclonedx` writes, and `pnpm sbom` output on the Windows runner.
+- Results of the 0.1.0 rehearsal (2026-09-11, `v2026.09.11-0.1.0-rc.1`, then `v2026.09.11-0.1.0` on the same
+  commit):
+  - The SBOM step found the files `cargo cyclonedx` writes and `pnpm sbom` produced the UI SBOM on the Windows
+    runner; all three SBOM attestations verify with `--predicate-type https://cyclonedx.org/bom`.
+  - The desktop-app gate passes the official build and fails desktop builds made without
+    `RONGROI_OFFICIAL_BUILD` and without `RONGROI_COMMIT` (built for `x86_64-pc-windows-msvc` with
+    `cargo-xwin`, then checked with `release-verify`).
+  - Builds are not byte-for-byte reproducible: the `-rc.1` and final executables from the same commit have
+    different SHA-256 values, so the checks on a real Windows machine are repeated on the final files before
+    publishing.
+  - Re-running the `draft release` job creates a second draft for the same tag.
+  - Checked on Windows 11 (build 26220) only. The exact SmartScreen wording is still unverified: files copied
+    for the check carried no Mark of the Web, so SmartScreen did not prompt.
