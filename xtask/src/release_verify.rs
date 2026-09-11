@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, bail};
-use rongroi_core::provenance::{Provenance, sha256_hex};
+use rongroi_core::provenance::{Provenance, build_marker, sha256_hex};
 
 use crate::release::{Checksum, ReleaseTag, format_sums, is_full_sha, read_report};
 
@@ -52,12 +52,8 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         &args.commit,
         &cli_sha256,
     );
-    if !contains_bytes(&desktop, args.commit.as_bytes()) {
-        problems.push(format!(
-            "{} does not contain the commit {}: RONGROI_COMMIT did not reach the desktop build",
-            args.desktop.display(),
-            args.commit
-        ));
+    if let Some(problem) = desktop_problem(&desktop, &args.commit) {
+        problems.push(format!("{}: {problem}", args.desktop.display()));
     }
     if !problems.is_empty() {
         for problem in &problems {
@@ -118,6 +114,17 @@ fn provenance_problems(
     problems
 }
 
+/// The desktop app cannot run headless on the runner, so it is checked for the build marker of an official
+/// build of this commit — the same text its report header is read from (ADR 0007).
+fn desktop_problem(desktop: &[u8], commit: &str) -> Option<String> {
+    let marker = build_marker(Some("1"), Some(commit));
+    (!contains_bytes(desktop, marker.as_bytes())).then(|| {
+        format!(
+            "does not contain `{marker}`: RONGROI_OFFICIAL_BUILD=1 or RONGROI_COMMIT did not reach the desktop build"
+        )
+    })
+}
+
 fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty()
         && haystack
@@ -175,6 +182,40 @@ mod tests {
             provenance_problems(&no_commit, "0.1.0", COMMIT, &hash("f")).len(),
             1
         );
+    }
+
+    #[test]
+    fn the_desktop_app_needs_the_official_marker_of_this_commit() {
+        let binary =
+            |marker: String| [b"\x00\x01prefix".as_slice(), marker.as_bytes(), b"\xff"].concat();
+        let official = binary(build_marker(Some("1"), Some(COMMIT)));
+        assert_eq!(desktop_problem(&official, COMMIT), None);
+
+        let other_commit = "1".repeat(40);
+        let failing = [
+            (
+                "commit without the flag",
+                binary(build_marker(None, Some(COMMIT))),
+            ),
+            (
+                "flag without the commit",
+                binary(build_marker(Some("1"), None)),
+            ),
+            (
+                "another commit",
+                binary(build_marker(Some("1"), Some(&other_commit))),
+            ),
+            ("the commit alone", binary(COMMIT.to_owned())),
+        ];
+        for (case, desktop) in failing {
+            let problem = desktop_problem(&desktop, COMMIT);
+            assert!(
+                problem
+                    .as_deref()
+                    .is_some_and(|p| p.contains("RONGROI_OFFICIAL_BUILD=1")),
+                "{case}: {problem:?}"
+            );
+        }
     }
 
     #[test]

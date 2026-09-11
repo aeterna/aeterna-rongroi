@@ -11,6 +11,8 @@ use std::fmt::Write as _;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+include!("build_marker.rs");
+
 /// Build provenance shown in every report header and in the UI banner.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Provenance {
@@ -25,12 +27,16 @@ pub struct Provenance {
 }
 
 impl Provenance {
-    /// Provenance of the running binary.
+    /// Provenance of the running binary, read from the build marker `build.rs` embedded.
     pub fn current() -> Self {
+        // `black_box` keeps the marker text in the executable: `release-verify` searches the desktop app,
+        // which cannot run headless on the release runner, for it (ADR 0008).
+        let (official_flag, commit) =
+            parse_build_marker(std::hint::black_box(env!("RONGROI_BUILD_MARKER")));
         Self::from_parts(
-            option_env!("RONGROI_OFFICIAL_BUILD"),
+            official_flag,
             env!("CARGO_PKG_VERSION"),
-            option_env!("RONGROI_COMMIT"),
+            commit,
             exe_sha256(),
         )
     }
@@ -49,6 +55,24 @@ impl Provenance {
             exe_sha256,
         }
     }
+}
+
+/// The official flag and commit written into a build marker by [`build_marker`]. Empty values, and every
+/// part of a marker that does not have that shape, are `None`.
+fn parse_build_marker(marker: &str) -> (Option<&str>, Option<&str>) {
+    let Some((official_flag, commit)) = marker
+        .strip_prefix(BUILD_MARKER_PREFIX)
+        .and_then(|rest| rest.strip_prefix("official="))
+        .and_then(|rest| rest.strip_suffix(';'))
+        .and_then(|rest| rest.split_once(";commit="))
+    else {
+        return (None, None);
+    };
+    (non_empty(official_flag), non_empty(commit))
+}
+
+fn non_empty(value: &str) -> Option<&str> {
+    (!value.is_empty()).then_some(value)
 }
 
 /// SHA-256 of the running executable. Reading our own file is the only file access in this crate.
@@ -81,6 +105,39 @@ mod tests {
                 "{flag:?}"
             );
         }
+    }
+
+    #[test]
+    fn build_marker_round_trips() {
+        let commit = "0123456789abcdef0123456789abcdef01234567";
+        let marker = build_marker(Some("1"), Some(commit));
+        assert_eq!(
+            marker,
+            format!("aeterna-rongroi build marker: official=1;commit={commit};")
+        );
+        assert_eq!(parse_build_marker(&marker), (Some("1"), Some(commit)));
+        assert_eq!(parse_build_marker(&build_marker(None, None)), (None, None));
+        assert_eq!(
+            parse_build_marker(&build_marker(None, Some(commit))),
+            (None, Some(commit))
+        );
+    }
+
+    #[test]
+    fn a_malformed_marker_is_unofficial() {
+        for marker in [
+            "",
+            "official=1;commit=abc;",
+            "aeterna-rongroi build marker: official=1",
+            "aeterna-rongroi build marker: official=1;commit=abc",
+        ] {
+            assert_eq!(parse_build_marker(marker), (None, None), "{marker:?}");
+        }
+    }
+
+    #[test]
+    fn this_build_has_a_marker() {
+        assert!(env!("RONGROI_BUILD_MARKER").starts_with(BUILD_MARKER_PREFIX));
     }
 
     #[test]
