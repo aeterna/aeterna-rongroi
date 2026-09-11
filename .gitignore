@@ -7,3 +7,4 @@ apps/desktop/src-tauri/gen/
 .DS_Store
 *.pending-snap
 .env
+.claude/
