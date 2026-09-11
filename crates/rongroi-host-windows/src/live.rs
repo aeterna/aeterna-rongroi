@@ -63,40 +63,42 @@ impl Host for LiveHost {
     }
 
     fn is_elevated(&self) -> Option<bool> {
-        token_is_elevated()
+        has_admin_rights()
     }
 }
 
+/// Whether the Administrators group is *enabled* in this process's token.
+///
+/// `TokenElevation` is not enough: a restricted (SAFER) token derived from an elevated one still reports
+/// "elevated" while Administrators is deny-only, so the process cannot use admin rights. Checked on
+/// Windows 11 build 26220 with `runas /trustlevel:0x20000`. `CheckTokenMembership` ignores deny-only
+/// groups, so it is false both for UAC-filtered and for restricted tokens.
 #[allow(unsafe_code)]
-fn token_is_elevated() -> Option<bool> {
-    use windows::Win32::Foundation::{CloseHandle, HANDLE};
+fn has_admin_rights() -> Option<bool> {
     use windows::Win32::Security::{
-        GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation,
+        CheckTokenMembership, CreateWellKnownSid, PSID, WinBuiltinAdministratorsSid,
     };
-    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    use windows::core::BOOL;
 
-    let mut token = HANDLE::default();
-    // SAFETY: GetCurrentProcess returns a pseudo-handle that is always valid for this process, and
-    // `token` is a valid, writable out-pointer for the lifetime of the call.
-    unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &raw mut token) }.ok()?;
-
-    let mut elevation = TOKEN_ELEVATION::default();
-    let mut returned = 0_u32;
-    let size = u32::try_from(size_of::<TOKEN_ELEVATION>()).ok()?;
-    // SAFETY: `token` was opened with TOKEN_QUERY above; the buffer is a TOKEN_ELEVATION of exactly
-    // `size` bytes and `returned` is a valid out-pointer.
-    let queried = unsafe {
-        GetTokenInformation(
-            token,
-            TokenElevation,
-            Some((&raw mut elevation).cast()),
-            size,
-            &raw mut returned,
+    // SECURITY_MAX_SID_SIZE is 68 bytes; u32 words keep the SID's DWORD fields aligned.
+    let mut sid_buffer = [0_u32; 17];
+    let mut sid_size = u32::try_from(size_of_val(&sid_buffer)).ok()?;
+    let sid = PSID(sid_buffer.as_mut_ptr().cast());
+    // SAFETY: `sid` points to `sid_size` writable bytes that outlive the call, and `sid_size` is a valid
+    // in/out pointer.
+    unsafe {
+        CreateWellKnownSid(
+            WinBuiltinAdministratorsSid,
+            None,
+            Some(sid),
+            &raw mut sid_size,
         )
-    };
-    // SAFETY: `token` is a handle this function opened and closes exactly once.
-    let _ = unsafe { CloseHandle(token) };
+    }
+    .ok()?;
 
-    queried.ok()?;
-    Some(elevation.TokenIsElevated != 0)
+    let mut is_member = BOOL::default();
+    // SAFETY: `None` makes the function use this thread's effective token; `sid` was initialised above
+    // and `is_member` is a valid out-pointer.
+    unsafe { CheckTokenMembership(None, sid, &raw mut is_member) }.ok()?;
+    Some(is_member.as_bool())
 }

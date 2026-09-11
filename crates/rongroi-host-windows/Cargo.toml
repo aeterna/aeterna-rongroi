@@ -20,7 +20,6 @@ windows-registry.workspace = true
 windows = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_Security",
-  "Win32_System_Threading",
 ] }
 
 [lints]

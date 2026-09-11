@@ -63,7 +63,8 @@ pub trait Host: RegistrySource {
     fn platform(&self) -> Platform;
     /// Windows build number, when known.
     fn os_build(&self) -> Option<String>;
-    /// Whether the process has administrator rights, when known.
+    /// Whether the process can use administrator rights, when known. False when the Administrators group
+    /// is only deny-only in the token (UAC-filtered or restricted tokens).
     fn is_elevated(&self) -> Option<bool>;
 }
 
