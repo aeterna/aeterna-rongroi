@@ -43,10 +43,12 @@ Releases are not code-signed yet, so Windows SmartScreen will warn when you run 
 have the real file, open PowerShell in the download folder:
 
 ```powershell
-Get-FileHash .\aeterna-rongroi.exe
+Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
 ```
 
-Compare the hash with `SHA256SUMS` on the GitHub release page. Builds that did not come from the official
+This prints the hash of each aeterna-rongroi executable in the folder. Compare each hash with the line for the
+same file name in `SHA256SUMS` on the GitHub release page; upper or lower case does not matter. Files from older
+versions in the folder are not listed there. Builds that did not come from the official
 release pipeline show **UNOFFICIAL BUILD** in the window, in the CLI header and in every report.
 If you see that banner, or the hash does not match, do not rely on the result.
 

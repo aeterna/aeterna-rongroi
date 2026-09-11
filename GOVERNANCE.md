@@ -22,6 +22,24 @@ marker is set. While there is a single maintainer, releases are not code-signed.
 SignPath Foundation requires separate author, reviewer and approver roles, so it will be requested once a
 second maintainer can act as release approver.
 
+### How to release
+
+The design and its reasons are in [ADR 0008](docs/adr/0008-release-pipeline.md).
+
+Before the first release, enable **immutable releases** in the repository settings, and run a rehearsal
+(`vYYYY.MM.DD-X.Y.Z-rc.N`) as described in ADR 0008, including the desktop-app gate failure test.
+
+1. Open a pull request `chore(release): X.Y.Z`. It renames `## [Unreleased]` in `CHANGELOG.md` to
+   `## [X.Y.Z] - YYYY-MM-DD` and sets version `X.Y.Z` in `Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
+   and `apps/desktop/package.json`. Merge it when CI is green.
+2. Tag that commit on `main` with the date from the changelog heading and push the tag:
+   `git tag -a vYYYY.MM.DD-X.Y.Z -m "aeterna-rongroi X.Y.Z" <commit>`, then `git push origin vYYYY.MM.DD-X.Y.Z`.
+   A rehearsal uses `vYYYY.MM.DD-X.Y.Z-rc.N`.
+3. Wait for the `release` workflow. It creates a **draft** release with both executables, `SHA256SUMS`, the SBOMs
+   and the notes. It never publishes.
+4. Open the draft, read the notes and the file list, and publish it. With immutable releases enabled, a published
+   release cannot have its tag or files changed; a wrong file needs a new version.
+
 ## Becoming a maintainer
 
 Sustained, good-quality contributions in an area (rules, a language, a collector) lead to an invitation for

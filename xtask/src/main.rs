@@ -9,6 +9,10 @@ mod check_rules;
 mod check_unicode;
 mod new_locale;
 mod new_rule;
+mod release;
+mod release_check;
+mod release_notes;
+mod release_verify;
 
 use std::path::{Path, PathBuf};
 
@@ -41,6 +45,12 @@ enum Command {
         /// BCP 47 tag, e.g. `vi` or `pt-BR`.
         lang: String,
     },
+    /// Check a release tag against the version manifests and `CHANGELOG.md` (release workflow).
+    ReleaseCheck(release_check::Args),
+    /// Check the built release executables and write `SHA256SUMS` (release workflow).
+    ReleaseVerify(release_verify::Args),
+    /// Write the release notes for a tag (release workflow).
+    ReleaseNotes(release_notes::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -51,6 +61,9 @@ fn main() -> anyhow::Result<()> {
         Command::CheckUnicode => check_unicode::run(&root),
         Command::NewRule { collector, path } => new_rule::run(&root, &collector, &path),
         Command::NewLocale { lang } => new_locale::run(&root, &lang),
+        Command::ReleaseCheck(args) => release_check::run(&root, &args),
+        Command::ReleaseVerify(args) => release_verify::run(&args),
+        Command::ReleaseNotes(args) => release_notes::run(&root, &args),
     }
 }
 

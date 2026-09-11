@@ -5004,6 +5004,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "insta",
  "jiff",
  "rongroi-core",
  "serde",

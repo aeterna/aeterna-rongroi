@@ -39,10 +39,10 @@ Read in English: [README.md](README.md)
 ตอนนี้ release ยังไม่ได้เซ็นโค้ด Windows SmartScreen จะขึ้นเตือนตอนเปิด ให้เปิด PowerShell ในโฟลเดอร์ที่โหลดมา:
 
 ```powershell
-Get-FileHash .\aeterna-rongroi.exe
+Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
 ```
 
-เทียบค่า hash กับไฟล์ `SHA256SUMS` ในหน้า release บน GitHub · build ที่ไม่ได้มาจากระบบ release ทางการ
+คำสั่งนี้แสดง hash ของไฟล์ aeterna-rongroi ทุกไฟล์ในโฟลเดอร์ ให้เทียบแต่ละค่ากับบรรทัดที่มีชื่อไฟล์เดียวกันใน `SHA256SUMS` ในหน้า release บน GitHub (ตัวพิมพ์เล็กหรือใหญ่ไม่มีผล) ไฟล์ของเวอร์ชันเก่าที่อยู่ในโฟลเดอร์เดียวกันจะไม่มีในรายการนั้น · build ที่ไม่ได้มาจากระบบ release ทางการ
 จะขึ้นป้าย **UNOFFICIAL BUILD** ในหน้าต่าง ในหัว CLI และในทุกรายงาน ถ้าเห็นป้ายนี้หรือ hash ไม่ตรง
 อย่าเชื่อผลตรวจนั้น
 

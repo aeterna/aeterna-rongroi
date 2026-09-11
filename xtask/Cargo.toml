@@ -21,5 +21,8 @@ serde.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true, features = ["v4"] }
 
+[dev-dependencies]
+insta.workspace = true
+
 [lints]
 workspace = true

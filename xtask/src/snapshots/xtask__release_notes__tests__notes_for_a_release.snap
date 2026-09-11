@@ -1,0 +1,48 @@
+---
+source: xtask/src/release_notes.rs
+expression: "notes_for(\"v2026.09.06-0.1.0\")"
+---
+> **Pre-alpha.** aeterna-rongroi shows evidence for a person to judge. It never proves that a PC is clean.
+
+## Changes
+
+### Added
+- First release.
+
+## Downloads
+
+Windows 10 22H2 or Windows 11, x64. There is no installer: download a file and run it.
+
+| File | What it is | SHA-256 |
+|---|---|---|
+| `aeterna-rongroi-0.1.0-windows-x64.exe` | Desktop app (uses Microsoft WebView2) | `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` |
+| `aeterna-rongroi-cli-0.1.0-windows-x64.exe` | Command line (does not use WebView2) | `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` |
+
+`SHA256SUMS` lists the same hashes. The `.cdx.json` files are CycloneDX software bills of materials.
+
+## Rules bundle
+
+Rule format 1 · 1 rule(s) · SHA-256 `cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`. The report header of the program you run shows the same values.
+
+## Verify before you trust a result
+
+1. In PowerShell, in the download folder: `Get-FileHash .\aeterna-rongroi-0.1.0-windows-x64.exe` — the hash must match `SHA256SUMS`.
+2. With the GitHub CLI: `gh attestation verify aeterna-rongroi-0.1.0-windows-x64.exe --repo aeterna/aeterna-rongroi --signer-workflow aeterna/aeterna-rongroi/.github/workflows/release.yml`.
+3. The program shows version 0.1.0 and no **UNOFFICIAL BUILD** banner.
+
+If any of these checks fails, do not rely on the result.
+
+## Windows SmartScreen
+
+These files are not code-signed yet (see [GOVERNANCE.md](https://github.com/aeterna/aeterna-rongroi/blob/main/GOVERNANCE.md)), so Windows may warn before running them. Check the hash first.
+
+## ภาษาไทย
+
+- โหลดไฟล์ exe แล้วเปิดได้เลย ไม่ต้องติดตั้ง · รุ่น CLI ไม่ใช้ WebView2
+- ตรวจไฟล์ก่อนใช้: `Get-FileHash` ต้องตรงกับ `SHA256SUMS` และต้องไม่มีป้าย **UNOFFICIAL BUILD** — ถ้าไม่ตรง อย่าเชื่อผลตรวจนั้น
+- ไฟล์ยังไม่ได้เซ็นโค้ด Windows SmartScreen อาจขึ้นเตือนตอนเปิด
+- ผลตรวจเป็นหลักฐานประกอบให้คนตัดสิน ไม่ใช่คำตัดสินว่าเครื่องนี้โกงหรือไม่
+
+---
+
+Built from commit [`0123456`](https://github.com/aeterna/aeterna-rongroi/commit/0123456789abcdef0123456789abcdef01234567) by [this workflow run](https://github.com/aeterna/aeterna-rongroi/actions/runs/1).

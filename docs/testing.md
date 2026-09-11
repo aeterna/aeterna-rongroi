@@ -50,3 +50,5 @@ confirm it fails:
 | `check-unicode` | inserting U+200B into any file |
 | `reuse lint` | deleting a file's SPDX header |
 | unofficial-build banner | building without `RONGROI_OFFICIAL_BUILD` |
+| `release-check` | tagging with a date other than the changelog heading, or a version other than `apps/desktop/package.json` |
+| `release-verify` | building the CLI without `RONGROI_OFFICIAL_BUILD` or without `RONGROI_COMMIT`; building the desktop app without `RONGROI_COMMIT` (Windows, during the rehearsal) |
