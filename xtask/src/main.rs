@@ -9,6 +9,7 @@ mod check_rules;
 mod check_unicode;
 mod new_locale;
 mod new_rule;
+mod release;
 
 use std::path::{Path, PathBuf};
 
