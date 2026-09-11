@@ -11,6 +11,7 @@ mod new_locale;
 mod new_rule;
 mod release;
 mod release_check;
+mod release_verify;
 
 use std::path::{Path, PathBuf};
 
@@ -45,6 +46,8 @@ enum Command {
     },
     /// Check a release tag against the version manifests and `CHANGELOG.md` (release workflow).
     ReleaseCheck(release_check::Args),
+    /// Check the built release executables and write `SHA256SUMS` (release workflow).
+    ReleaseVerify(release_verify::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -56,6 +59,7 @@ fn main() -> anyhow::Result<()> {
         Command::NewRule { collector, path } => new_rule::run(&root, &collector, &path),
         Command::NewLocale { lang } => new_locale::run(&root, &lang),
         Command::ReleaseCheck(args) => release_check::run(&root, &args),
+        Command::ReleaseVerify(args) => release_verify::run(&args),
     }
 }
 
