@@ -5,6 +5,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Desktop app: the report header shows the program version, which the release notes ask people to check.
+
 ## [0.1.0] - 2026-09-11
 
 ### Added
