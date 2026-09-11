@@ -144,6 +144,9 @@ pub struct RuleTextOverride {
     /// Translated false-positive notes.
     #[serde(default)]
     pub falsepositives: Option<Vec<String>>,
+    /// Translated look-back note shown for `not_found` evidence.
+    #[serde(default)]
+    pub retention: Option<String>,
 }
 
 /// `language -> rule id -> translated text`.
@@ -158,6 +161,8 @@ pub struct RuleText {
     pub description: String,
     /// False-positive notes.
     pub falsepositives: Vec<String>,
+    /// How far back the source can see. Reports keep the English `retention`; this is for display.
+    pub retention: String,
 }
 
 /// A validation problem in the rules tree.
@@ -288,13 +293,13 @@ fn validate_translations(
             if !rule_ids.contains(id) {
                 report(format!("translation for unknown rule id `{id}`"));
             }
-            let empty_title = text.title.as_ref().is_some_and(|t| t.trim().is_empty());
-            let empty_description = text
-                .description
-                .as_ref()
-                .is_some_and(|t| t.trim().is_empty());
+            let empty = |field: Option<&str>| field.is_some_and(|t| t.trim().is_empty());
             let empty_fp = text.falsepositives.as_ref().is_some_and(Vec::is_empty);
-            if empty_title || empty_description || empty_fp {
+            if empty(text.title.as_deref())
+                || empty(text.description.as_deref())
+                || empty(text.retention.as_deref())
+                || empty_fp
+            {
                 report(format!(
                     "translation for `{id}` has an empty field; omit it to fall back to English"
                 ));
@@ -442,6 +447,24 @@ date: 2026-09-11
             problems
                 .iter()
                 .any(|p| p.message.contains("unknown rule id"))
+        );
+    }
+
+    #[test]
+    fn empty_translated_retention_is_rejected() {
+        let rules = [sourced("posture/boot/example/rule.yaml", VALID)];
+        let mut translations = Translations::new();
+        translations.entry("th".to_owned()).or_default().insert(
+            rules[0].rule.id.clone(),
+            RuleTextOverride {
+                retention: Some("  ".to_owned()),
+                ..RuleTextOverride::default()
+            },
+        );
+        let problems = validate(&rules, &translations);
+        assert!(
+            problems.iter().any(|p| p.message.contains("empty field")),
+            "{problems:?}"
         );
     }
 

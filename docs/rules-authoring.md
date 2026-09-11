@@ -63,11 +63,15 @@ each kind.
 
 ## Translations
 
-Add the rule's text to `rules/i18n/<lang>.yaml`, keyed by id. Any field you leave out is shown in English.
+Add the rule's text to `rules/i18n/<lang>.yaml`, keyed by id. Translatable fields: `title`, `description`,
+`falsepositives` and `retention`. Any field you leave out is shown in English; an empty field is an error.
+Report JSON always keeps the English `retention`, so a report reads the same whatever language produced it —
+translations are applied only when the report is displayed.
 
 ```yaml
 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7:
   title: Secure Boot ถูกปิดอยู่
+  retention: เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
 ```
 
 ## Check

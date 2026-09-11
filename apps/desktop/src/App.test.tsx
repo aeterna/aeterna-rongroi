@@ -24,9 +24,13 @@ function snapshot(name: string): ReportView {
 }
 
 const RULE_ID = "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7";
+const ENGLISH_RETENTION =
+  "Current setting only. It says nothing about how the PC was configured in the past.";
+const THAI_RETENTION = "เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร";
 const selfView = snapshot("secure_boot_off_self_view");
 const ssView = snapshot("secure_boot_off_ss_view");
 let calls: string[] = [];
+let viewOverride: ReportView | null = null;
 
 beforeAll(async () => {
   await initI18n("en");
@@ -34,6 +38,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   calls = [];
+  viewOverride = null;
   await i18n.changeLanguage("en");
   mockIPC((cmd, args) => {
     calls.push(cmd);
@@ -42,13 +47,14 @@ beforeEach(async () => {
       case "report_header":
         return selfView.header;
       case "report_view":
-        return payload.mode === "ss" ? ssView : selfView;
+        return viewOverride ?? (payload.mode === "ss" ? ssView : selfView);
       case "rule_texts":
         return {
           [RULE_ID]: {
             title: payload.lang === "th" ? "Secure Boot ถูกปิดอยู่" : "Secure Boot is turned off",
             description: "",
             falsepositives: [],
+            retention: payload.lang === "th" ? THAI_RETENTION : ENGLISH_RETENTION,
           },
         };
       default:
@@ -104,5 +110,31 @@ describe("App", () => {
     fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
     expect(await screen.findByText("ตรวจ: Secure Boot ถูกปิดอยู่")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain("UNOFFICIAL BUILD");
+  });
+
+  it("shows the look-back note of not-found evidence in the chosen language", async () => {
+    const first = selfView.evidence[0];
+    if (!first) {
+      throw new Error("the self-view snapshot has no evidence");
+    }
+    viewOverride = {
+      ...selfView,
+      evidence: [
+        {
+          rule_id: first.rule_id,
+          collector: first.collector,
+          strength: first.strength,
+          state: "not_found",
+          retention: ENGLISH_RETENTION,
+        },
+      ],
+    };
+    render(<App />);
+    await act(async () => {
+      await i18n.changeLanguage("th");
+    });
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(await screen.findByText(`ย้อนดูได้: ${THAI_RETENTION}`)).toBeTruthy();
+    expect(screen.queryByText(ENGLISH_RETENTION, { exact: false })).toBeNull();
   });
 });

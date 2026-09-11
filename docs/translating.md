@@ -8,7 +8,7 @@ is useful from day one.
 | Text | Files | License |
 |---|---|---|
 | App interface (buttons, consent screen, labels) | `apps/desktop/src/locales/<lang>/*.json` | GPL-3.0-or-later |
-| Rule titles, descriptions, false-positive notes | `rules/i18n/<lang>.yaml`, keyed by rule id | CC-BY-SA-4.0 |
+| Rule `title`, `description`, `falsepositives`, `retention` (look-back note) | `rules/i18n/<lang>.yaml`, keyed by rule id | CC-BY-SA-4.0 |
 
 ## Add a language
 

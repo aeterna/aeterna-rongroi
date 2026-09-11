@@ -92,7 +92,8 @@ function EvidenceRow({ item, text }: { item: Evidence; text: RuleText | undefine
         .join(", ");
       break;
     case "not_found":
-      detail = `${t("retention")}: ${item.retention}`;
+      // The report keeps the English source text; the rule text carries the translation.
+      detail = `${t("retention")}: ${text?.retention ?? item.retention}`;
       break;
     case "unmeasured":
       detail = t(`reason.${item.reason}`);

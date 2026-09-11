@@ -49,6 +49,7 @@ pub fn run(root: &Path, lang: &str) -> anyhow::Result<()> {
 # SPDX-License-Identifier: CC-BY-SA-4.0
 # Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 # Rule text in `{lang}`, keyed by rule id. Anything omitted falls back to English. See rules/i18n/th.yaml.
+# Translatable fields: title, description, falsepositives, retention.
 "
             ),
         )?;

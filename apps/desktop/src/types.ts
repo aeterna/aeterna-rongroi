@@ -63,4 +63,6 @@ export interface RuleText {
   title: string;
   description: string;
   falsepositives: string[];
+  /** Look-back note for `not_found`, translated. Evidence keeps the English source. */
+  retention: string;
 }

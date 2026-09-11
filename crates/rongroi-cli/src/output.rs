@@ -148,9 +148,10 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         Lang::Th => "ตรวจ",
     };
     for evidence in &view.evidence {
-        let title = bundle
-            .text(&evidence.rule_id, lang.code())
-            .map_or_else(|| evidence.rule_id.clone(), |t| t.title);
+        let rule_text = bundle.text(&evidence.rule_id, lang.code());
+        let title = rule_text
+            .as_ref()
+            .map_or_else(|| evidence.rule_id.clone(), |t| t.title.clone());
         let (label, detail) = match &evidence.state {
             EvidenceState::Found { observations } => {
                 let fields = observations
@@ -160,7 +161,11 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
                     .join(", ");
                 (text(lang, "found"), fields)
             }
-            EvidenceState::NotFound { retention } => (text(lang, "not_found"), retention.clone()),
+            // The report keeps the English source text; the rule text carries the translation.
+            EvidenceState::NotFound { retention } => (
+                text(lang, "not_found"),
+                rule_text.map_or_else(|| retention.clone(), |t| t.retention),
+            ),
             EvidenceState::Unmeasured { reason: why } => {
                 (text(lang, "unmeasured"), reason(lang, *why).to_owned())
             }
@@ -271,5 +276,22 @@ mod tests {
         assert!(text.contains("Secure Boot ถูกปิดอยู่"), "{text}");
         assert!(text.contains("ซ่อนในโหมด SS"), "{text}");
         assert!(text.contains("พิสูจน์ไม่ได้ว่าเครื่องสะอาด"), "{text}");
+    }
+
+    #[test]
+    fn not_found_retention_is_shown_in_the_chosen_language() {
+        let (mut report, bundle) = report(false);
+        let english = bundle.rules()[0].rule.retention.clone();
+        report.evidence[0].state = EvidenceState::NotFound {
+            retention: english.clone(),
+        };
+        let view = view::for_mode(&report, Mode::SelfCheck);
+
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(thai.contains("เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น"), "{thai}");
+        assert!(!thai.contains(&english), "{thai}");
+
+        let text = render(&view, &bundle, Lang::En);
+        assert!(text.contains(&english), "{text}");
     }
 }

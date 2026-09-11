@@ -158,6 +158,9 @@ impl Bundle {
             falsepositives: translated
                 .and_then(|t| t.falsepositives.clone())
                 .unwrap_or_else(|| rule.falsepositives.clone()),
+            retention: translated
+                .and_then(|t| t.retention.clone())
+                .unwrap_or_else(|| rule.retention.clone()),
         })
     }
 }
@@ -204,6 +207,19 @@ mod tests {
             .text("7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7", "vi")
             .unwrap();
         assert_eq!(english.title, "English title");
+    }
+
+    #[test]
+    fn retention_falls_back_to_english_when_not_translated() {
+        let id = "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7";
+        let translated =
+            Bundle::from_bundle_json(&bundle_json(&format!("{id}:\n  retention: ตอนนี้\n"))).unwrap();
+        assert_eq!(translated.text(id, "th").unwrap().retention, "ตอนนี้");
+        assert_eq!(translated.text(id, "vi").unwrap().retention, "Now.");
+
+        let title_only =
+            Bundle::from_bundle_json(&bundle_json(&format!("{id}:\n  title: หัวข้อ\n"))).unwrap();
+        assert_eq!(title_only.text(id, "th").unwrap().retention, "Now.");
     }
 
     #[test]
