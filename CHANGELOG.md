@@ -11,3 +11,4 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Secure Boot posture collector with Live and Fixture hosts.
 - CLI with Self and SS modes, and an unofficial-build banner.
 - Desktop app shell (Tauri 2) with consent screen and English / Thai.
+- Release workflow: official Windows executables with `SHA256SUMS`, SBOMs and build attestations in a draft GitHub release (ADR 0008).
