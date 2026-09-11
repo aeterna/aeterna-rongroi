@@ -22,7 +22,8 @@ Anything that reads a real Windows machine is exercised in the Windows CI job.
 | A language | `cargo xtask new-locale <bcp47>` (e.g. `vi`, `pt-BR`) | Translate the generated files; missing keys fall back to English |
 | A collector | `cargo xtask new-collector <id>` (from M1) | Implement the `Collector` trait; write an ADR if it reads a new kind of source |
 
-Each one is a single pull request.
+Each one is a single pull request. Branch from `dev` and open the pull request against `dev`, the default
+branch; `main` only receives release pull requests (CONVENTIONS.md, section 7).
 
 ## Before you open a pull request
 
