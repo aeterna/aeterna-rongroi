@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-11
+
 ### Added
 - Repository foundation: licenses, NOTICE with GPL section 7 terms, AGENTS.md, CONVENTIONS.md, policies.
 - Rule format v1, rules bundle embedded in the executable, evidence engine with Found / NotFound / Unmeasured.
