@@ -81,8 +81,14 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 - Conventional Commits for PR titles: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `rules`, `i18n`, `ci`.
 - Scope is the crate or area: `feat(collectors): …`, `rules(posture): …`, `i18n(th): …`.
-- Branch names: `<type>/<short-description>`.
-- One concern per PR; squash-merged.
+- Permanent branches: `main` holds released code and carries the release tags; `dev` is where work is
+  integrated and is the default branch.
+- Work branches are named `<type>/<short-description>`, start from `dev`, and return to `dev` through a pull
+  request that is squash-merged. One concern per PR.
+- `dev` reaches `main` only through a release pull request from `dev` to `main`, merged with a merge commit
+  (GOVERNANCE.md, "How to release").
+- Repository rulesets enforce this: `main` and `dev` accept changes only through pull requests with the
+  required checks green, and cannot be deleted or force-pushed.
 
 ## 8. Docs and comments
 

@@ -34,13 +34,14 @@ Considered and rejected:
 
 ### How a release is made
 
-1. A pull request titled `chore(release): X.Y.Z` renames `## [Unreleased]` in `CHANGELOG.md` to
+1. A pull request titled `chore(release): X.Y.Z` into `dev` renames `## [Unreleased]` in `CHANGELOG.md` to
    `## [X.Y.Z] - YYYY-MM-DD` and bumps the version wherever it is not already `X.Y.Z` (workspace `Cargo.toml`,
    `apps/desktop/src-tauri/tauri.conf.json`, `apps/desktop/package.json`).
-2. After it merges, a maintainer pushes the tag `vYYYY.MM.DD-X.Y.Z` on that `main` commit, where `YYYY.MM.DD` is
-   the date in the changelog heading (for example `v2026.09.06-0.1.0`).
-3. `.github/workflows/release.yml` builds, checks and attests the files and creates a **draft** release.
-4. A maintainer reviews the draft and publishes it. The workflow never publishes.
+2. A release pull request from `dev` to `main` is merged with a merge commit (CONVENTIONS.md, section 7).
+3. A maintainer pushes the tag `vYYYY.MM.DD-X.Y.Z` on that merge commit on `main`, where `YYYY.MM.DD` is the date
+   in the changelog heading (for example `v2026.09.06-0.1.0`).
+4. `.github/workflows/release.yml` builds, checks and attests the files and creates a **draft** release.
+5. A maintainer reviews the draft and publishes it. The workflow never publishes.
 
 Immutable releases are enabled for the repository before the first tag: once published, the tag and the files
 cannot be changed or deleted (the title and notes still can). A mistake in a published file is fixed with a new
