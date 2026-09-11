@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+[package]
+name = "rongroi-cli"
+description = "aeterna-rongroi command-line scanner (no WebView)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "aeterna-rongroi-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+jiff.workspace = true
+serde_json.workspace = true
+rongroi-collectors.workspace = true
+rongroi-core.workspace = true
+rongroi-host.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+rongroi-host-windows.workspace = true
+
+[lints]
+workspace = true

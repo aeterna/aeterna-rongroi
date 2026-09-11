@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Missed evidence (false negative)
+description: A known cheat leaves traces that no rule shows.
+labels: ["type: false negative", "area: rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe **what traces** exist (files, registry values, log events) so a rule can look for them.
+        Do not attach cheat binaries or links to download them. If the cheat *avoids* an existing rule,
+        report it privately instead — see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+    validations:
+      required: true
+  - type: textarea
+    id: traces
+    attributes:
+      label: Which traces does it leave?
+      description: Artifact type and what is visible there. Hashes are welcome; binaries are not.
+    validations:
+      required: true
+  - type: textarea
+    id: legitimate
+    attributes:
+      label: Could legitimate software leave the same traces?
+    validations:
+      required: true

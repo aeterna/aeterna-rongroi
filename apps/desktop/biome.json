@@ -1,0 +1,29 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "files": {
+    "includes": ["src/**", "*.ts", "*.json", "!src-tauri", "!dist", "!node_modules"]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noRestrictedGlobals": {
+          "level": "error",
+          "options": {
+            "deniedGlobals": {
+              "fetch": "aeterna-rongroi has no network code (ADR 0003).",
+              "XMLHttpRequest": "aeterna-rongroi has no network code (ADR 0003).",
+              "WebSocket": "aeterna-rongroi has no network code (ADR 0003).",
+              "EventSource": "aeterna-rongroi has no network code (ADR 0003)."
+            }
+          }
+        }
+      }
+    }
+  }
+}

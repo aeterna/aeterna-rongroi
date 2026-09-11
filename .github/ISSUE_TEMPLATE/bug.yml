@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Bug
+description: The program crashes, shows something wrong, or behaves unexpectedly.
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A rule flagging legitimate software is a **false positive** — use that form instead.
+        A way around a detection is a **security report** — see SECURITY.md, not a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: Version and build
+      description: First lines of the CLI output or the About panel (version, official or UNOFFICIAL BUILD).
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and build
+      placeholder: Windows 11 24H2, build 26100
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true

@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# LF everywhere: the rules bundle hash must be identical on Windows, macOS and Linux checkouts.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.evtx binary
+*.pf binary

@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+[package]
+name = "rongroi-desktop"
+description = "aeterna-rongroi desktop app (Tauri 2)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "aeterna-rongroi"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+jiff.workspace = true
+rongroi-collectors.workspace = true
+rongroi-core.workspace = true
+rongroi-host.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2.11.5", features = [] }
+
+[target.'cfg(windows)'.dependencies]
+rongroi-host-windows.workspace = true
+
+[lints]
+workspace = true

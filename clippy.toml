@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+
+# Offline by design (AGENTS.md hard rule 1). cargo-deny bans network crates; this bans the standard library's.
+disallowed-types = [
+  { path = "std::net::TcpStream", reason = "aeterna-rongroi has no network code" },
+  { path = "std::net::TcpListener", reason = "aeterna-rongroi has no network code" },
+  { path = "std::net::UdpSocket", reason = "aeterna-rongroi has no network code" },
+]

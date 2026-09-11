@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: New rule idea
+description: Propose evidence the tool should show.
+labels: ["type: rule", "area: rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ready to write it yourself? `cargo xtask new-rule <collector> <category>/<slug>` — see docs/rules-authoring.md.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What should be shown, and what can it show? (execution, presence, tamper, posture, context)
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Which artifact or collector does it read?
+    validations:
+      required: true
+  - type: textarea
+    id: falsepositives
+    attributes:
+      label: What legitimate software or settings produce the same evidence?
+    validations:
+      required: true

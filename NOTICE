@@ -1,0 +1,42 @@
+aeterna-rongroi
+Copyright (C) 2026 aeterna-rongroi contributors
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. See LICENSES/GPL-3.0-or-later.txt.
+
+Detection rules, rule translations and rule test fixtures under rules/ are licensed under the Creative
+Commons Attribution-ShareAlike 4.0 International license. See LICENSES/CC-BY-SA-4.0.txt.
+
+Per-file licensing is declared with SPDX headers and REUSE.toml (https://reuse.software).
+
+-------------------------------------------------------------------------------------------------------
+ADDITIONAL TERMS UNDER SECTION 7 OF THE GNU GPL VERSION 3
+-------------------------------------------------------------------------------------------------------
+
+The copyright holders of the material in this repository add the following terms, as permitted by
+section 7 of the GNU General Public License version 3:
+
+(b) Preservation of notices. You must preserve this NOTICE file, the SPDX headers of each file, and
+    the author attributions in the Appropriate Legal Notices displayed by the program (the "About" and
+    report-header information), in all copies and modified versions.
+
+(c) Marking of modified versions. Modified versions must be marked in reasonable ways as different
+    from the original version. At minimum, a modified version must not present itself as an official
+    aeterna-rongroi build: it must not set the official-build marker used by the upstream release
+    process, and it must keep the "UNOFFICIAL BUILD" indication shown by the program. You may not
+    misrepresent the origin of this material.
+
+(e) Trade names. No rights are granted under trademark law for use of the names "aeterna-rongroi" or
+    "rongroi" to identify a modified version. Distribute modified versions under a different name.
+
+These terms do not restrict how you may use the program. The GPL does not allow such restrictions, and
+this project does not attempt to impose them.
+
+-------------------------------------------------------------------------------------------------------
+INTENDED USE (informational — not a license term)
+-------------------------------------------------------------------------------------------------------
+
+aeterna-rongroi exists to help players and server staff look at evidence of cheating on a PC, with the
+player's consent. The maintainers do not accept contributions that make cheats harder to detect, clean
+or forge traces, or produce misleading reports. See AGENTS.md and SECURITY.md.

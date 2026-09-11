@@ -1,0 +1,7 @@
+{
+  "description": "Windows reports Secure Boot off",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "disabled" } }
+  ],
+  "expect_matches": 1
+}

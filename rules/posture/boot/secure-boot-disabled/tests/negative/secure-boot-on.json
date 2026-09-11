@@ -1,0 +1,6 @@
+{
+  "description": "Windows reports Secure Boot on",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled" } }
+  ]
+}

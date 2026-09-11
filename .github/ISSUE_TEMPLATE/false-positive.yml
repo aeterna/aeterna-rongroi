@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: False positive
+description: A rule shows evidence that comes from legitimate software or settings.
+labels: ["type: false positive", "area: rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you — false positives matter most in a tool people use to judge each other.
+        Please share an **SS-mode export** (user names are already redacted). Do not post other personal data.
+  - type: input
+    id: version
+    attributes:
+      label: Version, and official or UNOFFICIAL BUILD
+    validations:
+      required: true
+  - type: input
+    id: exe-hash
+    attributes:
+      label: Executable SHA-256
+      description: "`Get-FileHash .\\aeterna-rongroi.exe` or the `exe sha256` line of the CLI."
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: Rule id and title
+    validations:
+      required: true
+  - type: textarea
+    id: software
+    attributes:
+      label: Which legitimate software or setting produces it?
+      description: Name, version, where it came from. If you know the file's SHA-256 or signer, include it.
+    validations:
+      required: true
+  - type: textarea
+    id: export
+    attributes:
+      label: SS-mode export
+      render: json

@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# Builds and exercises the Windows-only code against a real Windows machine (docs/testing.md, L5).
+# Note: GitHub Windows runners run as administrator with UAC off and disable SysMain/PcaSvc.
+
+name: windows
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: rust (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the toolchain pinned in rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
+        with:
+          tool: cargo-nextest
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: apps/desktop/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: Install desktop UI dependencies
+        run: pnpm -C apps/desktop install --frozen-lockfile
+      - name: Clippy (Windows code paths)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo nextest run --workspace --locked --profile ci
+      - name: Build the desktop app (unofficial build, no installer)
+        run: pnpm -C apps/desktop tauri build --no-bundle
+      - name: Live smoke — the CLI reads this machine
+        shell: pwsh
+        run: |
+          $before = reg query "HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State" 2>&1 | Out-String
+          cargo run --locked --quiet -p rongroi-cli -- scan --json | Out-File -Encoding utf8 report.json
+          $after = reg query "HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State" 2>&1 | Out-String
+          $report = Get-Content report.json -Raw | ConvertFrom-Json
+          if ($report.header.platform -ne 'windows') { throw "expected platform windows, got '$($report.header.platform)'" }
+          if ($report.header.provenance.official) { throw 'a CI build must never report itself as official' }
+          $posture = @($report.evidence | Where-Object { $_.collector -eq 'posture' })
+          if ($posture.Count -eq 0) { throw 'posture evidence is missing' }
+          foreach ($item in $posture) {
+            if ($item.state -eq 'unmeasured' -and $item.reason -in @('not_windows', 'collector_unavailable')) {
+              throw "posture was not measured on Windows: $($item.reason)"
+            }
+          }
+          if ($before -ne $after) { throw 'the scanned registry key changed during the scan' }
+          Write-Output "build $($report.header.os_build) · elevated $($report.header.elevated)"
+          $posture | ForEach-Object { Write-Output "posture: $($_.state) $($_.reason)" }

@@ -1,0 +1,39 @@
+{
+  "header": {
+    "mode_self": "ตรวจเครื่องตัวเอง",
+    "mode_ss": "โหมด SS",
+    "platform": "ระบบ",
+    "rights": "สิทธิ์",
+    "elevated_yes": "ผู้ดูแลระบบ",
+    "elevated_no": "ผู้ใช้ทั่วไป",
+    "elevated_unknown": "ไม่ทราบ",
+    "rules": "Rule",
+    "exe_sha256": "SHA-256 ของโปรแกรม"
+  },
+  "state": {
+    "found": "เจอ",
+    "not_found": "ไม่เจอ",
+    "unmeasured": "ยังไม่ได้วัด"
+  },
+  "check": "ตรวจ",
+  "strength": {
+    "execution": "การรันโปรแกรม",
+    "presence": "มีไฟล์อยู่",
+    "tamper": "ร่องรอยถูกล้าง",
+    "posture": "สถานะเครื่อง",
+    "context": "ข้อมูลประกอบ"
+  },
+  "reason": {
+    "not_windows": "ไม่ได้รันบน Windows",
+    "not_on_this_os": "ไม่มีใน Windows รุ่นนี้",
+    "not_admin": "ต้องใช้สิทธิ์ผู้ดูแลระบบ",
+    "access_denied": "Windows ไม่อนุญาตให้อ่าน",
+    "service_disabled": "บริการของ Windows ที่บันทึกข้อมูลนี้ถูกปิด",
+    "source_missing": "เครื่องนี้ไม่ได้รายงานข้อมูลนี้",
+    "read_failed": "อ่านข้อมูลไม่ได้",
+    "collector_unavailable": "build นี้ยังไม่รองรับ"
+  },
+  "retention": "ย้อนดูได้",
+  "hidden": "ซ่อนในโหมด SS: ไม่เจอ {{notFound}} · ยังไม่ได้วัด {{unmeasured}}",
+  "empty": "ไม่มีหลักฐานให้แสดง"
+}

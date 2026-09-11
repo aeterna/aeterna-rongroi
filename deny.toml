@@ -1,0 +1,78 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# cargo-deny configuration. The [bans] list enforces AGENTS.md hard rule 1 (no network code); see ADR 0003.
+
+[graph]
+# Desktop targets only: Tauri pulls an HTTP client only for mobile targets, which we do not build.
+targets = [
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+# Only "unmaintained" notices, all pulled in by Tauri with no upgrade available. Revisit on every Tauri update.
+ignore = [
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error: build-time macro via glib-macros → gtk, Linux desktop target only; we ship Windows builds" },
+  { id = "RUSTSEC-2025-0075", reason = "unic-char-range: via urlpattern → tauri-utils; no maintained replacement upstream yet" },
+  { id = "RUSTSEC-2025-0080", reason = "unic-common: via urlpattern → tauri-utils; no maintained replacement upstream yet" },
+  { id = "RUSTSEC-2025-0081", reason = "unic-char-property: via urlpattern → tauri-utils; no maintained replacement upstream yet" },
+  { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version: via urlpattern → tauri-utils; no maintained replacement upstream yet" },
+  { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident: via urlpattern → tauri-utils; no maintained replacement upstream yet" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+# The allow-list is the set we accept, not the set we currently use (the desktop app adds more).
+unused-allowed-license = "allow"
+# Licenses compatible with distributing the whole program under GPL-3.0-or-later.
+allow = [
+  "0BSD",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "CC0-1.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+
+[licenses.private]
+# Our own crates are `publish = false` and licensed GPL-3.0-or-later.
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+deny = [
+  { crate = "reqwest", reason = "offline-only: no HTTP clients (ADR 0003)" },
+  { crate = "hyper", reason = "offline-only: no HTTP stacks (ADR 0003)" },
+  { crate = "ureq", reason = "offline-only: no HTTP clients (ADR 0003)" },
+  { crate = "isahc", reason = "offline-only: no HTTP clients (ADR 0003)" },
+  { crate = "attohttpc", reason = "offline-only: no HTTP clients (ADR 0003)" },
+  { crate = "curl", reason = "offline-only: no HTTP clients (ADR 0003)" },
+  { crate = "surf", reason = "offline-only: no HTTP clients (ADR 0003)" },
+  { crate = "h2", reason = "offline-only: no HTTP/2 (ADR 0003)" },
+  { crate = "quinn", reason = "offline-only: no QUIC (ADR 0003)" },
+  { crate = "tungstenite", reason = "offline-only: no WebSockets (ADR 0003)" },
+  { crate = "tokio-tungstenite", reason = "offline-only: no WebSockets (ADR 0003)" },
+  { crate = "tauri-plugin-http", reason = "offline-only (ADR 0003)" },
+  { crate = "tauri-plugin-updater", reason = "no auto-update; users download releases (ADR 0003)" },
+  { crate = "tauri-plugin-websocket", reason = "offline-only (ADR 0003)" },
+  { crate = "tauri-plugin-upload", reason = "offline-only (ADR 0003)" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

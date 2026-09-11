@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# Platform-independent checks. Windows-only code is built and exercised in windows.yml.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: rust (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the toolchain pinned in rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
+        with:
+          tool: cargo-nextest,cargo-deny,cargo-insta,typos
+      - name: Format
+        run: cargo fmt --all --check
+      # No `--workspace`: default-members exclude the desktop app, which needs webkit2gtk on Linux.
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+      # `cargo insta test` has no `--locked`; the Clippy step above already fails on a stale Cargo.lock.
+      - name: Tests and snapshots (stale snapshots fail)
+        run: cargo insta test --unreferenced reject --test-runner nextest
+      - name: Rules and fixtures
+        run: cargo xtask check-rules
+      - name: Locales
+        run: cargo xtask check-locales
+      - name: No invisible or bidi characters
+        run: cargo xtask check-unicode
+      - name: No network crates, licenses, advisories, sources
+        run: cargo deny check
+      - name: Typos
+        run: typos
+
+  desktop-ui:
+    name: desktop UI (ubuntu)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: apps/desktop/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Types
+        run: pnpm typecheck
+      - name: Lint and format (Biome; bans network globals)
+        run: pnpm lint
+      - name: UI tests against the Rust report snapshots
+        run: pnpm test
+
+  reuse:
+    name: licensing headers (REUSE)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: New language
+description: Offer or request a translation.
+labels: ["type: i18n"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Translating yourself? `cargo xtask new-locale <bcp47>` — see docs/translating.md. A partial translation is welcome.
+  - type: input
+    id: language
+    attributes:
+      label: Language and BCP 47 tag
+      placeholder: Vietnamese (vi)
+    validations:
+      required: true
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who will translate?
+      options:
+        - I will open a pull request
+        - I am requesting it
+    validations:
+      required: true

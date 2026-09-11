@@ -1,0 +1,39 @@
+{
+  "header": {
+    "mode_self": "Self check",
+    "mode_ss": "SS mode",
+    "platform": "Platform",
+    "rights": "Rights",
+    "elevated_yes": "administrator",
+    "elevated_no": "standard user",
+    "elevated_unknown": "unknown",
+    "rules": "Rules",
+    "exe_sha256": "Executable SHA-256"
+  },
+  "state": {
+    "found": "Found",
+    "not_found": "Not found",
+    "unmeasured": "Not measured"
+  },
+  "check": "Check",
+  "strength": {
+    "execution": "execution",
+    "presence": "presence",
+    "tamper": "tamper",
+    "posture": "posture",
+    "context": "context"
+  },
+  "reason": {
+    "not_windows": "not running on Windows",
+    "not_on_this_os": "not available on this Windows version",
+    "not_admin": "needs administrator rights",
+    "access_denied": "Windows denied access",
+    "service_disabled": "the Windows service that records this is off",
+    "source_missing": "not reported on this PC",
+    "read_failed": "could not be read",
+    "collector_unavailable": "not supported by this build"
+  },
+  "retention": "Look-back",
+  "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasured}} not measured",
+  "empty": "No evidence to show."
+}

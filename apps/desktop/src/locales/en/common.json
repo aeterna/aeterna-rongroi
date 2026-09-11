@@ -1,0 +1,41 @@
+{
+  "app": {
+    "name": "aeterna-rongroi",
+    "tagline": "Offline PC check for FiveM communities. Shows evidence — never says a PC is clean."
+  },
+  "language": {
+    "label": "Language"
+  },
+  "start": {
+    "title": "What do you want to do?",
+    "self_button": "Check my own PC",
+    "self_hint": "See everything, only on this screen.",
+    "ss_button": "Screenshare check (SS mode)",
+    "ss_hint": "For staff watching your screen. Asks for your consent first and shows only what matches a rule.",
+    "scan_note": "The scan ran on this PC when the program started, before this window opened, so the window cannot change the results. Nothing is shown or saved until you choose."
+  },
+  "consent": {
+    "title": "Before you share your screen",
+    "reads": "This check reads machine security settings on this PC.",
+    "shows": "Staff will see only what matches a rule. Your user name is hidden in file paths.",
+    "sends": "aeterna-rongroi's own code sends nothing anywhere.",
+    "webview": "This window uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The CLI version does not use WebView2.",
+    "refuse_ok": "You may refuse.",
+    "agree": "I agree — show the SS view",
+    "refuse": "I refuse"
+  },
+  "declined": {
+    "title": "Nothing was shown",
+    "body": "You refused. No results were shown or saved. You can close this window."
+  },
+  "banner": {
+    "unofficial": "UNOFFICIAL BUILD",
+    "unofficial_body": "This program was not built by the aeterna-rongroi release workflow. Do not rely on its results."
+  },
+  "footer": {
+    "evidence_only": "Evidence only. This report cannot prove that a PC is clean."
+  },
+  "actions": {
+    "back": "Back"
+  }
+}

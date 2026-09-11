@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# One maintainer for now. Add rule and translation reviewers here when those roles are filled (GOVERNANCE.md).
+
+*                                   @tanakon8529
+
+# Files that define what the project promises. Keep these owned by core maintainers only.
+/NOTICE                             @tanakon8529
+/AGENTS.md                          @tanakon8529
+/deny.toml                          @tanakon8529
+/clippy.toml                        @tanakon8529
+/.github/                           @tanakon8529
+/rules/                             @tanakon8529

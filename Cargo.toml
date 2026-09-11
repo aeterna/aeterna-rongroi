@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask", "apps/desktop/src-tauri"]
+# The desktop app needs webkit2gtk to build on Linux; plain `cargo` commands skip it, `--workspace` includes it.
+default-members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/aeterna/aeterna-rongroi"
+publish = false
+
+[workspace.dependencies]
+rongroi-core = { path = "crates/rongroi-core" }
+rongroi-host = { path = "crates/rongroi-host" }
+rongroi-host-windows = { path = "crates/rongroi-host-windows" }
+rongroi-collectors = { path = "crates/rongroi-collectors" }
+
+anyhow = "1.0.104"
+clap = { version = "4.6", features = ["derive"] }
+insta = { version = "1.48", features = ["json", "redactions"] }
+jiff = "0.2.35"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.151"
+serde-saphyr = "1.2"
+sha2 = "0.11"
+thiserror = "2.0.20"
+uuid = "1.26"
+windows = "0.62"
+windows-registry = "0.100"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+module_name_repetitions = "allow"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+undocumented_unsafe_blocks = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# Thai rule text, keyed by rule id. Anything omitted falls back to the English text in rule.yaml.
+
+7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7:
+  title: Secure Boot ถูกปิดอยู่
+  description: >-
+    Windows รายงานว่า UEFI Secure Boot ปิดอยู่ Secure Boot อนุญาตให้เฉพาะ boot loader และ driver
+    ช่วงเริ่มระบบที่มีลายเซ็นเท่านั้นทำงาน เมื่อปิดไว้ ซอฟต์แวร์ระดับล่างที่ไม่มีลายเซ็นจะโหลดได้ง่ายขึ้น
+    เครื่องทั่วไปจำนวนมากก็ปิดไว้ ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
+  falsepositives:
+    - เครื่องที่บูตแบบ legacy BIOS หรือ CSM หรือไม่เคยเปิด Secure Boot มาก่อน
+    - เครื่องที่ติดตั้งหลายระบบปฏิบัติการซึ่งต้องปิด Secure Boot
+    - เจ้าของเครื่องปิดเองเพื่อใช้กับอุปกรณ์ เครื่องมือ virtualisation หรือการโอเวอร์คล็อก

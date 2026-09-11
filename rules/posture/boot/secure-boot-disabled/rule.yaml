@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7
+title: Secure Boot is turned off
+description: >-
+  Windows reports that UEFI Secure Boot is off. Secure Boot only lets signed boot loaders and early
+  drivers start; with it off, unsigned low-level software is easier to load. Many ordinary PCs run
+  with it off, so on its own this describes the machine — it is not evidence of cheating.
+status: test
+collector: posture
+strength: posture
+match:
+  secure_boot: disabled
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+unmeasured_when: [not_windows, source_missing, access_denied, read_failed]
+falsepositives:
+  - PCs that boot in legacy BIOS or CSM mode, or were never switched to Secure Boot
+  - Dual-boot setups with operating systems that need it off
+  - Owners who turned it off for hardware, virtualisation or overclocking tools
+references:
+  - https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-secure-boot
+author: aeterna-rongroi contributors
+date: 2026-09-11
+tags: [posture, boot]

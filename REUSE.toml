@@ -1,0 +1,30 @@
+version = 1
+SPDX-PackageName = "aeterna-rongroi"
+SPDX-PackageSupplier = "aeterna-rongroi contributors"
+SPDX-PackageDownloadLocation = "https://github.com/aeterna/aeterna-rongroi"
+
+# Files that cannot carry a comment header, or where a header would be noise.
+# Source files (.rs, .ts, .tsx, rule .yaml, workflows) carry inline SPDX headers instead.
+
+[[annotations]]
+path = [
+  "**/*.md",
+  "NOTICE",
+  ".gitignore",
+  "**/*.json",
+  "**/*.snap",
+  "Cargo.lock",
+  "pnpm-lock.yaml",
+  "apps/desktop/pnpm-lock.yaml",
+  "apps/desktop/pnpm-workspace.yaml",
+  "apps/desktop/src-tauri/icons/**",
+]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = ["rules/**/tests/**", "rules/**/*.md"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
