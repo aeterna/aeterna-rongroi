@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, bail};
 use rongroi_core::provenance::{Provenance, sha256_hex};
 
-use crate::release::{Checksum, ReleaseTag, format_sums, read_report};
+use crate::release::{Checksum, ReleaseTag, format_sums, is_full_sha, read_report};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -125,13 +125,6 @@ fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
             .any(|window| window == needle)
 }
 
-fn is_full_sha(text: &str) -> bool {
-    text.len() == 40
-        && text
-            .bytes()
-            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-}
-
 fn read(path: &Path) -> anyhow::Result<Vec<u8>> {
     std::fs::read(path).with_context(|| format!("reading {}", path.display()))
 }
@@ -195,12 +188,5 @@ mod tests {
         assert!(contains_bytes(&binary, COMMIT.as_bytes()));
         assert!(!contains_bytes(b"no commit here", COMMIT.as_bytes()));
         assert!(!contains_bytes(&binary, b""));
-    }
-
-    #[test]
-    fn only_full_lowercase_shas_are_accepted() {
-        assert!(is_full_sha(COMMIT));
-        assert!(!is_full_sha(&COMMIT[..7]));
-        assert!(!is_full_sha(&COMMIT.to_uppercase()));
     }
 }

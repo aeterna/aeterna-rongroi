@@ -22,12 +22,12 @@ Windows 10 22H2 or Windows 11, x64. There is no installer: download a file and r
 
 ## Rules bundle
 
-Rule format 1 · 1 rule(s) · SHA-256 `cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`. The report header shows the same values.
+Rule format 1 · 1 rule(s) · SHA-256 `cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`. The report header of the program you run shows the same values.
 
 ## Verify before you trust a result
 
 1. In PowerShell, in the download folder: `Get-FileHash .\aeterna-rongroi-0.1.0-windows-x64.exe` — the hash must match `SHA256SUMS`.
-2. With the GitHub CLI: `gh attestation verify aeterna-rongroi-0.1.0-windows-x64.exe --repo aeterna/aeterna-rongroi`.
+2. With the GitHub CLI: `gh attestation verify aeterna-rongroi-0.1.0-windows-x64.exe --repo aeterna/aeterna-rongroi --signer-workflow aeterna/aeterna-rongroi/.github/workflows/release.yml`.
 3. The program shows version 0.1.0 and no **UNOFFICIAL BUILD** banner.
 
 If any of these checks fails, do not rely on the result.

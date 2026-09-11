@@ -183,6 +183,14 @@ pub fn parse_sums(text: &str) -> anyhow::Result<Vec<Checksum>> {
     Ok(result)
 }
 
+/// `text` is a full 40-character lowercase hex commit SHA.
+pub fn is_full_sha(text: &str) -> bool {
+    text.len() == 40
+        && text
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+}
+
 /// The JSON report the built CLI printed with `scan --json`.
 pub fn read_report(path: &Path) -> anyhow::Result<ReportView> {
     let text =
@@ -310,5 +318,14 @@ mod tests {
             "{}",
             err.to_string()
         );
+    }
+
+    const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
+
+    #[test]
+    fn only_full_lowercase_shas_are_accepted() {
+        assert!(is_full_sha(COMMIT));
+        assert!(!is_full_sha(&COMMIT[..7]));
+        assert!(!is_full_sha(&COMMIT.to_uppercase()));
     }
 }

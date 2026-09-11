@@ -8,10 +8,12 @@
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use rongroi_core::bundle::BundleInfo;
 
-use crate::release::{Checksum, ReleaseTag, changelog_section, parse_sums, read_report};
+use crate::release::{
+    Checksum, ReleaseTag, changelog_section, is_full_sha, parse_sums, read_report,
+};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -39,6 +41,12 @@ pub struct Args {
 
 pub fn run(root: &Path, args: &Args) -> anyhow::Result<()> {
     let tag = ReleaseTag::parse(&args.tag)?;
+    if !is_full_sha(&args.commit) {
+        bail!(
+            "release-notes: `{}` is not a full 40-character lowercase commit SHA",
+            args.commit
+        );
+    }
     let changelog =
         std::fs::read_to_string(root.join("CHANGELOG.md")).context("reading CHANGELOG.md")?;
     let section = changelog_section(&changelog, &tag.version)?;
@@ -123,12 +131,12 @@ Windows 10 22H2 or Windows 11, x64. There is no installer: download a file and r
 
 ## Rules bundle
 
-Rule format {schema} · {rule_count} rule(s) · SHA-256 `{bundle_sha256}`. The report header shows the same values.
+Rule format {schema} · {rule_count} rule(s) · SHA-256 `{bundle_sha256}`. The report header of the program you run shows the same values.
 
 ## Verify before you trust a result
 
 1. In PowerShell, in the download folder: `Get-FileHash .\\{example}` — the hash must match `SHA256SUMS`.
-2. With the GitHub CLI: `gh attestation verify {example} --repo {repo}`.
+2. With the GitHub CLI: `gh attestation verify {example} --repo {repo} --signer-workflow {repo}/.github/workflows/release.yml`.
 3. The program shows version {version} and no **UNOFFICIAL BUILD** banner.
 
 If any of these checks fails, do not rely on the result.
