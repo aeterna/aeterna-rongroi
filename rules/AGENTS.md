@@ -19,6 +19,17 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   declares it can emit (`Collector::fields`, ADR 0026). A misspelling is not a quiet mistake: the rule
   becomes `not_found` on every machine, which this program shows a player as evidence that something
   was looked for and was not there. `check-rules` rejects it and names the field it meant.
+- **Co-occurring tamper signals are not corroboration — in this population they point the other way.** A
+  popular gaming "optimiser" script clears every event log on the machine in one click *and* wipes the
+  Prefetch folder, so a cleared log, a burst of log-cleared events and an empty Prefetch folder arrive
+  together on a PC whose owner did nothing wrong. The `evtx` collector reports a log's own state beside its
+  records — `oldest_record_time`, `oldest_record_id`, `newest_record_time`, `newest_record_id`,
+  `size_bytes`, and per folder `logs_without_records` and `channels` — so that a rule can match on the log
+  rather than on one event. Each of those has an innocent explanation written down in ADR 0028; a rule that
+  uses one must name that explanation in `falsepositives`. **A high `logs_without_records` is evidence for
+  the optimiser explanation**, never for a clearing. Do not derive a gap in the record ids from the two id
+  fields: an exported log is renumbered from 1, so a gap cannot be told apart from "the player exported the
+  log to send it to you" (ADR 0028).
 - `status: test` or `stable` needs a positive and a negative fixture in `tests/`.
 - A new rule must also be quiet on every `fixtures/hosts/baseline-*` host, or carry a
   `known-fps.csv` row with a reason (`cargo xtask check-baseline`, ADR 0017).

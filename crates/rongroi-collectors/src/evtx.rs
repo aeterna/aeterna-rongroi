@@ -20,6 +20,22 @@
 //! last time. Every field a rule could match survives that; the record ids do not, and widening this
 //! to keep them is a deliberate decision for the pull request that needs them.
 //!
+//! # The state of the log, beside the records in it
+//!
+//! One record is not enough to say anything about a log. An event that says a log was cleared is
+//! ordinary on a machine whose owner ran a PC-optimiser script, and a log that is empty or whose
+//! oldest surviving record is recent is equally explained by rotation at the size cap, by the channel
+//! never having been enabled, and by clearing. So each log also carries **its own state** — the
+//! oldest and newest surviving record, their times and their ids, and how many bytes the file was —
+//! and the folder carries how many of its logs hold no records at all.
+//!
+//! Those are facts, not a conclusion, and one of them points the opposite way to the instinct: a
+//! machine where nearly every log is empty is the shape a one-click optimiser leaves, which is
+//! evidence **for** the benign explanation and must never be read as corroboration of the others
+//! (ADR 0028). The engine matches by exact equality with conjunction only and deliberately gains no
+//! join across observations, so the facts a rule would need to reason about a log are computed here
+//! and matched flatly there.
+//!
 //! # An unread log is evidence, not silence
 //!
 //! Three things can stop a log being read, and all three are reported as observations rather than
@@ -37,7 +53,7 @@
 //! bar — it is an application that never appears. [`PARSE_BUDGET`] bounds the whole collection, on
 //! one worker thread, and a log the budget did not reach is named in the report. See ADR 0024.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -93,10 +109,11 @@ const PRIMARY_LOGS: [&str; 3] = ["security.evtx", "system.evtx", "application.ev
 /// rule that read an unread `Security.evtx` as "not found" would be saying the log was never
 /// cleared, on evidence that was never read — which is the `pca` case (ADR 0020), not the `fivem_dir`
 /// one.
-const FIELDS: [&str; 18] = [
+const FIELDS: [&str; 25] = [
     "budget_exhausted",
     "budget_seconds",
     "channel",
+    "channels",
     "count",
     "entries",
     "event_id",
@@ -107,11 +124,17 @@ const FIELDS: [&str; 18] = [
     "level",
     "log",
     "logs",
+    "logs_without_records",
+    "newest_record_id",
+    "newest_record_time",
+    "oldest_record_id",
+    "oldest_record_time",
     "path",
     "provider",
     "read",
     "refused",
     "rejected",
+    "size_bytes",
 ];
 
 /// The `evtx` collector.
@@ -230,6 +253,17 @@ struct Collection {
     examined: usize,
     /// Logs that were there and yielded nothing.
     refused: usize,
+    /// Of the logs that were read, how many held no record at all.
+    ///
+    /// Counted only among `examined`: a log that could not be read held nothing that was seen, which
+    /// is not the same as holding nothing.
+    without_records: usize,
+    /// Every channel a surviving record named, across every log that was read.
+    ///
+    /// The names are kept only so that they can be counted once each; the set itself never reaches an
+    /// observation. A log with no records names no channel, which is why `without_records` is beside
+    /// the count and not derived from it.
+    channels: BTreeSet<String>,
     /// The first reason a log could not be read, which is what `gaps` reports.
     first_failure: Option<UnmeasuredReason>,
     /// Whether the wall-clock budget ended the collection before every log was read.
@@ -244,6 +278,8 @@ impl Collection {
             listed: 0,
             examined: 0,
             refused: 0,
+            without_records: 0,
+            channels: BTreeSet::new(),
             first_failure: None,
             budget_exhausted: false,
             budget,
@@ -279,10 +315,30 @@ impl Collection {
                 self.refuse(name, &path, PARSE_UNAVAILABLE, UnmeasuredReason::ReadFailed);
                 continue;
             };
+            // Taken before the bytes are handed to the worker, which takes ownership of them. It is
+            // the length of what was read, and ADR 0019 caps that at 64 MiB — a file past the cap is
+            // refused rather than truncated, so this is never a short count of a long file.
+            let size_bytes = bytes.len();
             match worker.parse(bytes, deadline.saturating_duration_since(Instant::now())) {
                 Parsed::Done(Ok(file)) => {
                     self.examined += 1;
-                    self.observations.push(account(name, &path, &file));
+                    if file.records.is_empty() {
+                        self.without_records += 1;
+                    }
+                    // Checked before cloning: a real log holds tens of thousands of records and
+                    // names one channel, so `extend` over cloned names would allocate a string per
+                    // record to throw all but one of them away.
+                    for channel in file
+                        .records
+                        .iter()
+                        .filter_map(|record| record.channel.as_deref())
+                    {
+                        if !self.channels.contains(channel) {
+                            self.channels.insert(channel.to_owned());
+                        }
+                    }
+                    self.observations
+                        .push(account(name, &path, &file, size_bytes));
                     self.observations.extend(summaries(name, &file.records));
                 }
                 // The bytes arrived and are not a readable Event Log file. Each way that happens has
@@ -322,6 +378,8 @@ impl Collection {
             self.listed,
             self.examined,
             self.refused,
+            self.without_records,
+            self.channels.len(),
             self.budget_exhausted,
             self.budget,
         ));
@@ -452,13 +510,20 @@ fn summaries(log: &str, records: &[EvtxRecord]) -> Vec<Observation> {
         .collect()
 }
 
-/// What one log held and whether all of it decoded.
+/// What one log held, whether all of it decoded, and what window of time it covers.
 ///
 /// `intact` is `rejected == 0` as a value of its own, the same field and the same meaning `pca` and
 /// `prefetch` give it: a rule matches by exact equality and cannot say "more than none". A damaged
 /// chunk costs its own records and nothing else (ADR 0018), so a log with one is still read — and a
 /// log that is partly unreadable is exactly when what survives matters most.
-fn account(log: &str, path: &str, file: &EvtxFile) -> Observation {
+///
+/// The oldest and newest surviving record are the log's own state, and they are here rather than on
+/// a rule because the engine has no join across observations (ADR 0028). **None of the four says
+/// anything on its own**: a recent oldest record is what rotation at the size cap, a channel enabled
+/// last week, an in-place upgrade and a factory image all look like. A log that holds no record has
+/// no oldest and no newest, so the four fields are **absent** there rather than zero or null — the
+/// same discipline a record with no `Channel` element gets.
+fn account(log: &str, path: &str, file: &EvtxFile, size_bytes: usize) -> Observation {
     let mut fields = BTreeMap::new();
     fields.insert("log".to_owned(), serde_json::Value::from(log));
     fields.insert("path".to_owned(), serde_json::Value::from(path));
@@ -474,9 +539,60 @@ fn account(log: &str, path: &str, file: &EvtxFile) -> Observation {
         "intact".to_owned(),
         serde_json::Value::from(file.rejected.is_empty()),
     );
+    fields.insert("size_bytes".to_owned(), serde_json::Value::from(size_bytes));
+    if let Some(oldest) = extreme(&file.records, Extreme::Oldest) {
+        fields.insert(
+            "oldest_record_time".to_owned(),
+            serde_json::Value::from(oldest.written.to_string()),
+        );
+        fields.insert(
+            "oldest_record_id".to_owned(),
+            serde_json::Value::from(oldest.record_id),
+        );
+    }
+    if let Some(newest) = extreme(&file.records, Extreme::Newest) {
+        fields.insert(
+            "newest_record_time".to_owned(),
+            serde_json::Value::from(newest.written.to_string()),
+        );
+        fields.insert(
+            "newest_record_id".to_owned(),
+            serde_json::Value::from(newest.record_id),
+        );
+    }
     Observation {
         collector: ID.to_owned(),
         fields,
+    }
+}
+
+/// Which end of a log's surviving records is wanted.
+#[derive(Debug, Clone, Copy)]
+enum Extreme {
+    /// The record written first.
+    Oldest,
+    /// The record written last.
+    Newest,
+}
+
+/// The record at one end of what survives, by the time it was written.
+///
+/// Chosen by scanning rather than by taking the first or last of the file: records are stored in the
+/// order Windows wrote them, but a log recovered around a damaged chunk is missing some of them and
+/// an exported log is not the on-disk one, so the order is not relied on. Ties are broken by the
+/// record id, so that two records written in the same 100 ns pick the same one every run.
+///
+/// `None` for a log with no records at all — a log that was cleared, a channel that has never
+/// recorded anything, and a file that holds only its header are all this, and the difference between
+/// them is not in these bytes.
+fn extreme(records: &[EvtxRecord], end: Extreme) -> Option<&EvtxRecord> {
+    match end {
+        Extreme::Oldest => records
+            .iter()
+            .min_by_key(|one| (one.written, one.record_id)),
+        Extreme::Newest => records
+            .iter()
+            .max_by_key(|one| (one.written, one.record_id)),
     }
 }
 
@@ -485,10 +601,21 @@ fn account(log: &str, path: &str, file: &EvtxFile) -> Observation {
 /// `budget_exhausted` is the fact a rule can ask for: a scan that did not finish reading the Event
 /// Log is not a scan that found nothing there. `budget_seconds` is beside it so that a person
 /// reading the report does not have to know this program's constants to know what the bound was.
+///
+/// `logs_without_records` and `channels` are the shape of the folder rather than of one log, and the
+/// first of them **points at the benign explanation**: a stock Windows 11 install declares on the
+/// order of a thousand channels, most of which have never recorded anything, and a PC-optimiser
+/// script clears every one of them in a single click (ADR 0028). A machine where nearly every log is
+/// empty is that, far more often than it is anything else, and the pair is reported so that a reader
+/// sees it rather than reading one cleared log alone. `channels` counts the distinct channels the
+/// surviving records **name**, which is not `examined - logs_without_records`: one file can hold
+/// records of several channels, and two files can hold records of one.
 fn folder(
     logs: usize,
     examined: usize,
     refused: usize,
+    without_records: usize,
+    channels: usize,
     budget_exhausted: bool,
     budget: Duration,
 ) -> Observation {
@@ -496,6 +623,11 @@ fn folder(
     fields.insert("logs".to_owned(), serde_json::Value::from(logs));
     fields.insert("examined".to_owned(), serde_json::Value::from(examined));
     fields.insert("refused".to_owned(), serde_json::Value::from(refused));
+    fields.insert(
+        "logs_without_records".to_owned(),
+        serde_json::Value::from(without_records),
+    );
+    fields.insert("channels".to_owned(), serde_json::Value::from(channels));
     fields.insert(
         "budget_exhausted".to_owned(),
         serde_json::Value::from(budget_exhausted),
@@ -792,6 +924,116 @@ mod tests {
         assert_eq!(field(folder, "refused"), Some(&0_u64.into()));
         assert_eq!(field(folder, "budget_exhausted"), Some(&false.into()));
         assert_eq!(field(folder, "budget_seconds"), Some(&30_u64.into()));
+    }
+
+    /// **The log's own state**, which is what a rule about a cleared log has to match on instead of
+    /// one record (ADR 0028). The window the surviving records cover, both record ids, and the size
+    /// of the file — all four facts about the file rather than about any event in it.
+    ///
+    /// The oldest record here is the first the file holds and the newest is its damaged trailing
+    /// one, which is why the ends are found by scanning the times rather than by taking the first and
+    /// last record of the file: those two happen to agree here and would not on a log recovered
+    /// around a damaged chunk.
+    #[test]
+    fn each_log_says_which_record_survives_at_each_end_and_how_large_the_file_was() {
+        let run = Evtx::default().collect(&fixture("evtx-logs-present"));
+        let (observations, _) = measured(&run);
+
+        let account = account_of(observations, "Security.evtx");
+        assert_eq!(
+            text(account, "oldest_record_time"),
+            Some("2018-07-09T20:49:14.0577461Z")
+        );
+        assert_eq!(field(account, "oldest_record_id"), Some(&1_u64.into()));
+        assert_eq!(
+            text(account, "newest_record_time"),
+            Some("2018-08-03T06:44:06.4185334Z")
+        );
+        assert_eq!(field(account, "newest_record_id"), Some(&17_u64.into()));
+        // The 4 KiB header and the one chunk behind it.
+        assert_eq!(field(account, "size_bytes"), Some(&69632_u64.into()));
+    }
+
+    /// **The boundary this collector has to get right.** A log that holds no record has no oldest and
+    /// no newest record, so those four fields are absent rather than zero — `oldest_record_id: 0`
+    /// would be a record that does not exist, and a rule could match it.
+    ///
+    /// A cleared channel, a channel that has never recorded anything, and a file holding only its
+    /// header are the same bytes. Nothing here decides between them, and the fields that survive say
+    /// only what was there: no records, no rejections, and the size of the file.
+    #[test]
+    fn a_log_with_no_records_has_no_oldest_and_no_newest() {
+        let fixture = TempFixture::new(
+            "empty-log",
+            &[("Application.evtx", &LANGUAGE_PACK[..FILE_HEADER_LEN])],
+        );
+        let run = Evtx::default().collect(&fixture.host());
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+
+        let account = account_of(observations, "Application.evtx");
+        assert_eq!(field(account, "entries"), Some(&0_u64.into()));
+        assert_eq!(field(account, "intact"), Some(&true.into()));
+        assert_eq!(field(account, "size_bytes"), Some(&4096_u64.into()));
+        for absent in [
+            "oldest_record_time",
+            "oldest_record_id",
+            "newest_record_time",
+            "newest_record_id",
+        ] {
+            assert_eq!(field(account, absent), None, "{absent}");
+        }
+
+        // It was read, so it counts as examined — and it named no channel, which is the whole
+        // reason `channels` is counted apart from the logs.
+        let folder = folder_of(observations);
+        assert_eq!(field(folder, "examined"), Some(&1_u64.into()));
+        assert_eq!(field(folder, "logs_without_records"), Some(&1_u64.into()));
+        assert_eq!(field(folder, "channels"), Some(&0_u64.into()));
+    }
+
+    /// **The shape a PC-optimiser script leaves**, counted rather than concluded from: a folder full
+    /// of logs that hold nothing. One click of a popular gaming "optimiser" clears every channel on
+    /// the machine, so this count is evidence for that explanation and never corroboration of
+    /// anything else (ADR 0028).
+    ///
+    /// `channels` is not `examined - logs_without_records`: both readable logs here carry the same
+    /// channel, so three logs with records in two of them name one channel between them.
+    #[test]
+    fn the_folder_counts_the_logs_that_hold_nothing_and_the_channels_that_do() {
+        let header_only = &LANGUAGE_PACK[..FILE_HEADER_LEN];
+        let fixture = TempFixture::new(
+            "mostly-empty",
+            &[
+                ("Application.evtx", LANGUAGE_PACK),
+                ("Security.evtx", LANGUAGE_PACK),
+                ("System.evtx", header_only),
+                ("Setup.evtx", header_only),
+            ],
+        );
+        let run = Evtx::default().collect(&fixture.host());
+        let (observations, _) = measured(&run);
+
+        let folder = folder_of(observations);
+        assert_eq!(field(folder, "logs"), Some(&4_u64.into()));
+        assert_eq!(field(folder, "examined"), Some(&4_u64.into()));
+        assert_eq!(field(folder, "logs_without_records"), Some(&2_u64.into()));
+        assert_eq!(field(folder, "channels"), Some(&1_u64.into()));
+    }
+
+    /// A log that could not be read held nothing that was **seen**, which is not the same as holding
+    /// nothing. Counting it among the logs without records would turn an unread log into evidence
+    /// that the machine's logs are empty — the exact inversion ADR 0024 refuses everywhere else.
+    #[test]
+    fn a_log_that_could_not_be_read_is_not_counted_as_one_without_records() {
+        let run = Evtx::default().collect(&fixture("evtx-log-unreadable"));
+        let (observations, _) = measured(&run);
+
+        let folder = folder_of(observations);
+        assert_eq!(field(folder, "examined"), Some(&1_u64.into()));
+        assert_eq!(field(folder, "refused"), Some(&1_u64.into()));
+        assert_eq!(field(folder, "logs_without_records"), Some(&0_u64.into()));
+        assert_eq!(field(folder, "channels"), Some(&1_u64.into()));
     }
 
     /// A folder holds files that are not `.evtx`. They are not this artifact, so they are not read
