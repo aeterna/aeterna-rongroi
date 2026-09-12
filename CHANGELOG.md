@@ -6,6 +6,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Event Log parser: Windows `.evtx` files decode to a plain struct per record — the record id, the time
+  it was written, the event id, the channel, the provider and the level — and a damaged chunk costs its
+  own records and nothing else, the rest of the log being returned alongside an account of what failed.
+  No event is interpreted: which id means a log was cleared is a rule's judgement, not a parser's. A
+  record's payload is deliberately not kept, because that is where user names, host names, addresses and
+  command lines live. The binary XML decoder is the `evtx` crate, whose error type stops inside the
+  parser module; it brings the unmaintained `encoding` crate with it, and `deny.toml` now carries an
+  ignore for RUSTSEC-2021-0153 that states the exposure rather than waving it away (ADR 0018).
+- `fuzz_evtx`, the fuzz layer's sixth target, seeded from the same `fixtures/evtx/` files the parser tests
+  read. It covers more third-party code than any other target, and the RUSTSEC ignore above names it as
+  one of the things that bounds the risk of taking that dependency.
 - `cargo xtask check-baseline`: the whole rule set is run against fixture hosts described as ordinary
   machines, through the same `scan::run` pipeline the CLI uses, and any `Found` evidence that is not
   recorded in `rules/known-fps.csv` with a written reason fails the gate — as does a row whose rule no
