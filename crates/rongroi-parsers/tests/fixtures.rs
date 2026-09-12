@@ -13,7 +13,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rongroi_parsers::{bam, filetime, pca};
+use rongroi_parsers::{bam, evtx, filetime, pca};
 
 /// The directories that are both an L0 fixture set and a fuzz seed corpus.
 const SEEDED_DIRECTORIES: [&str; 3] = ["bam", "pca-app-launch", "pca-general"];
@@ -22,6 +22,11 @@ const SEEDED_DIRECTORIES: [&str; 3] = ["bam", "pca-app-launch", "pca-general"];
 /// those files are vendored from a third-party corpus under its own licence and `REUSE.toml`
 /// annotates them where they are (ADR 0015). The tie to `ci.yml` is the same one.
 const PREFETCH_SEED_DIRECTORY: &str = "fixtures/prefetch";
+
+/// `fuzz_evtx`'s seed corpus, which sits outside `fixtures/parsers/` for the same reason
+/// `fixtures/prefetch/` does: the files are vendored from a third-party corpus under its own licence
+/// and `REUSE.toml` annotates them where they lie (ADR 0018). The tie to `ci.yml` is the same one.
+const EVTX_SEED_DIRECTORY: &str = "fixtures/evtx";
 
 fn repository_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -109,6 +114,10 @@ fn the_ci_fuzz_job_seeds_from_these_directories() {
         text.contains(PREFETCH_SEED_DIRECTORY),
         "ci.yml does not seed a fuzz target from {PREFETCH_SEED_DIRECTORY}"
     );
+    assert!(
+        text.contains(EVTX_SEED_DIRECTORY),
+        "ci.yml does not seed a fuzz target from {EVTX_SEED_DIRECTORY}"
+    );
 }
 
 /// The emptiness check `fixtures_in` makes for the parser fixtures, for the seed corpus that does not
@@ -128,6 +137,47 @@ fn the_prefetch_seed_directory_holds_prefetch_files() {
     assert!(
         seeds > 0,
         "{} holds no .pf files: fuzz_prefetch, seeded from it, would start from nothing",
+        directory.display()
+    );
+}
+
+/// The same emptiness check for `fuzz_evtx`'s seeds, and the parse that says they are still Event Log
+/// files rather than bytes with an `.evtx` name. Both vendored fixtures hold 17 records and neither
+/// has a damaged chunk in it — the damaged cases are built in `evtx.rs` from these same bytes, because
+/// the upstream file that carries one is 1 MB of a real machine's logs
+/// (`fixtures/evtx/PROVENANCE.md`).
+#[test]
+fn every_evtx_fixture_parses_and_seeds_the_fuzz_target() {
+    let directory = repository_root().join(EVTX_SEED_DIRECTORY);
+
+    let mut seeds = 0;
+    for entry in std::fs::read_dir(&directory)
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let path = entry.path();
+        if !path.extension().is_some_and(|kind| kind == "evtx") {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+
+        match evtx::records(&std::fs::read(&path).unwrap_or_default()) {
+            Ok(file) => {
+                assert_eq!(file.records.len(), 17, "{name}");
+                assert!(file.rejected.is_empty(), "{name} has a rejected record");
+            }
+            Err(error) => panic!("{name}: {error}"),
+        }
+        seeds += 1;
+    }
+
+    assert!(
+        seeds > 0,
+        "{} holds no .evtx files: fuzz_evtx, seeded from it, would start from nothing",
         directory.display()
     );
 }
