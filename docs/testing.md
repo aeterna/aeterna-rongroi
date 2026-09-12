@@ -4,7 +4,7 @@
 
 | Layer | What it proves | Where | Runs on |
 |---|---|---|---|
-| L0 parsers (M2) | artifact formats decode correctly, including corrupt input | `crates/rongroi-parsers` | macOS · Linux · Windows |
+| L0 parsers | artifact formats decode correctly, including corrupt input — truncated, malformed, the wrong encoding, and bytes whose meaning is not established | `crates/rongroi-parsers` | macOS · Linux · Windows |
 | L1 collectors | every outcome — found, not found, unmeasured — against `FixtureHost` | `crates/rongroi-collectors/src/*.rs` | macOS · Linux · Windows |
 | L2 rules | each rule's positive fixture is `found`, negative is `not_found` | `rules/**/tests/` via `cargo xtask check-rules` | macOS · Linux · Windows |
 | L3 report | the full pipeline, as JSON snapshots; SS view never contains the fixture user name | `crates/rongroi-collectors/tests/`, `rongroi-core::view` | macOS · Linux · Windows |
