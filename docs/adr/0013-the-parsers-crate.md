@@ -1,14 +1,15 @@
 # ADR 0013 — The parsers crate
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-12
 
 ## Context
 
-M2 adds six Windows artifacts — BAM, PCA, Prefetch, EVTX, USN and Amcache — and each of them is a
-byte format that has to be decoded before anything can be said about it. Where that decoding lives
-decides what can be tested, on which machines, and how much of the program has to be trusted to be
-correct about a hostile input.
+M2 adds four Windows artifacts — BAM, PCA, Prefetch and EVTX — and each of them is a byte format
+that has to be decoded before anything can be said about it. USN and Amcache belong to M3 (README's
+Status table) and will need the same decoding when they come. Where that decoding lives decides what
+can be tested, on which machines, and how much of the program has to be trusted to be correct about a
+hostile input.
 
 Decoding could have gone inside each collector, next to the code that reads the machine. Every
 collector would then mix two different kinds of work: reading a real Windows registry or file, which

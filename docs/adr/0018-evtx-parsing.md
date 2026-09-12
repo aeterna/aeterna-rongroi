@@ -1,6 +1,6 @@
 # ADR 0018 — EVTX parsing
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-12
 
 ## Context

@@ -59,10 +59,14 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 | Milestone | Scope | State |
 |---|---|---|
-| M0 | Repository, rule format, engine, Secure Boot posture check, CLI and GUI shell | in progress |
-| M1 | FiveM folder checks, running processes, more posture checks, admin re-launch | planned |
-| M2 | Prefetch, BAM, PCA, event-log tamper signals | planned |
-| M3 | Vulnerable-driver list, USN journal, Amcache, release pipeline, screenshare guide | planned |
+| M0 | Repository, rule format, engine, Secure Boot posture check, CLI and GUI shell, release pipeline | released in 0.1.0 |
+| M1 | FiveM folder checks, running processes, more posture checks, admin re-launch | merged, not released yet |
+| M2 | Prefetch, BAM, PCA, event-log tamper signals | the four parsers are merged; no collector reads them, so a scan shows nothing from them yet |
+| M3 | Vulnerable-driver list, USN journal, Amcache, screenshare guide | planned |
+
+"Merged" means the work is on the `dev` branch and is not in a release. 0.1.0 is the only release so far,
+and the release pipeline itself shipped with it ([ADR 0008](docs/adr/0008-release-pipeline.md)), which is
+why it is listed under M0.
 
 ## Contributing
 

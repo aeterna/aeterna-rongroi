@@ -53,10 +53,13 @@ Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
 
 | เฟส | ขอบเขต | สถานะ |
 |---|---|---|
-| M0 | repo, รูปแบบ rule, engine, ตรวจ Secure Boot, CLI และโครง GUI | กำลังทำ |
-| M1 | ตรวจโฟลเดอร์ FiveM, process ที่รันอยู่, สถานะเครื่องเพิ่มเติม, เปิดใหม่ด้วยสิทธิ์ admin | วางแผนแล้ว |
-| M2 | Prefetch, BAM, PCA, สัญญาณล้าง event log | วางแผนแล้ว |
-| M3 | รายชื่อ driver มีช่องโหว่, USN journal, Amcache, ระบบ release, คู่มือ SS | วางแผนแล้ว |
+| M0 | repo, รูปแบบ rule, engine, ตรวจ Secure Boot, CLI และโครง GUI, ระบบ release | ออกใน 0.1.0 แล้ว |
+| M1 | ตรวจโฟลเดอร์ FiveM, process ที่รันอยู่, สถานะเครื่องเพิ่มเติม, เปิดใหม่ด้วยสิทธิ์ admin | merge แล้ว แต่ยังไม่ได้ออกเป็นรุ่น |
+| M2 | Prefetch, BAM, PCA, สัญญาณล้าง event log | parser ทั้งสี่ตัว merge แล้ว แต่ยังไม่มี collector ตัวไหนเรียกใช้ การสแกนจึงยังไม่แสดงอะไรจาก parser เหล่านี้ |
+| M3 | รายชื่อ driver มีช่องโหว่, USN journal, Amcache, คู่มือ SS | วางแผนแล้ว |
+
+"merge แล้ว" หมายถึงงานอยู่บน branch `dev` แต่ยังไม่ได้ออกเป็นรุ่น ตอนนี้มีรุ่นเดียวคือ 0.1.0 และระบบ release
+ออกมาพร้อมรุ่นนั้น ([ADR 0008](docs/adr/0008-release-pipeline.md)) จึงอยู่ในแถว M0
 
 ## ร่วมพัฒนา
 

@@ -67,7 +67,7 @@ with a single `diff`.
 |---|---|---|
 | A detection rule | `cargo xtask new-rule <collector> <category>/<slug>` | Fill in `rule.yaml`, a positive and a negative fixture, and optional translations |
 | A language | `cargo xtask new-locale <bcp47>` (e.g. `vi`, `pt-BR`) | Translate the generated files; missing keys fall back to English |
-| A collector | `cargo xtask new-collector <id>` (from M1) | Implement the `Collector` trait; write an ADR if it reads a new kind of source |
+| A collector | No scaffold — start from `crates/rongroi-collectors/src/process.rs` or `fivem_dir.rs` | Implement the `Collector` trait; write an ADR if it reads a new kind of source |
 
 Each one is a single pull request. Branch from `dev` and open the pull request against `dev`, the default
 branch; `main` only receives release pull requests (CONVENTIONS.md, section 7).

@@ -114,6 +114,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
   not: nothing carried an observation that no rule matched, so both collectors that ship without a rule
   read the machine on every scan and the result was discarded (ADR 0014).
 - Desktop app: the report header shows the program version, which the release notes ask people to check.
+- Documentation that had drifted from the code. `CONVENTIONS.md` §4 named `cargo xtask scrub-check` as
+  what keeps a real user name, host name or SID out of a fixture; that command has never existed, review by
+  hand is all there is, and the section now says so and records the gap. ADR 0008 and ADRs 0010–0018 were
+  still `proposed` for decisions that are built and merged, and ADR 0008's Context still said no release
+  workflow existed. `CONTRIBUTING.md` told a contributor to run `cargo xtask new-collector`, which does not
+  exist either. README's Status table called M0 "in progress" and everything after it "planned", and put
+  the release pipeline in M3 although it shipped with 0.1.0; it now says which milestones are released,
+  which are merged but unreleased, and that nothing reads the M2 parsers yet. `GOVERNANCE.md` still framed
+  the pre-first-release steps as outstanding, ADR 0013 placed USN and Amcache in M2 against README's M3,
+  and `CONVENTIONS.md` §8 said a screenshare guide exists in Thai when it exists in no language.
 
 ## [0.1.0] - 2026-09-11
 

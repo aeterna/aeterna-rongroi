@@ -1,6 +1,6 @@
 # ADR 0010 — The process source, and the tool's own traces
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-12
 
 ## Context

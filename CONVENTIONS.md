@@ -58,7 +58,20 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 - Never print or log a raw user path outside Self mode. Redaction goes through `rongroi_core::view`.
 - Logging (when added) goes to local stderr only. No telemetry, no crash upload, no network.
-- Test fixtures never contain a real person's user name, host name or SID (`cargo xtask scrub-check`, from M1).
+- Test fixtures never contain a real person's user name, host name or SID. Nothing checks this
+  automatically: `cargo xtask scrub-check` has been named here since M1 and was never written, so what
+  holds the rule up is this sentence and the person who reviews a new fixture, together with the
+  provenance document every vendored fixture has to come with.
+
+> **An open gap, as of 2026-09-12.** An automated scrub check does not exist and no ADR has decided to
+> write one. The provenance document of each vendored fixture set records the same absence
+> (`fixtures/evtx/PROVENANCE.md`, `fixtures/prefetch/PROVENANCE.md`), and ADR 0016 counts
+> `cargo xtask scrub-check` among the promises this repository has made with no code behind them.
+> Review by hand is what there is, and it has already failed once: a vendored Event Log fixture was
+> committed carrying a real machine SID that a byte scan had missed, and was removed again
+> (`CHANGELOG.md`). A vendored artifact cannot be cleaned in place either: its records are checksummed
+> inside their container, so editing a string breaks the container. The choice is to vendor a file
+> whole or not at all.
 
 ## 5. TypeScript / React (`apps/desktop`)
 
@@ -95,7 +108,8 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 ## 8. Docs and comments
 
-- Source docs are written in English. `README` and the screenshare guide also exist in Thai.
+- Source docs are written in English. `README` also exists in Thai. The screenshare guide is M3 work and
+  is not written yet, in either language; it is to be written in both.
 - Comments explain *why*, not *what*.
 - Changing the architecture, the rule format or adding a new kind of source needs an ADR in `docs/adr/`.
 

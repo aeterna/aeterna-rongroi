@@ -1,6 +1,6 @@
 # ADR 0015 — Prefetch parsing
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-12
 
 ## Context

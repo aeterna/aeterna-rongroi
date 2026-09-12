@@ -26,8 +26,11 @@ second maintainer can act as release approver.
 
 The design and its reasons are in [ADR 0008](docs/adr/0008-release-pipeline.md).
 
-Before the first release, enable **immutable releases** in the repository settings, and run a rehearsal
-(`vYYYY.MM.DD-X.Y.Z-rc.N`) as described in ADR 0008, including the desktop-app gate failure test.
+Enabling **immutable releases** in the repository settings, and the rehearsal (`vYYYY.MM.DD-X.Y.Z-rc.N`)
+described in ADR 0008 including the desktop-app gate failure test, were one-time steps before the first
+release. 0.1.0 shipped on 2026-09-11 and ADR 0008 records what the rehearsal found; a later release
+repeats neither. Step 6 below assumes immutable releases are still enabled — check the repository
+settings if you have not seen that yourself.
 
 1. Open a pull request `chore(release): X.Y.Z` against `dev`. It renames `## [Unreleased]` in `CHANGELOG.md` to
    `## [X.Y.Z] - YYYY-MM-DD` and sets version `X.Y.Z` in `Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`

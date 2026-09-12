@@ -26,6 +26,8 @@ Each one is a written profile; a setting in it is never changed to silence a rul
 The user name `fixtureuser` in these paths is invented; it exists so that SS-mode redaction has something
 to replace.
 
-When a fixture is generated from a real Windows install (M2 onwards), record here: the generator script in
-`tools/fixture-gen/`, the Windows build, that networking was disabled, and that `cargo xtask scrub-check`
-passed.
+When a fixture is generated from a real Windows install (M2 onwards), record here: what generated it, the
+Windows build, that networking was disabled, and who checked it for a real user name, host name or SID, and
+how. Neither `tools/fixture-gen/` nor `cargo xtask scrub-check` exists — ADR 0016 counts both among the
+promises this repository has made with no code behind them, and `CONVENTIONS.md` §4 records the gap — so
+that last check is a person's.
