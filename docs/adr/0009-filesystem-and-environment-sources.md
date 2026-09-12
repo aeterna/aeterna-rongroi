@@ -43,6 +43,12 @@ recursion into subdirectories, and no content beyond what the digest consumes. S
 so they can be excluded, and are not observed. Everything is opened for reading; nothing on the scanned
 machine is written, renamed, locked or touched.
 
+**Amended by ADR 0019.** "No content beyond what the digest consumes" described a file-system source
+whose only reason to open a file was to hash it. `FilesystemSource::read_file` returns the bytes of a
+file a collector names, bounded at 64 MiB, because three of the four parsers need bytes and nothing on
+`Host` supplied them. The rest of the paragraph above stands: still no recursion, no timestamps, no size,
+no owner or ACL, no attributes, and nothing read that a collector did not name.
+
 **No rule reads this collector yet.** A rule that says "there is a file in FiveM's plugin folder" matches
 ordinary overlay software on a great many legitimate machines, and neither an allow-list of known-good
 hashes nor Authenticode signer checking exists yet — and `allow` may only identify software by `sha256` or

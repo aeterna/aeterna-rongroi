@@ -97,8 +97,13 @@ enum RegistryValue {
     Text(String),
 }
 
-/// One entry in a fixture directory. A file unless `directory: true`; an absent `sha256` describes a
-/// file whose hash cannot be read, which a collector must report by omitting the field.
+/// One entry in a fixture directory, as the YAML writes it. A file unless `directory: true`; an
+/// absent `sha256` describes a file whose hash cannot be read, which a collector must report by
+/// omitting the field.
+///
+/// Its bytes are written one of two ways, and never both: `content:` holds them inline as text, and
+/// `from:` names a file under `fixtures/`, relative to the directory holding this `host.yaml`. An
+/// entry with neither describes a file that is listed and whose bytes cannot be read (ADR 0019).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureFile {
@@ -107,6 +112,21 @@ struct FixtureFile {
     sha256: Option<String>,
     #[serde(default)]
     directory: bool,
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+}
+
+/// One entry in a fixture directory with its `from:` already read from disk, so that a fixture with a
+/// path that does not resolve fails when it is loaded rather than looking like an unreadable file.
+#[derive(Debug, Clone)]
+struct FixtureEntry {
+    name: String,
+    sha256: Option<String>,
+    directory: bool,
+    /// The file's bytes. `None` describes a file that exists and cannot be read.
+    content: Option<Vec<u8>>,
 }
 
 /// Paths and registry keys are compared case-insensitively and without a trailing separator, like Windows.
@@ -120,6 +140,54 @@ fn split_parent(path: &str) -> (&str, &str) {
         .map_or(("", path), |index| (&path[..index], &path[index + 1..]))
 }
 
+/// Turns one described file into a stored entry, reading a `from:` file now rather than later.
+///
+/// `content:` and `from:` are two ways of writing the same thing, so a file that uses both is
+/// rejected instead of one of them being picked: a fixture that says two things about one file is a
+/// fixture whose reader has to guess.
+fn resolve_file(
+    described: FixtureFile,
+    origin: &str,
+    base: Option<&Path>,
+) -> Result<FixtureEntry, FixtureError> {
+    let content = match (described.content, described.from) {
+        (Some(_), Some(_)) => {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "file `{}` uses both `content:` and `from:`; it must use one",
+                    described.name
+                ),
+            });
+        }
+        (Some(inline), None) => Some(inline.into_bytes()),
+        (None, Some(relative)) => {
+            let Some(base) = base else {
+                return Err(FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!(
+                        "file `{}` uses `from:`, which needs a fixture directory to start from; \
+                         an inline fixture writes its bytes with `content:`",
+                        described.name
+                    ),
+                });
+            };
+            let path = base.join(&relative);
+            Some(std::fs::read(&path).map_err(|source| FixtureError::Io {
+                path: path.display().to_string(),
+                source,
+            })?)
+        }
+        (None, None) => None,
+    };
+    Ok(FixtureEntry {
+        name: described.name,
+        sha256: described.sha256,
+        directory: described.directory,
+        content,
+    })
+}
+
 /// A fake machine for tests. Registry keys, value names, directory paths and environment variable names
 /// are case-insensitive, like Windows.
 #[derive(Debug, Clone)]
@@ -129,7 +197,7 @@ pub struct FixtureHost {
     elevated: Option<bool>,
     registry: BTreeMap<String, BTreeMap<String, RegistryValue>>,
     env: BTreeMap<String, String>,
-    filesystem: BTreeMap<String, Vec<FixtureFile>>,
+    filesystem: BTreeMap<String, Vec<FixtureEntry>>,
     access_denied: Vec<String>,
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
@@ -137,18 +205,26 @@ pub struct FixtureHost {
 }
 
 impl FixtureHost {
-    /// Loads `<dir>/host.yaml`.
+    /// Loads `<dir>/host.yaml`. A `from:` in it is read relative to `dir`.
     pub fn load(dir: &Path) -> Result<Self, FixtureError> {
         let path = dir.join("host.yaml");
         let text = std::fs::read_to_string(&path).map_err(|source| FixtureError::Io {
             path: path.display().to_string(),
             source,
         })?;
-        Self::from_yaml_str(&text, &path.display().to_string())
+        Self::parse(&text, &path.display().to_string(), Some(dir))
     }
 
     /// Parses a fixture host from YAML; `origin` is used in error messages.
+    ///
+    /// An inline fixture has no directory for a relative path to start from, so a file entry that
+    /// uses `from:` is rejected here and must use `content:` instead.
     pub fn from_yaml_str(yaml: &str, origin: &str) -> Result<Self, FixtureError> {
+        Self::parse(yaml, origin, None)
+    }
+
+    /// `base` is the directory a `from:` resolves against, or `None` for an inline fixture.
+    fn parse(yaml: &str, origin: &str, base: Option<&Path>) -> Result<Self, FixtureError> {
         let file: HostFile = serde_saphyr::from_str(yaml).map_err(|e| FixtureError::Parse {
             path: origin.to_owned(),
             message: e.to_string(),
@@ -169,11 +245,14 @@ impl FixtureHost {
             .into_iter()
             .map(|(name, value)| (name.to_ascii_lowercase(), value))
             .collect();
-        let filesystem = file
-            .filesystem
-            .into_iter()
-            .map(|(dir, files)| (normalise_path(&dir), files))
-            .collect();
+        let mut filesystem = BTreeMap::new();
+        for (dir, files) in file.filesystem {
+            let mut entries = Vec::with_capacity(files.len());
+            for described in files {
+                entries.push(resolve_file(described, origin, base)?);
+            }
+            filesystem.insert(normalise_path(&dir), entries);
+        }
         Ok(Self {
             platform: file.platform,
             os_build: file.os_build,
@@ -284,6 +363,36 @@ impl FilesystemSource for FixtureHost {
             .clone()
             .ok_or_else(|| SourceError::Failed(format!("no sha256 recorded for {path}")))
     }
+
+    /// The bytes the fixture wrote for that file, through the same limit a live host applies.
+    ///
+    /// A file the fixture never listed does not exist, which is `Ok(None)`. A file it listed without
+    /// `content:` or `from:` exists and cannot be read, which is the per-file failure `sha256` already
+    /// models the same way — not `Unsupported`, which is reserved for a whole block the fixture never
+    /// described.
+    fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(file) = self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+        }) else {
+            return Ok(None);
+        };
+        if file.directory {
+            return Err(SourceError::Failed(format!("not a file: {path}")));
+        }
+        let content = file
+            .content
+            .as_ref()
+            .ok_or_else(|| SourceError::Failed(format!("no content recorded for {path}")))?;
+        crate::read_bounded(content.as_slice(), crate::MAX_FILE_BYTES).map(Some)
+    }
 }
 
 impl EnvironmentSource for FixtureHost {
@@ -373,6 +482,7 @@ filesystem:
   'C:\Users\fixtureuser\AppData\Local\Example':
     - name: readable.dll
       sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      content: "the bytes of readable.dll"
     - name: unreadable.dll
     - name: cache
       directory: true
@@ -511,6 +621,104 @@ processes:
             host.file_sha256(&format!(r"{dir}\x.dll")),
             Err(SourceError::AccessDenied)
         );
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\x.dll")),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    #[test]
+    fn file_content_is_read_case_insensitively() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Example";
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\READABLE.dll")),
+            Ok(Some(b"the bytes of readable.dll".to_vec()))
+        );
+    }
+
+    /// The two shapes a fixture can describe without writing bytes, and they are different answers:
+    /// a file nobody listed is not on this machine, while one listed without bytes is there and
+    /// cannot be read.
+    #[test]
+    fn an_absent_file_is_none_and_a_listed_one_without_bytes_fails() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Example";
+        assert_eq!(host.read_file(&format!(r"{dir}\absent.dll")), Ok(None));
+        assert_eq!(host.read_file(r"C:\Nowhere\at\all.dll"), Ok(None));
+        assert!(matches!(
+            host.read_file(&format!(r"{dir}\unreadable.dll")),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// `list_dir` says which entries are files; asking for a directory's bytes is a caller's mistake
+    /// and is reported as one rather than as an empty file.
+    #[test]
+    fn a_directory_has_no_bytes() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert!(matches!(
+            host.read_file(r"C:\Users\fixtureuser\AppData\Local\Example\cache"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_file_describing_its_bytes_twice_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.txt\n      content: \"a\"\n      from: 'b.txt'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("content"), "{error}");
+    }
+
+    /// `from:` is how a fixture reaches the artifact corpora in `fixtures/`, so it is tested against
+    /// a real one: the file is CRLF-terminated, which a read that went through text would change.
+    #[test]
+    fn a_loaded_fixture_resolves_from_against_its_own_directory() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+        let host = FixtureHost::load(&fixtures.join("hosts/file-content-present")).unwrap();
+        let dir = r"C:\ProgramData\fixture";
+
+        let on_disk = std::fs::read(fixtures.join("parsers/pca-app-launch/normal.txt")).unwrap();
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\from-disk.txt")),
+            Ok(Some(on_disk))
+        );
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\inline.txt")),
+            Ok(Some(b"hello\n".to_vec()))
+        );
+        assert!(matches!(
+            host.read_file(&format!(r"{dir}\unreadable.bin")),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// A `from:` that does not resolve is a broken fixture, and it says so when it is loaded rather
+    /// than looking like a file whose bytes cannot be read.
+    #[test]
+    fn a_from_path_that_does_not_exist_fails_at_load() {
+        let error = FixtureHost::parse(
+            "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.txt\n      from: 'no-such-file'\n",
+            "inline",
+            Some(Path::new(env!("CARGO_MANIFEST_DIR"))),
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Io { .. }), "{error}");
+    }
+
+    /// An inline fixture has no directory for a relative path to start from, so `from:` is refused
+    /// there instead of being resolved against whatever the test's working directory happens to be.
+    #[test]
+    fn from_needs_a_fixture_directory() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.txt\n      from: 'b.txt'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("from"), "{error}");
     }
 
     #[test]
@@ -624,6 +832,10 @@ processes:
         ));
         assert!(matches!(
             host.file_sha256(r"C:\x\y.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            host.read_file(r"C:\x\y.dll"),
             Err(SourceError::Unsupported(_))
         ));
     }

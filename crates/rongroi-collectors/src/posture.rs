@@ -109,12 +109,14 @@ fn record(
 
 /// How a failed source read is reported.
 ///
-/// `Unsupported` is reported the same way as `Failed`, as `fivem_dir` already does: in both cases the
-/// setting was not read, and nothing about it may be presented as "not found".
+/// `Unsupported` and `TooLarge` are reported the same way as `Failed`, as `fivem_dir` already does:
+/// in every case the setting was not read, and nothing about it may be presented as "not found".
 fn reason_for(error: &SourceError) -> UnmeasuredReason {
     match error {
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
-        SourceError::Unsupported(_) | SourceError::Failed(_) => UnmeasuredReason::ReadFailed,
+        SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
+            UnmeasuredReason::ReadFailed
+        }
     }
 }
 

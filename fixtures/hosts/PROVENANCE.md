@@ -16,6 +16,7 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
 | `process-own-trace` | Windows 11 running three processes: one whose image path cannot be resolved, one ordinary program, and aeterna-rongroi itself | `process` collector tests, report snapshots |
+| `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
 
@@ -25,6 +26,11 @@ Each one is a written profile; a setting in it is never changed to silence a rul
 
 The user name `fixtureuser` in these paths is invented; it exists so that SS-mode redaction has something
 to replace.
+
+A file entry may carry its bytes as well as its hash (ADR 0019): `content:` writes them inline, and
+`from:` names a file relative to the host's own directory, which is how a host reaches the artifact
+corpora in `fixtures/parsers/`, `fixtures/prefetch/` and `fixtures/evtx/`. Those corpora are inputs and
+are never written to; a host points at them and copies nothing.
 
 When a fixture is generated from a real Windows install (M2 onwards), record here: what generated it, the
 Windows build, that networking was disabled, and who checked it for a real user name, host name or SID, and
