@@ -16,9 +16,10 @@ pub const UNREDACTABLE_FORM: &str = "unredactable_form";
 
 /// The last segment of a Windows path, lower-cased.
 ///
-/// Lower-cased because a rule matches by exact equality and Windows does not care about the case a
-/// program was launched with, so `Cheat.exe` and `cheat.exe` have to reach a rule as one string.
-/// `path` is left exactly as the artifact spelled it, which is what CONVENTIONS.md defines it as.
+/// Lower-cased so that `Cheat.exe` and `cheat.exe` reach a report, and a rule author, as one string.
+/// It is no longer what makes a rule match: ADR 0025 made `match` fold ASCII case, so a rule naming
+/// either spelling matches either. `path` is left exactly as the artifact spelled it, which is what
+/// CONVENTIONS.md defines it as.
 pub fn file_name(path: &str) -> Option<String> {
     let name = path.rsplit(['\\', '/']).next()?;
     (!name.is_empty()).then(|| name.to_ascii_lowercase())

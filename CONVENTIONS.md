@@ -22,6 +22,7 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **unmatched observation** | Something a Collector saw that no Rule matched; shown in Self mode only, counted in SS mode | `rongroi_core::model::UnmatchedGroup` |
 | **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
 | **retention window** | How far back a source can see, in words shown to the user | `Rule::retention` |
+| **cased** | A `match` field a Rule compares byte for byte; every other string folds ASCII case (ADR 0025) | `Rule::cased` |
 | **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |
 | **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `rongroi_core::bundle` |
 | **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `rongroi_core::provenance` |
@@ -90,6 +91,7 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | `id` is a UUIDv4 and is never reused, even after deletion | `check-rules` |
 | English `title`, `description`, `falsepositives` live in the rule; translations in `rules/i18n/<lang>.yaml` | `check-rules` · `check-locales` |
 | `status: test` or `stable` requires at least one positive and one negative fixture in `tests/` | `check-rules` |
+| `match` strings compare without regard to ASCII case; `cased` names the fields compared exactly | `check-rules` · engine tests |
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
 | `falsepositives` is never empty — write what legitimately produces this evidence | `check-rules` |
 
