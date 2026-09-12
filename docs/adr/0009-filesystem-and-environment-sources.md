@@ -47,8 +47,14 @@ machine is written, renamed, locked or touched.
 ordinary overlay software on a great many legitimate machines, and neither an allow-list of known-good
 hashes nor Authenticode signer checking exists yet — and `allow` may only identify software by `sha256` or
 `signer`, never by file name. Shipping the rule now would produce evidence that a reviewer could not act
-on. The observations are still visible in Self mode, where a person reads them. The rule follows once
-signer checking or a starter allow-list exists.
+on. The rule follows once signer checking or a starter allow-list exists.
+
+This ADR originally continued: *"The observations are still visible in Self mode, where a person reads
+them."* That was false when it was written. A `Report` held one `Evidence` per rule, and an
+observation reached it only inside `EvidenceState::Found`, so a collector with no rule produced
+nothing any screen could show and everything this one read was discarded. ADR 0014 makes the sentence
+true: an observation that no rule matched is kept as an **unmatched observation**, listed in Self mode
+and counted — never listed — in SS mode.
 
 ## Consequences
 

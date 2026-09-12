@@ -15,8 +15,9 @@ Host ─► Collectors ─► CollectorRun ─► Engine (+ embedded rules bundl
    - `Measured { observations, gaps }` — what it saw, plus fields it could not read and why
    - `Unmeasured { reason }` — it could not look at all
 3. **Engine** — evaluates every rule in the embedded bundle against the runs. Pure: no I/O, no clock.
-4. **Report** — header (provenance, bundle hash, platform, elevation, time), one `Evidence` per rule, and
-   the `own_traces` the engine separated out. The report is frozen before any UI starts.
+4. **Report** — header (provenance, bundle hash, platform, elevation, time), one `Evidence` per rule,
+   the `own_traces` the engine separated out, and the `unmatched` observations no rule matched. The
+   report is frozen before any UI starts.
 5. **View** — `view::for_mode` decides what an audience may see. The UI only renders a view.
 
 Before any rule runs, the engine moves every observation that describes **this program** — its own path or
@@ -24,6 +25,13 @@ its own SHA-256 — out of the runs and into `own_traces`. aeterna-rongroi is ru
 collector that enumerates the machine sees it; separating that visibly, rather than deleting it, keeps the
 evidence about the PC and the trace of the tool apart without hiding either (ADR 0010). What "this program"
 is arrives in `ScanContext` from each binary's `main`, so a fixture can exercise the whole path.
+
+After the rules have run, every observation that **no** rule matched is kept as an *unmatched
+observation*, grouped by collector. Evidence carries observations only where a rule matched, so without
+this a collector that ships with no rule — `fivem_dir` and `process` both do — would read the machine on
+every scan and have its reading discarded. It is the complement of "matched at least one rule": an
+observation one rule matched is evidence under that rule and is not repeated here because a second rule
+did not match it. Own traces are taken out first, so one is never also an unmatched observation (ADR 0014).
 
 The CLI and the desktop app both call `rongroi_collectors::scan::run`, so they cannot disagree about a result.
 
@@ -64,6 +72,7 @@ that was never read would be false. There is no score and no overall verdict (AD
 | Shows | every piece of evidence | `found` evidence and all `posture` evidence |
 | Other evidence | shown | counted in `hidden.not_found` / `hidden.unmeasured` |
 | Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
+| Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |
 | Paths | as read | `X:\Users\<name>` → `%USERPROFILE%`, in evidence and own traces alike |
 
 Redaction is implemented and tested in `rongroi-core::view` (AGENTS.md hard rule 5).

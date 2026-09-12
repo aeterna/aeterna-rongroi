@@ -7,7 +7,7 @@
 use crate::bundle::Bundle;
 use crate::model::{
     CollectorRun, Evidence, EvidenceState, Observation, OwnTraceEntry, Report, ReportHeader,
-    UnmeasuredReason,
+    UnmatchedGroup, UnmeasuredReason,
 };
 use crate::rules::{Rule, Status};
 
@@ -60,18 +60,56 @@ pub fn evaluate(
     self_identity: &SelfIdentity,
 ) -> Report {
     let (runs, own_traces) = partition_own_traces(runs, self_identity);
-    let evidence = bundle
+    let active: Vec<&Rule> = bundle
         .rules()
         .iter()
         .map(|sourced| &sourced.rule)
         .filter(|rule| rule.status != Status::Deprecated)
+        .collect();
+    let evidence = active
+        .iter()
         .map(|rule| evaluate_rule(rule, &runs))
         .collect();
+    let unmatched = unmatched_observations(&runs, &active);
     Report {
         header,
         evidence,
         own_traces,
+        unmatched,
     }
+}
+
+/// What the collectors saw that no rule matched, grouped by collector (ADR 0014).
+///
+/// This is the complement of "matched at least one rule", never the union of what each rule
+/// rejected: an observation one rule matched is already evidence under that rule, and listing it
+/// here as well because a second rule did not match it would show nearly everything twice.
+///
+/// `runs` has already had the own traces taken out of it, so an own trace is never also an unmatched
+/// observation. A collector with nothing left over contributes no group rather than an empty one,
+/// and a run that could not look contributes none either — it saw nothing to leave unmatched.
+fn unmatched_observations(runs: &[CollectorRun], active: &[&Rule]) -> Vec<UnmatchedGroup> {
+    runs.iter()
+        .filter_map(|run| {
+            let CollectorRun::Measured {
+                collector,
+                observations,
+                ..
+            } = run
+            else {
+                return None;
+            };
+            let observations: Vec<Observation> = observations
+                .iter()
+                .filter(|observation| !active.iter().any(|rule| matches(rule, observation)))
+                .cloned()
+                .collect();
+            (!observations.is_empty()).then(|| UnmatchedGroup {
+                collector: collector.clone(),
+                observations,
+            })
+        })
+        .collect()
 }
 
 /// Moves the observations that describe this program out of the runs and into their own bucket.
@@ -214,17 +252,62 @@ author: a
 date: 2026-09-12
 ";
 
+    /// A second rule on the same collector, so that "matched at least one rule" can be told apart
+    /// from "matched every rule".
+    const FIVEM_RULE: &str = "id: 3d7b2a90-5e14-4f6c-8b03-1a2c4d5e6f70
+title: t
+description: d
+status: experimental
+collector: process
+strength: presence
+match:
+  name: FiveM.exe
+retention: Running processes only.
+falsepositives: [x]
+author: a
+date: 2026-09-12
+";
+
     fn our_sha256() -> String {
         "b".repeat(64)
     }
 
     fn bundle_with(rule_yaml: &str) -> Bundle {
-        let json = serde_json::json!({
-            "rules": [{ "path": "process/identity/own-trace/rule.yaml", "yaml": rule_yaml }],
-            "i18n": [],
-        })
-        .to_string();
+        bundle_of(&[rule_yaml])
+    }
+
+    /// A bundle of `rules` in the order given, each at a path of its own.
+    fn bundle_of(rules: &[&str]) -> Bundle {
+        let files: Vec<serde_json::Value> = rules
+            .iter()
+            .enumerate()
+            .map(|(i, yaml)| {
+                serde_json::json!({
+                    "path": format!("process/identity/rule-{i}/rule.yaml"),
+                    "yaml": yaml,
+                })
+            })
+            .collect();
+        let json = serde_json::json!({ "rules": files, "i18n": [] }).to_string();
         Bundle::from_bundle_json(&json).unwrap()
+    }
+
+    /// [`FIVEM_RULE`] with an `allow` entry, under an id of its own so the two never collide.
+    fn allowing(hash: &str) -> String {
+        format!(
+            "{}allow:\n  - sha256: {hash}\n",
+            FIVEM_RULE.replace(
+                "3d7b2a90-5e14-4f6c-8b03-1a2c4d5e6f70",
+                "5c9e1d04-7a3b-4e82-9f61-0d2b8c4a6e13",
+            )
+        )
+    }
+
+    fn unmatched_process(observations: Vec<Observation>) -> Vec<UnmatchedGroup> {
+        vec![UnmatchedGroup {
+            collector: "process".to_owned(),
+            observations,
+        }]
     }
 
     fn header() -> ReportHeader {
@@ -372,6 +455,118 @@ date: 2026-09-12
             report.evidence[0].state,
             EvidenceState::Found { .. }
         ));
+    }
+
+    /// A collector whose observations no rule reads produces nothing a screen can show unless they
+    /// are kept: evidence carries observations only inside `Found` (ADR 0014).
+    #[test]
+    fn an_observation_no_rule_matched_becomes_an_unmatched_observation() {
+        let bundle = bundle_of(&[PROCESS_RULE]);
+        let theirs = process_observation(&[("name", "FiveM.exe"), ("path", r"C:\Games\FiveM.exe")]);
+        let report = evaluate(
+            &bundle,
+            &[process_run(vec![theirs.clone()])],
+            header(),
+            &ours_by_path(),
+        );
+        assert_eq!(report.unmatched, unmatched_process(vec![theirs]));
+    }
+
+    /// The obvious wrong implementation — treating every rule's non-match as unmatched — would list
+    /// this observation, which one of the two rules did match. Unmatched is the complement of
+    /// "matched at least one rule", never the union of what each rule rejected.
+    #[test]
+    fn an_observation_one_rule_matched_is_not_unmatched_because_another_did_not() {
+        let bundle = bundle_of(&[PROCESS_RULE, FIVEM_RULE]);
+        let theirs = process_observation(&[("name", "FiveM.exe"), ("path", r"C:\Games\FiveM.exe")]);
+        let report = evaluate(
+            &bundle,
+            &[process_run(vec![theirs])],
+            header(),
+            &ours_by_path(),
+        );
+        let found: Vec<bool> = report
+            .evidence
+            .iter()
+            .map(|item| matches!(item.state, EvidenceState::Found { .. }))
+            .collect();
+        assert_eq!(found, [false, true], "{:?}", report.evidence);
+        assert!(report.unmatched.is_empty(), "{:?}", report.unmatched);
+    }
+
+    /// `allow` is part of what `matches` means, so an observation a rule excluded was not matched by
+    /// that rule. Nothing else matched it either, and it must stay visible rather than fall between
+    /// the rule and the report.
+    #[test]
+    fn an_observation_a_rules_allow_list_excluded_is_unmatched_not_dropped() {
+        let hash = "a".repeat(64);
+        let bundle = bundle_of(&[&allowing(&hash)]);
+        let allowed = process_observation(&[("name", "FiveM.exe"), ("sha256", &hash)]);
+        let report = evaluate(
+            &bundle,
+            &[process_run(vec![allowed.clone()])],
+            header(),
+            &ours_by_path(),
+        );
+        assert!(
+            matches!(report.evidence[0].state, EvidenceState::NotFound { .. }),
+            "{:?}",
+            report.evidence[0]
+        );
+        assert_eq!(report.unmatched, unmatched_process(vec![allowed]));
+    }
+
+    /// Own traces are partitioned out before any rule is evaluated, so the tool's own process is in
+    /// `own_traces` and never also in `unmatched` — where, with no rule reading `process`, it would
+    /// otherwise land and be shown twice.
+    #[test]
+    fn an_own_trace_is_never_also_an_unmatched_observation() {
+        let bundle = bundle_of(&[PROCESS_RULE]);
+        let ours = process_observation(&[("name", "aeterna-rongroi.exe"), ("path", OUR_EXE)]);
+        let theirs = process_observation(&[("name", "FiveM.exe")]);
+        let report = evaluate(
+            &bundle,
+            &[process_run(vec![ours.clone(), theirs.clone()])],
+            header(),
+            &ours_by_path(),
+        );
+        assert_eq!(report.own_traces.len(), 1, "{:?}", report.own_traces);
+        assert_eq!(report.own_traces[0].observation, ours);
+        assert_eq!(report.unmatched, unmatched_process(vec![theirs]));
+    }
+
+    /// `fivem_dir` and `process` both ship without a rule. They read the machine on every scan, and
+    /// everything they saw is unmatched.
+    #[test]
+    fn with_no_rules_at_all_every_observation_is_unmatched() {
+        let bundle = bundle_of(&[]);
+        let first = process_observation(&[("name", "FiveM.exe")]);
+        let second = process_observation(&[("name", "steam.exe")]);
+        let report = evaluate(
+            &bundle,
+            &[process_run(vec![first.clone(), second.clone()])],
+            header(),
+            &SelfIdentity::default(),
+        );
+        assert!(report.evidence.is_empty(), "{:?}", report.evidence);
+        assert_eq!(report.unmatched, unmatched_process(vec![first, second]));
+    }
+
+    /// A collector that saw only things a rule matched, and one that could not look at all, each
+    /// contribute no group — not an empty one.
+    #[test]
+    fn a_collector_with_nothing_unmatched_contributes_no_group() {
+        let bundle = bundle_of(&[FIVEM_RULE]);
+        let theirs = process_observation(&[("name", "FiveM.exe")]);
+        let runs = [
+            process_run(vec![theirs]),
+            CollectorRun::Unmeasured {
+                collector: "posture".to_owned(),
+                reason: UnmeasuredReason::NotWindows,
+            },
+        ];
+        let report = evaluate(&bundle, &runs, header(), &ours_by_path());
+        assert!(report.unmatched.is_empty(), "{:?}", report.unmatched);
     }
 
     fn rule(extra: &str) -> Rule {

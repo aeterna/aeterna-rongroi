@@ -6,7 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Evidence, EvidenceState, Mode, OwnTraceEntry, Report, ReportHeader, Strength};
+use crate::model::{
+    Evidence, EvidenceState, Mode, OwnTraceEntry, Report, ReportHeader, Strength, UnmatchedGroup,
+};
 
 /// Replacement for the user-profile part of a path in SS mode.
 pub const USERPROFILE_PLACEHOLDER: &str = "%USERPROFILE%";
@@ -18,6 +20,8 @@ pub struct HiddenCounts {
     pub not_found: usize,
     /// Rules that could not look.
     pub unmeasured: usize,
+    /// Unmatched observations. SS mode counts them instead of listing them (ADR 0014).
+    pub unmatched: usize,
 }
 
 /// A report as one audience may see it.
@@ -32,6 +36,9 @@ pub struct ReportView {
     /// What this program itself left in what the collectors saw. Shown in both modes: hiding "this
     /// was us" from the person watching a screenshare would be less transparent, not more (ADR 0010).
     pub own_traces: Vec<OwnTraceEntry>,
+    /// What the collectors saw that no rule matched. Self mode lists it; SS mode leaves it empty
+    /// and counts it in `hidden.unmatched` (ADR 0014).
+    pub unmatched: Vec<UnmatchedGroup>,
     /// What this view does not list.
     pub hidden: HiddenCounts,
 }
@@ -40,7 +47,8 @@ pub struct ReportView {
 ///
 /// - Self: everything, unchanged.
 /// - SS: `Found` evidence and all posture evidence; other evidence is only counted; user names in
-///   paths are replaced with [`USERPROFILE_PLACEHOLDER`].
+///   paths are replaced with [`USERPROFILE_PLACEHOLDER`]; unmatched observations are counted and
+///   none are listed (ADR 0014).
 pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
     match mode {
         Mode::SelfCheck => ReportView {
@@ -48,6 +56,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
             header: report.header.clone(),
             evidence: report.evidence.clone(),
             own_traces: report.own_traces.clone(),
+            unmatched: report.unmatched.clone(),
             hidden: HiddenCounts::default(),
         },
         Mode::Ss => {
@@ -64,11 +73,20 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
                     hidden.unmeasured += 1;
                 }
             }
+            // Counted, never listed. SS mode promises the person being screenshared that only what
+            // matches a rule is shown; a raw listing of every file and process name a collector saw
+            // would break that promise, and no redaction pass makes such a listing safe (ADR 0014).
+            hidden.unmatched = report
+                .unmatched
+                .iter()
+                .map(|group| group.observations.len())
+                .sum();
             ReportView {
                 mode,
                 header: report.header.clone(),
                 evidence,
                 own_traces: report.own_traces.iter().map(redacted_own_trace).collect(),
+                unmatched: Vec::new(),
                 hidden,
             }
         }
@@ -144,7 +162,7 @@ mod tests {
 
     use super::*;
     use crate::bundle::BundleInfo;
-    use crate::model::{Observation, UnmeasuredReason};
+    use crate::model::{Observation, UnmatchedGroup, UnmeasuredReason};
     use crate::provenance::Provenance;
 
     const USER: &str = "fixtureuser";
@@ -251,6 +269,19 @@ mod tests {
                     ]),
                 },
             }],
+            // What `fivem_dir` saw: it ships with no rule, so nothing about this file matched one.
+            unmatched: vec![UnmatchedGroup {
+                collector: "fivem_dir".to_owned(),
+                observations: vec![Observation {
+                    collector: "fivem_dir".to_owned(),
+                    fields: BTreeMap::from([(
+                        "path".to_owned(),
+                        serde_json::Value::from(format!(
+                            r"C:\Users\{USER}\AppData\Local\FiveM\FiveM.app\plugins\overlay.dll"
+                        )),
+                    )]),
+                }],
+            }],
         }
     }
 
@@ -271,9 +302,31 @@ mod tests {
             view.hidden,
             HiddenCounts {
                 not_found: 1,
-                unmeasured: 1
+                unmeasured: 1,
+                unmatched: 1
             }
         );
+    }
+
+    /// Self mode passes unmatched observations through whole. For a collector that ships without a
+    /// rule they are the only place what it saw can be read at all (ADR 0014).
+    #[test]
+    fn self_view_shows_unmatched_observations() {
+        let report = report();
+        assert_eq!(
+            for_mode(&report, Mode::SelfCheck).unmatched,
+            report.unmatched
+        );
+    }
+
+    /// SS mode's promise is "only what matches a rule, paths redacted". A raw listing of every file
+    /// and process name a collector saw would break that promise whatever the redaction, so SS mode
+    /// counts unmatched observations and lists none of them (ADR 0014).
+    #[test]
+    fn ss_view_lists_no_unmatched_observations_and_counts_them() {
+        let view = for_mode(&report(), Mode::Ss);
+        assert!(view.unmatched.is_empty(), "{:?}", view.unmatched);
+        assert_eq!(view.hidden.unmatched, 1);
     }
 
     /// Own traces are transparency about the tool, not evidence about the machine, so SS mode's

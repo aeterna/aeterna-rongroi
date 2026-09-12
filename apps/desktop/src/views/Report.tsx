@@ -85,11 +85,31 @@ export function Report({ mode, onBack }: Props) {
         </section>
       )}
 
+      {/* After the evidence and the own traces: what the collectors saw that no rule matched. Self
+          mode lists it; in SS mode the list is empty and it is counted below instead (ADR 0014). */}
+      {view.unmatched.length > 0 && (
+        <section className="unmatched" aria-labelledby="unmatched-title">
+          <h3 id="unmatched-title">{t("unmatched.title")}</h3>
+          <p className="muted">{t("unmatched.note")}</p>
+          <ul className="evidence">
+            {view.unmatched.flatMap((group) =>
+              group.observations.map((observation) => (
+                <li key={`${group.collector}:${fieldsOf(observation)}`}>
+                  <span className="muted">({group.collector})</span>
+                  <div className="detail">{fieldsOf(observation)}</div>
+                </li>
+              )),
+            )}
+          </ul>
+        </section>
+      )}
+
       {mode === "ss" && (
         <p className="muted">
           {t("hidden", {
             notFound: view.hidden.not_found,
             unmeasured: view.hidden.unmeasured,
+            unmatched: view.hidden.unmatched,
           })}
         </p>
       )}

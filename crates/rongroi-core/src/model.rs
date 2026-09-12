@@ -203,6 +203,20 @@ pub struct OwnTraceEntry {
     pub observation: Observation,
 }
 
+/// Observations of one collector that no rule matched.
+///
+/// A collector reads the machine whether or not a rule asks about what it finds, and an observation
+/// reaches [`Evidence`] only inside [`EvidenceState::Found`]. Without this bucket, everything a
+/// collector saw that no rule matched would be read and then discarded (ADR 0014).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnmatchedGroup {
+    /// Id of the collector that saw them.
+    pub collector: String,
+    /// The observations, as that collector reported them.
+    pub observations: Vec<Observation>,
+}
+
 /// A full scan result, before a view decides what to show.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Report {
@@ -214,4 +228,9 @@ pub struct Report {
     /// [`REPORT_SCHEMA_VERSION`] change: a report written before it existed reads back with none.
     #[serde(default)]
     pub own_traces: Vec<OwnTraceEntry>,
+    /// Unmatched observations: what the collectors saw that no rule matched, grouped by collector.
+    /// Additive like `own_traces`, and for the same reason: a report written before it existed
+    /// reads back with none, which is what it meant (ADR 0014).
+    #[serde(default)]
+    pub unmatched: Vec<UnmatchedGroup>,
 }

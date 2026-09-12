@@ -61,13 +61,25 @@ export interface OwnTraceEntry {
   observation: Observation;
 }
 
+/**
+ * Observations of one collector that no rule matched. A collector reads the machine whether or not a
+ * rule asks about what it finds, and evidence carries observations only where a rule matched, so
+ * without this bucket what such a collector saw would be read and then discarded (ADR 0014).
+ */
+export interface UnmatchedGroup {
+  collector: string;
+  observations: Observation[];
+}
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
   evidence: Evidence[];
   /** Shown in both modes: hiding "this was us" from an SS viewer would tell them less, not more. */
   own_traces: OwnTraceEntry[];
-  hidden: { not_found: number; unmeasured: number };
+  /** Self mode lists these; SS mode leaves the list empty and counts them in `hidden.unmatched`. */
+  unmatched: UnmatchedGroup[];
+  hidden: { not_found: number; unmeasured: number; unmatched: number };
 }
 
 export interface RuleText {

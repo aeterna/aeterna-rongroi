@@ -55,21 +55,27 @@ fn unreported_secure_boot_is_unmeasured_not_not_found() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
+/// No rule reads `fivem_dir` (ADR 0009), so every file it saw is an unmatched observation. Self
+/// mode is where a person reads them — which is what ADR 0009 claimed and what, until ADR 0014,
+/// nothing in the code did: an observation reached a view only inside `Found` evidence.
 #[test]
 fn fivem_dir_plugin_present_self_view() {
     let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::SelfCheck);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(json.contains(r"plugins\\example-plugin.dll"), "{json}");
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
 #[test]
 fn fivem_dir_plugin_present_ss_view() {
     let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::Ss);
-    // The fixture's files live under `C:\Users\fixtureuser\...`. No rule reads `fivem_dir` yet
-    // (ADR 0009), so no observation of it reaches a view at all; this holds the line for the day one
-    // does. What proves the redaction itself is `rongroi_core::view`, which redacts a path of exactly
-    // this shape.
+    // The fixture's files live under `C:\Users\fixtureuser\...`. SS mode counts unmatched
+    // observations and lists none of them, so neither the user name nor the file names reach the
+    // person watching. This is the assertion the earlier version of this test could not make,
+    // because nothing of this collector reached a view at all (ADR 0014).
     let json = serde_json::to_string(&view).unwrap();
     assert!(!json.contains("fixtureuser"), "{json}");
+    assert!(!json.contains("example-plugin.dll"), "{json}");
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
@@ -90,6 +96,13 @@ fn process_own_trace_self_view() {
     let report = report_for_self("process-own-trace", scanning_ourselves());
     // One of the three processes the fixture describes is ours; the other two stayed in the run.
     assert_eq!(report.own_traces.len(), 1);
+    // Those other two are unmatched observations — no rule reads `process`. Own traces are taken
+    // out before any rule runs, so the one that is ours is not repeated among them (ADR 0014).
+    assert_eq!(report.unmatched.len(), 1, "{:?}", report.unmatched);
+    assert_eq!(report.unmatched[0].collector, "process");
+    assert_eq!(report.unmatched[0].observations.len(), 2);
+    let unmatched = serde_json::to_string(&report.unmatched).unwrap();
+    assert!(!unmatched.contains("aeterna-rongroi"), "{unmatched}");
     let view = view::for_mode(&report, Mode::SelfCheck);
     let evidence = serde_json::to_string(&view.evidence).unwrap();
     assert!(!evidence.contains("aeterna-rongroi"), "{evidence}");
