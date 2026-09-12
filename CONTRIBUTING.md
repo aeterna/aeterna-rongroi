@@ -14,6 +14,33 @@ Thanks for helping. Please read [AGENTS.md](AGENTS.md) (purpose boundary) and
 Most of the code builds and tests on macOS and Linux: collectors are tested against fake `C:\` folders.
 Anything that reads a real Windows machine is exercised in the Windows CI job.
 
+### Running a fuzz target
+
+The pinned toolchain does not provide this and neither does `cargo` by itself: `cargo-fuzz` drives libFuzzer
+through `-Z sanitizer`, which is nightly-only. You need both of these once:
+
+```bash
+rustup toolchain install nightly --profile minimal --component rust-src
+cargo +nightly install --locked cargo-fuzz
+```
+
+Then, from the repository root:
+
+```bash
+cargo +nightly fuzz build                     # all four targets
+cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam -- -max_total_time=60
+```
+
+The targets are `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general` and `fuzz_filetime`. The seed corpus is
+the fixture directory the L0 tests read, and it comes **second** because libFuzzer writes what it finds to the
+first directory — `fixtures/parsers/` is an input, never an output. A crashing input is saved under
+`fuzz/artifacts/`; reproduce it with `cargo +nightly fuzz run <target> <that file>`.
+
+`fuzz/` is its own workspace, excluded from the root one, so none of the commands above changes what
+`cargo build`, `cargo clippy`, `cargo nextest run` or `cargo deny check` do (ADR 0016). CI runs each target
+for 30 seconds on every pull request, which is a smoke gate; a real campaign is a local run of minutes or
+hours when you change a parser.
+
 ## Three ways to contribute
 
 | You want to add | Run | Then |

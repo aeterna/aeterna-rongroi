@@ -10,10 +10,30 @@
 | L3 report | the full pipeline, as JSON snapshots; SS view never contains the fixture user name | `crates/rongroi-collectors/tests/`, `rongroi-core::view` | macOS · Linux · Windows |
 | L4 UI | the GUI renders the L3 report JSON through mocked IPC; WebView hardening settings | `apps/desktop` (vitest) | macOS · Linux |
 | L5 live | real Windows: no panic, non-admin gives `unmeasured(not_admin)`, scanned folders unchanged, no files left outside the run's temp folder | Windows CI job and a Windows test machine | Windows |
-| Fuzz (M2) | parsers never panic on arbitrary bytes | `fuzz/` | Linux |
+| Fuzz | the parsers never panic, abort or hang on arbitrary bytes | `fuzz/fuzz_targets/`, seeded from `fixtures/parsers/` | Linux CI — a **30-second smoke run per target**, not a campaign |
 
 GitHub's Windows runners disable the SysMain and PCA services, so Prefetch and PCA collectors are expected to
 be `unmeasured` there. Those collectors are verified on a real Windows 11 machine.
+
+## The fuzz layer
+
+One target per public parser entry point — `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general`,
+`fuzz_filetime`. Each asserts nothing about the value it gets back: a malformed artifact is a typed
+`ParseError`, which is a correct answer, so the bug a target looks for is a panic, an abort or a hang.
+
+Two things about it are deliberate and are not a gap to be closed later (ADR 0016):
+
+- **cargo-fuzz needs nightly** — it drives libFuzzer through `-Z sanitizer`. `fuzz/` is therefore its own
+  workspace, excluded from the root one, and the CI job installs nightly for itself alone. Every other
+  command still runs on the 1.98.1 toolchain pinned in `rust-toolchain.toml` and never sees `fuzz/`.
+- **CI runs a smoke, not a campaign.** 30 seconds per target proves the targets still build against the
+  parsers' public API and that neither the seeds nor a short mutation run around them crashes. Finding a
+  deep bug takes hours; run one locally when changing a parser.
+
+Seeds are the fixtures the L0 tests already read — `fixtures/parsers/<artifact>/` — so a fixture added for a
+parser test is a fuzz seed too, and there is no second set of sample bytes to keep in step.
+`crates/rongroi-parsers/tests/fixtures.rs` is what holds the two ends together: it fails if a seed directory
+is renamed, emptied, or no longer named by `ci.yml`. A fuzzer handed an empty corpus still exits 0.
 
 ## Commands
 
@@ -23,7 +43,14 @@ cargo xtask check-rules                 # L2
 cargo insta review                      # after an intended change to a report snapshot
 pnpm -C apps/desktop test               # L4
 cargo check --target x86_64-pc-windows-msvc -p rongroi-host-windows   # type-check Windows code from any OS
+
+# Fuzz — needs a nightly toolchain and `cargo install --locked cargo-fuzz` (CONTRIBUTING.md)
+cargo +nightly fuzz build                                             # every target
+cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam -- -max_total_time=30
 ```
+
+libFuzzer writes what it finds to the **first** corpus directory and reads the rest as seeds, which is why
+`fixtures/parsers/` comes second: the fixtures are an input, never an output.
 
 ## Snapshots
 
@@ -45,6 +72,7 @@ confirm it fails:
 | Gate | Break it by |
 |---|---|
 | `cargo deny check` | adding `reqwest` to a crate |
+| `fuzz smoke` | giving a parser a panicking path — e.g. indexing `bytes[TAIL_OFFSET]` in `bam::parse_value` instead of reaching for it with `get` |
 | `check-rules` | duplicating a rule id, deleting a negative fixture, or allowing by `name:` |
 | `check-locales` | adding a key to a translation that English does not have |
 | `check-unicode` | inserting U+200B into any file |

@@ -12,6 +12,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   an older or unrecognised version is a typed error rather than a wrong parse. The decompressor is the
   `prefetch-core` crate, whose error type stops inside the parser module and never reaches the rest of
   the codebase (ADR 0015).
+- The fuzz layer `docs/testing.md` has promised since M2: one cargo-fuzz target per parser entry point,
+  seeded from the same fixtures the parser tests read, and a CI job that builds them and runs each for 30
+  seconds as a smoke gate. `fuzz/` is its own workspace because cargo-fuzz needs nightly, so the pinned
+  1.98.1 toolchain builds, lints and tests everything else exactly as before (ADR 0016).
 - Unmatched observations: what a collector saw that no rule matched is kept, grouped by collector, and
   listed in Self mode — the files in FiveM's plugin folder and the running processes, which no rule reads.
   SS mode counts them and lists none, because a raw listing of every file and program name is what that
