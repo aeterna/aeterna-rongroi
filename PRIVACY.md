@@ -3,12 +3,19 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's own folders, the list of running processes, what the Program Compatibility Assistant recorded
-about programs that ran and, in later versions, Prefetch, BAM and Windows event logs. Each collector
-is listed with what it reads in [docs/architecture.md](docs/architecture.md).
+FiveM's own folders, the list of running processes, what the Program Compatibility Assistant and
+Windows Prefetch recorded about programs that ran and, in later versions, BAM and Windows event logs.
+Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
 is on disk. It does not read what a program is doing, what is in its memory, or what you typed into it.
+
+Of a Prefetch file it reads the program's name, how many times Windows recorded it running and when it
+last ran. **A Prefetch file also lists every file that program loaded — normally hundreds of paths,
+some of them inside your own folders — and the disks it touched, including a serial number that
+identifies your PC. None of that is reported, in either mode.** Replacing your user name inside those
+paths would not help: the list itself is a description of what is on your PC, and this check has no use
+for it. The report says so, rather than leaving you to notice it is missing.
 
 The tool does **not** take screenshots, read browser history, access files unrelated to its collectors,
 or allow remote access.

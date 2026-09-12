@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# The expected shape of an ordinary scan: the Prefetch folder is there, Windows will not list it for
+# a process without administrator rights, and ADR 0015 records that reading it needs an elevated
+# token. That pair is what makes the reason `not_admin` rather than `access_denied`, and what makes
+# the restart-as-administrator offer worth taking (ADR 0012).
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: CMD.EXE-D269B812.pf
+      from: '../../prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf'
+access_denied:
+  - 'C:\Windows\Prefetch'

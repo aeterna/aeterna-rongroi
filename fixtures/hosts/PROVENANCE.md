@@ -23,6 +23,13 @@ none contains a real person's user name, host name, SID or files.
 | `pca-malformed-lines` | Windows 11 whose launch dictionary has good lines, a line with no delimiter, an impossible date, an empty path and a blank line | `pca` collector tests |
 | `pca-utf16-file` | Windows 11 whose launch dictionary is UTF-16 with a byte order mark — not a PCA text file at all | `pca` collector tests |
 | `pca-unredactable-path` | Windows 11 whose launch dictionary holds one drive-rooted path, one UNC path and one device path; only the first is a shape SS-mode redaction can reach | `pca` collector tests |
+| `prefetch-files-present` | Windows 11 with a readable Prefetch folder holding one `.pf` file, whose bytes are the vendored Windows 10 corpus file, plus the `ReadyBoot` directory and a non-`.pf` file that a real folder also has | `prefetch` collector tests, report snapshots |
+| `prefetch-not-present` | Windows with no Prefetch folder at all: Prefetch switched off, or an installation that never had it | `prefetch` collector tests |
+| `prefetch-access-denied` | Windows 11, the Prefetch folder present and unlistable, by a process without administrator rights — the expected shape of an ordinary scan (ADR 0015) | `prefetch` collector tests |
+| `prefetch-access-denied-elevated` | The same denial with those rights already held, where restarting as administrator would not help | `prefetch` collector tests |
+| `prefetch-file-unreadable` | Windows 11 with one `.pf` file listed and holding no bytes and one that is readable | `prefetch` collector tests |
+| `prefetch-unsupported-version` | Windows 11 whose Prefetch folder holds one SCCA v26 file from an older Windows, which this parser does not decode | `prefetch` collector tests |
+| `prefetch-corrupt-files` | Windows 11 whose Prefetch folder holds an intact `MAM` container over a payload that is not Xpress-Huffman, and the corpus's deliberately bad file | `prefetch` collector tests |
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
@@ -42,6 +49,16 @@ are never written to; a host points at them and copies nothing.
 The account names `alex`, `shareduser` and `deviceuser` that reach these hosts are invented in the same way,
 `alex` through the parser corpora in `fixtures/parsers/` and the other two inline in `pca-unredactable-path`.
 They are there so that a test can assert a name never reaches an observation.
+
+**One host reaches bytes that carry a real account name**, and it is the only one: the four
+`prefetch-*` hosts that point at `fixtures/prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf` inherit
+that file's string table, which holds the upstream author's one-letter account name and his machine's
+volume serial numbers (`fixtures/prefetch/PROVENANCE.md` records why it was vendored anyway). A
+one-letter name cannot be asserted absent — `contains("a")` is true of almost any JSON — so the
+`prefetch` collector's tests assert the *shapes* instead: no `\USERS\`, no `VOLUME{`, no
+`HARDDISKVOLUME` and no `.DLL` in the serialised observations, and no `loaded_files` or `volumes`
+field under any name. The collector emits neither field at all, which is what makes those assertions
+meaningful rather than lucky (ADR 0021).
 
 When a fixture is generated from a real Windows install (M2 onwards), record here: what generated it, the
 Windows build, that networking was disabled, and who checked it for a real user name, host name or SID, and
