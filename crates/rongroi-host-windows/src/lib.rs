@@ -16,6 +16,8 @@ pub mod filesystem;
 
 pub mod elevate;
 
+pub mod process;
+
 pub mod system_integrity;
 
 pub mod tpm;
