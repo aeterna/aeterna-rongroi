@@ -6,6 +6,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- A rule's `match` compared strings byte for byte, so a rule naming `C:\Windows\Temp\x.exe` did not match
+  an observation carrying `C:\WINDOWS\Temp\x.exe` and reported `not_found` — a silent miss shown as a
+  thing looked for and not there. Strings now compare without regard to ASCII case; a rule names in
+  `cased` any field it wants compared exactly, and a rule that says nothing gets the safe comparison.
+  Numbers, booleans and null are unchanged and are still never coerced. No shipped rule's behaviour
+  changes (ADR 0025).
 - Vendored `evtx`: a `u16` multiplication in `binxml/name.rs` that overflows on a name length above
   32767. Under overflow checks it panics; in an ordinary release build it wraps silently, leaving
   `data_size` short and the cursor in the wrong place with nothing reporting it. The patch widens

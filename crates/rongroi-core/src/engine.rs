@@ -193,15 +193,65 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
     }
 }
 
+/// Whether `observation` is one this rule asks to be shown.
+///
+/// The collector id is compared byte for byte: it is not an observation field but an identifier this
+/// repository chooses, and `rules::validate_path` already requires it to be `snake_case`.
+///
+/// A field the rule names and the observation does not carry is not a match, and cannot be: there is
+/// no way to write "this field is absent". Whether that silence is `not_found` or `unmeasured` is
+/// decided by `gaps` in [`evaluate_rule`], which is keyed on the rule's `match` field **names** —
+/// case folding changes values only, so `cased` changes nothing about which rules a gap reaches.
 fn matches(rule: &Rule, observation: &Observation) -> bool {
     observation.collector == rule.collector
-        && rule
-            .matcher
-            .iter()
-            .all(|(field, expected)| observation.fields.get(field) == Some(expected))
+        && rule.matcher.iter().all(|(field, expected)| {
+            observation.fields.get(field).is_some_and(|seen| {
+                value_matches(expected, seen, rule.cased.contains(field.as_str()))
+            })
+        })
         && !is_allowed(rule, observation)
 }
 
+/// Whether the value an observation carries is the value a rule asked for (ADR 0025).
+///
+/// Strings compare without regard to **ASCII** case unless the rule listed the field in `cased`.
+/// Windows compares paths and file names that way, and byte equality turns a rule that should have
+/// matched into `not_found` — which the report presents as a thing looked for and not there.
+///
+/// Numbers, booleans and null carry no case and keep `serde_json`'s own equality, which is typed:
+/// `1102` does not match `"1102"`, and does not match `1102.0` either. Arrays and objects recurse so
+/// that one sentence covers every string in a rule; no collector emits either shape today.
+fn value_matches(expected: &serde_json::Value, seen: &serde_json::Value, cased: bool) -> bool {
+    use serde_json::Value;
+    if cased {
+        return expected == seen;
+    }
+    match (expected, seen) {
+        (Value::String(expected), Value::String(seen)) => expected.eq_ignore_ascii_case(seen),
+        (Value::Array(expected), Value::Array(seen)) => {
+            expected.len() == seen.len()
+                && std::iter::zip(expected, seen)
+                    .all(|(expected, seen)| value_matches(expected, seen, false))
+        }
+        // Keys are names, not values, so they are compared exactly — as the `match` field names
+        // themselves are, being looked up in the observation's own map.
+        (Value::Object(expected), Value::Object(seen)) => {
+            expected.len() == seen.len()
+                && expected.iter().all(|(key, expected)| {
+                    seen.get(key)
+                        .is_some_and(|seen| value_matches(expected, seen, false))
+                })
+        }
+        _ => expected == seen,
+    }
+}
+
+/// Whether a rule excuses this observation.
+///
+/// `sha256` compares without regard to ASCII case because hex is written both ways; `signer` stays
+/// exact. ADR 0025 made a rule's `match` case-insensitive and deliberately left this alone: folding
+/// here widens an exclusion rather than a match, which is weakening a rule, and no collector in this
+/// repository has ever emitted a `signer` field to fold.
 fn is_allowed(rule: &Rule, observation: &Observation) -> bool {
     let field = |name: &str| {
         observation
@@ -655,6 +705,147 @@ date: 2026-09-12
                 reason: UnmeasuredReason::CollectorUnavailable
             }
         );
+    }
+
+    /// A rule on a `path`, in the case the rule's author happened to type it, and one observation
+    /// per collector whose path differs from it only in case.
+    fn path_rule(expected: &str, extra: &str) -> Rule {
+        let yaml = format!(
+            "id: 4a6b8c0d-1e2f-4a3b-8c5d-6e7f8a9b0c1d\ntitle: t\ndescription: d\nstatus: experimental\ncollector: process\nstrength: presence\nmatch:\n  path: \"{expected}\"\nretention: Running processes only.\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-13\n{extra}"
+        );
+        serde_saphyr::from_str(&yaml).unwrap()
+    }
+
+    fn found(evidence: &Evidence) -> bool {
+        matches!(evidence.state, EvidenceState::Found { .. })
+    }
+
+    /// The defect ADR 0025 fixes. Windows does not care which case a path was written in; byte
+    /// equality does, and the rule reported `not_found` — a thing looked for and not there.
+    #[test]
+    fn a_rule_matches_a_path_that_differs_only_in_case() {
+        let rule = path_rule(r"C:\\Windows\\Temp\\x.exe", "");
+        let run = process_run(vec![process_observation(&[(
+            "path",
+            r"C:\WINDOWS\Temp\X.EXE",
+        )])]);
+        assert!(found(&evaluate_rule(&rule, &[run])));
+    }
+
+    /// The other half: `cased` is the way back to byte equality, and it has to actually stop the
+    /// match above rather than be a word the engine ignores.
+    #[test]
+    fn a_cased_rule_does_not_match_a_path_that_differs_only_in_case() {
+        let rule = path_rule(r"C:\\Windows\\Temp\\x.exe", "cased: [path]\n");
+        let run = process_run(vec![process_observation(&[(
+            "path",
+            r"C:\WINDOWS\Temp\X.EXE",
+        )])]);
+        assert_eq!(
+            evaluate_rule(&rule, &[run]).state,
+            EvidenceState::NotFound {
+                retention: "Running processes only.".to_owned(),
+            }
+        );
+        // …and still matches the spelling it was written in.
+        let run = process_run(vec![process_observation(&[(
+            "path",
+            r"C:\Windows\Temp\x.exe",
+        )])]);
+        assert!(found(&evaluate_rule(&rule, &[run])));
+    }
+
+    /// `cased` is per field, so one rule can compare a path loosely and something else exactly.
+    #[test]
+    fn cased_binds_only_the_field_it_names() {
+        let yaml = "id: 9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a\ntitle: t\ndescription: d\nstatus: experimental\ncollector: process\nstrength: presence\nmatch:\n  path: \"C:\\\\Games\\\\FiveM.exe\"\n  name: fivem.exe\ncased: [name]\nretention: Running processes only.\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-13\n";
+        let rule: Rule = serde_saphyr::from_str(yaml).unwrap();
+        let loose_path =
+            process_observation(&[("path", r"c:\games\fivem.exe"), ("name", "fivem.exe")]);
+        assert!(found(&evaluate_rule(
+            &rule,
+            &[process_run(vec![loose_path])]
+        )));
+        let loose_name =
+            process_observation(&[("path", r"C:\Games\FiveM.exe"), ("name", "FiveM.exe")]);
+        assert!(!found(&evaluate_rule(
+            &rule,
+            &[process_run(vec![loose_name])]
+        )));
+    }
+
+    /// What the ASCII fold does and does not reach. A Thai user folder passes through unchanged and
+    /// the ASCII part of the path still folds; a non-ASCII letter that differs in case does not
+    /// match, and this test is the record of that limit rather than a wish that it were otherwise.
+    #[test]
+    fn a_non_ascii_path_folds_in_its_ascii_part_only() {
+        let rule = path_rule(r"C:\\Users\\สมชาย\\Downloads\\loader.exe", "");
+        let run = process_run(vec![process_observation(&[(
+            "path",
+            r"C:\USERS\สมชาย\DOWNLOADS\LOADER.EXE",
+        )])]);
+        assert!(found(&evaluate_rule(&rule, &[run])));
+
+        let rule = path_rule(r"C:\\Users\\Sömchai\\loader.exe", "");
+        let run = process_run(vec![process_observation(&[(
+            "path",
+            r"C:\Users\SÖMCHAI\loader.exe",
+        )])]);
+        assert!(
+            !found(&evaluate_rule(&rule, &[run])),
+            "Ö and ö are not folded; the fold is ASCII-only (ADR 0025)"
+        );
+    }
+
+    /// Folding strings must not start folding types together. A rule that says the number 1102 asks
+    /// for the number, and an observation carrying the text `1102` is a different fact.
+    #[test]
+    fn a_number_is_not_compared_as_a_string() {
+        let yaml = "id: 1b2c3d4e-5f60-4718-9a2b-3c4d5e6f7081\ntitle: t\ndescription: d\nstatus: experimental\ncollector: process\nstrength: presence\nmatch:\n  event_id: 1102\nretention: Running processes only.\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-13\n";
+        let rule: Rule = serde_saphyr::from_str(yaml).unwrap();
+        let text = Observation {
+            collector: "process".to_owned(),
+            fields: BTreeMap::from([("event_id".to_owned(), serde_json::json!("1102"))]),
+        };
+        assert!(!found(&evaluate_rule(&rule, &[process_run(vec![text])])));
+        let number = Observation {
+            collector: "process".to_owned(),
+            fields: BTreeMap::from([("event_id".to_owned(), serde_json::json!(1102))]),
+        };
+        assert!(found(&evaluate_rule(&rule, &[process_run(vec![number])])));
+    }
+
+    /// A field the rule names and the observation does not carry stays a non-match, with `cased` and
+    /// without it. `is_some_and` over the lookup replaced an `Option` comparison; this holds it.
+    #[test]
+    fn a_field_the_observation_does_not_carry_is_not_a_match() {
+        for extra in ["", "cased: [path]\n"] {
+            let rule = path_rule(r"C:\\Windows\\Temp\\x.exe", extra);
+            let run = process_run(vec![process_observation(&[("name", "x.exe")])]);
+            assert_eq!(
+                evaluate_rule(&rule, &[run]).state,
+                EvidenceState::NotFound {
+                    retention: "Running processes only.".to_owned(),
+                },
+                "with `{extra}`"
+            );
+        }
+    }
+
+    /// Matching is one function, so an observation a rule matched only because of the fold is
+    /// evidence under that rule and not also an unmatched observation (ADR 0014).
+    #[test]
+    fn an_observation_matched_by_the_fold_is_not_also_unmatched() {
+        let bundle = bundle_of(&[FIVEM_RULE]);
+        let theirs = process_observation(&[("name", "fivem.EXE")]);
+        let report = evaluate(
+            &bundle,
+            &[process_run(vec![theirs])],
+            header(),
+            &ours_by_path(),
+        );
+        assert!(found(&report.evidence[0]), "{:?}", report.evidence[0]);
+        assert!(report.unmatched.is_empty(), "{:?}", report.unmatched);
     }
 
     #[test]

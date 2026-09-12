@@ -314,8 +314,8 @@ fn parse_failure(error: &ParseError) -> &'static str {
 ///
 /// Prefetch already stores a base name with no path in it, and Windows upper-cases it. Lower-casing
 /// is what makes it the same string a `pca` launch record emits as `name`, so a rule author learns
-/// one spelling rather than two — and a rule matches by exact equality, which `CMD.EXE` and
-/// `cmd.exe` would otherwise fail.
+/// one spelling rather than two, and a reader sees one. Since ADR 0025 it is not what makes a rule
+/// match `CMD.EXE`: `match` folds ASCII case.
 fn executable_name(executable: &str) -> Option<String> {
     let name = executable.trim();
     (!name.is_empty()).then(|| name.to_ascii_lowercase())

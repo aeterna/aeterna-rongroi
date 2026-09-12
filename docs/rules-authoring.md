@@ -23,7 +23,8 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `status` | yes | `experimental` · `test` · `stable` · `deprecated` |
 | `collector` | yes | must equal the first folder name |
 | `strength` | yes | `execution` · `presence` · `tamper` · `posture` · `context` |
-| `match` | yes | map of observation field → value; **all** must be equal to match |
+| `match` | yes | map of observation field → value; **all** must be equal to match. Strings compare without regard to ASCII case |
+| `cased` | no | fields of `match` compared byte for byte instead; everything left out folds case |
 | `allow` | no | legitimate software excluded by `sha256` or `signer` — never by file name |
 | `retention` | yes | how far back the source can see, in words for the user |
 | `unmeasured_when` | no | reason codes you expect on some machines |
@@ -39,9 +40,26 @@ Unknown fields are errors. Use `#` comments for notes.
 - If the collector could not look, the rule is `unmeasured` with the collector's reason.
 - Otherwise every observation whose fields equal all `match` entries is attached as `found` (minus `allow`ed
   software).
+- **Strings compare without regard to ASCII case** (ADR 0025): `path: "C:\\Windows\\Temp\\x.exe"` matches
+  `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in. Non-ASCII letters
+  are not folded — `Sömchai` does not match `SÖMCHAI`. Numbers, booleans and null are compared exactly and
+  are never coerced: `event_id: 1102` does not match the text `"1102"`, nor `1102.0`.
+- To compare one field byte for byte, name it in `cased`. It is per field, so the rest of `match` keeps
+  folding; a rule with no `cased` line is case-insensitive throughout. Naming a field `match` does not have
+  is an error, so a typo there cannot pass as an exact comparison that never happened.
 - If nothing matched but a field in `match` is listed in the run's `gaps`, the rule is `unmeasured` — never
-  `not_found`.
+  `not_found`. `cased` does not change that: `gaps` is keyed on the field names in `match`, not on values.
 - Otherwise the rule is `not_found`, and the report shows its `retention`.
+
+No rule ships with `cased` today. It looks like this, and needs a `#` comment saying why the field's own
+vocabulary distinguishes case:
+
+```yaml
+match:
+  path: "C:\\Windows\\Temp\\x.exe"    # matches C:\WINDOWS\TEMP\X.EXE
+  some_field: Exact Value
+cased: [some_field]
+```
 
 ## Fixtures
 

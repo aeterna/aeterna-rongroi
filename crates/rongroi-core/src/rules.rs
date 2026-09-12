@@ -94,6 +94,11 @@ pub struct Rule {
     /// Field values an observation must have, all of them, to match.
     #[serde(rename = "match")]
     pub matcher: BTreeMap<String, serde_json::Value>,
+    /// Fields of `match` whose strings are compared byte for byte instead of without regard to
+    /// ASCII case (ADR 0025). Every field left out of this list compares case-insensitively, so a
+    /// rule that says nothing gets the behaviour Windows has.
+    #[serde(default)]
+    pub cased: BTreeSet<String>,
     /// Legitimate software excluded from matching.
     #[serde(default)]
     pub allow: Vec<Allow>,
@@ -243,6 +248,14 @@ fn validate_rule(rule: &Rule, report: &mut impl FnMut(String)) {
     }
     if rule.matcher.is_empty() {
         report("`match` must name at least one field".to_owned());
+    }
+    for field in &rule.cased {
+        // A `cased` entry that names nothing is not harmless: it reads as "this field is compared
+        // exactly" while the field it meant is still compared case-insensitively, which is the kind
+        // of silent difference between what a rule says and what it does that ADR 0025 exists to end.
+        if !rule.matcher.contains_key(field) {
+            report(format!("`cased` names `{field}`, which `match` does not"));
+        }
     }
     if rule.falsepositives.is_empty() || rule.falsepositives.iter().any(|f| f.trim().is_empty()) {
         report("`falsepositives` must list what legitimately produces this evidence".to_owned());
@@ -429,6 +442,37 @@ date: 2026-09-11
         let rules = [sourced("posture/boot/example/rule.yaml", &yaml)];
         let problems = validate(&rules, &Translations::new());
         assert!(problems.iter().any(|p| p.message.contains("64 hex")));
+    }
+
+    /// A rule that says nothing about case is case-insensitive: the contributor who has never heard
+    /// of `cased` gets the safe comparison.
+    #[test]
+    fn a_rule_without_cased_names_no_case_sensitive_field() {
+        let rules = [sourced("posture/boot/example/rule.yaml", VALID)];
+        assert!(rules[0].rule.cased.is_empty());
+        assert_eq!(validate(&rules, &Translations::new()), vec![]);
+    }
+
+    /// A `cased` entry that matches no `match` field would read as an exact comparison while the
+    /// field it meant kept folding — the difference between what the rule says and what it does.
+    #[test]
+    fn cased_naming_a_field_match_does_not_have_is_rejected() {
+        let yaml = format!("{VALID}cased: [secure_bot]\n");
+        let rules = [sourced("posture/boot/example/rule.yaml", &yaml)];
+        let problems = validate(&rules, &Translations::new());
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.message.contains("`cased` names `secure_bot`")),
+            "{problems:?}"
+        );
+    }
+
+    #[test]
+    fn cased_naming_a_match_field_is_accepted() {
+        let yaml = format!("{VALID}cased: [secure_boot]\n");
+        let rules = [sourced("posture/boot/example/rule.yaml", &yaml)];
+        assert_eq!(validate(&rules, &Translations::new()), vec![]);
     }
 
     #[test]
