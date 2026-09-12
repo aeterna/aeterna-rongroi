@@ -25,6 +25,8 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
 | **retention window** | How far back a source can see, in words shown to the user | `Rule::retention` |
 | **cased** | A `match` field a Rule compares byte for byte; every other string folds ASCII case (ADR 0025) | `Rule::cased` |
+| **operator** | How one `match` entry compares its value, written `field\|operator`: `gt`, `gte`, `lt`, `lte`, `startswith`, `endswith`, `contains`, `exists`. A key with no `\|` compares for equality, and a list value means **or** (ADR 0029) | `rongroi_core::rules::Operator` |
+| **field kind** | What a Collector declares one of its observation fields holds — text, a number, a boolean or a timestamp — so that `check-rules` can refuse an operator the field cannot take | `rongroi_collectors::FieldKind` |
 | **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |
 | **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `rongroi_core::bundle` |
 | **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `rongroi_core::provenance` |
@@ -95,6 +97,8 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | English `title`, `description`, `falsepositives` live in the rule; translations in `rules/i18n/<lang>.yaml` | `check-rules` · `check-locales` |
 | `status: test` or `stable` requires at least one positive and one negative fixture in `tests/` | `check-rules` |
 | `match` strings compare without regard to ASCII case; `cased` names the fields compared exactly | `check-rules` · engine tests |
+| A `match` key is a field name, optionally `\|` and one of the eight operators; a list value means **or** | `check-rules` · engine tests |
+| An operator the field's declared kind cannot take, an empty list, and a `cased` entry `match` compares no text of are rejected | `check-rules` |
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
 | `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
 | `unmeasured_when` names only reasons the rule's collector can report, each once; it decides what an SS view lists | `check-rules` |

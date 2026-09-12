@@ -48,6 +48,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- Four operators for a rule's `match`, written `field|operator` (ADR 0029): a value list meaning **or**,
+  `gt`/`gte`/`lt`/`lte` on numbers and on timestamps, `startswith`/`endswith`/`contains` on text, and
+  `exists`, which tells a field that was withheld from one that is absent from one nobody could read.
+  Text operators fold ASCII case and `cased` still turns that off per field; timestamps are parsed rather
+  than compared as text, because the collectors emit two shapes and the text order puts the later instant
+  first. **A field in the run's `gaps` makes the rule `unmeasured` under every operator** — `exists: false`
+  checks it before matching, since a field nobody could read is also a field that is not there.
+  `check-rules` rejects an operator that is not one of these, an empty value list, a `cased` entry `match`
+  compares no text of, and an operator the field's declared kind cannot take; `Collector::fields` now
+  declares that kind. The four shipped rules are unaffected.
 - Reports now show what the rules already said (ADR 0027). Every row carries the rule's `description`,
   and a `found` row the `falsepositives` list of what legitimately produces the same evidence — both
   were mandatory in every rule, translated into Thai, rejected by CI when empty, and rendered nowhere.

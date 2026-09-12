@@ -23,8 +23,8 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `status` | yes | `experimental` · `test` · `stable` · `deprecated` |
 | `collector` | yes | must equal the first folder name, and must be a collector in this build |
 | `strength` | yes | `execution` · `presence` · `tamper` · `posture` · `context` |
-| `match` | yes | map of observation field → value; **all** must be equal to match. Strings compare without regard to ASCII case (ADR 0025). Every field name must be one the collector declares it can emit — `check-rules` rejects the rest and names the one it meant (ADR 0026) |
-| `cased` | no | fields of `match` compared byte for byte instead; everything left out folds case |
+| `match` | yes | map of `field` — or `field\|operator` — → value; **all** of them must hold to match. Strings compare without regard to ASCII case (ADR 0025). Every field name must be one the collector declares it can emit, and every operator one its kind can take — `check-rules` rejects the rest and names the one it meant (ADR 0026, ADR 0029). The whole vocabulary is in [How matching works](#how-matching-works) |
+| `cased` | no | **field** names compared byte for byte instead; everything left out folds case. One entry covers every comparison the rule makes against that field |
 | `allow` | no | legitimate software excluded by `sha256` or `signer` — never by file name |
 | `retention` | yes | how far back the source can see, in words for the user |
 | `unmeasured_when` | no | reason codes you expect on some machines. A reason named here is **counted** in SS mode; one that is not is **listed**, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest |
@@ -38,18 +38,69 @@ Unknown fields are errors. Use `#` comments for notes.
 
 - The engine takes the run of the rule's `collector`.
 - If the collector could not look, the rule is `unmeasured` with the collector's reason.
-- Otherwise every observation whose fields equal all `match` entries is attached as `found` (minus `allow`ed
-  software).
-- **Strings compare without regard to ASCII case** (ADR 0025): `path: "C:\\Windows\\Temp\\x.exe"` matches
-  `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in. Non-ASCII letters
-  are not folded — `Sömchai` does not match `SÖMCHAI`. Numbers, booleans and null are compared exactly and
-  are never coerced: `event_id: 1102` does not match the text `"1102"`, nor `1102.0`.
-- To compare one field byte for byte, name it in `cased`. It is per field, so the rest of `match` keeps
-  folding; a rule with no `cased` line is case-insensitive throughout. Naming a field `match` does not have
-  is an error, so a typo there cannot pass as an exact comparison that never happened.
+- Otherwise every observation that satisfies **all** `match` entries is attached as `found` (minus `allow`ed
+  software). `match` is a conjunction; there is no `or` between entries, no grouping and no negation.
 - If nothing matched but a field in `match` is listed in the run's `gaps`, the rule is `unmeasured` — never
-  `not_found`. `cased` does not change that: `gaps` is keyed on the field names in `match`, not on values.
+  `not_found`. That is true of **every** operator; the table below says so one by one, and `exists: false`
+  is checked against `gaps` before anything is matched at all (ADR 0029).
 - Otherwise the rule is `not_found`, and the report shows its `retention`.
+
+### The operators
+
+A key is a field name, or a field name, `|`, and one operator. A key with no `|` compares for equality,
+which is what every rule written before ADR 0029 says and still means.
+
+```yaml
+match:
+  event_id: 104                          # equality
+  channel: [Security, System]            # a list means OR — any one of them
+  run_count|gte: 2                       # gt · gte · lt · lte
+  last_run|gt: "2026-01-01T00:00:00Z"    # ordered as instants, not as text
+  path|startswith: 'C:\Users\'           # startswith · endswith · contains
+  path|exists: true                      # exists: true or false
+```
+
+| Operator | Takes | Works on a field the collector emits as |
+|---|---|---|
+| none (equality) | one value, or a list meaning **or** | anything |
+| `gt` `gte` `lt` `lte` | one number, or one RFC 3339 timestamp | a number or a timestamp |
+| `startswith` `endswith` `contains` | one string, or a list meaning **or** | text |
+| `exists` | `true` or `false` | anything |
+
+- **Strings compare without regard to ASCII case** (ADR 0025), and that reaches every text operator:
+  `path: "C:\\Windows\\Temp\\x.exe"` matches `C:\WINDOWS\Temp\X.EXE`, and so does
+  `path|startswith: 'C:\Windows\'`. Non-ASCII letters are not folded — `Sömchai` does not match `SÖMCHAI`.
+  Numbers, booleans and null are compared exactly and are never coerced: `event_id: 1102` does not match
+  the text `"1102"`, nor `1102.0`.
+- To compare one field byte for byte, name it in `cased`. It names a **field**, so one entry covers every
+  comparison the rule makes against it, and the rest of `match` keeps folding. Naming a field `match` does
+  not have — or one it uses only where no text is compared, such as `run_count|gte: 2` — is an error, so a
+  `cased` line that does nothing cannot pass as an exact comparison that never happened.
+- **Timestamps are parsed, not compared as text.** The collectors write them with `jiff`, which prints a
+  fraction of a second only when there is one, so `2020-01-01T00:00:00.5Z` and `2020-01-01T00:00:00Z` are
+  different shapes and comparing them as text puts the later instant first. Write an RFC 3339 value; an
+  offset such as `2026-09-13T07:00:00+07:00` is fine.
+- **`startswith` and `contains` are text, not paths.** Neither knows what `\` is, so
+  `path|startswith: 'C:\Users\Public'` also matches `C:\Users\PublicRecords\x.exe`, and
+  `path|contains: 'Temp'` matches `C:\Program Files\TempleOS\game.exe`. **Put the separators in the
+  value** — `'C:\Users\'`, `'\AppData\Local\Temp\'`, `'.exe'` — and check by eye that the rule's `title`
+  describes what you actually wrote.
+- **`exists` is not equality.** It asks whether the field is in the observation at all, which is how a
+  withheld path (`path_withheld` present), an absent one (`path` missing) and an unreadable one (`path` in
+  `gaps`) are told apart. `null` is its own type and equality cannot stand in for any of the three.
+
+### What a gap does, operator by operator
+
+A field in the run's `gaps` means the collector could not read it. **Every operator answers `unmeasured`**,
+never "no match" — ADR 0002 is what that protects, and ADR 0029 has the table in full.
+
+| Operator | Field is in `gaps` |
+|---|---|
+| equality, and a value list | `unmeasured` |
+| `gt` `gte` `lt` `lte` | `unmeasured` |
+| `startswith` `endswith` `contains` | `unmeasured` |
+| `exists: true` | `unmeasured` |
+| `exists: false` | `unmeasured` — checked **before** matching, because a field nobody could read is also a field that is not there, and without that order the rule would be `found` and the report would say "we looked and it is not there" |
 
 ## What the reader sees
 
@@ -63,8 +114,8 @@ only the ones no rule expected and counts the rest, so `unmeasured_when` is the 
 line a reviewer should ask about and a number they can move past. `not_admin` is never a row at all: it
 is one fact about the scan, said once above the evidence, with the remedy (ADR 0027).
 
-No rule ships with `cased` today. It looks like this, and needs a `#` comment saying why the field's own
-vocabulary distinguishes case:
+No rule ships with `cased` today, and none uses an operator. `cased` looks like this, and needs a `#`
+comment saying why the field's own vocabulary distinguishes case:
 
 ```yaml
 match:
