@@ -32,6 +32,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- Hosts can read a file's bytes: `FilesystemSource::read_file` returns the contents of a file a
+  collector names, which is what the four parsers in `rongroi-parsers` have been waiting for — their
+  whole API is bytes in, structs out, and until now nothing on a `Host` returned bytes. A file that is
+  not there is an answer rather than a failure, as it already is for a directory. The read is bounded
+  at 64 MiB and a larger file is refused whole rather than truncated: the file's size is chosen by
+  whoever put it on the machine being examined, and a truncated artifact would be reported as a damaged
+  one. A fixture describes a file's bytes inline with `content:` or points at a file under `fixtures/`
+  with `from:`. Nothing consumes it yet; the collectors are the next pull requests (ADR 0019).
 - Event Log parser: Windows `.evtx` files decode to a plain struct per record — the record id, the time
   it was written, the event id, the channel, the provider and the level — and a damaged chunk costs its
   own records and nothing else, the rest of the log being returned alongside an account of what failed.
