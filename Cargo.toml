@@ -21,6 +21,7 @@ rongroi-core = { path = "crates/rongroi-core" }
 rongroi-host = { path = "crates/rongroi-host" }
 rongroi-host-windows = { path = "crates/rongroi-host-windows" }
 rongroi-collectors = { path = "crates/rongroi-collectors" }
+rongroi-parsers = { path = "crates/rongroi-parsers" }
 
 anyhow = "1.0.104"
 clap = { version = "4.6", features = ["derive"] }
