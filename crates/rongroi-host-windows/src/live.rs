@@ -49,6 +49,44 @@ impl RegistrySource for LiveHost {
         };
         classify(opened.get_string(value))
     }
+
+    fn subkeys(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
+        else {
+            return Ok(None);
+        };
+        let Some(names) = classify(opened.keys())? else {
+            return Ok(None);
+        };
+        Ok(Some(names.collect()))
+    }
+
+    /// The names only. `Key::values` also hands back each value's data, which is dropped here so
+    /// that every byte a collector reads goes through `read_bytes` and its limit.
+    fn value_names(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
+        else {
+            return Ok(None);
+        };
+        let Some(values) = classify(opened.values())? else {
+            return Ok(None);
+        };
+        Ok(Some(values.map(|(name, _)| name).collect()))
+    }
+
+    fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
+        else {
+            return Ok(None);
+        };
+        // `get_bytes` refuses a value that is not `REG_BINARY`, which arrives here as a failure
+        // rather than as a conversion nobody asked for.
+        let Some(bytes) = classify(opened.get_bytes(value))? else {
+            return Ok(None);
+        };
+        // The limit lives in `rongroi-host`, so this host refuses exactly what the fixture host does.
+        rongroi_host::bound_registry_value(bytes, rongroi_host::MAX_REGISTRY_VALUE_BYTES).map(Some)
+    }
 }
 
 impl Host for LiveHost {

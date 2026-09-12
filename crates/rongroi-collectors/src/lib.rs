@@ -5,8 +5,10 @@
 //! Collectors read one kind of artifact from a [`Host`] and report what they saw.
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
+pub mod bam;
 pub mod failure;
 pub mod fivem_dir;
+pub mod paths;
 pub mod pca;
 pub mod posture;
 pub mod prefetch;
@@ -27,6 +29,7 @@ pub trait Collector {
 /// Every collector in this build.
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
+        Box::new(bam::Bam),
         Box::new(fivem_dir::FivemDir),
         Box::new(pca::Pca),
         Box::new(posture::Posture),

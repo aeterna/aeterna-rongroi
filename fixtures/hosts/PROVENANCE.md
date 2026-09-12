@@ -30,6 +30,17 @@ none contains a real person's user name, host name, SID or files.
 | `prefetch-file-unreadable` | Windows 11 with one `.pf` file listed and holding no bytes and one that is readable | `prefetch` collector tests |
 | `prefetch-unsupported-version` | Windows 11 whose Prefetch folder holds one SCCA v26 file from an older Windows, which this parser does not decode | `prefetch` collector tests |
 | `prefetch-corrupt-files` | Windows 11 whose Prefetch folder holds an intact `MAM` container over a payload that is not Xpress-Huffman, and the corpus's deliberately bad file | `prefetch` collector tests |
+| `registry-bytes-present` | Windows 11, one registry key holding a binary value whose bytes come from `fixtures/parsers/bam/documented-24-byte-value.bin`, one written inline, and one described without bytes — a value that is there and cannot be read | `rongroi-host` fixture tests |
+| `bam-entries-present` | Windows 11 whose BAM state holds one account with two executables in it, their value bytes taken from `fixtures/parsers/bam/` | `bam` collector tests, report snapshots |
+| `bam-device-paths` | The same with the value name spelled as a device path, the form no SS-mode redaction can reach | `bam` collector tests |
+| `bam-two-accounts` | Two accounts with BAM records, so that the report's count of them can be asserted and their SIDs asserted absent | `bam` collector tests |
+| `bam-not-present` | A Windows machine with no BAM state at all: the service is not there, or this build never had it | `bam` collector tests |
+| `bam-empty` | The BAM key present and holding no account — a machine whose execution history was cleared | `bam` collector tests |
+| `bam-access-denied` | Windows 11, the BAM key present and unreadable, by a process without administrator rights | `bam` collector tests |
+| `bam-access-denied-elevated` | The same denial with those rights already held, where restarting as administrator would not help | `bam` collector tests |
+| `bam-account-denied` | Two accounts, one of whose keys cannot be read, so an unknown number of records is missing | `bam` collector tests |
+| `bam-malformed-value` | One account holding a value that decodes, one a byte short of a timestamp, and one that is there and has no bytes | `bam` collector tests |
+| `bam-longer-value` | A BAM value longer than the public write-ups describe, as a newer Windows build might write | `bam` collector tests |
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
@@ -46,8 +57,15 @@ A file entry may carry its bytes as well as its hash (ADR 0019): `content:` writ
 corpora in `fixtures/parsers/`, `fixtures/prefetch/` and `fixtures/evtx/`. Those corpora are inputs and
 are never written to; a host points at them and copies nothing.
 
+A registry value carries its bytes the same two ways (ADR 0022): a value written as a map with
+`content:` or `from:` is a `REG_BINARY`, a number is a `REG_DWORD` and a string is a `REG_SZ`. A value
+written as an empty map is there and cannot be read.
+
 The account names `alex`, `shareduser` and `deviceuser` that reach these hosts are invented in the same way,
-`alex` through the parser corpora in `fixtures/parsers/` and the other two inline in `pca-unredactable-path`.
+`alex` through the parser corpora in `fixtures/parsers/` and the other two inline in `pca-unredactable-path`
+and `bam-device-paths`. So are `otheruser` and every SID in the `bam-*` hosts: the SIDs are written out in
+full there deliberately, so that a test asserting no part of one reaches an observation has something to
+assert against.
 They are there so that a test can assert a name never reaches an observation.
 
 **One host reaches bytes that carry a real account name**, and it is the only one: the four

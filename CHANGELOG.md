@@ -33,6 +33,23 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- The `bam` collector: it enumerates the Background Activity Moderator's per-account keys under
+  `HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings` and reports, per registry value,
+  the program's name, when BAM last saw it run, the parser's moderation state and how many bytes the
+  value held — that last one because whether a value is still the documented 24 is the first sign of a
+  layout this repository has never confirmed on Windows 11. **No part of the account's SID goes out**,
+  hashed or otherwise: it identifies one account and one Windows installation, and the report says how
+  many accounts had records instead. A path is emitted only when it begins with a drive letter, the one
+  shape SS-mode redaction can reach. An absent BAM key is `source_missing`; a key that is there and
+  holds nothing is `values: 0`, a cleared execution history. No rule reads it yet (ADR 0023).
+- Hosts can enumerate the registry and read a value's bytes: `RegistrySource` gains `subkeys`,
+  `value_names` and `read_bytes`, which is what BAM needs and what no other artifact does — its value
+  *names* are executable paths and its value *data* is the artifact. A key or value that is not there
+  is an answer rather than a failure, as it already is for a file. Each value is bounded at 64 KiB and
+  a larger one is refused whole rather than truncated; the count of subkeys and of values is
+  deliberately not bounded, because a partial enumeration would read as "there was nothing else". A
+  fixture writes a binary value as a map with `content:` or `from:`, the pair a file entry already uses
+  (ADR 0022).
 - The `prefetch` collector: it lists `%SystemRoot%\Prefetch` and reports, per `.pf` file, the
   program's name, how many times Windows recorded it running, how many run times the file still held
   and the newest of them, plus one account of how many files the folder held and how many decoded —

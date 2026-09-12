@@ -14,7 +14,14 @@
 | Fuzz | the parsers never panic, abort or hang on arbitrary bytes | `fuzz/fuzz_targets/`, seeded from `fixtures/parsers/`, `fixtures/prefetch/` and `fixtures/evtx/` | Linux CI — a **30-second smoke run per target**, not a campaign |
 
 GitHub's Windows runners disable the SysMain and PCA services, so Prefetch and PCA collectors are expected to
-be `unmeasured` there. Those collectors are verified on a real Windows 11 machine.
+be `unmeasured` there.
+
+> **Not true yet, as of 2026-09-12.** That paragraph used to end "those collectors are verified on a real
+> Windows 11 machine". It was written before either collector existed. None of the artifact collectors —
+> PCA (ADR 0020), Prefetch (ADR 0021), BAM (ADR 0023) — has been run against a real Windows install: every
+> fixture is a vendored sample or synthetic, and the Windows CI job cannot stand in for one, because it runs
+> elevated with UAC off and with those services disabled. Which path shapes the artifacts really hold, and
+> whether each source is readable without an elevated token, are open questions, and each ADR says so.
 
 ## The fuzz layer
 

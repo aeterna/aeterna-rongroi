@@ -1,0 +1,99 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: view
+---
+{
+  "mode": "self",
+  "header": {
+    "schema_version": 1,
+    "provenance": {
+      "official": false,
+      "version": "0.0.0-test",
+      "commit": null,
+      "exe_sha256": null
+    },
+    "rules_bundle": {
+      "schema_version": 1,
+      "sha256": "[bundle sha256]",
+      "rule_count": 4
+    },
+    "platform": "windows",
+    "os_build": "26100",
+    "elevated": true,
+    "generated_at": "2026-01-01T00:00:00Z"
+  },
+  "evidence": [
+    {
+      "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_missing"
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed"
+    },
+    {
+      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_missing"
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed"
+    }
+  ],
+  "own_traces": [],
+  "unmatched": [
+    {
+      "collector": "bam",
+      "observations": [
+        {
+          "collector": "bam",
+          "fields": {
+            "last_run": "2020-01-01T00:00:00Z",
+            "moderation_state": 0,
+            "name": "example.exe",
+            "path": "C:\\Users\\fixtureuser\\Downloads\\example.exe",
+            "value_bytes": 24
+          }
+        },
+        {
+          "collector": "bam",
+          "fields": {
+            "last_run": "2020-01-01T00:00:00Z",
+            "moderation_state": 131073,
+            "name": "notepad.exe",
+            "path": "C:\\Windows\\System32\\notepad.exe",
+            "value_bytes": 24
+          }
+        },
+        {
+          "collector": "bam",
+          "fields": {
+            "entries": 2,
+            "intact": true,
+            "rejected": 0,
+            "sid_withheld": "per_user_identifier",
+            "users": 1,
+            "values": 2
+          }
+        }
+      ]
+    }
+  ],
+  "hidden": {
+    "not_found": 0,
+    "unmeasured": 0,
+    "unmatched": 0
+  }
+}

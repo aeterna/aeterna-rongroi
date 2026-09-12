@@ -164,6 +164,37 @@ fn prefetch_files_present_self_view() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
+/// No rule reads `bam` either (ADR 0023). The programs it saw, and the account of what BAM held,
+/// reach Self mode through the unmatched bucket with no change to the CLI or the app.
+#[test]
+fn bam_entries_present_self_view() {
+    let view = view::for_mode(&report_for("bam-entries-present"), Mode::SelfCheck);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(json.contains("example.exe"), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// BAM is keyed by a SID, and the fixture writes a whole one out so that this assertion has
+/// something to bite on. A real machine's account name may be a single character — the vendored
+/// Prefetch corpus's is — so the assertion that carries the weight is on the *shapes* an account or
+/// an installation leaves behind, and it is made against the whole report rather than only the view:
+/// neither mode has anything to redact here, because the collector never emits them.
+#[test]
+fn bam_entries_present_ss_view() {
+    let report = report_for("bam-entries-present");
+    let everything = serde_json::to_string(&report).unwrap().to_uppercase();
+    for leaked in ["S-1-5-", "USERSETTINGS", "HARDDISKVOLUME"] {
+        assert!(!everything.contains(leaked), "{leaked} reached the report");
+    }
+
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(!json.contains("example.exe"), "{json}");
+    assert!(!json.contains("fixtureuser"), "{json}");
+    assert!(view.hidden.unmatched > 0);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
 /// A `.pf` file lists every file the program loaded and the volumes it touched. The fixture's own
 /// `.pf` carries the upstream author's profile paths and his machine's volume serial numbers
 /// (`fixtures/prefetch/PROVENANCE.md`), and **neither mode has anything to redact**, because the

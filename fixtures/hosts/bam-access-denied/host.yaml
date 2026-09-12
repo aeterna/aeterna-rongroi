@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# The BAM key is there and Windows will not enumerate it for a process without administrator rights.
+# That pair is what makes the reason `not_admin` rather than `access_denied`, and what makes the
+# restart-as-administrator offer worth taking (ADR 0012).
+platform: windows
+os_build: "26100"
+elevated: false
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    'C:\Users\fixtureuser\Downloads\example.exe':
+      from: '../../parsers/bam/documented-24-byte-value.bin'
+access_denied:
+  - 'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings'
