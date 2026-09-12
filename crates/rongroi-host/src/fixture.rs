@@ -9,7 +9,9 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::{Host, Platform, RegistrySource, SourceError};
+use crate::{
+    DirEntryInfo, EnvironmentSource, FilesystemSource, Host, Platform, RegistrySource, SourceError,
+};
 
 /// Why a fixture host could not be loaded.
 #[derive(Debug, thiserror::Error)]
@@ -44,6 +46,10 @@ struct HostFile {
     #[serde(default)]
     registry: BTreeMap<String, BTreeMap<String, RegistryValue>>,
     #[serde(default)]
+    env: BTreeMap<String, String>,
+    #[serde(default)]
+    filesystem: BTreeMap<String, Vec<FixtureFile>>,
+    #[serde(default)]
     access_denied: Vec<String>,
 }
 
@@ -54,13 +60,39 @@ enum RegistryValue {
     Text(String),
 }
 
-/// A fake machine for tests. Registry keys and value names are case-insensitive, like Windows.
+/// One entry in a fixture directory. A file unless `directory: true`; an absent `sha256` describes a
+/// file whose hash cannot be read, which a collector must report by omitting the field.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureFile {
+    name: String,
+    #[serde(default)]
+    sha256: Option<String>,
+    #[serde(default)]
+    directory: bool,
+}
+
+/// Paths and registry keys are compared case-insensitively and without a trailing separator, like Windows.
+fn normalise_path(path: &str) -> String {
+    path.trim_end_matches(['\\', '/']).to_ascii_lowercase()
+}
+
+/// Splits a normalised path into its parent directory and the last segment.
+fn split_parent(path: &str) -> (&str, &str) {
+    path.rfind(['\\', '/'])
+        .map_or(("", path), |index| (&path[..index], &path[index + 1..]))
+}
+
+/// A fake machine for tests. Registry keys, value names, directory paths and environment variable names
+/// are case-insensitive, like Windows.
 #[derive(Debug, Clone)]
 pub struct FixtureHost {
     platform: Platform,
     os_build: Option<String>,
     elevated: Option<bool>,
     registry: BTreeMap<String, BTreeMap<String, RegistryValue>>,
+    env: BTreeMap<String, String>,
+    filesystem: BTreeMap<String, Vec<FixtureFile>>,
     access_denied: Vec<String>,
 }
 
@@ -92,17 +124,44 @@ impl FixtureHost {
                 (key.to_ascii_lowercase(), values)
             })
             .collect();
+        let env = file
+            .env
+            .into_iter()
+            .map(|(name, value)| (name.to_ascii_lowercase(), value))
+            .collect();
+        let filesystem = file
+            .filesystem
+            .into_iter()
+            .map(|(dir, files)| (normalise_path(&dir), files))
+            .collect();
         Ok(Self {
             platform: file.platform,
             os_build: file.os_build,
             elevated: file.elevated,
             registry,
+            env,
+            filesystem,
             access_denied: file
                 .access_denied
                 .iter()
-                .map(|key| key.to_ascii_lowercase())
+                .map(|key| normalise_path(key))
                 .collect(),
         })
+    }
+
+    /// The file system is only described for Windows fixtures.
+    fn windows_filesystem(&self) -> Result<(), SourceError> {
+        if self.platform == Platform::Windows {
+            Ok(())
+        } else {
+            Err(SourceError::Unsupported(
+                "no Windows file system on this platform".to_owned(),
+            ))
+        }
+    }
+
+    fn is_denied(&self, path: &str) -> bool {
+        self.access_denied.iter().any(|denied| denied == path)
     }
 
     fn lookup(&self, key: &str, value: &str) -> Result<Option<&RegistryValue>, SourceError> {
@@ -144,6 +203,52 @@ impl RegistrySource for FixtureHost {
     }
 }
 
+impl FilesystemSource for FixtureHost {
+    fn list_dir(&self, dir: &str) -> Result<Option<Vec<DirEntryInfo>>, SourceError> {
+        self.windows_filesystem()?;
+        let dir = normalise_path(dir);
+        if self.is_denied(&dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        Ok(self.filesystem.get(&dir).map(|files| {
+            files
+                .iter()
+                .map(|file| DirEntryInfo {
+                    name: file.name.clone(),
+                    is_file: !file.directory,
+                })
+                .collect()
+        }))
+    }
+
+    fn file_sha256(&self, path: &str) -> Result<String, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let file = self
+            .filesystem
+            .get(dir)
+            .and_then(|files| {
+                files
+                    .iter()
+                    .find(|file| file.name.eq_ignore_ascii_case(name))
+            })
+            .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))?;
+        file.sha256
+            .clone()
+            .ok_or_else(|| SourceError::Failed(format!("no sha256 recorded for {path}")))
+    }
+}
+
+impl EnvironmentSource for FixtureHost {
+    fn env_var(&self, name: &str) -> Option<String> {
+        self.env.get(&name.to_ascii_lowercase()).cloned()
+    }
+}
+
 impl Host for FixtureHost {
     fn platform(&self) -> Platform {
         self.platform
@@ -170,9 +275,21 @@ registry:
   'HKLM\SYSTEM\Example':
     Enabled: 1
     Name: "hello"
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\Example':
+    - name: readable.dll
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    - name: unreadable.dll
+    - name: cache
+      directory: true
 access_denied:
   - 'HKLM\SYSTEM\Locked'
+  - 'C:\Users\fixtureuser\AppData\Local\Locked'
 "#;
+
+    const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
     #[test]
     fn reads_values_case_insensitively() {
@@ -205,5 +322,103 @@ access_denied:
     #[test]
     fn unknown_fields_are_rejected() {
         assert!(FixtureHost::from_yaml_str("platform: windows\nbogus: 1\n", "inline").is_err());
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.dll\n      bogus: 1\n",
+                "inline"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn the_four_existing_fields_still_load_without_the_new_ones() {
+        let host = FixtureHost::from_yaml_str("platform: windows\nos_build: \"26100\"\n", "inline")
+            .unwrap();
+        assert_eq!(host.env_var("LOCALAPPDATA"), None);
+        assert_eq!(host.list_dir(r"C:\anything"), Ok(None));
+    }
+
+    #[test]
+    fn environment_variables_are_case_insensitive() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.env_var("localappdata").as_deref(),
+            Some(r"C:\Users\fixtureuser\AppData\Local")
+        );
+        assert_eq!(host.env_var("NOT_SET"), None);
+    }
+
+    #[test]
+    fn directories_are_listed_case_insensitively_and_mark_subdirectories() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.list_dir(r"c:\users\FIXTUREUSER\appdata\local\example"),
+            Ok(Some(vec![
+                DirEntryInfo {
+                    name: "readable.dll".to_owned(),
+                    is_file: true,
+                },
+                DirEntryInfo {
+                    name: "unreadable.dll".to_owned(),
+                    is_file: true,
+                },
+                DirEntryInfo {
+                    name: "cache".to_owned(),
+                    is_file: false,
+                },
+            ]))
+        );
+    }
+
+    #[test]
+    fn a_directory_that_is_not_described_is_none() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.list_dir(r"C:\Users\fixtureuser\AppData\Local\Absent"),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn a_file_hash_is_read_and_an_absent_one_fails() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Example";
+        assert_eq!(
+            host.file_sha256(&format!(r"{dir}\READABLE.dll")),
+            Ok(EMPTY_HASH.to_owned())
+        );
+        assert!(matches!(
+            host.file_sha256(&format!(r"{dir}\unreadable.dll")),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.file_sha256(&format!(r"{dir}\absent.dll")),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn access_denied_covers_directories_too() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        let dir = r"C:\Users\fixtureuser\AppData\Local\Locked";
+        assert_eq!(host.list_dir(dir), Err(SourceError::AccessDenied));
+        assert_eq!(
+            host.file_sha256(&format!(r"{dir}\x.dll")),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    #[test]
+    fn a_non_windows_fixture_has_no_file_system() {
+        let host = FixtureHost::from_yaml_str("platform: other\n", "inline").unwrap();
+        assert!(matches!(
+            host.list_dir(r"C:\x"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            host.file_sha256(r"C:\x\y.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
     }
 }
