@@ -266,6 +266,12 @@ mod tests {
     use super::{PcaFile, PcaGeneralEntry, PcaLaunchEntry, parse_app_launch_dic, parse_general_db};
     use crate::error::ParseError;
 
+    /// An ordinary file, as a file rather than as bytes built here, because the same file is a seed
+    /// for the `fuzz_pca_app_launch` target (ADR 0016). It is CRLF on disk, which is what Windows
+    /// writes and what `.gitattributes` keeps git from normalising away.
+    const NORMAL_APP_LAUNCH: &[u8] =
+        include_bytes!("../../../fixtures/parsers/pca-app-launch/normal.txt");
+
     /// Joins lines with CRLF, including after the last one, as Windows writes them.
     fn crlf_file(lines: &[&[u8]]) -> Vec<u8> {
         let mut bytes = Vec::new();
@@ -304,13 +310,7 @@ mod tests {
 
     #[test]
     fn a_normal_app_launch_file() {
-        let bytes = crlf_file(&[
-            b"C:\\Users\\alex\\Downloads\\game.exe|2026-09-12 10:23:46",
-            b"C:\\Program Files\\FiveM\\FiveM.exe|2026-09-11 22:05:01",
-            b"C:\\Windows\\System32\\notepad.exe|2026-01-02 03:04:05",
-        ]);
-
-        let file = launch(&bytes);
+        let file = launch(NORMAL_APP_LAUNCH);
 
         assert!(file.rejected.is_empty());
         assert_eq!(file.entries.len(), 3);

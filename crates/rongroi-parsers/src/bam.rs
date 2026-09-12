@@ -129,6 +129,13 @@ mod tests {
     /// 2020-01-01T00:00:00Z, as a FILETIME.
     const FILETIME_2020: u64 = 132_223_104_000_000_000;
 
+    /// The documented shape, as a file rather than as bytes built here, because the same file is a
+    /// seed for the `fuzz_bam` and `fuzz_filetime` targets (ADR 0016). The constants are still what
+    /// is asserted below, so the test says what the layout is and fails if the fixture stops being
+    /// that layout.
+    const DOCUMENTED_VALUE: &[u8] =
+        include_bytes!("../../../fixtures/parsers/bam/documented-24-byte-value.bin");
+
     fn value(filetime: u64, moderation_state: u32, tail: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&filetime.to_le_bytes());
@@ -146,7 +153,7 @@ mod tests {
 
     #[test]
     fn the_documented_twenty_four_byte_value_with_a_zero_moderation_state() {
-        let entry = parsed(&value(FILETIME_2020, 0, &TAIL));
+        let entry = parsed(DOCUMENTED_VALUE);
 
         assert_eq!(entry.last_run_filetime, FILETIME_2020);
         assert_eq!(

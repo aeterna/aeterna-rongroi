@@ -8,3 +8,7 @@
 *.icns binary
 *.evtx binary
 *.pf binary
+
+# Artifact bytes, byte for byte. The PCA fixtures are CRLF because that is what Windows writes, and
+# `eol=lf` above would rewrite them into a file Windows never produced.
+fixtures/parsers/** binary
