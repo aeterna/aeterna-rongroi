@@ -360,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn a_line_with_an_unparseable_timestamp_is_rejected_and_the_rest_survive() {
+    fn a_line_with_an_unparsable_timestamp_is_rejected_and_the_rest_survive() {
         let bytes = crlf_file(&[
             b"C:\\Users\\alex\\first.exe|not a timestamp",
             b"C:\\Users\\alex\\second.exe|2026-13-45 99:99:99",
