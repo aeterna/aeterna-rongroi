@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 with all three Program Compatibility Assistant files present and readable. Their bytes
+# are the synthetic parser corpora in fixtures/parsers/, referenced rather than copied (ADR 0019).
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      from: '../../parsers/pca-app-launch/normal.txt'
+    - name: PcaGeneralDb0.txt
+      from: '../../parsers/pca-general/normal.txt'
+    - name: PcaGeneralDb1.txt
+      from: '../../parsers/pca-general/normal.txt'

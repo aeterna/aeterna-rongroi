@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows with no Program Compatibility Assistant files at all: a build that predates PCA, or a
+# machine where the service has never written. The folder is described as empty so that the fixture
+# says "these files are not here" rather than saying nothing about the file system.
+platform: windows
+os_build: "19045"
+elevated: false
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca': []

@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A launch dictionary with good lines, a line with no delimiter, an impossible date, an empty path and
+# a blank line: the file that shows a bad line costs its own line and nothing else.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      from: '../../parsers/pca-app-launch/malformed-lines.txt'

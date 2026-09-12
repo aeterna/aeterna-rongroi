@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A file in `appcompat\pca` that is not a PCA text file: UTF-16 with a byte order mark, which is the
+# one thing the parser refuses whole. The bytes are the parser's own fixture for that case.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      from: '../../parsers/pca-app-launch/utf16-bom.txt'
