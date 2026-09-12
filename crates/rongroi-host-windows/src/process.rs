@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! What is running on this machine, read through the ToolHelp process snapshot (ADR 0010).
+//! What is running on this machine, read through the `ToolHelp` process snapshot (ADR 0010).
 //!
 //! Name and path only: no image is hashed, no process memory is read, and every handle is closed as
 //! soon as the one query that needs it has answered.
