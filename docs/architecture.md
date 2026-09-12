@@ -15,9 +15,15 @@ Host ─► Collectors ─► CollectorRun ─► Engine (+ embedded rules bundl
    - `Measured { observations, gaps }` — what it saw, plus fields it could not read and why
    - `Unmeasured { reason }` — it could not look at all
 3. **Engine** — evaluates every rule in the embedded bundle against the runs. Pure: no I/O, no clock.
-4. **Report** — header (provenance, bundle hash, platform, elevation, time) plus one `Evidence` per rule.
-   The report is frozen before any UI starts.
+4. **Report** — header (provenance, bundle hash, platform, elevation, time), one `Evidence` per rule, and
+   the `own_traces` the engine separated out. The report is frozen before any UI starts.
 5. **View** — `view::for_mode` decides what an audience may see. The UI only renders a view.
+
+Before any rule runs, the engine moves every observation that describes **this program** — its own path or
+its own SHA-256 — out of the runs and into `own_traces`. aeterna-rongroi is running while it scans, so a
+collector that enumerates the machine sees it; separating that visibly, rather than deleting it, keeps the
+evidence about the PC and the trace of the tool apart without hiding either (ADR 0010). What "this program"
+is arrives in `ScanContext` from each binary's `main`, so a fixture can exercise the whole path.
 
 The CLI and the desktop app both call `rongroi_collectors::scan::run`, so they cannot disagree about a result.
 
@@ -56,7 +62,8 @@ that was never read would be false. There is no score and no overall verdict (AD
 |---|---|---|
 | Shows | every piece of evidence | `found` evidence and all `posture` evidence |
 | Other evidence | shown | counted in `hidden.not_found` / `hidden.unmeasured` |
-| Paths | as read | `X:\Users\<name>` → `%USERPROFILE%` |
+| Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
+| Paths | as read | `X:\Users\<name>` → `%USERPROFILE%`, in evidence and own traces alike |
 
 Redaction is implemented and tested in `rongroi-core::view` (AGENTS.md hard rule 5).
 
@@ -77,6 +84,7 @@ Only the upstream release workflow sets `RONGROI_OFFICIAL_BUILD=1` at compile ti
 |---|---|---|---|
 | `posture` | `HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State` → `UEFISecureBootEnabled`; `HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity` → `Enabled`, the *configured* memory-integrity policy rather than the running state; the kernel's code-integrity options, including test signing, via `NtQuerySystemInformation`; whether a TPM is present and which specification family it implements, via `Tbsi_GetDeviceInfo`. One observation per run (ADR 0011) | no | M0, M1 |
 | `fivem_dir` | `%LOCALAPPDATA%\FiveM\FiveM.app\plugins` — the names of the files directly inside it and, when readable, each file's SHA-256. No recursion, no timestamps, no ACLs (ADR 0009) | no | M1 |
+| `process` | The list of running processes through a ToolHelp snapshot: each process's image name and, when `QueryFullProcessImageNameW` answers, its path. No hashing, no process memory, no handle kept beyond the one query (ADR 0010) | no | M1 |
 
 Every new collector adds a row here in the same PR.
 

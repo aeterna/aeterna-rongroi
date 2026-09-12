@@ -11,7 +11,8 @@ use serde::Deserialize;
 
 use crate::{
     CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource, Host, Platform,
-    RegistrySource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
+    ProcessRecord, ProcessSource, RegistrySource, SourceError, SystemIntegritySource, TpmInfo,
+    TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -56,6 +57,8 @@ struct HostFile {
     code_integrity: Option<FixtureCodeIntegrity>,
     #[serde(default)]
     tpm: Option<FixtureTpm>,
+    #[serde(default)]
+    processes: Option<Vec<FixtureProcess>>,
 }
 
 /// Code-integrity settings a fixture describes. Absent means the fixture never modelled them, which
@@ -74,6 +77,17 @@ struct FixtureTpm {
     present: bool,
     #[serde(default)]
     spec_version: Option<String>,
+}
+
+/// One process a fixture describes. An absent `path` describes a process whose image path cannot be
+/// resolved, which a collector reports by omitting that one field — never by dropping the process.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureProcess {
+    pid: u32,
+    name: String,
+    #[serde(default)]
+    path: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -119,6 +133,7 @@ pub struct FixtureHost {
     access_denied: Vec<String>,
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
+    processes: Option<Vec<FixtureProcess>>,
 }
 
 impl FixtureHost {
@@ -173,6 +188,7 @@ impl FixtureHost {
                 .collect(),
             code_integrity: file.code_integrity,
             tpm: file.tpm,
+            processes: file.processes,
         })
     }
 
@@ -302,6 +318,29 @@ impl TpmSource for FixtureHost {
     }
 }
 
+impl ProcessSource for FixtureHost {
+    /// The processes the fixture lists, in file order.
+    ///
+    /// A fixture with no `processes:` block never modelled a process list, so it is `Unsupported`
+    /// rather than an empty list: an empty list is the claim that nothing was running (ADR 0010).
+    /// A fixture that writes `processes: []` makes that claim deliberately.
+    fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError> {
+        let described = self.processes.as_ref().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe running processes".to_owned(),
+            )
+        })?;
+        Ok(described
+            .iter()
+            .map(|process| ProcessRecord {
+                pid: process.pid,
+                name: process.name.clone(),
+                path: process.path.clone(),
+            })
+            .collect())
+    }
+}
+
 impl Host for FixtureHost {
     fn platform(&self) -> Platform {
         self.platform
@@ -346,6 +385,12 @@ code_integrity:
 tpm:
   present: true
   spec_version: "2.0"
+processes:
+  - pid: 4
+    name: System
+  - pid: 1200
+    name: FiveM.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe'
 "#;
 
     const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -497,6 +542,38 @@ tpm:
             Err(SourceError::Unsupported(_))
         ));
         assert!(matches!(host.tpm_info(), Err(SourceError::Unsupported(_))));
+        assert!(matches!(
+            host.running_processes(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn processes_are_returned_in_file_order() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.running_processes(),
+            Ok(vec![
+                ProcessRecord {
+                    pid: 4,
+                    name: "System".to_owned(),
+                    path: None,
+                },
+                ProcessRecord {
+                    pid: 1200,
+                    name: "FiveM.exe".to_owned(),
+                    path: Some(r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe".to_owned()),
+                },
+            ])
+        );
+    }
+
+    /// Writing the block with nothing in it is a deliberate statement, unlike leaving it out.
+    #[test]
+    fn an_explicitly_empty_process_list_is_an_answer() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nprocesses: []\n", "inline").unwrap();
+        assert_eq!(host.running_processes(), Ok(vec![]));
     }
 
     #[test]
@@ -525,6 +602,13 @@ tpm:
         assert!(
             FixtureHost::from_yaml_str(
                 "platform: windows\ntpm:\n  present: true\n  bogus: 1\n",
+                "inline"
+            )
+            .is_err()
+        );
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\nprocesses:\n  - pid: 4\n    name: System\n    bogus: 1\n",
                 "inline"
             )
             .is_err()

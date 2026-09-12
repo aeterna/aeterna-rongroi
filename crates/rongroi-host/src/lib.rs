@@ -134,6 +134,27 @@ pub trait TpmSource {
     fn tpm_info(&self) -> Result<TpmInfo, SourceError>;
 }
 
+/// One process that was running when the process list was read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessRecord {
+    /// Process id, as the operating system reported it at that moment.
+    pub pid: u32,
+    /// Name of the image file, without a path, e.g. `FiveM.exe`.
+    pub name: String,
+    /// Full path of the image file, when it could be resolved.
+    pub path: Option<String>,
+}
+
+/// Read-only access to the list of running processes (ADR 0010).
+pub trait ProcessSource {
+    /// Every process running at the moment of the call.
+    ///
+    /// A process whose image path cannot be resolved — a protected process, or one that exited
+    /// between the list being taken and the query — is still returned, with `path` as `None`.
+    /// Dropping it would understate what is running.
+    fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError>;
+}
+
 /// Size of one read when a file is streamed through SHA-256.
 const READ_BLOCK: usize = 64 * 1024;
 
@@ -175,7 +196,12 @@ pub fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
 
 /// A machine that collectors can read. More source traits are added as collectors need them.
 pub trait Host:
-    RegistrySource + FilesystemSource + EnvironmentSource + SystemIntegritySource + TpmSource
+    RegistrySource
+    + FilesystemSource
+    + EnvironmentSource
+    + SystemIntegritySource
+    + TpmSource
+    + ProcessSource
 {
     /// Operating system family.
     fn platform(&self) -> Platform;
@@ -240,6 +266,14 @@ impl TpmSource for NonWindowsHost {
     }
 }
 
+impl ProcessSource for NonWindowsHost {
+    fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows process list on this platform".to_owned(),
+        ))
+    }
+}
+
 impl Host for NonWindowsHost {
     fn platform(&self) -> Platform {
         Platform::Other
@@ -279,6 +313,16 @@ mod tests {
         ));
         assert!(matches!(
             NonWindowsHost.tpm_info(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// Not an empty list: "nothing is running" would be a claim about the machine, and this host
+    /// cannot look at all.
+    #[test]
+    fn non_windows_host_lists_no_processes_rather_than_an_empty_list() {
+        assert!(matches!(
+            NonWindowsHost.running_processes(),
             Err(SourceError::Unsupported(_))
         ));
     }

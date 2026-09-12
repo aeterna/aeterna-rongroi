@@ -189,6 +189,20 @@ pub struct ReportHeader {
     pub generated_at: String,
 }
 
+/// One observation that describes aeterna-rongroi itself rather than the machine it scanned.
+///
+/// The program's own process is running while it scans, so a collector that enumerates the machine
+/// sees it. Keeping it in its own bucket shows the reader what the tool did without presenting it as
+/// evidence about the PC; dropping it silently would hide that (ADR 0010).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnTraceEntry {
+    /// Id of the collector that saw it.
+    pub collector: String,
+    /// The observation, as that collector reported it.
+    pub observation: Observation,
+}
+
 /// A full scan result, before a view decides what to show.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Report {
@@ -196,4 +210,8 @@ pub struct Report {
     pub header: ReportHeader,
     /// One entry per active rule.
     pub evidence: Vec<Evidence>,
+    /// What this program itself left in what the collectors saw. Added to the format without a
+    /// [`REPORT_SCHEMA_VERSION`] change: a report written before it existed reads back with none.
+    #[serde(default)]
+    pub own_traces: Vec<OwnTraceEntry>,
 }

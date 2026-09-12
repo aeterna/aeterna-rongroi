@@ -11,6 +11,7 @@ mod webview_hardening;
 
 use rongroi_collectors::scan::{self, ScanContext};
 use rongroi_core::bundle::Bundle;
+use rongroi_core::engine::SelfIdentity;
 use rongroi_core::model::Report;
 use rongroi_core::provenance::Provenance;
 use rongroi_host::Host;
@@ -24,9 +25,20 @@ pub struct AppState {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Scan before the WebView exists, so nothing the window does can change what was measured.
     let bundle = Bundle::embedded()?;
+    let provenance = Provenance::current();
+    // This program is in its own process list while it scans. The engine needs to know what "this
+    // program" is to separate those traces from evidence about the PC (ADR 0010); the executable's
+    // digest is the one the header already carries, so it is not read twice.
+    let self_identity = SelfIdentity {
+        exe_path: std::env::current_exe()
+            .ok()
+            .map(|path| path.display().to_string()),
+        exe_sha256: provenance.exe_sha256.clone(),
+    };
     let context = ScanContext {
-        provenance: Provenance::current(),
+        provenance,
         generated_at: jiff::Timestamp::now().to_string(),
+        self_identity,
     };
     let host = live_host();
     let report = scan::run(host.as_ref(), &bundle, context);

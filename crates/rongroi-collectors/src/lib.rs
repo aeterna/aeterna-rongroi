@@ -7,6 +7,7 @@
 
 pub mod fivem_dir;
 pub mod posture;
+pub mod process;
 pub mod scan;
 
 use rongroi_core::model::CollectorRun;
@@ -22,5 +23,9 @@ pub trait Collector {
 
 /// Every collector in this build.
 pub fn all() -> Vec<Box<dyn Collector>> {
-    vec![Box::new(fivem_dir::FivemDir), Box::new(posture::Posture)]
+    vec![
+        Box::new(fivem_dir::FivemDir),
+        Box::new(posture::Posture),
+        Box::new(process::Process),
+    ]
 }

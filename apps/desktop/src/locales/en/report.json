@@ -35,6 +35,10 @@
     "collector_unavailable": "not supported by this build"
   },
   "retention": "Look-back",
+  "own_traces": {
+    "title": "Own traces (excluded)",
+    "note": "What this program itself left in what was read. It is not evidence about this PC."
+  },
   "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasured}} not measured",
   "empty": "No evidence to show."
 }

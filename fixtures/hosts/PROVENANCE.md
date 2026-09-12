@@ -15,6 +15,7 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-not-installed` | Windows 11 with no FiveM: `%LOCALAPPDATA%` is set and the plugin folder does not exist | `fivem_dir` collector tests |
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
+| `process-own-trace` | Windows 11 running three processes: one whose image path cannot be resolved, one ordinary program, and aeterna-rongroi itself | `process` collector tests, report snapshots |
 
 The user name `fixtureuser` in these paths is invented; it exists so that SS-mode redaction has something
 to replace.

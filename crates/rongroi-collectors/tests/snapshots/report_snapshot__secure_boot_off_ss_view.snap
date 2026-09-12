@@ -56,6 +56,7 @@ expression: view
       "retention": "Current setting only. It says nothing about how the PC was configured in the past."
     }
   ],
+  "own_traces": [],
   "hidden": {
     "not_found": 1,
     "unmeasured": 0

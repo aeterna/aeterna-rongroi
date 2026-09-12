@@ -141,6 +141,30 @@ describe("App", () => {
     expect(screen.getByRole("alert").textContent).toContain("UNOFFICIAL BUILD");
   });
 
+  it("lists what the tool itself left, apart from the evidence", async () => {
+    viewOverride = {
+      ...selfView,
+      own_traces: [
+        {
+          collector: "process",
+          observation: {
+            collector: "process",
+            fields: {
+              name: "aeterna-rongroi.exe",
+              path: "%USERPROFILE%\\Downloads\\aeterna-rongroi.exe",
+            },
+          },
+        },
+      ],
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const section = await screen.findByRole("region", { name: "Own traces (excluded)" });
+    expect(section.textContent).toContain("aeterna-rongroi.exe");
+    // The evidence list above it is untouched.
+    expect(screen.getByText("Check: Secure Boot is turned off")).toBeTruthy();
+  });
+
   it("shows the look-back note of not-found evidence in the chosen language", async () => {
     const first = selfView.evidence[0];
     if (!first) {
