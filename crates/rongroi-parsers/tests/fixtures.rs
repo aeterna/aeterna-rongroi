@@ -18,8 +18,17 @@ use rongroi_parsers::{bam, filetime, pca};
 /// The directories that are both an L0 fixture set and a fuzz seed corpus.
 const SEEDED_DIRECTORIES: [&str; 3] = ["bam", "pca-app-launch", "pca-general"];
 
+/// `fuzz_prefetch`'s seed corpus, which is the one that does not live under `fixtures/parsers/`:
+/// those files are vendored from a third-party corpus under its own licence and `REUSE.toml`
+/// annotates them where they are (ADR 0015). The tie to `ci.yml` is the same one.
+const PREFETCH_SEED_DIRECTORY: &str = "fixtures/prefetch";
+
+fn repository_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
 fn parsers_fixture_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/parsers")
+    repository_root().join("fixtures/parsers")
 }
 
 /// Every file in one fixture directory as `(file name, bytes)`, sorted by name.
@@ -86,7 +95,7 @@ fn launch_file(bytes: &[u8]) -> pca::PcaFile<pca::PcaLaunchEntry> {
 /// would still exit 0 — a green job that fuzzed no artifact at all. Neither end may move alone.
 #[test]
 fn the_ci_fuzz_job_seeds_from_these_directories() {
-    let workflow = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.github/workflows/ci.yml");
+    let workflow = repository_root().join(".github/workflows/ci.yml");
     let text = std::fs::read_to_string(&workflow).unwrap_or_default();
     assert!(!text.is_empty(), "{} is unreadable", workflow.display());
     for artifact in SEEDED_DIRECTORIES {
@@ -96,6 +105,31 @@ fn the_ci_fuzz_job_seeds_from_these_directories() {
             "ci.yml does not seed a fuzz target from {seed_path}"
         );
     }
+    assert!(
+        text.contains(PREFETCH_SEED_DIRECTORY),
+        "ci.yml does not seed a fuzz target from {PREFETCH_SEED_DIRECTORY}"
+    );
+}
+
+/// The emptiness check `fixtures_in` makes for the parser fixtures, for the seed corpus that does not
+/// go through it. libFuzzer handed a directory with nothing in it still exits 0, so `fuzz_prefetch`
+/// would report success having never seen a `.pf` file.
+#[test]
+fn the_prefetch_seed_directory_holds_prefetch_files() {
+    let directory = repository_root().join(PREFETCH_SEED_DIRECTORY);
+
+    let seeds = std::fs::read_dir(&directory)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().extension().is_some_and(|kind| kind == "pf"))
+        .count();
+
+    assert!(
+        seeds > 0,
+        "{} holds no .pf files: fuzz_prefetch, seeded from it, would start from nothing",
+        directory.display()
+    );
 }
 
 #[test]

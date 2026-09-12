@@ -11,16 +11,20 @@
 | L3 report | the full pipeline, as JSON snapshots; SS view never contains the fixture user name | `crates/rongroi-collectors/tests/`, `rongroi-core::view` | macOS · Linux · Windows |
 | L4 UI | the GUI renders the L3 report JSON through mocked IPC; WebView hardening settings | `apps/desktop` (vitest) | macOS · Linux |
 | L5 live | real Windows: no panic, non-admin gives `unmeasured(not_admin)`, scanned folders unchanged, no files left outside the run's temp folder | Windows CI job and a Windows test machine | Windows |
-| Fuzz | the parsers never panic, abort or hang on arbitrary bytes | `fuzz/fuzz_targets/`, seeded from `fixtures/parsers/` | Linux CI — a **30-second smoke run per target**, not a campaign |
+| Fuzz | the parsers never panic, abort or hang on arbitrary bytes | `fuzz/fuzz_targets/`, seeded from `fixtures/parsers/` and `fixtures/prefetch/` | Linux CI — a **30-second smoke run per target**, not a campaign |
 
 GitHub's Windows runners disable the SysMain and PCA services, so Prefetch and PCA collectors are expected to
 be `unmeasured` there. Those collectors are verified on a real Windows 11 machine.
 
 ## The fuzz layer
 
-One target per public parser entry point — `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general`,
-`fuzz_filetime`. Each asserts nothing about the value it gets back: a malformed artifact is a typed
-`ParseError`, which is a correct answer, so the bug a target looks for is a panic, an abort or a hang.
+One target per public parser entry point — five of them: `fuzz_bam`, `fuzz_pca_app_launch`,
+`fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`. Each asserts nothing about the value it gets back: a
+malformed artifact is a typed `ParseError`, which is a correct answer, so the bug a target looks for is a
+panic, an abort or a hang.
+
+`fuzz_prefetch` is the one whose bytes reach a third-party decompressor rather than only our own code, which
+is half of why ADR 0015 accepted that dependency's immaturity.
 
 Two things about it are deliberate and are not a gap to be closed later (ADR 0016):
 
@@ -31,8 +35,10 @@ Two things about it are deliberate and are not a gap to be closed later (ADR 001
   parsers' public API and that neither the seeds nor a short mutation run around them crashes. Finding a
   deep bug takes hours; run one locally when changing a parser.
 
-Seeds are the fixtures the L0 tests already read — `fixtures/parsers/<artifact>/` — so a fixture added for a
-parser test is a fuzz seed too, and there is no second set of sample bytes to keep in step.
+Seeds are the fixtures the L0 tests already read — `fixtures/parsers/<artifact>/`, and `fixtures/prefetch/`
+for `fuzz_prefetch`, which sits apart because those files are vendored under their own licence (ADR 0015) —
+so a fixture added for a parser test is a fuzz seed too, and there is no second set of sample bytes to keep
+in step.
 `crates/rongroi-parsers/tests/fixtures.rs` is what holds the two ends together: it fails if a seed directory
 is renamed, emptied, or no longer named by `ci.yml`. A fuzzer handed an empty corpus still exits 0.
 
@@ -74,7 +80,7 @@ confirm it fails:
 | Gate | Break it by |
 |---|---|
 | `cargo deny check` | adding `reqwest` to a crate |
-| `fuzz smoke` | giving a parser a panicking path — e.g. indexing `bytes[TAIL_OFFSET]` in `bam::parse_value` instead of reaching for it with `get` |
+| `fuzz smoke` | giving a parser a panicking path — e.g. indexing `bytes[TAIL_OFFSET]` in `bam::parse_value`, or slicing `bytes[4..MAM_HEADER_LEN]` in `prefetch::reject_implausible_declared_size`, instead of reaching for it with `get` |
 | `check-rules` | duplicating a rule id, deleting a negative fixture, or allowing by `name:` |
 | `check-baseline` | pointing a rule's `match` at a value a baseline host carries, or leaving a `known-fps.csv` row in place once its rule no longer matches |
 | `check-locales` | adding a key to a translation that English does not have |

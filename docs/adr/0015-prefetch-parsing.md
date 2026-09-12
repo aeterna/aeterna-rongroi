@@ -49,8 +49,8 @@ absent:
 - Its blast radius is a wrong parse, not memory corruption: it is pure, `unsafe`-free, and reaches no
   file, socket or clock. A defect in it produces wrong evidence, which this project's own rule —
   evidence, never a verdict (ADR 0002) — leaves a human reading the report able to question.
-- A fuzz target pointed at `prefetch::parse` is what would find such a defect. **That target is still
-  owed** (see Consequences).
+- A fuzz target pointed at `prefetch::parse` is what would find such a defect. **That target exists**:
+  `fuzz_prefetch`, added once this parser and the fuzz layer were both on `dev` (see Consequences).
 
 ### Dependency form: crates.io, locked, not vendored
 
@@ -201,9 +201,11 @@ same bytes.
   both already permitted by `deny.toml`'s allow-list. No policy change.
 - `rongroi-parsers` now has three dependencies. It is still pure, still compiles and tests on macOS and
   Linux, and still has no `Host`, no clock and no OS call.
-- **A `fuzz_prefetch` target is owed.** `fuzz/` does not exist on this branch; a parallel PR adds that
-  layer, and pointing a target at `prefetch::parse` is a one-file follow-up once both have landed. The
-  argument above that the immaturity risk is acceptable is weaker until it exists.
+- **A `fuzz_prefetch` target was owed, and now exists.** `fuzz/` did not exist on this branch; a
+  parallel PR added that layer (ADR 0016), and pointing a target at `prefetch::parse` was the one-file
+  follow-up once both had landed. It seeds from `fixtures/prefetch/` and runs in the `fuzz smoke
+  (ubuntu)` job with the other four. The argument above — that this dependency's immaturity is
+  acceptable rather than absent — rests on it, so it is no longer a forward reference.
 - Nothing consumes this parser yet. The collector that reads `%SystemRoot%\Prefetch` — which needs an
   elevated token, and reports `Unmeasured` without one — and the rules that read the result are later
   PRs. No report changes.
