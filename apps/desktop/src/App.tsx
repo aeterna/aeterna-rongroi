@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { reportHeader } from "./api";
+import { type ElevateOutcome, relaunchElevated, reportHeader } from "./api";
 import { languageNames, supportedLanguages } from "./i18n";
 import type { Mode, ReportHeader } from "./types";
 import { Consent } from "./views/Consent";
@@ -17,6 +17,7 @@ export function App() {
   const { t, i18n } = useTranslation();
   const [header, setHeader] = useState<ReportHeader | null>(null);
   const [screen, setScreen] = useState<Screen>("start");
+  const [elevation, setElevation] = useState<ElevateOutcome | null>(null);
 
   useEffect(() => {
     void reportHeader().then(setHeader);
@@ -54,6 +55,18 @@ export function App() {
             {t("start.ss_button")}
           </button>
           <p className="muted">{t("start.ss_hint")}</p>
+          {/* Only worth offering while this scan ran without the rights some checks need. */}
+          {header?.elevated === false && (
+            <>
+              <button type="button" onClick={() => void relaunchElevated().then(setElevation)}>
+                {t("start.elevate_button")}
+              </button>
+              <p className="muted">{t("start.elevate_hint")}</p>
+              {/* Declining is a choice, so it is a plain sentence and not an alert (ADR 0012). */}
+              {elevation === "declined" && <p className="muted">{t("start.elevate_declined")}</p>}
+              {elevation === "failed" && <p className="note">{t("start.elevate_failed")}</p>}
+            </>
+          )}
           <p className="note">{t("start.scan_note")}</p>
         </section>
       )}

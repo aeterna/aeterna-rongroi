@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
-import type { ReportView } from "./types";
+import type { ReportHeader, ReportView } from "./types";
 
 // Vitest runs with apps/desktop as the working directory.
 const SNAPSHOTS = resolve(process.cwd(), "../../crates/rongroi-collectors/tests/snapshots");
@@ -31,6 +31,7 @@ const selfView = snapshot("secure_boot_off_self_view");
 const ssView = snapshot("secure_boot_off_ss_view");
 let calls: string[] = [];
 let viewOverride: ReportView | null = null;
+let headerOverride: ReportHeader | null = null;
 
 beforeAll(async () => {
   await initI18n("en");
@@ -39,13 +40,14 @@ beforeAll(async () => {
 beforeEach(async () => {
   calls = [];
   viewOverride = null;
+  headerOverride = null;
   await i18n.changeLanguage("en");
   mockIPC((cmd, args) => {
     calls.push(cmd);
     const payload = (args ?? {}) as Record<string, unknown>;
     switch (cmd) {
       case "report_header":
-        return selfView.header;
+        return headerOverride ?? selfView.header;
       case "report_view":
         return viewOverride ?? (payload.mode === "ss" ? ssView : selfView);
       case "rule_texts":
@@ -107,6 +109,24 @@ describe("App", () => {
     fireEvent.click(await screen.findByText("Check my own PC"));
     expect(await screen.findByText("Version")).toBeTruthy();
     expect(screen.getByText(selfView.header.provenance.version)).toBeTruthy();
+  });
+
+  it("offers the administrator restart when the scan ran without administrator rights", async () => {
+    render(<App />);
+    expect(await screen.findByText("Scan as administrator")).toBeTruthy();
+  });
+
+  it("does not offer the administrator restart when the scan already had those rights", async () => {
+    headerOverride = { ...selfView.header, elevated: true };
+    render(<App />);
+    // The banner proves the header arrived, so the button is absent by choice and not by timing.
+    await screen.findByRole("alert");
+    expect(screen.queryByText("Scan as administrator")).toBeNull();
+  });
+
+  it("does not offer the administrator restart before the header has loaded", () => {
+    render(<App />);
+    expect(screen.queryByText("Scan as administrator")).toBeNull();
   });
 
   it("switches to Thai, keeping the UNOFFICIAL BUILD token in English", async () => {
