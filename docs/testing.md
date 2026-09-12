@@ -23,6 +23,14 @@ One target per public parser entry point — six of them: `fuzz_bam`, `fuzz_pca_
 gets back: a malformed artifact is a typed `ParseError`, which is a correct answer, so the bug a target looks
 for is a panic, an abort or a hang.
 
+> **One known exception, open as of 2026-09-12.** A crafted `.evtx` input exists on which
+> `rongroi_parsers::evtx::records` does **not return** — over 300 s under the sanitizer with the
+> timeout raised, and over 600 s in a release build without one. It is a defect in the vendored
+> `evtx` crate, present with and without the two patches this repository carries, and its location has
+> not yet been found. So the row above overstates the current position for EVTX: that parser is not
+> known to be hang-free, and `fuzz smoke` may go red on any run whose seed happens to reach it. The
+> reproducing input is kept out of the repository; `third_party/evtx/PROVENANCE.md` records it.
+
 `fuzz_prefetch` is one of two whose bytes reach third-party code rather than only our own, which is half of
 why ADR 0015 accepted that decompressor's immaturity. `fuzz_evtx` is the other and covers the most of it: a
 binary XML decoder, a chunk reader, per-chunk string tables, and under them the unmaintained `encoding` crate

@@ -1,7 +1,7 @@
 # Vendored `evtx` — provenance
 
-This directory is the `evtx` crate's own source, vendored into this repository and carrying **one
-patch**. It is not a fork: the intent is to carry the patch only until an upstream release includes it,
+This directory is the `evtx` crate's own source, vendored into this repository and carrying **two
+patches**. It is not a fork: the intent is to carry the patch only until an upstream release includes it,
 then delete this directory and go back to the registry crate.
 
 Why it is here at all, and what the alternatives were, is `docs/adr/0018-evtx-parsing.md`.
@@ -21,9 +21,15 @@ The files cannot each carry an SPDX header without diverging from upstream on ev
 **upstream's** licence, not this project's: the code is Omer Ben-Amram's, and relicensing it by
 annotation would be a false claim.
 
-## The patch
+## The patches
 
-One function, `binxml::tokens::read_template_values_cursor`, in `src/binxml/tokens.rs`.
+Two, in two files. Both are the same kind of defect — a number read off the wire used in arithmetic
+without checking what the wire could actually hold — and both were found by `fuzz_evtx`, the second
+one after the first had already been fixed and merged.
+
+### 1. An unbounded reservation — `src/binxml/tokens.rs`
+
+`binxml::tokens::read_template_values_cursor`.
 
 `number_of_substitutions` is a `u32` read from the file and was used directly as a `Vec::with_capacity`
 argument, twice. Nothing bounded it against the bytes actually remaining. A **crafted** 69 632-byte
@@ -69,6 +75,62 @@ The fix is two changes, and both use an idiom the crate already uses — in `src
 2. The second allocation reserved from the same unchecked figure a second time. By that point the
    descriptors have been read, so the exact count is `value_descriptors.len()` and no bound is needed.
 
+### 2. A `u16` multiplication that overflows — `src/binxml/name.rs`
+
+`BinXmlNameRef::from_cursor`, line 78:
+
+```rust
+let len = cursor.u16_named("string_table_name_len")?;
+let nul_terminator_len = 4;
+let data_size = BinXmlNameLink::data_size() + u32::from(len * 2) + nul_terminator_len;
+//                                                     ^^^^^^^^^ u16 arithmetic, widened afterwards
+```
+
+`len` is a `u16` from the file and `len * 2` is evaluated **in `u16`**, so any length above 32767
+overflows. Where overflow checks are on — a test build, a fuzz build — it panics:
+
+```
+thread '<unnamed>' panicked at src/binxml/name.rs:78:69:
+attempt to multiply with overflow
+```
+
+In an ordinary release build it does something worse: it **wraps silently**. `data_size` comes out
+short, the cursor is moved to the wrong place, and the rest of the stream is misread with nothing
+reporting it. The fix widens before multiplying, which makes the arithmetic exact and turns an
+implausible length into an out-of-range seek — an error the caller already handles.
+
+This one was found on `dev` after the first patch had merged, by the same fuzz target that had gone
+green on the pull request an hour earlier. The fuzzer takes a random seed; one green run says nothing
+about the next. The regression test for it is therefore deterministic and lives in
+`crates/rongroi-parsers/src/evtx.rs`, built from the good fixture rather than from a saved crash.
+
+## Known and unfixed: a parse that does not terminate
+
+A third defect of the same family is **open**. A crafted 69 632-byte input makes
+`EvtxParser`'s record iteration never come back:
+
+| Measurement | Result |
+|---|---|
+| under the sanitizer, `-timeout=300` | still running at 302 s |
+| release build, no sanitizer | still running past 600 s, killed |
+| with this directory's two patches | hangs |
+| with `name.rs` reverted to upstream | hangs |
+
+So it is upstream's, it is independent of both patches, and neither patch caused or unmasked it. Where
+it spins has not been identified — the alarm's stack lands inside the allocator, which says only what
+it was doing when the clock ran out, not what it was looping on.
+
+It is recorded here rather than fixed because a fix needs the loop found first, and because
+`docs/testing.md` claims this crate's parsers never hang. That claim is currently false for EVTX and
+now says so.
+
+The input is **not** committed: it is a fuzzer artifact, and `fixtures/evtx/` is both the L0 fixture
+directory and the fuzz seed corpus, so everything in it must parse. It lives outside the repository
+with whoever is working on this. `fuzz smoke` may therefore go red on any run whose seed happens to
+find it again — if it does, that is this defect and not a regression of the two patched ones.
+
+## Nothing else
+
 Nothing else in the crate is modified. A scan of every `with_capacity`, `reserve` and `vec![n]` site in
 the crate found these two to be the only allocations sized by an unchecked value read from the file;
 every other one is bounded by `EVTX_CHUNK_SIZE`, by a slice length already in memory, or sits in the
@@ -82,7 +144,7 @@ dependency.
 
 ## What was removed, and what was not
 
-Nothing was added, edited or reformatted apart from the patch above. Three kinds of file were dropped,
+Nothing was added, edited or reformatted apart from the two patches above. Three kinds of file were dropped,
 all of them targets the library does not need:
 
 | Removed | Why it is safe |
@@ -113,7 +175,7 @@ shasum -a 256 ~/.cargo/registry/cache/*/evtx-0.12.2.crate
 
 mkdir -p /tmp/evtx-check && tar xzf ~/.cargo/registry/cache/*/evtx-0.12.2.crate -C /tmp/evtx-check
 
-# Only src/binxml/tokens.rs may differ, and only by the patch described above.
+# Only src/binxml/tokens.rs and src/binxml/name.rs may differ, and only by the patches above.
 diff -r -x bin -x benches /tmp/evtx-check/evtx-0.12.2/src third_party/evtx/src
 
 # The manifest is deliberately trimmed (see the table below), so it will differ — but only by
@@ -122,5 +184,5 @@ diff -u /tmp/evtx-check/evtx-0.12.2/Cargo.toml third_party/evtx/Cargo.toml | gre
 diff -u /tmp/evtx-check/evtx-0.12.2/src/binxml/tokens.rs third_party/evtx/src/binxml/tokens.rs
 ```
 
-A `diff -r` that reports anything other than `src/binxml/tokens.rs` means this directory has drifted
+A `diff -r` that reports anything other than those two files means this directory has drifted
 from upstream and the drift was not recorded here — treat that as a defect in this file.

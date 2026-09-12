@@ -11,7 +11,7 @@ default-members = ["crates/*", "xtask"]
 # `-Z sanitizer`). Excluding them is what keeps the 1.98.1 toolchain pinned in rust-toolchain.toml
 # building, linting and testing everything else exactly as before: `cargo clippy --all-targets` and
 # `cargo deny check` never see a nightly-only crate (ADR 0016).
-# `third_party/evtx` is a vendored copy of the `evtx` crate carrying one patch (ADR 0018). Excluding it
+# `third_party/evtx` is a vendored copy of the `evtx` crate carrying two patches (ADR 0018). Excluding it
 # keeps 13k lines of third-party source out of `cargo fmt --all`, `cargo clippy --all-targets` and
 # `[workspace.lints]`, which are this project's rules and not upstream's.
 exclude = ["fuzz", "third_party/evtx"]
@@ -77,7 +77,9 @@ strip = "symbols"
 # macOS, where the reservation is lazy and the process survives. Windows was not tested; there the
 # commit is charged up front and a failed Rust allocation aborts uncatchably. Either way the size is
 # chosen by the file, and `rongroi-parsers` promises it never aborts on any input, so the crate is
-# vendored with that one bound applied. The fix has NOT been sent upstream yet. `deny.toml` denies unknown *git* sources; a path source inside the repository is reviewable
+# vendored with that bound applied — and with a second patch for a `u16` multiplication in
+# `binxml/name.rs` that overflows on a name length above 32767, found later by the same fuzz target.
+# Neither fix has been sent upstream yet. `deny.toml` denies unknown *git* sources; a path source inside the repository is reviewable
 # in the same PR as the code that uses it. Remove this the moment an upstream release carries the fix.
 # See docs/adr/0018-evtx-parsing.md and third_party/evtx/PROVENANCE.md.
 [patch.crates-io]
