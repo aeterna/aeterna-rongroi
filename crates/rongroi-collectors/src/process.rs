@@ -21,6 +21,16 @@ use crate::Collector;
 
 const ID: &str = "process";
 
+/// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
+///
+/// The process list was denied or could not be read. `not_admin` is not here: this collector
+/// does not split denial by elevation, because the list is readable without it.
+const REASONS: [UnmeasuredReason; 3] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::ReadFailed,
+];
+
 /// Every field this collector can emit.
 ///
 /// The list is never a `gaps` key here: a process list that could not be read is the whole reading,
@@ -39,6 +49,10 @@ impl Collector for Process {
 
     fn fields(&self) -> &'static [&'static str] {
         &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {

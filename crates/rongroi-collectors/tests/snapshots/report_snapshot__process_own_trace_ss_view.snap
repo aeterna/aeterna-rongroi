@@ -22,29 +22,7 @@ expression: view
     "elevated": false,
     "generated_at": "2026-01-01T00:00:00Z"
   },
-  "evidence": [
-    {
-      "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
-      "collector": "posture",
-      "strength": "posture",
-      "state": "unmeasured",
-      "reason": "source_missing"
-    },
-    {
-      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
-      "collector": "posture",
-      "strength": "posture",
-      "state": "unmeasured",
-      "reason": "read_failed"
-    },
-    {
-      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
-      "collector": "posture",
-      "strength": "posture",
-      "state": "unmeasured",
-      "reason": "source_missing"
-    }
-  ],
+  "evidence": [],
   "own_traces": [
     {
       "collector": "process",
@@ -58,9 +36,13 @@ expression: view
     }
   ],
   "unmatched": [],
+  "scope": {
+    "not_admin": 0
+  },
   "hidden": {
     "not_found": 0,
-    "unmeasured": 1,
+    "unmeasured_expected": 4,
+    "unmeasured_unexpected": 0,
     "unmatched": 2
   }
 }

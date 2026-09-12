@@ -127,6 +127,17 @@ pub struct Rule {
     pub related: Vec<Related>,
 }
 
+impl Rule {
+    /// Whether this rule said in `unmeasured_when` that it expects to be unmeasured for `reason`.
+    ///
+    /// This is the whole of what `unmeasured_when` does: the engine records the answer on the
+    /// evidence and the view lists the surprises and counts the rest (ADR 0027). It changes nothing
+    /// about whether the rule matches.
+    pub fn expects_unmeasured(&self, reason: UnmeasuredReason) -> bool {
+        self.unmeasured_when.contains(&reason)
+    }
+}
+
 /// A rule together with its path relative to `rules/`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourcedRule {

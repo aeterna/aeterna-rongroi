@@ -156,13 +156,15 @@ fn partition_own_traces(
 
 /// Evaluates one rule. Used by [`evaluate`] and by fixture checks in `cargo xtask check-rules`.
 pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
+    // Every unmeasured result goes through here, so a reason the rule declared in `unmeasured_when`
+    // is marked expected once, whichever of the three ways it arose (ADR 0027).
+    let unmeasured = |reason: UnmeasuredReason| EvidenceState::Unmeasured {
+        reason,
+        expected: rule.expects_unmeasured(reason),
+    };
     let state = match runs.iter().find(|run| run.collector() == rule.collector) {
-        None => EvidenceState::Unmeasured {
-            reason: UnmeasuredReason::CollectorUnavailable,
-        },
-        Some(CollectorRun::Unmeasured { reason, .. }) => {
-            EvidenceState::Unmeasured { reason: *reason }
-        }
+        None => unmeasured(UnmeasuredReason::CollectorUnavailable),
+        Some(CollectorRun::Unmeasured { reason, .. }) => unmeasured(*reason),
         Some(CollectorRun::Measured {
             observations, gaps, ..
         }) => {
@@ -177,7 +179,7 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
                 }
             } else if let Some(reason) = rule.matcher.keys().find_map(|field| gaps.get(field)) {
                 // Nothing matched, but a field the rule needs was never read: "not found" would lie.
-                EvidenceState::Unmeasured { reason: *reason }
+                unmeasured(*reason)
             } else {
                 EvidenceState::NotFound {
                     retention: rule.retention.clone(),
@@ -676,7 +678,8 @@ date: 2026-09-12
         assert_eq!(
             evidence.state,
             EvidenceState::Unmeasured {
-                reason: UnmeasuredReason::AccessDenied
+                reason: UnmeasuredReason::AccessDenied,
+                expected: false
             }
         );
     }
@@ -691,7 +694,80 @@ date: 2026-09-12
         assert_eq!(
             evidence.state,
             EvidenceState::Unmeasured {
-                reason: UnmeasuredReason::NotWindows
+                reason: UnmeasuredReason::NotWindows,
+                expected: false
+            }
+        );
+    }
+
+    /// `unmeasured_when` names the reasons the rule's author said happen on ordinary machines. The
+    /// engine records which of the two a result is; the view decides what to do with it (ADR 0027).
+    #[test]
+    fn a_declared_reason_is_expected_and_an_undeclared_one_is_not() {
+        let rule = rule("unmeasured_when: [access_denied]\n");
+        let declared = CollectorRun::Unmeasured {
+            collector: "posture".to_owned(),
+            reason: UnmeasuredReason::AccessDenied,
+        };
+        assert_eq!(
+            evaluate_rule(&rule, &[declared]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: true
+            }
+        );
+        let undeclared = CollectorRun::Unmeasured {
+            collector: "posture".to_owned(),
+            reason: UnmeasuredReason::ReadFailed,
+        };
+        assert_eq!(
+            evaluate_rule(&rule, &[undeclared]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::ReadFailed,
+                expected: false
+            }
+        );
+    }
+
+    /// The other two ways a rule becomes unmeasured answer the same way: a gap in a field the rule
+    /// needs, and no run for its collector at all.
+    #[test]
+    fn a_declared_reason_is_expected_whichever_way_it_arose() {
+        let rule = rule("unmeasured_when: [access_denied, collector_unavailable]\n");
+        let gap = CollectorRun::Measured {
+            collector: "posture".to_owned(),
+            observations: vec![],
+            gaps: BTreeMap::from([("secure_boot".to_owned(), UnmeasuredReason::AccessDenied)]),
+        };
+        assert_eq!(
+            evaluate_rule(&rule, &[gap]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: true
+            }
+        );
+        assert_eq!(
+            evaluate_rule(&rule, &[]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::CollectorUnavailable,
+                expected: true
+            }
+        );
+    }
+
+    /// A rule with no `unmeasured_when` expects nothing, which is the state every rule was in while
+    /// the field was parsed and read by nothing.
+    #[test]
+    fn a_rule_that_declares_nothing_expects_nothing() {
+        let run = CollectorRun::Unmeasured {
+            collector: "posture".to_owned(),
+            reason: UnmeasuredReason::AccessDenied,
+        };
+        assert_eq!(
+            evaluate_rule(&rule(""), &[run]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: false
             }
         );
     }
@@ -702,7 +778,8 @@ date: 2026-09-12
         assert_eq!(
             evidence.state,
             EvidenceState::Unmeasured {
-                reason: UnmeasuredReason::CollectorUnavailable
+                reason: UnmeasuredReason::CollectorUnavailable,
+                expected: false
             }
         );
     }

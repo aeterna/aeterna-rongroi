@@ -58,10 +58,19 @@ Every rule produces exactly one of:
 |---|---|---|
 | `found` | the rule matched | the matching observations |
 | `not_found` | the collector looked and nothing matched | the rule's `retention` text — how far back the source can see |
-| `unmeasured` | the collector could not look, or could not read a field the rule needs | a reason code |
+| `unmeasured` | the collector could not look, or could not read a field the rule needs | a reason code, and whether the rule named that reason in `unmeasured_when` |
 
 A rule whose field is listed in `gaps` is `unmeasured`, never `not_found`: saying "not found" about something
 that was never read would be false. There is no score and no overall verdict (ADR 0002).
+
+An `unmeasured` result carries `expected`: whether the reason is one the rule named in its
+`unmeasured_when`. A declared reason is one the author said happens on ordinary machines; an undeclared
+one means something they did not anticipate stopped the measurement, and it is the only unmeasured
+result SS mode lists (ADR 0027).
+
+Each row is shown with the rule's `description` — what the check means and what it does not prove —
+and a `found` row also with its `falsepositives`, the ordinary things that produce the same evidence.
+Both are mandatory in every rule and translated with the rest of its text (ADR 0027).
 
 `strength` says what evidence can show: `execution`, `presence`, `tamper`, `posture`, `context`.
 
@@ -69,11 +78,15 @@ that was never read would be false. There is no score and no overall verdict (AD
 
 | | Self | SS |
 |---|---|---|
-| Shows | every piece of evidence | `found` evidence and all `posture` evidence |
-| Other evidence | shown | counted in `hidden.not_found` / `hidden.unmeasured` |
+| Shows | every piece of evidence | `found` evidence, `posture` evidence that looked, and `unmeasured` evidence for a reason its rule did not name |
+| Other evidence | shown | counted in `hidden.not_found` / `hidden.unmeasured_expected` / `hidden.unmeasured_unexpected` |
+| `unmeasured` with reason `not_admin` | shown, and in the scope statement | **not** a row — one fact about the scan, said once above the evidence in `scope.not_admin`, with the remedy (ADR 0012, ADR 0027) |
 | Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
 | Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |
 | Paths | as read | `X:\Users\<name>` → `%USERPROFILE%`, in evidence and own traces alike |
+
+`scope.not_admin` is not a fourth hidden count: in SS mode those rules are counted in
+`hidden.unmeasured_*` as well, so the hidden counts keep accounting for everything the view leaves out.
 
 Redaction is implemented and tested in `rongroi-core::view` (AGENTS.md hard rule 5).
 

@@ -101,6 +101,18 @@ const PARSE_UNAVAILABLE: &str = "parse_unavailable";
 /// about what an event *means*, which stays where ADR 0002 put it: in a rule.
 const PRIMARY_LOGS: [&str; 3] = ["security.evtx", "system.evtx", "application.evtx"];
 
+/// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
+///
+/// The folder is absent, or listing it was denied, denied without administrator rights, or
+/// failed — including a log larger than a host reads in one piece and the collector's own budget.
+const REASONS: [UnmeasuredReason; 5] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::NotAdmin,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::ReadFailed,
+];
+
 /// Every field this collector can emit.
 ///
 /// A folder it could not list gaps all of them, and so does a log it could not read — unlike
@@ -159,6 +171,10 @@ impl Collector for Evtx {
 
     fn fields(&self) -> &'static [&'static str] {
         &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
     }
 
     /// Lists `%SystemRoot%\System32\winevt\Logs` and reads every `.evtx` file in it, within

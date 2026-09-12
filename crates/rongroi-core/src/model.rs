@@ -153,6 +153,18 @@ pub enum EvidenceState {
     Unmeasured {
         /// Why it could not look.
         reason: UnmeasuredReason,
+        /// Whether the rule named this reason in its `unmeasured_when`.
+        ///
+        /// A rule author who writes "PCA does not exist on Windows 10" into the rule has said that
+        /// this outcome carries no information on such a machine; a reason they did not name means
+        /// something they did not anticipate stopped the measurement, which is the only unmeasured
+        /// result worth listing to a reviewer (ADR 0027).
+        ///
+        /// Additive like `own_traces` and `unmatched`, and [`REPORT_SCHEMA_VERSION`] stays at 1: a
+        /// report written before the field existed reads back `false`, which lists it — the same
+        /// behaviour that report had.
+        #[serde(default)]
+        expected: bool,
     },
 }
 

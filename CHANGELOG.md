@@ -48,6 +48,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- Reports now show what the rules already said (ADR 0027). Every row carries the rule's `description`,
+  and a `found` row the `falsepositives` list of what legitimately produces the same evidence — both
+  were mandatory in every rule, translated into Thai, rejected by CI when empty, and rendered nowhere.
+  `unmeasured_when` now does something: a reason the rule named is counted in SS mode, one it did not
+  name is listed, `hidden.unmeasured` splits into expected and unexpected, and missing administrator
+  rights is one scope statement above the evidence instead of a row per rule. `check-rules` rejects an
+  `unmeasured_when` reason the collector cannot report. The report format gains fields and no schema
+  bump, as `own_traces` and `unmatched` did; the evidence states are still exactly three.
 - The `evtx` collector now reports each log's **own state** beside the events in it — the time and record
   id of the oldest and newest surviving record and the size of the file — and, per folder, how many logs
   read held no record and how many channels have any. A rule about a cleared log has to match the log,

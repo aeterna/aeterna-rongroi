@@ -28,7 +28,8 @@ expression: view
       "collector": "posture",
       "strength": "posture",
       "state": "unmeasured",
-      "reason": "source_missing"
+      "reason": "source_missing",
+      "expected": true
     },
     {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
@@ -69,9 +70,13 @@ expression: view
       ]
     }
   ],
+  "scope": {
+    "not_admin": 0
+  },
   "hidden": {
     "not_found": 0,
-    "unmeasured": 0,
+    "unmeasured_expected": 0,
+    "unmeasured_unexpected": 0,
     "unmatched": 0
   }
 }

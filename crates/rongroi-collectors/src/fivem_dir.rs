@@ -24,6 +24,16 @@ pub const PLUGINS_LOCATION: &str = "plugins";
 
 const ID: &str = "fivem_dir";
 
+/// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
+///
+/// `%LOCALAPPDATA%` is not set, or listing the plugin folder was denied or failed. An absent
+/// folder is not here: `FiveM` is not installed, and the collector did look.
+const REASONS: [UnmeasuredReason; 3] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::ReadFailed,
+];
+
 /// Every field this collector can emit. A folder it could not read is a gap in all of them: a rule
 /// that matches on any one of them must come out `Unmeasured`, never `NotFound`.
 const FIELDS: [&str; 3] = ["location", "path", "sha256"];
@@ -39,6 +49,10 @@ impl Collector for FivemDir {
 
     fn fields(&self) -> &'static [&'static str] {
         &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {

@@ -33,6 +33,17 @@ pub const HVCI_VALUE: &str = "Enabled";
 
 const ID: &str = "posture";
 
+/// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
+///
+/// A value the machine does not report, or a registry or platform read that was denied or
+/// failed. `not_admin` is not here: this collector reads what any account may read.
+const REASONS: [UnmeasuredReason; 4] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::ReadFailed,
+];
+
 /// Every field this collector can emit.
 ///
 /// Unlike the collectors that read one artifact, a setting this one could not read is a gap in that
@@ -58,6 +69,10 @@ impl Collector for Posture {
 
     fn fields(&self) -> &'static [&'static str] {
         &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {

@@ -19,7 +19,7 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 |---|---|---|
 | `id` | yes | lowercase UUIDv4, never reused — not even after the rule is deleted |
 | `title` | yes | short, English |
-| `description` | yes | what it means, why it matters, and what it does **not** prove |
+| `description` | yes | what it means, why it matters, and what it does **not** prove. Shown to the reader beside every row, whatever the state (ADR 0027) |
 | `status` | yes | `experimental` · `test` · `stable` · `deprecated` |
 | `collector` | yes | must equal the first folder name, and must be a collector in this build |
 | `strength` | yes | `execution` · `presence` · `tamper` · `posture` · `context` |
@@ -27,8 +27,8 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `cased` | no | fields of `match` compared byte for byte instead; everything left out folds case |
 | `allow` | no | legitimate software excluded by `sha256` or `signer` — never by file name |
 | `retention` | yes | how far back the source can see, in words for the user |
-| `unmeasured_when` | no | reason codes you expect on some machines |
-| `falsepositives` | yes | what legitimately produces this evidence; never empty |
+| `unmeasured_when` | no | reason codes you expect on some machines. A reason named here is **counted** in SS mode; one that is not is **listed**, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest |
+| `falsepositives` | yes | what legitimately produces this evidence; never empty. Shown to the reader beside every `found` row (ADR 0027), so write it for them |
 | `references`, `tags`, `related`, `modified` | no | |
 | `author`, `date` | yes | `date` is `YYYY-MM-DD` |
 
@@ -50,6 +50,18 @@ Unknown fields are errors. Use `#` comments for notes.
 - If nothing matched but a field in `match` is listed in the run's `gaps`, the rule is `unmeasured` — never
   `not_found`. `cased` does not change that: `gaps` is keyed on the field names in `match`, not on values.
 - Otherwise the rule is `not_found`, and the report shows its `retention`.
+
+## What the reader sees
+
+Every row carries the rule's `title` and its `description`, in the reader's language. A `found` row
+also carries `falsepositives` — a finding shown without what else produces it is a finding shown as an
+accusation (NIST SP 800-86 section 3.4). A `not_found` row does not: nothing was found, so there is
+nothing to explain.
+
+An `unmeasured` row says whether its reason was one this rule named in `unmeasured_when`. SS mode lists
+only the ones no rule expected and counts the rest, so `unmeasured_when` is the difference between a
+line a reviewer should ask about and a number they can move past. `not_admin` is never a row at all: it
+is one fact about the scan, said once above the evidence, with the remedy (ADR 0027).
 
 No rule ships with `cased` today. It looks like this, and needs a `#` comment saying why the field's own
 vocabulary distinguishes case:

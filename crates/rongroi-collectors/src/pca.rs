@@ -59,6 +59,18 @@ const SOURCES: [(&str, &str); 3] = [
     ("general_db1", "PcaGeneralDb1.txt"),
 ];
 
+/// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
+///
+/// `%WinDir%` is not set, the folder is absent, or a file was denied, denied without
+/// administrator rights, or could not be read.
+const REASONS: [UnmeasuredReason; 5] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::NotAdmin,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::ReadFailed,
+];
+
 /// Every field this collector can emit.
 ///
 /// One PCA file that could not be read is a gap in all of them, unlike `fivem_dir`, where one
@@ -89,6 +101,10 @@ impl Collector for Pca {
 
     fn fields(&self) -> &'static [&'static str] {
         &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {
