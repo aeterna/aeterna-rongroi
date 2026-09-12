@@ -75,9 +75,32 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   the optimiser explanation**, never for a clearing. Do not derive a gap in the record ids from the two id
   fields: an exported log is renumbered from 1, so a gap cannot be told apart from "the player exported the
   log to send it to you" (ADR 0028).
-- `status: test` or `stable` needs a positive and a negative fixture in `tests/`.
+- **An event id is unique only per provider, so never match one alone.** 1102 is a cleared audit log on
+  the `Security` channel *and* an Exchange antimalware engine update in `Application` *and* an RDP client
+  event; 104 is a cleared log file on `System` *and* a Remote Desktop timezone offset. Pin `provider` and
+  `channel` beside the id, and give the rule a negative fixture built from the collision (ADR 0031).
+- **A value list is `or` within one field, so two fields carrying one are a cross product.**
+  `event_id: [1102, 104]` with `channel: [Security, System]` also asks for a 1102 on `System`. Where the
+  pairs are what you mean and the cross product is not, that is two rules, not one — and two findings a
+  reader can tell apart usually turn out to be the reason (ADR 0031).
+- **`strength` decides whether a rule's `not_found` reaches an SS reviewer**: `posture` is listed,
+  everything else is counted (`view::ss_lists`). So a rule whose negative result means almost nothing —
+  a log-clearing rule, whose record a later clearing removes — must not be `posture`, or the report
+  grows a row that reads as "we looked and it is clean", which is the closest this program can come to a
+  verdict (ADR 0002, ADR 0031).
+- `status: test` or `stable` needs a positive and a negative fixture in `tests/`. Fixtures are
+  hand-written observations, so they test the engine and the predicate — **not** that a real machine
+  produces the strings the rule matches. Where the matched value comes from Windows rather than from our
+  own collector, and no file in this repository carries it, `experimental` is what the evidence supports
+  and a fixture must not be manufactured to leave it (ADR 0031).
 - A new rule must also be quiet on every `fixtures/hosts/baseline-*` host, or carry a
-  `known-fps.csv` row with a reason (`cargo xtask check-baseline`, ADR 0017).
+  `known-fps.csv` row with a reason (`cargo xtask check-baseline`, ADR 0017). **Quiet is not the same as
+  measured, and for some rules the gate cannot tell you which you have.** The only Event Log sample in
+  this repository is a LanguagePackSetup log, so a rule naming the `Security` or `System` channel is
+  `not_found` on every baseline and the gate stays green whatever the rule says. Do not close that by
+  inventing a log: a baseline asserts that a machine like it is unremarkable
+  (`fixtures/hosts/PROVENANCE.md`). Say in the pull request which of your rules the gate could not
+  measure (ADR 0031).
 - Fixtures are synthetic observations. Never commit cheat binaries, loaders or real player data.
 - **Out of scope:** rules, comments or fixtures that explain how to avoid a rule, and weakening a rule
   without a documented false-positive reason. Bypasses are reported privately via

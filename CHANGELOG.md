@@ -59,6 +59,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- The first two rules that read the Event Log, both `strength: tamper` and both `status: experimental`
+  (ADR 0031): the Security log's own record that it was cleared (event 1102), and the System log's record
+  that some log file was (event 104). Each pins `provider` and `channel` beside the id, because an event
+  id is unique only per provider and 1102 is also an Exchange engine update and an RDP client event; each
+  says in its own text that the two rows can be one action, since clearing the Security log can be
+  recorded in both logs and the engine has no way to de-duplicate them. `falsepositives` leads with the
+  gaming "optimiser" that clears every log on the PC in one click, which is the dominant innocent cause in
+  this population, and `retention` says that a later clearing removes the record of an earlier one, so
+  finding nothing means very little. A third rule — "the Security log is empty" — is **deliberately not
+  written**: cleared, rotated at the size cap and never enabled are not separable from an `.evtx` file.
+  `cargo xtask check-baseline` cannot measure either rule, because the one Event Log sample in this
+  repository is a LanguagePackSetup log; `docs/testing.md` records that as an open false green.
 - Four operators for a rule's `match`, written `field|operator` (ADR 0029): a value list meaning **or**,
   `gt`/`gte`/`lt`/`lte` on numbers and on timestamps, `startswith`/`endswith`/`contains` on text, and
   `exists`, which tells a field that was withheld from one that is absent from one nobody could read.

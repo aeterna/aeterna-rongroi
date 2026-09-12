@@ -35,6 +35,18 @@ const ENGLISH_FALSEPOSITIVE = "PCs that boot in legacy BIOS or CSM mode";
 const THAI_FALSEPOSITIVE = "เครื่องที่บูตแบบ legacy BIOS หรือ CSM";
 const selfView = snapshot("secure_boot_off_self_view");
 const ssView = snapshot("secure_boot_off_ss_view");
+
+// The evidence entry these tests build their overrides from: the Secure Boot rule, found by id
+// rather than taken as `evidence[0]`. Every assertion below is about that rule's own text, and the
+// order of the evidence list is the order of the rules bundle — which changes whenever a rule is
+// added, as `rules/evtx/` did.
+function subject(view: ReportView) {
+  const found = view.evidence.find((item) => item.rule_id === RULE_ID);
+  if (!found) {
+    throw new Error(`the snapshot has no evidence for ${RULE_ID}`);
+  }
+  return found;
+}
 let calls: string[] = [];
 let viewOverride: ReportView | null = null;
 let headerOverride: ReportHeader | null = null;
@@ -80,7 +92,7 @@ describe("App", () => {
   it("snapshots are the Rust pipeline output", () => {
     expect(selfView.mode).toBe("self");
     expect(ssView.mode).toBe("ss");
-    expect(selfView.evidence[0]?.rule_id).toBe(RULE_ID);
+    expect(subject(selfView).rule_id).toBe(RULE_ID);
   });
 
   it("announces an unofficial build on the start screen", async () => {
@@ -235,10 +247,7 @@ describe("App", () => {
   // `description` says what the check is, which a reader needs whatever the answer was;
   // `falsepositives` explains a match, and nothing matched.
   it("shows the description but no false positives beside a not-found entry", async () => {
-    const first = selfView.evidence[0];
-    if (!first) {
-      throw new Error("the self-view snapshot has no evidence");
-    }
+    const first = subject(selfView);
     viewOverride = {
       ...selfView,
       evidence: [
@@ -261,10 +270,7 @@ describe("App", () => {
   // The whole of what `unmeasured_when` does to a view: a reason the rule named is a number, a
   // reason it did not name is a row (ADR 0027).
   it("lists the unmeasured result its rule did not expect and counts the one it did", async () => {
-    const first = selfView.evidence[0];
-    if (!first) {
-      throw new Error("the self-view snapshot has no evidence");
-    }
+    const first = subject(selfView);
     viewOverride = {
       ...ssView,
       evidence: [
@@ -356,10 +362,7 @@ describe("App", () => {
   });
 
   it("shows the look-back note of not-found evidence in the chosen language", async () => {
-    const first = selfView.evidence[0];
-    if (!first) {
-      throw new Error("the self-view snapshot has no evidence");
-    }
+    const first = subject(selfView);
     viewOverride = {
       ...selfView,
       evidence: [

@@ -436,13 +436,29 @@ mod tests {
         ReportHeader, Strength, UnmatchedGroup,
     };
     use rongroi_core::provenance::Provenance;
+    use rongroi_core::rules::Rule;
     use rongroi_core::view;
 
     use super::*;
 
+    /// The rule these tests build a report around.
+    ///
+    /// Looked up by path, not taken as `rules()[0]`: the report below fabricates a
+    /// `secure_boot=disabled` observation and asserts this rule's own Thai `retention`, so it is
+    /// this rule the tests mean and not whichever one sorts first. Index 0 was that rule until
+    /// `rules/evtx/` existed, which is the kind of coupling a new rule is not supposed to break.
+    fn subject(bundle: &Bundle) -> &Rule {
+        &bundle
+            .rules()
+            .iter()
+            .find(|sourced| sourced.path == "posture/boot/secure-boot-disabled/rule.yaml")
+            .expect("the secure-boot rule is in the embedded bundle")
+            .rule
+    }
+
     fn report(official: bool) -> (Report, Bundle) {
         let bundle = Bundle::embedded().unwrap();
-        let rule = &bundle.rules()[0].rule;
+        let rule = subject(&bundle);
         let header = ReportHeader {
             schema_version: REPORT_SCHEMA_VERSION,
             provenance: Provenance::from_parts(official.then_some("1"), "0.0.0-test", None, None),
@@ -606,7 +622,7 @@ mod tests {
     #[test]
     fn a_found_entry_shows_its_description_and_its_false_positives() {
         let (report, bundle) = report(false);
-        let rule = &bundle.rules()[0].rule;
+        let rule = subject(&bundle);
         let view = view::for_mode(&report, Mode::SelfCheck);
 
         let english = render(&view, &bundle, Lang::En);
@@ -636,7 +652,7 @@ mod tests {
     #[test]
     fn a_not_found_entry_shows_the_description_and_not_the_false_positives() {
         let (mut report, bundle) = report(false);
-        let rule = bundle.rules()[0].rule.clone();
+        let rule = subject(&bundle).clone();
         report.evidence[0].state = EvidenceState::NotFound {
             retention: rule.retention.clone(),
         };
@@ -695,7 +711,7 @@ mod tests {
     #[test]
     fn not_found_retention_is_shown_in_the_chosen_language() {
         let (mut report, bundle) = report(false);
-        let english = bundle.rules()[0].rule.retention.clone();
+        let english = subject(&bundle).retention.clone();
         report.evidence[0].state = EvidenceState::NotFound {
             retention: english.clone(),
         };

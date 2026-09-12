@@ -9,8 +9,9 @@
 //! nothing itself (ADR 0018). Reading the `Security` channel needs an elevated token, so `not_admin`
 //! is an expected outcome of an ordinary scan rather than a defect (ADR 0012, ADR 0024).
 //!
-//! No rule reads this collector (ADR 0024), so what it sees is listed in Self mode as unmatched
-//! observations and counted, never listed, in SS mode (ADR 0014).
+//! Two rules read this collector — the Security log's own record that it was cleared, and the System
+//! log's record that some log file was (ADR 0031). Everything else it sees is listed in Self mode as
+//! unmatched observations and counted, never listed, in SS mode (ADR 0014).
 //!
 //! # One observation per kind of event, never one per record
 //!

@@ -215,9 +215,11 @@ fn prefetch_files_present_ss_view() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
-/// No rule reads `evtx` either (ADR 0024). What each log held reaches Self mode through the unmatched
-/// bucket, counted by kind of event rather than one observation per record — a real log holds tens of
-/// thousands of them.
+/// Two rules read `evtx` (ADR 0031), and this host holds neither channel they name, so both are
+/// `not_found` here — which is the false green that ADR records: the one vendored sample is a
+/// `LanguagePackSetup` log, so no fixture in this repository can make either of them match. Everything
+/// else each log held reaches Self mode through the unmatched bucket, counted by kind of event rather
+/// than one observation per record — a real log holds tens of thousands of them.
 #[test]
 fn evtx_logs_present_self_view() {
     let view = view::for_mode(&report_for("evtx-logs-present"), Mode::SelfCheck);
@@ -233,7 +235,9 @@ fn evtx_logs_present_self_view() {
 /// The parser drops every record's payload and its `Computer` field (ADR 0018), so **neither mode has
 /// anything to redact** — the host name of the machine that wrote the vendored sample reaches no part
 /// of the report. What SS mode adds on top is that it lists no unmatched observation at all, so not
-/// even the names of the channels on this PC reach the person watching.
+/// even the names of the channels on this PC reach the person watching. The two `evtx` rules are
+/// `tamper`, not `posture`, so their `not_found` is counted here rather than listed — a rule whose
+/// negative result means almost nothing does not get a row in front of a reviewer (ADR 0031).
 #[test]
 fn evtx_logs_present_ss_view() {
     let report = report_for("evtx-logs-present");
@@ -248,4 +252,42 @@ fn evtx_logs_present_ss_view() {
     assert!(!json.contains("LanguagePackSetup"), "{json}");
     assert!(view.hidden.unmatched > 0);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// The two log-clearing rules (ADR 0031) are `unmeasured` on an Event Log that could not be read,
+/// never `not_found`.
+///
+/// This is the property that protects a player and the one a rule cannot state about itself. A
+/// `not_found` row is shown as "this was looked for over that window and was not there"; saying it
+/// about a log nobody read would be this program asserting that the Security log was never cleared on
+/// evidence it never saw (ADR 0002). The `evtx` collector's `gaps` are folder-wide, so **one**
+/// unreadable log is enough — which is why `evtx-log-unreadable`, where the folder listed fine and a
+/// single file did not, is the case worth pinning rather than the wholly denied one.
+#[test]
+fn a_log_that_could_not_be_read_leaves_the_clearing_rules_unmeasured() {
+    const SECURITY_LOG_CLEARED: &str = "ff967b28-984b-4de0-b361-58367ae0c2d5";
+    const EVENT_LOG_FILE_CLEARED: &str = "f4c99b57-02c8-4e53-82d0-dba8bdc13dda";
+
+    for host in ["evtx-log-unreadable", "evtx-access-denied"] {
+        let report = report_for(host);
+        let mut seen = 0;
+        for evidence in &report.evidence {
+            if evidence.rule_id != SECURITY_LOG_CLEARED
+                && evidence.rule_id != EVENT_LOG_FILE_CLEARED
+            {
+                continue;
+            }
+            seen += 1;
+            assert!(
+                matches!(
+                    evidence.state,
+                    rongroi_core::model::EvidenceState::Unmeasured { .. }
+                ),
+                "{host}: {} is {:?}, which tells a player a cleared log was looked for and was not there",
+                evidence.rule_id,
+                evidence.state
+            );
+        }
+        assert_eq!(seen, 2, "{host}: both rules must reach the report");
+    }
 }

@@ -108,6 +108,17 @@ chosen to silence a rule — and a source one of them leaves undescribed is not 
 collector that never reads is `Unmeasured` and a rule for it is then unmeasurable in either direction
 (ADR 0026).
 
+> **The gate cannot measure the two log-clearing rules, and its green says nothing about them.**
+> `fixtures/hosts/baseline-elevated-win11` holds exactly one `.evtx` file, a LanguagePackSetup log, and
+> no `Security` or `System` channel at all — so `security-audit-log-cleared` and `event-log-file-cleared`
+> are `not_found` there, `unmeasured` on the other two baselines, and `check-baseline` fails only on
+> `found`. Those two rules would pass this gate whatever they said. It is the false green ADR 0026 was
+> written to close, reappearing for one rule set, and it is **open**. Closing it needs a Security-channel
+> sample that carries nobody's data; the last candidate was removed on finding a real machine SID in it
+> (`fixtures/evtx/PROVENANCE.md`). **Do not close it by adding an invented Security log to a baseline** —
+> a baseline is a claim about an ordinary machine, and one written to exercise a rule is not that claim
+> (ADR 0031, `fixtures/hosts/PROVENANCE.md`).
+
 ## Prove that a check can fail
 
 A gate that has never failed has not been tested. When adding or changing a gate, break it on purpose once and
