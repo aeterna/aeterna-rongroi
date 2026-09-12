@@ -35,6 +35,15 @@ precedence = "override"
 SPDX-FileCopyrightText = "2016 Eric Zimmerman"
 SPDX-License-Identifier = "MIT"
 
+# Vendored EVTX test corpus: the evtx crate's own samples, dual MIT/Apache-2.0 upstream, taken here
+# under Apache-2.0. Source, commit, per-file detail and what each file was scanned for are in
+# fixtures/evtx/PROVENANCE.md.
+[[annotations]]
+path = ["fixtures/evtx/*.evtx"]
+precedence = "override"
+SPDX-FileCopyrightText = "2019 Omer Ben-Amram"
+SPDX-License-Identifier = "Apache-2.0"
+
 [[annotations]]
 path = ["rules/**/tests/**", "rules/**/*.md"]
 precedence = "override"
