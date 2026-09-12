@@ -32,6 +32,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- The `prefetch` collector: it lists `%SystemRoot%\Prefetch` and reports, per `.pf` file, the
+  program's name, how many times Windows recorded it running, how many run times the file still held
+  and the newest of them, plus one account of how many files the folder held and how many decoded —
+  an emptied Prefetch folder is `files: 0`. **The files each program loaded and the volumes it touched
+  are read and never reported**: Prefetch writes loaded-file paths as `\VOLUME{…}\USERS\<account>\…`,
+  which SS-mode redaction cannot reach, a raw listing of them is what SS mode promises not to show
+  whether or not a name is replaced in it, and a volume serial number identifies one machine across
+  two reports with no rule able to ask anything of it. Reading the folder needs an elevated token, so
+  a scan without one reports `not_admin` and says in the report that it could not read the artifact.
+  No rule reads it yet (ADR 0021).
 - The `pca` collector, the first thing in the product to call `rongroi-parsers`: it reads the three
   Program Compatibility Assistant files under `%WinDir%\appcompat\pca` and reports, per launch record,
   the program's name, when PCA saw it run, and its path — the last of these only when the path begins
