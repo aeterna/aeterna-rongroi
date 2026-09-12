@@ -56,6 +56,20 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (_, "elevated_unknown") => "?",
         (Lang::En, "declined") => "Scan cancelled. Nothing was read.",
         (Lang::Th, "declined") => "ยกเลิกการสแกนแล้ว ไม่ได้อ่านอะไรเลย",
+        (Lang::En, "elevate_started") => {
+            "Starting again with administrator rights. The new window does the scan."
+        }
+        (Lang::Th, "elevate_started") => "กำลังเปิดใหม่ด้วยสิทธิ์ผู้ดูแลระบบ หน้าต่างใหม่จะเป็นตัวสแกน",
+        (Lang::En, "elevate_declined") => {
+            "The administrator prompt was declined. Nothing was scanned."
+        }
+        (Lang::Th, "elevate_declined") => "ไม่ได้อนุญาตสิทธิ์ผู้ดูแลระบบ ยังไม่ได้สแกนอะไร",
+        (Lang::En, "elevate_failed") => "could not start again with administrator rights",
+        (Lang::Th, "elevate_failed") => "เปิดใหม่ด้วยสิทธิ์ผู้ดูแลระบบไม่สำเร็จ",
+        (Lang::En, "elevate_not_windows") => {
+            "Administrator rights are a Windows idea; --elevate does nothing on this system."
+        }
+        (Lang::Th, "elevate_not_windows") => "สิทธิ์ผู้ดูแลระบบเป็นเรื่องของ Windows --elevate ไม่มีผลบนระบบนี้",
         _ => "",
     }
 }
@@ -104,6 +118,30 @@ pub fn consent(lang: Lang) -> String {
 /// Message printed when consent is refused.
 pub fn declined(lang: Lang) -> &'static str {
     text(lang, "declined")
+}
+
+/// Message printed once the elevated restart has been requested.
+#[cfg(windows)]
+pub fn elevate_started(lang: Lang) -> &'static str {
+    text(lang, "elevate_started")
+}
+
+/// Message printed when the Windows consent prompt was dismissed.
+#[cfg(windows)]
+pub fn elevate_declined(lang: Lang) -> &'static str {
+    text(lang, "elevate_declined")
+}
+
+/// Context added to the error when Windows refused to start the elevated program.
+#[cfg(windows)]
+pub fn elevate_failed(lang: Lang) -> &'static str {
+    text(lang, "elevate_failed")
+}
+
+/// Message printed when `--elevate` is used on something other than Windows.
+#[cfg(not(windows))]
+pub fn elevate_not_windows(lang: Lang) -> &'static str {
+    text(lang, "elevate_not_windows")
 }
 
 /// Renders a view as text.
