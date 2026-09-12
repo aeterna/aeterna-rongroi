@@ -127,3 +127,29 @@ fn unofficial_provenance_is_reported() {
     let report = report_for("secure-boot-on");
     assert!(!report.header.provenance.official);
 }
+
+/// No rule reads `pca` either (ADR 0020), so every launch record and every per-file account of what
+/// parsed is an unmatched observation. This is the whole of the collector's route to a screen, and it
+/// needs no change to the CLI or the app: both render the bucket by collector id (ADR 0014).
+#[test]
+fn pca_files_present_self_view() {
+    let view = view::for_mode(&report_for("pca-files-present"), Mode::SelfCheck);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(json.contains("game.exe"), "{json}");
+    assert!(json.contains(r"Users\\alex\\Downloads\\game.exe"), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// PCA records the paths of programs that ran, which is a list of what a person has on their
+/// computer. SS mode lists no unmatched observation at all, so none of it reaches the person watching
+/// the screenshare — neither the account name in the paths nor the names of the programs.
+#[test]
+fn pca_files_present_ss_view() {
+    let view = view::for_mode(&report_for("pca-files-present"), Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(!json.contains("alex"), "{json}");
+    assert!(!json.contains("game.exe"), "{json}");
+    // The viewer is told how many were withheld rather than being told nothing (ADR 0014).
+    assert!(view.hidden.unmatched > 0);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
