@@ -6,6 +6,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `cargo xtask check-baseline`: the whole rule set is run against fixture hosts described as ordinary
+  machines, through the same `scan::run` pipeline the CLI uses, and any `Found` evidence that is not
+  recorded in `rules/known-fps.csv` with a written reason fails the gate — as does a row whose rule no
+  longer matches, because an unused exception is a claim about the rule set that is no longer true.
+  Two baseline profiles ship, and both are silent today (ADR 0017).
 - Prefetch parser: Windows `.pf` files — MAM-compressed or not — decode to a plain struct with the
   executable, run count, the last eight run times, the volumes and the loaded files, with every raw
   `FILETIME` kept beside its converted timestamp. SCCA versions 30 and 31 (Windows 10 and 11) are read;

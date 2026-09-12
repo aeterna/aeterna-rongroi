@@ -46,6 +46,8 @@ jobs:
         run: cargo insta test --unreferenced reject --test-runner nextest
       - name: Rules and fixtures
         run: cargo xtask check-rules
+      - name: Clean baseline (the rule set stays quiet on an ordinary machine)
+        run: cargo xtask check-baseline
       - name: Locales
         run: cargo xtask check-locales
       - name: No invisible or bidi characters
