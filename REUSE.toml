@@ -23,6 +23,14 @@ precedence = "closest"
 SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 
+# Vendored Prefetch test corpus: binary files that cannot carry a header, under their own licence.
+# Source, commit and per-file detail are in fixtures/prefetch/PROVENANCE.md.
+[[annotations]]
+path = ["fixtures/prefetch/*.pf"]
+precedence = "override"
+SPDX-FileCopyrightText = "2016 Eric Zimmerman"
+SPDX-License-Identifier = "MIT"
+
 [[annotations]]
 path = ["rules/**/tests/**", "rules/**/*.md"]
 precedence = "override"
