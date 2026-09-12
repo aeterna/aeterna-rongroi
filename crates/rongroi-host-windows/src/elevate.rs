@@ -48,7 +48,7 @@ fn quote(arg: &str) -> String {
             // A run of backslashes only needs escaping if a quote turns out to follow it.
             '\\' => backslashes += 1,
             '"' => {
-                for _ in 0..backslashes * 2 + 1 {
+                for _ in 0..=(backslashes * 2) {
                     out.push('\\');
                 }
                 backslashes = 0;
@@ -69,6 +69,68 @@ fn quote(arg: &str) -> String {
     }
     out.push('"');
     out
+}
+
+/// Asks Windows to start this program again with administrator rights, passing it `args`.
+///
+/// Returns once the relaunch has been *requested*. It does not wait for the new process and it does not
+/// end this one; the caller decides when to exit (ADR 0012). Windows shows its consent prompt first, and
+/// dismissing that prompt gives [`ElevateError::Declined`] — a normal outcome, not a fault.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+pub fn relaunch_elevated(args: &[String]) -> Result<(), ElevateError> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+
+    use windows::Win32::UI::Shell::{
+        SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, ShellExecuteExW,
+    };
+    use windows::core::PCWSTR;
+
+    /// `HRESULT_FROM_WIN32(ERROR_CANCELLED)` — 1223, what Windows reports when the person dismisses the
+    /// consent prompt.
+    const HRESULT_ERROR_CANCELLED: i32 = 0x8007_04C7_u32.cast_signed();
+    /// `SW_SHOWNORMAL`, written out so this crate does not take the whole
+    /// `Win32_UI_WindowsAndMessaging` feature for one constant.
+    const SW_SHOWNORMAL: i32 = 1;
+
+    /// A NUL-terminated UTF-16 copy, as the `W` entry points expect.
+    fn wide(text: &OsStr) -> Vec<u16> {
+        text.encode_wide().chain(std::iter::once(0)).collect()
+    }
+
+    let exe =
+        std::env::current_exe().map_err(|error| ElevateError::ExePathUnknown(error.to_string()))?;
+    let Ok(cb_size) = u32::try_from(size_of::<SHELLEXECUTEINFOW>()) else {
+        return Err(ElevateError::Failed(
+            "SHELLEXECUTEINFOW does not fit in a u32".to_owned(),
+        ));
+    };
+
+    // These three buffers must outlive the call: the struct only holds pointers into them.
+    let file = wide(exe.as_os_str());
+    let verb = wide(OsStr::new("runas"));
+    let parameters = wide(OsStr::new(&command_line(args)));
+
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: cb_size,
+        // NOASYNC: finish the request before returning, because the caller exits straight afterwards.
+        // FLAG_NO_UI: hand failures back here instead of letting the shell put up its own dialog.
+        fMask: SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+        lpVerb: PCWSTR(verb.as_ptr()),
+        lpFile: PCWSTR(file.as_ptr()),
+        lpParameters: PCWSTR(parameters.as_ptr()),
+        nShow: SW_SHOWNORMAL,
+        ..Default::default()
+    };
+
+    // SAFETY: `info` is a fully initialised `SHELLEXECUTEINFOW` whose `cbSize` is its own size, and the
+    // three strings it points at are NUL-terminated and owned by this function, so they outlive the
+    // call — `SEE_MASK_NOASYNC` means the call is finished when it returns.
+    unsafe { ShellExecuteExW(&raw mut info) }.map_err(|error| match error.code().0 {
+        HRESULT_ERROR_CANCELLED => ElevateError::Declined,
+        _ => ElevateError::Failed(error.message()),
+    })
 }
 
 #[cfg(test)]
