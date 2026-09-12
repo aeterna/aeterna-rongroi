@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 with a readable Event Log folder, holding two `.evtx` files whose bytes are the one
+# vendored Event Log sample, referenced rather than copied (ADR 0019). The same bytes stand in for
+# two channels so that a test can see more than one log and the order they are read in; a second
+# real sample does not exist, because every other candidate carried a real machine's user names,
+# addresses or SIDs (fixtures/evtx/PROVENANCE.md).
+#
+# `Security.evtx` is named after the channel this collector's elevation requirement is about, and
+# `Application.evtx` after the one that would be read after it. Neither file's records say they
+# belong to those channels — they say `Microsoft-Windows-LanguagePackSetup/Operational`, which is
+# what the sample is — and that is not a defect of the fixture: an observation carries the file it
+# came from *and* the channel its records declare, precisely because a log whose records name
+# another channel is a file that was put there.
+#
+# The sample's own chunk string table holds the host name of the machine that wrote it,
+# `DESKTOP-1N4R894` (fixtures/evtx/PROVENANCE.md). That is why this host exists: the collector's
+# tests assert that it reaches no observation.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\System32\winevt\Logs':
+    - name: Application.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+    - name: Security.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+    - name: not-a-log.txt
+      content: "not an event log\n"

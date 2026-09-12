@@ -214,3 +214,38 @@ fn prefetch_files_present_ss_view() {
     assert!(view.hidden.unmatched > 0);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
+
+/// No rule reads `evtx` either (ADR 0024). What each log held reaches Self mode through the unmatched
+/// bucket, counted by kind of event rather than one observation per record — a real log holds tens of
+/// thousands of them.
+#[test]
+fn evtx_logs_present_self_view() {
+    let view = view::for_mode(&report_for("evtx-logs-present"), Mode::SelfCheck);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(
+        json.contains("Microsoft-Windows-LanguagePackSetup"),
+        "{json}"
+    );
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// One Event Log record can carry a user name, a host name, an address, a SID and a command line.
+/// The parser drops every record's payload and its `Computer` field (ADR 0018), so **neither mode has
+/// anything to redact** — the host name of the machine that wrote the vendored sample reaches no part
+/// of the report. What SS mode adds on top is that it lists no unmatched observation at all, so not
+/// even the names of the channels on this PC reach the person watching.
+#[test]
+fn evtx_logs_present_ss_view() {
+    let report = report_for("evtx-logs-present");
+    let everything = serde_json::to_string(&report).unwrap();
+    assert!(
+        !everything.contains("DESKTOP-1N4R894"),
+        "the host name reached the report"
+    );
+
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(!json.contains("LanguagePackSetup"), "{json}");
+    assert!(view.hidden.unmatched > 0);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}

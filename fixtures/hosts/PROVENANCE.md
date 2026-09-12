@@ -41,6 +41,12 @@ none contains a real person's user name, host name, SID or files.
 | `bam-account-denied` | Two accounts, one of whose keys cannot be read, so an unknown number of records is missing | `bam` collector tests |
 | `bam-malformed-value` | One account holding a value that decodes, one a byte short of a timestamp, and one that is there and has no bytes | `bam` collector tests |
 | `bam-longer-value` | A BAM value longer than the public write-ups describe, as a newer Windows build might write | `bam` collector tests |
+| `evtx-logs-present` | Windows 11 with a readable Event Log folder holding two `.evtx` files, both referencing the one vendored Event Log sample, plus a file that is not a log | `evtx` collector tests, report snapshots |
+| `evtx-not-present` | Windows with no Event Log folder at all, so nothing can be said about what any log holds | `evtx` collector tests |
+| `evtx-access-denied` | Windows 11, the Event Log folder present and unlistable, by a process without administrator rights — the expected shape of an ordinary scan (ADR 0018) | `evtx` collector tests |
+| `evtx-access-denied-elevated` | The same denial with those rights already held, where restarting as administrator would not help | `evtx` collector tests |
+| `evtx-log-unreadable` | Windows 11 with `Security.evtx` listed and holding no bytes and `Application.evtx` readable | `evtx` collector tests |
+| `evtx-log-truncated` | Windows 11 whose Event Log folder holds a file shorter than the fixed 4 KiB header every `.evtx` begins with | `evtx` collector tests |
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
@@ -77,6 +83,22 @@ one-letter name cannot be asserted absent — `contains("a")` is true of almost 
 `HARDDISKVOLUME` and no `.DLL` in the serialised observations, and no `loaded_files` or `volumes`
 field under any name. The collector emits neither field at all, which is what makes those assertions
 meaningful rather than lucky (ADR 0021).
+
+**The `evtx-*` hosts reach a real host name**, `DESKTOP-1N4R894`, in the chunk string table of
+`fixtures/evtx/languagepacksetup-operational.evtx` — the one Event Log sample this repository vendors,
+and a name Windows generates at install time (`fixtures/evtx/PROVENANCE.md` records why it was vendored
+anyway and counts every other string in the file). Unlike the Prefetch account name, 15 characters can
+be asserted absent and are, in the `evtx` collector's tests and in the report snapshot test. That
+assertion alone would not catch a payload leak, so the element names and payload fragments the file also
+holds — `EventData`, `Computer`, `UserID`, the `ping-response` fragments, the `MS-CV` tokens — are
+asserted absent beside it (ADR 0024). The parser drops every record's payload before the collector sees
+it (ADR 0018).
+
+Two `evtx` tests build a fixture host in the temporary directory instead of reading one from here: a
+damaged chunk and a file whose header is not an Event Log's. Neither may be committed to
+`fixtures/evtx/`, which is the seed corpus `fuzz_evtx` reads and where everything has to parse, and an
+`.evtx` file is binary, so neither can be written inline in a `host.yaml` the way `prefetch-corrupt-files`
+writes its bytes.
 
 When a fixture is generated from a real Windows install (M2 onwards), record here: what generated it, the
 Windows build, that networking was disabled, and who checked it for a real user name, host name or SID, and

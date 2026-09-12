@@ -17,11 +17,17 @@ GitHub's Windows runners disable the SysMain and PCA services, so Prefetch and P
 be `unmeasured` there.
 
 > **Not true yet, as of 2026-09-12.** That paragraph used to end "those collectors are verified on a real
-> Windows 11 machine". It was written before either collector existed. None of the artifact collectors —
-> PCA (ADR 0020), Prefetch (ADR 0021), BAM (ADR 0023) — has been run against a real Windows install: every
-> fixture is a vendored sample or synthetic, and the Windows CI job cannot stand in for one, because it runs
-> elevated with UAC off and with those services disabled. Which path shapes the artifacts really hold, and
-> whether each source is readable without an elevated token, are open questions, and each ADR says so.
+> Windows 11 machine". It was written before any of them existed. None of the artifact collectors — PCA
+> (ADR 0020), Prefetch (ADR 0021), BAM (ADR 0023), Event Log (ADR 0024) — has been run against a real
+> Windows install by anyone here: every fixture is a vendored sample or synthetic, and the Windows CI job
+> cannot stand in for one, because it runs elevated with UAC off and with SysMain and PcaSvc disabled.
+> Which path shapes the artifacts really hold, and whether each source is readable without an elevated
+> token, are open questions, and each ADR says so.
+>
+> The Event Log is the one partial exception, and it is worth stating precisely: the runner has a real
+> `winevt\Logs` folder and an elevated token, so the Windows job is the first place this program parses a
+> real machine's event logs. That exercises the parser against real bytes. It says nothing about the
+> non-elevated branch, which is the one an ordinary scan takes (ADR 0024).
 
 ## The fuzz layer
 

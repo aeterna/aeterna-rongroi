@@ -3,9 +3,9 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's own folders, the list of running processes, what the Program Compatibility Assistant,
-Windows Prefetch and the Background Activity Moderator recorded about programs that ran and, in later
-versions, Windows event logs.
+FiveM's own folders, the list of running processes, what the Program Compatibility Assistant, Windows
+Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
+event logs hold.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
@@ -25,6 +25,13 @@ says how many accounts had records and nothing else about them. The path of a pr
 when it starts with a drive letter, because that is the only shape SS mode knows how to redact. A path
 written any other way can carry your account name with nothing to replace it, so it is withheld rather
 than shown — and the report says it was withheld, rather than leaving you to notice it is missing.
+Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
+wrote them, the event number, the severity and the first and last time one was written. **What each event
+says is not read into the report at all**: an event's own text is where user names, PC names, addresses,
+account identifiers and full command lines live, and none of it survives the step that reads the file.
+A log the tool could not read — because Windows refused it, because it is larger than the tool will open,
+or because the tool's own time limit ran out — is **named in the report as one it could not read**, rather
+than passed over in silence.
 
 The tool does **not** take screenshots, read browser history, access files unrelated to its collectors,
 or allow remote access.

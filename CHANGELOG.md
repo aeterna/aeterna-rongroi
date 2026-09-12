@@ -33,6 +33,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- The `evtx` collector, the last of the four parsers to reach the product: it reads every `.evtx` file
+  in `%SystemRoot%\System32\winevt\Logs` and reports, per log, **how many events of each kind** it
+  holds — channel, provider, event id, level, a count and the first and last time one was written —
+  plus how much of the log decoded. Records are counted, never listed: a real log holds tens of
+  thousands. No event's payload reaches the collector, because the parser drops it and with it the user
+  names, host names, addresses, SIDs and command lines an event carries. A log that was denied, is
+  larger than a host reads in one piece, or was not reached inside the collector's 30-second budget is
+  **named in the report as one that was not read** and gaps the run, so a rule reports `unmeasured`
+  rather than "nothing was found in the log" — an Event Log nobody could read is what someone who
+  wants it unexamined would arrange. The parse runs on a worker thread so that a log that does not
+  parse costs the collection its budget rather than the whole program, which until now had no window
+  on screen while it scanned. No rule reads it yet (ADR 0024).
 - The `bam` collector: it enumerates the Background Activity Moderator's per-account keys under
   `HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings` and reports, per registry value,
   the program's name, when BAM last saw it run, the parser's moderation state and how many bytes the

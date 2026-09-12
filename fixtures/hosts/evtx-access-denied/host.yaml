@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# The expected shape of an ordinary scan: the Event Log folder is there, Windows will not list it for
+# a process without administrator rights, and ADR 0018 records that reading the `Security` channel
+# needs an elevated token. That pair is what makes the reason `not_admin` rather than `access_denied`,
+# and what makes the restart-as-administrator offer worth taking (ADR 0012).
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\System32\winevt\Logs':
+    - name: Security.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+access_denied:
+  - 'C:\Windows\System32\winevt\Logs'
