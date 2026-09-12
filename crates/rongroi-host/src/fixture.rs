@@ -673,6 +673,42 @@ processes:
         assert!(error.to_string().contains("content"), "{error}");
     }
 
+    /// `from:` is how a fixture reaches the artifact corpora in `fixtures/`, so it is tested against
+    /// a real one: the file is CRLF-terminated, which a read that went through text would change.
+    #[test]
+    fn a_loaded_fixture_resolves_from_against_its_own_directory() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+        let host = FixtureHost::load(&fixtures.join("hosts/file-content-present")).unwrap();
+        let dir = r"C:\ProgramData\fixture";
+
+        let on_disk = std::fs::read(fixtures.join("parsers/pca-app-launch/normal.txt")).unwrap();
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\from-disk.txt")),
+            Ok(Some(on_disk))
+        );
+        assert_eq!(
+            host.read_file(&format!(r"{dir}\inline.txt")),
+            Ok(Some(b"hello\n".to_vec()))
+        );
+        assert!(matches!(
+            host.read_file(&format!(r"{dir}\unreadable.bin")),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// A `from:` that does not resolve is a broken fixture, and it says so when it is loaded rather
+    /// than looking like a file whose bytes cannot be read.
+    #[test]
+    fn a_from_path_that_does_not_exist_fails_at_load() {
+        let error = FixtureHost::parse(
+            "platform: windows\nfilesystem:\n  'C:\\x':\n    - name: a.txt\n      from: 'no-such-file'\n",
+            "inline",
+            Some(Path::new(env!("CARGO_MANIFEST_DIR"))),
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Io { .. }), "{error}");
+    }
+
     /// An inline fixture has no directory for a relative path to start from, so `from:` is refused
     /// there instead of being resolved against whatever the test's working directory happens to be.
     #[test]
