@@ -332,19 +332,19 @@ fn to_parse_error(error: &EvtxError, stage: Stage) -> ParseError {
 
 #[cfg(test)]
 mod tests {
-    use super::{EvtxFile, records};
+    use super::{EvtxFile, number, records, scalar};
     use crate::error::ParseError;
 
-    /// 17 records, no errors. Carries `EventID` rendered both as a bare number and as an object with
-    /// a `Qualifiers` attribute, which is the shape a caller most easily gets wrong.
-    const APPLICATION: &[u8] = include_bytes!("../../../fixtures/evtx/application-no-crc32.evtx");
-    /// 17 records, the last of them damaged: a truncated provider GUID and no channel at all.
+    /// 17 records, the last of them damaged: a truncated provider GUID and no channel at all. The
+    /// only vendored Event Log sample: a second one was removed on finding it carried a real
+    /// machine SID (`fixtures/evtx/PROVENANCE.md`), so every test here reads this file or bytes
+    /// built from it.
     const LANGUAGE_PACK: &[u8] =
         include_bytes!("../../../fixtures/evtx/languagepacksetup-operational.evtx");
 
     /// The fixed file header every `.evtx` begins with.
     const FILE_HEADER_LEN: usize = 4096;
-    /// One chunk. Both fixtures are a single chunk behind the header.
+    /// One chunk. The fixture is a single chunk behind the header.
     const CHUNK_LEN: usize = 65536;
 
     fn parsed(bytes: &[u8]) -> EvtxFile {
@@ -373,33 +373,51 @@ mod tests {
 
     #[test]
     fn a_normal_file_parses() {
-        let file = parsed(APPLICATION);
+        let file = parsed(LANGUAGE_PACK);
 
         assert!(file.rejected.is_empty());
         assert_eq!(file.records.len(), 17);
         let first = &file.records[0];
-        assert_eq!(first.record_id, 426);
-        assert_eq!(first.channel.as_deref(), Some("Application"));
-        assert_eq!(first.provider.as_deref(), Some("SecurityCenter"));
+        assert_eq!(first.record_id, 1);
+        assert_eq!(first.event_id, Some(4000));
         assert_eq!(first.level, Some(4));
         // Seven fractional digits, not the six the rendered `SystemTime` element shows: `written`
         // is the record header's own `FILETIME`, which has 100-nanosecond resolution, and not the
         // timestamp the XML prints. Pinned here so that a change of source would fail rather than
         // pass with a value that looks close enough.
-        assert_eq!(first.written.to_string(), "2021-03-31T23:51:45.0187674Z");
+        assert_eq!(first.written.to_string(), "2018-07-09T20:49:14.0577461Z");
     }
 
-    /// `EventID` is a bare number in some records and an object carrying a `Qualifiers` attribute in
-    /// others — both in this one file. A parser that reads only the first shape silently loses the
-    /// event id of every record written the second way, which is the field a later rule reads.
+    /// `EventID` renders as a bare number when the element has no attributes, and as an object with
+    /// the value under `#text` when it carries `Qualifiers`. A parser that reads only the first shape
+    /// silently loses the event id of every record written the second way — the field a later rule
+    /// reads.
+    ///
+    /// This is asserted against the two shapes directly rather than through a fixture. The sample
+    /// that carried both in one file was removed for holding a real machine SID, and the surviving
+    /// one renders only bare numbers; a test that reached for the object shape through it would pass
+    /// while exercising nothing. `scalar` and `number` are the whole of that logic.
     #[test]
     fn an_event_id_is_read_whether_or_not_it_carries_qualifiers() {
-        let file = parsed(APPLICATION);
+        use serde_json::json;
 
-        // Record 1 renders as {"#attributes": {"Qualifiers": 0}, "#text": 1}.
-        assert_eq!(file.records[0].event_id, Some(1));
-        // Record 4 renders as a bare 1532.
-        assert_eq!(file.records[3].event_id, Some(1532));
+        // The shape a record with `Qualifiers` renders as.
+        let with_attributes = json!({"#attributes": {"Qualifiers": 0}, "#text": 1});
+        assert_eq!(number(scalar(&with_attributes)), Some(1));
+
+        // The shape a record without them renders as.
+        let bare = json!(1532);
+        assert_eq!(number(scalar(&bare)), Some(1532));
+
+        // Some providers render these fields as JSON strings.
+        assert_eq!(number(scalar(&json!("4"))), Some(4));
+        assert_eq!(number(scalar(&json!({"#text": "4000"}))), Some(4000));
+
+        // Anything that is neither is `None` rather than a guess.
+        assert_eq!(number(scalar(&json!("not a number"))), None);
+        assert_eq!(number(scalar(&json!(null))), None);
+
+        let file = parsed(LANGUAGE_PACK);
         assert!(
             file.records.iter().all(|record| record.event_id.is_some()),
             "every record in this fixture has an event id"
@@ -470,7 +488,7 @@ mod tests {
     /// nothing in them to recover, and saying so once is more use than a rejection per chunk.
     #[test]
     fn bytes_that_are_not_an_event_log_are_refused_as_a_whole() {
-        let mut bytes = APPLICATION.to_vec();
+        let mut bytes = LANGUAGE_PACK.to_vec();
         bytes[..8].copy_from_slice(b"XlfFile0");
 
         assert!(matches!(
@@ -492,7 +510,7 @@ mod tests {
     #[test]
     fn a_file_shorter_than_its_header_is_truncated() {
         assert_eq!(
-            records(&APPLICATION[..FILE_HEADER_LEN - 1]),
+            records(&LANGUAGE_PACK[..FILE_HEADER_LEN - 1]),
             Err(ParseError::Truncated {
                 expected: FILE_HEADER_LEN,
                 found: FILE_HEADER_LEN - 1
@@ -511,7 +529,7 @@ mod tests {
     /// empty result, not an error — and deciding what it means is a rule's job, not this one's.
     #[test]
     fn a_header_with_no_chunks_is_an_empty_file_not_an_error() {
-        let file = parsed(&APPLICATION[..FILE_HEADER_LEN]);
+        let file = parsed(&LANGUAGE_PACK[..FILE_HEADER_LEN]);
 
         assert!(file.records.is_empty());
         assert!(file.rejected.is_empty());
@@ -523,13 +541,13 @@ mod tests {
     /// message built from the file's own numbers.
     #[test]
     fn an_error_never_carries_anything_read_from_the_file() {
-        let mut not_a_log = APPLICATION.to_vec();
+        let mut not_a_log = LANGUAGE_PACK.to_vec();
         not_a_log[..8].copy_from_slice(b"XlfFile0");
 
         let mut errors: Vec<ParseError> = Vec::new();
         for attempt in [
             records(&not_a_log),
-            records(&APPLICATION[..100]),
+            records(&LANGUAGE_PACK[..100]),
             records(&[]),
         ] {
             if let Err(error) = attempt {
@@ -538,7 +556,7 @@ mod tests {
         }
         for file in [
             with_damaged_chunk(LANGUAGE_PACK, 0),
-            with_damaged_chunk(APPLICATION, 1),
+            with_damaged_chunk(LANGUAGE_PACK, 1),
         ] {
             errors.extend(parsed(&file).rejected.into_iter().map(|one| one.reason));
         }
@@ -546,22 +564,23 @@ mod tests {
 
         for error in errors {
             let text = error.to_string().to_uppercase();
-            // Every token here is distinctive enough that it cannot occur in an English sentence.
-            // An earlier version of this test looked for "WER", the Windows Error Reporting folder
-            // these fixtures contain, and failed on the word "were" inside a perfectly clean error
-            // message — a check that cries wolf is one the next person learns to loosen.
+            // Every token here is distinctive enough that it cannot occur in an English sentence,
+            // and — this is the part that is easy to get wrong — every one of them is verified to be
+            // **present in the fixture**. A token the file never contained would make this assertion
+            // pass for the wrong reason. The list shrank when the second fixture was removed: the
+            // strings it held (`DESKTOP-0HIJB49`, the Windows Error Reporting paths, `SearchIndexer`,
+            // `SecurityCenter`) are gone from the corpus, and asserting their absence now would prove
+            // nothing. `S-1-5` and `C:\` are likewise absent from this file and were dropped for the
+            // same reason.
+            //
+            // An earlier version looked for "WER", the Windows Error Reporting folder, and failed on
+            // the word "were" inside a perfectly clean error message — a check that cries wolf is one
+            // the next person learns to loosen.
             for leaked in [
-                "DESKTOP-",
-                "REPORTARCHIVE",
-                "WERINTERNALMETADATA",
-                "APPHANG",
-                "NCBSERVICE",
-                "SEARCHINDEXER",
-                "SECURITYCENTER",
-                "MS-CV",
+                "DESKTOP-1N4R894",
                 "LANGUAGEPACKSETUP",
-                "S-1-5",
-                "C:\\",
+                "MS-CV",
+                "PING-RESPONSE",
             ] {
                 assert!(
                     !text.contains(leaked),
@@ -582,23 +601,17 @@ mod tests {
     /// The parser keeps a record's identity and nothing a record says. An event's payload — the user
     /// name, the host name, the command line — is deliberately not carried into this struct, so a
     /// collector cannot put it in a report by accident. This pins that: the whole parsed file,
-    /// rendered, contains none of the payload strings these two fixtures are known to hold.
+    /// rendered, contains none of the payload strings this fixture is known to hold.
     #[test]
     fn a_records_payload_and_computer_name_are_not_kept() {
-        let rendered = format!(
-            "{:?}{:?}",
-            parsed(APPLICATION).records,
-            parsed(LANGUAGE_PACK).records
-        );
+        let rendered = format!("{:?}", parsed(LANGUAGE_PACK).records);
 
+        // Each of these is verified to be in the fixture's bytes, so its absence from the rendered
+        // records is the parser withholding it rather than the file never having held it. Tokens
+        // belonging only to the removed fixture were dropped rather than left to pass vacuously.
         for payload in [
-            "DESKTOP-0HIJB49", // the Computer field of every record in the first fixture
-            "DESKTOP-1N4R894", // and of the second
-            "S-1-5-18",        // the Security/UserID field
-            "WSearch",
-            "TriggerStarted",
-            "SearchIndexer",
-            "MS-CV",
+            "DESKTOP-1N4R894", // the Computer field of every record
+            "MS-CV",           // Windows Update correlation ids, in the payload
             "ping-response",
         ] {
             assert!(
@@ -611,9 +624,6 @@ mod tests {
     /// An `.evtx` file is read from a machine that may be hostile. No input may abort.
     #[test]
     fn no_length_of_a_real_file_panics() {
-        for length in (0..APPLICATION.len()).step_by(997) {
-            let _ = records(&APPLICATION[..length]);
-        }
         for length in (0..LANGUAGE_PACK.len()).step_by(997) {
             let _ = records(&LANGUAGE_PACK[..length]);
         }
@@ -634,7 +644,7 @@ mod tests {
         }
 
         // A real header followed by bytes that are not a chunk.
-        let mut header_then_noise = APPLICATION[..FILE_HEADER_LEN].to_vec();
+        let mut header_then_noise = LANGUAGE_PACK[..FILE_HEADER_LEN].to_vec();
         header_then_noise.extend(std::iter::repeat_n(0xFFu8, CHUNK_LEN));
         let _ = records(&header_then_noise);
 
