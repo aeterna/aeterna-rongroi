@@ -79,7 +79,7 @@ strip = "symbols"
 # chosen by the file, and `rongroi-parsers` promises it never aborts on any input, so the crate is
 # vendored with that bound applied — and with a second patch for a `u16` multiplication in
 # `binxml/name.rs` that overflows on a name length above 32767, found later by the same fuzz target.
-# Neither fix has been sent upstream yet. `deny.toml` denies unknown *git* sources; a path source inside the repository is reviewable
+# Both fixes are offered upstream as omerbenamram/evtx#294. `deny.toml` denies unknown *git* sources; a path source inside the repository is reviewable
 # in the same PR as the code that uses it. Remove this the moment an upstream release carries the fix.
 # See docs/adr/0018-evtx-parsing.md and third_party/evtx/PROVENANCE.md.
 [patch.crates-io]

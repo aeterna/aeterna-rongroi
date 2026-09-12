@@ -48,8 +48,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   commit is charged up front and a failed Rust allocation aborts uncatchably, so a machine without that
   much commit available would lose the process. Either way the size is chosen by the file and not by the
   program, which is what this crate's "never panics, never aborts" contract rules out. The patch bounds the reservation by the bytes the input could actually
-  contain. It has **not** been sent upstream yet — filing into someone else's repository is the
-  owner's call; the directory goes away when an upstream release carries the fix. Everything else
+  contain. Both fixes are now offered upstream as
+  [omerbenamram/evtx#294](https://github.com/omerbenamram/evtx/pull/294), which credits the April 2026
+  reports (#291, #292, #293) rather than claiming the finding, and discloses that it was written and
+  opened by an AI assistant on the account owner's instruction. The directory goes away when an
+  upstream release carries the fix. Everything else
   in it is byte-identical to the published crate and `third_party/evtx/PROVENANCE.md` says how to check
   that (ADR 0018).
 - `fuzz_evtx`, the fuzz layer's sixth target, seeded from the same `fixtures/evtx/` file the parser tests
