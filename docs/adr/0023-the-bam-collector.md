@@ -193,7 +193,7 @@ named `Users`.
 | What happened | Outcome |
 |---|---|
 | Not Windows | `Unmeasured { not_windows }` |
-| the BAM key is not there | `Unmeasured { source_missing }` |
+| the BAM key is not there | `Unmeasured { source_missing }` — since ADR 0030, `source_absent`; a key that is there and holds no record is `source_empty` |
 | the BAM key is there and could not be enumerated | a `read:` observation **and** every field in `gaps` |
 | the BAM key is there and holds no account | `Measured`, one account observation, `users: 0` |
 | one account's key could not be enumerated | a `read:` observation **and** every field in `gaps` |

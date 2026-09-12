@@ -11,8 +11,19 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
 - `unmeasured_when` decides what an SS view lists: a reason named there is **counted**, one that is not
   is **listed**, because an undeclared reason means something the author did not anticipate stopped the
   measurement (ADR 0027). Every entry must be a reason that collector can report — `check-rules`
-  rejects the rest, including `not_on_this_os` and `service_disabled`, which nothing in this build
-  produces. Declaring a reason you have not thought about hides a result a reviewer should have seen.
+  rejects the rest and names what the collector does report. Since ADR 0030 every one of the twelve
+  reasons has a producer, so the check is entirely about *which* collector: `not_on_this_os` is `pca`
+  alone, `service_disabled` is `prefetch` alone, `budget_spent` and `not_attempted` are `evtx` alone.
+  Declaring a reason you have not thought about hides a result a reviewer should have seen.
+- **`partial` and `budget_spent` cannot be declared away.** Naming them in `unmeasured_when` is
+  accepted and changes nothing: SS mode lists them either way, because both say the artifact was
+  reachable and that this program stopped short of it — a fact about the scan, not one about the
+  machine that an author could have anticipated (ADR 0030).
+- **`source_absent` and `source_empty` are opposite statements.** "This PC has no such record" and
+  "the record's place is there and holds nothing" were one word until ADR 0030; a rule that means one
+  must not declare the other. `source_empty` in particular is **never** evidence that anything was
+  removed: Windows' own scavenger empties BAM of entries older than seven days at every boot, and a
+  Prefetch folder is routinely emptied by an optimiser the player ran.
 - `allow` identifies legitimate software by `sha256` or `signer` only — never by file name.
 - **`match` compares strings without regard to ASCII case.** `path: "C:\\Windows\\Temp\\x.exe"` matches
   `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in and a rule that

@@ -11,9 +11,13 @@ export type UnmeasuredReason =
   | "not_windows"
   | "not_on_this_os"
   | "not_admin"
+  | "not_attempted"
   | "access_denied"
   | "service_disabled"
-  | "source_missing"
+  | "source_absent"
+  | "source_empty"
+  | "partial"
+  | "budget_spent"
   | "read_failed"
   | "collector_unavailable";
 
@@ -85,7 +89,7 @@ export interface ReportView {
    * administrator rights left unanswered — one fact about the scan rather than one per rule, and the
    * one with a remedy. It is not a fourth hidden count; the same checks are in `hidden` (ADR 0027).
    */
-  scope: { not_admin: number };
+  scope: { not_admin: number; not_attempted: number };
   hidden: {
     not_found: number;
     unmeasured_expected: number;

@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 24H2 — a build that does keep PCA's files — with no `appcompat\pca` folder at all.
+# `%WinDir%` is set and `C:\Windows` is described as holding nothing, so the fixture says "this
+# folder is not here" rather than saying nothing about the file system (ADR 0030).
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows': []

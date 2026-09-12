@@ -40,7 +40,7 @@ const ID: &str = "posture";
 const REASONS: [UnmeasuredReason; 4] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::AccessDenied,
-    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::SourceAbsent,
     UnmeasuredReason::ReadFailed,
 ];
 
@@ -163,7 +163,7 @@ fn registry_switch(
     match read {
         Ok(Some(1)) => Ok("enabled"),
         Ok(Some(0)) => Ok("disabled"),
-        Ok(None) => Err(UnmeasuredReason::SourceMissing),
+        Ok(None) => Err(UnmeasuredReason::SourceAbsent),
         Ok(Some(_)) => Err(UnmeasuredReason::ReadFailed),
         Err(error) => Err(reason_for(&error)),
     }
@@ -259,7 +259,7 @@ tpm:
         assert_eq!(field(&run, "secure_boot"), None);
         assert_eq!(
             gap_for(&run, "secure_boot"),
-            Some(UnmeasuredReason::SourceMissing)
+            Some(UnmeasuredReason::SourceAbsent)
         );
     }
 
@@ -321,7 +321,7 @@ tpm:
 ";
         let run = Posture.collect(&inline(yaml));
         assert_eq!(field(&run, "hvci"), None);
-        assert_eq!(gap_for(&run, "hvci"), Some(UnmeasuredReason::SourceMissing));
+        assert_eq!(gap_for(&run, "hvci"), Some(UnmeasuredReason::SourceAbsent));
     }
 
     #[test]

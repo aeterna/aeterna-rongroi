@@ -17,14 +17,18 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
 | `process-own-trace` | Windows 11 running three processes: one whose image path cannot be resolved, one ordinary program, and aeterna-rongroi itself | `process` collector tests, report snapshots |
 | `pca-files-present` | Windows 11 with all three PCA files present and readable, their bytes taken from `fixtures/parsers/` | `pca` collector tests, report snapshots |
-| `pca-not-present` | Windows with no PCA file at all: a build that predates PCA, or a machine where the service never wrote | `pca` collector tests |
+| `pca-not-present` | **Windows 10 22H2 (build 19045)**, which predates `C:\Windows\appcompat\pca` entirely — the folder arrived in Windows 11 22H2, build 22621. Still a large share of gaming PCs, and on every one of them the artifact's absence carries no information | `pca` collector tests |
+| `pca-folder-absent` | Windows 11 24H2 — a build that does keep the files — with no `appcompat\pca` folder at all | `pca` collector tests |
+| `pca-folder-empty` | Windows 11 24H2 whose `appcompat\pca` folder is there and holds none of the three files: a machine that keeps this artifact and has written nothing into it. A clean install reaches this on its own, and PCA records only launches made from File Explorer, which is not how a game started by Steam or Epic is launched | `pca` collector tests |
 | `pca-access-denied` | Windows 11, the PCA folder present and unreadable, by a process without administrator rights | `pca` collector tests |
 | `pca-file-unreadable` | Windows 11 with one PCA file listed and holding no bytes and one that is readable | `pca` collector tests |
 | `pca-malformed-lines` | Windows 11 whose launch dictionary has good lines, a line with no delimiter, an impossible date, an empty path and a blank line | `pca` collector tests |
 | `pca-utf16-file` | Windows 11 whose launch dictionary is UTF-16 with a byte order mark — not a PCA text file at all | `pca` collector tests |
 | `pca-unredactable-path` | Windows 11 whose launch dictionary holds one drive-rooted path, one UNC path and one device path; only the first is a shape SS-mode redaction can reach | `pca` collector tests |
 | `prefetch-files-present` | Windows 11 with a readable Prefetch folder holding one `.pf` file, whose bytes are the vendored Windows 10 corpus file, plus the `ReadyBoot` directory and a non-`.pf` file that a real folder also has | `prefetch` collector tests, report snapshots |
-| `prefetch-not-present` | Windows with no Prefetch folder at all: Prefetch switched off, or an installation that never had it | `prefetch` collector tests |
+| `prefetch-not-present` | Windows with no Prefetch folder at all and no `EnablePrefetcher` value to explain it | `prefetch` collector tests |
+| `prefetch-folder-empty` | Windows 11 whose Prefetch folder is there, is readable and holds no `.pf` file, with `EnablePrefetcher` at Windows' default of 3. The state a "delete Prefetch for FPS" tip, a one-click optimiser or natural eviction at the 1024-file cap leaves — all ordinary on a gaming PC and none of them a statement about what ran | `prefetch` collector tests |
+| `prefetch-service-disabled` | Windows 11 with `EnablePrefetcher` at 2 — boot only. Windows writes no application-launch record at all and keeps whatever was written before the switch changed, so the folder is **not** empty and still answers nothing about what ran | `prefetch` collector tests |
 | `prefetch-access-denied` | Windows 11, the Prefetch folder present and unlistable, by a process without administrator rights — the expected shape of an ordinary scan (ADR 0015) | `prefetch` collector tests |
 | `prefetch-access-denied-elevated` | The same denial with those rights already held, where restarting as administrator would not help | `prefetch` collector tests |
 | `prefetch-file-unreadable` | Windows 11 with one `.pf` file listed and holding no bytes and one that is readable | `prefetch` collector tests |
@@ -43,6 +47,7 @@ none contains a real person's user name, host name, SID or files.
 | `bam-longer-value` | A BAM value longer than the public write-ups describe, as a newer Windows build might write | `bam` collector tests |
 | `evtx-logs-present` | Windows 11 with a readable Event Log folder holding two `.evtx` files, both referencing the one vendored Event Log sample, plus a file that is not a log | `evtx` collector tests, report snapshots |
 | `evtx-not-present` | Windows with no Event Log folder at all, so nothing can be said about what any log holds | `evtx` collector tests |
+| `evtx-logs-folder-empty` | Windows 11 whose Event Log folder is there, is readable and holds no `.evtx` file — the shape a one-click maintenance script leaves when it clears every log, and the shape Microsoft's own "delete corrupt Event Viewer log files" remedy leaves. The one file in it is not a log | `evtx` collector tests |
 | `evtx-access-denied` | Windows 11, the Event Log folder present and unlistable, by a process without administrator rights — the expected shape of an ordinary scan (ADR 0018) | `evtx` collector tests |
 | `evtx-access-denied-elevated` | The same denial with those rights already held, where restarting as administrator would not help | `evtx` collector tests |
 | `evtx-log-unreadable` | Windows 11 with `Security.evtx` listed and holding no bytes and `Application.evtx` readable | `evtx` collector tests |

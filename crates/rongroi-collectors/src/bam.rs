@@ -54,13 +54,20 @@ const SID_WITHHELD: &str = "per_user_identifier";
 
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
 ///
-/// `%SystemRoot%` is not set, or the BAM key is not there, so nothing was looked at; the
-/// registry read itself denied, denied without administrator rights, or failed.
-const REASONS: [UnmeasuredReason; 5] = [
+/// The BAM key is not there; it is there and holds no record; some of its values decoded and some
+/// did not; or the registry read was denied, denied without administrator rights, or failed.
+///
+/// `service_disabled` is **not** here, and the omission is the point: BAM's own scavenger deletes
+/// every entry older than seven days at each boot, which is Microsoft's code running on schedule and
+/// not a service being off. Nothing this collector reads distinguishes "the service is disabled"
+/// from "the scavenger has run", so it does not claim to (ADR 0030).
+const REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
-    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::SourceAbsent,
+    UnmeasuredReason::SourceEmpty,
+    UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
 ];
 
@@ -82,6 +89,20 @@ const FIELDS: [Field; 13] = [
     Field::number("users"),
     Field::number("value_bytes"),
     Field::number("values"),
+];
+
+/// The fields that describe one program BAM recorded, as opposed to what the key held.
+///
+/// The subset a content-level reason gaps: `source_empty` and `partial` both describe a key this
+/// collector **did** enumerate, so gapping `users`, `values`, `entries`, `rejected` or `intact` —
+/// which were measured — would claim it had not (ADR 0030).
+const RECORD_FIELDS: [&str; 6] = [
+    "last_run",
+    "moderation_state",
+    "name",
+    "path",
+    "path_withheld",
+    "value_bytes",
 ];
 
 /// The `bam` collector.
@@ -127,7 +148,7 @@ impl Collector for Bam {
             Ok(None) => {
                 return CollectorRun::Unmeasured {
                     collector: ID.to_owned(),
-                    reason: UnmeasuredReason::SourceMissing,
+                    reason: UnmeasuredReason::SourceAbsent,
                 };
             }
             Ok(Some(accounts)) => accounts,
@@ -188,10 +209,22 @@ impl Collector for Bam {
         }
         observations.push(account_of(accounts.len(), values, parsed, rejected));
 
+        let gaps = match first_failure {
+            Some(reason) => gaps(reason),
+            // The key is there and nothing at all is recorded under it. That is not "no program
+            // ran": Windows' own `BampScavengeUserSettings` deletes every entry older than seven
+            // days at each boot, so a key that holds nothing is what a machine unused for a week
+            // looks like the moment it starts (ADR 0030).
+            None if values == 0 => record_gaps(UnmeasuredReason::SourceEmpty),
+            // Some of the values decoded and some did not, so an unknown number of programs is
+            // missing from what was read.
+            None if rejected > 0 => record_gaps(UnmeasuredReason::Partial),
+            None => BTreeMap::new(),
+        };
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
-            gaps: first_failure.map_or_else(BTreeMap::new, gaps),
+            gaps,
         }
     }
 }
@@ -200,6 +233,14 @@ fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
         .map(|field| (field.name.to_owned(), reason))
+        .collect()
+}
+
+/// A gap in what one recorded program would have said, leaving what the key held measured.
+fn record_gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
+    RECORD_FIELDS
+        .iter()
+        .map(|field| ((*field).to_owned(), reason))
         .collect()
 }
 
@@ -459,29 +500,43 @@ mod tests {
         assert!(!json.contains("S-1-5-"), "{json}");
     }
 
-    /// BAM is not on this machine, or the service has recorded nothing. Nothing was read, so nothing
-    /// can be said about what ran — a rule must not read this as "the program did not run".
+    /// BAM is not on this machine at all. Nothing was read, so nothing can be said about what ran —
+    /// a rule must not read this as "the program did not run".
     #[test]
     fn no_bam_key_is_unmeasured() {
         assert_eq!(
             Bam.collect(&fixture("bam-not-present")),
             CollectorRun::Unmeasured {
                 collector: "bam".to_owned(),
-                reason: UnmeasuredReason::SourceMissing,
+                reason: UnmeasuredReason::SourceAbsent,
             }
         );
     }
 
-    /// The key is there and holds no account: BAM's state was cleared, which is a different
-    /// statement from BAM not being there, and the only one of the two a rule could match.
+    /// The key is there and holds no record, which is the opposite statement from the key not being
+    /// there and used to share one word with it.
+    ///
+    /// **It is not evidence that anything was removed.** `BampScavengeUserSettings` deletes every
+    /// entry older than seven days at each boot — Microsoft's own code, on every machine, by design
+    /// — so a PC that has been off for a week reaches this state on its own the moment it starts.
+    /// The count is still measured and is not gapped, so a rule may still ask what the key held
+    /// (ADR 0030).
     #[test]
-    fn an_empty_key_is_measured_and_says_it_held_nothing() {
+    fn an_empty_key_is_source_empty_and_still_says_it_held_nothing() {
         let run = Bam.collect(&fixture("bam-empty"));
         let (observations, gaps) = measured(&run);
-        assert!(gaps.is_empty(), "{gaps:?}");
         assert_eq!(observations.len(), 1, "{observations:?}");
         assert_eq!(field(account(observations), "users"), Some(&0_u64.into()));
         assert_eq!(field(account(observations), "values"), Some(&0_u64.into()));
+        for name in RECORD_FIELDS {
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::SourceEmpty),
+                "{name}"
+            );
+        }
+        assert_eq!(gaps.get("users"), None);
+        assert_eq!(gaps.get("values"), None);
     }
 
     /// The expected outcome of a scan without an elevated token, if that is what this key needs —
@@ -545,7 +600,13 @@ mod tests {
     fn a_value_of_the_wrong_length_is_named_and_does_not_gap_the_run() {
         let run = Bam.collect(&fixture("bam-malformed-value"));
         let (observations, gaps) = measured(&run);
-        assert!(gaps.is_empty(), "{gaps:?}");
+        // Two of three values did not decode, so an unknown number of programs is missing from what
+        // was read: `partial`, not "nothing matched" (ADR 0030). What the key held is still
+        // measured, so the counts are not gapped.
+        for name in RECORD_FIELDS {
+            assert_eq!(gaps.get(name), Some(&UnmeasuredReason::Partial), "{name}");
+        }
+        assert_eq!(gaps.get("values"), None);
 
         let refused = refusals(observations);
         assert_eq!(refused.len(), 2, "{refused:?}");
@@ -591,7 +652,12 @@ mod tests {
 
         let run = Bam.collect(&host);
         let (observations, gaps) = measured(&run);
-        assert!(gaps.is_empty(), "{gaps:?}");
+        // The key was enumerated and one of its values was not read, which is `partial`.
+        assert_eq!(
+            gaps.get("name"),
+            Some(&UnmeasuredReason::Partial),
+            "{gaps:?}"
+        );
 
         let refused = refusals(observations);
         assert_eq!(refused.len(), 1, "{refused:?}");

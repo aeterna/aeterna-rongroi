@@ -1,6 +1,6 @@
 # ADR 0020 — The PCA collector
 
-- Status: proposed
+- Status: proposed; the reason vocabulary below is superseded by ADR 0030
 - Date: 2026-09-12
 
 ## Context
@@ -200,6 +200,12 @@ the other. Where this repository cannot tell two states apart it says the thing 
 (`posture` makes an absent registry value a gap rather than "off"), so that is what this does.
 `not_on_this_os` stays unproduced. Producing it honestly needs the Windows version or PcaSvc's own
 state read, which is a later decision and a different source.
+
+> **Superseded by ADR 0030.** That later decision was taken: `Host::os_build()` — which was in the
+> report header when this was written and which no collector read — now decides it. A build below
+> 22621 is `not_on_this_os`; above it, an absent folder is `source_absent` and a folder holding none
+> of the three files is `source_empty`. `PcaSvc`'s own state is still not read, so `service_disabled`
+> is still unproduced here.
 
 **One unreadable file gaps every field, which is stricter than `fivem_dir`.** ADR 0009 established
 that a per-item failure omits a field and is never a gap: one unhashable plugin says nothing about the

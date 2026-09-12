@@ -27,19 +27,24 @@
   },
   "reason": {
     "not_windows": "not running on Windows",
-    "not_on_this_os": "not available on this Windows version",
-    "not_admin": "needs administrator rights",
-    "access_denied": "Windows denied access",
-    "service_disabled": "the Windows service that records this is off",
-    "source_missing": "not reported on this PC",
-    "read_failed": "could not be read",
-    "collector_unavailable": "not supported by this build"
+    "not_on_this_os": "this version of Windows does not keep this record",
+    "not_admin": "Windows would not show this without administrator rights",
+    "not_attempted": "this was not read — the scan stopped before reaching it",
+    "access_denied": "Windows refused to open this",
+    "service_disabled": "the Windows service that writes this record is switched off",
+    "source_absent": "this PC has no such record to read",
+    "source_empty": "the place this is kept is there and holds nothing",
+    "partial": "part of this was read and part of it was not",
+    "budget_spent": "this program stopped reading before it finished",
+    "read_failed": "this could not be read",
+    "collector_unavailable": "this build does not read that"
   },
   "retention": "Look-back",
   "description": "About this check",
   "falsepositives": "Ordinary things that also produce this",
   "scope": {
-    "not_admin": "Scope: {{checks}} check(s) could not be answered because this scan does not have administrator rights. Running it again as administrator answers them."
+    "not_admin": "Scope: {{checks}} check(s) could not be answered because this scan does not have administrator rights. Running it again as administrator answers them.",
+    "not_attempted": "Scope: {{checks}} check(s) could not be answered because this program stopped reading before it reached what they ask about. That is this program's limit, not a finding about this PC."
   },
   "own_traces": {
     "title": "Own traces (excluded)",

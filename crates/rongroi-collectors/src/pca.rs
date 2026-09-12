@@ -59,15 +59,29 @@ const SOURCES: [(&str, &str); 3] = [
     ("general_db1", "PcaGeneralDb1.txt"),
 ];
 
+/// First Windows build that keeps `%WinDir%\appcompat\pca` at all: Windows 11 22H2.
+///
+/// Tested present on 22621 and absent on 21H2 by the practitioner write-up ADR 0020 cites, and
+/// corroborated by three others. Below it the folder has never existed, which is why the absence of
+/// these files on a Windows 10 machine carries no information whatsoever (ADR 0030).
+///
+/// The PCA *feature* dates to Windows Vista; only the files are new. "PCA is on my Windows 10 box"
+/// is true of the service and false of the artifact this collector reads.
+pub const FIRST_BUILD_WITH_PCA_FILES: u32 = 22621;
+
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
 ///
-/// `%WinDir%` is not set, the folder is absent, or a file was denied, denied without
-/// administrator rights, or could not be read.
-const REASONS: [UnmeasuredReason; 5] = [
+/// `%WinDir%` is not set; this Windows is too old to keep the files; the folder is absent, or
+/// present and holding none of them; some of the lines in a file did not yield a record; or a file
+/// was denied, denied without administrator rights, or could not be read.
+const REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::NotWindows,
+    UnmeasuredReason::NotOnThisOs,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
-    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::SourceAbsent,
+    UnmeasuredReason::SourceEmpty,
+    UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
 ];
 
@@ -89,6 +103,13 @@ const FIELDS: [Field; 9] = [
     Field::number("rejected"),
     Field::text("source"),
 ];
+
+/// The fields that describe one launch PCA recorded, as opposed to what a file held.
+///
+/// The subset a content-level reason gaps: `source_empty` and `partial` both describe files this
+/// collector **did** reach, so gapping `entries`, `rejected`, `intact` or `source` — which were
+/// measured — would claim it had not (ADR 0030).
+const RECORD_FIELDS: [&str; 4] = ["last_run", "name", "path", "path_withheld"];
 
 /// The `pca` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -125,6 +146,7 @@ impl Collector for Pca {
         let mut observations = Vec::new();
         let mut first_failure = None;
         let mut anything_there = false;
+        let mut rejected_lines = 0_usize;
 
         for (source, file) in SOURCES {
             let path = format!(r"{dir}\{file}");
@@ -134,7 +156,7 @@ impl Collector for Pca {
                 Ok(None) => None,
                 Ok(Some(bytes)) => {
                     anything_there = true;
-                    read_source(source, &bytes, &mut observations)
+                    read_source(source, &bytes, &mut observations, &mut rejected_lines)
                 }
                 Err(error) => {
                     // The file is there and Windows would not hand it over, or it is larger than a
@@ -149,27 +171,75 @@ impl Collector for Pca {
         }
 
         if !anything_there {
-            // None of the three files is on this machine: PCA has recorded nothing here, or this
-            // Windows build has no PCA at all. Either way there is no record to read, and a rule
-            // must not read that as "this program did not run" (ADR 0020).
+            // None of the three files is on this machine, and there are three different reasons for
+            // that which used to be one word. Most specific first (ADR 0030).
             return CollectorRun::Unmeasured {
                 collector: ID.to_owned(),
-                reason: UnmeasuredReason::SourceMissing,
+                reason: absence_of(host, &dir),
             };
         }
 
+        let gaps = match first_failure {
+            Some(reason) => gaps(reason),
+            // Every file that was there was read, and some of its lines were not records. That is
+            // not "nothing matched": an unknown number of launches is missing from what was read.
+            None if rejected_lines > 0 => record_gaps(UnmeasuredReason::Partial),
+            None => BTreeMap::new(),
+        };
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
-            gaps: first_failure.map_or_else(BTreeMap::new, gaps),
+            gaps,
         }
     }
+}
+
+/// Why none of PCA's three files was there, most specific answer first.
+///
+/// - **This Windows is older than 22H2**, so the folder has never existed on it and its absence
+///   carries no information. ADR 0020 chose `source_missing` here because the collector could not
+///   tell that case apart from a Windows 11 machine that had written nothing; the build number was
+///   in the report header the whole time and no collector read it (ADR 0030).
+/// - **The folder is not there** on a build that would have kept it.
+/// - **The folder is there and holds none of the three files**, which is a different statement:
+///   OVAL will not call an absence meaningful until the structure that would hold it is present.
+///
+/// A folder that could not be listed answers `source_absent`, which is what this collector said
+/// before it asked the question at all: guessing `source_empty` from a failed listing would claim
+/// the folder was reached.
+fn absence_of(host: &dyn Host, dir: &str) -> UnmeasuredReason {
+    if predates_pca_files(host) {
+        return UnmeasuredReason::NotOnThisOs;
+    }
+    match host.list_dir(dir) {
+        Ok(Some(_)) => UnmeasuredReason::SourceEmpty,
+        Ok(None) | Err(_) => UnmeasuredReason::SourceAbsent,
+    }
+}
+
+/// Whether this Windows is older than the build that first kept PCA's files.
+///
+/// `false` when the build is not reported or is not a number: an absent header field is not evidence
+/// about the operating system, and answering `true` from it would put a guess where the report says
+/// it read something.
+fn predates_pca_files(host: &dyn Host) -> bool {
+    host.os_build()
+        .and_then(|build| build.parse::<u32>().ok())
+        .is_some_and(|build| build < FIRST_BUILD_WITH_PCA_FILES)
 }
 
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
         .map(|field| (field.name.to_owned(), reason))
+        .collect()
+}
+
+/// A gap in what one launch record would have said, leaving what each file held measured.
+fn record_gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
+    RECORD_FIELDS
+        .iter()
+        .map(|field| ((*field).to_owned(), reason))
         .collect()
 }
 
@@ -180,15 +250,18 @@ fn pca_dir(host: &dyn Host) -> Option<String> {
 }
 
 /// Parses one file's bytes and pushes what it yielded. Returns the reason a rule may not read this
-/// collector as "not found", when the file could not be parsed at all.
+/// collector as "not found", when the file could not be parsed at all, and adds the lines that were
+/// not records to `rejected_lines`, which is what makes a partly-read file `partial` (ADR 0030).
 fn read_source(
     source: &str,
     bytes: &[u8],
     observations: &mut Vec<Observation>,
+    rejected_lines: &mut usize,
 ) -> Option<UnmeasuredReason> {
     if source == APP_LAUNCH_DIC {
         match pca::parse_app_launch_dic(bytes) {
             Ok(file) => {
+                *rejected_lines += file.rejected.len();
                 observations.push(integrity(source, file.entries.len(), file.rejected.len()));
                 observations.extend(file.entries.iter().map(|entry| launch(source, entry)));
                 None
@@ -204,6 +277,7 @@ fn read_source(
             // assigns no meaning to any position, so naming one here would put a guess into a
             // report a server admin is asked to trust — and one of the positions is a user path.
             Ok(file) => {
+                *rejected_lines += file.rejected.len();
                 observations.push(integrity(source, file.entries.len(), file.rejected.len()));
                 None
             }
@@ -391,17 +465,64 @@ mod tests {
         assert!(!json.contains("Cfx.re"), "{json}");
     }
 
-    /// PCA's folder is not on this machine at all. A rule must not read that as "the program did not
-    /// run": nothing was read, so nothing can be said about what ran.
+    /// **The single largest false-positive class this collector has.** `C:\Windows\appcompat\pca`
+    /// arrived in Windows 11 22H2, so on a Windows 10 machine — still a large share of gaming PCs —
+    /// its absence carries no information at all. ADR 0020 could not tell that apart from a Windows
+    /// 11 machine that had written nothing and said `source_missing` for both; the build number was
+    /// in the report header the whole time (ADR 0030).
     #[test]
-    fn no_pca_files_at_all_is_unmeasured() {
+    fn a_windows_older_than_22h2_has_never_had_these_files() {
         assert_eq!(
             Pca.collect(&fixture("pca-not-present")),
             CollectorRun::Unmeasured {
                 collector: "pca".to_owned(),
-                reason: UnmeasuredReason::SourceMissing,
+                reason: UnmeasuredReason::NotOnThisOs,
             }
         );
+    }
+
+    /// The same absence on a build that does keep the files, with the folder itself not there.
+    #[test]
+    fn no_pca_folder_on_a_build_that_keeps_it_is_source_absent() {
+        assert_eq!(
+            Pca.collect(&fixture("pca-folder-absent")),
+            CollectorRun::Unmeasured {
+                collector: "pca".to_owned(),
+                reason: UnmeasuredReason::SourceAbsent,
+            }
+        );
+    }
+
+    /// And the third statement the one word used to make: the folder is there and holds none of the
+    /// three files. OVAL will not call an absence meaningful until the structure that would hold it
+    /// is present, and this is the case where it is.
+    #[test]
+    fn a_pca_folder_holding_none_of_the_files_is_source_empty() {
+        assert_eq!(
+            Pca.collect(&fixture("pca-folder-empty")),
+            CollectorRun::Unmeasured {
+                collector: "pca".to_owned(),
+                reason: UnmeasuredReason::SourceEmpty,
+            }
+        );
+    }
+
+    /// The build number decides it, and a build this program cannot read is not an answer about the
+    /// operating system.
+    #[test]
+    fn the_build_number_is_read_and_never_guessed() {
+        let with = |build: &str| {
+            FixtureHost::from_yaml_str(&format!("platform: windows\nos_build: {build}\n"), "inline")
+                .unwrap()
+        };
+        assert!(predates_pca_files(&with("'19045'")));
+        assert!(predates_pca_files(&with("'22000'")));
+        assert!(!predates_pca_files(&with("'22621'")));
+        assert!(!predates_pca_files(&with("'26100'")));
+        // Not reported, and reported as something that is not a build number.
+        let unknown = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(!predates_pca_files(&unknown));
+        assert!(!predates_pca_files(&with("'22H2'")));
     }
 
     /// Denied, and this program could have asked for administrator rights and did not have them.
@@ -451,8 +572,14 @@ mod tests {
     fn a_malformed_file_reports_what_parsed_and_what_did_not() {
         let run = Pca.collect(&fixture("pca-malformed-lines"));
         let (observations, gaps) = measured(&run);
-        // A malformed line is not a failure to read: the file was read, so no rule is blocked.
-        assert!(gaps.is_empty(), "{gaps:?}");
+        // The file was read and three of its lines were not records, so an unknown number of
+        // launches is missing from what was read: that is `partial`, not "nothing matched"
+        // (ADR 0030). What each file held is still measured and is not gapped.
+        for name in RECORD_FIELDS {
+            assert_eq!(gaps.get(name), Some(&UnmeasuredReason::Partial), "{name}");
+        }
+        assert_eq!(gaps.get("entries"), None);
+        assert_eq!(gaps.get("intact"), None);
 
         let integrity = of_source(observations, APP_LAUNCH_DIC)
             .into_iter()

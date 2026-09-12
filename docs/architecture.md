@@ -65,8 +65,31 @@ that was never read would be false. There is no score and no overall verdict (AD
 
 An `unmeasured` result carries `expected`: whether the reason is one the rule named in its
 `unmeasured_when`. A declared reason is one the author said happens on ordinary machines; an undeclared
-one means something they did not anticipate stopped the measurement, and it is the only unmeasured
-result SS mode lists (ADR 0027).
+one means something they did not anticipate stopped the measurement, and it is the unmeasured result
+SS mode lists (ADR 0027).
+
+There are twelve reasons, and the split between them is how the report separates "we checked and there
+was nothing" from "we could not check" (ADR 0030). Four describe a machine behaving exactly as Windows
+ships it, so none of them may be read as a finding:
+
+| Reason | Says |
+|---|---|
+| `not_windows` | the scan is not on Windows |
+| `not_on_this_os` | this Windows version does not keep the artifact at all — PCA's files arrived in 22H2 |
+| `not_admin` | Windows would not show it without administrator rights |
+| `not_attempted` | the collector never looked; nothing was tried |
+| `access_denied` | denied with the rights already held |
+| `service_disabled` | the Windows service that writes the record is switched off |
+| `source_absent` | the place the artifact is kept is not on this PC |
+| `source_empty` | the place is on this PC and holds nothing |
+| `partial` | some of it was read and some of it was not |
+| `budget_spent` | a limit **this program** chose ended the read |
+| `read_failed` | it is there and could not be read or understood |
+| `collector_unavailable` | this build has no collector for the rule |
+
+`source_absent` and `source_empty` mean opposite things and were one word until ADR 0030. A
+content-level reason — `source_empty`, `service_disabled`, `partial` — gaps only the fields that
+describe a record, because the folder or key itself **was** read and what it held is still measured.
 
 Each row is shown with the rule's `description` — what the check means and what it does not prove —
 and a `found` row also with its `falsepositives`, the ordinary things that produce the same evidence.
@@ -80,13 +103,14 @@ Both are mandatory in every rule and translated with the rest of its text (ADR 0
 |---|---|---|
 | Shows | every piece of evidence | `found` evidence, `posture` evidence that looked, and `unmeasured` evidence for a reason its rule did not name |
 | Other evidence | shown | counted in `hidden.not_found` / `hidden.unmeasured_expected` / `hidden.unmeasured_unexpected` |
-| `unmeasured` with reason `not_admin` | shown, and in the scope statement | **not** a row — one fact about the scan, said once above the evidence in `scope.not_admin`, with the remedy (ADR 0012, ADR 0027) |
+| `unmeasured` with reason `partial` or `budget_spent` | shown | **always** a row, declared or not: both say the artifact was reachable and that this program stopped short of it, which is not a rule author's to declare away (ADR 0030) |
+| `unmeasured` with reason `not_admin` or `not_attempted` | shown, and in the scope statement | **not** a row — one fact about the scan, said once above the evidence in `scope.not_admin` / `scope.not_attempted` (ADR 0012, ADR 0027, ADR 0030) |
 | Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
 | Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |
 | Paths | as read | `X:\Users\<name>` → `%USERPROFILE%`, in evidence and own traces alike |
 
-`scope.not_admin` is not a fourth hidden count: in SS mode those rules are counted in
-`hidden.unmeasured_*` as well, so the hidden counts keep accounting for everything the view leaves out.
+The `scope` numbers are not hidden counts: in SS mode those rules are counted in `hidden.unmeasured_*`
+as well, so the hidden counts keep accounting for everything the view leaves out.
 
 Redaction is implemented and tested in `rongroi-core::view` (AGENTS.md hard rule 5).
 

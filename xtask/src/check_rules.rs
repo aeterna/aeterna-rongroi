@@ -226,8 +226,10 @@ impl Vocabulary {
     /// undeclared one is listed. A reason the rule's collector cannot produce is therefore a
     /// suppression that never fires — the author believes they have said "this one is ordinary
     /// here" and the report will list it anyway — and nothing in the rule file, in `check-baseline`
-    /// or in a fixture shows it. Two of the eight reasons (`not_on_this_os`, `service_disabled`)
-    /// have no producer anywhere in this build, so no rule may declare them at all.
+    /// or in a fixture shows it. Since ADR 0030 every one of the twelve reasons has a producer in
+    /// some collector, so the check is now entirely about which collector: `not_on_this_os` is `pca`
+    /// and nothing else, `service_disabled` is `prefetch` and nothing else, and `budget_spent` is
+    /// `evtx` and nothing else.
     fn check_unmeasured_when(&self, path: &str, rule: &Rule, problems: &mut Vec<String>) {
         let Some(known) = self.reasons.get(rule.collector.as_str()) else {
             return;
@@ -653,9 +655,10 @@ date: 2026-09-11
         }
     }
 
-    /// A reason no collector in this build produces is a suppression that never fires: the author
-    /// has written "this one is ordinary on some machines" and the report lists it anyway. Neither
-    /// `not_on_this_os` nor `service_disabled` has a producer anywhere in this build (ADR 0027).
+    /// A reason its own collector does not produce is a suppression that never fires: the author has
+    /// written "this one is ordinary on some machines" and the report lists it anyway. `posture`
+    /// reads registry values and a platform API and has no service to be switched off, so
+    /// `service_disabled` — which since ADR 0030 `prefetch` does produce — is still wrong here.
     #[test]
     fn an_unmeasured_when_reason_this_build_cannot_produce_is_rejected() {
         let tmp = TempRoot::new("dead-reason");
@@ -684,7 +687,7 @@ date: 2026-09-11
         // The message names what it can report, so the fix does not need a grep.
         assert!(
             outcome.problems[0]
-                .contains("it reports access_denied, collector_unavailable, not_windows, read_failed, source_missing"),
+                .contains("it reports access_denied, collector_unavailable, not_windows, read_failed, source_absent"),
             "{:?}",
             outcome.problems
         );
@@ -724,7 +727,7 @@ date: 2026-09-11
         let tmp = TempRoot::new("good-reasons");
         let rule = VALID_RULE.replace(
             "retention: Current setting only.",
-            "retention: Current setting only.\nunmeasured_when: [not_windows, source_missing, access_denied, read_failed, collector_unavailable]",
+            "retention: Current setting only.\nunmeasured_when: [not_windows, source_absent, access_denied, read_failed, collector_unavailable]",
         );
         let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
         write(&dir.join("rule.yaml"), &rule);
@@ -734,6 +737,42 @@ date: 2026-09-11
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
         assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
+    }
+
+    /// ADR 0027 recorded `not_on_this_os` and `service_disabled` as having no producer anywhere in
+    /// this build, so no rule could declare either. ADR 0030 gave each one exactly one, and this is
+    /// what that means for the gate: the reason is now usable, and only on the collector that can
+    /// actually report it. Asserted against the vocabulary the shipped executable builds, so a
+    /// collector that later stops producing one fails here rather than silently accepting a
+    /// suppression that never fires.
+    #[test]
+    fn the_revived_reasons_belong_to_one_collector_each() {
+        let vocabulary = Vocabulary::of_this_build();
+        let reports = |collector: &str, reason: &str| {
+            vocabulary
+                .reasons
+                .get(collector)
+                .is_some_and(|reasons| reasons.contains(reason))
+        };
+
+        for (reason, owner) in [
+            ("not_on_this_os", "pca"),
+            ("service_disabled", "prefetch"),
+            ("budget_spent", "evtx"),
+            ("not_attempted", "evtx"),
+        ] {
+            assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
+            for other in rongroi_collectors::all() {
+                if other.id() == owner {
+                    continue;
+                }
+                assert!(
+                    !reports(other.id(), reason),
+                    "`{}` also reports `{reason}`; the ADR 0030 table says only `{owner}` does",
+                    other.id()
+                );
+            }
+        }
     }
 
     /// Every collector can be asked which reasons it reports, so the first rule written for any of

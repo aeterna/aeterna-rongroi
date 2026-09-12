@@ -28,7 +28,7 @@ expression: view
       "collector": "posture",
       "strength": "posture",
       "state": "unmeasured",
-      "reason": "source_missing",
+      "reason": "source_absent",
       "expected": true
     },
     {
@@ -44,7 +44,7 @@ expression: view
       "collector": "posture",
       "strength": "posture",
       "state": "unmeasured",
-      "reason": "source_missing",
+      "reason": "source_absent",
       "expected": true
     },
     {
@@ -183,7 +183,8 @@ expression: view
     }
   ],
   "scope": {
-    "not_admin": 0
+    "not_admin": 0,
+    "not_attempted": 0
   },
   "hidden": {
     "not_found": 0,

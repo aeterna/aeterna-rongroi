@@ -199,7 +199,7 @@ this collector emits.
 |---|---|
 | Not Windows | `Unmeasured { not_windows }` |
 | `%SystemRoot%` unset or empty | `Unmeasured { read_failed }` — there was no folder to look in |
-| the Prefetch folder is not there | `Unmeasured { source_missing }` |
+| the Prefetch folder is not there | `Unmeasured { source_missing }` — since ADR 0030, `source_absent`, or `service_disabled` when `EnablePrefetcher` says Windows records no application launch |
 | the folder is there and could not be listed | a `read:` observation **and** every field in `gaps` |
 | one `.pf` file could not be read or decoded | a `read:` observation naming it; `rejected` and `intact` say so; **no gap** |
 | a `.pf` file was listed and is gone when read | nothing; counted as neither read nor refused |

@@ -41,11 +41,18 @@ pub struct ScopeNotes {
     /// unmeasured reason with a remedy: it is what makes the restart-as-administrator offer worth
     /// taking (ADR 0012, ADR 0027).
     ///
-    /// This is not a fourth hidden count and must not be added to them: in SS mode the same rules
-    /// are counted in [`HiddenCounts::unmeasured_expected`] or
-    /// [`HiddenCounts::unmeasured_unexpected`], which together account for every unlisted result.
-    /// Self mode lists all of them and carries this number as well.
+    /// This is not a hidden count and must not be added to them: in SS mode the same rules are
+    /// counted in [`HiddenCounts::unmeasured_expected`] or [`HiddenCounts::unmeasured_unexpected`],
+    /// which together account for every unlisted result. Self mode lists all of them and carries
+    /// this number as well.
     pub not_admin: usize,
+    /// How many rules were unmeasured because the collector never looked at their source.
+    ///
+    /// The same shape as [`Self::not_admin`] and here for the same reason: a source this program
+    /// stopped short of is one fact about how far the scan got, not N facts about the PC. Additive
+    /// to the view, and [`crate::model::REPORT_SCHEMA_VERSION`] stays at 1 (ADR 0030).
+    #[serde(default)]
+    pub not_attempted: usize,
 }
 
 /// A report as one audience may see it.
@@ -70,22 +77,19 @@ pub struct ReportView {
     pub hidden: HiddenCounts,
 }
 
-/// How many rules could not be measured for want of administrator rights (ADR 0027).
+/// The reasons a view states once above the evidence instead of as a row per rule (ADR 0027,
+/// ADR 0030).
 fn scope_notes(report: &Report) -> ScopeNotes {
-    ScopeNotes {
-        not_admin: report
+    let counted = |wanted: UnmeasuredReason| {
+        report
             .evidence
             .iter()
-            .filter(|item| {
-                matches!(
-                    item.state,
-                    EvidenceState::Unmeasured {
-                        reason: UnmeasuredReason::NotAdmin,
-                        ..
-                    }
-                )
-            })
-            .count(),
+            .filter(|item| matches!(item.state, EvidenceState::Unmeasured { reason, .. } if reason == wanted))
+            .count()
+    };
+    ScopeNotes {
+        not_admin: counted(UnmeasuredReason::NotAdmin),
+        not_attempted: counted(UnmeasuredReason::NotAttempted),
     }
 }
 
@@ -97,16 +101,20 @@ fn scope_notes(report: &Report) -> ScopeNotes {
 /// declared is one they said happens on ordinary machines, and a row per such rule is the "sea of
 /// red flags" that teaches a reviewer to stop reading (ADR 0027).
 ///
-/// `not_admin` is never a row. It is one fact about the scan, it applies to every rule at once, and
-/// it is the only unmeasured reason with a remedy, so it is stated once in [`ScopeNotes`].
+/// Two exceptions in each direction, both from [`UnmeasuredReason`] and both about who the fact
+/// belongs to (ADR 0030):
+///
+/// - `not_admin` and `not_attempted` are never a row. Each is one fact about the **scan** that
+///   applies to every rule it stopped, and each is stated once in [`ScopeNotes`].
+/// - `partial` and `budget_spent` are always a row, declared or not. They say the artifact was
+///   reachable and that **this program** stopped short of it, which is not something a rule author
+///   could have anticipated about the machine and so is not theirs to declare away.
 fn ss_lists(item: &Evidence) -> bool {
     match &item.state {
         EvidenceState::Found { .. } => true,
         EvidenceState::NotFound { .. } => item.strength == Strength::Posture,
-        EvidenceState::Unmeasured {
-            reason: UnmeasuredReason::NotAdmin,
-            ..
-        } => false,
+        EvidenceState::Unmeasured { reason, .. } if reason.is_scope_statement() => false,
+        EvidenceState::Unmeasured { reason, .. } if reason.is_always_listed() => true,
         EvidenceState::Unmeasured { expected, .. } => !expected,
     }
 }
@@ -343,12 +351,36 @@ mod tests {
                 expected: false,
             },
         };
+        // A source this program stopped short of: one fact about how far the scan got, like
+        // `not_admin`, and never a row of its own (ADR 0030).
+        let not_attempted = Evidence {
+            rule_id: "not-attempted".to_owned(),
+            collector: "evtx".to_owned(),
+            strength: Strength::Execution,
+            state: EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::NotAttempted,
+                expected: true,
+            },
+        };
+        // Declared by its rule and listed anyway: "part of this was read" is a fact about what this
+        // program did, not one the author could have anticipated about the machine (ADR 0030).
+        let partial = Evidence {
+            rule_id: "partial".to_owned(),
+            collector: "prefetch".to_owned(),
+            strength: Strength::Execution,
+            state: EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::Partial,
+                expected: true,
+            },
+        };
         vec![
             found,
             not_found,
             expected_unmeasured,
             unexpected_unmeasured,
             not_admin,
+            not_attempted,
+            partial,
         ]
     }
 
@@ -402,12 +434,12 @@ mod tests {
     fn ss_view_shows_found_and_posture_and_counts_the_rest() {
         let view = for_mode(&report(), Mode::Ss);
         let ids: Vec<&str> = view.evidence.iter().map(|e| e.rule_id.as_str()).collect();
-        assert_eq!(ids, ["found", "unexpected"]);
+        assert_eq!(ids, ["found", "unexpected", "partial"]);
         assert_eq!(
             view.hidden,
             HiddenCounts {
                 not_found: 1,
-                unmeasured_expected: 1,
+                unmeasured_expected: 2,
                 unmeasured_unexpected: 1,
                 unmatched: 1
             }
@@ -423,7 +455,7 @@ mod tests {
         let ids: Vec<&str> = view.evidence.iter().map(|e| e.rule_id.as_str()).collect();
         assert!(ids.contains(&"unexpected"), "{ids:?}");
         assert!(!ids.contains(&"posture"), "{ids:?}");
-        assert_eq!(view.hidden.unmeasured_expected, 1);
+        assert_eq!(view.hidden.unmeasured_expected, 2);
     }
 
     /// Self mode lists both, as it lists everything else.
@@ -518,6 +550,75 @@ mod tests {
                 .and_then(serde_json::Value::as_str),
             Some("aeterna-rongroi.exe")
         );
+    }
+
+    /// The two reasons a rule author cannot declare away. Both say the artifact was reachable and
+    /// that this program stopped short of it, which is a fact about the scan's own limits and not
+    /// one about the machine, so SS mode lists them even though the rule named them (ADR 0030).
+    #[test]
+    fn ss_view_lists_a_partial_result_even_though_its_rule_declared_it() {
+        let view = for_mode(&report(), Mode::Ss);
+        let ids: Vec<&str> = view.evidence.iter().map(|e| e.rule_id.as_str()).collect();
+        assert!(ids.contains(&"partial"), "{ids:?}");
+    }
+
+    /// A source the collector never looked at is the same shape as missing administrator rights:
+    /// one fact about how far the scan got, stated once above the evidence in both modes and never
+    /// as a row of its own (ADR 0030).
+    #[test]
+    fn not_attempted_is_a_scope_statement_in_both_modes_and_never_an_ss_row() {
+        let report = report();
+        assert_eq!(for_mode(&report, Mode::SelfCheck).scope.not_attempted, 1);
+        let ss = for_mode(&report, Mode::Ss);
+        assert_eq!(ss.scope.not_attempted, 1);
+        assert!(
+            !ss.evidence.iter().any(|e| e.rule_id == "not-attempted"),
+            "{:?}",
+            ss.evidence
+        );
+        // Still accounted for: it was declared, so it is one of the expected ones.
+        assert_eq!(ss.hidden.unmeasured_expected, 2);
+    }
+
+    /// The two questions [`UnmeasuredReason`] answers for a view, asserted on every reason at once
+    /// so that one added later cannot quietly default to "ordinary row".
+    #[test]
+    fn every_reason_says_whether_it_is_a_scope_statement_or_always_listed() {
+        use UnmeasuredReason as R;
+        for reason in [
+            R::NotWindows,
+            R::NotOnThisOs,
+            R::NotAdmin,
+            R::NotAttempted,
+            R::AccessDenied,
+            R::ServiceDisabled,
+            R::SourceAbsent,
+            R::SourceEmpty,
+            R::Partial,
+            R::BudgetSpent,
+            R::ReadFailed,
+            R::CollectorUnavailable,
+        ] {
+            let scope = reason.is_scope_statement();
+            let listed = reason.is_always_listed();
+            assert!(
+                !(scope && listed),
+                "{} is both a scope statement and always listed",
+                reason.as_str()
+            );
+            assert_eq!(
+                scope,
+                matches!(reason, R::NotAdmin | R::NotAttempted),
+                "{}",
+                reason.as_str()
+            );
+            assert_eq!(
+                listed,
+                matches!(reason, R::Partial | R::BudgetSpent),
+                "{}",
+                reason.as_str()
+            );
+        }
     }
 
     #[test]

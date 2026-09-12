@@ -216,7 +216,7 @@ comparable, as `fivem_dir` and `prefetch` already do.
 |---|---|
 | Not Windows | `Unmeasured { not_windows }` |
 | `%SystemRoot%` unset or empty | `Unmeasured { read_failed }` — there was no folder to look in |
-| the Event Log folder is not there | `Unmeasured { source_missing }` |
+| the Event Log folder is not there | `Unmeasured { source_missing }` — since ADR 0030, `source_absent`; a folder holding no `.evtx` file is `source_empty`, and a log the budget did not reach is `budget_spent` or `not_attempted` |
 | the folder is there and could not be listed | a `read:` observation **and** every field in `gaps` |
 | one log could not be read, decoded, or reached inside the budget | a `read:` observation naming it, **and** every field in `gaps` |
 | a log was listed and is gone when read | nothing; counted as neither examined nor refused |

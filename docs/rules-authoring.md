@@ -27,7 +27,7 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `cased` | no | **field** names compared byte for byte instead; everything left out folds case. One entry covers every comparison the rule makes against that field |
 | `allow` | no | legitimate software excluded by `sha256` or `signer` — never by file name |
 | `retention` | yes | how far back the source can see, in words for the user |
-| `unmeasured_when` | no | reason codes you expect on some machines. A reason named here is **counted** in SS mode; one that is not is **listed**, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest |
+| `unmeasured_when` | no | reason codes you expect on some machines. A reason named here is **counted** in SS mode; one that is not is **listed**, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest and names what it does report. `partial` and `budget_spent` are listed whatever you declare (ADR 0030) |
 | `falsepositives` | yes | what legitimately produces this evidence; never empty. Shown to the reader beside every `found` row (ADR 0027), so write it for them |
 | `references`, `tags`, `related`, `modified` | no | |
 | `author`, `date` | yes | `date` is `YYYY-MM-DD` |
@@ -110,9 +110,16 @@ accusation (NIST SP 800-86 section 3.4). A `not_found` row does not: nothing was
 nothing to explain.
 
 An `unmeasured` row says whether its reason was one this rule named in `unmeasured_when`. SS mode lists
-only the ones no rule expected and counts the rest, so `unmeasured_when` is the difference between a
-line a reviewer should ask about and a number they can move past. `not_admin` is never a row at all: it
-is one fact about the scan, said once above the evidence, with the remedy (ADR 0027).
+the ones no rule expected and counts the rest, so `unmeasured_when` is the difference between a line a
+reviewer should ask about and a number they can move past. Two exceptions in each direction (ADR 0030):
+`not_admin` and `not_attempted` are never a row at all — each is one fact about the scan, said once
+above the evidence — and `partial` and `budget_spent` are always a row, declared or not, because each
+says the artifact was reachable and that this program stopped short of it.
+
+The twelve reasons, and what each says to the reader, are in `docs/architecture.md`; ADR 0030 adds the
+ordinary condition that produces each and how common it is. The two that most often need declaring:
+`source_absent` ("this PC has no such record to read") and `source_empty` ("the place this is kept is
+there and holds nothing"). They mean opposite things — write the one you mean.
 
 No rule ships with `cased` today, and none uses an operator. `cased` looks like this, and needs a `#`
 comment saying why the field's own vocabulary distinguishes case:

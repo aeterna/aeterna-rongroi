@@ -61,10 +61,13 @@ export function Report({ mode, onBack }: Props) {
         )}
       </dl>
 
-      {/* A fact about the scan, not one about the machine, and the one unmeasured reason with a
-          remedy — so it is stated once here rather than on every rule it stopped (ADR 0027). */}
+      {/* Facts about the scan, not about the machine: each applies to every rule it stopped, so it
+          is stated once here rather than as a row per rule (ADR 0027, ADR 0030). */}
       {view.scope.not_admin > 0 && (
         <p className="scope">{t("scope.not_admin", { checks: view.scope.not_admin })}</p>
+      )}
+      {view.scope.not_attempted > 0 && (
+        <p className="scope">{t("scope.not_attempted", { checks: view.scope.not_attempted })}</p>
       )}
 
       {view.evidence.length === 0 && <p>{t("empty")}</p>}

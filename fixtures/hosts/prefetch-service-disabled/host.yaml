@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 with `EnablePrefetcher` set to 2 — boot only. Windows still writes the boot trace and
+# still keeps whatever application records were written before the switch was changed, so the folder
+# is **not** empty and a `.pf` file in it still parses; what it does not do is record the next launch
+# of anything. That is why the switch is read before the folder is interpreted: the folder's state is
+# not the answer to "did this program run" on such a machine, whatever it holds (ADR 0030).
+#
+# The one `.pf` file is the vendored Windows 10 corpus file, referenced rather than copied and
+# spelled with the name the corpus gives it (ADR 0019, fixtures/prefetch/PROVENANCE.md).
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters':
+    EnablePrefetcher: 2
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: CMD.EXE-D269B812.pf
+      from: '../../prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf'

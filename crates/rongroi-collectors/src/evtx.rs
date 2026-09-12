@@ -86,8 +86,12 @@ pub const PARSE_BUDGET: Duration = Duration::from_secs(30);
 
 const ID: &str = "evtx";
 
-/// Value of `read` for a log the budget did not reach.
+/// Value of `read` for the log that was being parsed when the budget ran out.
 const BUDGET_EXHAUSTED: &str = "budget_exhausted";
+/// Value of `read` for a log that was never opened, because the budget was already spent when its
+/// turn came. Separate from [`BUDGET_EXHAUSTED`]: one log used the time and the rest were not looked
+/// at, and calling the second a failed read would name a failure that did not happen (ADR 0030).
+const NOT_ATTEMPTED: &str = "not_attempted";
 /// Value of `read` for a log this program would not parse because it had no worker thread to parse
 /// it on. It never parses a log on the thread that has to return.
 const PARSE_UNAVAILABLE: &str = "parse_unavailable";
@@ -103,13 +107,18 @@ const PRIMARY_LOGS: [&str; 3] = ["security.evtx", "system.evtx", "application.ev
 
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
 ///
-/// The folder is absent, or listing it was denied, denied without administrator rights, or
-/// failed — including a log larger than a host reads in one piece and the collector's own budget.
-const REASONS: [UnmeasuredReason; 5] = [
+/// The folder is absent, or present and holding no `.evtx` file; the budget ended the read, or was
+/// already spent when a log's turn came; some logs were read and some were not; or listing was
+/// denied, denied without administrator rights, or failed — which includes a log larger than a host
+/// reads in one piece.
+const REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
+    UnmeasuredReason::NotAttempted,
     UnmeasuredReason::AccessDenied,
-    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::SourceAbsent,
+    UnmeasuredReason::SourceEmpty,
+    UnmeasuredReason::BudgetSpent,
     UnmeasuredReason::ReadFailed,
 ];
 
@@ -147,6 +156,29 @@ const FIELDS: [Field; 25] = [
     Field::number("refused"),
     Field::number("rejected"),
     Field::number("size_bytes"),
+];
+
+/// The fields that describe what a log held, as opposed to what the folder held.
+///
+/// The subset `source_empty` gaps: a folder that was listed and holds no `.evtx` file was **read**,
+/// so gapping `logs`, `examined`, `refused` or `budget_seconds` — which were measured — would claim
+/// it had not (ADR 0030).
+const RECORD_FIELDS: [&str; 15] = [
+    "channel",
+    "count",
+    "entries",
+    "event_id",
+    "first_seen",
+    "intact",
+    "last_seen",
+    "level",
+    "newest_record_id",
+    "newest_record_time",
+    "oldest_record_id",
+    "oldest_record_time",
+    "provider",
+    "rejected",
+    "size_bytes",
 ];
 
 /// The `evtx` collector.
@@ -200,7 +232,7 @@ impl Collector for Evtx {
             Ok(None) => {
                 return CollectorRun::Unmeasured {
                     collector: ID.to_owned(),
-                    reason: UnmeasuredReason::SourceMissing,
+                    reason: UnmeasuredReason::SourceAbsent,
                 };
             }
             Ok(Some(entries)) => log_files(entries),
@@ -227,6 +259,14 @@ fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
         .map(|field| (field.name.to_owned(), reason))
+        .collect()
+}
+
+/// A gap in what one log would have said, leaving what the folder held measured.
+fn record_gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
+    RECORD_FIELDS
+        .iter()
+        .map(|field| ((*field).to_owned(), reason))
         .collect()
 }
 
@@ -314,6 +354,13 @@ impl Collection {
 
         for name in names {
             let path = format!(r"{dir}\{name}");
+            // The budget is already gone, spent by an earlier log. This one is not opened at all,
+            // and saying so is not the same statement as "the read of this log ran out of time"
+            // (ADR 0030).
+            if self.budget_exhausted {
+                self.refuse(name, &path, NOT_ATTEMPTED, UnmeasuredReason::NotAttempted);
+                continue;
+            }
             let bytes = match host.read_file(&path) {
                 // Listed a moment ago and gone now: Windows rolls a log over while a scan runs, so
                 // this is ordinary (ADR 0019) and is counted as neither examined nor refused.
@@ -328,7 +375,12 @@ impl Collection {
             };
 
             let Some(worker) = worker.as_ref() else {
-                self.refuse(name, &path, PARSE_UNAVAILABLE, UnmeasuredReason::ReadFailed);
+                self.refuse(
+                    name,
+                    &path,
+                    PARSE_UNAVAILABLE,
+                    UnmeasuredReason::NotAttempted,
+                );
                 continue;
             };
             // Taken before the bytes are handed to the worker, which takes ownership of them. It is
@@ -369,14 +421,19 @@ impl Collection {
                 }
                 Parsed::OutOfBudget => {
                     self.budget_exhausted = true;
-                    self.refuse(name, &path, BUDGET_EXHAUSTED, UnmeasuredReason::ReadFailed);
+                    self.refuse(name, &path, BUDGET_EXHAUSTED, UnmeasuredReason::BudgetSpent);
                 }
                 // The worker stopped without answering. `rongroi-parsers` promises it never panics,
                 // so this is not expected to happen — and it is reported rather than folded into the
                 // budget, because "the parse did not run" and "the parse ran out of time" are not
                 // the same thing to a reviewer.
                 Parsed::WorkerGone => {
-                    self.refuse(name, &path, PARSE_UNAVAILABLE, UnmeasuredReason::ReadFailed);
+                    self.refuse(
+                        name,
+                        &path,
+                        PARSE_UNAVAILABLE,
+                        UnmeasuredReason::NotAttempted,
+                    );
                 }
             }
         }
@@ -399,10 +456,18 @@ impl Collection {
             self.budget_exhausted,
             self.budget,
         ));
+        let gaps = match self.first_failure {
+            Some(reason) => gaps(reason),
+            // The folder is there and holds no `.evtx` file at all. Nothing was refused and nothing
+            // was read, so no rule about what a log holds can be answered — but the folder itself
+            // was listed, and what it held stays measured (ADR 0030).
+            None if self.listed == 0 => record_gaps(UnmeasuredReason::SourceEmpty),
+            None => BTreeMap::new(),
+        };
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations: self.observations,
-            gaps: self.first_failure.map_or_else(BTreeMap::new, gaps),
+            gaps,
         }
     }
 }
@@ -1115,7 +1180,7 @@ mod tests {
             Evtx::default().collect(&fixture("evtx-not-present")),
             CollectorRun::Unmeasured {
                 collector: "evtx".to_owned(),
-                reason: UnmeasuredReason::SourceMissing,
+                reason: UnmeasuredReason::SourceAbsent,
             }
         );
     }
@@ -1253,6 +1318,12 @@ mod tests {
     /// as one, the folder says the collection did not finish, and every field is a gap — so a rule
     /// reports `unmeasured` rather than "nothing was found in the log".
     ///
+    /// Two words, not one, and the difference is which of them is this program's fault. The first
+    /// log **spent** the budget, which is a limit this program chose and discloses; every log after
+    /// it was never opened, and reporting that as a failed read would name a failure that did not
+    /// happen (ADR 0030). The run reports the first, because that is the one a reviewer can act on
+    /// and because SS mode lists it whatever a rule declared.
+    ///
     /// A budget of zero stands in for a parse that does not return, because nothing in this
     /// repository can make the parser hang on demand: the one input that did is fixed and neither
     /// reproducer is committed (`third_party/evtx/PROVENANCE.md`). What this proves is the reporting
@@ -1264,12 +1335,11 @@ mod tests {
 
         let refused = refusals(observations);
         assert_eq!(refused.len(), 2, "{refused:?}");
-        for observation in &refused {
-            assert_eq!(text(observation, "read"), Some(BUDGET_EXHAUSTED));
-        }
         // Named, so a reviewer reads *which* log went unexamined rather than only that one did.
         assert_eq!(text(refused[0], "log"), Some("Security.evtx"));
+        assert_eq!(text(refused[0], "read"), Some(BUDGET_EXHAUSTED));
         assert_eq!(text(refused[1], "log"), Some("Application.evtx"));
+        assert_eq!(text(refused[1], "read"), Some(NOT_ATTEMPTED));
 
         let folder = folder_of(observations);
         assert_eq!(field(folder, "budget_exhausted"), Some(&true.into()));
@@ -1281,10 +1351,33 @@ mod tests {
             let name = field.name;
             assert_eq!(
                 gaps.get(name),
-                Some(&UnmeasuredReason::ReadFailed),
+                Some(&UnmeasuredReason::BudgetSpent),
                 "{name}"
             );
         }
+    }
+
+    /// The folder is there and holds no `.evtx` file: a different statement from the folder not
+    /// being there, which used to share one word with it. What the folder held is still measured, so
+    /// a rule may still ask for it (ADR 0030).
+    #[test]
+    fn a_logs_folder_holding_no_log_is_source_empty_and_still_says_what_it_held() {
+        let run = Evtx::default().collect(&fixture("evtx-logs-folder-empty"));
+        let (observations, gaps) = measured(&run);
+
+        let folder = folder_of(observations);
+        assert_eq!(field(folder, "logs"), Some(&0_u64.into()));
+        assert_eq!(field(folder, "examined"), Some(&0_u64.into()));
+        assert_eq!(field(folder, "refused"), Some(&0_u64.into()));
+        for name in RECORD_FIELDS {
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::SourceEmpty),
+                "{name}"
+            );
+        }
+        assert_eq!(gaps.get("logs"), None);
+        assert_eq!(gaps.get("examined"), None);
     }
 
     /// The budget decides which logs go unread, so the order is chosen here rather than taken from a
