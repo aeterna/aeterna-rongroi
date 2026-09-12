@@ -14,12 +14,17 @@ publish.workspace = true
 
 [dependencies]
 rongroi-host.workspace = true
+thiserror.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-registry.workspace = true
+# `ShellExecuteExW` is declared under `Win32_UI_Shell`, but its `SHELLEXECUTEINFOW` carries an `HKEY`, so
+# the generated function is gated on `Win32_System_Registry` as well.
 windows = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_System_Registry",
+  "Win32_UI_Shell",
 ] }
 
 [lints]
