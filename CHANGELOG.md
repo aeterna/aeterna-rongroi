@@ -6,6 +6,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- Twelve words for what could not be measured, where there were eight (ADR 0030). `source_missing` made
+  two opposite statements and is now `source_absent` ("this PC has no such record to read") and
+  `source_empty` ("the place this is kept is there and holds nothing"); `partial`, `not_attempted` and
+  `budget_spent` are new; `not_on_this_os` and `service_disabled` existed as words with no producer and
+  now have one each — PCA on a Windows older than 22H2, and Prefetch with `EnablePrefetcher` switched
+  off. A Prefetch folder that was half read reported `not_found` — "looked for and not there" — and now
+  reports `partial`. Every reason has a one-line wording a non-expert reads, in English and Thai, and
+  none of `source_empty`, `service_disabled` or `not_on_this_os` is a finding: Windows empties BAM of
+  entries older than seven days at every boot, and a Prefetch folder is routinely emptied by an
+  optimiser the player ran. SS mode always lists `partial` and `budget_spent`, whatever a rule
+  declared, and states `not_attempted` once above the evidence as it already did `not_admin`.
 - Two gates that could not fail (ADR 0026). `cargo xtask check-rules` now rejects a rule whose
   `collector` is not a collector in this build, or whose `match` names a field that collector cannot
   emit — a misspelling used to ship as a rule that is `not_found` on every machine, which this program
@@ -91,8 +102,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   layout this repository has never confirmed on Windows 11. **No part of the account's SID goes out**,
   hashed or otherwise: it identifies one account and one Windows installation, and the report says how
   many accounts had records instead. A path is emitted only when it begins with a drive letter, the one
-  shape SS-mode redaction can reach. An absent BAM key is `source_missing`; a key that is there and
-  holds nothing is `values: 0`, a cleared execution history. No rule reads it yet (ADR 0023).
+  shape SS-mode redaction can reach. An absent BAM key is `source_absent`; a key that is there and
+  holds nothing is `source_empty` with `values: 0`. No rule reads it yet (ADR 0023).
 - Hosts can enumerate the registry and read a value's bytes: `RegistrySource` gains `subkeys`,
   `value_names` and `read_bytes`, which is what BAM needs and what no other artifact does — its value
   *names* are executable paths and its value *data* is the artifact. A key or value that is not there

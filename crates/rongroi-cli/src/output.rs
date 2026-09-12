@@ -64,6 +64,17 @@ fn text(lang: Lang, key: &str) -> &'static str {
             "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะการสแกนครั้งนี้ไม่มีสิทธิ์ผู้ดูแลระบบ \
              เปิดใหม่ด้วยสิทธิ์ผู้ดูแลระบบแล้วจะตอบได้"
         }
+        // The same shape as the line above and for the same reason: one fact about how far the scan
+        // got, said once, rather than a row per rule it stopped (ADR 0030).
+        (Lang::En, "scope_not_attempted") => {
+            "Scope: {n} check(s) could not be answered because this program stopped reading before \
+             it reached what they ask about. That is this program's limit, not a finding about \
+             this PC."
+        }
+        (Lang::Th, "scope_not_attempted") => {
+            "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะโปรแกรมหยุดอ่านก่อนจะถึงส่วนที่รายการนั้นถาม \
+             เป็นข้อจำกัดของโปรแกรมนี้เอง ไม่ใช่สิ่งที่ตรวจเจอในเครื่องนี้"
+        }
         (Lang::En, "own_traces") => "own traces (excluded)",
         (Lang::Th, "own_traces") => "ร่องรอยของโปรแกรมนี้เอง (แยกออกแล้ว)",
         (Lang::En, "own_traces_note") => {
@@ -105,26 +116,52 @@ fn text(lang: Lang, key: &str) -> &'static str {
     }
 }
 
+/// The one line a non-expert reads beside an unmeasured result.
+///
+/// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
+/// name the thing that was not seen and never the person, and say it about the record or about this
+/// program rather than about the machine's owner. The same twelve strings are in
+/// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
+/// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
+/// `check-locales` there.
 fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
     match (lang, reason) {
         (Lang::En, UnmeasuredReason::NotWindows) => "not running on Windows",
         (Lang::Th, UnmeasuredReason::NotWindows) => "ไม่ได้รันบน Windows",
-        (Lang::En, UnmeasuredReason::NotOnThisOs) => "not available on this Windows version",
-        (Lang::Th, UnmeasuredReason::NotOnThisOs) => "ไม่มีใน Windows รุ่นนี้",
-        (Lang::En, UnmeasuredReason::NotAdmin) => "needs administrator rights",
-        (Lang::Th, UnmeasuredReason::NotAdmin) => "ต้องใช้สิทธิ์ผู้ดูแลระบบ",
-        (Lang::En, UnmeasuredReason::AccessDenied) => "Windows denied access",
-        (Lang::Th, UnmeasuredReason::AccessDenied) => "Windows ไม่อนุญาตให้อ่าน",
-        (Lang::En, UnmeasuredReason::ServiceDisabled) => {
-            "the Windows service that records this is off"
+        (Lang::En, UnmeasuredReason::NotOnThisOs) => {
+            "this version of Windows does not keep this record"
         }
-        (Lang::Th, UnmeasuredReason::ServiceDisabled) => "บริการของ Windows ที่บันทึกข้อมูลนี้ถูกปิด",
-        (Lang::En, UnmeasuredReason::SourceMissing) => "not reported on this PC",
-        (Lang::Th, UnmeasuredReason::SourceMissing) => "เครื่องนี้ไม่ได้รายงานข้อมูลนี้",
-        (Lang::En, UnmeasuredReason::ReadFailed) => "could not be read",
-        (Lang::Th, UnmeasuredReason::ReadFailed) => "อ่านข้อมูลไม่ได้",
-        (Lang::En, UnmeasuredReason::CollectorUnavailable) => "not supported by this build",
-        (Lang::Th, UnmeasuredReason::CollectorUnavailable) => "build นี้ยังไม่รองรับ",
+        (Lang::Th, UnmeasuredReason::NotOnThisOs) => "Windows รุ่นนี้ไม่ได้เก็บข้อมูลส่วนนี้",
+        (Lang::En, UnmeasuredReason::NotAdmin) => {
+            "Windows would not show this without administrator rights"
+        }
+        (Lang::Th, UnmeasuredReason::NotAdmin) => "ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน",
+        (Lang::En, UnmeasuredReason::NotAttempted) => {
+            "this was not read — the scan stopped before reaching it"
+        }
+        (Lang::Th, UnmeasuredReason::NotAttempted) => "ไม่ได้อ่านส่วนนี้ เพราะการสแกนหยุดก่อนจะถึง",
+        (Lang::En, UnmeasuredReason::AccessDenied) => "Windows refused to open this",
+        (Lang::Th, UnmeasuredReason::AccessDenied) => "Windows ไม่อนุญาตให้เปิดอ่าน",
+        (Lang::En, UnmeasuredReason::ServiceDisabled) => {
+            "the Windows service that writes this record is switched off"
+        }
+        (Lang::Th, UnmeasuredReason::ServiceDisabled) => "บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่",
+        (Lang::En, UnmeasuredReason::SourceAbsent) => "this PC has no such record to read",
+        (Lang::Th, UnmeasuredReason::SourceAbsent) => "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน",
+        (Lang::En, UnmeasuredReason::SourceEmpty) => {
+            "the place this is kept is there and holds nothing"
+        }
+        (Lang::Th, UnmeasuredReason::SourceEmpty) => "มีที่เก็บข้อมูลอยู่ แต่ว่างเปล่า",
+        (Lang::En, UnmeasuredReason::Partial) => "part of this was read and part of it was not",
+        (Lang::Th, UnmeasuredReason::Partial) => "อ่านได้บางส่วน ไม่ครบ",
+        (Lang::En, UnmeasuredReason::BudgetSpent) => {
+            "this program stopped reading before it finished"
+        }
+        (Lang::Th, UnmeasuredReason::BudgetSpent) => "โปรแกรมนี้หยุดอ่านก่อนจะครบ",
+        (Lang::En, UnmeasuredReason::ReadFailed) => "this could not be read",
+        (Lang::Th, UnmeasuredReason::ReadFailed) => "อ่านข้อมูลนี้ไม่ได้",
+        (Lang::En, UnmeasuredReason::CollectorUnavailable) => "this build does not read that",
+        (Lang::Th, UnmeasuredReason::CollectorUnavailable) => "build นี้ยังไม่ได้อ่านส่วนนี้",
     }
 }
 
@@ -212,12 +249,17 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     // Above the evidence, because it is a fact about the scan and not about the machine, and
     // because a reviewer who has made up their mind by the third row never reaches a footer
     // (ADR 0027).
-    if view.scope.not_admin > 0 {
-        let _ = writeln!(
-            out,
-            "{}",
-            text(lang, "scope_not_admin").replace("{n}", &view.scope.not_admin.to_string())
-        );
+    for (count, key) in [
+        (view.scope.not_admin, "scope_not_admin"),
+        (view.scope.not_attempted, "scope_not_attempted"),
+    ] {
+        if count > 0 {
+            let _ = writeln!(
+                out,
+                "{}",
+                text(lang, key).replace("{n}", &count.to_string())
+            );
+        }
     }
     out.push('\n');
 
@@ -642,7 +684,7 @@ mod tests {
     fn an_expected_unmeasured_result_is_labelled_apart_from_an_unexpected_one() {
         let (mut report, bundle) = report(false);
         report.evidence[0].state = EvidenceState::Unmeasured {
-            reason: rongroi_core::model::UnmeasuredReason::SourceMissing,
+            reason: rongroi_core::model::UnmeasuredReason::SourceAbsent,
             expected: true,
         };
         let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);

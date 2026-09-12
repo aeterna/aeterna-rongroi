@@ -20,6 +20,8 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **NotFound** | The Collector ran and nothing matched; carries the **retention window** | `EvidenceState::NotFound` |
 | **Unmeasured** | The Collector could not look; carries a **reason** and whether the Rule **expected** it | `EvidenceState::Unmeasured` |
 | **expected unmeasured** | An Unmeasured result whose reason the Rule named in `unmeasured_when`; SS mode counts it. One whose reason it did not name is **unexpected** and SS mode lists it (ADR 0027) | `EvidenceState::Unmeasured::expected` |
+| **source absent** / **source empty** | Opposite Unmeasured reasons: the place the artifact is kept is not on this PC, versus it is there and holds nothing. One word until ADR 0030 | `UnmeasuredReason::SourceAbsent`, `::SourceEmpty` |
+| **scope statement** | An Unmeasured reason that is one fact about the **scan** — `not_admin`, `not_attempted` — stated once above the evidence and never as a row per Rule | `UnmeasuredReason::is_scope_statement`, `view::ScopeNotes` |
 | **scope statement** | A fact about the **scan** rather than about the machine, said once above the evidence in both modes. Today: how many Rules missing administrator rights left unanswered | `rongroi_core::view::ScopeNotes` |
 | **unmatched observation** | Something a Collector saw that no Rule matched; shown in Self mode only, counted in SS mode | `rongroi_core::model::UnmatchedGroup` |
 | **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
@@ -101,7 +103,7 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | An operator the field's declared kind cannot take, an empty list, and a `cased` entry `match` compares no text of are rejected | `check-rules` |
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
 | `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
-| `unmeasured_when` names only reasons the rule's collector can report, each once; it decides what an SS view lists | `check-rules` |
+| `unmeasured_when` names only reasons the rule's collector can report, each once; it decides what an SS view lists, except for `partial` and `budget_spent`, which are listed whatever a rule declares (ADR 0030) | `check-rules` |
 
 ## 7. Git
 

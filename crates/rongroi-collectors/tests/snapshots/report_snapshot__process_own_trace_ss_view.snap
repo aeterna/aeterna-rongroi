@@ -37,7 +37,8 @@ expression: view
   ],
   "unmatched": [],
   "scope": {
-    "not_admin": 0
+    "not_admin": 0,
+    "not_attempted": 0
   },
   "hidden": {
     "not_found": 0,

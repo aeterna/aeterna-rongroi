@@ -51,6 +51,12 @@ pub const PREFETCH_RELATIVE_PATH: &str = "Prefetch";
 /// Extension of the files Windows writes there, lower-cased for comparison.
 const PREFETCH_EXTENSION: &str = ".pf";
 
+/// The key holding the switch that decides whether Windows writes these files at all.
+pub const PREFETCH_PARAMETERS_KEY: &str =
+    r"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters";
+/// The switch itself: `0` off, `1` application launch only, `2` boot only, `3` both.
+pub const ENABLE_PREFETCHER: &str = "EnablePrefetcher";
+
 const ID: &str = "prefetch";
 
 /// Why `loaded_files` is not in the report, as the account observation states it.
@@ -60,13 +66,17 @@ const VOLUMES_WITHHELD: &str = "machine_identifier";
 
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
 ///
-/// `%SystemRoot%` is not set, the folder is absent, or it was denied, denied without
-/// administrator rights, or could not be read.
-const REASONS: [UnmeasuredReason; 5] = [
+/// `%SystemRoot%` is not set; the folder is absent, or present and holding no `.pf` file; Windows
+/// is not writing application-launch records at all; some of the folder was read and some was not;
+/// or the read was denied, denied without administrator rights, or failed.
+const REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
-    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::ServiceDisabled,
+    UnmeasuredReason::SourceAbsent,
+    UnmeasuredReason::SourceEmpty,
+    UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
 ];
 
@@ -88,6 +98,21 @@ const FIELDS: [Field; 13] = [
     Field::number("run_count"),
     Field::number("scca_version"),
     Field::text("volumes_withheld"),
+];
+
+/// The fields that describe one program Prefetch recorded, as opposed to what the folder held.
+///
+/// This is the subset a content-level reason gaps: `source_empty`, `service_disabled` and `partial`
+/// all describe a folder this collector **did** read, so gapping `files`, `entries`, `rejected` or
+/// `intact` — which were measured — would claim it had not. The reasons that describe a folder
+/// nothing was read from keep gapping every field (ADR 0030).
+const RECORD_FIELDS: [&str; 6] = [
+    "last_run",
+    "name",
+    "path",
+    "recorded_runs",
+    "run_count",
+    "scca_version",
 ];
 
 /// The `prefetch` collector.
@@ -130,6 +155,11 @@ impl Collector for Prefetch {
             };
         };
 
+        // Read before the folder is interpreted. A machine whose `EnablePrefetcher` says Windows is
+        // not writing application-launch records has no such record to be missing, so the folder's
+        // state is not the answer to "did this program run" on it either way (ADR 0030).
+        let launches_recorded = application_launches_recorded(host);
+
         let names = match host.list_dir(&dir) {
             // Prefetch is not on this machine: it is switched off, or this installation never had
             // it. That is not the statement "no program ran" — it is the absence of the record that
@@ -137,7 +167,11 @@ impl Collector for Prefetch {
             Ok(None) => {
                 return CollectorRun::Unmeasured {
                     collector: ID.to_owned(),
-                    reason: UnmeasuredReason::SourceMissing,
+                    reason: if launches_recorded == Some(false) {
+                        UnmeasuredReason::ServiceDisabled
+                    } else {
+                        UnmeasuredReason::SourceAbsent
+                    },
                 };
             }
             Ok(Some(entries)) => prefetch_files(entries),
@@ -187,8 +221,49 @@ impl Collector for Prefetch {
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
-            gaps: BTreeMap::new(),
+            gaps: content_gap(launches_recorded, names.len(), rejected)
+                .map_or_else(BTreeMap::new, record_gaps),
         }
+    }
+}
+
+/// The reason a folder this collector **read** still cannot answer "did this program run".
+///
+/// Three of them, most specific first, and each is ordinary on a machine nobody has touched:
+///
+/// - Windows is not writing application-launch records, so there is no record to have kept. This
+///   outranks the other two because it explains them: it is the answer whatever the folder holds,
+///   including a boot-only machine's folder of `NTOSBOOT` and layout files, which is not empty and
+///   holds nothing about an application (ADR 0030).
+/// - the folder is there and holds no `.pf` file at all.
+/// - some of the `.pf` files did not yield a record. Before ADR 0030 this gapped nothing, so a rule
+///   over a folder that was half read was `NotFound` — "the collector looked and nothing matched".
+fn content_gap(
+    launches_recorded: Option<bool>,
+    files: usize,
+    rejected: usize,
+) -> Option<UnmeasuredReason> {
+    if launches_recorded == Some(false) {
+        Some(UnmeasuredReason::ServiceDisabled)
+    } else if files == 0 {
+        Some(UnmeasuredReason::SourceEmpty)
+    } else if rejected > 0 {
+        Some(UnmeasuredReason::Partial)
+    } else {
+        None
+    }
+}
+
+/// Whether Windows writes a `.pf` file when an application is launched on this machine.
+///
+/// `EnablePrefetcher` is `0` off, `1` application launch only, `2` boot only and `3` both, so the
+/// answer is the low bit. `None` when the value is not there or could not be read: a registry read
+/// this program could not do is not evidence about what Windows is recording, and answering `true`
+/// or `false` from it would put a guess where the report says it read something.
+fn application_launches_recorded(host: &dyn Host) -> Option<bool> {
+    match host.read_u32(PREFETCH_PARAMETERS_KEY, ENABLE_PREFETCHER) {
+        Ok(Some(value)) => Some(value & 1 == 1),
+        Ok(None) | Err(_) => None,
     }
 }
 
@@ -196,6 +271,14 @@ fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
         .map(|field| (field.name.to_owned(), reason))
+        .collect()
+}
+
+/// A gap in what one `.pf` file would have said, leaving what the folder held measured.
+fn record_gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
+    RECORD_FIELDS
+        .iter()
+        .map(|field| ((*field).to_owned(), reason))
         .collect()
 }
 
@@ -497,9 +580,94 @@ mod tests {
             Prefetch.collect(&fixture("prefetch-not-present")),
             CollectorRun::Unmeasured {
                 collector: "prefetch".to_owned(),
-                reason: UnmeasuredReason::SourceMissing,
+                reason: UnmeasuredReason::SourceAbsent,
             }
         );
+    }
+
+    /// The folder is there and holds no `.pf` file. Opposite statements, which one word used to make
+    /// one statement: `source_absent` says this PC keeps no such record, and this says it keeps one
+    /// and the record is empty. What the folder held is still measured, so only the fields that
+    /// describe a program are gapped (ADR 0030).
+    #[test]
+    fn an_empty_prefetch_folder_is_source_empty_and_still_says_what_it_held() {
+        let run = Prefetch.collect(&fixture("prefetch-folder-empty"));
+        let (observations, gaps) = measured(&run);
+
+        let account = account_of(observations);
+        assert_eq!(field(account, "files"), Some(&0_u64.into()));
+        assert_eq!(field(account, "intact"), Some(&true.into()));
+        for name in RECORD_FIELDS {
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::SourceEmpty),
+                "{name}"
+            );
+        }
+        // Measured, so not gapped: a rule asking what the folder held gets an answer.
+        assert_eq!(gaps.get("files"), None);
+        assert_eq!(gaps.get("intact"), None);
+    }
+
+    /// `EnablePrefetcher` says Windows writes no application-launch record on this machine, so the
+    /// folder's state answers nothing about what ran — whatever it holds. A boot-only machine's
+    /// folder is not empty and still holds nothing about an application (ADR 0030).
+    #[test]
+    fn prefetching_switched_off_is_service_disabled_whatever_the_folder_holds() {
+        let run = Prefetch.collect(&fixture("prefetch-service-disabled"));
+        let (observations, gaps) = measured(&run);
+
+        // The boot file is there and was read: this is not an empty folder.
+        assert_eq!(
+            field(account_of(observations), "files"),
+            Some(&1_u64.into())
+        );
+        for name in RECORD_FIELDS {
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::ServiceDisabled),
+                "{name}"
+            );
+        }
+    }
+
+    /// With no folder at all and the switch off, the more truthful of the two is the one that says
+    /// why there is nothing to read.
+    #[test]
+    fn no_folder_with_prefetching_switched_off_is_service_disabled_not_source_absent() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\nfilesystem:\n  'C:\\Windows': []\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters':\n    EnablePrefetcher: 0\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            Prefetch.collect(&host),
+            CollectorRun::Unmeasured {
+                collector: "prefetch".to_owned(),
+                reason: UnmeasuredReason::ServiceDisabled,
+            }
+        );
+    }
+
+    /// The switch is the low bit of `EnablePrefetcher`, and a value this program could not read is
+    /// not an answer about what Windows records.
+    #[test]
+    fn the_switch_is_read_from_the_registry_and_never_guessed() {
+        let with = |value: &str| {
+            FixtureHost::from_yaml_str(
+                &format!("platform: windows\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters':\n    EnablePrefetcher: {value}\n"),
+                "inline",
+            )
+            .unwrap()
+        };
+        assert_eq!(application_launches_recorded(&with("0")), Some(false));
+        assert_eq!(application_launches_recorded(&with("1")), Some(true));
+        assert_eq!(application_launches_recorded(&with("2")), Some(false));
+        assert_eq!(application_launches_recorded(&with("3")), Some(true));
+        // Not there at all, and a key that holds a string where a number belongs.
+        let absent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert_eq!(application_launches_recorded(&absent), None);
+        assert_eq!(application_launches_recorded(&with("'three'")), None);
     }
 
     /// The ordinary outcome of a scan without an elevated token, which ADR 0015 says is what reading
@@ -545,7 +713,13 @@ mod tests {
     fn one_unreadable_file_is_named_and_does_not_gap_the_run() {
         let run = Prefetch.collect(&fixture("prefetch-file-unreadable"));
         let (observations, gaps) = measured(&run);
-        assert!(gaps.is_empty(), "{gaps:?}");
+        // Part of the folder was read and part of it was not, so a rule over a program that ran is
+        // `partial` and not `not_found`. Until ADR 0030 this gapped nothing, and the engine called a
+        // half-read folder "the collector looked and nothing matched".
+        for name in RECORD_FIELDS {
+            assert_eq!(gaps.get(name), Some(&UnmeasuredReason::Partial), "{name}");
+        }
+        assert_eq!(gaps.get("files"), None);
 
         let refused = refusals(observations);
         assert_eq!(refused.len(), 1, "{refused:?}");
@@ -569,7 +743,11 @@ mod tests {
     fn an_unsupported_scca_version_is_reported_as_such() {
         let run = Prefetch.collect(&fixture("prefetch-unsupported-version"));
         let (observations, gaps) = measured(&run);
-        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(
+            gaps.get("name"),
+            Some(&UnmeasuredReason::Partial),
+            "{gaps:?}"
+        );
 
         let refused = refusals(observations);
         assert_eq!(refused.len(), 1, "{refused:?}");
@@ -588,7 +766,11 @@ mod tests {
     fn a_corrupt_file_is_reported_with_what_stopped_it() {
         let run = Prefetch.collect(&fixture("prefetch-corrupt-files"));
         let (observations, gaps) = measured(&run);
-        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(
+            gaps.get("name"),
+            Some(&UnmeasuredReason::Partial),
+            "{gaps:?}"
+        );
 
         let reads: Vec<Option<&str>> = refusals(observations)
             .into_iter()

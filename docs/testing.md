@@ -117,7 +117,7 @@ confirm it fails:
 |---|---|
 | `cargo deny check` | adding `reqwest` to a crate |
 | `fuzz smoke` | giving a parser a panicking path — e.g. indexing `bytes[TAIL_OFFSET]` in `bam::parse_value`, slicing `bytes[4..MAM_HEADER_LEN]` in `prefetch::reject_implausible_declared_size`, or indexing `bytes[FILE_HEADER_LEN]` in `evtx::records` instead of comparing the length, rather than reaching for it with `get` |
-| `check-rules` | duplicating a rule id, deleting a negative fixture, allowing by `name:`, misspelling a `match` field (`run_cout`) or a `collector` (`postures`), declaring an `unmeasured_when` reason the collector cannot report (`service_disabled`, or `not_admin` on `posture`), writing an operator that is not one (`secure_boot\|matches:`), an empty value list (`secure_boot: []`), or an operator the field's kind cannot take (`secure_boot\|gt: 1`) |
+| `check-rules` | duplicating a rule id, deleting a negative fixture, allowing by `name:`, misspelling a `match` field (`run_cout`) or a `collector` (`postures`), declaring an `unmeasured_when` reason the collector cannot report (`service_disabled` or `not_admin` on `posture`, both of which other collectors do report), writing an operator that is not one (`secure_boot\|matches:`), an empty value list (`secure_boot: []`), or an operator the field's kind cannot take (`secure_boot\|gt: 1`) |
 | `check-baseline` | pointing a rule's `match` at a value a baseline host carries — `prefetch` / `name: cmd.exe` fires on `baseline-elevated-win11` — or leaving a `known-fps.csv` row in place once its rule no longer matches |
 | `check-locales` | adding a key to a translation that English does not have |
 | `check-unicode` | inserting U+200B into any file |

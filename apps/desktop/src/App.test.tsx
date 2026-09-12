@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
-import type { ReportHeader, ReportView } from "./types";
+import type { ReportHeader, ReportView, UnmeasuredReason } from "./types";
 
 // Vitest runs with apps/desktop as the working directory.
 const SNAPSHOTS = resolve(process.cwd(), "../../crates/rongroi-collectors/tests/snapshots");
@@ -293,12 +293,58 @@ describe("App", () => {
   // One fact about the scan that applies to every rule at once, and the one unmeasured reason with
   // a remedy, so it is stated once above the evidence (ADR 0012, ADR 0027).
   it("states missing administrator rights once, above the evidence", async () => {
-    viewOverride = { ...selfView, scope: { not_admin: 2 } };
+    viewOverride = { ...selfView, scope: { not_admin: 2, not_attempted: 0 } };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
     const statements = await screen.findAllByText(/could not be answered because this scan/);
     expect(statements).toHaveLength(1);
     expect(statements[0]?.textContent).toContain("2 check(s)");
+  });
+
+  // The second scope statement, and the same shape for the same reason: a source this program
+  // stopped short of is one fact about how far the scan got, and it says so about the program and
+  // never about the PC (ADR 0030).
+  it("states the sources it never reached once, above the evidence", async () => {
+    viewOverride = { ...selfView, scope: { not_admin: 0, not_attempted: 3 } };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const statements = await screen.findAllByText(/this program stopped reading before/);
+    expect(statements).toHaveLength(1);
+    expect(statements[0]?.textContent).toContain("3 check(s)");
+    expect(statements[0]?.textContent).toContain("not a finding about this PC");
+  });
+
+  // Each of the twelve reasons reaches a reader as a sentence, never as its identifier: a row
+  // reading `source_empty` is a row that says nothing to the person it is about (ADR 0030).
+  it.each([
+    ["not_on_this_os", "this version of Windows does not keep this record"],
+    ["not_attempted", "the scan stopped before reaching it"],
+    ["service_disabled", "the Windows service that writes this record is switched off"],
+    ["source_absent", "this PC has no such record to read"],
+    ["source_empty", "the place this is kept is there and holds nothing"],
+    ["partial", "part of this was read and part of it was not"],
+    ["budget_spent", "this program stopped reading before it finished"],
+  ])("shows %s as a sentence a non-expert reads", async (reason, sentence) => {
+    const first = selfView.evidence[0];
+    if (!first) {
+      throw new Error("the self-view snapshot has no evidence");
+    }
+    viewOverride = {
+      ...selfView,
+      evidence: [
+        {
+          rule_id: first.rule_id,
+          collector: first.collector,
+          strength: first.strength,
+          state: "unmeasured",
+          reason: reason as UnmeasuredReason,
+          expected: false,
+        },
+      ],
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText(new RegExp(sentence))).toBeTruthy();
   });
 
   it("states nothing about administrator rights when every check was answerable", async () => {

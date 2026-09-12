@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 24H2 whose `appcompat\pca` folder is there and holds none of the three files: the
+# machine keeps this artifact and has written nothing into it yet. A clean install reaches this
+# state on its own, and PCA only records launches made from File Explorer, which is not how a game
+# started by Steam, Epic or a Discord "Play" action is launched at all (ADR 0030).
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca': []

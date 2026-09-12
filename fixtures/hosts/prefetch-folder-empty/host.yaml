@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 whose Prefetch folder is there, is readable, and holds no `.pf` file — the state a
+# cleaning tip, a one-click "optimiser" or `del C:\Windows\Prefetch\*` leaves, all of which a player
+# runs for frame rate and none of which says anything about what ran (ADR 0030). `EnablePrefetcher`
+# is 3, Windows' default, so the folder being empty is not explained by the switch: this is the
+# `source_empty` case and not the `service_disabled` one.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters':
+    EnablePrefetcher: 3
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: ReadyBoot
+      directory: true

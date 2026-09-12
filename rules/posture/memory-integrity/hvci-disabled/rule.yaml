@@ -16,7 +16,7 @@ strength: posture
 match:
   hvci: disabled
 retention: Current setting only. It says nothing about how the PC was configured in the past.
-unmeasured_when: [not_windows, source_missing, access_denied, read_failed]
+unmeasured_when: [not_windows, source_absent, access_denied, read_failed]
 falsepositives:
   - PCs whose hardware or firmware cannot support virtualisation-based security
   - Machines where it was switched off to resolve a driver, anti-cheat or virtualisation conflict

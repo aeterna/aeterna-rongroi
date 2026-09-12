@@ -38,7 +38,32 @@ all**: an event's own text is where user names, PC names, addresses, account ide
 lines live, and none of it survives the step that reads the file.
 A log the tool could not read — because Windows refused it, because it is larger than the tool will open,
 or because the tool's own time limit ran out — is **named in the report as one it could not read**, rather
-than passed over in silence.
+than passed over in silence. A log the tool never opened at all, because that time limit was already gone
+when its turn came, is named as one it did not look at — which is a different thing and is said in
+different words.
+
+It also reads one Windows setting about itself: whether Windows is writing a record when a program is
+launched (`EnablePrefetcher`). That is a machine setting and names no person. It is read so that "there
+is no record of this program" can be told apart from "Windows is not keeping such records on this PC",
+which are not the same statement about you.
+
+### When the tool says it could not answer
+
+Every check that could not be answered says **why**, in one sentence, in your language. Several of the
+reasons are the ordinary state of an ordinary PC and none of them is a finding about you:
+
+- *"this version of Windows does not keep this record"* — the record arrived in a later Windows than
+  this one.
+- *"the place this is kept is there and holds nothing"* — Windows keeps such records here and there are
+  none right now. Windows itself deletes some of them on a schedule, and emptying others is a common
+  "speed up my PC" tip.
+- *"the Windows service that writes this record is switched off"* — a setting on this PC, so nothing was
+  ever written to be missing.
+- *"part of this was read and part of it was not"* and *"this program stopped reading before it
+  finished"* — limits of this program, not of your PC, and the report says so rather than reporting
+  "nothing found".
+
+"Not measured" means the check did not get an answer. It is not a finding.
 
 The tool does **not** take screenshots, read browser history, access files unrelated to its collectors,
 or allow remote access.
@@ -59,7 +84,7 @@ or allow remote access.
 | | Self mode | SS mode (screenshare) |
 |---|---|---|
 | Consent screen | no | yes — you may refuse |
-| Evidence shown | everything | only rule matches, plus counts of what was not found or not measured |
+| Evidence shown | everything | rule matches, plus counts of what was not found or could not be answered for a reason the rule itself said is ordinary. A check this program stopped short of is shown, because that is its own limit and not a fact about your PC |
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` |
 

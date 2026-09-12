@@ -202,6 +202,10 @@ over `crates/`, `apps/` and `xtask/`, not from an exhaustive analysis.** The gre
 the CLI's and the app's reason wordings. If a collector is later taught to produce one, the collector's
 own declaration is what makes it usable in a rule, and no gate has to be edited.
 
+> That happened in ADR 0030: `pca` produces `not_on_this_os` and `prefetch` produces
+> `service_disabled`, and no gate was edited. This paragraph, and every `source_missing` above, are
+> the state of the build on 2026-09-13 before that change.
+
 **No real Windows machine was read, and no human read the new output.** Whether "Ordinary things that
 also produce this" reads as a caveat or as a hedge to a Thai-speaking server admin during a
 screenshare is not established by any test here; the tests establish that the text is present, in the
