@@ -1,0 +1,90 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: view
+---
+{
+  "mode": "self",
+  "header": {
+    "schema_version": 1,
+    "provenance": {
+      "official": false,
+      "version": "0.0.0-test",
+      "commit": null,
+      "exe_sha256": null
+    },
+    "rules_bundle": {
+      "schema_version": 1,
+      "sha256": "[bundle sha256]",
+      "rule_count": 4
+    },
+    "platform": "windows",
+    "os_build": "26100",
+    "elevated": true,
+    "generated_at": "2026-01-01T00:00:00Z"
+  },
+  "evidence": [
+    {
+      "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_missing"
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed"
+    },
+    {
+      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_missing"
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed"
+    }
+  ],
+  "own_traces": [],
+  "unmatched": [
+    {
+      "collector": "prefetch",
+      "observations": [
+        {
+          "collector": "prefetch",
+          "fields": {
+            "last_run": "2016-01-12T20:07:03.9810694Z",
+            "name": "cmd.exe",
+            "path": "C:\\Windows\\Prefetch\\CMD.EXE-D269B812.pf",
+            "recorded_runs": 8,
+            "run_count": 55,
+            "scca_version": 30
+          }
+        },
+        {
+          "collector": "prefetch",
+          "fields": {
+            "entries": 1,
+            "files": 1,
+            "intact": true,
+            "loaded_files_withheld": "user_file_list",
+            "rejected": 0,
+            "volumes_withheld": "machine_identifier"
+          }
+        }
+      ]
+    }
+  ],
+  "hidden": {
+    "not_found": 0,
+    "unmeasured": 0,
+    "unmatched": 0
+  }
+}

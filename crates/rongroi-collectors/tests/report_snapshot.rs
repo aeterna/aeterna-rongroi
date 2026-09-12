@@ -153,3 +153,33 @@ fn pca_files_present_ss_view() {
     assert!(view.hidden.unmatched > 0);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
+
+/// No rule reads `prefetch` either (ADR 0021). The programs it saw, and the account of what the
+/// folder held, reach Self mode through the unmatched bucket with no change to the CLI or the app.
+#[test]
+fn prefetch_files_present_self_view() {
+    let view = view::for_mode(&report_for("prefetch-files-present"), Mode::SelfCheck);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(json.contains("cmd.exe"), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// A `.pf` file lists every file the program loaded and the volumes it touched. The fixture's own
+/// `.pf` carries the upstream author's profile paths and his machine's volume serial numbers
+/// (`fixtures/prefetch/PROVENANCE.md`), and **neither mode has anything to redact**, because the
+/// collector never emits them. What SS mode adds on top is that it lists no unmatched observation at
+/// all, so not even the program's name reaches the person watching.
+#[test]
+fn prefetch_files_present_ss_view() {
+    let report = report_for("prefetch-files-present");
+    let everything = serde_json::to_string(&report).unwrap().to_uppercase();
+    for leaked in ["VOLUME{", "HARDDISKVOLUME", "\\\\USERS\\\\", ".DLL"] {
+        assert!(!everything.contains(leaked), "{leaked} reached the report");
+    }
+
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(!json.contains("cmd.exe"), "{json}");
+    assert!(view.hidden.unmatched > 0);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
