@@ -75,7 +75,13 @@ impl BinXmlNameRef {
             let len = cursor.u16_named("string_table_name_len")?;
 
             let nul_terminator_len = 4;
-            let data_size = BinXmlNameLink::data_size() + u32::from(len * 2) + nul_terminator_len;
+            // `len` is a u16 read from the file, and `len * 2` was evaluated in u16 before being
+            // widened: any `len` above 32767 overflows. Under overflow checks that is a panic; in a
+            // release build it wraps silently and `data_size` comes out short, so the cursor is
+            // moved to the wrong place and the rest of the stream is misread with nothing reporting
+            // it. Widening first makes the arithmetic exact, and an implausible length then fails in
+            // `set_pos_u64` as an out-of-range seek, which is what the code already does with one.
+            let data_size = BinXmlNameLink::data_size() + u32::from(len) * 2 + nul_terminator_len;
 
             cursor.set_pos_u64(position_before_string + u64::from(data_size), "Skip string")?;
         }

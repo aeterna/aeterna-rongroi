@@ -49,8 +49,9 @@ dependency from the one the product ships — a green gate over code nobody runs
 
 ### Re-syncing the vendored `evtx`
 
-`third_party/evtx/` is the `evtx` crate's source with one patch applied: an allocation sized from a
-record's substitution count, bounded against the bytes actually remaining. The reasoning, the measured
+`third_party/evtx/` is the `evtx` crate's source with two patches applied: an allocation sized from a
+record's substitution count, bounded against the bytes actually remaining; and a `u16` multiplication
+on a name length that overflowed before being widened. The reasoning, the measured
 allocation, and a command that proves the rest of the directory is byte-identical to the published crate
 are in `third_party/evtx/PROVENANCE.md`; the decision is ADR 0018.
 

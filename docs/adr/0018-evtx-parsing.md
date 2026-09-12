@@ -39,7 +39,7 @@ command line; and `multithreading`, which would pull `rayon` and a global thread
 thread, so the order of returned records is deterministic — worth having in a tool whose output a
 person is asked to compare.
 
-### Vendored with one patch, not taken from the registry
+### Vendored and patched, not taken from the registry
 
 `third_party/evtx/`, wired in by `[patch.crates-io]` in both the root `Cargo.toml` and `fuzz/Cargo.toml`.
 
@@ -94,6 +94,20 @@ Every other `with_capacity` in the crate was checked. None is sized by an unchec
 file: they are bounded by `EVTX_CHUNK_SIZE`, by a slice already in memory, by a `u16` field, by an
 explicit bounds check three lines earlier (`ir.rs`'s template `data_size`), or they sit in the
 `wevt_templates` feature, which is off.
+
+**A second patch followed, and how it arrived matters more than what it fixes.** `binxml/name.rs:78`
+evaluates `len * 2` in `u16` before widening, where `len` is a name length read from the file, so any
+length above 32767 overflows: a panic where overflow checks are on, and a silent wrap in an ordinary
+release build, which leaves the cursor in the wrong place with nothing reporting it. The fix widens
+first.
+
+`fuzz_evtx` found it **on `dev`, minutes after the pull request carrying the first patch had merged
+with that same job green**. Nothing had changed between the two runs except libFuzzer's seed. This is
+§8.3 of the workspace standard happening in front of us rather than in the abstract: a green run is
+evidence about one execution, not about a commit, and it was right to re-read CI on `dev` instead of
+carrying the branch's result forward. The regression test for this one is therefore deterministic —
+built in `evtx.rs` from the good fixture, the way the damaged-chunk cases are — rather than a saved
+crash input and a hope that the fuzzer finds it again.
 
 `third_party/evtx/` is excluded from the workspace, from `typos`, and from this project's lints, and
 `REUSE.toml` annotates it under **upstream's** licence rather than ours. It is Omer Ben-Amram's code; a
@@ -304,6 +318,12 @@ duplicates a known-good chunk and breaks its signature in four lines.
 - **One sample, not two.** Every Event Log test reads `languagepacksetup-operational.evtx` or bytes
   built from it, so a defect peculiar to that file has no second opinion. The `EventID`-as-object shape
   it does not contain is covered by a unit test over `scalar`/`number` rather than by a sample.
+- **A third defect is open: a parse that does not terminate.** A crafted input makes `records` never
+  return — past 300 s under the sanitizer, past 600 s without it — with and without both patches, so
+  it is upstream's and independent of them. Its location is unknown. It makes `docs/testing.md`'s
+  "never panic, abort or hang" false for EVTX today, and that document now says so. Two of the three
+  defects in this dependency are fixed; the count is going up rather than down, which is itself worth
+  weighing the next time a parser this size is taken on.
 - **The patch is verified against this repository's use, not against every use of the crate.** The
   bound was exercised by the full test suite, by the reverted-and-restored reproduction, and by a
   263 568-run campaign that found nothing further. Upstream may hold a different view of it, and until

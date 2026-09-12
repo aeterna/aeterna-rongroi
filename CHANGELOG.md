@@ -5,6 +5,22 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Vendored `evtx`: a `u16` multiplication in `binxml/name.rs` that overflows on a name length above
+  32767. Under overflow checks it panics; in an ordinary release build it wraps silently, leaving
+  `data_size` short and the cursor in the wrong place with nothing reporting it. The patch widens
+  before multiplying, so an implausible length becomes an out-of-range seek and the chunk is refused
+  like any other damaged chunk. `fuzz_evtx` found it on `dev` minutes after the pull request that
+  introduced the parser had merged with that same job green — the fuzzer takes a random seed, so the
+  regression test added for it is deterministic rather than a saved crash input.
+
+### Known issues
+- A crafted `.evtx` input makes the Event Log parser **not return** — past 300 s under the sanitizer,
+  past 600 s without. It is a defect in the vendored `evtx` crate, present with and without both
+  patches carried here, and its location has not been found. `docs/testing.md`'s claim that the
+  parsers never hang is therefore false for EVTX today and has been marked as such. The `fuzz smoke`
+  job may go red on any run whose seed reaches it.
+
 ### Removed
 - The `application-no-crc32.evtx` Event Log fixture, on finding that it carried a real machine SID
   (`S-1-5-21-…-1000`, the first user account of a real computer) in its chunk string table. It had been

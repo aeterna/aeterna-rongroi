@@ -363,6 +363,24 @@ mod tests {
         bytes
     }
 
+    /// Rewrites the first `string_table_name_len` in the fixture's chunk, which sits 595 bytes in.
+    /// A `u16` there above 32767 is what overflowed upstream's `len * 2`. Built from good bytes in
+    /// the test rather than vendored, the same way the damaged-chunk cases are.
+    fn with_name_length(source: &[u8], length: u16) -> Vec<u8> {
+        const NAME_LENGTH_OFFSET: usize = FILE_HEADER_LEN + 595;
+
+        let mut bytes = source.to_vec();
+        let found = u16::from_le_bytes([bytes[NAME_LENGTH_OFFSET], bytes[NAME_LENGTH_OFFSET + 1]]);
+        assert_eq!(
+            found, 5,
+            "the fixture drifted: offset {NAME_LENGTH_OFFSET} no longer holds the name length this \
+             helper rewrites, so the test below would prove nothing"
+        );
+
+        bytes[NAME_LENGTH_OFFSET..NAME_LENGTH_OFFSET + 2].copy_from_slice(&length.to_le_bytes());
+        bytes
+    }
+
     /// Breaks one chunk's `ElfChnk\0` signature, leaving every other byte of the file alone.
     fn with_damaged_chunk(source: &[u8], chunk_number: usize) -> Vec<u8> {
         let mut bytes = two_chunk_file(source);
@@ -482,6 +500,31 @@ mod tests {
         assert_eq!(file.records.len(), 17);
         assert_eq!(file.rejected.len(), 1);
         assert_eq!(file.rejected[0].chunk_number, Some(0));
+    }
+
+    /// A name's length is a `u16` read from the file, and upstream multiplied it by two *before*
+    /// widening it, so any length above 32767 overflowed. Where overflow checks are on — a test
+    /// build, a fuzz build — that is a panic. In a release build it wraps silently, `data_size`
+    /// comes out short, and the cursor is left in the wrong place with nothing reporting it, which
+    /// is the worse of the two. The vendored crate widens first
+    /// (`third_party/evtx/PROVENANCE.md`), so an implausible length becomes an out-of-range seek
+    /// and the chunk is refused like any other damaged chunk.
+    ///
+    /// Found by `fuzz_evtx` on `dev`, not on the pull request that introduced it: the fuzzer takes a
+    /// random seed, so one green run is not evidence about the next. This test is deterministic.
+    #[test]
+    fn a_name_length_that_overflows_its_field_is_refused_rather_than_wrapped() {
+        let file = parsed(&with_name_length(LANGUAGE_PACK, u16::MAX));
+
+        assert!(
+            file.records.is_empty(),
+            "the chunk carrying the bad name holds every record in this fixture"
+        );
+        assert_eq!(file.rejected.len(), 1);
+        assert!(matches!(
+            file.rejected[0].reason,
+            ParseError::Malformed { field: "chunk", .. }
+        ));
     }
 
     /// Bytes that are not an Event Log at all are the one thing that fails a whole file — there is
