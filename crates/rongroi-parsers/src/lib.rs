@@ -30,5 +30,6 @@
 //!
 //! [`rongroi_host::Host`]: https://github.com/aeterna/aeterna-rongroi
 
+pub mod bam;
 pub mod error;
 pub mod filetime;
