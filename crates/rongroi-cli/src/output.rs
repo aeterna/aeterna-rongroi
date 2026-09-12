@@ -53,6 +53,14 @@ fn text(lang: Lang, key: &str) -> &'static str {
             "what this program itself left in what was read; not evidence about this PC"
         }
         (Lang::Th, "own_traces_note") => "สิ่งที่โปรแกรมนี้ทิ้งไว้เองในสิ่งที่อ่านมา ไม่ใช่หลักฐานเกี่ยวกับเครื่องนี้",
+        (Lang::En, "unmatched") => "unmatched observations",
+        (Lang::Th, "unmatched") => "สิ่งที่เห็นแต่ไม่ตรง rule ใดเลย",
+        (Lang::En, "unmatched_note") => {
+            "what the collectors saw that no rule matched; these are things that were seen, not findings"
+        }
+        (Lang::Th, "unmatched_note") => {
+            "สิ่งที่ collector เห็นแต่ไม่มี rule ไหนตรงเลย เป็นสิ่งที่เห็น ไม่ใช่สิ่งที่ตรวจเจอ"
+        }
         (Lang::En, "footer") => "Evidence only. This report cannot prove that a PC is clean.",
         (Lang::Th, "footer") => "เป็นหลักฐานประกอบเท่านั้น รายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด",
         (Lang::En, "elevated_yes") => "administrator",
@@ -246,15 +254,39 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         }
     }
 
+    // After the evidence and after the own traces: what the collectors saw that no rule matched.
+    // Self mode lists these; in SS mode the list is empty and they are counted below (ADR 0014).
+    if !view.unmatched.is_empty() {
+        let _ = writeln!(
+            out,
+            "\n{} — {}",
+            text(lang, "unmatched"),
+            text(lang, "unmatched_note")
+        );
+        for group in &view.unmatched {
+            for observation in &group.observations {
+                let fields = observation
+                    .fields
+                    .iter()
+                    .map(|(k, v)| format!("{k}={}", plain(v)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let _ = writeln!(out, "    [{}] {fields}", group.collector);
+            }
+        }
+    }
+
     if view.mode == Mode::Ss {
         let _ = writeln!(
             out,
-            "\n{}: {} {} · {} {}",
+            "\n{}: {} {} · {} {} · {} {}",
             text(lang, "hidden"),
             text(lang, "not_found"),
             view.hidden.not_found,
             text(lang, "unmeasured"),
-            view.hidden.unmeasured
+            view.hidden.unmeasured,
+            text(lang, "unmatched"),
+            view.hidden.unmatched
         );
     }
     let _ = writeln!(out, "\n{}", text(lang, "footer"));
@@ -275,7 +307,7 @@ fn short(sha: &str) -> &str {
 mod tests {
     use rongroi_core::model::{
         Evidence, EvidenceState, Mode, Observation, OwnTraceEntry, REPORT_SCHEMA_VERSION, Report,
-        ReportHeader, Strength,
+        ReportHeader, Strength, UnmatchedGroup,
     };
     use rongroi_core::provenance::Provenance;
     use rongroi_core::view;
@@ -314,6 +346,7 @@ mod tests {
                 header,
                 evidence: vec![evidence],
                 own_traces: Vec::new(),
+                unmatched: Vec::new(),
             },
             bundle,
         )
@@ -382,6 +415,63 @@ mod tests {
 
         let thai = render(&view, &bundle, Lang::Th);
         assert!(thai.contains("ร่องรอยของโปรแกรมนี้เอง"), "{thai}");
+    }
+
+    /// A plugin file the `fivem_dir` collector saw. No rule reads that collector, so nothing about
+    /// it matched one.
+    fn plugin_file() -> Vec<UnmatchedGroup> {
+        vec![UnmatchedGroup {
+            collector: "fivem_dir".to_owned(),
+            observations: vec![Observation {
+                collector: "fivem_dir".to_owned(),
+                fields: [(
+                    "path".to_owned(),
+                    serde_json::Value::from(
+                        r"C:\Users\a\AppData\Local\FiveM\FiveM.app\plugins\overlay.dll",
+                    ),
+                )]
+                .into(),
+            }],
+        }]
+    }
+
+    /// What the collectors saw that no rule matched is listed after the evidence and after the own
+    /// traces, in a section of its own that says these are not findings (ADR 0014).
+    #[test]
+    fn unmatched_observations_are_rendered_in_their_own_section() {
+        let (mut report, bundle) = report(false);
+        report.unmatched = plugin_file();
+        let view = view::for_mode(&report, Mode::SelfCheck);
+        let text = render(&view, &bundle, Lang::En);
+
+        let (above, section) = text
+            .split_once("unmatched observations")
+            .expect("the unmatched section is announced");
+        // Nothing about the file appears among the evidence above it.
+        assert!(!above.contains("overlay.dll"), "{above}");
+        assert!(section.contains("overlay.dll"), "{section}");
+        assert!(section.contains("fivem_dir"), "{section}");
+
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(thai.contains("ไม่ตรง rule ใดเลย"), "{thai}");
+    }
+
+    /// SS mode says how many there were and names none of them: a raw listing of what a collector
+    /// saw is exactly what that mode promises not to show (ADR 0014).
+    #[test]
+    fn ss_mode_counts_unmatched_observations_without_listing_them() {
+        let (mut report, bundle) = report(false);
+        report.unmatched = plugin_file();
+        let text = render(&view::for_mode(&report, Mode::Ss), &bundle, Lang::En);
+        assert!(!text.contains("overlay.dll"), "{text}");
+        assert!(text.contains("unmatched observations 1"), "{text}");
+    }
+
+    #[test]
+    fn no_unmatched_section_when_every_observation_matched_a_rule() {
+        let (report, bundle) = report(false);
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(!text.contains("unmatched observations"), "{text}");
     }
 
     #[test]
