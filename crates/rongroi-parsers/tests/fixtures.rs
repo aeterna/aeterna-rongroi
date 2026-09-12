@@ -157,7 +157,7 @@ fn every_evtx_fixture_parses_and_seeds_the_fuzz_target() {
         .flatten()
     {
         let path = entry.path();
-        if !path.extension().is_some_and(|kind| kind == "evtx") {
+        if path.extension().is_none_or(|kind| kind != "evtx") {
             continue;
         }
         let name = path
