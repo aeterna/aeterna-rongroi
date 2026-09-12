@@ -33,7 +33,7 @@ debug = 1
 # libFuzzer harnesses with `#![no_main]`, not ordinary binaries.
 #
 # The names are snake_case, which is cargo-fuzz's convention and the name `cargo fuzz run <target>`
-# takes, so cargo warns four times that a binary "should have a kebab-case name". Renaming them would
+# takes, so cargo warns five times that a binary "should have a kebab-case name". Renaming them would
 # silence the warning and break every documented command; the warnings are expected here.
 
 [[bin]]
@@ -60,6 +60,13 @@ bench = false
 [[bin]]
 name = "fuzz_filetime"
 path = "fuzz_targets/fuzz_filetime.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_prefetch"
+path = "fuzz_targets/fuzz_prefetch.rs"
 test = false
 doc = false
 bench = false
