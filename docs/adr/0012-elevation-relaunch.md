@@ -1,6 +1,6 @@
 # ADR 0012 — Restarting with administrator rights
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-12
 
 ## Context

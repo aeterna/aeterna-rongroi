@@ -1,6 +1,6 @@
 # ADR 0011 — Native system and TPM sources
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-12
 
 ## Context

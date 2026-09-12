@@ -1,13 +1,15 @@
 # ADR 0008 — Release pipeline and release page
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-11
 
 ## Context
 
 ADR 0007 and the README promise two things that only a release can provide: executables built with the
 official-build marker, and a `SHA256SUMS` file on the GitHub release page that staff compare against during a
-screenshare. No release workflow exists yet, and the repository has no tags or releases.
+screenshare. No release workflow existed when this was written, and the repository had no tags or releases.
+The workflow decided below has since been built and has published 0.1.0 as `v2026.09.11-0.1.0`; what the
+rehearsal before it found is recorded under Consequences.
 
 The people who download a release are server staff and players on Windows 10 22H2 or Windows 11. They need to
 get the right file, check that it is the published one, and understand why Windows may warn about it. Releases

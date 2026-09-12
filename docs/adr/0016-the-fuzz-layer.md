@@ -1,6 +1,6 @@
 # ADR 0016 — The fuzz layer
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-12
 
 ## Context
