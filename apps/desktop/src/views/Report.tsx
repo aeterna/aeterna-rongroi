@@ -61,6 +61,12 @@ export function Report({ mode, onBack }: Props) {
         )}
       </dl>
 
+      {/* A fact about the scan, not one about the machine, and the one unmeasured reason with a
+          remedy — so it is stated once here rather than on every rule it stopped (ADR 0027). */}
+      {view.scope.not_admin > 0 && (
+        <p className="scope">{t("scope.not_admin", { checks: view.scope.not_admin })}</p>
+      )}
+
       {view.evidence.length === 0 && <p>{t("empty")}</p>}
       <ul className="evidence">
         {view.evidence.map((item) => (
@@ -108,7 +114,8 @@ export function Report({ mode, onBack }: Props) {
         <p className="muted">
           {t("hidden", {
             notFound: view.hidden.not_found,
-            unmeasured: view.hidden.unmeasured,
+            unmeasuredExpected: view.hidden.unmeasured_expected,
+            unmeasuredUnexpected: view.hidden.unmeasured_unexpected,
             unmatched: view.hidden.unmatched,
           })}
         </p>
@@ -131,6 +138,9 @@ function fieldsOf(observation: Observation): string {
 function EvidenceRow({ item, text }: { item: Evidence; text: RuleText | undefined }) {
   const { t } = useTranslation("report");
   let detail: string;
+  // A reason the rule itself declared in `unmeasured_when` is a different statement from one it did
+  // not, and the reason alone does not tell them apart (ADR 0027).
+  let stateKey: string = item.state;
   switch (item.state) {
     case "found":
       detail = item.observations.map(fieldsOf).join(", ");
@@ -141,11 +151,15 @@ function EvidenceRow({ item, text }: { item: Evidence; text: RuleText | undefine
       break;
     case "unmeasured":
       detail = t(`reason.${item.reason}`);
+      stateKey = item.expected ? "unmeasured_expected" : "unmeasured_unexpected";
       break;
   }
+  // What the rule means and what it does not prove goes beside every state; what legitimately
+  // produces the same evidence goes beside a match, where there is something to explain (ADR 0027).
+  const falsepositives = item.state === "found" ? (text?.falsepositives ?? []) : [];
   return (
     <li className={`evidence-${item.state}`}>
-      <span className="state">{t(`state.${item.state}`)}</span>{" "}
+      <span className="state">{t(`state.${stateKey}`)}</span>{" "}
       <span className="title">
         {t("check")}: {text?.title ?? item.rule_id}
       </span>{" "}
@@ -153,6 +167,21 @@ function EvidenceRow({ item, text }: { item: Evidence; text: RuleText | undefine
         ({t(`strength.${item.strength}`)}, {item.collector})
       </span>
       <div className="detail">{detail}</div>
+      {text?.description && (
+        <p className="description">
+          {t("description")}: {text.description}
+        </p>
+      )}
+      {falsepositives.length > 0 && (
+        <div className="falsepositives">
+          <p className="muted">{t("falsepositives")}:</p>
+          <ul>
+            {falsepositives.map((cause) => (
+              <li key={cause}>{cause}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </li>
   );
 }

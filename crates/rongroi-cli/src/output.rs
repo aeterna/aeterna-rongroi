@@ -43,10 +43,27 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::Th, "found") => "เจอ",
         (Lang::En, "not_found") => "NOT FOUND",
         (Lang::Th, "not_found") => "ไม่เจอ",
-        (Lang::En, "unmeasured") => "NOT MEASURED",
-        (Lang::Th, "unmeasured") => "ยังไม่ได้วัด",
         (Lang::En, "hidden") => "Hidden in SS mode",
         (Lang::Th, "hidden") => "ซ่อนในโหมด SS",
+        (Lang::En, "unmeasured_expected") => "NOT MEASURED (expected here)",
+        (Lang::Th, "unmeasured_expected") => "ยังไม่ได้วัด (เป็นเรื่องปกติของเครื่องนี้)",
+        (Lang::En, "unmeasured_unexpected") => "NOT MEASURED (not expected)",
+        (Lang::Th, "unmeasured_unexpected") => "ยังไม่ได้วัด (ไม่ได้คาดไว้)",
+        // The rule's own description, beside every state: it says what the check means and what it
+        // does not prove, which is the sentence that stops a single row being read as a verdict.
+        (Lang::En, "description") => "About this check",
+        (Lang::Th, "description") => "เกี่ยวกับการตรวจนี้",
+        // NIST SP 800-86 section 3.4's alternative explanations, beside a `found` row only.
+        (Lang::En, "falsepositives") => "Ordinary things that also produce this",
+        (Lang::Th, "falsepositives") => "เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน",
+        (Lang::En, "scope_not_admin") => {
+            "Scope: {n} check(s) could not be answered because this scan does not have administrator \
+             rights. Running it again as administrator answers them."
+        }
+        (Lang::Th, "scope_not_admin") => {
+            "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะการสแกนครั้งนี้ไม่มีสิทธิ์ผู้ดูแลระบบ \
+             เปิดใหม่ด้วยสิทธิ์ผู้ดูแลระบบแล้วจะตอบได้"
+        }
         (Lang::En, "own_traces") => "own traces (excluded)",
         (Lang::Th, "own_traces") => "ร่องรอยของโปรแกรมนี้เอง (แยกออกแล้ว)",
         (Lang::En, "own_traces_note") => {
@@ -192,8 +209,46 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     if let Some(sha) = &provenance.exe_sha256 {
         let _ = writeln!(out, "exe sha256: {sha}");
     }
+    // Above the evidence, because it is a fact about the scan and not about the machine, and
+    // because a reviewer who has made up their mind by the third row never reaches a footer
+    // (ADR 0027).
+    if view.scope.not_admin > 0 {
+        let _ = writeln!(
+            out,
+            "{}",
+            text(lang, "scope_not_admin").replace("{n}", &view.scope.not_admin.to_string())
+        );
+    }
     out.push('\n');
 
+    out.push_str(&evidence_section(view, bundle, lang));
+
+    // Both sections come after the evidence and clearly apart from it, in this order.
+    out.push_str(&own_traces_section(view, lang));
+    out.push_str(&unmatched_section(view, lang));
+
+    if view.mode == Mode::Ss {
+        let _ = writeln!(
+            out,
+            "\n{}: {} {} · {} {} · {} {} · {} {}",
+            text(lang, "hidden"),
+            text(lang, "not_found"),
+            view.hidden.not_found,
+            text(lang, "unmeasured_expected"),
+            view.hidden.unmeasured_expected,
+            text(lang, "unmeasured_unexpected"),
+            view.hidden.unmeasured_unexpected,
+            text(lang, "unmatched"),
+            view.hidden.unmatched
+        );
+    }
+    let _ = writeln!(out, "\n{}", text(lang, "footer"));
+    out
+}
+
+/// The evidence, one entry at a time, each with the rule's own text.
+fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
+    let mut out = String::new();
     // A rule title states what the rule looks for, not what was seen; say so for every state.
     let check = match lang {
         Lang::En => "check",
@@ -216,10 +271,22 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
             // The report keeps the English source text; the rule text carries the translation.
             EvidenceState::NotFound { retention } => (
                 text(lang, "not_found"),
-                rule_text.map_or_else(|| retention.clone(), |t| t.retention),
+                rule_text
+                    .as_ref()
+                    .map_or_else(|| retention.clone(), |t| t.retention.clone()),
             ),
-            EvidenceState::Unmeasured { reason: why } => {
-                (text(lang, "unmeasured"), reason(lang, *why).to_owned())
+            EvidenceState::Unmeasured {
+                reason: why,
+                expected,
+            } => {
+                // A reason the rule itself named is a different statement from one it did not, and
+                // a reader cannot tell them apart from the reason alone (ADR 0027).
+                let label = if *expected {
+                    text(lang, "unmeasured_expected")
+                } else {
+                    text(lang, "unmeasured_unexpected")
+                };
+                (label, reason(lang, *why).to_owned())
             }
         };
         let _ = writeln!(
@@ -231,26 +298,28 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         if !detail.is_empty() {
             let _ = writeln!(out, "    {detail}");
         }
+        // What the rule means and what it does not prove, beside every state; what legitimately
+        // produces the same evidence, beside a match only. Both are mandatory in every rule and
+        // neither reached a screen before (ADR 0027).
+        if let Some(rule_text) = &rule_text {
+            if !rule_text.description.is_empty() {
+                let _ = writeln!(
+                    out,
+                    "    {}: {}",
+                    text(lang, "description"),
+                    rule_text.description
+                );
+            }
+            if matches!(evidence.state, EvidenceState::Found { .. })
+                && !rule_text.falsepositives.is_empty()
+            {
+                let _ = writeln!(out, "    {}:", text(lang, "falsepositives"));
+                for cause in &rule_text.falsepositives {
+                    let _ = writeln!(out, "      - {cause}");
+                }
+            }
+        }
     }
-
-    // Both sections come after the evidence and clearly apart from it, in this order.
-    out.push_str(&own_traces_section(view, lang));
-    out.push_str(&unmatched_section(view, lang));
-
-    if view.mode == Mode::Ss {
-        let _ = writeln!(
-            out,
-            "\n{}: {} {} · {} {} · {} {}",
-            text(lang, "hidden"),
-            text(lang, "not_found"),
-            view.hidden.not_found,
-            text(lang, "unmeasured"),
-            view.hidden.unmeasured,
-            text(lang, "unmatched"),
-            view.hidden.unmatched
-        );
-    }
-    let _ = writeln!(out, "\n{}", text(lang, "footer"));
     out
 }
 
@@ -487,6 +556,98 @@ mod tests {
         let (report, bundle) = report(false);
         let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
         assert!(!text.contains("unmatched observations"), "{text}");
+    }
+
+    /// A match shown without what else produces it is a match shown as an accusation. Both halves
+    /// are mandatory in every rule, both are translated, and neither reached a screen before
+    /// (NIST SP 800-86 section 3.4, ADR 0027).
+    #[test]
+    fn a_found_entry_shows_its_description_and_its_false_positives() {
+        let (report, bundle) = report(false);
+        let rule = &bundle.rules()[0].rule;
+        let view = view::for_mode(&report, Mode::SelfCheck);
+
+        let english = render(&view, &bundle, Lang::En);
+        assert!(english.contains("About this check"), "{english}");
+        assert!(english.contains(&rule.description), "{english}");
+        assert!(
+            english.contains("Ordinary things that also produce this"),
+            "{english}"
+        );
+        for cause in &rule.falsepositives {
+            assert!(english.contains(cause), "{english}");
+        }
+
+        let thai = render(&view, &bundle, Lang::Th);
+        let translated = bundle.text(&rule.id, "th").expect("the rule is translated");
+        assert!(thai.contains("เกี่ยวกับการตรวจนี้"), "{thai}");
+        assert!(thai.contains(&translated.description), "{thai}");
+        for cause in &translated.falsepositives {
+            assert!(thai.contains(cause), "{thai}");
+        }
+        // The English text is not shown alongside it.
+        assert!(!thai.contains(&rule.description), "{thai}");
+    }
+
+    /// `description` says what the check is, which a reader needs whatever the answer was.
+    /// `falsepositives` explains a match, and nothing matched here, so there is nothing to explain.
+    #[test]
+    fn a_not_found_entry_shows_the_description_and_not_the_false_positives() {
+        let (mut report, bundle) = report(false);
+        let rule = bundle.rules()[0].rule.clone();
+        report.evidence[0].state = EvidenceState::NotFound {
+            retention: rule.retention.clone(),
+        };
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(text.contains(&rule.description), "{text}");
+        assert!(
+            !text.contains("Ordinary things that also produce this"),
+            "{text}"
+        );
+        for cause in &rule.falsepositives {
+            assert!(!text.contains(cause), "{text}");
+        }
+    }
+
+    /// Two rules that could not be measured for want of administrator rights are one fact about the
+    /// scan. It is stated once, above the evidence, and it names the remedy (ADR 0012, ADR 0027).
+    #[test]
+    fn missing_administrator_rights_is_one_scope_statement_above_the_evidence() {
+        let (mut report, bundle) = report(false);
+        let first = report.evidence[0].clone();
+        report.evidence = vec![first.clone(), first];
+        for item in &mut report.evidence {
+            item.state = EvidenceState::Unmeasured {
+                reason: rongroi_core::model::UnmeasuredReason::NotAdmin,
+                expected: false,
+            };
+        }
+        let view = view::for_mode(&report, Mode::SelfCheck);
+
+        let text = render(&view, &bundle, Lang::En);
+        let (scope, below) = text
+            .split_once("Scope: 2 check(s)")
+            .expect("the scope statement is printed once, with the count");
+        assert!(scope.contains("mode: self"), "{scope}");
+        assert!(!below.contains("Scope: "), "{below}");
+        assert!(below.contains("[NOT MEASURED (not expected)]"), "{below}");
+
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(thai.contains("ขอบเขตการตรวจ: มี 2 รายการ"), "{thai}");
+    }
+
+    /// A reason the rule named and a reason it did not are different statements, and the reason
+    /// alone does not tell them apart (ADR 0027).
+    #[test]
+    fn an_expected_unmeasured_result_is_labelled_apart_from_an_unexpected_one() {
+        let (mut report, bundle) = report(false);
+        report.evidence[0].state = EvidenceState::Unmeasured {
+            reason: rongroi_core::model::UnmeasuredReason::SourceMissing,
+            expected: true,
+        };
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(text.contains("[NOT MEASURED (expected here)]"), "{text}");
+        assert!(!text.contains("(not expected)"), "{text}");
     }
 
     #[test]

@@ -27,6 +27,12 @@ const RULE_ID = "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7";
 const ENGLISH_RETENTION =
   "Current setting only. It says nothing about how the PC was configured in the past.";
 const THAI_RETENTION = "เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร";
+// Both are mandatory in every rule and CI rejects a rule that leaves either empty, so the mock
+// carries them the way the real bundle does (ADR 0027).
+const ENGLISH_DESCRIPTION = "Windows reports that UEFI Secure Boot is off.";
+const THAI_DESCRIPTION = "Windows รายงานว่า UEFI Secure Boot ปิดอยู่";
+const ENGLISH_FALSEPOSITIVE = "PCs that boot in legacy BIOS or CSM mode";
+const THAI_FALSEPOSITIVE = "เครื่องที่บูตแบบ legacy BIOS หรือ CSM";
 const selfView = snapshot("secure_boot_off_self_view");
 const ssView = snapshot("secure_boot_off_ss_view");
 let calls: string[] = [];
@@ -54,8 +60,8 @@ beforeEach(async () => {
         return {
           [RULE_ID]: {
             title: payload.lang === "th" ? "Secure Boot ถูกปิดอยู่" : "Secure Boot is turned off",
-            description: "",
-            falsepositives: [],
+            description: payload.lang === "th" ? THAI_DESCRIPTION : ENGLISH_DESCRIPTION,
+            falsepositives: [payload.lang === "th" ? THAI_FALSEPOSITIVE : ENGLISH_FALSEPOSITIVE],
             retention: payload.lang === "th" ? THAI_RETENTION : ENGLISH_RETENTION,
           },
         };
@@ -104,7 +110,7 @@ describe("App", () => {
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 0 not measured · 0 unmatched observations",
+        "Hidden in SS mode: 1 not found · 0 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -201,6 +207,106 @@ describe("App", () => {
     // The evidence proves the view arrived, so the section is absent by choice and not by timing.
     await screen.findByText("Check: Secure Boot is turned off");
     expect(screen.queryByRole("region", { name: "Unmatched observations" })).toBeNull();
+  });
+
+  // A match shown without what else produces it is a match shown as an accusation. Both halves are
+  // written in every rule and translated, and neither reached a screen before (ADR 0027).
+  it("shows a found entry's description and its false positives", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Check: Secure Boot is turned off");
+    expect(screen.getByText(`About this check: ${ENGLISH_DESCRIPTION}`)).toBeTruthy();
+    expect(screen.getByText("Ordinary things that also produce this:")).toBeTruthy();
+    expect(screen.getByText(ENGLISH_FALSEPOSITIVE)).toBeTruthy();
+  });
+
+  it("shows a found entry's description and its false positives in Thai", async () => {
+    render(<App />);
+    await act(async () => {
+      await i18n.changeLanguage("th");
+    });
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    await screen.findByText("ตรวจ: Secure Boot ถูกปิดอยู่");
+    expect(screen.getByText(`เกี่ยวกับการตรวจนี้: ${THAI_DESCRIPTION}`)).toBeTruthy();
+    expect(screen.getByText("เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน:")).toBeTruthy();
+    expect(screen.getByText(THAI_FALSEPOSITIVE)).toBeTruthy();
+  });
+
+  // `description` says what the check is, which a reader needs whatever the answer was;
+  // `falsepositives` explains a match, and nothing matched.
+  it("shows the description but no false positives beside a not-found entry", async () => {
+    const first = selfView.evidence[0];
+    if (!first) {
+      throw new Error("the self-view snapshot has no evidence");
+    }
+    viewOverride = {
+      ...selfView,
+      evidence: [
+        {
+          rule_id: first.rule_id,
+          collector: first.collector,
+          strength: first.strength,
+          state: "not_found",
+          retention: ENGLISH_RETENTION,
+        },
+      ],
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText(`About this check: ${ENGLISH_DESCRIPTION}`)).toBeTruthy();
+    expect(screen.queryByText("Ordinary things that also produce this:")).toBeNull();
+    expect(screen.queryByText(ENGLISH_FALSEPOSITIVE)).toBeNull();
+  });
+
+  // The whole of what `unmeasured_when` does to a view: a reason the rule named is a number, a
+  // reason it did not name is a row (ADR 0027).
+  it("lists the unmeasured result its rule did not expect and counts the one it did", async () => {
+    const first = selfView.evidence[0];
+    if (!first) {
+      throw new Error("the self-view snapshot has no evidence");
+    }
+    viewOverride = {
+      ...ssView,
+      evidence: [
+        {
+          rule_id: first.rule_id,
+          collector: first.collector,
+          strength: first.strength,
+          state: "unmeasured",
+          reason: "read_failed",
+          expected: false,
+        },
+      ],
+      hidden: { ...ssView.hidden, unmeasured_expected: 3 },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(await screen.findByText("Not measured (not expected)")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Hidden in SS mode: 1 not found · 3 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
+      ),
+    ).toBeTruthy();
+  });
+
+  // One fact about the scan that applies to every rule at once, and the one unmeasured reason with
+  // a remedy, so it is stated once above the evidence (ADR 0012, ADR 0027).
+  it("states missing administrator rights once, above the evidence", async () => {
+    viewOverride = { ...selfView, scope: { not_admin: 2 } };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const statements = await screen.findAllByText(/could not be answered because this scan/);
+    expect(statements).toHaveLength(1);
+    expect(statements[0]?.textContent).toContain("2 check(s)");
+  });
+
+  it("states nothing about administrator rights when every check was answerable", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    // The evidence proves the view arrived, so the statement is absent by choice and not by timing.
+    await screen.findByText("Check: Secure Boot is turned off");
+    expect(screen.queryByText(/could not be answered because this scan/)).toBeNull();
   });
 
   it("shows the look-back note of not-found evidence in the chosen language", async () => {
