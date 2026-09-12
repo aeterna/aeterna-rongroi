@@ -215,6 +215,13 @@ here bounds the second direction: `check-baseline` still fails only on `Found`, 
 every reason its collector can give is invisible to CI. Extending `check-baseline` to bound SS-listed
 `unmeasured` is the research brief's §6.6 and is not in this change.
 
+That second direction is not hypothetical: **all four shipped rules already declare `read_failed`**, and
+three of them `access_denied`, in lines written when nothing read the field. From this change on those
+lines have teeth, so a registry read that genuinely failed is counted rather than listed in SS mode. That
+is a defensible reading of `read_failed` for a posture check on a machine the tool cannot always see into,
+and it is also exactly the silence described above — it was not re-derived for this change, and whether
+each of those four declarations is still what its author meant is an open question.
+
 **Nothing was measured about whether the longer rows are read.** Every evidence row is now two to six
 lines instead of two, which is the opposite of the "reports people skim" failure this project worries
 about. The judgement that the alternatives are worth the length is taken from NIST SP 800-86 §3.4 and
