@@ -14,6 +14,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   section of its own — in both Self and SS mode, because hiding "this was us" from the person watching a
   screenshare would tell them less. The section is new in the CLI output and in the desktop report, and
   `own_traces` is a new, additive field of the report format (ADR 0010).
+- `rongroi-parsers`: a new crate that turns Windows artifact bytes into plain Rust structs, with its
+  first two parsers — BAM registry values and the PCA text files. Parsers are pure (no OS calls, no
+  `Host`, no clock, no panic on any input), so they are tested on macOS and Linux as well as Windows.
+  A PCA file with a malformed line returns the lines that parsed alongside an account of the ones that
+  did not, and bytes whose meaning no public source establishes are kept rather than named or dropped
+  (ADR 0013).
 - `posture` collector: Windows test signing, memory integrity (HVCI) and whether a TPM is present, beside
   the Secure Boot state it already read. Memory integrity is read from the configured policy in the
   registry, which says what Windows was told to enforce and not that the hypervisor is enforcing it; a
