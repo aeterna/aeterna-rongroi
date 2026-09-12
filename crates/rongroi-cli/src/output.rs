@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 
 use clap::ValueEnum;
 use rongroi_core::bundle::Bundle;
-use rongroi_core::model::{EvidenceState, Mode, UnmeasuredReason};
+use rongroi_core::model::{EvidenceState, Mode, Observation, UnmeasuredReason};
 use rongroi_core::view::ReportView;
 
 /// Output language.
@@ -233,48 +233,9 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         }
     }
 
-    // After the evidence and clearly apart from it: this is what the program itself left in what the
-    // collectors saw, and it is shown in both modes (ADR 0010).
-    if !view.own_traces.is_empty() {
-        let _ = writeln!(
-            out,
-            "\n{} — {}",
-            text(lang, "own_traces"),
-            text(lang, "own_traces_note")
-        );
-        for entry in &view.own_traces {
-            let fields = entry
-                .observation
-                .fields
-                .iter()
-                .map(|(k, v)| format!("{k}={}", plain(v)))
-                .collect::<Vec<_>>()
-                .join(", ");
-            let _ = writeln!(out, "    [{}] {fields}", entry.collector);
-        }
-    }
-
-    // After the evidence and after the own traces: what the collectors saw that no rule matched.
-    // Self mode lists these; in SS mode the list is empty and they are counted below (ADR 0014).
-    if !view.unmatched.is_empty() {
-        let _ = writeln!(
-            out,
-            "\n{} — {}",
-            text(lang, "unmatched"),
-            text(lang, "unmatched_note")
-        );
-        for group in &view.unmatched {
-            for observation in &group.observations {
-                let fields = observation
-                    .fields
-                    .iter()
-                    .map(|(k, v)| format!("{k}={}", plain(v)))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let _ = writeln!(out, "    [{}] {fields}", group.collector);
-            }
-        }
-    }
+    // Both sections come after the evidence and clearly apart from it, in this order.
+    out.push_str(&own_traces_section(view, lang));
+    out.push_str(&unmatched_section(view, lang));
 
     if view.mode == Mode::Ss {
         let _ = writeln!(
@@ -290,6 +251,60 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         );
     }
     let _ = writeln!(out, "\n{}", text(lang, "footer"));
+    out
+}
+
+/// One observation as `field=value, field=value`, the way both trailing sections list it.
+fn fields_of(observation: &Observation) -> String {
+    observation
+        .fields
+        .iter()
+        .map(|(k, v)| format!("{k}={}", plain(v)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// What this program itself left in what the collectors saw. Shown in both modes (ADR 0010).
+fn own_traces_section(view: &ReportView, lang: Lang) -> String {
+    let mut out = String::new();
+    if view.own_traces.is_empty() {
+        return out;
+    }
+    let _ = writeln!(
+        out,
+        "\n{} — {}",
+        text(lang, "own_traces"),
+        text(lang, "own_traces_note")
+    );
+    for entry in &view.own_traces {
+        let _ = writeln!(
+            out,
+            "    [{}] {}",
+            entry.collector,
+            fields_of(&entry.observation)
+        );
+    }
+    out
+}
+
+/// What the collectors saw that no rule matched. Self mode lists these; in SS mode the list arrives
+/// empty and they appear only as a number in the hidden line (ADR 0014).
+fn unmatched_section(view: &ReportView, lang: Lang) -> String {
+    let mut out = String::new();
+    if view.unmatched.is_empty() {
+        return out;
+    }
+    let _ = writeln!(
+        out,
+        "\n{} — {}",
+        text(lang, "unmatched"),
+        text(lang, "unmatched_note")
+    );
+    for group in &view.unmatched {
+        for observation in &group.observations {
+            let _ = writeln!(out, "    [{}] {}", group.collector, fields_of(observation));
+        }
+    }
     out
 }
 
