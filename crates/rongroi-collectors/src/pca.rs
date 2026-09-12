@@ -31,11 +31,12 @@
 use std::collections::BTreeMap;
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, SourceError};
+use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
 use rongroi_parsers::pca::{self, PcaLaunchEntry};
 
 use crate::Collector;
+use crate::failure::{read_failure, reason_for};
 
 /// Environment variable holding the Windows directory.
 pub const WINDOWS_DIR: &str = "WinDir";
@@ -256,15 +257,6 @@ fn status(source: &str, read: &'static str) -> Observation {
     }
 }
 
-/// Value of the `read` field for a file whose bytes never arrived.
-fn read_failure(error: &SourceError) -> &'static str {
-    match error {
-        SourceError::AccessDenied => "access_denied",
-        SourceError::TooLarge { .. } => "too_large",
-        SourceError::Unsupported(_) | SourceError::Failed(_) => "failed",
-    }
-}
-
 /// Value of the `read` field for a file whose bytes arrived and are not this artifact.
 ///
 /// Finer than the `gaps` reason on purpose: a reviewer needs to tell "Windows would not let me read
@@ -274,24 +266,6 @@ fn parse_failure(error: &ParseError) -> &'static str {
     match error {
         ParseError::Truncated { .. } => "truncated",
         ParseError::Malformed { .. } => "not_pca_text",
-    }
-}
-
-/// How a failed source read is reported.
-///
-/// Denial is split by whether this program could have used administrator rights, which is what makes
-/// the CLI's and the app's restart-as-administrator offer worth taking (ADR 0012). The attempt comes
-/// first and the classification second, so a machine where the folder happens to be readable without
-/// them is read.
-fn reason_for(host: &dyn Host, error: &SourceError) -> UnmeasuredReason {
-    match error {
-        SourceError::AccessDenied if host.is_elevated() == Some(false) => {
-            UnmeasuredReason::NotAdmin
-        }
-        SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
-        SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
-            UnmeasuredReason::ReadFailed
-        }
     }
 }
 

@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows with no Prefetch folder at all: Prefetch is switched off by policy, or this installation
+# never had it. `%SystemRoot%` is set, so the collector had somewhere to look and looked.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows': []

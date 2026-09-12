@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A Prefetch folder holding one file from an older Windows: SCCA version 26, which this parser does
+# not decode and must never decode with version 30 offsets (ADR 0015). A machine that was upgraded
+# in place can carry such a file, so it is a legitimate input and not a tamper signal on its own.
+# The bytes are the vendored Windows 8.1 corpus file, which carries system paths only.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: CMD.EXE-4A81B364.pf
+      from: '../../prefetch/win81-raw-v26-CMD.EXE-4A81B364.pf'
