@@ -26,12 +26,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   ignore for RUSTSEC-2021-0153 that states the exposure rather than waving it away (ADR 0018).
 - The `evtx` crate is **vendored under `third_party/evtx/` with one patch**, rather than taken from the
   registry. Its binary-XML reader sized a `Vec` from a record's substitution count without bounding it
-  against the bytes remaining, so an ordinary 68 KiB Event Log reached a 7.7 GB allocation — measured,
-  not estimated. macOS survives it, since the reservation is lazy. Windows was not tested: there the
+  against the bytes remaining, so a **crafted** 68 KiB Event Log reached a 7.7 GB allocation — measured,
+  not estimated. Crafted matters: the input came out of `fuzz_evtx`, mutated from a well-formed sample,
+  and an unmodified Event Log does not do this. macOS survives it, since the reservation is lazy. Windows was not tested: there the
   commit is charged up front and a failed Rust allocation aborts uncatchably, so a machine without that
   much commit available would lose the process. Either way the size is chosen by the file and not by the
   program, which is what this crate's "never panics, never aborts" contract rules out. The patch bounds the reservation by the bytes the input could actually
-  contain and is being sent upstream; the directory goes away when a release carries it. Everything else
+  contain. It has **not** been sent upstream yet — filing into someone else's repository is the
+  owner's call; the directory goes away when an upstream release carries the fix. Everything else
   in it is byte-identical to the published crate and `third_party/evtx/PROVENANCE.md` says how to check
   that (ADR 0018).
 - `fuzz_evtx`, the fuzz layer's sixth target, seeded from the same `fixtures/evtx/` file the parser tests

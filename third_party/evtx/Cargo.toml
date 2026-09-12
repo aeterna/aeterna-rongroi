@@ -10,7 +10,9 @@
 #     upstream already means there is no build script, so `skeptic` went with them.
 #   - [profile.release], which cargo ignores outside a workspace root.
 # Every [dependencies] entry, every feature and every `auto*` key is upstream's, unchanged, so no
-# `cfg(feature = ...)` in the vendored source becomes unexpected.
+# `cfg(feature = ...)` in the vendored source becomes unexpected. No key is added — not `publish`, not
+# a lint, not a profile; the only additions are the comment lines you are reading. Removal is auditable
+# against the published manifest, whereas an addition hides in a file nobody diffs.
 
 [package]
 edition = "2024"
@@ -28,7 +30,6 @@ homepage = "https://github.com/omerbenamram/EVTX"
 readme = "README.md"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/omerbenamram/EVTX"
-publish = false
 
 [features]
 bench = []
