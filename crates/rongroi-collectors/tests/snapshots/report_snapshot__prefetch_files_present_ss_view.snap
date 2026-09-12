@@ -28,7 +28,7 @@ expression: view
       "collector": "evtx",
       "strength": "tamper",
       "state": "unmeasured",
-      "reason": "source_missing",
+      "reason": "source_absent",
       "expected": false
     },
     {
@@ -36,7 +36,7 @@ expression: view
       "collector": "evtx",
       "strength": "tamper",
       "state": "unmeasured",
-      "reason": "source_missing",
+      "reason": "source_absent",
       "expected": false
     }
   ],
