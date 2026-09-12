@@ -39,10 +39,15 @@ ordinary single-chunk `.evtx`, the smallest size the format comes in — reaches
     #12 rongroi_parsers::evtx::records
 ```
 
-On macOS this survives, because the reservation is lazy and the pages are never touched. On Windows it
-**aborts**: an abort is not an `Err`, is not catchable with `catch_unwind`, and kills the process.
-`crates/rongroi-parsers/src/lib.rs` states that a parser never panics and never aborts on any input,
-so shipping this would have made that sentence false on the one platform the tool runs on.
+On macOS this survives, because the reservation is lazy and the pages are never touched — measured, on
+the run quoted above.
+
+The Windows behaviour is **reasoned, not observed**: Windows charges commit up front rather than
+overcommitting, and a Rust allocation that fails calls `handle_alloc_error`, which aborts — not an
+`Err`, not catchable with `catch_unwind`. A machine without that much commit available loses the
+process; one with a large page file may not. This has not been run on Windows. Either way the
+allocation's size is chosen by the file, and `crates/rongroi-parsers/src/lib.rs` promises a parser never
+panics and never aborts on any input.
 
 The fix is two changes, and both use the idiom the same file already uses elsewhere — `read_sid_ref`
 and `read_sized_slice_aligned_in` both check the bytes remaining before allocating:

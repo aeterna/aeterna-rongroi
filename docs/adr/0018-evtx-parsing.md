@@ -54,10 +54,16 @@ file, the smallest an `.evtx` comes in, reaches:
     #12 rongroi_parsers::evtx::records
 ```
 
-7.7 GB. On macOS the reservation is lazy and the process survives; on Windows it **aborts**. An abort is
-not an `Err`, is not `catch_unwind`-able, and takes the process with it — and
-`crates/rongroi-parsers/src/lib.rs` states that a parser never panics and never aborts on any input.
-Shipping this would have made that sentence false on the one platform the tool is for.
+7.7 GB. On macOS the reservation is lazy and the process survives — that part is measured, on this
+machine, by the run quoted above.
+
+**The Windows half is reasoned, not observed.** Windows charges a commit up front instead of
+overcommitting, and a Rust allocation that fails calls `handle_alloc_error`, which aborts: not an `Err`,
+not `catch_unwind`-able, and it takes the process with it. So a Windows machine without 7.7 GB of commit
+available loses the process, while one with a large enough page file may simply succeed. This was not run
+on Windows. What *is* certain either way is that the size is chosen by the file rather than by the
+program, and `crates/rongroi-parsers/src/lib.rs` promises a parser never panics and never aborts on any
+input — a promise that cannot be kept while an attacker picks the allocation size.
 
 Four options were weighed:
 

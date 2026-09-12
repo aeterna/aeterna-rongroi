@@ -27,9 +27,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - The `evtx` crate is **vendored under `third_party/evtx/` with one patch**, rather than taken from the
   registry. Its binary-XML reader sized a `Vec` from a record's substitution count without bounding it
   against the bytes remaining, so an ordinary 68 KiB Event Log reached a 7.7 GB allocation — measured,
-  not estimated. That survives on macOS and **aborts on Windows**, and an abort is not an error a caller
-  can catch, which would have made this crate's "never panics, never aborts" contract false on the only
-  platform the tool runs on. The patch bounds the reservation by the bytes the input could actually
+  not estimated. macOS survives it, since the reservation is lazy. Windows was not tested: there the
+  commit is charged up front and a failed Rust allocation aborts uncatchably, so a machine without that
+  much commit available would lose the process. Either way the size is chosen by the file and not by the
+  program, which is what this crate's "never panics, never aborts" contract rules out. The patch bounds the reservation by the bytes the input could actually
   contain and is being sent upstream; the directory goes away when a release carries it. Everything else
   in it is byte-identical to the published crate and `third_party/evtx/PROVENANCE.md` says how to check
   that (ADR 0018).
