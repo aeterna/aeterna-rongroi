@@ -3,8 +3,9 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's own folders, the list of running processes, what the Program Compatibility Assistant and
-Windows Prefetch recorded about programs that ran and, in later versions, BAM and Windows event logs.
+FiveM's own folders, the list of running processes, what the Program Compatibility Assistant,
+Windows Prefetch and the Background Activity Moderator recorded about programs that ran and, in later
+versions, Windows event logs.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
@@ -16,6 +17,14 @@ some of them inside your own folders — and the disks it touched, including a s
 identifies your PC. None of that is reported, in either mode.** Replacing your user name inside those
 paths would not help: the list itself is a description of what is on your PC, and this check has no use
 for it. The report says so, rather than leaving you to notice it is missing.
+
+Of Windows' Background Activity Moderator it reads which programs ran and when. That record is kept
+**per user account**, and the account is named by a SID — an identifier of the account *and* of the
+Windows installation it belongs to. **No part of that SID is reported**, hashed or otherwise: the report
+says how many accounts had records and nothing else about them. The path of a program is reported only
+when it starts with a drive letter, because that is the only shape SS mode knows how to redact. A path
+written any other way can carry your account name with nothing to replace it, so it is withheld rather
+than shown — and the report says it was withheld, rather than leaving you to notice it is missing.
 
 The tool does **not** take screenshots, read browser history, access files unrelated to its collectors,
 or allow remote access.

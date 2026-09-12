@@ -33,6 +33,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- The `bam` collector: it enumerates the Background Activity Moderator's per-account keys under
+  `HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings` and reports, per registry value,
+  the program's name, when BAM last saw it run, the parser's moderation state and how many bytes the
+  value held — that last one because whether a value is still the documented 24 is the first sign of a
+  layout this repository has never confirmed on Windows 11. **No part of the account's SID goes out**,
+  hashed or otherwise: it identifies one account and one Windows installation, and the report says how
+  many accounts had records instead. A path is emitted only when it begins with a drive letter, the one
+  shape SS-mode redaction can reach. An absent BAM key is `source_missing`; a key that is there and
+  holds nothing is `values: 0`, a cleared execution history. No rule reads it yet (ADR 0023).
 - Hosts can enumerate the registry and read a value's bytes: `RegistrySource` gains `subkeys`,
   `value_names` and `read_bytes`, which is what BAM needs and what no other artifact does — its value
   *names* are executable paths and its value *data* is the artifact. A key or value that is not there
