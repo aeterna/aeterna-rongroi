@@ -9,7 +9,17 @@ use std::path::Path;
 
 use anyhow::bail;
 
-const SKIP_DIRS: &[&str] = &[".git", "target", "node_modules", "dist", "gen"];
+// `corpus` and `artifacts` hold inputs libFuzzer invented (fuzz/, ADR 0016). They are generated, not
+// committed, and a run that happens to produce a byte order mark must not fail this check.
+const SKIP_DIRS: &[&str] = &[
+    ".git",
+    "target",
+    "node_modules",
+    "dist",
+    "gen",
+    "corpus",
+    "artifacts",
+];
 const MAX_BYTES: u64 = 5 * 1024 * 1024;
 
 fn is_forbidden(c: char) -> bool {

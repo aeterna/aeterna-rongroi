@@ -7,6 +7,11 @@ resolver = "3"
 members = ["crates/*", "xtask", "apps/desktop/src-tauri"]
 # The desktop app needs webkit2gtk to build on Linux; plain `cargo` commands skip it, `--workspace` includes it.
 default-members = ["crates/*", "xtask"]
+# The fuzz targets are their own workspace and need nightly (cargo-fuzz drives libFuzzer through
+# `-Z sanitizer`). Excluding them is what keeps the 1.98.1 toolchain pinned in rust-toolchain.toml
+# building, linting and testing everything else exactly as before: `cargo clippy --all-targets` and
+# `cargo deny check` never see a nightly-only crate (ADR 0016).
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.1.0"

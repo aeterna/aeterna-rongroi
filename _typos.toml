@@ -3,4 +3,12 @@
 # Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
 [files]
-extend-exclude = ["LICENSES/", "*.snap", "Cargo.lock", "pnpm-lock.yaml"]
+# fuzz/corpus and fuzz/artifacts hold bytes libFuzzer invented; they are not prose and are not committed.
+extend-exclude = [
+  "LICENSES/",
+  "*.snap",
+  "Cargo.lock",
+  "pnpm-lock.yaml",
+  "fuzz/corpus/",
+  "fuzz/artifacts/",
+]

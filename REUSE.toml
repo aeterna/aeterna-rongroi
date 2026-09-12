@@ -14,6 +14,10 @@ path = [
   "**/*.json",
   "**/*.snap",
   "Cargo.lock",
+  "fuzz/Cargo.lock",
+  # Artifact bytes: a BAM registry value or a PCA text file is the artifact and nothing else, so it
+  # cannot carry a header. What they are and where they came from is in fixtures/parsers/PROVENANCE.md.
+  "fixtures/parsers/**",
   "pnpm-lock.yaml",
   "apps/desktop/pnpm-lock.yaml",
   "apps/desktop/pnpm-workspace.yaml",
