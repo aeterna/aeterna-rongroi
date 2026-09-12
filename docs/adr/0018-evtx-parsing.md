@@ -27,7 +27,7 @@ each carrying their own string table and template cache, and inside each record 
 dialect with templates, substitution arrays, per-chunk string interning and typed value variants.
 Writing that here would mean writing a template-substituting XML interpreter over attacker-controlled
 offsets, in a program whose whole job is to be correct about a hostile input. The `evtx` crate is
-`#![forbid(unsafe_code)]`, is on its 0.12 line with a decade of samples behind it, and already
+`#![forbid(unsafe_code)]`, is on its 0.12 line with a sample corpus going back to 2018, and already
 implements the record recovery around damaged chunks that this parser needs. Writing our own to avoid
 the dependency would be the larger risk, not the smaller one — the same conclusion ADR 0015 reached
 about Xpress-Huffman, reached again on a bigger format.
@@ -78,13 +78,22 @@ So: vendor, bound, upstream, delete when released. `sources ok` from `cargo deny
 path source in place — a path inside the repository is reviewable in the same pull request as the code
 that uses it, which is what `unknown-git = "deny"` is protecting against in the first place.
 
-The patch is two changes, and both follow the idiom the same file already uses — `read_sid_ref` and
-`read_sized_slice_aligned_in` each check the bytes remaining before allocating. The descriptor loop
+The patch is two changes, and both follow an idiom the crate already uses — in
+`src/utils/byte_cursor.rs`, `read_sid_ref` and `read_sized_slice_aligned_in` each check the bytes
+remaining before allocating. (They are in the cursor's own module, not in `tokens.rs` beside the
+defect; a reviewer told to look in "the same file" would not find them.) The descriptor loop
 consumes exactly four bytes per entry, so the reservation is capped at `bytes_remaining / 4`; the second
 allocation reserves `value_descriptors.len()`, which is known exactly by then. **What is reserved
 changes; what is accepted does not** — a truncated file still fails in the same loop with the same
-error. Every other `with_capacity` in the crate was checked: all are bounded by `EVTX_CHUNK_SIZE`, by a
-slice already in memory, or sit in the `wevt_templates` feature, which is off.
+error. The bound is *sound* on any buffer — it never exceeds what the input could hold — but its
+*tightness* rests on the buffer being one 64 KiB chunk, which `EvtxParser` guarantees and the crate's
+public API does not (`EvtxChunkData::new` takes a `Vec` of any length). So it is stated as "the bytes
+remaining" and never as a fixed 16 384.
+
+Every other `with_capacity` in the crate was checked. None is sized by an unchecked value from the
+file: they are bounded by `EVTX_CHUNK_SIZE`, by a slice already in memory, by a `u16` field, by an
+explicit bounds check three lines earlier (`ir.rs`'s template `data_size`), or they sit in the
+`wevt_templates` feature, which is off.
 
 `third_party/evtx/` is excluded from the workspace, from `typos`, and from this project's lints, and
 `REUSE.toml` annotates it under **upstream's** licence rather than ours. It is Omer Ben-Amram's code; a
@@ -307,8 +316,10 @@ duplicates a known-good chunk and breaks its signature in four lines.
 
 - `rongroi-parsers` gains two dependencies in its manifest, `evtx` and `serde_json`, and a
   substantially larger transitive tree than any previous parser brought — `sonic-rs`, `bumpalo`,
-  `winstructs`, `chrono`, `utf16-simd`, the `encoding-index-*` tables, and `skeptic` as a build
-  dependency of `evtx`. `cargo deny check`'s `licenses`, `bans` and `sources` all pass over it
+  `winstructs`, `chrono`, `utf16-simd` and the `encoding-index-*` tables. (An earlier draft named
+  `skeptic` here as a build dependency of `evtx`: true of the registry crate, not of the vendored one,
+  whose manifest drops `[build-dependencies]`. It is in no lockfile in this repository.)
+  `cargo deny check`'s `licenses`, `bans` and `sources` all pass over it
   unchanged; `advisories` passes only because of the entry above.
 - **`deny.toml` now carries a non-Tauri ignore**, the first. It is tied to one dependency and one
   upstream decision, and the reason field says what would end it.

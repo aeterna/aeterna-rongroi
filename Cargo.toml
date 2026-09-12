@@ -73,10 +73,11 @@ codegen-units = 1
 strip = "symbols"
 
 # The registry `evtx` 0.12.2 reserves a `Vec` from a record's substitution count without bounding it
-# against the bytes remaining, which a 68 KiB file turns into a 7.7 GB allocation — survivable on macOS,
-# an abort on Windows, and an abort is not something a caller can catch. `rongroi-parsers` promises it
-# never aborts on any input, so the crate is vendored with that one bound applied and the fix sent
-# upstream. `deny.toml` denies unknown *git* sources; a path source inside the repository is reviewable
+# against the bytes remaining, which a crafted 68 KiB file turns into a 7.7 GB allocation — measured on
+# macOS, where the reservation is lazy and the process survives. Windows was not tested; there the
+# commit is charged up front and a failed Rust allocation aborts uncatchably. Either way the size is
+# chosen by the file, and `rongroi-parsers` promises it never aborts on any input, so the crate is
+# vendored with that one bound applied. The fix has NOT been sent upstream yet. `deny.toml` denies unknown *git* sources; a path source inside the repository is reviewable
 # in the same PR as the code that uses it. Remove this the moment an upstream release carries the fix.
 # See docs/adr/0018-evtx-parsing.md and third_party/evtx/PROVENANCE.md.
 [patch.crates-io]

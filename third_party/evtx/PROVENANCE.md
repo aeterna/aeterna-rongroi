@@ -26,9 +26,13 @@ annotation would be a false claim.
 One function, `binxml::tokens::read_template_values_cursor`, in `src/binxml/tokens.rs`.
 
 `number_of_substitutions` is a `u32` read from the file and was used directly as a `Vec::with_capacity`
-argument, twice. Nothing bounded it against the bytes actually remaining. A 69 632-byte file — an
-ordinary single-chunk `.evtx`, the smallest size the format comes in — reaches a `malloc` of
-**7 717 636 096 bytes**, measured, not estimated:
+argument, twice. Nothing bounded it against the bytes actually remaining. A **crafted** 69 632-byte
+file — one chunk behind one header, the smallest an `.evtx` comes in — reaches a `malloc` of
+**7 717 636 096 bytes**, measured, not estimated.
+
+It is crafted, and that word is load-bearing: the input came out of `fuzz_evtx`, mutated from a
+well-formed sample. An unmodified Event Log does not do this, and saying "an ordinary file" would send
+anyone trying to reproduce it to a file that parses cleanly.
 
 ```
 ==20889== ERROR: libFuzzer: out-of-memory (malloc(7717636096))
@@ -49,13 +53,19 @@ process; one with a large page file may not. This has not been run on Windows. E
 allocation's size is chosen by the file, and `crates/rongroi-parsers/src/lib.rs` promises a parser never
 panics and never aborts on any input.
 
-The fix is two changes, and both use the idiom the same file already uses elsewhere — `read_sid_ref`
-and `read_sized_slice_aligned_in` both check the bytes remaining before allocating:
+The fix is two changes, and both use an idiom the crate already uses — in `src/utils/byte_cursor.rs`,
+`read_sid_ref` and `read_sized_slice_aligned_in` each check the bytes remaining before allocating.
+(They are in the cursor's own module, not in `tokens.rs` alongside the defect.)
 
 1. The descriptor loop consumes exactly four bytes per entry (`u16` + `u8` + `u8`), so a count larger
    than `bytes_remaining / 4` cannot be satisfied by this input. The reservation is capped at that.
    The loop itself is untouched, so a truncated file still fails exactly where and how it did before —
    this changes what is *reserved*, never what is *accepted*.
+
+   The bound is *sound* on any buffer: it never exceeds what the input could hold. How *tight* it is
+   depends on the buffer being one 64 KiB chunk, which `EvtxParser` guarantees but the crate's public
+   API does not — `EvtxChunkData::new` accepts a `Vec` of any length. State the bound as "the bytes
+   remaining", never as a fixed 16 384.
 2. The second allocation reserved from the same unchecked figure a second time. By that point the
    descriptors have been read, so the exact count is `value_descriptors.len()` and no bound is needed.
 
@@ -105,6 +115,10 @@ mkdir -p /tmp/evtx-check && tar xzf ~/.cargo/registry/cache/*/evtx-0.12.2.crate 
 
 # Only src/binxml/tokens.rs may differ, and only by the patch described above.
 diff -r -x bin -x benches /tmp/evtx-check/evtx-0.12.2/src third_party/evtx/src
+
+# The manifest is deliberately trimmed (see the table below), so it will differ — but only by
+# removals. Anything ADDED here is drift this file failed to record.
+diff -u /tmp/evtx-check/evtx-0.12.2/Cargo.toml third_party/evtx/Cargo.toml | grep '^+' | grep -v '^+++'
 diff -u /tmp/evtx-check/evtx-0.12.2/src/binxml/tokens.rs third_party/evtx/src/binxml/tokens.rs
 ```
 
