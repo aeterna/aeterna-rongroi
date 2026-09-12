@@ -26,6 +26,13 @@ members = ["."]
 libfuzzer-sys = "0.4"
 rongroi-parsers = { path = "../crates/rongroi-parsers" }
 
+# This is its own workspace, so the root `[patch.crates-io]` does not reach it and the patch has to be
+# repeated here. Without this stanza `fuzz_evtx` would build the unpatched registry `evtx` and would
+# keep finding the 7.7 GB allocation the vendored copy exists to bound — a fuzz gate testing code the
+# product does not ship. See ../Cargo.toml, ../third_party/evtx/PROVENANCE.md and ADR 0018.
+[patch.crates-io]
+evtx = { path = "../third_party/evtx" }
+
 [profile.release]
 debug = 1
 
@@ -33,8 +40,8 @@ debug = 1
 # libFuzzer harnesses with `#![no_main]`, not ordinary binaries.
 #
 # The names are snake_case, which is cargo-fuzz's convention and the name `cargo fuzz run <target>`
-# takes, so cargo warns five times that a binary "should have a kebab-case name". Renaming them would
-# silence the warning and break every documented command; the warnings are expected here.
+# takes, so cargo warns once per target that a binary "should have a kebab-case name". Renaming them
+# would silence the warning and break every documented command; the warnings are expected here.
 
 [[bin]]
 name = "fuzz_bam"
@@ -67,6 +74,13 @@ bench = false
 [[bin]]
 name = "fuzz_prefetch"
 path = "fuzz_targets/fuzz_prefetch.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_evtx"
+path = "fuzz_targets/fuzz_evtx.rs"
 test = false
 doc = false
 bench = false

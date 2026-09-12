@@ -27,12 +27,12 @@ cargo +nightly install --locked cargo-fuzz
 Then, from the repository root:
 
 ```bash
-cargo +nightly fuzz build                     # all five targets
+cargo +nightly fuzz build                     # all six targets
 cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam -- -max_total_time=60
 ```
 
-The targets are `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general`, `fuzz_filetime` and `fuzz_prefetch`
-(which seeds from `fixtures/prefetch/`). The seed corpus is the fixture directory the L0 tests read, and it
+The targets are `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`
+(which seeds from `fixtures/prefetch/`) and `fuzz_evtx` (from `fixtures/evtx/`). The seed corpus is the fixture directory the L0 tests read, and it
 comes **second** because libFuzzer writes what it finds to the first directory — the fixtures are an input,
 never an output. A crashing input is saved under
 `fuzz/artifacts/`; reproduce it with `cargo +nightly fuzz run <target> <that file>`.
@@ -41,6 +41,24 @@ never an output. A crashing input is saved under
 `cargo build`, `cargo clippy`, `cargo nextest run` or `cargo deny check` do (ADR 0016). CI runs each target
 for 30 seconds on every pull request, which is a smoke gate; a real campaign is a local run of minutes or
 hours when you change a parser.
+
+Being a separate workspace has one consequence that is easy to miss: a `[patch.crates-io]` entry in the
+root `Cargo.toml` does **not** reach `fuzz/`. `fuzz/Cargo.toml` repeats the `evtx` patch for that reason.
+A patch added in one place and not the other would leave the fuzz targets exercising a different
+dependency from the one the product ships — a green gate over code nobody runs.
+
+### Re-syncing the vendored `evtx`
+
+`third_party/evtx/` is the `evtx` crate's source with one patch applied: an allocation sized from a
+record's substitution count, bounded against the bytes actually remaining. The reasoning, the measured
+allocation, and a command that proves the rest of the directory is byte-identical to the published crate
+are in `third_party/evtx/PROVENANCE.md`; the decision is ADR 0018.
+
+It is meant to be temporary. When an upstream release carries the fix, delete the directory, delete both
+`[patch.crates-io]` stanzas, and bump the registry dependency. Until then, do not reformat it, do not
+apply this project's lints to it, and do not fix its spelling — `Cargo.toml`'s `exclude`, `_typos.toml`
+and `REUSE.toml` all hold it apart on purpose, so that the next person can verify it against upstream
+with a single `diff`.
 
 ## Three ways to contribute
 

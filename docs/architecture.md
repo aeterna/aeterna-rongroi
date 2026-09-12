@@ -42,7 +42,7 @@ The CLI and the desktop app both call `rongroi_collectors::scan::run`, so they c
 | `rongroi-core` | model, rule format and validation, embedded bundle, engine, views, provenance | — |
 | `rongroi-host` | `Host` and source traits, `NonWindowsHost`, `FixtureHost` (feature `fixture`) | — |
 | `rongroi-host-windows` | `LiveHost`: the only crate that calls Windows APIs or uses `unsafe` | `rongroi-host` |
-| `rongroi-parsers` | artifact formats decoded from bytes into plain structs (BAM, PCA, Prefetch): no OS calls, no `Host`, no clock (ADR 0013, ADR 0015) | — |
+| `rongroi-parsers` | artifact formats decoded from bytes into plain structs (BAM, PCA, Prefetch, EVTX): no OS calls, no `Host`, no clock (ADR 0013, ADR 0015, ADR 0018) | — |
 | `rongroi-collectors` | `Collector` trait, collectors, `scan::run` | core, host |
 | `rongroi-cli` | `aeterna-rongroi-cli` binary, no WebView | core, host, collectors, host-windows (Windows) |
 | `xtask` | scaffolding and project checks | core (feature `source-tree`) |

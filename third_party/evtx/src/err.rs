@@ -1,0 +1,214 @@
+use thiserror::Error;
+
+use crate::evtx_record::RecordId;
+use std::io;
+use std::path::Path;
+use winstructs::guid::Guid;
+
+/// This is the only `Result` type that should be exposed on public interfaces.
+pub type Result<T> = std::result::Result<T, EvtxError>;
+pub(crate) type DeserializationResult<T> = std::result::Result<T, crate::err::DeserializationError>;
+pub(crate) type EvtxChunkResult<T> = std::result::Result<T, crate::err::ChunkError>;
+
+#[derive(Debug, Error)]
+pub enum DeserializationError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+
+    /// An extra layer of error indirection to keep template GUID.
+    #[error("Failed to deserialize template `{template_id}`")]
+    FailedToDeserializeTemplate {
+        template_id: Guid,
+        source: Box<DeserializationError>,
+    },
+
+    /// While decoding ANSI strings, we might get an incorrect decoder, which will yield a special message.
+    #[error("Failed to decode ANSI string (encoding used: {encoding_used}) - `{inner_message}`")]
+    AnsiDecodeError {
+        encoding_used: &'static str,
+        inner_message: String,
+    },
+
+    #[error("Offset 0x{offset:08x}: Tried to read an invalid byte `0x{value:02x}` as binxml token")]
+    InvalidToken { value: u8, offset: u64 },
+
+    #[error(
+        "Offset 0x{offset:08x}: Tried to read an invalid byte `0x{value:2x}` as binxml value variant"
+    )]
+    InvalidValueVariant { value: u8, offset: u64 },
+
+    #[error("buffer too small for {what} at offset {offset} (need {need} bytes, have {have})")]
+    Truncated {
+        what: &'static str,
+        offset: u64,
+        need: usize,
+        have: usize,
+    },
+
+    #[error(
+        "Offset 0x{offset:08x}: WEVT inline name hash mismatch (expected 0x{expected:04x}, found 0x{found:04x})"
+    )]
+    WevtInlineNameHashMismatch {
+        expected: u16,
+        found: u16,
+        offset: u64,
+    },
+
+    #[error("Offset 0x{offset:08x}: WEVT inline name missing NUL terminator (found 0x{found:04x})")]
+    WevtInlineNameMissingNulTerminator { found: u16, offset: u64 },
+
+    #[error("An out-of-range date, invalid month and/or day")]
+    InvalidDateTimeError,
+
+    /// Assertion errors.
+    #[error("Invalid EVTX record header magic, expected `2a2a0000`, found `{magic:2X?}`")]
+    InvalidEvtxRecordHeaderMagic { magic: [u8; 4] },
+
+    #[error("Invalid EVTX chunk header magic, expected `ElfChnk0`, found `{magic:2X?}`")]
+    InvalidEvtxChunkMagic { magic: [u8; 8] },
+
+    #[error("Invalid EVTX file header magic, expected `ElfFile0`, found `{magic:2X?}`")]
+    InvalidEvtxFileHeaderMagic { magic: [u8; 8] },
+
+    #[error("Unknown EVTX record header flags value: {value}")]
+    UnknownEvtxHeaderFlagValue { value: u32 },
+
+    /// Unimplemented Tokens/Variants.
+    #[error("Offset {offset}: Token `{name}` is unimplemented")]
+    UnimplementedToken { name: &'static str, offset: u64 },
+
+    #[error("Offset {offset}: Value variant `{name}` (size {size:?}) is unimplemented")]
+    UnimplementedValueVariant {
+        name: String,
+        size: Option<u16>,
+        offset: u64,
+    },
+}
+
+/// Errors related to serialization of IR trees to XML/JSON.
+#[derive(Debug, Error)]
+pub enum SerializationError {
+    // Since `quick-xml` maintains the stack for us, structural errors with the XML
+    // Will be included in this generic error alongside IO errors.
+    #[error("Writing to XML failed")]
+    XmlOutputError {
+        #[from]
+        source: io::Error,
+    },
+
+    #[error("Building a JSON document failed with message: {message}")]
+    JsonStructureError { message: String },
+
+    #[error("`serde_json` failed")]
+    JsonError {
+        #[from]
+        source: serde_json::error::Error,
+    },
+
+    #[error("Record data contains invalid UTF-8")]
+    RecordContainsInvalidUTF8 {
+        #[from]
+        source: std::string::FromUtf8Error,
+    },
+
+    #[error("Unimplemented: {message}")]
+    Unimplemented { message: String },
+}
+
+#[derive(Debug, Error)]
+pub enum InputError {
+    #[error("Failed to open file {}", path.display())]
+    FailedToOpenFile {
+        source: std::io::Error,
+        path: std::path::PathBuf,
+    },
+}
+
+impl InputError {
+    /// Context Convenience for `InputError`
+    pub(crate) fn failed_to_open_file<P: AsRef<Path>>(source: io::Error, path: P) -> Self {
+        InputError::FailedToOpenFile {
+            source,
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+}
+
+/// Raised on Invalid/Incomplete data
+/// May also be raised if common chunk resources are not read succesfully.
+#[derive(Debug, Error)]
+pub enum ChunkError {
+    #[error("Reached EOF while trying to allocate chunk")]
+    IncompleteChunk,
+
+    #[error("Failed to seek to start of chunk.")]
+    FailedToSeekToChunk(io::Error),
+
+    #[error("Failed to parse chunk header")]
+    FailedToParseChunkHeader(#[from] DeserializationError),
+
+    #[error("chunk data CRC32 invalid")]
+    InvalidChunkChecksum { expected: u32, found: u32 },
+
+    #[error("Failed to build string cache")]
+    FailedToBuildStringCache { source: DeserializationError },
+}
+
+/// Public result API.
+/// Inner errors are considered implementation details and are opaque.
+#[derive(Debug, Error)]
+pub enum EvtxError {
+    #[error("An error occurred while trying to read input.")]
+    InputError(#[from] InputError),
+
+    #[error("An error occurred while trying to serialize binary xml to output.")]
+    SerializationError(#[from] SerializationError),
+
+    // TODO: Should this be split to `ChunkError` vs `RecordError`?
+    #[error("An error occurred while trying to deserialize evtx stream.")]
+    DeserializationError(#[from] DeserializationError),
+
+    #[error("Failed to parse chunk number {chunk_id}")]
+    FailedToParseChunk {
+        chunk_id: u64,
+        source: Box<ChunkError>,
+    },
+
+    #[error("Failed to parse record number {record_id}")]
+    FailedToParseRecord {
+        record_id: RecordId,
+        source: Box<EvtxError>,
+    },
+
+    #[error("Calculation Error, reason: {}", .0)]
+    CalculationError(String),
+
+    #[error("An IO error occured.")]
+    IoError(#[from] std::io::Error),
+
+    // TODO: move this error.
+    #[error("Failed to create record model, reason: {}", .0)]
+    FailedToCreateRecordModel(&'static str),
+
+    // TODO: should we keep an `Unimplemented` variant at public API?
+    #[error("Unimplemented: {name}")]
+    Unimplemented { name: String },
+
+    #[error(
+        "Invalid EVTX record data size, should be equals or greater than {expected}, found `{length}`"
+    )]
+    InvalidDataSize { length: u32, expected: u32 },
+}
+
+impl EvtxError {
+    pub(crate) fn calculation_error(msg: String) -> EvtxError {
+        EvtxError::CalculationError(msg)
+    }
+
+    pub(crate) fn incomplete_chunk(chunk_id: u64) -> EvtxError {
+        EvtxError::FailedToParseChunk {
+            chunk_id,
+            source: Box::new(ChunkError::IncompleteChunk),
+        }
+    }
+}

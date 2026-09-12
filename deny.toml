@@ -16,8 +16,10 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
-# Only "unmaintained" notices, all pulled in by Tauri with no upgrade available. Revisit on every Tauri update.
+# Only "unmaintained" notices, with no upgrade available. The Tauri ones are revisited on every Tauri
+# update; the `encoding` one is revisited on every `evtx` update (ADR 0018).
 ignore = [
+  { id = "RUSTSEC-2021-0153", reason = "encoding 0.2.33: unmaintained since 2016 and the advisory lists no patched version. It is a non-optional dependency of `evtx` — no feature flag removes it — and is the ANSI codec that decodes 8-bit strings inside a log's binary XML. The exposure is not zero: those bytes come from the .evtx file under examination, so a decoding defect in an unmaintained crate is reachable from input this program does not control. What bounds it is that this is an unmaintained notice rather than a known vulnerability, that the crate performs no I/O and this program is offline (ADR 0003), and that `fuzz_evtx` fuzzes the path that reaches it. Revisit if evtx moves to encoding_rs." },
   { id = "RUSTSEC-2024-0370", reason = "proc-macro-error: build-time macro via glib-macros → gtk, Linux desktop target only; we ship Windows builds" },
   { id = "RUSTSEC-2025-0075", reason = "unic-char-range: via urlpattern → tauri-utils; no maintained replacement upstream yet" },
   { id = "RUSTSEC-2025-0080", reason = "unic-common: via urlpattern → tauri-utils; no maintained replacement upstream yet" },

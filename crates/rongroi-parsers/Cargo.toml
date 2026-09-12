@@ -18,11 +18,19 @@ publish.workspace = true
 # never asks for the current time. jiff is already in the workspace lockfile via the CLI and xtask, so
 # this adds no new dependency to the build.
 jiff.workspace = true
+# evtx: the binary-XML decoder, chunk reader and record recovery for Event Log files, rather than our own
+# (ADR 0018). Its types stop at `evtx.rs`: `EvtxError` never appears in a signature outside that module.
+# It is the one dependency here that *can* touch a filesystem — `EvtxParser::from_path` — and this parser
+# never calls it; every entry point used takes bytes already in memory.
+evtx = { workspace = true }
 # prefetch-core: the MAM/Xpress-Huffman decompressor and the SCCA v30/v31 reader, rather than our own
 # (ADR 0015). It is pure — no filesystem, no network, `#![forbid(unsafe_code)]` — and its only dependency
 # is `xpress-huffman`, so it adds two Apache-2.0 crates to the lockfile and nothing else. Its types stop at
 # `prefetch.rs`: `PrefetchError` never appears in a signature outside that module.
 prefetch-core = { workspace = true }
+# serde_json: `evtx` renders a record as JSON, and this crate reads four `System` fields out of that
+# document and keeps nothing else. It is already in the workspace lockfile via the CLI and the desktop app.
+serde_json.workspace = true
 thiserror.workspace = true
 
 [lints]

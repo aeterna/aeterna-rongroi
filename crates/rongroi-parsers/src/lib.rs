@@ -33,6 +33,7 @@
 pub mod bam;
 mod cp1252;
 pub mod error;
+pub mod evtx;
 pub mod filetime;
 pub mod pca;
 pub mod prefetch;

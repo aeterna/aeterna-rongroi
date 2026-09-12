@@ -94,7 +94,7 @@ jobs:
         run: |
           mkdir -p fuzz/corpus/fuzz_bam fuzz/corpus/fuzz_pca_app_launch \
                    fuzz/corpus/fuzz_pca_general fuzz/corpus/fuzz_filetime \
-                   fuzz/corpus/fuzz_prefetch
+                   fuzz/corpus/fuzz_prefetch fuzz/corpus/fuzz_evtx
           cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam \
             -- -max_total_time=30 -timeout=10
           cargo +nightly fuzz run fuzz_pca_app_launch fuzz/corpus/fuzz_pca_app_launch fixtures/parsers/pca-app-launch \
@@ -104,6 +104,8 @@ jobs:
           cargo +nightly fuzz run fuzz_filetime fuzz/corpus/fuzz_filetime fixtures/parsers/bam \
             -- -max_total_time=30 -timeout=10
           cargo +nightly fuzz run fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch \
+            -- -max_total_time=30 -timeout=10
+          cargo +nightly fuzz run fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx \
             -- -max_total_time=30 -timeout=10
       # A crash leaves its input in fuzz/artifacts/. Keeping it is the difference between "a target
       # failed" and being able to reproduce it with `cargo fuzz run <target> <file>`.
