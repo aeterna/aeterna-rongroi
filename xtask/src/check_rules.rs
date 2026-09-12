@@ -8,10 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::bail;
+use rongroi_collectors::FieldKind;
 use rongroi_core::bundle::{Bundle, BundleError};
 use rongroi_core::engine;
 use rongroi_core::model::{CollectorRun, EvidenceState, Observation, UnmeasuredReason};
-use rongroi_core::rules::Rule;
+use rongroi_core::rules::{MatchKey, Operator, Rule};
 use rongroi_core::source_tree::collect_bundle_json;
 use serde::Deserialize;
 
@@ -133,7 +134,7 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
 /// made for `check-baseline` running the product's own pipeline. ADR 0026 has the reasoning and the
 /// alternative that was rejected.
 struct Vocabulary {
-    fields: BTreeMap<&'static str, BTreeSet<&'static str>>,
+    fields: BTreeMap<&'static str, BTreeMap<&'static str, FieldKind>>,
     reasons: BTreeMap<&'static str, BTreeSet<&'static str>>,
 }
 
@@ -147,7 +148,14 @@ impl Vocabulary {
         Self {
             fields: collectors
                 .iter()
-                .map(|collector| (collector.id(), collector.fields().iter().copied().collect()))
+                .map(|collector| {
+                    let fields = collector
+                        .fields()
+                        .iter()
+                        .map(|field| (field.name, field.kind))
+                        .collect();
+                    (collector.id(), fields)
+                })
                 .collect(),
             reasons: collectors
                 .iter()
@@ -184,17 +192,30 @@ impl Vocabulary {
             // once per field.
             return;
         };
-        for field in rule.matcher.keys() {
-            if known.contains(field.as_str()) {
+        for (key, value) in rule.conditions() {
+            let field = key.field();
+            let Some(kind) = known.get(field).copied() else {
+                let suggestion = nearest(field, known)
+                    .map_or_else(String::new, |name| format!(" (did you mean `{name}`?)"));
+                problems.push(format!(
+                    "rules/{path}: `match` names `{field}`, which the `{}` collector cannot emit{suggestion}; it emits {}",
+                    rule.collector,
+                    comma(known.keys().copied())
+                ));
                 continue;
+            };
+            // An unknown operator is `rules::validate`'s to report, and it already has.
+            if let MatchKey::Known { operator, .. } = key {
+                check_operator(
+                    path,
+                    &rule.collector,
+                    field,
+                    operator,
+                    kind,
+                    value,
+                    problems,
+                );
             }
-            let suggestion = nearest(field, known)
-                .map_or_else(String::new, |name| format!(" (did you mean `{name}`?)"));
-            problems.push(format!(
-                "rules/{path}: `match` names `{field}`, which the `{}` collector cannot emit{suggestion}; it emits {}",
-                rule.collector,
-                comma(known.iter().copied())
-            ));
         }
         self.check_unmeasured_when(path, rule, problems);
     }
@@ -231,11 +252,67 @@ impl Vocabulary {
     }
 }
 
+/// Rejects an operator the field's declared kind cannot take, and a value of a shape that kind
+/// cannot hold.
+///
+/// `rules::validate` has already checked the value against the **operator** — that `exists` gets a
+/// boolean, that an ordinal comparison gets a number or a timestamp. What only this build knows is
+/// what the field itself holds, so this is where `name|gt: 3` is caught: text has no order, the
+/// comparison can never be true, and the rule would be `not_found` on every machine — which this
+/// program shows a player as evidence that something was looked for and was not there. That is the
+/// defect ADR 0026 removed for field names, and this is the same defect through the operator.
+fn check_operator(
+    path: &str,
+    collector: &str,
+    field: &str,
+    operator: Operator,
+    kind: FieldKind,
+    value: &serde_json::Value,
+    problems: &mut Vec<String>,
+) {
+    let key = operator
+        .as_str()
+        .map_or_else(|| field.to_owned(), |name| format!("{field}|{name}"));
+    if operator.is_ordinal() {
+        match kind {
+            FieldKind::Number if !holds(value, serde_json::Value::is_number) => problems.push(format!(
+                "rules/{path}: `match` key `{key}` puts values in order, and the `{collector}` collector emits `{field}` as a number, so the value must be a number too"
+            )),
+            FieldKind::Timestamp if !holds(value, serde_json::Value::is_string) => problems.push(format!(
+                "rules/{path}: `match` key `{key}` puts values in order, and the `{collector}` collector emits `{field}` as a timestamp, so the value must be an RFC 3339 timestamp such as `2026-09-13T00:00:00Z`"
+            )),
+            FieldKind::Number | FieldKind::Timestamp => {}
+            FieldKind::Text | FieldKind::Bool => problems.push(format!(
+                "rules/{path}: `match` key `{key}` puts values in order, which the `{collector}` collector's `{field}` cannot be: it emits {}. `gt`, `gte`, `lt` and `lte` need a number or a timestamp",
+                kind.as_str()
+            )),
+        }
+        return;
+    }
+    if matches!(
+        operator,
+        Operator::StartsWith | Operator::EndsWith | Operator::Contains
+    ) && kind != FieldKind::Text
+    {
+        problems.push(format!(
+            "rules/{path}: `match` key `{key}` matches text, which the `{collector}` collector's `{field}` is not: it emits {}",
+            kind.as_str()
+        ));
+    }
+}
+
+/// Whether a `match` value, or every element of a list value, has the shape `is` accepts.
+fn holds(value: &serde_json::Value, is: fn(&serde_json::Value) -> bool) -> bool {
+    value
+        .as_array()
+        .map_or_else(|| is(value), |list| list.iter().all(is))
+}
+
 /// The declared name closest to `field`, when one is close enough to be a misspelling of it rather
 /// than a different name. Two edits is the widest gap that is still more likely a typo than a choice.
-fn nearest<'a>(field: &str, known: &BTreeSet<&'a str>) -> Option<&'a str> {
+fn nearest<'a>(field: &str, known: &BTreeMap<&'a str, FieldKind>) -> Option<&'a str> {
     known
-        .iter()
+        .keys()
         .map(|name| (distance(field, name), *name))
         .filter(|(distance, _)| *distance <= 2)
         .min_by_key(|(distance, name)| (*distance, *name))
@@ -688,7 +765,12 @@ date: 2026-09-11
     /// name, and naming one would send an author to the wrong field.
     #[test]
     fn a_suggestion_is_offered_only_within_two_edits() {
-        let known: BTreeSet<&str> = ["run_count", "scca_version"].into_iter().collect();
+        let known: BTreeMap<&str, FieldKind> = [
+            ("run_count", FieldKind::Number),
+            ("scca_version", FieldKind::Number),
+        ]
+        .into_iter()
+        .collect();
         assert_eq!(nearest("run_cout", &known), Some("run_count"));
         assert_eq!(nearest("runcount", &known), Some("run_count"));
         assert_eq!(nearest("executions", &known), None);
@@ -715,5 +797,130 @@ date: 2026-09-11
             message.contains("unknown field `file_name`, expected one of sha256, signer"),
             "{message}"
         );
+    }
+
+    /// A rule for the `prefetch` collector, so a test can name a numeric field. `experimental`
+    /// needs no fixtures, so the `match` block under test is the only expected problem.
+    fn prefetch_rule(match_block: &str) -> String {
+        format!(
+            "id: 2f0c4b1e-8a3d-4c57-9e21-6b0d7f8a1c34\ntitle: t\ndescription: d\nstatus: experimental\ncollector: prefetch\nstrength: execution\nmatch:\n{match_block}retention: What Prefetch still holds.\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-13\n"
+        )
+    }
+
+    fn problems_for(label: &str, rule: &str) -> Vec<String> {
+        let tmp = TempRoot::new(label);
+        write(
+            &tmp.path()
+                .join("rules/prefetch/execution/example/rule.yaml"),
+            rule,
+        );
+        check(tmp.path())
+            .expect("check-rules should run to completion")
+            .problems
+    }
+
+    /// Gate (6): an operator that is not one of ours. Accepting it would evaluate the rule as
+    /// something other than what it says (ADR 0029).
+    #[test]
+    fn an_operator_name_that_is_not_one_of_ours_is_rejected() {
+        let problems = problems_for("bad-operator", &prefetch_rule("  run_count|atleast: 2\n"));
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains("asks for `atleast`, which is not an operator"),
+            "{problems:?}"
+        );
+        // The message names the operators there are, so the fix does not need a grep.
+        assert!(problems[0].contains("`gte`"), "{problems:?}");
+    }
+
+    /// Gate (7): an empty list matches nothing on any machine, and this program shows `not_found`
+    /// to a player as a thing looked for and not there.
+    #[test]
+    fn an_empty_value_list_is_rejected() {
+        let problems = problems_for("empty-list", &prefetch_rule("  name: []\n"));
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("has an empty list"), "{problems:?}");
+    }
+
+    /// Gate (8): an ordinal comparison against a field that is only ever text. Nothing in the rule
+    /// file says so, and the rule would be `not_found` for ever — the same defect ADR 0026 removed
+    /// for field names, arriving through the operator instead.
+    #[test]
+    fn an_ordinal_comparison_against_a_text_field_is_rejected() {
+        let problems = problems_for("ordinal-on-text", &prefetch_rule("  name|gt: 2\n"));
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains(
+                "`match` key `name|gt` puts values in order, which the `prefetch` collector's `name` cannot be: it emits text"
+            ),
+            "{problems:?}"
+        );
+    }
+
+    /// The mirror of it: text matching against a field that holds a count.
+    #[test]
+    fn a_text_operator_against_a_number_field_is_rejected() {
+        let problems = problems_for(
+            "text-on-number",
+            &prefetch_rule("  run_count|contains: '2'\n"),
+        );
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains(
+                "`match` key `run_count|contains` matches text, which the `prefetch` collector's `run_count` is not: it emits a number"
+            ),
+            "{problems:?}"
+        );
+    }
+
+    /// The value has to suit the field as well as the operator: `last_run` is a timestamp, so a
+    /// number can never be put in order against it.
+    #[test]
+    fn an_ordinal_comparison_whose_value_does_not_suit_the_field_is_rejected() {
+        let problems = problems_for("ordinal-wrong-value", &prefetch_rule("  last_run|gte: 2\n"));
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains("the value must be an RFC 3339 timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The positive twin of the four rejections above: every operator, against fields whose kind
+    /// takes it, passes.
+    #[test]
+    fn the_operators_are_accepted_where_the_field_kind_takes_them() {
+        let problems = problems_for(
+            "good-operators",
+            &prefetch_rule(
+                "  name: [FiveM.exe, cmd.exe]\n  path|startswith: 'C:\\\\Windows\\\\'\n  path|endswith: .pf\n  path|contains: Prefetch\n  run_count|gte: 2\n  rejected|gt: 0\n  last_run|lt: \"2026-09-13T00:00:00Z\"\n  read|exists: false\n",
+            ),
+        );
+
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    /// Every field a collector declares carries a kind, so the first rule written for any of them
+    /// can use an operator.
+    #[test]
+    fn every_declared_field_has_a_kind_check_rules_can_use() {
+        let vocabulary = Vocabulary::of_this_build();
+
+        for collector in rongroi_collectors::all() {
+            let fields = vocabulary
+                .fields
+                .get(collector.id())
+                .unwrap_or_else(|| panic!("collector `{}` has no vocabulary", collector.id()));
+            assert_eq!(
+                fields.len(),
+                collector.fields().len(),
+                "collector `{}` lost a field on the way into the vocabulary",
+                collector.id()
+            );
+        }
     }
 }

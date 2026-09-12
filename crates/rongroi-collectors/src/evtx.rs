@@ -62,8 +62,8 @@ use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{self, EvtxFile, EvtxRecord};
 
-use crate::Collector;
 use crate::failure::{read_failure, reason_for};
+use crate::{Collector, Field};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -121,32 +121,32 @@ const REASONS: [UnmeasuredReason; 5] = [
 /// rule that read an unread `Security.evtx` as "not found" would be saying the log was never
 /// cleared, on evidence that was never read — which is the `pca` case (ADR 0020), not the `fivem_dir`
 /// one.
-const FIELDS: [&str; 25] = [
-    "budget_exhausted",
-    "budget_seconds",
-    "channel",
-    "channels",
-    "count",
-    "entries",
-    "event_id",
-    "examined",
-    "first_seen",
-    "intact",
-    "last_seen",
-    "level",
-    "log",
-    "logs",
-    "logs_without_records",
-    "newest_record_id",
-    "newest_record_time",
-    "oldest_record_id",
-    "oldest_record_time",
-    "path",
-    "provider",
-    "read",
-    "refused",
-    "rejected",
-    "size_bytes",
+const FIELDS: [Field; 25] = [
+    Field::boolean("budget_exhausted"),
+    Field::number("budget_seconds"),
+    Field::text("channel"),
+    Field::number("channels"),
+    Field::number("count"),
+    Field::number("entries"),
+    Field::number("event_id"),
+    Field::number("examined"),
+    Field::timestamp("first_seen"),
+    Field::boolean("intact"),
+    Field::timestamp("last_seen"),
+    Field::number("level"),
+    Field::text("log"),
+    Field::number("logs"),
+    Field::number("logs_without_records"),
+    Field::number("newest_record_id"),
+    Field::timestamp("newest_record_time"),
+    Field::number("oldest_record_id"),
+    Field::timestamp("oldest_record_time"),
+    Field::text("path"),
+    Field::text("provider"),
+    Field::text("read"),
+    Field::number("refused"),
+    Field::number("rejected"),
+    Field::number("size_bytes"),
 ];
 
 /// The `evtx` collector.
@@ -169,7 +169,7 @@ impl Collector for Evtx {
         ID
     }
 
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &'static [Field] {
         &FIELDS
     }
 
@@ -226,7 +226,7 @@ impl Collector for Evtx {
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
-        .map(|field| ((*field).to_owned(), reason))
+        .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
 
@@ -1131,7 +1131,8 @@ mod tests {
         assert_eq!(observations.len(), 1, "{observations:?}");
         assert_eq!(text(&observations[0], "read"), Some("access_denied"));
         assert_eq!(observations[0].fields.get("path"), None);
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(gaps.get(name), Some(&UnmeasuredReason::NotAdmin), "{name}");
         }
     }
@@ -1144,7 +1145,8 @@ mod tests {
         let (observations, gaps) = measured(&run);
 
         assert_eq!(text(&observations[0], "read"), Some("access_denied"));
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::AccessDenied),
@@ -1169,7 +1171,8 @@ mod tests {
             text(refused[0], "path"),
             Some(format!(r"{LOGS_DIR}\Security.evtx").as_str())
         );
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::ReadFailed),
@@ -1193,7 +1196,8 @@ mod tests {
         let run = Evtx::default().collect(&fixture("evtx-log-truncated"));
         let (observations, gaps) = measured(&run);
         assert_eq!(text(refusals(observations)[0], "read"), Some("truncated"));
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::ReadFailed),
@@ -1273,7 +1277,8 @@ mod tests {
         assert_eq!(field(folder, "refused"), Some(&2_u64.into()));
         assert_eq!(field(folder, "budget_seconds"), Some(&0_u64.into()));
 
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::ReadFailed),

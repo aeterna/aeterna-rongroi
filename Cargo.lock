@@ -3098,6 +3098,7 @@ dependencies = [
 name = "rongroi-core"
 version = "0.1.0"
 dependencies = [
+ "jiff",
  "serde",
  "serde-saphyr",
  "serde_json",

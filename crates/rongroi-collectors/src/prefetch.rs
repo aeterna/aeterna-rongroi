@@ -37,8 +37,8 @@ use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
 use rongroi_parsers::prefetch::{self, PrefetchRecord};
 
-use crate::Collector;
 use crate::failure::{read_failure, reason_for};
+use crate::{Collector, Field};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -74,20 +74,20 @@ const REASONS: [UnmeasuredReason; 5] = [
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
 /// the comment on [`Prefetch::collect`].
-const FIELDS: [&str; 13] = [
-    "entries",
-    "files",
-    "intact",
-    "last_run",
-    "loaded_files_withheld",
-    "name",
-    "path",
-    "read",
-    "recorded_runs",
-    "rejected",
-    "run_count",
-    "scca_version",
-    "volumes_withheld",
+const FIELDS: [Field; 13] = [
+    Field::number("entries"),
+    Field::number("files"),
+    Field::boolean("intact"),
+    Field::timestamp("last_run"),
+    Field::text("loaded_files_withheld"),
+    Field::text("name"),
+    Field::text("path"),
+    Field::text("read"),
+    Field::number("recorded_runs"),
+    Field::number("rejected"),
+    Field::number("run_count"),
+    Field::number("scca_version"),
+    Field::text("volumes_withheld"),
 ];
 
 /// The `prefetch` collector.
@@ -99,7 +99,7 @@ impl Collector for Prefetch {
         ID
     }
 
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &'static [Field] {
         &FIELDS
     }
 
@@ -195,7 +195,7 @@ impl Collector for Prefetch {
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
-        .map(|field| ((*field).to_owned(), reason))
+        .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
 
@@ -513,7 +513,8 @@ mod tests {
         assert_eq!(observations.len(), 1, "{observations:?}");
         assert_eq!(text(&observations[0], "read"), Some("access_denied"));
         assert_eq!(observations[0].fields.get("path"), None);
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(gaps.get(name), Some(&UnmeasuredReason::NotAdmin), "{name}");
         }
     }
@@ -526,7 +527,8 @@ mod tests {
         let (observations, gaps) = measured(&run);
 
         assert_eq!(text(&observations[0], "read"), Some("access_denied"));
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::AccessDenied),

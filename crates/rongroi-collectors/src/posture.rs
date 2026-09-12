@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform, SourceError};
 
-use crate::Collector;
+use crate::{Collector, Field};
 
 /// Registry key where Windows reports the UEFI Secure Boot state.
 pub const SECURE_BOOT_KEY: &str = r"HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State";
@@ -50,12 +50,12 @@ const REASONS: [UnmeasuredReason; 4] = [
 /// setting alone and in nothing else: one observation carries every setting that was readable, and
 /// each name below is both a field and a `gaps` key (ADR 0011). `tpm_spec_version` is the one name
 /// that is never a gap — an absent TPM has no version, and that is not a failure to measure.
-const FIELDS: [&str; 5] = [
-    "hvci",
-    "secure_boot",
-    "test_signing",
-    "tpm",
-    "tpm_spec_version",
+const FIELDS: [Field; 5] = [
+    Field::text("hvci"),
+    Field::text("secure_boot"),
+    Field::text("test_signing"),
+    Field::text("tpm"),
+    Field::text("tpm_spec_version"),
 ];
 
 /// The posture collector.
@@ -67,7 +67,7 @@ impl Collector for Posture {
         ID
     }
 
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &'static [Field] {
         &FIELDS
     }
 

@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform, ProcessRecord, SourceError};
 
-use crate::Collector;
+use crate::{Collector, Field};
 
 const ID: &str = "process";
 
@@ -36,7 +36,7 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// The list is never a `gaps` key here: a process list that could not be read is the whole reading,
 /// so it is an `Unmeasured` run rather than a gap, and an unresolved image path omits `path` on that
 /// one process without saying anything about the rest (ADR 0010).
-const FIELDS: [&str; 2] = ["name", "path"];
+const FIELDS: [Field; 2] = [Field::text("name"), Field::text("path")];
 
 /// The `process` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -47,7 +47,7 @@ impl Collector for Process {
         ID
     }
 
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &'static [Field] {
         &FIELDS
     }
 

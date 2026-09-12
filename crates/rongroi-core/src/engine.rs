@@ -9,7 +9,7 @@ use crate::model::{
     CollectorRun, Evidence, EvidenceState, Observation, OwnTraceEntry, Report, ReportHeader,
     UnmatchedGroup, UnmeasuredReason,
 };
-use crate::rules::{Rule, Status};
+use crate::rules::{MatchKey, Operator, Rule, Status};
 
 /// What the running program is, so that its own traces can be told apart from evidence about the
 /// machine (ADR 0010).
@@ -168,6 +168,15 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
         Some(CollectorRun::Measured {
             observations, gaps, ..
         }) => {
+            // Checked before anything is matched, and this ordering is the whole of ADR 0029's
+            // `exists: false` answer. That operator is satisfied by a field that is not there, and a
+            // field the collector could not read is not there either — so a rule asking "this path
+            // is absent" about an unreadable path would be `Found`, and the report would say "we
+            // looked and there is no path" about a path nobody could read. Every other operator
+            // needs the field to be present, so for those the gap can be, and is, checked after.
+            if let Some(reason) = absence_fields(rule).find_map(|field| gaps.get(field)) {
+                return evidence(rule, unmeasured(*reason));
+            }
             let matched: Vec<Observation> = observations
                 .iter()
                 .filter(|observation| matches(rule, observation))
@@ -177,7 +186,7 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
                 EvidenceState::Found {
                     observations: matched,
                 }
-            } else if let Some(reason) = rule.matcher.keys().find_map(|field| gaps.get(field)) {
+            } else if let Some(reason) = rule.match_fields().find_map(|field| gaps.get(field)) {
                 // Nothing matched, but a field the rule needs was never read: "not found" would lie.
                 unmeasured(*reason)
             } else {
@@ -187,6 +196,11 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
             }
         }
     };
+    evidence(rule, state)
+}
+
+/// Wraps one rule's state as its evidence.
+fn evidence(rule: &Rule, state: EvidenceState) -> Evidence {
     Evidence {
         rule_id: rule.id.clone(),
         collector: rule.collector.clone(),
@@ -195,23 +209,197 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
     }
 }
 
+/// The fields a rule asks to be **absent** — `<field>|exists: false`.
+///
+/// These are the only fields whose condition an observation can satisfy by carrying nothing, which
+/// is why [`evaluate_rule`] consults `gaps` for them before it matches anything.
+fn absence_fields(rule: &Rule) -> impl Iterator<Item = &str> {
+    rule.conditions().filter_map(|(key, value)| match key {
+        MatchKey::Known {
+            field,
+            operator: Operator::Exists,
+        } if value == &serde_json::Value::Bool(false) => Some(field),
+        _ => None,
+    })
+}
+
 /// Whether `observation` is one this rule asks to be shown.
 ///
 /// The collector id is compared byte for byte: it is not an observation field but an identifier this
 /// repository chooses, and `rules::validate_path` already requires it to be `snake_case`.
 ///
-/// A field the rule names and the observation does not carry is not a match, and cannot be: there is
-/// no way to write "this field is absent". Whether that silence is `not_found` or `unmeasured` is
-/// decided by `gaps` in [`evaluate_rule`], which is keyed on the rule's `match` field **names** —
-/// case folding changes values only, so `cased` changes nothing about which rules a gap reaches.
+/// Every condition must hold — `match` is a conjunction, and ADR 0029 left it one. A field the rule
+/// names and the observation does not carry satisfies only `<field>|exists: false`; for every other
+/// operator it is not a match. Whether that silence is `not_found` or `unmeasured` is decided by
+/// `gaps` in [`evaluate_rule`], which is keyed on the rule's `match` field **names** as split out by
+/// `rules::parse_match_key` — never on the `match` key, so an operator suffix does not take a field
+/// out of the gap lookup (ADR 0025's objection to a suffix, answered in ADR 0029).
 fn matches(rule: &Rule, observation: &Observation) -> bool {
     observation.collector == rule.collector
-        && rule.matcher.iter().all(|(field, expected)| {
-            observation.fields.get(field).is_some_and(|seen| {
-                value_matches(expected, seen, rule.cased.contains(field.as_str()))
-            })
+        && rule.conditions().all(|(key, expected)| match key {
+            MatchKey::Known { field, operator } => condition_matches(
+                operator,
+                expected,
+                observation.fields.get(field),
+                rule.cased.contains(field),
+            ),
+            // `rules::validate` refuses such a key, so no loaded bundle holds one. If one ever
+            // reached here it must not be skipped: skipping a condition drops a restriction and
+            // widens the rule past what its title claims.
+            MatchKey::UnknownOperator { .. } => false,
         })
         && !is_allowed(rule, observation)
+}
+
+/// Whether one `match` entry holds for the value an observation carries, or does not carry.
+fn condition_matches(
+    operator: Operator,
+    expected: &serde_json::Value,
+    seen: Option<&serde_json::Value>,
+    cased: bool,
+) -> bool {
+    if operator == Operator::Exists {
+        return expected.as_bool() == Some(seen.is_some());
+    }
+    seen.is_some_and(|seen| {
+        any_of(expected, |expected| {
+            compare(operator, expected, seen, cased)
+        })
+    })
+}
+
+/// Applies `compare` to each element of a list value, or to a lone value.
+///
+/// A list in `match` means **or**, which is what a list means in Sigma's `detection` and what makes
+/// one rule out of what would otherwise be one rule per value (ADR 0029). Only the operators whose
+/// `takes_a_list` is true reach here with a list; `rules::validate` refuses the others.
+fn any_of(expected: &serde_json::Value, compare: impl Fn(&serde_json::Value) -> bool) -> bool {
+    match expected {
+        serde_json::Value::Array(list) => list.iter().any(compare),
+        single => compare(single),
+    }
+}
+
+/// Compares one expected value to the one an observation carries, for every operator but `exists`.
+fn compare(
+    operator: Operator,
+    expected: &serde_json::Value,
+    seen: &serde_json::Value,
+    cased: bool,
+) -> bool {
+    match operator {
+        Operator::Equals => value_matches(expected, seen, cased),
+        Operator::StartsWith | Operator::EndsWith | Operator::Contains => {
+            text_matches(operator, expected, seen, cased)
+        }
+        Operator::GreaterThan | Operator::AtLeast | Operator::LessThan | Operator::AtMost => {
+            ordering_of(expected, seen).is_some_and(|ordering| accepts(operator, ordering))
+        }
+        // Handled by `condition_matches` before a value is looked at, because it is the one operator
+        // that has an answer when there is no value.
+        Operator::Exists => false,
+    }
+}
+
+/// Whether the text an observation carries begins with, ends with or holds the text a rule names.
+///
+/// Both sides must be strings: a rule comparing text to a number is refused by `check-rules`, and if
+/// one arrived it is not a match rather than a coercion (ADR 0025 settled that for equality).
+///
+/// Case folds ASCII unless the field is in `cased`, which is the whole of what a string operator
+/// inherits from ADR 0025 — the bytes are compared with `eq_ignore_ascii_case`, so `startswith` on
+/// `C:\Users\` matches `c:\users\somchai\…` exactly as equality on a whole path does.
+///
+/// **These are text operators, not path operators.** `startswith` is a byte prefix and `contains` a
+/// byte substring; neither knows what a directory separator is. ADR 0029 says why, and says what a
+/// rule author has to write instead.
+fn text_matches(
+    operator: Operator,
+    expected: &serde_json::Value,
+    seen: &serde_json::Value,
+    cased: bool,
+) -> bool {
+    let (Some(expected), Some(seen)) = (expected.as_str(), seen.as_str()) else {
+        return false;
+    };
+    let (needle, haystack) = (expected.as_bytes(), seen.as_bytes());
+    // An empty needle would make the condition true of every observation — a rule broader than any
+    // title it could carry. `rules::validate` refuses one; this is the answer if one arrived.
+    if needle.is_empty() || needle.len() > haystack.len() {
+        return false;
+    }
+    let same = |left: &[u8], right: &[u8]| {
+        if cased {
+            left == right
+        } else {
+            left.eq_ignore_ascii_case(right)
+        }
+    };
+    match operator {
+        Operator::StartsWith => same(&haystack[..needle.len()], needle),
+        Operator::EndsWith => same(&haystack[haystack.len() - needle.len()..], needle),
+        Operator::Contains => haystack
+            .windows(needle.len())
+            .any(|window| same(window, needle)),
+        _ => false,
+    }
+}
+
+/// Whether an ordering satisfies the operator that asked for it.
+fn accepts(operator: Operator, ordering: std::cmp::Ordering) -> bool {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    match operator {
+        Operator::GreaterThan => ordering == Greater,
+        Operator::AtLeast => matches!(ordering, Greater | Equal),
+        Operator::LessThan => ordering == Less,
+        Operator::AtMost => matches!(ordering, Less | Equal),
+        _ => false,
+    }
+}
+
+/// How the value an observation carries sorts against the one the rule names, or `None` when the two
+/// cannot be put in order at all.
+///
+/// Two kinds are ordered, and nothing else: **numbers**, and **RFC 3339 timestamps**, which are
+/// parsed rather than compared as text. The collectors write a timestamp with
+/// `jiff::Timestamp::to_string`, which omits a fraction of a second that is zero and trims trailing
+/// zeros from one that is not — so `2020-01-01T00:00:00.5Z` and `2020-01-01T00:00:00Z` have
+/// different shapes, and comparing them as text puts the later instant first, because `.` sorts
+/// before `Z`. That is measured, not assumed (ADR 0029).
+///
+/// A pair that does not parse, or a number against a string, is `None`: not a match, never a
+/// coercion, and `check-rules` refuses the rule that could produce it.
+fn ordering_of(
+    expected: &serde_json::Value,
+    seen: &serde_json::Value,
+) -> Option<std::cmp::Ordering> {
+    use serde_json::Value;
+    match (expected, seen) {
+        (Value::Number(expected), Value::Number(seen)) => number_ordering(expected, seen),
+        (Value::String(expected), Value::String(seen)) => {
+            let expected: jiff::Timestamp = expected.parse().ok()?;
+            let seen: jiff::Timestamp = seen.parse().ok()?;
+            Some(seen.cmp(&expected))
+        }
+        _ => None,
+    }
+}
+
+/// How two JSON numbers sort, without going through `f64` when both fit an integer.
+///
+/// A record id or a byte count can exceed the 53 bits an `f64` holds exactly, and two such values
+/// one apart would compare equal after the conversion.
+fn number_ordering(
+    expected: &serde_json::Number,
+    seen: &serde_json::Number,
+) -> Option<std::cmp::Ordering> {
+    if let (Some(expected), Some(seen)) = (expected.as_i64(), seen.as_i64()) {
+        return Some(seen.cmp(&expected));
+    }
+    if let (Some(expected), Some(seen)) = (expected.as_u64(), seen.as_u64()) {
+        return Some(seen.cmp(&expected));
+    }
+    seen.as_f64()?.partial_cmp(&expected.as_f64()?)
 }
 
 /// Whether the value an observation carries is the value a rule asked for (ADR 0025).
@@ -223,6 +411,10 @@ fn matches(rule: &Rule, observation: &Observation) -> bool {
 /// Numbers, booleans and null carry no case and keep `serde_json`'s own equality, which is typed:
 /// `1102` does not match `"1102"`, and does not match `1102.0` either. Arrays and objects recurse so
 /// that one sentence covers every string in a rule; no collector emits either shape today.
+///
+/// A **top-level** array in `match` no longer reaches here as a value: since ADR 0029 it means "any
+/// of these", and `any_of` has already split it. The recursive arm below is for an array nested
+/// inside one, which no collector emits and no rule writes.
 fn value_matches(expected: &serde_json::Value, seen: &serde_json::Value, cased: bool) -> bool {
     use serde_json::Value;
     if cased {
@@ -935,5 +1127,342 @@ date: 2026-09-12
         ])]);
         let evidence = evaluate_rule(&rule, &[run]);
         assert!(matches!(evidence.state, EvidenceState::NotFound { .. }));
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // ADR 0029: the four operators, each with a match, a non-match, its `gaps` case and, where the
+    // operator compares text, what `cased` does to it.
+    // ------------------------------------------------------------------------------------------
+
+    /// A rule on the `evtx` collector carrying the `match` block given. No rule ships for that
+    /// collector, so every operator test brings its own; the fields are the ones `evtx` declares.
+    fn evtx_rule(match_block: &str) -> Rule {
+        let yaml = format!(
+            "id: 8f2e1a47-0b6c-4d93-9a15-2c7e4f6b8d03\ntitle: t\ndescription: d\nstatus: experimental\ncollector: evtx\nstrength: context\nmatch:\n{match_block}retention: What the logs still hold.\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-13\n"
+        );
+        serde_saphyr::from_str(&yaml).expect("the test rule parses")
+    }
+
+    /// One `evtx` observation from JSON, so a test can carry a number, a boolean or a string.
+    fn evtx_observation(fields: serde_json::Value) -> Observation {
+        Observation {
+            collector: "evtx".to_owned(),
+            fields: serde_json::from_value(fields).expect("the test fields are an object"),
+        }
+    }
+
+    fn evtx_run(observations: Vec<Observation>) -> CollectorRun {
+        CollectorRun::Measured {
+            collector: "evtx".to_owned(),
+            observations,
+            gaps: BTreeMap::new(),
+        }
+    }
+
+    /// A run that saw nothing because `field` could not be read.
+    fn evtx_gap(field: &str) -> CollectorRun {
+        CollectorRun::Measured {
+            collector: "evtx".to_owned(),
+            observations: vec![],
+            gaps: BTreeMap::from([(field.to_owned(), UnmeasuredReason::ReadFailed)]),
+        }
+    }
+
+    fn not_found(evidence: &Evidence) -> bool {
+        matches!(evidence.state, EvidenceState::NotFound { .. })
+    }
+
+    fn unmeasured(evidence: &Evidence) -> bool {
+        matches!(evidence.state, EvidenceState::Unmeasured { .. })
+    }
+
+    /// A list means **or**: one rule where six would otherwise be six rules, six ids and six
+    /// `falsepositives` lists to keep in step.
+    #[test]
+    fn a_value_list_matches_any_of_its_values() {
+        let rule = evtx_rule("  event_id: [1102, 104]\n");
+        for id in [1102, 104] {
+            let run = evtx_run(vec![evtx_observation(serde_json::json!({
+                "event_id": id
+            }))]);
+            assert!(found(&evaluate_rule(&rule, &[run])), "event_id {id}");
+        }
+    }
+
+    #[test]
+    fn a_value_list_does_not_match_a_value_outside_it() {
+        let rule = evtx_rule("  event_id: [1102, 104]\n");
+        let run = evtx_run(vec![evtx_observation(serde_json::json!({
+            "event_id": 4624
+        }))]);
+        assert!(not_found(&evaluate_rule(&rule, &[run])));
+    }
+
+    /// Every string in a list folds ASCII case, as a lone string does (ADR 0025).
+    #[test]
+    fn a_string_in_a_list_folds_case_unless_the_field_is_cased() {
+        let folding = evtx_rule("  channel: [Security, System]\n");
+        let exact = evtx_rule("  channel: [Security, System]\ncased: [channel]\n");
+        let run = || {
+            evtx_run(vec![evtx_observation(serde_json::json!({
+                "channel": "SECURITY"
+            }))])
+        };
+        assert!(found(&evaluate_rule(&folding, &[run()])));
+        assert!(not_found(&evaluate_rule(&exact, &[run()])));
+    }
+
+    #[test]
+    fn a_gap_reaches_a_rule_whose_only_condition_is_a_list() {
+        let rule = evtx_rule("  event_id: [1102, 104]\n");
+        assert!(unmeasured(&evaluate_rule(&rule, &[evtx_gap("event_id")])));
+    }
+
+    /// `rejected|gt: 0` is the rule the collectors were papering over with `intact`.
+    #[test]
+    fn gt_matches_a_larger_number_and_not_an_equal_one() {
+        let rule = evtx_rule("  rejected|gt: 0\n");
+        let one = evtx_run(vec![evtx_observation(serde_json::json!({ "rejected": 1 }))]);
+        let none = evtx_run(vec![evtx_observation(serde_json::json!({ "rejected": 0 }))]);
+        assert!(found(&evaluate_rule(&rule, &[one])));
+        assert!(not_found(&evaluate_rule(&rule, &[none])));
+    }
+
+    /// The three other ordinal operators at their boundary, where an off-by-one would hide.
+    #[test]
+    fn the_ordinal_operators_sit_where_their_names_say() {
+        for (block, matching, missing) in [
+            ("  entries|gte: 2\n", 2, 1),
+            ("  entries|lt: 2\n", 1, 2),
+            ("  entries|lte: 2\n", 2, 3),
+        ] {
+            let rule = evtx_rule(block);
+            let run = |value: i64| {
+                evtx_run(vec![evtx_observation(
+                    serde_json::json!({ "entries": value }),
+                )])
+            };
+            assert!(found(&evaluate_rule(&rule, &[run(matching)])), "{block}");
+            assert!(not_found(&evaluate_rule(&rule, &[run(missing)])), "{block}");
+        }
+    }
+
+    /// Timestamps are put in order by parsing both sides, not by comparing their text.
+    #[test]
+    fn a_timestamp_comparison_orders_instants() {
+        let rule = evtx_rule("  oldest_record_time|gt: \"2026-01-01T00:00:00Z\"\n");
+        let later = evtx_run(vec![evtx_observation(serde_json::json!({
+            "oldest_record_time": "2026-09-13T10:00:00Z"
+        }))]);
+        let earlier = evtx_run(vec![evtx_observation(serde_json::json!({
+            "oldest_record_time": "2025-12-31T23:59:59Z"
+        }))]);
+        assert!(found(&evaluate_rule(&rule, &[later])));
+        assert!(not_found(&evaluate_rule(&rule, &[earlier])));
+    }
+
+    /// Why the comparison parses. `jiff::Timestamp::to_string` writes a fraction of a second only
+    /// when there is one, so the collectors emit two shapes; `.` sorts before `Z`, so comparing the
+    /// text puts `…:00.5Z` **before** `…:00Z` and the later instant would read as the earlier one.
+    #[test]
+    fn a_fraction_of_a_second_is_later_and_not_earlier() {
+        assert!(
+            "2020-01-01T00:00:00.5Z" < "2020-01-01T00:00:00Z",
+            "the text comparison this test exists to avoid has changed"
+        );
+        let rule = evtx_rule("  oldest_record_time|gt: \"2020-01-01T00:00:00Z\"\n");
+        let run = evtx_run(vec![evtx_observation(serde_json::json!({
+            "oldest_record_time": "2020-01-01T00:00:00.5Z"
+        }))]);
+        assert!(found(&evaluate_rule(&rule, &[run])));
+    }
+
+    /// A timestamp an observation carries that is not one is not a match, and never a coercion.
+    #[test]
+    fn an_ordinal_comparison_of_two_kinds_is_not_a_match() {
+        let rule = evtx_rule("  entries|gt: 1\n");
+        let run = evtx_run(vec![evtx_observation(serde_json::json!({
+            "entries": "many"
+        }))]);
+        assert!(not_found(&evaluate_rule(&rule, &[run])));
+    }
+
+    #[test]
+    fn a_gap_reaches_a_rule_whose_condition_is_ordinal() {
+        let rule = evtx_rule("  entries|gt: 1\n");
+        assert!(unmeasured(&evaluate_rule(&rule, &[evtx_gap("entries")])));
+    }
+
+    #[test]
+    fn the_text_operators_match_where_their_names_say() {
+        for (block, matching, missing) in [
+            (
+                r"  path|startswith: 'C:\Windows\'",
+                r"C:\Windows\System32\x.evtx",
+                r"D:\Windows\x.evtx",
+            ),
+            ("  path|endswith: '.evtx'", r"C:\x.evtx", r"C:\x.evtx.bak"),
+            (
+                r"  path|contains: '\winevt\'",
+                r"C:\Windows\System32\winevt\Logs\x.evtx",
+                r"C:\Windows\x.evtx",
+            ),
+        ] {
+            let rule = evtx_rule(&format!("{block}\n"));
+            let run =
+                |path: &str| evtx_run(vec![evtx_observation(serde_json::json!({ "path": path }))]);
+            assert!(found(&evaluate_rule(&rule, &[run(matching)])), "{block}");
+            assert!(not_found(&evaluate_rule(&rule, &[run(missing)])), "{block}");
+        }
+    }
+
+    /// The string operators inherit ADR 0025: they fold ASCII case, and `cased` is the way back.
+    #[test]
+    fn a_text_operator_folds_case_unless_the_field_is_cased() {
+        let folding = evtx_rule("  path|startswith: 'C:\\Windows\\'\n");
+        let exact = evtx_rule("  path|startswith: 'C:\\Windows\\'\ncased: [path]\n");
+        let run = || {
+            evtx_run(vec![evtx_observation(serde_json::json!({
+                "path": r"c:\WINDOWS\System32\winevt\Logs\Security.evtx"
+            }))])
+        };
+        assert!(found(&evaluate_rule(&folding, &[run()])));
+        assert!(not_found(&evaluate_rule(&exact, &[run()])));
+    }
+
+    /// `startswith` and `contains` are **text** operators: neither knows what a directory separator
+    /// is, so a prefix that stops in the middle of a folder name matches a different folder. This
+    /// test pins the behaviour ADR 0029 warns rule authors about rather than leaving it to be found
+    /// by a rule that reads more broadly than its title.
+    #[test]
+    fn a_text_prefix_does_not_stop_at_a_directory_separator() {
+        let rule = evtx_rule("  path|startswith: 'C:\\Users\\Public'\n");
+        let run = evtx_run(vec![evtx_observation(serde_json::json!({
+            "path": r"C:\Users\PublicRecords\x.evtx"
+        }))]);
+        assert!(found(&evaluate_rule(&rule, &[run])));
+    }
+
+    #[test]
+    fn a_gap_reaches_a_rule_whose_condition_is_a_text_operator() {
+        let rule = evtx_rule("  path|contains: 'winevt'\n");
+        assert!(unmeasured(&evaluate_rule(&rule, &[evtx_gap("path")])));
+    }
+
+    /// `exists` asks about the field, not about its value: `null` is its own type and equality
+    /// cannot stand in for either answer.
+    #[test]
+    fn exists_tells_a_field_that_is_there_from_one_that_is_not() {
+        let present = evtx_rule("  oldest_record_time|exists: true\n");
+        let absent = evtx_rule("  oldest_record_time|exists: false\n");
+        let holds_records = evtx_run(vec![evtx_observation(serde_json::json!({
+            "log": "Security", "oldest_record_time": "2026-09-13T10:00:00Z"
+        }))]);
+        let holds_none = evtx_run(vec![evtx_observation(
+            serde_json::json!({ "log": "Security" }),
+        )]);
+        assert!(found(&evaluate_rule(
+            &present,
+            std::slice::from_ref(&holds_records)
+        )));
+        assert!(not_found(&evaluate_rule(
+            &present,
+            std::slice::from_ref(&holds_none)
+        )));
+        assert!(found(&evaluate_rule(&absent, &[holds_none])));
+        assert!(not_found(&evaluate_rule(&absent, &[holds_records])));
+    }
+
+    #[test]
+    fn a_gap_reaches_a_rule_asking_whether_a_field_exists() {
+        let rule = evtx_rule("  oldest_record_time|exists: true\n");
+        assert!(unmeasured(&evaluate_rule(
+            &rule,
+            &[evtx_gap("oldest_record_time")]
+        )));
+    }
+
+    /// The one this whole change turns on. A field the collector could not read is not in the
+    /// observation, and `exists: false` is satisfied by a field that is not in the observation — so
+    /// without the gap being consulted **before** anything is matched, this rule would be `found`
+    /// and the report would say "the log holds no record" about a log it could not read. That is the
+    /// `unmeasured → not_found` collapse ADR 0002 exists to prevent, wearing a `found`.
+    #[test]
+    fn exists_false_on_an_unreadable_field_is_unmeasured_and_never_found() {
+        let rule = evtx_rule("  oldest_record_time|exists: false\n");
+        let run = CollectorRun::Measured {
+            collector: "evtx".to_owned(),
+            observations: vec![evtx_observation(serde_json::json!({ "log": "Security" }))],
+            gaps: BTreeMap::from([(
+                "oldest_record_time".to_owned(),
+                UnmeasuredReason::AccessDenied,
+            )]),
+        };
+        assert_eq!(
+            evaluate_rule(&rule, &[run]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: false
+            }
+        );
+    }
+
+    /// A gap in a field the rule does not read leaves `exists: false` alone: the early check is
+    /// about the field the rule asks to be absent, not about every gap in the run.
+    #[test]
+    fn exists_false_is_unaffected_by_a_gap_in_another_field() {
+        let rule = evtx_rule("  oldest_record_time|exists: false\n");
+        let run = CollectorRun::Measured {
+            collector: "evtx".to_owned(),
+            observations: vec![evtx_observation(serde_json::json!({ "log": "Security" }))],
+            gaps: BTreeMap::from([("provider".to_owned(), UnmeasuredReason::ReadFailed)]),
+        };
+        assert!(found(&evaluate_rule(&rule, &[run])));
+    }
+
+    /// Two conditions on one field, which is the reason the operator is a key suffix and not a list
+    /// beside `match` the way `cased` is: a map keyed on the field name could hold only one of them.
+    #[test]
+    fn one_field_can_carry_two_conditions() {
+        let rule = evtx_rule("  entries|gte: 2\n  entries|lt: 10\n");
+        let run = |value: i64| {
+            evtx_run(vec![evtx_observation(
+                serde_json::json!({ "entries": value }),
+            )])
+        };
+        assert!(found(&evaluate_rule(&rule, &[run(5)])));
+        assert!(not_found(&evaluate_rule(&rule, &[run(1)])));
+        assert!(not_found(&evaluate_rule(&rule, &[run(10)])));
+    }
+
+    /// `gaps` is keyed on the field name, and a suffixed key still resolves to it. ADR 0025 rejected
+    /// a key suffix for `cased` on exactly this ground — that the key would stop equalling the field
+    /// name and a field the collector could not read would report `not_found`. Splitting the key
+    /// before the lookup is the answer, and this is what holds it.
+    #[test]
+    fn a_suffixed_key_is_still_found_in_gaps() {
+        for block in [
+            "  entries|gte: 2\n",
+            "  path|contains: 'winevt'\n",
+            "  path|exists: true\n",
+        ] {
+            let field = if block.contains("entries") {
+                "entries"
+            } else {
+                "path"
+            };
+            let evidence = evaluate_rule(&evtx_rule(block), &[evtx_gap(field)]);
+            assert!(unmeasured(&evidence), "{block}: {evidence:?}");
+        }
+    }
+
+    /// A key whose suffix names no operator is refused by `rules::validate`, so it cannot be in a
+    /// loaded bundle. If one ever arrived it must drop the observation rather than the condition:
+    /// skipping the condition would widen the rule past what its title claims.
+    #[test]
+    fn a_key_with_an_unknown_operator_matches_nothing() {
+        let rule = evtx_rule("  entries|atleast: 2\n");
+        let run = evtx_run(vec![evtx_observation(serde_json::json!({ "entries": 5 }))]);
+        assert!(not_found(&evaluate_rule(&rule, &[run])));
     }
 }
