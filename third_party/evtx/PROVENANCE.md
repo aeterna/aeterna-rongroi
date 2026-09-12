@@ -64,9 +64,11 @@ the crate found these two to be the only allocations sized by an unchecked value
 every other one is bounded by `EVTX_CHUNK_SIZE`, by a slice length already in memory, or sits in the
 `wevt_templates` feature, which is off and which this parser never enters.
 
-**Upstream:** the patch is being reported to `omerbenamram/EVTX`. When a release carries the fix, delete
-this directory, delete both `[patch.crates-io]` stanzas (root `Cargo.toml` and `fuzz/Cargo.toml`), and
-bump the registry dependency.
+**Upstream:** not yet reported. The patch is written to be sent to `omerbenamram/EVTX`, and this line
+should say so with a link once it has been — an unreported finding recorded as reported is how a fix
+stays vendored forever. When a release carries it, delete this directory, delete both
+`[patch.crates-io]` stanzas (root `Cargo.toml` and `fuzz/Cargo.toml`), and bump the registry
+dependency.
 
 ## What was removed, and what was not
 
