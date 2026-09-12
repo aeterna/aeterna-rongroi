@@ -6,6 +6,7 @@
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
 pub mod fivem_dir;
+pub mod pca;
 pub mod posture;
 pub mod process;
 pub mod scan;
@@ -25,6 +26,7 @@ pub trait Collector {
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
         Box::new(fivem_dir::FivemDir),
+        Box::new(pca::Pca),
         Box::new(posture::Posture),
         Box::new(process::Process),
     ]

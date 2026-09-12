@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Three launch records whose paths are three different shapes: one rooted at a drive letter, which is
+# the only shape `rongroi_core::view::redact_user_paths` can reach; one UNC path and one device path,
+# neither of which it can, and which therefore reach no report at all (ADR 0020).
+#
+# The bytes are written inline rather than added to `fixtures/parsers/`: they exist to exercise the
+# collector's withholding, not the parser, and the parser corpora are also fuzz seeds. The account
+# names `shareduser` and `deviceuser` are invented, and are here so that a test can assert they never
+# appear in an observation.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      content: |
+        C:\Users\fixtureuser\Downloads\drive-rooted.exe|2026-09-12 10:23:46
+        \\nas\home\shareduser\unc.exe|2026-09-12 10:24:00
+        \Device\HarddiskVolume3\Users\deviceuser\device.exe|2026-09-12 10:25:00

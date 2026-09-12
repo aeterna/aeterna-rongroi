@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# The PCA folder is there and Windows will not hand its files over, to a process that is not running
+# with administrator rights. That pair is what makes `not_admin` the reason rather than
+# `access_denied`, and what makes the restart-as-administrator offer worth taking (ADR 0012).
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      from: '../../parsers/pca-app-launch/normal.txt'
+    - name: PcaGeneralDb0.txt
+      from: '../../parsers/pca-general/normal.txt'
+    - name: PcaGeneralDb1.txt
+      from: '../../parsers/pca-general/normal.txt'
+access_denied:
+  - 'C:\Windows\appcompat\pca'

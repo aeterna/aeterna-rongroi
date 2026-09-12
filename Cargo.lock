@@ -3090,6 +3090,7 @@ dependencies = [
  "insta",
  "rongroi-core",
  "rongroi-host",
+ "rongroi-parsers",
  "serde_json",
 ]
 

@@ -32,6 +32,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- The `pca` collector, the first thing in the product to call `rongroi-parsers`: it reads the three
+  Program Compatibility Assistant files under `%WinDir%\appcompat\pca` and reports, per launch record,
+  the program's name, when PCA saw it run, and its path — the last of these only when the path begins
+  with a drive letter, which is the one shape SS-mode redaction can reach, so that a UNC or device path
+  carrying an account name is withheld rather than shown unredacted. The general databases contribute
+  only how many records they held and whether every line parsed, because no position in them has an
+  established meaning and one of them is a user path. A file that is there and could not be read says so
+  in the report rather than being counted away. No rule reads it yet, so what it sees is listed in Self
+  mode and counted in SS mode (ADR 0020).
 - Hosts can read a file's bytes: `FilesystemSource::read_file` returns the contents of a file a
   collector names, which is what the four parsers in `rongroi-parsers` have been waiting for — their
   whole API is bytes in, structs out, and until now nothing on a `Host` returned bytes. A file that is
