@@ -19,22 +19,99 @@ pub mod scan;
 use rongroi_core::model::{CollectorRun, UnmeasuredReason};
 use rongroi_host::Host;
 
+/// What kind of value an observation field carries, so that `cargo xtask check-rules` can refuse an
+/// operator the field cannot take (ADR 0029).
+///
+/// The engine never sees this: it dispatches on the JSON value it is handed, and the rules bundle
+/// loads in a build whose collectors this declaration does not reach. It exists so that a rule
+/// asking `name|gt: 3` is refused at review time rather than reported `not_found` for ever.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldKind {
+    /// A string with no order of its own: a path, a file name, a channel, a status word.
+    Text,
+    /// A JSON number: a count, a size, an id.
+    Number,
+    /// A JSON boolean.
+    Bool,
+    /// A string holding one instant, written by `jiff::Timestamp::to_string` (RFC 3339, UTC).
+    Timestamp,
+}
+
+impl FieldKind {
+    /// Stable identifier used in the messages `check-rules` prints.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Number => "a number",
+            Self::Bool => "a boolean",
+            Self::Timestamp => "a timestamp",
+        }
+    }
+}
+
+/// One observation field a collector declares it can emit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Field {
+    /// The field name a rule's `match` may use.
+    pub name: &'static str,
+    /// What kind of value it carries.
+    pub kind: FieldKind,
+}
+
+impl Field {
+    /// A field carrying text.
+    pub const fn text(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Text,
+        }
+    }
+
+    /// A field carrying a number.
+    pub const fn number(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Number,
+        }
+    }
+
+    /// A field carrying a boolean.
+    pub const fn boolean(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Bool,
+        }
+    }
+
+    /// A field carrying one instant as RFC 3339 text.
+    pub const fn timestamp(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Timestamp,
+        }
+    }
+}
+
 /// Reads one kind of artifact. Implementations must be read-only and must never panic.
 pub trait Collector {
     /// Stable id, equal to the `collector` field of the rules that read it.
     fn id(&self) -> &'static str;
-    /// Every observation field name this collector can emit, sorted.
+    /// Every observation field this collector can emit, with the kind of value it carries, sorted
+    /// by name.
     ///
     /// This is the vocabulary a rule's `match` may name, and `cargo xtask check-rules` rejects a
-    /// rule that names anything outside it (ADR 0026). It is a declaration rather than something
-    /// derived from the code, so it can drift from what `collect` really puts in a field map; what
-    /// holds the two together is the `every_emitted_field_is_declared` test in this file, which
-    /// runs every collector over every fixture host and fails on a field no list names.
+    /// rule that names anything outside it (ADR 0026). Since ADR 0029 each entry also carries a
+    /// [`FieldKind`], and `check-rules` rejects an operator the kind cannot take — an ordinal
+    /// comparison against a field that is only ever text, for one. It is a declaration rather than
+    /// something derived from the code, so it can drift from what `collect` really puts in a field
+    /// map; what holds the two together is `every_emitted_field_is_declared` and
+    /// `every_emitted_value_has_its_declared_kind` in this file, which run every collector over
+    /// every fixture host and fail on a field no list names or a value of the wrong shape.
     ///
     /// There is deliberately no default implementation: a new collector that forgets this does not
     /// compile, rather than declaring an empty vocabulary that would reject every rule written for
     /// it.
-    fn fields(&self) -> &'static [&'static str];
+    fn fields(&self) -> &'static [Field];
     /// Every reason this collector can give for not having looked, in a run or in `gaps`.
     ///
     /// This is what a rule's `unmeasured_when` may name, and `cargo xtask check-rules` rejects a
@@ -65,7 +142,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
 
     use rongroi_core::model::{CollectorRun, UnmeasuredReason};
@@ -106,7 +183,8 @@ mod tests {
         for (name, dir) in fixture_hosts() {
             let host = FixtureHost::load(&dir).expect("a fixture host loads");
             for collector in all() {
-                let declared: BTreeSet<&str> = collector.fields().iter().copied().collect();
+                let declared: BTreeSet<&str> =
+                    collector.fields().iter().map(|field| field.name).collect();
                 let CollectorRun::Measured { observations, .. } = collector.collect(&host) else {
                     continue;
                 };
@@ -123,6 +201,54 @@ mod tests {
         }
     }
 
+    /// A declared [`FieldKind`] is what `check-rules` refuses an operator against, so a kind that
+    /// does not match the value a collector really emits would refuse a correct rule, or — worse —
+    /// accept `oldest_record_time|gt:` against a field that turns out to hold a count.
+    ///
+    /// This proves the same half `every_emitted_field_is_declared` proves, and has the same limit: a
+    /// field no fixture host produces is not checked here. `Timestamp` is checked as far as it can
+    /// be from this side — the value is a string that `rongroi_core::rules::is_rfc3339` accepts,
+    /// which is the same function the engine's ordinal comparison parses with.
+    #[test]
+    fn every_emitted_value_has_its_declared_kind() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeMap<&str, FieldKind> = collector
+                    .fields()
+                    .iter()
+                    .map(|field| (field.name, field.kind))
+                    .collect();
+                let CollectorRun::Measured { observations, .. } = collector.collect(&host) else {
+                    continue;
+                };
+                for observation in &observations {
+                    for (field, value) in &observation.fields {
+                        let Some(kind) = declared.get(field.as_str()) else {
+                            continue; // `every_emitted_field_is_declared` is what reports this one.
+                        };
+                        let ok = match kind {
+                            FieldKind::Text => value.is_string(),
+                            FieldKind::Number => value.is_number(),
+                            FieldKind::Bool => value.is_boolean(),
+                            // The engine's own test for one, so the kind is bound to what
+                            // `<field>|gt:` will actually be able to put in order (ADR 0029).
+                            FieldKind::Timestamp => {
+                                value.as_str().is_some_and(rongroi_core::rules::is_rfc3339)
+                            }
+                        };
+                        assert!(
+                            ok,
+                            "fixtures/hosts/{name}: collector `{}` emitted `{field}` as {value}, which is not {}",
+                            collector.id(),
+                            kind.as_str()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// A gap names the field it is a gap in, so a `gaps` key outside the declared list is the same
     /// drift as an undeclared observation field: a rule matching that field would be `NotFound`
     /// where the collector meant `Unmeasured`.
@@ -131,7 +257,8 @@ mod tests {
         for (name, dir) in fixture_hosts() {
             let host = FixtureHost::load(&dir).expect("a fixture host loads");
             for collector in all() {
-                let declared: BTreeSet<&str> = collector.fields().iter().copied().collect();
+                let declared: BTreeSet<&str> =
+                    collector.fields().iter().map(|field| field.name).collect();
                 let CollectorRun::Measured { gaps, .. } = collector.collect(&host) else {
                     continue;
                 };
@@ -184,13 +311,13 @@ mod tests {
     #[test]
     fn fields_are_sorted_and_unique() {
         for collector in all() {
-            let declared = collector.fields();
-            let mut sorted = declared.to_vec();
+            let declared: Vec<&str> = collector.fields().iter().map(|field| field.name).collect();
+            let mut sorted = declared.clone();
             sorted.sort_unstable();
             sorted.dedup();
             assert_eq!(
                 sorted,
-                declared.to_vec(),
+                declared,
                 "collector `{}` declares fields that are unsorted or repeated",
                 collector.id()
             );

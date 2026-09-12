@@ -39,9 +39,9 @@ use rongroi_host::{Host, Platform};
 use rongroi_parsers::bam::{self, BamEntry};
 use rongroi_parsers::error::ParseError;
 
-use crate::Collector;
 use crate::failure::{read_failure, reason_for};
 use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::{Collector, Field};
 
 /// The key holding one subkey per user account that BAM has recorded anything for.
 pub const USER_SETTINGS_KEY: &str =
@@ -68,20 +68,20 @@ const REASONS: [UnmeasuredReason; 5] = [
 ///
 /// A key it could not enumerate is a gap in all of them. One value it could not read or decode is
 /// not: see the comment on [`Bam::collect`].
-const FIELDS: [&str; 13] = [
-    "entries",
-    "intact",
-    "last_run",
-    "moderation_state",
-    "name",
-    "path",
-    "path_withheld",
-    "read",
-    "rejected",
-    "sid_withheld",
-    "users",
-    "value_bytes",
-    "values",
+const FIELDS: [Field; 13] = [
+    Field::number("entries"),
+    Field::boolean("intact"),
+    Field::timestamp("last_run"),
+    Field::number("moderation_state"),
+    Field::text("name"),
+    Field::text("path"),
+    Field::text("path_withheld"),
+    Field::text("read"),
+    Field::number("rejected"),
+    Field::text("sid_withheld"),
+    Field::number("users"),
+    Field::number("value_bytes"),
+    Field::number("values"),
 ];
 
 /// The `bam` collector.
@@ -93,7 +93,7 @@ impl Collector for Bam {
         ID
     }
 
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &'static [Field] {
         &FIELDS
     }
 
@@ -199,7 +199,7 @@ impl Collector for Bam {
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
-        .map(|field| ((*field).to_owned(), reason))
+        .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
 
@@ -496,7 +496,8 @@ mod tests {
         assert_eq!(observations.len(), 1, "{observations:?}");
         assert_eq!(text(&observations[0], "read"), Some("access_denied"));
         assert_eq!(observations[0].fields.get("path"), None);
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(gaps.get(name), Some(&UnmeasuredReason::NotAdmin), "{name}");
         }
     }
@@ -509,7 +510,8 @@ mod tests {
         let (observations, gaps) = measured(&run);
 
         assert_eq!(text(&observations[0], "read"), Some("access_denied"));
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::AccessDenied),
@@ -531,7 +533,8 @@ mod tests {
         assert_eq!(text(refused[0], "read"), Some("access_denied"));
         assert_eq!(executions(observations).len(), 1);
         assert_eq!(field(account(observations), "users"), Some(&2_u64.into()));
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(gaps.get(name), Some(&UnmeasuredReason::NotAdmin), "{name}");
         }
     }

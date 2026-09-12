@@ -19,10 +19,36 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   missed one would report `not_found` — a thing looked for and not there. Non-ASCII letters are **not**
   folded: `Sömchai` does not match `SÖMCHAI`. Numbers, booleans and null are compared exactly, so
   `event_id: 1102` never matches the text `"1102"` (ADR 0025).
+- **A `match` key may carry an operator**, written `field|operator` (ADR 0029). The whole vocabulary, with
+  examples, is in [`docs/rules-authoring.md`](../docs/rules-authoring.md#the-operators):
+
+  | Written | Means |
+  |---|---|
+  | `event_id: [1102, 104]` | a list is **or** — any one of them |
+  | `run_count\|gte: 2` · `gt` · `lt` · `lte` | ordered; on numbers, and on timestamps, which are **parsed** and not compared as text |
+  | `path\|startswith:` · `endswith` · `contains` | text begins with / ends with / holds text |
+  | `path\|exists: true` or `false` | the field is there, or is not — which is not the same question as equality |
+
+  `match` is still every entry at once: no `or` between entries, no grouping, no negation, no regular
+  expressions, no wildcards inside a value. `check-rules` rejects an operator name that is not one of
+  these, an empty list, a list where the operator has no reading for one, and an operator the field's own
+  kind cannot take — an ordinal comparison against a field that is only ever text, for one.
+- **`startswith` and `contains` are text, not paths.** Neither knows what a directory separator is, so
+  `path|startswith: 'C:\Users\Public'` also matches `C:\Users\PublicRecords\x.exe` and
+  `path|contains: 'Temp'` matches `C:\Program Files\TempleOS\game.exe`. **Put the separators in the value**
+  — `'C:\Users\'`, `'\AppData\Local\Temp\'`, `'.exe'` — and read the rule's `title` back against what you
+  wrote. A rule that matches more people than its title claims is the failure this repository cares most
+  about (ADR 0029).
+- **A field the collector could not read makes the rule `unmeasured`, under every operator**, `exists:
+  false` included — there the gap is checked before anything is matched, because a field nobody could read
+  is also a field that is not there, and the rule would otherwise be `found` and the report would say "we
+  looked and it is not there" about it (ADR 0002, ADR 0029).
 - To compare one field byte for byte, list its name in `cased`. It is per field, so the rest of `match`
-  keeps folding, and every field left out of it folds. A rule with no `cased` line is case-insensitive —
-  write one only when the field's own vocabulary distinguishes case, and say in a `#` comment why. A
-  `cased` entry naming a field `match` does not have fails `cargo xtask check-rules`.
+  keeps folding, every field left out of it folds, and one entry covers every comparison the rule makes
+  against that field, `startswith` and `contains` included. A rule with no `cased` line is
+  case-insensitive — write one only when the field's own vocabulary distinguishes case, and say in a `#`
+  comment why. A `cased` entry naming a field `match` does not have, or one `match` compares no text of,
+  fails `cargo xtask check-rules`.
 - `collector` must be a collector in this build and every `match` field name one that collector
   declares it can emit (`Collector::fields`, ADR 0026). A misspelling is not a quiet mistake: the rule
   becomes `not_found` on every machine, which this program shows a player as evidence that something

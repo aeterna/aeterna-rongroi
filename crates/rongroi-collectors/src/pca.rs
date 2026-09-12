@@ -35,9 +35,9 @@ use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
 use rongroi_parsers::pca::{self, PcaLaunchEntry};
 
-use crate::Collector;
 use crate::failure::{read_failure, reason_for};
 use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::{Collector, Field};
 
 /// Environment variable holding the Windows directory.
 pub const WINDOWS_DIR: &str = "WinDir";
@@ -78,16 +78,16 @@ const REASONS: [UnmeasuredReason; 5] = [
 /// listing: it is the whole record of a class of launches, and losing it loses an unknown number of
 /// entries. A rule that read a PCA absence as "not found" after that would be saying a program did
 /// not run, on evidence that was never read.
-const FIELDS: [&str; 9] = [
-    "entries",
-    "intact",
-    "last_run",
-    "name",
-    "path",
-    "path_withheld",
-    "read",
-    "rejected",
-    "source",
+const FIELDS: [Field; 9] = [
+    Field::number("entries"),
+    Field::boolean("intact"),
+    Field::timestamp("last_run"),
+    Field::text("name"),
+    Field::text("path"),
+    Field::text("path_withheld"),
+    Field::text("read"),
+    Field::number("rejected"),
+    Field::text("source"),
 ];
 
 /// The `pca` collector.
@@ -99,7 +99,7 @@ impl Collector for Pca {
         ID
     }
 
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &'static [Field] {
         &FIELDS
     }
 
@@ -169,7 +169,7 @@ impl Collector for Pca {
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
-        .map(|field| ((*field).to_owned(), reason))
+        .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
 
@@ -416,7 +416,8 @@ mod tests {
             assert_eq!(text(observation, "read"), Some("access_denied"));
             assert_eq!(observation.fields.get("path"), None);
         }
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(gaps.get(name), Some(&UnmeasuredReason::NotAdmin), "{name}");
         }
     }
@@ -434,7 +435,8 @@ mod tests {
         assert_eq!(text(denied[0], "read"), Some("failed"));
         // The readable file was still read.
         assert_eq!(of_source(observations, "general_db0").len(), 1);
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::ReadFailed),
@@ -511,7 +513,8 @@ mod tests {
         let refused = of_source(observations, APP_LAUNCH_DIC);
         assert_eq!(refused.len(), 1, "{refused:?}");
         assert_eq!(text(refused[0], "read"), Some("not_pca_text"));
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::ReadFailed),

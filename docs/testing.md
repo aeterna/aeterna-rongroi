@@ -6,7 +6,7 @@
 |---|---|---|---|
 | L0 parsers | artifact formats decode correctly, including corrupt input — truncated, malformed, the wrong encoding, and bytes whose meaning is not established | `crates/rongroi-parsers` | macOS · Linux · Windows |
 | L1 collectors | every outcome — found, not found, unmeasured — against `FixtureHost` | `crates/rongroi-collectors/src/*.rs` | macOS · Linux · Windows |
-| L2 rules | each rule's `collector`, every `match` field name and every `unmeasured_when` reason exist in this build; each rule's positive fixture is `found`, negative is `not_found` | `rules/**/tests/` via `cargo xtask check-rules` | macOS · Linux · Windows |
+| L2 rules | each rule's `collector`, every `match` field name and every `unmeasured_when` reason exist in this build, and every `match` operator is one the field's kind can take; each rule's positive fixture is `found`, negative is `not_found` | `rules/**/tests/` via `cargo xtask check-rules` | macOS · Linux · Windows |
 | L2b baseline | the whole rule set stays quiet on machines described as ordinary; each accepted match needs a `rules/known-fps.csv` row with a reason, and an unused row fails. Three profiles, one of which — `baseline-elevated-win11` — has every collector `Measured`, so a rule for `pca`, `prefetch`, `bam` or `evtx` is answerable here rather than `Unmeasured` (ADR 0026) | `fixtures/hosts/baseline-*/` via `cargo xtask check-baseline` | macOS · Linux · Windows |
 | L3 report | the full pipeline, as JSON snapshots; SS view never contains the fixture user name, lists no `unmeasured` result its rule expected, and carries the `not_admin` scope statement rather than a row per rule (ADR 0027) | `crates/rongroi-collectors/tests/`, `rongroi-core::view` | macOS · Linux · Windows |
 | L4 UI | the GUI renders the L3 report JSON through mocked IPC; WebView hardening settings | `apps/desktop` (vitest) | macOS · Linux |
@@ -117,7 +117,7 @@ confirm it fails:
 |---|---|
 | `cargo deny check` | adding `reqwest` to a crate |
 | `fuzz smoke` | giving a parser a panicking path — e.g. indexing `bytes[TAIL_OFFSET]` in `bam::parse_value`, slicing `bytes[4..MAM_HEADER_LEN]` in `prefetch::reject_implausible_declared_size`, or indexing `bytes[FILE_HEADER_LEN]` in `evtx::records` instead of comparing the length, rather than reaching for it with `get` |
-| `check-rules` | duplicating a rule id, deleting a negative fixture, allowing by `name:`, misspelling a `match` field (`run_cout`) or a `collector` (`postures`), or declaring an `unmeasured_when` reason the collector cannot report (`service_disabled`, or `not_admin` on `posture`) |
+| `check-rules` | duplicating a rule id, deleting a negative fixture, allowing by `name:`, misspelling a `match` field (`run_cout`) or a `collector` (`postures`), declaring an `unmeasured_when` reason the collector cannot report (`service_disabled`, or `not_admin` on `posture`), writing an operator that is not one (`secure_boot\|matches:`), an empty value list (`secure_boot: []`), or an operator the field's kind cannot take (`secure_boot\|gt: 1`) |
 | `check-baseline` | pointing a rule's `match` at a value a baseline host carries — `prefetch` / `name: cmd.exe` fires on `baseline-elevated-win11` — or leaving a `known-fps.csv` row in place once its rule no longer matches |
 | `check-locales` | adding a key to a translation that English does not have |
 | `check-unicode` | inserting U+200B into any file |

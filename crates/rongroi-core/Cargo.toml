@@ -17,6 +17,11 @@ publish.workspace = true
 source-tree = []
 
 [dependencies]
+# jiff: an ordinal comparison of timestamps parses both sides rather than comparing their text
+# (ADR 0029). The collectors emit `jiff::Timestamp::to_string`, which trims trailing zeros from the
+# fraction, so `…:00.5Z` and `…:00Z` are different shapes and a lexical compare puts the later
+# instant first. Parsing is the whole of why this is here; nothing in this crate reads the clock.
+jiff.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde-saphyr.workspace = true

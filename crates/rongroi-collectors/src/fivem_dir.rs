@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{DirEntryInfo, Host, Platform, SourceError};
 
-use crate::Collector;
+use crate::{Collector, Field};
 
 /// Environment variable holding the per-user local application data folder.
 pub const LOCAL_APP_DATA: &str = "LOCALAPPDATA";
@@ -36,7 +36,11 @@ const REASONS: [UnmeasuredReason; 3] = [
 
 /// Every field this collector can emit. A folder it could not read is a gap in all of them: a rule
 /// that matches on any one of them must come out `Unmeasured`, never `NotFound`.
-const FIELDS: [&str; 3] = ["location", "path", "sha256"];
+const FIELDS: [Field; 3] = [
+    Field::text("location"),
+    Field::text("path"),
+    Field::text("sha256"),
+];
 
 /// The `fivem_dir` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -47,7 +51,7 @@ impl Collector for FivemDir {
         ID
     }
 
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &'static [Field] {
         &FIELDS
     }
 
@@ -99,7 +103,7 @@ fn measured(
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
-        .map(|field| ((*field).to_owned(), reason))
+        .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
 
@@ -233,7 +237,8 @@ mod tests {
         assert!(observations.is_empty());
         // Nothing in the folder could be read, so every field a rule might match on is a gap and no
         // rule may read this run as "not found".
-        for name in FIELDS {
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::AccessDenied),
