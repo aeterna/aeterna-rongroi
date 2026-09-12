@@ -285,7 +285,9 @@ fn parse_failure(error: &ParseError) -> &'static str {
 /// them is read.
 fn reason_for(host: &dyn Host, error: &SourceError) -> UnmeasuredReason {
     match error {
-        SourceError::AccessDenied if host.is_elevated() == Some(false) => UnmeasuredReason::NotAdmin,
+        SourceError::AccessDenied if host.is_elevated() == Some(false) => {
+            UnmeasuredReason::NotAdmin
+        }
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
         SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
             UnmeasuredReason::ReadFailed
@@ -390,7 +392,11 @@ mod tests {
         let run = Pca.collect(&fixture("pca-files-present"));
         let (observations, _) = measured(&run);
 
-        for (source, entries) in [(APP_LAUNCH_DIC, 3_u64), ("general_db0", 2), ("general_db1", 2)] {
+        for (source, entries) in [
+            (APP_LAUNCH_DIC, 3_u64),
+            ("general_db0", 2),
+            ("general_db1", 2),
+        ] {
             let integrity = of_source(observations, source)
                 .into_iter()
                 .find(|observation| observation.fields.contains_key("entries"))
@@ -460,7 +466,11 @@ mod tests {
         // The readable file was still read.
         assert_eq!(of_source(observations, "general_db0").len(), 1);
         for name in FIELDS {
-            assert_eq!(gaps.get(name), Some(&UnmeasuredReason::ReadFailed), "{name}");
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::ReadFailed),
+                "{name}"
+            );
         }
     }
 
@@ -533,7 +543,11 @@ mod tests {
         assert_eq!(refused.len(), 1, "{refused:?}");
         assert_eq!(text(refused[0], "read"), Some("not_pca_text"));
         for name in FIELDS {
-            assert_eq!(gaps.get(name), Some(&UnmeasuredReason::ReadFailed), "{name}");
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::ReadFailed),
+                "{name}"
+            );
         }
     }
 
@@ -575,8 +589,14 @@ mod tests {
 
     #[test]
     fn a_name_is_the_last_segment_lower_cased() {
-        assert_eq!(file_name(r"C:\Users\alex\Game.EXE").as_deref(), Some("game.exe"));
-        assert_eq!(file_name(r"\\nas\share\Tool.exe").as_deref(), Some("tool.exe"));
+        assert_eq!(
+            file_name(r"C:\Users\alex\Game.EXE").as_deref(),
+            Some("game.exe")
+        );
+        assert_eq!(
+            file_name(r"\\nas\share\Tool.exe").as_deref(),
+            Some("tool.exe")
+        );
         assert_eq!(file_name("bare.exe").as_deref(), Some("bare.exe"));
         assert_eq!(file_name(r"C:\Users\alex\"), None);
     }
@@ -586,7 +606,9 @@ mod tests {
         assert!(is_drive_rooted(r"C:\Users\alex\x.exe"));
         assert!(is_drive_rooted("d:/users/alex/x.exe"));
         assert!(!is_drive_rooted(r"\\nas\share\x.exe"));
-        assert!(!is_drive_rooted(r"\Device\HarddiskVolume3\Users\alex\x.exe"));
+        assert!(!is_drive_rooted(
+            r"\Device\HarddiskVolume3\Users\alex\x.exe"
+        ));
         assert!(!is_drive_rooted(r"\??\C:\Users\alex\x.exe"));
         assert!(!is_drive_rooted("C:"));
         assert!(!is_drive_rooted(""));
