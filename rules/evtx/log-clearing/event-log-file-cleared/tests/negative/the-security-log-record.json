@@ -1,0 +1,9 @@
+{
+  "description": "The Security log's own record of a clearing, event 1102, must not also match this rule. Clearing the Security log can be recorded in both logs, and one action showing as two findings of the same kind is what the two rules being separate prevents.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "channel": "Security", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 1102, "level": 4, "count": 1,
+      "first_seen": "2026-03-02T11:04:51.117Z", "last_seen": "2026-03-02T11:04:51.117Z" } }
+  ]
+}

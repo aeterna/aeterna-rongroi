@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 1,
       "sha256": "[bundle sha256]",
-      "rule_count": 4
+      "rule_count": 6
     },
     "platform": "windows",
     "os_build": "26100",
@@ -30,7 +30,7 @@ expression: view
     "not_attempted": 0
   },
   "hidden": {
-    "not_found": 0,
+    "not_found": 2,
     "unmeasured_expected": 4,
     "unmeasured_unexpected": 0,
     "unmatched": 9
