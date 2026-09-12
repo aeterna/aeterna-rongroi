@@ -25,6 +25,8 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `rongroi_core::bundle` |
 | **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `rongroi_core::provenance` |
 | **build marker** | The text `aeterna-rongroi build marker: official=<flag>;commit=<sha>;` embedded in every binary; the report's provenance is read from it | `rongroi_core::provenance::build_marker` |
+| **path** | Observation field: the full path of the file the observation is about, as it was read. Redacted to `%USERPROFILE%` in SS mode | observation field `path` |
+| **sha256** | Observation field: SHA-256 of that file, 64 lowercase hex characters. The only file hash, and one of the two things `allow` may compare | observation field `sha256` |
 
 Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as "detection result",
 "hit", "finding" for Evidence.

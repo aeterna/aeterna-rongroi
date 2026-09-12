@@ -10,3 +10,6 @@ mod live;
 
 #[cfg(windows)]
 pub use live::LiveHost;
+
+#[cfg(windows)]
+pub mod filesystem;

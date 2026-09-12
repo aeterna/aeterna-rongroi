@@ -48,6 +48,24 @@ fn unreported_secure_boot_is_unmeasured_not_not_found() {
 }
 
 #[test]
+fn fivem_dir_plugin_present_self_view() {
+    let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::SelfCheck);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+#[test]
+fn fivem_dir_plugin_present_ss_view() {
+    let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::Ss);
+    // The fixture's files live under `C:\Users\fixtureuser\...`. No rule reads `fivem_dir` yet
+    // (ADR 0009), so no observation of it reaches a view at all; this holds the line for the day one
+    // does. What proves the redaction itself is `rongroi_core::view`, which redacts a path of exactly
+    // this shape.
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(!json.contains("fixtureuser"), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+#[test]
 fn unofficial_provenance_is_reported() {
     let report = report_for("secure-boot-on");
     assert!(!report.header.provenance.official);
