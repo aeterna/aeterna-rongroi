@@ -1,15 +1,18 @@
 # SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 with no TPM. Very common on older or self-built PCs; everything else is ordinary, so this
+# fixture isolates that one fact. An absent TPM has no specification version to report.
 platform: windows
-os_build: "19045"
-elevated: true
+os_build: "26100"
+elevated: false
 registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
+    UEFISecureBootEnabled: 1
   'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
     Enabled: 1
 code_integrity:
   enabled: true
   test_signing: false
 tpm:
-  present: true
-  spec_version: "2.0"
+  present: false

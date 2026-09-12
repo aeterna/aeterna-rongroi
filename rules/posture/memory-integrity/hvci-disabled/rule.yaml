@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 8458638a-04fd-4bbf-910a-c4dd9bbe36bb
+title: Memory integrity (HVCI) is configured off
+description: >-
+  Windows is configured not to enforce Hypervisor-Enforced Code Integrity, so kernel code is not
+  checked inside the hypervisor-protected environment that feature provides. This reads the configured
+  policy and not a live confirmation that the hypervisor is enforcing anything: a PC whose hardware
+  lacks the necessary virtualisation support can carry the setting either way and enforce nothing.
+  Memory integrity is off on a great many ordinary PCs, so on its own this describes the machine — it
+  is not evidence of cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  hvci: disabled
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+unmeasured_when: [not_windows, source_missing, access_denied, read_failed]
+falsepositives:
+  - PCs whose hardware or firmware cannot support virtualisation-based security
+  - Machines where it was switched off to resolve a driver, anti-cheat or virtualisation conflict
+  - The many consumer PCs, and PCs upgraded in place, that simply run with it off by default
+references:
+  - https://learn.microsoft.com/en-us/windows/security/hardware-security/enable-virtualization-based-protection-of-code-integrity
+author: aeterna-rongroi contributors
+date: 2026-09-12
+tags: [posture, memory-integrity]

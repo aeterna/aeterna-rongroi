@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 1,
       "sha256": "[bundle sha256]",
-      "rule_count": 1
+      "rule_count": 4
     },
     "platform": "windows",
     "os_build": "26100",
@@ -32,10 +32,35 @@ expression: view
         {
           "collector": "posture",
           "fields": {
-            "secure_boot": "disabled"
+            "hvci": "enabled",
+            "secure_boot": "disabled",
+            "test_signing": "disabled",
+            "tpm": "present",
+            "tpm_spec_version": "2.0"
           }
         }
       ]
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "not_found",
+      "retention": "Current hardware state only. It says nothing about earlier hardware or firmware settings."
     }
   ],
   "hidden": {

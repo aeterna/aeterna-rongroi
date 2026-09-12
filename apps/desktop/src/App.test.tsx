@@ -100,7 +100,9 @@ describe("App", () => {
     fireEvent.click(screen.getByText("I agree — show the SS view"));
     expect(await screen.findByText("Found")).toBeTruthy();
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
-    expect(screen.getByText("Hidden in SS mode: 0 not found · 0 not measured")).toBeTruthy();
+    // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
+    // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
+    expect(screen.getByText("Hidden in SS mode: 1 not found · 0 not measured")).toBeTruthy();
     expect(calls).toContain("report_view");
   });
 

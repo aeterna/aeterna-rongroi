@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 66d513b5-fe61-415a-9385-9d01f85c3ef5
+title: No TPM is present
+description: >-
+  The platform reports that this machine has no TPM. A TPM is one of the stable pieces of hardware an
+  identity can be tied to, so whether one exists is useful background when a reviewer is reading the
+  rest of a report. Enormous numbers of working PCs have no TPM at all or have it switched off in
+  firmware, so this says nothing about the person using the machine and is not evidence of cheating.
+status: experimental
+collector: posture
+strength: context
+match:
+  tpm: absent
+retention: Current hardware state only. It says nothing about earlier hardware or firmware settings.
+unmeasured_when: [not_windows, access_denied, read_failed]
+falsepositives:
+  - PCs built without a TPM, which includes a great many older and self-assembled machines
+  - A TPM switched off or hidden in firmware, which is a common factory default
+  - Virtual machines and test systems that have no virtual TPM attached
+references:
+  - https://learn.microsoft.com/en-us/windows/security/hardware-security/tpm/trusted-platform-module-overview
+author: aeterna-rongroi contributors
+date: 2026-09-12
+tags: [posture, tpm]
