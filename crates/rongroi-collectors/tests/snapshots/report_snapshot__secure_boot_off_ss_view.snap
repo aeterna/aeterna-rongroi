@@ -57,8 +57,10 @@ expression: view
     }
   ],
   "own_traces": [],
+  "unmatched": [],
   "hidden": {
     "not_found": 1,
-    "unmeasured": 0
+    "unmeasured": 0,
+    "unmatched": 0
   }
 }

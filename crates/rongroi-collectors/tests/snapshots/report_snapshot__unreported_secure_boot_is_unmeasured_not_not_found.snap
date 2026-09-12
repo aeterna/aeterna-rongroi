@@ -53,8 +53,25 @@ expression: view
     }
   ],
   "own_traces": [],
+  "unmatched": [
+    {
+      "collector": "posture",
+      "observations": [
+        {
+          "collector": "posture",
+          "fields": {
+            "hvci": "enabled",
+            "test_signing": "disabled",
+            "tpm": "present",
+            "tpm_spec_version": "2.0"
+          }
+        }
+      ]
+    }
+  ],
   "hidden": {
     "not_found": 0,
-    "unmeasured": 0
+    "unmeasured": 0,
+    "unmatched": 0
   }
 }

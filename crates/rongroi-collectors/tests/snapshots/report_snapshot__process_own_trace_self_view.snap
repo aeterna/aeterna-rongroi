@@ -64,8 +64,29 @@ expression: view
       }
     }
   ],
+  "unmatched": [
+    {
+      "collector": "process",
+      "observations": [
+        {
+          "collector": "process",
+          "fields": {
+            "name": "System"
+          }
+        },
+        {
+          "collector": "process",
+          "fields": {
+            "name": "FiveM.exe",
+            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe"
+          }
+        }
+      ]
+    }
+  ],
   "hidden": {
     "not_found": 0,
-    "unmeasured": 0
+    "unmeasured": 0,
+    "unmatched": 0
   }
 }

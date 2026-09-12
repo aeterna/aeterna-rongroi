@@ -53,8 +53,31 @@ expression: view
     }
   ],
   "own_traces": [],
+  "unmatched": [
+    {
+      "collector": "fivem_dir",
+      "observations": [
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "location": "plugins",
+            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "location": "plugins",
+            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll"
+          }
+        }
+      ]
+    }
+  ],
   "hidden": {
     "not_found": 0,
-    "unmeasured": 0
+    "unmeasured": 0,
+    "unmatched": 0
   }
 }
