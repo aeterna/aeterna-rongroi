@@ -101,6 +101,39 @@ pub trait EnvironmentSource {
     fn env_var(&self, name: &str) -> Option<String>;
 }
 
+/// What the running kernel reports about code integrity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CodeIntegrityOptions {
+    /// Kernel-mode code integrity is enforcing driver signatures.
+    pub enabled: bool,
+    /// Test signing is on, so the kernel also accepts self-signed drivers.
+    pub test_signing: bool,
+}
+
+/// Read-only access to the kernel's own code-integrity state (ADR 0011).
+pub trait SystemIntegritySource {
+    /// What the running kernel reports about code integrity and test signing.
+    fn code_integrity_options(&self) -> Result<CodeIntegrityOptions, SourceError>;
+}
+
+/// What the platform reports about the TPM.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TpmInfo {
+    /// Whether a TPM is present at all.
+    pub present: bool,
+    /// Specification family, e.g. `2.0`, when the platform reports one it recognises. `None` when
+    /// there is no TPM, or when its version is not one this program can name.
+    pub spec_version: Option<String>,
+}
+
+/// Read-only access to the TPM's identity (ADR 0011). No command is ever submitted to the device.
+pub trait TpmSource {
+    /// Whether a TPM is present and, when known, which specification family it implements.
+    ///
+    /// A machine with no TPM is an answer (`present: false`), not a failure to look.
+    fn tpm_info(&self) -> Result<TpmInfo, SourceError>;
+}
+
 /// Size of one read when a file is streamed through SHA-256.
 const READ_BLOCK: usize = 64 * 1024;
 
@@ -141,7 +174,9 @@ pub fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
 }
 
 /// A machine that collectors can read. More source traits are added as collectors need them.
-pub trait Host: RegistrySource + FilesystemSource + EnvironmentSource {
+pub trait Host:
+    RegistrySource + FilesystemSource + EnvironmentSource + SystemIntegritySource + TpmSource
+{
     /// Operating system family.
     fn platform(&self) -> Platform;
     /// Windows build number, when known.
@@ -189,6 +224,22 @@ impl EnvironmentSource for NonWindowsHost {
     }
 }
 
+impl SystemIntegritySource for NonWindowsHost {
+    fn code_integrity_options(&self) -> Result<CodeIntegrityOptions, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows code integrity on this platform".to_owned(),
+        ))
+    }
+}
+
+impl TpmSource for NonWindowsHost {
+    fn tpm_info(&self) -> Result<TpmInfo, SourceError> {
+        Err(SourceError::Unsupported(
+            "no TPM base services on this platform".to_owned(),
+        ))
+    }
+}
+
 impl Host for NonWindowsHost {
     fn platform(&self) -> Platform {
         Platform::Other
@@ -218,6 +269,18 @@ mod tests {
             Err(SourceError::Unsupported(_))
         ));
         assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);
+    }
+
+    #[test]
+    fn non_windows_host_reports_no_code_integrity_and_no_tpm() {
+        assert!(matches!(
+            NonWindowsHost.code_integrity_options(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.tpm_info(),
+            Err(SourceError::Unsupported(_))
+        ));
     }
 
     #[test]
