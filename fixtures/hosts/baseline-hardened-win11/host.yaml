@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# A baseline (ADR 0017): this host asserts "a machine like this is unremarkable", and
+# `cargo xtask check-baseline` requires the whole rule set to stay quiet on it. It is a documented
+# profile, not a machine tuned until the gate passed — changing a setting here to silence a rule would
+# be changing what the project claims an ordinary PC looks like.
+#
+# Profile: Windows 11 set up the way Microsoft ships it. Secure Boot on, the memory-integrity policy
+# written and on, test signing off, a TPM 2.0 present. FiveM is not installed — %LOCALAPPDATA% is set
+# and the plugin folder does not exist, so `fivem_dir` looked and saw nothing. A short list of
+# ordinary programs is running.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
+    UEFISecureBootEnabled: 1
+  'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
+    Enabled: 1
+code_integrity:
+  enabled: true
+  test_signing: false
+tpm:
+  present: true
+  spec_version: "2.0"
+processes:
+  - pid: 4
+    name: System
+  - pid: 1024
+    name: explorer.exe
+    path: 'C:\Windows\explorer.exe'
+  - pid: 2048
+    name: chrome.exe
+    path: 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+  - pid: 3072
+    name: steam.exe
+    path: 'C:\Program Files (x86)\Steam\steam.exe'

@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# Matches that `cargo xtask check-baseline` accepts on a baseline host: one row each, with the reason
+# it is accepted. Lines starting with `#` and blank lines are ignored; a `reason` containing a comma is
+# double-quoted.
+#
+# The gate reads this file strictly, because a file that silently accumulates permissions stops being
+# an exception list:
+#   - `rule_id` must be a rule in the bundle and `baseline` a `fixtures/hosts/baseline-*` host.
+#   - `reason` must not be empty.
+#   - A row whose rule no longer matches that baseline is a failure, not a warning. An unused row is a
+#     claim about the rule set that is no longer true.
+#
+# A row is for a match that is a genuine false positive — the rule's own `falsepositives` list should
+# already say so. It is never a way to quiet a rule that is wrong, and tuning a rule so that a baseline
+# goes quiet is out of scope (AGENTS.md, "weakening a rule or collector without a documented
+# false-positive reason"). ADR 0017 has the reasoning.
+#
+# There are no rows today: all four rules in the bundle are quiet on both baselines.
+rule_id,baseline,reason,added

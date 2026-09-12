@@ -16,6 +16,12 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
 | `process-own-trace` | Windows 11 running three processes: one whose image path cannot be resolved, one ordinary program, and aeterna-rongroi itself | `process` collector tests, report snapshots |
+| `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
+| `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
+
+A host named `baseline-*` is read by `cargo xtask check-baseline` and means more than the others: it
+asserts that a machine like this is unremarkable, so the whole rule set must stay quiet on it (ADR 0017).
+Each one is a written profile; a setting in it is never changed to silence a rule.
 
 The user name `fixtureuser` in these paths is invented; it exists so that SS-mode redaction has something
 to replace.

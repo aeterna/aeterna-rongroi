@@ -58,7 +58,8 @@ branch; `main` only receives release pull requests (CONVENTIONS.md, section 7).
 cargo fmt --all --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo nextest run
-cargo xtask check-rules && cargo xtask check-locales && cargo xtask check-unicode
+cargo xtask check-rules && cargo xtask check-baseline
+cargo xtask check-locales && cargo xtask check-unicode
 uvx --with chardet reuse lint
 pnpm -C apps/desktop typecheck && pnpm -C apps/desktop lint && pnpm -C apps/desktop test
 ```

@@ -61,6 +61,7 @@ cargo fmt --all --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo nextest run            # or: cargo test
 cargo xtask check-rules
+cargo xtask check-baseline     # the rule set stays quiet on an ordinary machine
 cargo xtask check-locales
 cargo xtask check-unicode
 uvx --with chardet reuse lint   # chardet: see CONTRIBUTING.md

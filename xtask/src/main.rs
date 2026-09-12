@@ -4,6 +4,7 @@
 
 //! `cargo xtask <command>`: scaffolding and project checks. See CONTRIBUTING.md.
 
+mod check_baseline;
 mod check_locales;
 mod check_rules;
 mod check_unicode;
@@ -29,6 +30,8 @@ struct Cli {
 enum Command {
     /// Validate every rule, its fixtures and rule translations.
     CheckRules,
+    /// Run the whole rule set against the baseline hosts; every match needs a `known-fps.csv` row.
+    CheckBaseline,
     /// Check that every UI locale has the same keys as English.
     CheckLocales,
     /// Fail on zero-width and bidi control characters in any text file.
@@ -57,6 +60,7 @@ fn main() -> anyhow::Result<()> {
     let root = repo_root();
     match Cli::parse().command {
         Command::CheckRules => check_rules::run(&root),
+        Command::CheckBaseline => check_baseline::run(&root),
         Command::CheckLocales => check_locales::run(&root),
         Command::CheckUnicode => check_unicode::run(&root),
         Command::NewRule { collector, path } => new_rule::run(&root, &collector, &path),
