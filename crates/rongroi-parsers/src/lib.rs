@@ -35,3 +35,4 @@ mod cp1252;
 pub mod error;
 pub mod filetime;
 pub mod pca;
+pub mod prefetch;
