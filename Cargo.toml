@@ -30,6 +30,11 @@ rongroi-parsers = { path = "crates/rongroi-parsers" }
 
 anyhow = "1.0.104"
 clap = { version = "4.6", features = ["derive"] }
+# evtx: the binary-XML and chunk reader for Windows Event Log files (ADR 0018). `default-features = false`
+# drops the `evtx_dump` CLI (clap, dialoguer, indoc, simplelog, anyhow, tempfile) and `multithreading`
+# (rayon): this crate parses on the calling thread, which keeps chunk order deterministic and the parsers
+# crate free of a thread pool. It carries RUSTSEC-2021-0153 through `encoding`; see `deny.toml`.
+evtx = { version = "0.12.2", default-features = false }
 insta = { version = "1.48", features = ["json", "redactions"] }
 jiff = "0.2.35"
 prefetch-core = "0.1.1"
