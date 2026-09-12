@@ -6,6 +6,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Prefetch parser: Windows `.pf` files — MAM-compressed or not — decode to a plain struct with the
+  executable, run count, the last eight run times, the volumes and the loaded files, with every raw
+  `FILETIME` kept beside its converted timestamp. SCCA versions 30 and 31 (Windows 10 and 11) are read;
+  an older or unrecognised version is a typed error rather than a wrong parse. The decompressor is the
+  `prefetch-core` crate, whose error type stops inside the parser module and never reaches the rest of
+  the codebase (ADR 0015).
 - Unmatched observations: what a collector saw that no rule matched is kept, grouped by collector, and
   listed in Self mode — the files in FiveM's plugin folder and the running processes, which no rule reads.
   SS mode counts them and lists none, because a raw listing of every file and program name is what that
