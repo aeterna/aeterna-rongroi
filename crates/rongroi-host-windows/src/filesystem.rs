@@ -43,6 +43,21 @@ impl FilesystemSource for LiveHost {
         rongroi_host::sha256_file(std::path::Path::new(path))
             .map_err(|error| SourceError::from_io(&error))
     }
+
+    fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        // Opened for reading only, like every other read here: no truncation flag, no write share
+        // request, no timestamp changed (AGENTS.md hard rule 2).
+        let file = match std::fs::File::open(path) {
+            Ok(file) => file,
+            // The file is not there — the same fact `list_dir` reports for a folder. A Prefetch entry
+            // that Windows replaced between the listing and the read lands here.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(SourceError::from_io(&error)),
+        };
+        // The limit lives in `rongroi-host`, so this host refuses exactly what the fixture host does.
+        rongroi_host::read_bounded(std::io::BufReader::new(file), rongroi_host::MAX_FILE_BYTES)
+            .map(Some)
+    }
 }
 
 impl EnvironmentSource for LiveHost {

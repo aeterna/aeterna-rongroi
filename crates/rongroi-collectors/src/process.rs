@@ -74,12 +74,15 @@ fn observation(process: &ProcessRecord) -> Observation {
     }
 }
 
-/// How a failed source read is reported, as `posture` and `fivem_dir` already do it: `Unsupported`
-/// and `Failed` both mean the list was not read, and nothing about it may be shown as "not found".
+/// How a failed source read is reported, as `posture` and `fivem_dir` already do it: `Unsupported`,
+/// `Failed` and `TooLarge` all mean the list was not read, and nothing about it may be shown as
+/// "not found".
 fn reason_for(error: &SourceError) -> UnmeasuredReason {
     match error {
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
-        SourceError::Unsupported(_) | SourceError::Failed(_) => UnmeasuredReason::ReadFailed,
+        SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
+            UnmeasuredReason::ReadFailed
+        }
     }
 }
 

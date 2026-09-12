@@ -44,6 +44,16 @@ pub enum SourceError {
     /// The request is not supported by this host.
     #[error("unsupported: {0}")]
     Unsupported(String),
+    /// The file holds more bytes than a host will read into memory in one piece (ADR 0019).
+    ///
+    /// A separate variant rather than a `Failed`: the file was found and was readable, and the limit
+    /// is this program's, not the machine's. It carries the limit and never the size, because the
+    /// reader stops one byte past the limit and so never learns how large the file really is.
+    #[error("larger than the {limit} bytes this host reads in one piece")]
+    TooLarge {
+        /// Most bytes this host reads for one file.
+        limit: usize,
+    },
     /// Anything else.
     #[error("read failed: {0}")]
     Failed(String),
@@ -93,6 +103,19 @@ pub trait FilesystemSource {
     ///
     /// The error is about that one file. A collector that cannot hash a file still reports the file.
     fn file_sha256(&self, path: &str) -> Result<String, SourceError>;
+
+    /// The bytes of one file, at most [`MAX_FILE_BYTES`] of them (ADR 0019).
+    ///
+    /// `Ok(None)` means the file does not exist, which is something the collector looked at and saw —
+    /// the same distinction [`FilesystemSource::list_dir`] makes for a directory. A file enumerated a
+    /// moment ago and gone by the time it is read is that case, not a failure.
+    ///
+    /// A file larger than the limit is [`SourceError::TooLarge`]: nothing is truncated, because a
+    /// truncated artifact parses as a damaged one and would show damage this program caused.
+    ///
+    /// The path must name a regular file; `list_dir` already says which entries are files. Anything
+    /// else is an error rather than an answer.
+    fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError>;
 }
 
 /// Read-only access to the process environment. Names are case-insensitive, like Windows.
@@ -194,6 +217,42 @@ pub fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
     sha256_reader(std::io::BufReader::new(std::fs::File::open(path)?))
 }
 
+/// Most bytes [`FilesystemSource::read_file`] returns for one file (ADR 0019).
+///
+/// Every file a collector reads is on the machine being examined, so its size is chosen by whoever
+/// put it there. Without a limit, `read_to_end` on a hostile path sizes an allocation from the file —
+/// the defect this project patched in the vendored `evtx` crate (ADR 0018), one layer lower.
+///
+/// 64 MiB is four times the 16 MiB cap `rongroi_parsers::prefetch` already applies to a declared
+/// decompressed size, and far above the artifacts this program reads: the vendored Event Log sample is
+/// 69 632 bytes and the largest vendored Prefetch file decompresses to 25 KiB. It is also far below a
+/// size that costs a player's machine anything to refuse.
+pub const MAX_FILE_BYTES: usize = 64 * 1024 * 1024;
+
+/// Reads at most `limit` bytes from `reader`, or reports [`SourceError::TooLarge`].
+///
+/// It reads one byte past the limit deliberately: that is what tells a file of exactly `limit` bytes,
+/// which is returned whole, from a larger one, which is refused. Nothing is ever truncated.
+///
+/// The buffer grows as bytes arrive rather than being reserved from a size the file declares, so the
+/// largest allocation this makes is the program's choice and not the file's. It lives here next to the
+/// trait, as [`sha256_file`] does, so every host that reads real files applies the same limit the same
+/// way and so the loop is covered by tests that need no Windows.
+pub fn read_bounded<R: std::io::Read>(reader: R, limit: usize) -> Result<Vec<u8>, SourceError> {
+    use std::io::Read as _;
+
+    let one_past = u64::try_from(limit.saturating_add(1)).unwrap_or(u64::MAX);
+    let mut bytes = Vec::new();
+    reader
+        .take(one_past)
+        .read_to_end(&mut bytes)
+        .map_err(|error| SourceError::from_io(&error))?;
+    if bytes.len() > limit {
+        return Err(SourceError::TooLarge { limit });
+    }
+    Ok(bytes)
+}
+
 /// A machine that collectors can read. More source traits are added as collectors need them.
 pub trait Host:
     RegistrySource
@@ -238,6 +297,12 @@ impl FilesystemSource for NonWindowsHost {
     }
 
     fn file_sha256(&self, _path: &str) -> Result<String, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn read_file(&self, _path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows file system on this platform".to_owned(),
         ))
@@ -302,6 +367,10 @@ mod tests {
             NonWindowsHost.file_sha256(r"C:\Users\a\x.dll"),
             Err(SourceError::Unsupported(_))
         ));
+        assert!(matches!(
+            NonWindowsHost.read_file(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
         assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);
     }
 
@@ -347,6 +416,63 @@ mod tests {
                 SourceError::Failed(_)
             ));
         }
+    }
+
+    /// A reader that fails on the first call, so the classification of a mid-read failure is covered
+    /// without a real file and without Windows.
+    struct FailingReader(std::io::ErrorKind);
+
+    impl std::io::Read for FailingReader {
+        fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::from(self.0))
+        }
+    }
+
+    #[test]
+    fn a_bounded_read_returns_everything_up_to_and_including_the_limit() {
+        assert_eq!(read_bounded(&b""[..], 4), Ok(Vec::new()));
+        assert_eq!(read_bounded(&b"abc"[..], 4), Ok(b"abc".to_vec()));
+        // Exactly the limit is a file this host reads, not one it refuses.
+        assert_eq!(read_bounded(&b"abcd"[..], 4), Ok(b"abcd".to_vec()));
+    }
+
+    /// One byte over the limit is refused as a whole. Returning the first four bytes instead would
+    /// hand a parser a damaged artifact and let the report describe damage this program caused.
+    #[test]
+    fn a_file_over_the_limit_is_refused_rather_than_truncated() {
+        assert_eq!(
+            read_bounded(&b"abcde"[..], 4),
+            Err(SourceError::TooLarge { limit: 4 })
+        );
+        assert_eq!(
+            read_bounded(vec![b'a'; READ_BLOCK * 3].as_slice(), READ_BLOCK),
+            Err(SourceError::TooLarge { limit: READ_BLOCK })
+        );
+        // A limit of zero still reads: it refuses every file that has any bytes in it.
+        assert_eq!(read_bounded(&b""[..], 0), Ok(Vec::new()));
+        assert_eq!(
+            read_bounded(&b"a"[..], 0),
+            Err(SourceError::TooLarge { limit: 0 })
+        );
+    }
+
+    #[test]
+    fn a_bounded_read_classifies_its_failures_like_every_other_file_read() {
+        assert_eq!(
+            read_bounded(FailingReader(std::io::ErrorKind::PermissionDenied), 16),
+            Err(SourceError::AccessDenied)
+        );
+        assert!(matches!(
+            read_bounded(FailingReader(std::io::ErrorKind::InvalidData), 16),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// The limit is a documented decision (ADR 0019), not an implementation detail: changing it
+    /// changes which artifacts this program can read at all, so it is pinned here.
+    #[test]
+    fn the_file_size_limit_is_the_one_the_adr_states() {
+        assert_eq!(MAX_FILE_BYTES, 64 * 1024 * 1024);
     }
 
     #[test]

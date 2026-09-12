@@ -60,9 +60,9 @@ impl Collector for FivemDir {
             Err(SourceError::AccessDenied) => {
                 measured(Vec::new(), gaps(UnmeasuredReason::AccessDenied))
             }
-            Err(SourceError::Failed(_) | SourceError::Unsupported(_)) => {
-                measured(Vec::new(), gaps(UnmeasuredReason::ReadFailed))
-            }
+            Err(
+                SourceError::Failed(_) | SourceError::Unsupported(_) | SourceError::TooLarge { .. },
+            ) => measured(Vec::new(), gaps(UnmeasuredReason::ReadFailed)),
         }
     }
 }
