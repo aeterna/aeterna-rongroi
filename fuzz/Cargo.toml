@@ -26,6 +26,13 @@ members = ["."]
 libfuzzer-sys = "0.4"
 rongroi-parsers = { path = "../crates/rongroi-parsers" }
 
+# This is its own workspace, so the root `[patch.crates-io]` does not reach it and the patch has to be
+# repeated here. Without this stanza `fuzz_evtx` would build the unpatched registry `evtx` and would
+# keep finding the 7.7 GB allocation the vendored copy exists to bound — a fuzz gate testing code the
+# product does not ship. See ../Cargo.toml, ../third_party/evtx/PROVENANCE.md and ADR 0018.
+[patch.crates-io]
+evtx = { path = "../third_party/evtx" }
+
 [profile.release]
 debug = 1
 

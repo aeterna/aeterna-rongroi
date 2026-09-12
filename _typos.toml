@@ -11,4 +11,8 @@ extend-exclude = [
   "pnpm-lock.yaml",
   "fuzz/corpus/",
   "fuzz/artifacts/",
+  # third_party/evtx is upstream's source, vendored verbatim apart from one patch (ADR 0018).
+  # Correcting spelling in it would be a divergence from upstream that carries no benefit and makes
+  # the next re-sync harder to verify.
+  "third_party/evtx/",
 ]

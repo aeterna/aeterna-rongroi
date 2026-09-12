@@ -1,0 +1,314 @@
+//! Intermediate representation (IR) for parsed BinXML content.
+//!
+//! This module defines a small, allocation-friendly tree that mirrors the
+//! structure of BinXML records while keeping names and text separate. The IR
+//! is used by renderers (e.g. JSON streaming) and by template instantiation.
+//!
+//! Design notes:
+//! - Names and text are borrowed when possible via `Cow` to avoid copies.
+//! - `Node::Placeholder` is used only inside cached template definitions and
+//!   is resolved during template instantiation (IR build), before rendering.
+//! - `Element::has_element_child` is maintained to optimize rendering decisions.
+
+use crate::binxml::value_variant::{BinXmlValue, BinXmlValueType};
+use crate::utils::Utf16LeSlice;
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
+use std::mem::ManuallyDrop;
+
+/// An XML name backed by a UTF-8 string slice.
+///
+/// Names are guaranteed to be valid XML names as produced by the BinXML
+/// stream.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Name<'a> {
+    value: &'a str,
+}
+
+impl<'a> Name<'a> {
+    /// Wrap a string slice as an IR name.
+    pub(crate) fn new(value: &'a str) -> Self {
+        Name { value }
+    }
+
+    /// Returns the name as a UTF-8 string slice.
+    pub(crate) fn as_str(&self) -> &str {
+        self.value
+    }
+}
+
+/// Text content stored as UTF-16LE or UTF-8.
+///
+/// BinXML text is preserved in UTF-16LE to avoid eager decoding and to enable
+/// fast SIMD escaping when rendering JSON/XML. UTF-8 text is reserved for
+/// synthetic or already-decoded content (e.g. ANSI strings or template
+/// substitutions).
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Text<'a> {
+    /// UTF-16LE text slice borrowed from the chunk.
+    Utf16(Utf16LeSlice<'a>),
+    /// UTF-8 text (borrowed from chunk/bump storage).
+    Utf8(&'a str),
+}
+
+impl<'a> Text<'a> {
+    /// Wrap UTF-16LE text as an IR text node.
+    pub(crate) fn utf16(value: Utf16LeSlice<'a>) -> Self {
+        Text::Utf16(value)
+    }
+
+    /// Wrap UTF-8 text as an IR text node.
+    pub(crate) fn utf8(value: &'a str) -> Self {
+        Text::Utf8(value)
+    }
+
+    /// Returns true if the text is empty.
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            Text::Utf16(value) => value.is_empty(),
+            Text::Utf8(value) => value.is_empty(),
+        }
+    }
+}
+
+/// A single node in the IR tree.
+///
+/// `Placeholder` nodes only appear in cached template definitions. Renderers
+/// should resolve them when rendering a `TemplateInstance`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Node<'a> {
+    /// Reference to an element stored in the IR arena.
+    Element(ElementId),
+    Text(Text<'a>),
+    Value(BinXmlValue<'a>),
+    EntityRef(Name<'a>),
+    CharRef(u16),
+    CData(Text<'a>),
+    PITarget(Name<'a>),
+    PIData(Text<'a>),
+    Placeholder(Placeholder),
+}
+
+// Tripwire for the `ManuallyDrop` element arenas (`IrTree::arena`,
+// `binxml::ir::TemplateContent::frags`): skipping their drop glue is only
+// leak-free while node payloads own no heap memory. Adding an owning variant
+// (e.g. `String`) to `Node`/`Name` or their payloads must fail compilation
+// here rather than silently leak per record.
+const _: () =
+    assert!(!std::mem::needs_drop::<Node<'static>>() && !std::mem::needs_drop::<Name<'static>>());
+
+/// Template substitution placeholder captured during template parsing.
+///
+/// `id` indexes into the template substitution array. `value_type` is the
+/// declared substitution type, and `optional` indicates the substitution may
+/// be omitted if empty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Placeholder {
+    pub(crate) id: u16,
+    pub(crate) value_type: BinXmlValueType,
+    pub(crate) optional: bool,
+}
+
+/// An attribute name plus its value nodes.
+///
+/// Attribute values are stored as a sequence of non-element nodes.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Attr<'a> {
+    pub(crate) name: Name<'a>,
+    pub(crate) value: IrVec<'a, Node<'a>>,
+}
+
+/// Substitution values captured for a template instance.
+///
+/// `Value` stores the raw BinXML value, while `BinXmlElement` references a
+/// pre-parsed BinXML fragment that was expanded into the record arena.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum TemplateValue<'a> {
+    /// A raw substitution value.
+    Value(BinXmlValue<'a>),
+    /// A parsed BinXML fragment stored in the record arena.
+    BinXmlElement(ElementId),
+}
+
+/// An element with attributes and child nodes.
+///
+/// `has_element_child` is tracked to speed up JSON rendering decisions.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Element<'a> {
+    pub(crate) name: Name<'a>,
+    pub(crate) attrs: IrVec<'a, Attr<'a>>,
+    pub(crate) children: IrVec<'a, Node<'a>>,
+    pub(crate) has_element_child: bool,
+}
+
+impl<'a> Element<'a> {
+    /// Create a new element with the provided name, allocating vectors in the bump arena.
+    pub(crate) fn new_in(name: Name<'a>, arena: &'a Bump) -> Self {
+        Element {
+            name,
+            attrs: IrVec::new_in(arena),
+            children: IrVec::new_in(arena),
+            has_element_child: false,
+        }
+    }
+
+    /// Append a child node and update `has_element_child` if needed.
+    pub(crate) fn push_child(&mut self, node: Node<'a>) {
+        if matches!(node, Node::Element(_)) {
+            self.has_element_child = true;
+        }
+        self.children.push(node);
+    }
+}
+
+/// Bump-allocated vector type used inside IR nodes.
+pub(crate) type IrVec<'a, T> = BumpVec<'a, T>;
+
+/// Identifier for an element stored in an IR arena.
+pub type ElementId = usize;
+
+/// Bump-allocated arena for IR elements.
+///
+/// Elements are stored densely in a bump-backed vector and referenced by
+/// index. This keeps element allocation fast and avoids per-node heap churn.
+#[derive(Debug, Clone)]
+pub struct IrArena<'a> {
+    elements: IrVec<'a, Element<'a>>,
+}
+
+impl<'a> IrArena<'a> {
+    /// Create a new empty arena in the provided bump allocator.
+    pub fn new_in(arena: &'a Bump) -> Self {
+        IrArena {
+            elements: IrVec::new_in(arena),
+        }
+    }
+
+    /// Create a new arena with the given capacity.
+    pub(crate) fn with_capacity_in(capacity: usize, arena: &'a Bump) -> Self {
+        IrArena {
+            elements: IrVec::with_capacity_in(capacity, arena),
+        }
+    }
+
+    /// Allocate a new element and return its ID.
+    pub(crate) fn new_node(&mut self, element: Element<'a>) -> ElementId {
+        let id = self.elements.len();
+        self.elements.push(element);
+        id
+    }
+
+    /// Reserve space for at least `additional` elements.
+    pub(crate) fn reserve(&mut self, additional: usize) {
+        self.elements.reserve(additional);
+    }
+
+    /// Returns the number of elements stored in the arena.
+    pub(crate) fn count(&self) -> usize {
+        self.elements.len()
+    }
+
+    /// Returns a reference to the element with the given ID.
+    pub(crate) fn get(&self, id: ElementId) -> Option<&Element<'a>> {
+        self.elements.get(id)
+    }
+
+    /// Returns a mutable reference to the element with the given ID.
+    pub(crate) fn get_mut(&mut self, id: ElementId) -> Option<&mut Element<'a>> {
+        self.elements.get_mut(id)
+    }
+}
+
+/// Arena-backed IR tree.
+///
+/// The tree owns an `IrArena` of elements and stores the root node ID. All
+/// element references inside `Node::Element` variants point back into this
+/// arena.
+#[derive(Debug, Clone)]
+pub(crate) struct IrTree<'a> {
+    arena: ManuallyDrop<IrArena<'a>>,
+    root: ElementId,
+}
+
+impl<'a> IrTree<'a> {
+    /// Create a new IR tree from the provided arena and root ID.
+    pub(crate) fn new(arena: IrArena<'a>, root: ElementId) -> Self {
+        IrTree {
+            arena: ManuallyDrop::new(arena),
+            root,
+        }
+    }
+
+    /// Returns the root element ID.
+    pub(crate) fn root(&self) -> ElementId {
+        self.root
+    }
+
+    /// Returns a shared reference to the element arena.
+    pub(crate) fn arena(&self) -> &IrArena<'a> {
+        &self.arena
+    }
+
+    /// Returns the root element.
+    pub(crate) fn root_element(&self) -> &Element<'a> {
+        self.element(self.root)
+    }
+
+    /// Returns a reference to the element for the given ID.
+    pub(crate) fn element(&self, id: ElementId) -> &Element<'a> {
+        self.arena().get(id).expect("invalid element id")
+    }
+}
+
+/// Returns true if the value should be considered "empty" for optional substitutions.
+pub(crate) fn is_optional_empty(value: &BinXmlValue<'_>) -> bool {
+    match value {
+        BinXmlValue::NullType => true,
+        BinXmlValue::StringType(s) => s.is_empty(),
+        BinXmlValue::AnsiStringType(s) => s.is_empty(),
+        BinXmlValue::BinaryType(bytes) => bytes.is_empty(),
+        BinXmlValue::BinXmlType(bytes) => bytes.is_empty(),
+        BinXmlValue::StringArrayType(v) => v.is_empty(),
+        BinXmlValue::Int8ArrayType(v) => v.is_empty(),
+        BinXmlValue::UInt8ArrayType(v) => v.is_empty(),
+        BinXmlValue::Int16ArrayType(v) => v.is_empty(),
+        BinXmlValue::UInt16ArrayType(v) => v.is_empty(),
+        BinXmlValue::Int32ArrayType(v) => v.is_empty(),
+        BinXmlValue::UInt32ArrayType(v) => v.is_empty(),
+        BinXmlValue::Int64ArrayType(v) => v.is_empty(),
+        BinXmlValue::UInt64ArrayType(v) => v.is_empty(),
+        BinXmlValue::Real32ArrayType(v) => v.is_empty(),
+        BinXmlValue::Real64ArrayType(v) => v.is_empty(),
+        BinXmlValue::BoolArrayType(v) => v.is_empty(),
+        BinXmlValue::GuidArrayType(v) => v.is_empty(),
+        BinXmlValue::FileTimeArrayType(v) => v.is_empty(),
+        BinXmlValue::SysTimeArrayType(v) => v.is_empty(),
+        BinXmlValue::SidArrayType(v) => v.is_empty(),
+        BinXmlValue::HexInt32ArrayType(v) => v.is_empty(),
+        BinXmlValue::HexInt64ArrayType(v) => v.is_empty(),
+        _ => false,
+    }
+}
+
+/// Returns true if the template value should be considered "empty" for optional substitutions.
+pub(crate) fn is_optional_empty_template_value(value: &TemplateValue<'_>) -> bool {
+    match value {
+        TemplateValue::BinXmlElement(_) => false,
+        TemplateValue::Value(value) => is_optional_empty(value),
+    }
+}
+
+#[cfg(test)]
+mod drop_free_tests {
+    use super::*;
+    use crate::binxml::value_variant::BinXmlValue;
+
+    #[test]
+    fn ir_and_value_types_are_drop_free() {
+        assert!(!std::mem::needs_drop::<Name<'static>>());
+        assert!(!std::mem::needs_drop::<Text<'static>>());
+        assert!(!std::mem::needs_drop::<BinXmlValue<'static>>());
+        assert!(!std::mem::needs_drop::<Node<'static>>());
+        assert!(!std::mem::needs_drop::<IrTree<'static>>());
+    }
+}
