@@ -45,7 +45,18 @@ expression: view
       "reason": "source_missing"
     }
   ],
-  "own_traces": [],
+  "own_traces": [
+    {
+      "collector": "process",
+      "observation": {
+        "collector": "process",
+        "fields": {
+          "name": "aeterna-rongroi.exe",
+          "path": "%USERPROFILE%\\Downloads\\aeterna-rongroi.exe"
+        }
+      }
+    }
+  ],
   "hidden": {
     "not_found": 0,
     "unmeasured": 1

@@ -63,6 +63,7 @@ expression: view
       "retention": "Current hardware state only. It says nothing about earlier hardware or firmware settings."
     }
   ],
+  "own_traces": [],
   "hidden": {
     "not_found": 0,
     "unmeasured": 0

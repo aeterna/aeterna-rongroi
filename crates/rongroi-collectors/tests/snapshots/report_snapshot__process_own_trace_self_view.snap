@@ -3,7 +3,7 @@ source: crates/rongroi-collectors/tests/report_snapshot.rs
 expression: view
 ---
 {
-  "mode": "ss",
+  "mode": "self",
   "header": {
     "schema_version": 1,
     "provenance": {
@@ -43,11 +43,29 @@ expression: view
       "strength": "posture",
       "state": "unmeasured",
       "reason": "source_missing"
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed"
     }
   ],
-  "own_traces": [],
+  "own_traces": [
+    {
+      "collector": "process",
+      "observation": {
+        "collector": "process",
+        "fields": {
+          "name": "aeterna-rongroi.exe",
+          "path": "C:\\Users\\fixtureuser\\Downloads\\aeterna-rongroi.exe"
+        }
+      }
+    }
+  ],
   "hidden": {
     "not_found": 0,
-    "unmeasured": 1
+    "unmeasured": 0
   }
 }

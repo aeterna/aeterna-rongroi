@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Evidence, EvidenceState, Mode, Report, ReportHeader, Strength};
+use crate::model::{Evidence, EvidenceState, Mode, OwnTraceEntry, Report, ReportHeader, Strength};
 
 /// Replacement for the user-profile part of a path in SS mode.
 pub const USERPROFILE_PLACEHOLDER: &str = "%USERPROFILE%";
@@ -29,6 +29,9 @@ pub struct ReportView {
     pub header: ReportHeader,
     /// Evidence this view shows.
     pub evidence: Vec<Evidence>,
+    /// What this program itself left in what the collectors saw. Shown in both modes: hiding "this
+    /// was us" from the person watching a screenshare would be less transparent, not more (ADR 0010).
+    pub own_traces: Vec<OwnTraceEntry>,
     /// What this view does not list.
     pub hidden: HiddenCounts,
 }
@@ -44,6 +47,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
             mode,
             header: report.header.clone(),
             evidence: report.evidence.clone(),
+            own_traces: report.own_traces.clone(),
             hidden: HiddenCounts::default(),
         },
         Mode::Ss => {
@@ -64,6 +68,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
                 mode,
                 header: report.header.clone(),
                 evidence,
+                own_traces: report.own_traces.iter().map(redacted_own_trace).collect(),
                 hidden,
             }
         }
@@ -78,6 +83,15 @@ fn redacted(item: &Evidence) -> Evidence {
         }
     }
     item
+}
+
+/// An own trace as SS mode shows it. It is always listed — the mode's "matches and posture only"
+/// filter is about evidence, and this is not evidence — but its paths are of the same shape as any
+/// other and carry the same user name, so they go through the same redaction (ADR 0010).
+fn redacted_own_trace(entry: &OwnTraceEntry) -> OwnTraceEntry {
+    let mut entry = entry.clone();
+    entry.observation.fields.values_mut().for_each(redact_value);
+    entry
 }
 
 fn redact_value(value: &mut serde_json::Value) {
@@ -219,6 +233,24 @@ mod tests {
         Report {
             header,
             evidence: vec![found, not_found, posture_unmeasured, other_unmeasured],
+            own_traces: vec![OwnTraceEntry {
+                collector: "process".to_owned(),
+                observation: Observation {
+                    collector: "process".to_owned(),
+                    fields: BTreeMap::from([
+                        (
+                            "name".to_owned(),
+                            serde_json::Value::from("aeterna-rongroi.exe"),
+                        ),
+                        (
+                            "path".to_owned(),
+                            serde_json::Value::from(format!(
+                                r"C:\Users\{USER}\Downloads\aeterna-rongroi.exe"
+                            )),
+                        ),
+                    ]),
+                },
+            }],
         }
     }
 
@@ -241,6 +273,39 @@ mod tests {
                 not_found: 1,
                 unmeasured: 1
             }
+        );
+    }
+
+    /// Own traces are transparency about the tool, not evidence about the machine, so SS mode's
+    /// "only matches and posture" filter does not apply to them: hiding "this was us" from the
+    /// person watching the screenshare would be less transparent, not more (ADR 0010).
+    #[test]
+    fn both_views_show_own_traces() {
+        let report = report();
+        assert_eq!(
+            for_mode(&report, Mode::SelfCheck).own_traces,
+            report.own_traces
+        );
+        assert_eq!(for_mode(&report, Mode::Ss).own_traces.len(), 1);
+    }
+
+    #[test]
+    fn ss_view_redacts_the_path_of_an_own_trace() {
+        let view = for_mode(&report(), Mode::Ss);
+        let path = view.own_traces[0]
+            .observation
+            .fields
+            .get("path")
+            .and_then(serde_json::Value::as_str);
+        assert_eq!(path, Some(r"%USERPROFILE%\Downloads\aeterna-rongroi.exe"));
+        // The name is not a path and is not touched; PRIVACY.md says so (ADR 0010).
+        assert_eq!(
+            view.own_traces[0]
+                .observation
+                .fields
+                .get("name")
+                .and_then(serde_json::Value::as_str),
+            Some("aeterna-rongroi.exe")
         );
     }
 
