@@ -19,6 +19,7 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **Found** | The Rule matched; the matching Observations are attached | `EvidenceState::Found` |
 | **NotFound** | The Collector ran and nothing matched; carries the **retention window** | `EvidenceState::NotFound` |
 | **Unmeasured** | The Collector could not look; carries a **reason** | `EvidenceState::Unmeasured` |
+| **unmatched observation** | Something a Collector saw that no Rule matched; shown in Self mode only, counted in SS mode | `rongroi_core::model::UnmatchedGroup` |
 | **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
 | **retention window** | How far back a source can see, in words shown to the user | `Rule::retention` |
 | **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |

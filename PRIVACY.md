@@ -30,6 +30,7 @@ or allow remote access.
 |---|---|---|
 | Consent screen | no | yes — you may refuse |
 | Evidence shown | everything | only rule matches, plus counts of what was not found or not measured |
+| What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` |
 
 ### Program names are not redacted, and that can matter
@@ -50,6 +51,20 @@ aeterna-rongroi is running while it scans, so it is in the list of running progr
 keeps what it saw of **itself** in a separate "own traces" section instead of deleting it, and shows that
 section in both modes: it is not evidence about your PC, and hiding it would tell you less about what the
 tool did, not more. Paths in it are redacted in SS mode like any other.
+
+### What a collector saw that no rule matched
+
+Some collectors read things no rule asks about — the files in FiveM's plugin folder, and the list of
+programs you are running. **Self mode lists them**, under "unmatched observations", so that you can read
+what the tool saw and judge it yourself.
+
+**SS mode does not list them.** It says how many there were and nothing more. That mode promises to show
+only what matches a rule, and the names of every file and every running program on your PC are not that:
+they would tell whoever is watching what you have open, which is none of the check's business. Replacing
+your user name in paths would not change that, so the list is withheld rather than redacted.
+
+If you want to know what SS mode will show before anyone sees it, run Self mode first. What SS mode adds
+is nothing; what it removes is this list and the evidence that did not match.
 
 ## What is stored
 

@@ -6,6 +6,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Unmatched observations: what a collector saw that no rule matched is kept, grouped by collector, and
+  listed in Self mode — the files in FiveM's plugin folder and the running processes, which no rule reads.
+  SS mode counts them and lists none, because a raw listing of every file and program name is what that
+  mode promises not to show. `unmatched` is a new, additive field of the report format (ADR 0014).
 - `process` collector: the processes running at scan time, each with its image name and, when Windows
   will name it, the path of its image. Nothing is hashed and no process memory is read; a process whose
   path cannot be resolved is still listed, without that field. No rule reads it yet (ADR 0010).
@@ -28,6 +32,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Windows prompt is a normal outcome, not an error (ADR 0012).
 
 ### Fixed
+- ADR 0009 claimed the `fivem_dir` collector's observations were "still visible in Self mode". They were
+  not: nothing carried an observation that no rule matched, so both collectors that ship without a rule
+  read the machine on every scan and the result was discarded (ADR 0014).
 - Desktop app: the report header shows the program version, which the release notes ask people to check.
 
 ## [0.1.0] - 2026-09-11
