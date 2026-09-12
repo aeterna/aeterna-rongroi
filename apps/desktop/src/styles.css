@@ -70,6 +70,16 @@ button {
   margin: 8px 0;
 }
 
+.own-traces {
+  border-top: 1px solid #2c2c31;
+  margin-top: 24px;
+}
+
+.own-traces h3 {
+  color: #a39f96;
+  margin-bottom: 0;
+}
+
 .evidence-found .state {
   color: #e0b84f;
   font-weight: 600;

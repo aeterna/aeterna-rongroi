@@ -52,10 +52,21 @@ export interface ReportHeader {
   generated_at: string;
 }
 
+/**
+ * One observation that describes aeterna-rongroi itself rather than the machine. The tool is running
+ * while it scans, so a collector that enumerates the machine sees it (ADR 0010).
+ */
+export interface OwnTraceEntry {
+  collector: string;
+  observation: Observation;
+}
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
   evidence: Evidence[];
+  /** Shown in both modes: hiding "this was us" from an SS viewer would tell them less, not more. */
+  own_traces: OwnTraceEntry[];
   hidden: { not_found: number; unmeasured: number };
 }
 

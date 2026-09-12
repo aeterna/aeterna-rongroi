@@ -47,6 +47,12 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::Th, "unmeasured") => "ยังไม่ได้วัด",
         (Lang::En, "hidden") => "Hidden in SS mode",
         (Lang::Th, "hidden") => "ซ่อนในโหมด SS",
+        (Lang::En, "own_traces") => "own traces (excluded)",
+        (Lang::Th, "own_traces") => "ร่องรอยของโปรแกรมนี้เอง (แยกออกแล้ว)",
+        (Lang::En, "own_traces_note") => {
+            "what this program itself left in what was read; not evidence about this PC"
+        }
+        (Lang::Th, "own_traces_note") => "สิ่งที่โปรแกรมนี้ทิ้งไว้เองในสิ่งที่อ่านมา ไม่ใช่หลักฐานเกี่ยวกับเครื่องนี้",
         (Lang::En, "footer") => "Evidence only. This report cannot prove that a PC is clean.",
         (Lang::Th, "footer") => "เป็นหลักฐานประกอบเท่านั้น รายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด",
         (Lang::En, "elevated_yes") => "administrator",
@@ -219,6 +225,27 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         }
     }
 
+    // After the evidence and clearly apart from it: this is what the program itself left in what the
+    // collectors saw, and it is shown in both modes (ADR 0010).
+    if !view.own_traces.is_empty() {
+        let _ = writeln!(
+            out,
+            "\n{} — {}",
+            text(lang, "own_traces"),
+            text(lang, "own_traces_note")
+        );
+        for entry in &view.own_traces {
+            let fields = entry
+                .observation
+                .fields
+                .iter()
+                .map(|(k, v)| format!("{k}={}", plain(v)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let _ = writeln!(out, "    [{}] {fields}", entry.collector);
+        }
+    }
+
     if view.mode == Mode::Ss {
         let _ = writeln!(
             out,
@@ -247,8 +274,8 @@ fn short(sha: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use rongroi_core::model::{
-        Evidence, EvidenceState, Mode, Observation, REPORT_SCHEMA_VERSION, Report, ReportHeader,
-        Strength,
+        Evidence, EvidenceState, Mode, Observation, OwnTraceEntry, REPORT_SCHEMA_VERSION, Report,
+        ReportHeader, Strength,
     };
     use rongroi_core::provenance::Provenance;
     use rongroi_core::view;
@@ -286,6 +313,7 @@ mod tests {
             Report {
                 header,
                 evidence: vec![evidence],
+                own_traces: Vec::new(),
             },
             bundle,
         )
@@ -314,6 +342,46 @@ mod tests {
         assert!(text.contains("Secure Boot ถูกปิดอยู่"), "{text}");
         assert!(text.contains("ซ่อนในโหมด SS"), "{text}");
         assert!(text.contains("พิสูจน์ไม่ได้ว่าเครื่องสะอาด"), "{text}");
+    }
+
+    /// What the tool itself left in what the collectors saw is listed apart from the evidence and
+    /// said to be excluded, so that a reader cannot mistake it for something found on the PC.
+    #[test]
+    fn own_traces_are_rendered_in_their_own_section() {
+        let (mut report, bundle) = report(false);
+        report.own_traces = vec![OwnTraceEntry {
+            collector: "process".to_owned(),
+            observation: Observation {
+                collector: "process".to_owned(),
+                fields: [
+                    (
+                        "name".to_owned(),
+                        serde_json::Value::from("aeterna-rongroi.exe"),
+                    ),
+                    (
+                        "path".to_owned(),
+                        serde_json::Value::from(r"C:\Users\a\aeterna-rongroi.exe"),
+                    ),
+                ]
+                .into(),
+            },
+        }];
+        let view = view::for_mode(&report, Mode::SelfCheck);
+        let text = render(&view, &bundle, Lang::En);
+
+        let (above, section) = text
+            .split_once("own traces (excluded)")
+            .expect("the own-traces section is announced");
+        // Nothing about the tool's own process appears among the evidence above it.
+        assert!(!above.contains("aeterna-rongroi.exe"), "{above}");
+        assert!(section.contains("aeterna-rongroi.exe"), "{section}");
+        assert!(
+            section.contains(r"C:\Users\a\aeterna-rongroi.exe"),
+            "{section}"
+        );
+
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(thai.contains("ร่องรอยของโปรแกรมนี้เอง"), "{thai}");
     }
 
     #[test]

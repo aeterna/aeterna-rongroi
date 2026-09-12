@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { reportView, ruleTexts } from "../api";
-import type { Evidence, Mode, ReportView, RuleText } from "../types";
+import type { Evidence, Mode, Observation, ReportView, RuleText } from "../types";
 
 interface Props {
   mode: Mode;
@@ -68,6 +68,23 @@ export function Report({ mode, onBack }: Props) {
         ))}
       </ul>
 
+      {/* Apart from the evidence, and shown in both modes: this is what the program itself left in
+          what the collectors saw, not evidence about the PC (ADR 0010). */}
+      {view.own_traces.length > 0 && (
+        <section className="own-traces" aria-labelledby="own-traces-title">
+          <h3 id="own-traces-title">{t("own_traces.title")}</h3>
+          <p className="muted">{t("own_traces.note")}</p>
+          <ul className="evidence">
+            {view.own_traces.map((entry) => (
+              <li key={`${entry.collector}:${fieldsOf(entry.observation)}`}>
+                <span className="muted">({entry.collector})</span>
+                <div className="detail">{fieldsOf(entry.observation)}</div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {mode === "ss" && (
         <p className="muted">
           {t("hidden", {
@@ -84,14 +101,19 @@ export function Report({ mode, onBack }: Props) {
   );
 }
 
+/** One observation as a line of `field=value`, the way both lists show it. */
+function fieldsOf(observation: Observation): string {
+  return Object.entries(observation.fields)
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(", ");
+}
+
 function EvidenceRow({ item, text }: { item: Evidence; text: RuleText | undefined }) {
   const { t } = useTranslation("report");
   let detail: string;
   switch (item.state) {
     case "found":
-      detail = item.observations
-        .flatMap((o) => Object.entries(o.fields).map(([k, v]) => `${k}=${String(v)}`))
-        .join(", ");
+      detail = item.observations.map(fieldsOf).join(", ");
       break;
     case "not_found":
       // The report keeps the English source text; the rule text carries the translation.
