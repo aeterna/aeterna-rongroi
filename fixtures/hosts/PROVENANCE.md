@@ -60,7 +60,7 @@ Each one is a written profile; a setting in it is never changed to silence a rul
 collector is `Unmeasured`, and a rule for it passes the gate whatever it says — which is what
 `baseline-consumer-win11` and `baseline-hardened-win11` do to `pca`, `prefetch`, `bam` and `evtx`: neither
 sets `WinDir` or `SystemRoot` and neither carries a BAM key. `baseline-elevated-win11` was added for that
-(ADR 0025) and is the host on which every collector in the build is `Measured` with no gaps. Its artifacts
+(ADR 0026) and is the host on which every collector in the build is `Measured` with no gaps. Its artifacts
 hold the shapes a careless rule fires on — a game executable run from a Downloads folder, `cmd.exe` with a
 Prefetch record, a BAM entry whose path is a device path — because leaving those out would make the claim
 weaker, not safer.

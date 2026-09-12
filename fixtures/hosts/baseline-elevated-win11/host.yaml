@@ -14,7 +14,7 @@
 # the **artifact surface**: `%WinDir%` and `%SystemRoot%` are set, as they are on every Windows
 # installation, and PCA, Prefetch, the Event Log folder and the BAM state key are all present and
 # readable. The other two baselines describe none of them, so on those two every rule for those four
-# collectors comes out `Unmeasured` and says nothing about the rule (ADR 0025).
+# collectors comes out `Unmeasured` and says nothing about the rule (ADR 0026).
 #
 # Elevation is what makes this honest rather than optimistic. This repository does not claim any of
 # these four sources is readable without an elevated token — ADR 0021 and ADR 0024 say the opposite

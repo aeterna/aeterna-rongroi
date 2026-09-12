@@ -130,7 +130,7 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
 ///
 /// Built from `rongroi_collectors::all()`, which is the list `scan::run` iterates, so the vocabulary
 /// this gate enforces is the one the shipped executable actually has — the same argument ADR 0017
-/// made for `check-baseline` running the product's own pipeline. ADR 0025 has the reasoning and the
+/// made for `check-baseline` running the product's own pipeline. ADR 0026 has the reasoning and the
 /// alternative that was rejected.
 struct Vocabulary {
     fields: BTreeMap<&'static str, BTreeSet<&'static str>>,
@@ -413,7 +413,7 @@ date: 2026-09-11
 
     /// Gate (4): a rule whose `collector` is not a collector in this build must be rejected.
     ///
-    /// Before ADR 0025 such a rule parsed, passed every gate, and evaluated to
+    /// Before ADR 0026 such a rule parsed, passed every gate, and evaluated to
     /// `Unmeasured { collector_unavailable }` on every machine — silently, because `check-baseline`
     /// only fails on `Found`.
     #[test]

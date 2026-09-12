@@ -26,7 +26,7 @@ pub trait Collector {
     /// Every observation field name this collector can emit, sorted.
     ///
     /// This is the vocabulary a rule's `match` may name, and `cargo xtask check-rules` rejects a
-    /// rule that names anything outside it (ADR 0025). It is a declaration rather than something
+    /// rule that names anything outside it (ADR 0026). It is a declaration rather than something
     /// derived from the code, so it can drift from what `collect` really puts in a field map; what
     /// holds the two together is the `every_emitted_field_is_declared` test in this file, which
     /// runs every collector over every fixture host and fails on a field no list names.
@@ -82,14 +82,14 @@ mod tests {
     }
 
     /// `Collector::fields` is a declaration, and `cargo xtask check-rules` rejects a rule that names
-    /// a field outside it (ADR 0025). A declaration that has drifted from what `collect` emits turns
+    /// a field outside it (ADR 0026). A declaration that has drifted from what `collect` emits turns
     /// that gate into a wrong answer in either direction — a real field rejected, or a renamed one
     /// still accepted — so the two are bound here rather than by review.
     ///
     /// This proves one half: no collector emits a field it did not declare. The other half — that a
     /// declared field is reachable at all — is what the fixture hosts cannot prove, since a name is
     /// only seen on a host that produces it; `fields_are_sorted_and_unique` is what keeps the lists
-    /// readable, and ADR 0025 records the limit.
+    /// readable, and ADR 0026 records the limit.
     #[test]
     fn every_emitted_field_is_declared() {
         for (name, dir) in fixture_hosts() {

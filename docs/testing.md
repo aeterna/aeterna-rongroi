@@ -7,7 +7,7 @@
 | L0 parsers | artifact formats decode correctly, including corrupt input — truncated, malformed, the wrong encoding, and bytes whose meaning is not established | `crates/rongroi-parsers` | macOS · Linux · Windows |
 | L1 collectors | every outcome — found, not found, unmeasured — against `FixtureHost` | `crates/rongroi-collectors/src/*.rs` | macOS · Linux · Windows |
 | L2 rules | each rule's `collector` and every `match` field name exist in this build; each rule's positive fixture is `found`, negative is `not_found` | `rules/**/tests/` via `cargo xtask check-rules` | macOS · Linux · Windows |
-| L2b baseline | the whole rule set stays quiet on machines described as ordinary; each accepted match needs a `rules/known-fps.csv` row with a reason, and an unused row fails. Three profiles, one of which — `baseline-elevated-win11` — has every collector `Measured`, so a rule for `pca`, `prefetch`, `bam` or `evtx` is answerable here rather than `Unmeasured` (ADR 0025) | `fixtures/hosts/baseline-*/` via `cargo xtask check-baseline` | macOS · Linux · Windows |
+| L2b baseline | the whole rule set stays quiet on machines described as ordinary; each accepted match needs a `rules/known-fps.csv` row with a reason, and an unused row fails. Three profiles, one of which — `baseline-elevated-win11` — has every collector `Measured`, so a rule for `pca`, `prefetch`, `bam` or `evtx` is answerable here rather than `Unmeasured` (ADR 0026) | `fixtures/hosts/baseline-*/` via `cargo xtask check-baseline` | macOS · Linux · Windows |
 | L3 report | the full pipeline, as JSON snapshots; SS view never contains the fixture user name | `crates/rongroi-collectors/tests/`, `rongroi-core::view` | macOS · Linux · Windows |
 | L4 UI | the GUI renders the L3 report JSON through mocked IPC; WebView hardening settings | `apps/desktop` (vitest) | macOS · Linux |
 | L5 live | real Windows: no panic, non-admin gives `unmeasured(not_admin)`, scanned folders unchanged, no files left outside the run's temp folder | Windows CI job and a Windows test machine | Windows |
@@ -106,7 +106,7 @@ A `baseline-*` host means more than the others: it asserts that a machine like i
 `check-baseline` requires the whole rule set to stay quiet on it (ADR 0017). A setting in one is never
 chosen to silence a rule — and a source one of them leaves undescribed is not neutral either, because a
 collector that never reads is `Unmeasured` and a rule for it is then unmeasurable in either direction
-(ADR 0025).
+(ADR 0026).
 
 ## Prove that a check can fail
 

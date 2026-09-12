@@ -1,4 +1,4 @@
-# ADR 0025 — The rule vocabulary, and a baseline that can measure the artifact collectors
+# ADR 0026 — The rule vocabulary, and a baseline that can measure the artifact collectors
 
 - Status: accepted
 - Date: 2026-09-13
