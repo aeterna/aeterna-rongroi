@@ -53,7 +53,7 @@ part of the shipped program. `cargo deny check` continuing to pass is not a clai
 is the absence of one.
 
 The cost is that the fuzz crate has no gate of its own beyond compiling: it does not inherit the
-workspace lints, and `cargo deny` does not read `fuzz/Cargo.lock`. For four files that each make one
+workspace lints, and `cargo deny` does not read `fuzz/Cargo.lock`. For five files that each make one
 call, that is the right trade; it would not be if the harness grew logic.
 
 ### CI runs a smoke, not a campaign
@@ -77,6 +77,11 @@ which is exactly what ADR 0013's pure-parser shape bought. Those files are the L
 the seed corpus the fuzz job hands libFuzzer. `fuzz_filetime` seeds from the BAM directory, because a
 BAM value's first eight bytes are the little-endian `FILETIME` it converts.
 
+`fuzz_prefetch` seeds from `fixtures/prefetch/` rather than from a directory under `fixtures/parsers/`.
+The principle is the same — the fuzzer's seeds are the L0 tests' inputs — but those files are vendored
+from a third-party corpus under its own licence and `REUSE.toml` annotates them where they lie
+(ADR 0015), so moving them under `fixtures/parsers/` would be a licensing change for a tidier path.
+
 A second, parallel set of sample bytes for the fuzzer was the obvious alternative and is how these
 things usually rot: the parser gets a new test fixture, the fuzz corpus does not, and after a year the
 fuzzer starts from bytes that no longer resemble the artifact. One set means a fixture added for a
@@ -99,9 +104,12 @@ assertions on by default, which is the build where that class of defect fires at
 
 ## Consequences
 
-- A `fuzz/` workspace with four targets, one per public parser entry point that exists today:
-  `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general`, `fuzz_filetime`. A parser added later gets a
-  target in the same pull request; the file is ten lines.
+- A `fuzz/` workspace with five targets, one per public parser entry point: `fuzz_bam`,
+  `fuzz_pca_app_launch`, `fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`. The first four landed
+  with this layer; `fuzz_prefetch` followed in its own pull request, because the Prefetch parser was
+  being written in a parallel branch while this layer was and a target pointed at it would not have
+  compiled here (ADR 0015). A parser added later gets a target in the same pull request; the file is
+  ten lines.
 - Each target asserts nothing about the value it receives. A malformed artifact is a typed
   `ParseError` and a `FILETIME` out of range is `None` — both correct answers. The bug a target looks
   for is a panic, an abort or a hang.
@@ -111,7 +119,7 @@ assertions on by default, which is the build where that class of defect fires at
 - `cargo-fuzz` is pinned by version in the workflow and built with `cargo install`, because
   `taiki-e/install-action` does not carry it and would fall back to an unpinned `cargo-binstall` —
   every other action in this repository is pinned to a commit SHA.
-- Cargo warns four times that the binary names are not kebab-case. `fuzz_bam` is cargo-fuzz's
+- Cargo warns five times that the binary names are not kebab-case. `fuzz_bam` is cargo-fuzz's
   convention and the name every documented command uses; the warning is expected and is noted in
   `fuzz/Cargo.toml`.
 - `fixtures/parsers/**` is marked `binary` in `.gitattributes`. The repository normalises to LF, and

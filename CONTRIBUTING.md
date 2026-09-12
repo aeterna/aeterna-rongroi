@@ -27,13 +27,14 @@ cargo +nightly install --locked cargo-fuzz
 Then, from the repository root:
 
 ```bash
-cargo +nightly fuzz build                     # all four targets
+cargo +nightly fuzz build                     # all five targets
 cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam -- -max_total_time=60
 ```
 
-The targets are `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general` and `fuzz_filetime`. The seed corpus is
-the fixture directory the L0 tests read, and it comes **second** because libFuzzer writes what it finds to the
-first directory — `fixtures/parsers/` is an input, never an output. A crashing input is saved under
+The targets are `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general`, `fuzz_filetime` and `fuzz_prefetch`
+(which seeds from `fixtures/prefetch/`). The seed corpus is the fixture directory the L0 tests read, and it
+comes **second** because libFuzzer writes what it finds to the first directory — the fixtures are an input,
+never an output. A crashing input is saved under
 `fuzz/artifacts/`; reproduce it with `cargo +nightly fuzz run <target> <that file>`.
 
 `fuzz/` is its own workspace, excluded from the root one, so none of the commands above changes what

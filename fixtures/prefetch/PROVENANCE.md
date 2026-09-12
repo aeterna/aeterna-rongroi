@@ -43,6 +43,10 @@ ce6664ab57e09ec71ec63f60e2917d7825185cf53fb9dcc9de19a63a3793c865  bad-notAPrefet
 The smallest file of each version was taken, so the corpus costs 24 KiB rather than the 1.7 MB the
 whole `TestFiles/` folder would.
 
+These same bytes are the seed corpus `ci.yml` hands `fuzz_prefetch` (ADR 0016), so the directory is read
+by the L0 tests and by the fuzzer and may not be emptied or renamed at one end alone:
+`crates/rongroi-parsers/tests/fixtures.rs` fails if it holds no `.pf` file or if `ci.yml` stops naming it.
+
 ## What is in them — read this before adding another
 
 These are prefetch files from the upstream author's own test machines, so their string tables are that

@@ -16,6 +16,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   seeded from the same fixtures the parser tests read, and a CI job that builds them and runs each for 30
   seconds as a smoke gate. `fuzz/` is its own workspace because cargo-fuzz needs nightly, so the pinned
   1.98.1 toolchain builds, lints and tests everything else exactly as before (ADR 0016).
+- `fuzz_prefetch`, the fuzz layer's fifth target, seeded from the same `fixtures/prefetch/` files the parser
+  tests read. Prefetch is the only parser that hands bytes read from the machine to a third-party
+  decompressor, and a target pointed at it is half of why ADR 0015 accepted that dependency's immaturity.
 - Unmatched observations: what a collector saw that no rule matched is kept, grouped by collector, and
   listed in Self mode — the files in FiveM's plugin folder and the running processes, which no rule reads.
   SS mode counts them and lists none, because a raw listing of every file and program name is what that
