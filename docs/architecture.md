@@ -76,6 +76,7 @@ Only the upstream release workflow sets `RONGROI_OFFICIAL_BUILD=1` at compile ti
 | Collector | Reads | Needs admin | Since |
 |---|---|---|---|
 | `posture` | `HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State` → `UEFISecureBootEnabled` | no | M0 |
+| `fivem_dir` | `%LOCALAPPDATA%\FiveM\FiveM.app\plugins` — the names of the files directly inside it and, when readable, each file's SHA-256. No recursion, no timestamps, no ACLs (ADR 0009) | no | M1 |
 
 Every new collector adds a row here in the same PR.
 
