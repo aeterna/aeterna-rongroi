@@ -3,9 +3,9 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's own folders, the list of running processes and, in later versions, Prefetch, BAM, PCA and
-Windows event logs. Each collector is listed with what it reads in
-[docs/architecture.md](docs/architecture.md).
+FiveM's own folders, the list of running processes, what the Program Compatibility Assistant recorded
+about programs that ran and, in later versions, Prefetch, BAM and Windows event logs. Each collector
+is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
 is on disk. It does not read what a program is doing, what is in its memory, or what you typed into it.

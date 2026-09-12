@@ -16,6 +16,13 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
 | `process-own-trace` | Windows 11 running three processes: one whose image path cannot be resolved, one ordinary program, and aeterna-rongroi itself | `process` collector tests, report snapshots |
+| `pca-files-present` | Windows 11 with all three PCA files present and readable, their bytes taken from `fixtures/parsers/` | `pca` collector tests, report snapshots |
+| `pca-not-present` | Windows with no PCA file at all: a build that predates PCA, or a machine where the service never wrote | `pca` collector tests |
+| `pca-access-denied` | Windows 11, the PCA folder present and unreadable, by a process without administrator rights | `pca` collector tests |
+| `pca-file-unreadable` | Windows 11 with one PCA file listed and holding no bytes and one that is readable | `pca` collector tests |
+| `pca-malformed-lines` | Windows 11 whose launch dictionary has good lines, a line with no delimiter, an impossible date, an empty path and a blank line | `pca` collector tests |
+| `pca-utf16-file` | Windows 11 whose launch dictionary is UTF-16 with a byte order mark — not a PCA text file at all | `pca` collector tests |
+| `pca-unredactable-path` | Windows 11 whose launch dictionary holds one drive-rooted path, one UNC path and one device path; only the first is a shape SS-mode redaction can reach | `pca` collector tests |
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
@@ -31,6 +38,10 @@ A file entry may carry its bytes as well as its hash (ADR 0019): `content:` writ
 `from:` names a file relative to the host's own directory, which is how a host reaches the artifact
 corpora in `fixtures/parsers/`, `fixtures/prefetch/` and `fixtures/evtx/`. Those corpora are inputs and
 are never written to; a host points at them and copies nothing.
+
+The account names `alex`, `shareduser` and `deviceuser` that reach these hosts are invented in the same way,
+`alex` through the parser corpora in `fixtures/parsers/` and the other two inline in `pca-unredactable-path`.
+They are there so that a test can assert a name never reaches an observation.
 
 When a fixture is generated from a real Windows install (M2 onwards), record here: what generated it, the
 Windows build, that networking was disabled, and who checked it for a real user name, host name or SID, and
