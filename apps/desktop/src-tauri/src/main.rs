@@ -39,7 +39,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             commands::report_header,
             commands::report_view,
-            commands::rule_texts
+            commands::rule_texts,
+            commands::relaunch_elevated
         ])
         .setup(move |app| {
             webview_hardening::build_main_window(app, &window_dir)?;

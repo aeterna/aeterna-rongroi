@@ -28,6 +28,53 @@ pub fn report_view(state: State<'_, AppState>, mode: Mode) -> ReportView {
     view::for_mode(&state.report, mode)
 }
 
+/// What came of a request to restart with administrator rights.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ElevateOutcome {
+    /// An elevated copy is starting and this one is closing.
+    Started,
+    /// The person dismissed the Windows prompt. A normal outcome, not a failure (ADR 0012).
+    Declined,
+    /// Windows did not start the elevated program.
+    Failed,
+}
+
+/// Starts an elevated copy of this program and closes this one.
+///
+/// Nothing is handed over: the new process scans from the beginning on its own startup path, because a
+/// report this process did not measure is not one it can show (ADR 0012).
+#[tauri::command]
+pub fn relaunch_elevated(app: tauri::AppHandle) -> ElevateOutcome {
+    relaunch(&app)
+}
+
+#[cfg(windows)]
+fn relaunch(app: &tauri::AppHandle) -> ElevateOutcome {
+    use rongroi_host_windows::elevate::{self, ElevateError};
+
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match elevate::relaunch_elevated(&args) {
+        Ok(()) => {
+            // Exit through the handle, so the `RunEvent::Exit` handler still deletes this run's
+            // WebView2 profile folder.
+            app.exit(0);
+            ElevateOutcome::Started
+        }
+        Err(ElevateError::Declined) => ElevateOutcome::Declined,
+        Err(error) => {
+            // Local stderr only (CONVENTIONS.md, section 4). A declined prompt never reaches here.
+            eprintln!("relaunch with administrator rights failed: {error}");
+            ElevateOutcome::Failed
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn relaunch(_app: &tauri::AppHandle) -> ElevateOutcome {
+    ElevateOutcome::Failed
+}
+
 /// Rule text in `lang`, keyed by rule id.
 #[tauri::command]
 pub fn rule_texts(state: State<'_, AppState>, lang: &str) -> BTreeMap<String, RuleText> {

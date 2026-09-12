@@ -12,6 +12,10 @@
     "self_hint": "See everything, only on this screen.",
     "ss_button": "Screenshare check (SS mode)",
     "ss_hint": "For staff watching your screen. Asks for your consent first and shows only what matches a rule.",
+    "elevate_button": "Scan as administrator",
+    "elevate_hint": "Some checks need administrator rights. This closes the program, starts it again with those rights and scans from the beginning. Windows will ask you to confirm.",
+    "elevate_declined": "You declined the Windows prompt. Nothing changed.",
+    "elevate_failed": "Windows did not start the program with administrator rights. Nothing changed.",
     "scan_note": "The scan ran on this PC when the program started, before this window opened, so the window cannot change the results. Nothing is shown or saved until you choose."
   },
   "consent": {
