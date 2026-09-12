@@ -134,6 +134,10 @@ impl Collector for Evtx {
         ID
     }
 
+    fn fields(&self) -> &'static [&'static str] {
+        &FIELDS
+    }
+
     /// Lists `%SystemRoot%\System32\winevt\Logs` and reads every `.evtx` file in it, within
     /// [`PARSE_BUDGET`].
     fn collect(&self, host: &dyn Host) -> CollectorRun {

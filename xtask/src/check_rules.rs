@@ -4,7 +4,7 @@
 
 //! `cargo xtask check-rules`: the bundle validation plus fixtures (docs/rules-authoring.md).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::bail;
@@ -68,9 +68,11 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         Err(error) => bail!("check-rules: {error}"),
     };
 
+    let vocabulary = Vocabulary::of_this_build();
     let mut problems = Vec::new();
     let mut fixture_count = 0;
     for sourced in bundle.rules() {
+        vocabulary.check(&sourced.path, &sourced.rule, &mut problems);
         let rule_folder = rules_dir.join(sourced.path.trim_end_matches("rule.yaml"));
         let tests_dir = rule_folder.join("tests");
         let positive = json_files(&tests_dir.join("positive"))?;
@@ -121,6 +123,96 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         fixture_count,
         language_count: bundle.languages().len(),
     })
+}
+
+/// What the collectors in this build can be asked about: each collector's id, and the field names it
+/// declares it can emit (`rongroi_collectors::Collector::fields`).
+///
+/// Built from `rongroi_collectors::all()`, which is the list `scan::run` iterates, so the vocabulary
+/// this gate enforces is the one the shipped executable actually has — the same argument ADR 0017
+/// made for `check-baseline` running the product's own pipeline. ADR 0025 has the reasoning and the
+/// alternative that was rejected.
+struct Vocabulary {
+    fields: BTreeMap<&'static str, BTreeSet<&'static str>>,
+}
+
+impl Vocabulary {
+    fn of_this_build() -> Self {
+        Self {
+            fields: rongroi_collectors::all()
+                .iter()
+                .map(|collector| (collector.id(), collector.fields().iter().copied().collect()))
+                .collect(),
+        }
+    }
+
+    /// Rejects a rule that names a collector this build does not have, or a field that collector
+    /// cannot emit.
+    ///
+    /// Either mistake produces a rule that is never `Found` on any machine — an unknown collector is
+    /// `Unmeasured { collector_unavailable }`, an unknown field is a `match` key no observation
+    /// carries and therefore `NotFound` — and `NotFound` is shown to a player as "this was looked
+    /// for and was not there". Neither is visible in the rule file, in `check-baseline`, or in a
+    /// fixture written from the same misspelling.
+    fn check(&self, path: &str, rule: &Rule, problems: &mut Vec<String>) {
+        let Some(known) = self.fields.get(rule.collector.as_str()) else {
+            problems.push(format!(
+                "rules/{path}: no collector in this build has the id `{}`; this build has {}",
+                rule.collector,
+                comma(self.fields.keys().copied())
+            ));
+            // One mistake, one message: with no collector resolved there is nothing to check the
+            // `match` field names against, and reporting each of them would name the same defect
+            // once per field.
+            return;
+        };
+        for field in rule.matcher.keys() {
+            if known.contains(field.as_str()) {
+                continue;
+            }
+            let suggestion = nearest(field, known)
+                .map_or_else(String::new, |name| format!(" (did you mean `{name}`?)"));
+            problems.push(format!(
+                "rules/{path}: `match` names `{field}`, which the `{}` collector cannot emit{suggestion}; it emits {}",
+                rule.collector,
+                comma(known.iter().copied())
+            ));
+        }
+    }
+}
+
+/// The declared name closest to `field`, when one is close enough to be a misspelling of it rather
+/// than a different name. Two edits is the widest gap that is still more likely a typo than a choice.
+fn nearest<'a>(field: &str, known: &BTreeSet<&'a str>) -> Option<&'a str> {
+    known
+        .iter()
+        .map(|name| (distance(field, name), *name))
+        .filter(|(distance, _)| *distance <= 2)
+        .min_by_key(|(distance, name)| (*distance, *name))
+        .map(|(_, name)| name)
+}
+
+/// Levenshtein distance, one row at a time. Field names are short, so the quadratic cost is bounded
+/// by the length of the longest name a collector declares.
+fn distance(left: &str, right: &str) -> usize {
+    let right: Vec<char> = right.chars().collect();
+    let mut previous: Vec<usize> = (0..=right.len()).collect();
+    let mut current = vec![0; right.len() + 1];
+    for (row, left_char) in left.chars().enumerate() {
+        current[0] = row + 1;
+        for (column, right_char) in right.iter().enumerate() {
+            let substitution = usize::from(left_char != *right_char);
+            current[column + 1] = (previous[column] + substitution)
+                .min(previous[column + 1] + 1)
+                .min(current[column] + 1);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    previous[right.len()]
+}
+
+fn comma<'a>(names: impl Iterator<Item = &'a str>) -> String {
+    names.collect::<Vec<_>>().join(", ")
 }
 
 fn json_files(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
@@ -317,6 +409,133 @@ date: 2026-09-11
             "{:?}",
             outcome.problems
         );
+    }
+
+    /// Gate (4): a rule whose `collector` is not a collector in this build must be rejected.
+    ///
+    /// Before ADR 0025 such a rule parsed, passed every gate, and evaluated to
+    /// `Unmeasured { collector_unavailable }` on every machine — silently, because `check-baseline`
+    /// only fails on `Found`.
+    #[test]
+    fn a_rule_naming_a_collector_this_build_does_not_have_is_rejected() {
+        let tmp = TempRoot::new("unknown-collector");
+        // `experimental` needs no fixtures, so the collector id is the only expected problem.
+        let rule = VALID_RULE
+            .replace("status: test", "status: experimental")
+            .replace("collector: posture", "collector: postures");
+        write(
+            &tmp.path()
+                .join("rules/postures/boot/secure-boot-disabled/rule.yaml"),
+            &rule,
+        );
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains(
+                "rules/postures/boot/secure-boot-disabled/rule.yaml: no collector in this build has the id `postures`"
+            ),
+            "{:?}",
+            outcome.problems
+        );
+        // The message names what this build does have, so the fix does not need a grep.
+        assert!(
+            outcome.problems[0].contains("posture"),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// Gate (5): a `match` field the named collector cannot emit must be rejected.
+    ///
+    /// This is the misspelling that used to ship as a rule that is `not_found` on every machine —
+    /// which this program presents to a player as evidence that something was looked for and was not
+    /// there.
+    #[test]
+    fn a_match_field_the_collector_cannot_emit_is_rejected() {
+        let tmp = TempRoot::new("unknown-field");
+        let rule = VALID_RULE
+            .replace("status: test", "status: experimental")
+            .replace("  secure_boot: disabled", "  secure_boo: disabled");
+        write(
+            &tmp.path()
+                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
+            &rule,
+        );
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains(
+                "`match` names `secure_boo`, which the `posture` collector cannot emit (did you mean `secure_boot`?)"
+            ),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// A field name that is nothing like any of them gets the vocabulary and no guess: a wrong
+    /// suggestion is worse than none, because it reads as though the tool knows what was meant.
+    #[test]
+    fn an_unrelated_match_field_is_rejected_without_a_suggestion() {
+        let tmp = TempRoot::new("unrelated-field");
+        let rule = VALID_RULE
+            .replace("status: test", "status: experimental")
+            .replace("  secure_boot: disabled", "  wallpaper: blue");
+        write(
+            &tmp.path()
+                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
+            &rule,
+        );
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            !outcome.problems[0].contains("did you mean"),
+            "{:?}",
+            outcome.problems
+        );
+        assert!(
+            outcome.problems[0]
+                .contains("it emits hvci, secure_boot, test_signing, tpm, tpm_spec_version"),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// Every collector in the build is asked for its vocabulary, so a rule for any of them can be
+    /// written. A `check` that resolved only the collectors a rule already uses would pass this test
+    /// and reject the first rule written for a new collector.
+    #[test]
+    fn every_collector_in_the_build_has_a_vocabulary() {
+        let vocabulary = Vocabulary::of_this_build();
+
+        for collector in rongroi_collectors::all() {
+            let fields = vocabulary
+                .fields
+                .get(collector.id())
+                .unwrap_or_else(|| panic!("collector `{}` has no vocabulary", collector.id()));
+            assert!(
+                !fields.is_empty(),
+                "collector `{}` declares no field, so no rule could ever be written for it",
+                collector.id()
+            );
+        }
+    }
+
+    /// The suggestion is a typo detector, not a synonym finder: three edits apart is a different
+    /// name, and naming one would send an author to the wrong field.
+    #[test]
+    fn a_suggestion_is_offered_only_within_two_edits() {
+        let known: BTreeSet<&str> = ["run_count", "scca_version"].into_iter().collect();
+        assert_eq!(nearest("run_cout", &known), Some("run_count"));
+        assert_eq!(nearest("runcount", &known), Some("run_count"));
+        assert_eq!(nearest("executions", &known), None);
+        assert_eq!(distance("run_count", "run_count"), 0);
+        assert_eq!(distance("", "abc"), 3);
     }
 
     /// Gate (3): an `allow` entry that is not `sha256` or `signer` (e.g. `file_name`) must be

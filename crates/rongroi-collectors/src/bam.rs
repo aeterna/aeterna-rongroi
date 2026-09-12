@@ -81,6 +81,10 @@ impl Collector for Bam {
         ID
     }
 
+    fn fields(&self) -> &'static [&'static str] {
+        &FIELDS
+    }
+
     /// Enumerates the account keys under [`USER_SETTINGS_KEY`] and reads every value in each of them.
     ///
     /// Three kinds of failure, classified differently on purpose:

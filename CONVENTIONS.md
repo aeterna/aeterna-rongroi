@@ -89,6 +89,7 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 |---|---|
 | Path `rules/<collector>/<category>/<slug>/rule.yaml`, `slug` in kebab-case | `cargo xtask check-rules` |
 | `id` is a UUIDv4 and is never reused, even after deletion | `check-rules` |
+| `collector` is a collector in this build, and every `match` field name one it declares it can emit | `check-rules` |
 | English `title`, `description`, `falsepositives` live in the rule; translations in `rules/i18n/<lang>.yaml` | `check-rules` · `check-locales` |
 | `status: test` or `stable` requires at least one positive and one negative fixture in `tests/` | `check-rules` |
 | `match` strings compare without regard to ASCII case; `cased` names the fields compared exactly | `check-rules` · engine tests |

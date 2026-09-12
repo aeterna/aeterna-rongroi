@@ -26,7 +26,7 @@ const ID: &str = "fivem_dir";
 
 /// Every field this collector can emit. A folder it could not read is a gap in all of them: a rule
 /// that matches on any one of them must come out `Unmeasured`, never `NotFound`.
-const FIELDS: [&str; 3] = ["path", "location", "sha256"];
+const FIELDS: [&str; 3] = ["location", "path", "sha256"];
 
 /// The `fivem_dir` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -35,6 +35,10 @@ pub struct FivemDir;
 impl Collector for FivemDir {
     fn id(&self) -> &'static str {
         ID
+    }
+
+    fn fields(&self) -> &'static [&'static str] {
+        &FIELDS
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {
