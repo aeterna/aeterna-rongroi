@@ -75,7 +75,7 @@ Only the upstream release workflow sets `RONGROI_OFFICIAL_BUILD=1` at compile ti
 
 | Collector | Reads | Needs admin | Since |
 |---|---|---|---|
-| `posture` | `HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State` → `UEFISecureBootEnabled` | no | M0 |
+| `posture` | `HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State` → `UEFISecureBootEnabled`; `HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity` → `Enabled`, the *configured* memory-integrity policy rather than the running state; the kernel's code-integrity options, including test signing, via `NtQuerySystemInformation`; whether a TPM is present and which specification family it implements, via `Tbsi_GetDeviceInfo`. One observation per run (ADR 0011) | no | M0, M1 |
 | `fivem_dir` | `%LOCALAPPDATA%\FiveM\FiveM.app\plugins` — the names of the files directly inside it and, when readable, each file's SHA-256. No recursion, no timestamps, no ACLs (ADR 0009) | no | M1 |
 
 Every new collector adds a row here in the same PR.

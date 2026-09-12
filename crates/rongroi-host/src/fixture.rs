@@ -10,7 +10,8 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    DirEntryInfo, EnvironmentSource, FilesystemSource, Host, Platform, RegistrySource, SourceError,
+    CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource, Host, Platform,
+    RegistrySource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -51,6 +52,28 @@ struct HostFile {
     filesystem: BTreeMap<String, Vec<FixtureFile>>,
     #[serde(default)]
     access_denied: Vec<String>,
+    #[serde(default)]
+    code_integrity: Option<FixtureCodeIntegrity>,
+    #[serde(default)]
+    tpm: Option<FixtureTpm>,
+}
+
+/// Code-integrity settings a fixture describes. Absent means the fixture never modelled them, which
+/// the accessor reports as `Unsupported` rather than inventing a value (ADR 0011).
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureCodeIntegrity {
+    enabled: bool,
+    test_signing: bool,
+}
+
+/// The TPM a fixture describes. Absent means the fixture never modelled one.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureTpm {
+    present: bool,
+    #[serde(default)]
+    spec_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -94,6 +117,8 @@ pub struct FixtureHost {
     env: BTreeMap<String, String>,
     filesystem: BTreeMap<String, Vec<FixtureFile>>,
     access_denied: Vec<String>,
+    code_integrity: Option<FixtureCodeIntegrity>,
+    tpm: Option<FixtureTpm>,
 }
 
 impl FixtureHost {
@@ -146,6 +171,8 @@ impl FixtureHost {
                 .iter()
                 .map(|key| normalise_path(key))
                 .collect(),
+            code_integrity: file.code_integrity,
+            tpm: file.tpm,
         })
     }
 
@@ -249,6 +276,32 @@ impl EnvironmentSource for FixtureHost {
     }
 }
 
+impl SystemIntegritySource for FixtureHost {
+    fn code_integrity_options(&self) -> Result<CodeIntegrityOptions, SourceError> {
+        let described = self.code_integrity.ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe code integrity".to_owned(),
+            )
+        })?;
+        Ok(CodeIntegrityOptions {
+            enabled: described.enabled,
+            test_signing: described.test_signing,
+        })
+    }
+}
+
+impl TpmSource for FixtureHost {
+    fn tpm_info(&self) -> Result<TpmInfo, SourceError> {
+        let described = self.tpm.as_ref().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe a TPM".to_owned())
+        })?;
+        Ok(TpmInfo {
+            present: described.present,
+            spec_version: described.spec_version.clone(),
+        })
+    }
+}
+
 impl Host for FixtureHost {
     fn platform(&self) -> Platform {
         self.platform
@@ -287,6 +340,12 @@ filesystem:
 access_denied:
   - 'HKLM\SYSTEM\Locked'
   - 'C:\Users\fixtureuser\AppData\Local\Locked'
+code_integrity:
+  enabled: true
+  test_signing: true
+tpm:
+  present: true
+  spec_version: "2.0"
 "#;
 
     const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -406,6 +465,69 @@ access_denied:
         assert_eq!(
             host.file_sha256(&format!(r"{dir}\x.dll")),
             Err(SourceError::AccessDenied)
+        );
+    }
+
+    #[test]
+    fn code_integrity_and_tpm_are_read_from_the_fixture() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.code_integrity_options(),
+            Ok(CodeIntegrityOptions {
+                enabled: true,
+                test_signing: true,
+            })
+        );
+        assert_eq!(
+            host.tpm_info(),
+            Ok(TpmInfo {
+                present: true,
+                spec_version: Some("2.0".to_owned()),
+            })
+        );
+    }
+
+    /// A fixture written before these settings existed must not silently claim one: silence is
+    /// "never modelled", which is `Unsupported`, and never a made-up "disabled" or "absent".
+    #[test]
+    fn a_fixture_without_the_new_blocks_is_unsupported_not_a_default() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            host.code_integrity_options(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(host.tpm_info(), Err(SourceError::Unsupported(_))));
+    }
+
+    #[test]
+    fn an_absent_tpm_has_no_spec_version() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\ntpm:\n  present: false\n", "inline")
+                .unwrap();
+        assert_eq!(
+            host.tpm_info(),
+            Ok(TpmInfo {
+                present: false,
+                spec_version: None,
+            })
+        );
+    }
+
+    #[test]
+    fn unknown_fields_in_the_new_blocks_are_rejected() {
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\ncode_integrity:\n  enabled: true\n  bogus: 1\n",
+                "inline"
+            )
+            .is_err()
+        );
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\ntpm:\n  present: true\n  bogus: 1\n",
+                "inline"
+            )
+            .is_err()
         );
     }
 

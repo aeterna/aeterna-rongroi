@@ -1,0 +1,7 @@
+{
+  "description": "The platform reports no TPM, so there is no specification version either",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "tpm": "absent" } }
+  ],
+  "expect_matches": 1
+}

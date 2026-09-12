@@ -15,3 +15,7 @@ pub use live::LiveHost;
 pub mod filesystem;
 
 pub mod elevate;
+
+pub mod system_integrity;
+
+pub mod tpm;

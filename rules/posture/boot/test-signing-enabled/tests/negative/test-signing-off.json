@@ -1,0 +1,6 @@
+{
+  "description": "An ordinary machine: the kernel only starts drivers a trusted publisher signed",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "test_signing": "disabled" } }
+  ]
+}

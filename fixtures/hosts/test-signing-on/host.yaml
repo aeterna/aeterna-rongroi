@@ -1,15 +1,19 @@
 # SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 with test signing switched on: the kernel accepts self-signed drivers. Everything else is
+# ordinary, so this fixture isolates that one setting.
 platform: windows
-os_build: "19045"
-elevated: true
+os_build: "26100"
+elevated: false
 registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
+    UEFISecureBootEnabled: 1
   'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
     Enabled: 1
 code_integrity:
   enabled: true
-  test_signing: false
+  test_signing: true
 tpm:
   present: true
   spec_version: "2.0"
