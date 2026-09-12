@@ -50,10 +50,38 @@ none contains a real person's user name, host name, SID or files.
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
+| `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder, and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable | `cargo xtask check-baseline` |
 
 A host named `baseline-*` is read by `cargo xtask check-baseline` and means more than the others: it
 asserts that a machine like this is unremarkable, so the whole rule set must stay quiet on it (ADR 0017).
 Each one is a written profile; a setting in it is never changed to silence a rule.
+
+**What a baseline leaves out is a claim too.** A source a baseline does not describe is not read, the
+collector is `Unmeasured`, and a rule for it passes the gate whatever it says — which is what
+`baseline-consumer-win11` and `baseline-hardened-win11` do to `pca`, `prefetch`, `bam` and `evtx`: neither
+sets `WinDir` or `SystemRoot` and neither carries a BAM key. `baseline-elevated-win11` was added for that
+(ADR 0025) and is the host on which every collector in the build is `Measured` with no gaps. Its artifacts
+hold the shapes a careless rule fires on — a game executable run from a Downloads folder, `cmd.exe` with a
+Prefetch record, a BAM entry whose path is a device path — because leaving those out would make the claim
+weaker, not safer.
+
+**Three things about `baseline-elevated-win11` are the fixture's shape rather than an ordinary machine's**,
+and a rule keyed on them is not meaningfully measured there. It holds **one** `.evtx` file where a real
+`winevt\Logs` holds on the order of a hundred, and **one** `.pf` file where a real Prefetch folder holds
+hundreds, because this repository vendors exactly one modern sample of each and every other candidate
+carried somebody's data (`fixtures/evtx/PROVENANCE.md`, `fixtures/prefetch/PROVENANCE.md`); so `logs: 1`,
+`examined: 1` and `files: 1` are artefacts of that. And the one event log is
+`Microsoft-Windows-LanguagePackSetup/Operational`, so event ids 4000 and 4001 are the only ones any rule can
+be measured against — the `Security` channel, which ADR 0018 and ADR 0024 were written for, is not
+represented. Its log file is named after the channel its records declare, deliberately: a log whose records
+name a different channel is a file that was *put* there, and a baseline showing that shape would be
+asserting it is unremarkable.
+
+**It is `elevated: true`, and that is the claim, not a convenience.** This repository does not say any of
+those four sources is readable without an elevated token — ADR 0021 and ADR 0024 say the opposite for
+Prefetch and for `Security.evtx`, ADR 0020 and ADR 0023 record PCA and BAM as unestablished — so a
+non-elevated host that read them all would assert something nobody here has measured. The two existing
+baselines stay `elevated: false` and remain the only description of a non-elevated scan.
 
 The user name `fixtureuser` in these paths is invented; it exists so that SS-mode redaction has something
 to replace.
@@ -74,25 +102,26 @@ full there deliberately, so that a test asserting no part of one reaches an obse
 assert against.
 They are there so that a test can assert a name never reaches an observation.
 
-**One host reaches bytes that carry a real account name**, and it is the only one: the four
-`prefetch-*` hosts that point at `fixtures/prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf` inherit
-that file's string table, which holds the upstream author's one-letter account name and his machine's
-volume serial numbers (`fixtures/prefetch/PROVENANCE.md` records why it was vendored anyway). A
-one-letter name cannot be asserted absent — `contains("a")` is true of almost any JSON — so the
-`prefetch` collector's tests assert the *shapes* instead: no `\USERS\`, no `VOLUME{`, no
-`HARDDISKVOLUME` and no `.DLL` in the serialised observations, and no `loaded_files` or `volumes`
-field under any name. The collector emits neither field at all, which is what makes those assertions
-meaningful rather than lucky (ADR 0021).
+**One set of bytes carries a real account name**: the `prefetch-*` hosts and
+`baseline-elevated-win11`, which point at
+`fixtures/prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf`, inherit that file's string table,
+which holds the upstream author's one-letter account name and his machine's volume serial numbers
+(`fixtures/prefetch/PROVENANCE.md` records why it was vendored anyway). A one-letter name cannot be
+asserted absent — `contains("a")` is true of almost any JSON — so the `prefetch` collector's tests
+assert the *shapes* instead: no `\USERS\`, no `VOLUME{`, no `HARDDISKVOLUME` and no `.DLL` in the
+serialised observations, and no `loaded_files` or `volumes` field under any name. The collector
+emits neither field at all, which is what makes those assertions meaningful rather than lucky (ADR
+0021).
 
-**The `evtx-*` hosts reach a real host name**, `DESKTOP-1N4R894`, in the chunk string table of
-`fixtures/evtx/languagepacksetup-operational.evtx` — the one Event Log sample this repository vendors,
-and a name Windows generates at install time (`fixtures/evtx/PROVENANCE.md` records why it was vendored
-anyway and counts every other string in the file). Unlike the Prefetch account name, 15 characters can
-be asserted absent and are, in the `evtx` collector's tests and in the report snapshot test. That
-assertion alone would not catch a payload leak, so the element names and payload fragments the file also
-holds — `EventData`, `Computer`, `UserID`, the `ping-response` fragments, the `MS-CV` tokens — are
-asserted absent beside it (ADR 0024). The parser drops every record's payload before the collector sees
-it (ADR 0018).
+**The `evtx-*` hosts and `baseline-elevated-win11` reach a real host name**, `DESKTOP-1N4R894`, in
+the chunk string table of `fixtures/evtx/languagepacksetup-operational.evtx` — the one Event Log
+sample this repository vendors, and a name Windows generates at install time
+(`fixtures/evtx/PROVENANCE.md` records why it was vendored anyway and counts every other string in
+the file). Unlike the Prefetch account name, 15 characters can be asserted absent and are, in the
+`evtx` collector's tests and in the report snapshot test. That assertion alone would not catch a
+payload leak, so the element names and payload fragments the file also holds — `EventData`,
+`Computer`, `UserID`, the `ping-response` fragments, the `MS-CV` tokens — are asserted absent beside
+it (ADR 0024). The parser drops every record's payload before the collector sees it (ADR 0018).
 
 Two `evtx` tests build a fixture host in the temporary directory instead of reading one from here: a
 damaged chunk and a file whose header is not an Event Log's. Neither may be committed to

@@ -6,8 +6,8 @@
 |---|---|---|---|
 | L0 parsers | artifact formats decode correctly, including corrupt input — truncated, malformed, the wrong encoding, and bytes whose meaning is not established | `crates/rongroi-parsers` | macOS · Linux · Windows |
 | L1 collectors | every outcome — found, not found, unmeasured — against `FixtureHost` | `crates/rongroi-collectors/src/*.rs` | macOS · Linux · Windows |
-| L2 rules | each rule's positive fixture is `found`, negative is `not_found` | `rules/**/tests/` via `cargo xtask check-rules` | macOS · Linux · Windows |
-| L2b baseline | the whole rule set stays quiet on machines described as ordinary; each accepted match needs a `rules/known-fps.csv` row with a reason, and an unused row fails | `fixtures/hosts/baseline-*/` via `cargo xtask check-baseline` | macOS · Linux · Windows |
+| L2 rules | each rule's `collector` and every `match` field name exist in this build; each rule's positive fixture is `found`, negative is `not_found` | `rules/**/tests/` via `cargo xtask check-rules` | macOS · Linux · Windows |
+| L2b baseline | the whole rule set stays quiet on machines described as ordinary; each accepted match needs a `rules/known-fps.csv` row with a reason, and an unused row fails. Three profiles, one of which — `baseline-elevated-win11` — has every collector `Measured`, so a rule for `pca`, `prefetch`, `bam` or `evtx` is answerable here rather than `Unmeasured` (ADR 0025) | `fixtures/hosts/baseline-*/` via `cargo xtask check-baseline` | macOS · Linux · Windows |
 | L3 report | the full pipeline, as JSON snapshots; SS view never contains the fixture user name | `crates/rongroi-collectors/tests/`, `rongroi-core::view` | macOS · Linux · Windows |
 | L4 UI | the GUI renders the L3 report JSON through mocked IPC; WebView hardening settings | `apps/desktop` (vitest) | macOS · Linux |
 | L5 live | real Windows: no panic, non-admin gives `unmeasured(not_admin)`, scanned folders unchanged, no files left outside the run's temp folder | Windows CI job and a Windows test machine | Windows |
@@ -102,6 +102,12 @@ CI runs `cargo insta test --unreferenced reject`, so a stale snapshot fails.
 keys that deny access. All of them are synthetic; see `fixtures/hosts/PROVENANCE.md`. Never copy files from
 a real player's PC into this repository.
 
+A `baseline-*` host means more than the others: it asserts that a machine like it is unremarkable, so
+`check-baseline` requires the whole rule set to stay quiet on it (ADR 0017). A setting in one is never
+chosen to silence a rule — and a source one of them leaves undescribed is not neutral either, because a
+collector that never reads is `Unmeasured` and a rule for it is then unmeasurable in either direction
+(ADR 0025).
+
 ## Prove that a check can fail
 
 A gate that has never failed has not been tested. When adding or changing a gate, break it on purpose once and
@@ -111,8 +117,8 @@ confirm it fails:
 |---|---|
 | `cargo deny check` | adding `reqwest` to a crate |
 | `fuzz smoke` | giving a parser a panicking path — e.g. indexing `bytes[TAIL_OFFSET]` in `bam::parse_value`, slicing `bytes[4..MAM_HEADER_LEN]` in `prefetch::reject_implausible_declared_size`, or indexing `bytes[FILE_HEADER_LEN]` in `evtx::records` instead of comparing the length, rather than reaching for it with `get` |
-| `check-rules` | duplicating a rule id, deleting a negative fixture, or allowing by `name:` |
-| `check-baseline` | pointing a rule's `match` at a value a baseline host carries, or leaving a `known-fps.csv` row in place once its rule no longer matches |
+| `check-rules` | duplicating a rule id, deleting a negative fixture, allowing by `name:`, or misspelling a `match` field (`run_cout`) or a `collector` (`postures`) |
+| `check-baseline` | pointing a rule's `match` at a value a baseline host carries — `prefetch` / `name: cmd.exe` fires on `baseline-elevated-win11` — or leaving a `known-fps.csv` row in place once its rule no longer matches |
 | `check-locales` | adding a key to a translation that English does not have |
 | `check-unicode` | inserting U+200B into any file |
 | `reuse lint` | deleting a file's SPDX header |

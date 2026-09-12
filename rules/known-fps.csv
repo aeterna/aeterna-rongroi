@@ -18,5 +18,5 @@
 # goes quiet is out of scope (AGENTS.md, "weakening a rule or collector without a documented
 # false-positive reason"). ADR 0017 has the reasoning.
 #
-# There are no rows today: all four rules in the bundle are quiet on both baselines.
+# There are no rows today: all four rules in the bundle are quiet on all three baselines.
 rule_id,baseline,reason,added

@@ -6,6 +6,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- Two gates that could not fail (ADR 0026). `cargo xtask check-rules` now rejects a rule whose
+  `collector` is not a collector in this build, or whose `match` names a field that collector cannot
+  emit — a misspelling used to ship as a rule that is `not_found` on every machine, which this program
+  shows a player as evidence that something was looked for and was not there. The vocabulary comes from
+  a new required `Collector::fields`, bound to what each collector really emits by a test over every
+  fixture host. And `cargo xtask check-baseline` gains `fixtures/hosts/baseline-elevated-win11`, the
+  first baseline on which `pca`, `prefetch`, `bam` and `evtx` are `Measured` rather than `Unmeasured`:
+  until now a rule for any of those four passed that gate whatever it said. The four rules that ship
+  today pass both unchanged.
 - A rule's `match` compared strings byte for byte, so a rule naming `C:\Windows\Temp\x.exe` did not match
   an observation carrying `C:\WINDOWS\Temp\x.exe` and reported `not_found` — a silent miss shown as a
   thing looked for and not there. Strings now compare without regard to ASCII case; a rule names in
