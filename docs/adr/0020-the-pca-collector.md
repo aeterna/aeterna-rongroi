@@ -270,8 +270,9 @@ behavioural change to the report that PRIVACY.md describes but that has never be
   without an edit. The two new L3 snapshots are read by name, so `pnpm test` is unaffected.
 - `not_admin` becomes producible for the first time. Its translations in the CLI and both locale files
   have existed and been unreachable since M1.
-- Seven fixture hosts are added and each one points at the parser corpora rather than copying them,
-  except `pca-unredactable-path`, whose bytes are inline because they exercise the collector's
+- Seven fixture hosts are added. Five of them point at the synthetic parser corpora in
+  `fixtures/parsers/` rather than copying them; `pca-not-present` describes no file at all, and
+  `pca-unredactable-path` writes its bytes inline, because they exercise the collector's
   withholding rather than the parser and must not become a fuzz seed.
 - `rongroi_parsers::pca::parse_general_db` is now called by the product and its result is deliberately
   almost entirely discarded. That is not waste: `rejected` is a tamper signal and costs one read, and
