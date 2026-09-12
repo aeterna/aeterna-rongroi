@@ -52,6 +52,18 @@ const ID: &str = "bam";
 /// Why the account a record belongs to is not in the report, as the account observation states it.
 const SID_WITHHELD: &str = "per_user_identifier";
 
+/// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
+///
+/// `%SystemRoot%` is not set, or the BAM key is not there, so nothing was looked at; the
+/// registry read itself denied, denied without administrator rights, or failed.
+const REASONS: [UnmeasuredReason; 5] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::NotAdmin,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::ReadFailed,
+];
+
 /// Every field this collector can emit.
 ///
 /// A key it could not enumerate is a gap in all of them. One value it could not read or decode is
@@ -83,6 +95,10 @@ impl Collector for Bam {
 
     fn fields(&self) -> &'static [&'static str] {
         &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
     }
 
     /// Enumerates the account keys under [`USER_SETTINGS_KEY`] and reads every value in each of them.

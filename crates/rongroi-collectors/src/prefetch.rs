@@ -58,6 +58,18 @@ const LOADED_FILES_WITHHELD: &str = "user_file_list";
 /// Why `volumes` is not in the report, as the account observation states it.
 const VOLUMES_WITHHELD: &str = "machine_identifier";
 
+/// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
+///
+/// `%SystemRoot%` is not set, the folder is absent, or it was denied, denied without
+/// administrator rights, or could not be read.
+const REASONS: [UnmeasuredReason; 5] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::NotAdmin,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::SourceMissing,
+    UnmeasuredReason::ReadFailed,
+];
+
 /// Every field this collector can emit.
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
@@ -89,6 +101,10 @@ impl Collector for Prefetch {
 
     fn fields(&self) -> &'static [&'static str] {
         &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
     }
 
     /// Lists `%SystemRoot%\Prefetch` and reads every `.pf` file in it.

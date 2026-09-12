@@ -53,7 +53,7 @@ strength: TODO  # execution | presence | tamper | posture | context
 match:
   TODO_field: TODO_value
 retention: TODO how far back this source can see.
-unmeasured_when: []
+unmeasured_when: []  # reasons this collector can report and you expect here; check-rules rejects the rest
 falsepositives:
   - TODO what legitimately produces this evidence
 references: []

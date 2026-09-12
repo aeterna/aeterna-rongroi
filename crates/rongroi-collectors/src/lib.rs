@@ -16,7 +16,7 @@ pub mod prefetch;
 pub mod process;
 pub mod scan;
 
-use rongroi_core::model::CollectorRun;
+use rongroi_core::model::{CollectorRun, UnmeasuredReason};
 use rongroi_host::Host;
 
 /// Reads one kind of artifact. Implementations must be read-only and must never panic.
@@ -35,6 +35,17 @@ pub trait Collector {
     /// compile, rather than declaring an empty vocabulary that would reject every rule written for
     /// it.
     fn fields(&self) -> &'static [&'static str];
+    /// Every reason this collector can give for not having looked, in a run or in `gaps`.
+    ///
+    /// This is what a rule's `unmeasured_when` may name, and `cargo xtask check-rules` rejects a
+    /// rule that declares a reason its collector cannot produce (ADR 0027) — a declaration that can
+    /// never come true, which since ADR 0027 also silently suppresses nothing. `collector_unavailable`
+    /// is not listed by anyone: the engine produces it when no run for the collector exists at all.
+    ///
+    /// Like [`Collector::fields`] it is a declaration, bound to the code by the
+    /// `every_reason_a_collector_reports_is_declared` test in this file rather than derived from it,
+    /// and with the same limit: a reason no fixture host provokes cannot be proved reachable.
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason];
     /// Looks at the host.
     fn collect(&self, host: &dyn Host) -> CollectorRun;
 }
@@ -57,7 +68,7 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
-    use rongroi_core::model::CollectorRun;
+    use rongroi_core::model::{CollectorRun, UnmeasuredReason};
     use rongroi_host::FixtureHost;
 
     use super::*;
@@ -129,6 +140,39 @@ mod tests {
                         declared.contains(field.as_str()),
                         "fixtures/hosts/{name}: collector `{}` gapped `{field}`, which `Collector::fields` does not declare",
                         collector.id()
+                    );
+                }
+            }
+        }
+    }
+
+    /// `Collector::unmeasured_reasons` is a declaration too, and since ADR 0027 it decides which
+    /// `unmeasured_when` entries `check-rules` accepts. A collector that reports a reason it did
+    /// not declare would have that reason rejected in every rule written for it, so the two are
+    /// bound here the same way the field lists are.
+    ///
+    /// This proves one half — nothing reported is undeclared. The other half is what the fixture
+    /// hosts cannot prove: a reason is only seen on a host that provokes it. ADR 0027 records it.
+    #[test]
+    fn every_reason_a_collector_reports_is_declared() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeSet<&str> = collector
+                    .unmeasured_reasons()
+                    .iter()
+                    .map(|reason| reason.as_str())
+                    .collect();
+                let reported: Vec<UnmeasuredReason> = match collector.collect(&host) {
+                    CollectorRun::Unmeasured { reason, .. } => vec![reason],
+                    CollectorRun::Measured { gaps, .. } => gaps.values().copied().collect(),
+                };
+                for reason in reported {
+                    assert!(
+                        declared.contains(reason.as_str()),
+                        "fixtures/hosts/{name}: collector `{}` reported `{}`, which `Collector::unmeasured_reasons` does not declare",
+                        collector.id(),
+                        reason.as_str()
                     );
                 }
             }

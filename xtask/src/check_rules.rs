@@ -134,14 +134,32 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
 /// alternative that was rejected.
 struct Vocabulary {
     fields: BTreeMap<&'static str, BTreeSet<&'static str>>,
+    reasons: BTreeMap<&'static str, BTreeSet<&'static str>>,
 }
+
+/// The one unmeasured reason no collector declares: the engine produces it when the build has no
+/// run for the rule's collector at all (`engine::evaluate_rule`), so any rule may expect it.
+const ENGINE_REASON: UnmeasuredReason = UnmeasuredReason::CollectorUnavailable;
 
 impl Vocabulary {
     fn of_this_build() -> Self {
+        let collectors = rongroi_collectors::all();
         Self {
-            fields: rongroi_collectors::all()
+            fields: collectors
                 .iter()
                 .map(|collector| (collector.id(), collector.fields().iter().copied().collect()))
+                .collect(),
+            reasons: collectors
+                .iter()
+                .map(|collector| {
+                    let reasons = collector
+                        .unmeasured_reasons()
+                        .iter()
+                        .map(|reason| reason.as_str())
+                        .chain(std::iter::once(ENGINE_REASON.as_str()))
+                        .collect();
+                    (collector.id(), reasons)
+                })
                 .collect(),
         }
     }
@@ -177,6 +195,38 @@ impl Vocabulary {
                 rule.collector,
                 comma(known.iter().copied())
             ));
+        }
+        self.check_unmeasured_when(path, rule, problems);
+    }
+
+    /// Rejects an `unmeasured_when` entry naming a reason this rule can never be given.
+    ///
+    /// Since ADR 0027 the field decides what an SS view lists: a declared reason is counted, an
+    /// undeclared one is listed. A reason the rule's collector cannot produce is therefore a
+    /// suppression that never fires — the author believes they have said "this one is ordinary
+    /// here" and the report will list it anyway — and nothing in the rule file, in `check-baseline`
+    /// or in a fixture shows it. Two of the eight reasons (`not_on_this_os`, `service_disabled`)
+    /// have no producer anywhere in this build, so no rule may declare them at all.
+    fn check_unmeasured_when(&self, path: &str, rule: &Rule, problems: &mut Vec<String>) {
+        let Some(known) = self.reasons.get(rule.collector.as_str()) else {
+            return;
+        };
+        let mut seen = BTreeSet::new();
+        for reason in &rule.unmeasured_when {
+            let name = reason.as_str();
+            if !seen.insert(name) {
+                problems.push(format!(
+                    "rules/{path}: `unmeasured_when` names `{name}` twice"
+                ));
+                continue;
+            }
+            if !known.contains(name) {
+                problems.push(format!(
+                    "rules/{path}: `unmeasured_when` names `{name}`, which the `{}` collector cannot report; it reports {}",
+                    rule.collector,
+                    comma(known.iter().copied())
+                ));
+            }
         }
     }
 }
@@ -521,6 +571,114 @@ date: 2026-09-11
             assert!(
                 !fields.is_empty(),
                 "collector `{}` declares no field, so no rule could ever be written for it",
+                collector.id()
+            );
+        }
+    }
+
+    /// A reason no collector in this build produces is a suppression that never fires: the author
+    /// has written "this one is ordinary on some machines" and the report lists it anyway. Neither
+    /// `not_on_this_os` nor `service_disabled` has a producer anywhere in this build (ADR 0027).
+    #[test]
+    fn an_unmeasured_when_reason_this_build_cannot_produce_is_rejected() {
+        let tmp = TempRoot::new("dead-reason");
+        let rule = VALID_RULE
+            .replace("status: test", "status: experimental")
+            .replace(
+                "retention: Current setting only.",
+                "retention: Current setting only.\nunmeasured_when: [service_disabled]",
+            );
+        write(
+            &tmp.path()
+                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
+            &rule,
+        );
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains(
+                "`unmeasured_when` names `service_disabled`, which the `posture` collector cannot report"
+            ),
+            "{:?}",
+            outcome.problems
+        );
+        // The message names what it can report, so the fix does not need a grep.
+        assert!(
+            outcome.problems[0]
+                .contains("it reports access_denied, collector_unavailable, not_windows, read_failed, source_missing"),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// A reason another collector produces is still wrong here: `posture` reads what any account may
+    /// read and never splits a denial by elevation, so it cannot report `not_admin`.
+    #[test]
+    fn an_unmeasured_when_reason_another_collector_produces_is_rejected() {
+        let tmp = TempRoot::new("wrong-collector-reason");
+        let rule = VALID_RULE
+            .replace("status: test", "status: experimental")
+            .replace(
+                "retention: Current setting only.",
+                "retention: Current setting only.\nunmeasured_when: [not_admin]",
+            );
+        write(
+            &tmp.path()
+                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
+            &rule,
+        );
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains("`unmeasured_when` names `not_admin`"),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// The reasons the four shipped rules declare, and the one the engine itself produces when a
+    /// build has no run for the collector at all.
+    #[test]
+    fn the_reasons_a_collector_declares_are_accepted() {
+        let tmp = TempRoot::new("good-reasons");
+        let rule = VALID_RULE.replace(
+            "retention: Current setting only.",
+            "retention: Current setting only.\nunmeasured_when: [not_windows, source_missing, access_denied, read_failed, collector_unavailable]",
+        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write(&dir.join("tests/positive/on.json"), POSITIVE_FIXTURE);
+        write(&dir.join("tests/negative/off.json"), NEGATIVE_FIXTURE);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
+    }
+
+    /// Every collector can be asked which reasons it reports, so the first rule written for any of
+    /// them can carry an `unmeasured_when` line.
+    #[test]
+    fn every_collector_in_the_build_declares_the_reasons_it_reports() {
+        let vocabulary = Vocabulary::of_this_build();
+
+        for collector in rongroi_collectors::all() {
+            let reasons = vocabulary
+                .reasons
+                .get(collector.id())
+                .unwrap_or_else(|| panic!("collector `{}` declares no reason", collector.id()));
+            // `collector_unavailable` is added to every collector's set and belongs to the engine.
+            assert!(
+                reasons.contains(ENGINE_REASON.as_str()),
+                "collector `{}` cannot be expected to be unavailable",
+                collector.id()
+            );
+            assert!(
+                reasons.len() > 1,
+                "collector `{}` reports no reason of its own",
                 collector.id()
             );
         }
