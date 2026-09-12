@@ -30,6 +30,7 @@ none contains a real person's user name, host name, SID or files.
 | `prefetch-file-unreadable` | Windows 11 with one `.pf` file listed and holding no bytes and one that is readable | `prefetch` collector tests |
 | `prefetch-unsupported-version` | Windows 11 whose Prefetch folder holds one SCCA v26 file from an older Windows, which this parser does not decode | `prefetch` collector tests |
 | `prefetch-corrupt-files` | Windows 11 whose Prefetch folder holds an intact `MAM` container over a payload that is not Xpress-Huffman, and the corpus's deliberately bad file | `prefetch` collector tests |
+| `registry-bytes-present` | Windows 11, one registry key holding a binary value whose bytes come from `fixtures/parsers/bam/documented-24-byte-value.bin`, one written inline, and one described without bytes — a value that is there and cannot be read | `rongroi-host` fixture tests |
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
@@ -45,6 +46,10 @@ A file entry may carry its bytes as well as its hash (ADR 0019): `content:` writ
 `from:` names a file relative to the host's own directory, which is how a host reaches the artifact
 corpora in `fixtures/parsers/`, `fixtures/prefetch/` and `fixtures/evtx/`. Those corpora are inputs and
 are never written to; a host points at them and copies nothing.
+
+A registry value carries its bytes the same two ways (ADR 0022): a value written as a map with
+`content:` or `from:` is a `REG_BINARY`, a number is a `REG_DWORD` and a string is a `REG_SZ`. A value
+written as an empty map is there and cannot be read.
 
 The account names `alex`, `shareduser` and `deviceuser` that reach these hosts are invented in the same way,
 `alex` through the parser corpora in `fixtures/parsers/` and the other two inline in `pca-unredactable-path`.

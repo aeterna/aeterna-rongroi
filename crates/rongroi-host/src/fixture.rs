@@ -90,11 +90,52 @@ struct FixtureProcess {
     path: Option<String>,
 }
 
+/// One registry value as the YAML writes it. A number is a `REG_DWORD`, a string is a `REG_SZ`, and
+/// a map is a `REG_BINARY` whose bytes are written the two ways a file's bytes are (ADR 0019):
+/// `content:` inline, or `from:` a file under `fixtures/`. The three cannot be confused for one
+/// another, which is what makes the untagged enum safe to extend.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum RegistryValue {
     Dword(u32),
     Text(String),
+    Binary(FixtureBinary),
+}
+
+/// The bytes of one `REG_BINARY` value. Neither `content:` nor `from:` describes a value that is
+/// there and whose bytes cannot be read, as a file entry with neither does (ADR 0019).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureBinary {
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    from: Option<String>,
+}
+
+/// One registry value with its `from:` already read from disk and the spelling the fixture used for
+/// its name, so that enumeration can hand back what a real registry would.
+#[derive(Debug, Clone)]
+struct StoredValue {
+    /// The name as the fixture wrote it; the map key is its lower-cased form.
+    name: String,
+    data: StoredData,
+}
+
+#[derive(Debug, Clone)]
+enum StoredData {
+    Dword(u32),
+    Text(String),
+    /// `None` describes a value that is there and cannot be read.
+    Binary(Option<Vec<u8>>),
+}
+
+/// One registry key a fixture describes, with the spelling it used for the key's own path.
+#[derive(Debug, Clone)]
+struct StoredKey {
+    /// The full key path as the fixture wrote it; the map key is its lower-cased form.
+    path: String,
+    values: BTreeMap<String, StoredValue>,
 }
 
 /// One entry in a fixture directory, as the YAML writes it. A file unless `directory: true`; an
@@ -140,52 +181,87 @@ fn split_parent(path: &str) -> (&str, &str) {
         .map_or(("", path), |index| (&path[..index], &path[index + 1..]))
 }
 
-/// Turns one described file into a stored entry, reading a `from:` file now rather than later.
+/// Reads the bytes a fixture described, resolving a `from:` now rather than later.
 ///
-/// `content:` and `from:` are two ways of writing the same thing, so a file that uses both is
-/// rejected instead of one of them being picked: a fixture that says two things about one file is a
-/// fixture whose reader has to guess.
-fn resolve_file(
-    described: FixtureFile,
+/// `content:` and `from:` are two ways of writing the same thing, so an entry that uses both is
+/// rejected instead of one of them being picked: a fixture that says two things about one entry is a
+/// fixture whose reader has to guess. `what` names the entry in an error message.
+fn resolve_content(
+    content: Option<String>,
+    from: Option<String>,
+    what: &str,
     origin: &str,
     base: Option<&Path>,
-) -> Result<FixtureEntry, FixtureError> {
-    let content = match (described.content, described.from) {
-        (Some(_), Some(_)) => {
-            return Err(FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!(
-                    "file `{}` uses both `content:` and `from:`; it must use one",
-                    described.name
-                ),
-            });
-        }
-        (Some(inline), None) => Some(inline.into_bytes()),
+) -> Result<Option<Vec<u8>>, FixtureError> {
+    match (content, from) {
+        (Some(_), Some(_)) => Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!("{what} uses both `content:` and `from:`; it must use one"),
+        }),
+        (Some(inline), None) => Ok(Some(inline.into_bytes())),
         (None, Some(relative)) => {
             let Some(base) = base else {
                 return Err(FixtureError::Parse {
                     path: origin.to_owned(),
                     message: format!(
-                        "file `{}` uses `from:`, which needs a fixture directory to start from; \
-                         an inline fixture writes its bytes with `content:`",
-                        described.name
+                        "{what} uses `from:`, which needs a fixture directory to start from; \
+                         an inline fixture writes its bytes with `content:`"
                     ),
                 });
             };
             let path = base.join(&relative);
-            Some(std::fs::read(&path).map_err(|source| FixtureError::Io {
-                path: path.display().to_string(),
-                source,
-            })?)
+            Ok(Some(std::fs::read(&path).map_err(|source| {
+                FixtureError::Io {
+                    path: path.display().to_string(),
+                    source,
+                }
+            })?))
         }
-        (None, None) => None,
-    };
+        (None, None) => Ok(None),
+    }
+}
+
+/// Turns one described file into a stored entry, reading a `from:` file now rather than later.
+fn resolve_file(
+    described: FixtureFile,
+    origin: &str,
+    base: Option<&Path>,
+) -> Result<FixtureEntry, FixtureError> {
+    let content = resolve_content(
+        described.content,
+        described.from,
+        &format!("file `{}`", described.name),
+        origin,
+        base,
+    )?;
     Ok(FixtureEntry {
         name: described.name,
         sha256: described.sha256,
         directory: described.directory,
         content,
     })
+}
+
+/// Turns one described registry value into a stored one, reading a `from:` file now rather than
+/// later, and keeping the name as the fixture spelled it.
+fn resolve_value(
+    name: String,
+    described: RegistryValue,
+    origin: &str,
+    base: Option<&Path>,
+) -> Result<StoredValue, FixtureError> {
+    let data = match described {
+        RegistryValue::Dword(number) => StoredData::Dword(number),
+        RegistryValue::Text(text) => StoredData::Text(text),
+        RegistryValue::Binary(binary) => StoredData::Binary(resolve_content(
+            binary.content,
+            binary.from,
+            &format!("registry value `{name}`"),
+            origin,
+            base,
+        )?),
+    };
+    Ok(StoredValue { name, data })
 }
 
 /// A fake machine for tests. Registry keys, value names, directory paths and environment variable names
@@ -195,7 +271,7 @@ pub struct FixtureHost {
     platform: Platform,
     os_build: Option<String>,
     elevated: Option<bool>,
-    registry: BTreeMap<String, BTreeMap<String, RegistryValue>>,
+    registry: BTreeMap<String, StoredKey>,
     env: BTreeMap<String, String>,
     filesystem: BTreeMap<String, Vec<FixtureEntry>>,
     access_denied: Vec<String>,
@@ -229,17 +305,21 @@ impl FixtureHost {
             path: origin.to_owned(),
             message: e.to_string(),
         })?;
-        let registry = file
-            .registry
-            .into_iter()
-            .map(|(key, values)| {
-                let values = values
-                    .into_iter()
-                    .map(|(name, value)| (name.to_ascii_lowercase(), value))
-                    .collect();
-                (key.to_ascii_lowercase(), values)
-            })
-            .collect();
+        let mut registry = BTreeMap::new();
+        for (key, values) in file.registry {
+            let mut stored = BTreeMap::new();
+            for (name, value) in values {
+                let lowercased = name.to_ascii_lowercase();
+                stored.insert(lowercased, resolve_value(name, value, origin, base)?);
+            }
+            registry.insert(
+                key.to_ascii_lowercase(),
+                StoredKey {
+                    path: key,
+                    values: stored,
+                },
+            );
+        }
         let env = file
             .env
             .into_iter()
@@ -286,7 +366,9 @@ impl FixtureHost {
         self.access_denied.iter().any(|denied| denied == path)
     }
 
-    fn lookup(&self, key: &str, value: &str) -> Result<Option<&RegistryValue>, SourceError> {
+    /// The lower-cased key a fixture would have stored, once this host is known to have a registry
+    /// and the key is known not to be one the fixture denies.
+    fn registry_key(&self, key: &str) -> Result<String, SourceError> {
         if self.platform != Platform::Windows {
             return Err(SourceError::Unsupported(
                 "no registry on this platform".to_owned(),
@@ -296,29 +378,119 @@ impl FixtureHost {
         if self.access_denied.contains(&key) {
             return Err(SourceError::AccessDenied);
         }
+        Ok(key)
+    }
+
+    fn lookup(&self, key: &str, value: &str) -> Result<Option<&StoredValue>, SourceError> {
+        let key = self.registry_key(key)?;
         Ok(self
             .registry
             .get(&key)
-            .and_then(|values| values.get(&value.to_ascii_lowercase())))
+            .and_then(|stored| stored.values.get(&value.to_ascii_lowercase())))
+    }
+
+    /// Whether a fixture described this key at all — either by writing it, or by writing a key
+    /// underneath it. A key with subkeys and no values of its own is still a key that is there.
+    fn registry_key_exists(&self, key: &str) -> bool {
+        let prefix = format!(r"{key}\");
+        self.registry.contains_key(key)
+            || self
+                .registry
+                .keys()
+                .any(|stored| stored.starts_with(&prefix))
     }
 }
 
 impl RegistrySource for FixtureHost {
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError> {
-        match self.lookup(key, value)? {
-            Some(RegistryValue::Dword(number)) => Ok(Some(*number)),
-            Some(RegistryValue::Text(_)) => Err(SourceError::Failed(
+        match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Dword(number)) => Ok(Some(*number)),
+            Some(StoredData::Text(_)) => Err(SourceError::Failed(
                 "expected a DWORD, found a string".to_owned(),
+            )),
+            Some(StoredData::Binary(_)) => Err(SourceError::Failed(
+                "expected a DWORD, found a binary value".to_owned(),
             )),
             None => Ok(None),
         }
     }
 
     fn read_string(&self, key: &str, value: &str) -> Result<Option<String>, SourceError> {
-        match self.lookup(key, value)? {
-            Some(RegistryValue::Text(text)) => Ok(Some(text.clone())),
-            Some(RegistryValue::Dword(_)) => Err(SourceError::Failed(
+        match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Text(text)) => Ok(Some(text.clone())),
+            Some(StoredData::Dword(_)) => Err(SourceError::Failed(
                 "expected a string, found a DWORD".to_owned(),
+            )),
+            Some(StoredData::Binary(_)) => Err(SourceError::Failed(
+                "expected a string, found a binary value".to_owned(),
+            )),
+            None => Ok(None),
+        }
+    }
+
+    /// The keys the fixture wrote directly underneath this one, in a stable order and spelled as it
+    /// wrote them.
+    ///
+    /// A fixture describes a key by writing its values, so the subkeys of a key are found by
+    /// scanning for the keys whose path starts with it — which is also why a key nobody wrote and
+    /// nothing sits under is `Ok(None)`, the same answer `read_u32` gives for a key that is not
+    /// there.
+    fn subkeys(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        let key = self.registry_key(key)?;
+        if !self.registry_key_exists(&key) {
+            return Ok(None);
+        }
+        let prefix = format!(r"{key}\");
+        let mut children: BTreeMap<String, String> = BTreeMap::new();
+        for stored in self.registry.values() {
+            // Lower-casing is length-preserving, so the prefix that matched the lower-cased path
+            // covers the same bytes of the path as the fixture spelled it.
+            let lowercased = stored.path.to_ascii_lowercase();
+            let Some(rest) = lowercased.strip_prefix(&prefix) else {
+                continue;
+            };
+            let length = rest.find('\\').unwrap_or(rest.len());
+            let child = &stored.path[prefix.len()..prefix.len() + length];
+            children.insert(child.to_ascii_lowercase(), child.to_owned());
+        }
+        Ok(Some(children.into_values().collect()))
+    }
+
+    /// The names of this key's values, in a stable order and spelled as the fixture wrote them.
+    fn value_names(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        let key = self.registry_key(key)?;
+        if !self.registry_key_exists(&key) {
+            return Ok(None);
+        }
+        Ok(Some(
+            self.registry
+                .get(&key)
+                .map(|stored| {
+                    stored
+                        .values
+                        .values()
+                        .map(|value| value.name.clone())
+                        .collect()
+                })
+                .unwrap_or_default(),
+        ))
+    }
+
+    /// The bytes the fixture wrote for that value, through the same limit a live host applies.
+    ///
+    /// A value written with neither `content:` nor `from:` is there and cannot be read, which is the
+    /// per-value failure a file entry without bytes already models the same way (ADR 0019).
+    fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Binary(Some(bytes))) => {
+                crate::bound_registry_value(bytes.clone(), crate::MAX_REGISTRY_VALUE_BYTES)
+                    .map(Some)
+            }
+            Some(StoredData::Binary(None)) => Err(SourceError::Failed(format!(
+                "no bytes recorded for {key}\\{value}"
+            ))),
+            Some(StoredData::Dword(_) | StoredData::Text(_)) => Err(SourceError::Failed(
+                "expected a binary value, found a DWORD or a string".to_owned(),
             )),
             None => Ok(None),
         }
@@ -476,6 +648,13 @@ registry:
   'HKLM\SYSTEM\Example':
     Enabled: 1
     Name: "hello"
+    Blob:
+      content: "eight or more bytes"
+    Unwritten: {}
+  'HKLM\SYSTEM\Example\Inner':
+    Enabled: 0
+  'HKLM\SYSTEM\Example\Inner\Deeper':
+    Enabled: 0
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
 filesystem:
@@ -531,6 +710,163 @@ processes:
             host.read_u32(r"HKLM\SYSTEM\Example", "Name"),
             Err(SourceError::Failed(_))
         ));
+    }
+
+    /// Enumeration answers with the spelling the fixture used, not the lower-cased form the lookup
+    /// map is keyed by: a collector that emits a value name would otherwise report a path the
+    /// machine does not have.
+    #[test]
+    fn subkeys_and_value_names_are_listed_as_the_fixture_spelled_them() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.subkeys(r"hklm\system\EXAMPLE"),
+            Ok(Some(vec!["Inner".to_owned()]))
+        );
+        assert_eq!(
+            host.value_names(r"HKLM\SYSTEM\Example"),
+            Ok(Some(vec![
+                "Blob".to_owned(),
+                "Enabled".to_owned(),
+                "Name".to_owned(),
+                "Unwritten".to_owned(),
+            ]))
+        );
+    }
+
+    /// Only the keys directly inside, as `list_dir` lists only what is directly inside a directory.
+    #[test]
+    fn subkeys_never_recurse() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Example\Inner"),
+            Ok(Some(vec!["Deeper".to_owned()]))
+        );
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Example\Inner\Deeper"),
+            Ok(Some(vec![]))
+        );
+    }
+
+    /// The three answers a key can give, and they are three different statements: the key is not
+    /// there, the key is there and holds nothing, the key cannot be read.
+    #[test]
+    fn an_absent_key_is_none_and_an_empty_one_is_an_empty_list() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(host.subkeys(r"HKLM\SYSTEM\Absent"), Ok(None));
+        assert_eq!(host.value_names(r"HKLM\SYSTEM\Absent"), Ok(None));
+        assert_eq!(host.read_bytes(r"HKLM\SYSTEM\Absent", "Anything"), Ok(None));
+        assert_eq!(host.read_bytes(r"HKLM\SYSTEM\Example", "Absent"), Ok(None));
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Locked"),
+            Err(SourceError::AccessDenied)
+        );
+        assert_eq!(
+            host.value_names(r"HKLM\SYSTEM\Locked"),
+            Err(SourceError::AccessDenied)
+        );
+        assert_eq!(
+            host.read_bytes(r"HKLM\SYSTEM\Locked", "Anything"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    /// A key that only has subkeys was never written as a key of its own, and it is there all the
+    /// same: a fixture describes a key by writing its values, and this one has none.
+    #[test]
+    fn a_key_that_only_holds_subkeys_is_there_and_holds_no_value() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nregistry:\n  'HKLM\\SYSTEM\\Parent\\Child':\n    Enabled: 1\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.subkeys(r"HKLM\SYSTEM\Parent"),
+            Ok(Some(vec!["Child".to_owned()]))
+        );
+        assert_eq!(host.value_names(r"HKLM\SYSTEM\Parent"), Ok(Some(vec![])));
+    }
+
+    #[test]
+    fn binary_value_bytes_are_read_and_a_value_without_them_fails() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert_eq!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "blob"),
+            Ok(Some(b"eight or more bytes".to_vec()))
+        );
+        assert!(matches!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "Unwritten"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// Asking for the wrong type is a caller's mistake and is reported as one, in both directions,
+    /// rather than being converted into something the caller did not ask for.
+    #[test]
+    fn a_value_of_another_type_is_not_converted() {
+        let host = FixtureHost::from_yaml_str(HOST, "inline").unwrap();
+        assert!(matches!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "Enabled"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_u32(r"HKLM\SYSTEM\Example", "Blob"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_string(r"HKLM\SYSTEM\Example", "Blob"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// The limit is the host's, so it is applied by the fixture host as well as the live one; a
+    /// value of exactly the limit is still read.
+    #[test]
+    fn a_registry_value_over_the_limit_is_refused() {
+        let over = "a".repeat(crate::MAX_REGISTRY_VALUE_BYTES + 1);
+        let host = FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nregistry:\n  'HKLM\\SYSTEM\\Example':\n    Blob:\n      content: \"{over}\"\n"
+            ),
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.read_bytes(r"HKLM\SYSTEM\Example", "Blob"),
+            Err(SourceError::TooLarge {
+                limit: crate::MAX_REGISTRY_VALUE_BYTES
+            })
+        );
+    }
+
+    /// `from:` reaches the artifact corpora for a registry value exactly as it does for a file, and
+    /// it is tested against a real one: these bytes are a fuzz seed and a parser fixture.
+    #[test]
+    fn a_loaded_fixture_resolves_a_registry_from_against_its_own_directory() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
+        let host = FixtureHost::load(&fixtures.join("hosts/registry-bytes-present")).unwrap();
+        let key = r"HKLM\SYSTEM\CurrentControlSet\Services\fixture\State";
+
+        let on_disk =
+            std::fs::read(fixtures.join("parsers/bam/documented-24-byte-value.bin")).unwrap();
+        assert_eq!(host.read_bytes(key, "from-disk"), Ok(Some(on_disk)));
+        assert_eq!(
+            host.read_bytes(key, "inline"),
+            Ok(Some(b"hello\n".to_vec()))
+        );
+        assert!(matches!(
+            host.read_bytes(key, "unreadable"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_registry_value_describing_its_bytes_twice_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nregistry:\n  'HKLM\\SYSTEM\\Example':\n    Blob:\n      content: \"a\"\n      from: 'b.bin'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("content"), "{error}");
     }
 
     #[test]

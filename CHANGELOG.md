@@ -33,6 +33,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- Hosts can enumerate the registry and read a value's bytes: `RegistrySource` gains `subkeys`,
+  `value_names` and `read_bytes`, which is what BAM needs and what no other artifact does — its value
+  *names* are executable paths and its value *data* is the artifact. A key or value that is not there
+  is an answer rather than a failure, as it already is for a file. Each value is bounded at 64 KiB and
+  a larger one is refused whole rather than truncated; the count of subkeys and of values is
+  deliberately not bounded, because a partial enumeration would read as "there was nothing else". A
+  fixture writes a binary value as a map with `content:` or `from:`, the pair a file entry already uses
+  (ADR 0022).
 - The `prefetch` collector: it lists `%SystemRoot%\Prefetch` and reports, per `.pf` file, the
   program's name, how many times Windows recorded it running, how many run times the file still held
   and the newest of them, plus one account of how many files the folder held and how many decoded —

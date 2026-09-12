@@ -79,6 +79,34 @@ pub trait RegistrySource {
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError>;
     /// Reads a `REG_SZ`. `Ok(None)` when the key or value does not exist.
     fn read_string(&self, key: &str, value: &str) -> Result<Option<String>, SourceError>;
+
+    /// Names of the keys directly inside `key`; it never recurses (ADR 0022).
+    ///
+    /// `Ok(None)` means the key does not exist, which is something the collector looked at and saw —
+    /// the same distinction [`FilesystemSource::list_dir`] makes for a directory. A key that is there
+    /// and holds no subkey is `Ok(Some(vec![]))`, which is a different statement.
+    ///
+    /// The count is not bounded, for the reason `list_dir` does not bound a directory listing: a
+    /// truncated enumeration would read as "there was nothing else", which is the one wrong answer.
+    fn subkeys(&self, key: &str) -> Result<Option<Vec<String>>, SourceError>;
+
+    /// Names of the values directly under `key`, as the registry spells them (ADR 0022).
+    ///
+    /// `Ok(None)` when the key does not exist; `Ok(Some(vec![]))` when it is there and holds no
+    /// value. The names are returned, never the data: a value's bytes are read one at a time with
+    /// [`RegistrySource::read_bytes`], so that the bound below applies to each of them.
+    fn value_names(&self, key: &str) -> Result<Option<Vec<String>>, SourceError>;
+
+    /// The bytes of one `REG_BINARY` value, at most [`MAX_REGISTRY_VALUE_BYTES`] of them (ADR 0022).
+    ///
+    /// `Ok(None)` when the key or the value does not exist, like [`RegistrySource::read_u32`]. A
+    /// value of another type is an error rather than an answer: a caller that wanted a number or a
+    /// string has a method for it, and guessing a conversion here would hand a parser bytes that
+    /// mean something else.
+    ///
+    /// A value larger than the limit is [`SourceError::TooLarge`]; nothing is truncated, because a
+    /// truncated artifact parses as a damaged one.
+    fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError>;
 }
 
 /// One entry directly inside a directory. Only what collectors need: nothing about times, size or ACLs
@@ -253,6 +281,34 @@ pub fn read_bounded<R: std::io::Read>(reader: R, limit: usize) -> Result<Vec<u8>
     Ok(bytes)
 }
 
+/// Most bytes [`RegistrySource::read_bytes`] returns for one registry value (ADR 0022).
+///
+/// Every value a collector reads is on the machine being examined, so its size is chosen by whoever
+/// put it there — the same argument [`MAX_FILE_BYTES`] rests on, one source over.
+///
+/// 64 KiB is far above the artifact this exists for: the BAM layout `rongroi_parsers::bam` describes
+/// is 24 bytes, so the limit is some 2 700 times it, and a value that is longer is kept whole by that
+/// parser rather than trimmed. It is also a thousandth of what a file may be, which is the ratio
+/// between the two sources: the registry is a settings store, and a value in it is small by design.
+/// A machine with a larger value is answered with [`SourceError::TooLarge`], which is a fact about
+/// that value rather than a failure to look.
+pub const MAX_REGISTRY_VALUE_BYTES: usize = 64 * 1024;
+
+/// Refuses a registry value larger than `limit`, as [`read_bounded`] refuses a file.
+///
+/// It takes bytes rather than a reader, and that difference is the honest part: a platform registry
+/// API hands back a whole value in one call, sized from the length the value declares, so this bounds
+/// what crosses the trait boundary and reaches a parser — not the allocation the platform already
+/// made. [`read_bounded`] can bound both because it owns the reading loop.
+///
+/// It lives here next to the trait so that every host refuses exactly the same values.
+pub fn bound_registry_value(bytes: Vec<u8>, limit: usize) -> Result<Vec<u8>, SourceError> {
+    if bytes.len() > limit {
+        return Err(SourceError::TooLarge { limit });
+    }
+    Ok(bytes)
+}
+
 /// A machine that collectors can read. More source traits are added as collectors need them.
 pub trait Host:
     RegistrySource
@@ -283,6 +339,24 @@ impl RegistrySource for NonWindowsHost {
     }
 
     fn read_string(&self, _key: &str, _value: &str) -> Result<Option<String>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn subkeys(&self, _key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn value_names(&self, _key: &str) -> Result<Option<Vec<String>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn read_bytes(&self, _key: &str, _value: &str) -> Result<Option<Vec<u8>>, SourceError> {
         Err(SourceError::Unsupported(
             "no registry on this platform".to_owned(),
         ))
@@ -372,6 +446,27 @@ mod tests {
             Err(SourceError::Unsupported(_))
         ));
         assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);
+    }
+
+    #[test]
+    fn non_windows_host_reads_no_registry_at_all() {
+        let key = r"HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings";
+        assert!(matches!(
+            NonWindowsHost.read_u32(key, "Anything"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.subkeys(key),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.value_names(key),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.read_bytes(key, r"C:\x.exe"),
+            Err(SourceError::Unsupported(_))
+        ));
     }
 
     #[test]
@@ -473,6 +568,32 @@ mod tests {
     #[test]
     fn the_file_size_limit_is_the_one_the_adr_states() {
         assert_eq!(MAX_FILE_BYTES, 64 * 1024 * 1024);
+    }
+
+    /// The same for the registry (ADR 0022), and the boundary itself: a value of exactly the limit
+    /// is read whole, one byte more is refused whole rather than trimmed to fit.
+    #[test]
+    fn a_registry_value_over_the_limit_is_refused_rather_than_truncated() {
+        assert_eq!(MAX_REGISTRY_VALUE_BYTES, 64 * 1024);
+
+        assert_eq!(bound_registry_value(Vec::new(), 4), Ok(Vec::new()));
+        assert_eq!(
+            bound_registry_value(vec![1, 2, 3, 4], 4),
+            Ok(vec![1, 2, 3, 4])
+        );
+        assert_eq!(
+            bound_registry_value(vec![1, 2, 3, 4, 5], 4),
+            Err(SourceError::TooLarge { limit: 4 })
+        );
+        assert_eq!(
+            bound_registry_value(
+                vec![0; MAX_REGISTRY_VALUE_BYTES + 1],
+                MAX_REGISTRY_VALUE_BYTES
+            ),
+            Err(SourceError::TooLarge {
+                limit: MAX_REGISTRY_VALUE_BYTES
+            })
+        );
     }
 
     #[test]
