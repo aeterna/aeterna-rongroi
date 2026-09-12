@@ -4,7 +4,15 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
 [`docs/rules-authoring.md`](../docs/rules-authoring.md).
 
 - A rule describes **evidence to show**, never a verdict. No scores, no "clean" rules.
-- `falsepositives` must honestly list what legitimately produces the evidence.
+- `falsepositives` must honestly list what legitimately produces the evidence. It is **shown to the
+  reader** beside every `found` row, in their language (ADR 0027) — a finding shown without its
+  alternatives is a finding shown as an accusation. `description` is shown beside every row whatever
+  the state, so its "what this does not prove" clause is written for the reader, not for a maintainer.
+- `unmeasured_when` decides what an SS view lists: a reason named there is **counted**, one that is not
+  is **listed**, because an undeclared reason means something the author did not anticipate stopped the
+  measurement (ADR 0027). Every entry must be a reason that collector can report — `check-rules`
+  rejects the rest, including `not_on_this_os` and `service_disabled`, which nothing in this build
+  produces. Declaring a reason you have not thought about hides a result a reviewer should have seen.
 - `allow` identifies legitimate software by `sha256` or `signer` only — never by file name.
 - **`match` compares strings without regard to ASCII case.** `path: "C:\\Windows\\Temp\\x.exe"` matches
   `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in and a rule that

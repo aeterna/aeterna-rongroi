@@ -18,7 +18,9 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **Evidence** | The result of one Rule: `Found`, `NotFound` or `Unmeasured` | `rongroi_core::model::Evidence` |
 | **Found** | The Rule matched; the matching Observations are attached | `EvidenceState::Found` |
 | **NotFound** | The Collector ran and nothing matched; carries the **retention window** | `EvidenceState::NotFound` |
-| **Unmeasured** | The Collector could not look; carries a **reason** | `EvidenceState::Unmeasured` |
+| **Unmeasured** | The Collector could not look; carries a **reason** and whether the Rule **expected** it | `EvidenceState::Unmeasured` |
+| **expected unmeasured** | An Unmeasured result whose reason the Rule named in `unmeasured_when`; SS mode counts it. One whose reason it did not name is **unexpected** and SS mode lists it (ADR 0027) | `EvidenceState::Unmeasured::expected` |
+| **scope statement** | A fact about the **scan** rather than about the machine, said once above the evidence in both modes. Today: how many Rules missing administrator rights left unanswered | `rongroi_core::view::ScopeNotes` |
 | **unmatched observation** | Something a Collector saw that no Rule matched; shown in Self mode only, counted in SS mode | `rongroi_core::model::UnmatchedGroup` |
 | **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
 | **retention window** | How far back a source can see, in words shown to the user | `Rule::retention` |
@@ -94,7 +96,8 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | `status: test` or `stable` requires at least one positive and one negative fixture in `tests/` | `check-rules` |
 | `match` strings compare without regard to ASCII case; `cased` names the fields compared exactly | `check-rules` · engine tests |
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
-| `falsepositives` is never empty — write what legitimately produces this evidence | `check-rules` |
+| `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
+| `unmeasured_when` names only reasons the rule's collector can report, each once; it decides what an SS view lists | `check-rules` |
 
 ## 7. Git
 
