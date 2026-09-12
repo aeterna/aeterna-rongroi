@@ -39,6 +39,52 @@ command line; and `multithreading`, which would pull `rayon` and a global thread
 thread, so the order of returned records is deterministic — worth having in a tool whose output a
 person is asked to compare.
 
+### Vendored with one patch, not taken from the registry
+
+`third_party/evtx/`, wired in by `[patch.crates-io]` in both the root `Cargo.toml` and `fuzz/Cargo.toml`.
+
+`fuzz_evtx` found this before the branch was pushed. `binxml::tokens::read_template_values_cursor`
+reads `number_of_substitutions`, a `u32`, from the record and passed it straight to
+`Vec::with_capacity` — twice — with nothing bounding it against the bytes remaining. A 69 632-byte
+file, the smallest an `.evtx` comes in, reaches:
+
+```
+==20889== ERROR: libFuzzer: out-of-memory (malloc(7717636096))
+    #9  evtx::binxml::tokens::read_template_values_cursor
+    #12 rongroi_parsers::evtx::records
+```
+
+7.7 GB. On macOS the reservation is lazy and the process survives; on Windows it **aborts**. An abort is
+not an `Err`, is not `catch_unwind`-able, and takes the process with it — and
+`crates/rongroi-parsers/src/lib.rs` states that a parser never panics and never aborts on any input.
+Shipping this would have made that sentence false on the one platform the tool is for.
+
+Four options were weighed:
+
+| Option | Why not |
+|---|---|
+| Bound it from our side, before calling in | The count sits inside each record's binary XML, not in a header. Checking it first means walking binary XML ourselves — writing the decoder this ADR declined to write |
+| A git fork via `[patch]` | `deny.toml` sets `unknown-git = "deny"`. A git source is exactly what that line exists to refuse |
+| Hold EVTX until upstream releases a fix | Puts M2's tamper signals behind someone else's release schedule, for a two-line change |
+| Land it with `fuzz_evtx` excluded | Ships a known abort **and** removes the gate that caught it. The RUSTSEC reason below names this target as something that bounds the dependency's risk; deleting it would hollow out that argument |
+
+So: vendor, bound, upstream, delete when released. `sources ok` from `cargo deny` was verified with the
+path source in place — a path inside the repository is reviewable in the same pull request as the code
+that uses it, which is what `unknown-git = "deny"` is protecting against in the first place.
+
+The patch is two changes, and both follow the idiom the same file already uses — `read_sid_ref` and
+`read_sized_slice_aligned_in` each check the bytes remaining before allocating. The descriptor loop
+consumes exactly four bytes per entry, so the reservation is capped at `bytes_remaining / 4`; the second
+allocation reserves `value_descriptors.len()`, which is known exactly by then. **What is reserved
+changes; what is accepted does not** — a truncated file still fails in the same loop with the same
+error. Every other `with_capacity` in the crate was checked: all are bounded by `EVTX_CHUNK_SIZE`, by a
+slice already in memory, or sit in the `wevt_templates` feature, which is off.
+
+`third_party/evtx/` is excluded from the workspace, from `typos`, and from this project's lints, and
+`REUSE.toml` annotates it under **upstream's** licence rather than ours. It is Omer Ben-Amram's code; a
+`diff -r` against the published tarball must show `src/binxml/tokens.rs` and nothing else, and
+`third_party/evtx/PROVENANCE.md` gives the command.
+
 ### The RUSTSEC ignore, and what would end it
 
 **`cargo deny check` fails with this dependency and no ignore entry**, and that is not a surprise to be
@@ -172,9 +218,9 @@ rather than passing with a value that looks close enough.
 
 ## Fixtures
 
-Two files, 136 KiB, vendored from the `evtx` crate's own Apache-2.0 corpus, which
+One file, 68 KiB, vendored from the `evtx` crate's own Apache-2.0 corpus, which
 `docs/research/06-testing-windows-forensic-code.md` already vetted as vendor-eligible. Source, commit,
-per-file detail, and what each file was scanned for are in `fixtures/evtx/PROVENANCE.md`.
+detail, and what it was scanned for are in `fixtures/evtx/PROVENANCE.md`.
 
 **This is the highest-PII artifact the repository has vendored, and the selection was the work.** Seven
 candidate files of the smallest available size were decoded and read in full. Five were dropped:
@@ -199,17 +245,28 @@ blind in opposite directions, and both directions were observed on these files:
 - The kept `languagepacksetup` sample renders `Computer: DESKTOP-1N4R894`, and that string does **not**
   appear in its bytes, because the value is interned in the chunk's string table and substituted into a
   template.
-- The kept `application-no-crc32` sample carries, in chunk slack past its last live record, Windows
-  Error Reporting paths and a service-hang report id that appear in **no** rendered record. Only the
-  raw scan revealed those.
+- The since-removed `application-no-crc32` sample carried, in chunk slack past its last live record,
+  Windows Error Reporting paths and a service-hang report id that appeared in **no** rendered record.
+  Only the raw scan revealed those.
 
-What the two kept files do contain is written down in `PROVENANCE.md` rather than left to be found:
-system paths only, the well-known `S-1-5-18` and no other SID, no user name, no address, no credential
-material — and a Windows-generated `DESKTOP-XXXXXXXX` computer name in each, which is a host name and
-therefore in tension with `CONVENTIONS.md` §4's unconditional wording. That was **not avoidable**:
-every `.evtx` record carries a `Computer` field by format, so a file with no host name in it is not an
-Event Log. The names are machine-generated and identify nobody, which is why they were accepted; the
-same tension is recorded for Prefetch in ADR 0015.
+**A sixth file was removed after it had been vendored and committed.** `application-no-crc32.evtx` was
+accepted on a byte scan that missed a real machine SID — `S-1-5-21-…-1000`, the first user account of a
+real computer — held as UTF-16 in its chunk string table. The provenance document written alongside it
+asserted that no such SID was present, and was wrong in both directions: the machine SID was there, and
+the well-known `S-1-5-18` it did claim was not. The branch had not been pushed. The file is gone, the
+correction is recorded in `fixtures/evtx/PROVENANCE.md` rather than quietly applied, and the standard is
+now that such a claim is a counted measurement with the counts written down.
+
+That leaves one sample, and the cost is named in "What is unverified" below rather than absorbed
+silently.
+
+What the kept file does contain is written down in `PROVENANCE.md` rather than left to be found: system
+paths only, no SID in any form, no user name, no address, no credential material — and a
+Windows-generated `DESKTOP-XXXXXXXX` computer name, which is a host name and therefore in tension with
+`CONVENTIONS.md` §4's unconditional wording. That was **not avoidable**: every `.evtx` record carries a
+`Computer` field by format, so a file with no host name in it is not an Event Log. The name is
+machine-generated and identifies nobody, which is why it was accepted; the same tension is recorded for
+Prefetch in ADR 0015.
 
 The corrupt-chunk cases are **built in the tests from these bytes** rather than vendored. The upstream
 file with a deliberately bad chunk magic is 1 MB of a real machine's logs, against a test helper that
@@ -229,6 +286,16 @@ duplicates a known-good chunk and breaks its signature in four lines.
 - **The upstream crate's own recovery behaviour is taken as observed, not as specified.** That a
   damaged chunk costs only its own records was established by constructing such a file and running it,
   not from a document.
+- **One sample, not two.** Every Event Log test reads `languagepacksetup-operational.evtx` or bytes
+  built from it, so a defect peculiar to that file has no second opinion. The `EventID`-as-object shape
+  it does not contain is covered by a unit test over `scalar`/`number` rather than by a sample.
+- **The patch is verified against this repository's use, not against every use of the crate.** The
+  bound was exercised by the full test suite, by the reverted-and-restored reproduction, and by a
+  263 568-run campaign that found nothing further. Upstream may hold a different view of it, and until
+  they take it the vendored copy is ours to maintain.
+- **Whether the removed fixture's SID reached a rendered record was never established.** The file was
+  removed rather than analysed further; the parser keeps six fields and `UserID` is not among them, but
+  that was not the reason for the decision and is not offered as one.
 
 ## Consequences
 
@@ -239,6 +306,10 @@ duplicates a known-good chunk and breaks its signature in four lines.
   unchanged; `advisories` passes only because of the entry above.
 - **`deny.toml` now carries a non-Tauri ignore**, the first. It is tied to one dependency and one
   upstream decision, and the reason field says what would end it.
+- **A `third_party/` directory exists for the first time**, with 13 268 lines of someone else's code in
+  it, held apart from this project's formatter, lints, spell-check and licence header. That is a
+  standing cost: every `evtx` upgrade is now a re-vendor and a re-verify rather than a version bump.
+  It is accepted only because it is temporary and because the alternative was shipping a known abort.
 - The crate is still pure: no OS call, no `Host`, no clock, no global state. The one entry point in
   `evtx` that touches a filesystem, `EvtxParser::from_path`, is never called — purity here is a
   property of this module's call site rather than of the dependency, which is a weaker guarantee than

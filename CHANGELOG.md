@@ -5,6 +5,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+- The `application-no-crc32.evtx` Event Log fixture, on finding that it carried a real machine SID
+  (`S-1-5-21-…-1000`, the first user account of a real computer) in its chunk string table. It had been
+  vendored and committed on the strength of a byte scan that missed it, under a provenance document
+  asserting no such SID was present — an assertion that was wrong in both directions, since the
+  well-known `S-1-5-18` it did claim was not there either. `fixtures/evtx/PROVENANCE.md` records the
+  correction rather than quietly dropping the file. The `EventID`-as-object case it covered is now a
+  unit test over `scalar`/`number`, and two tests that asserted the absence of strings only that file
+  contained were trimmed, since such an assertion passes whether or not the parser works.
+
 ### Added
 - Event Log parser: Windows `.evtx` files decode to a plain struct per record — the record id, the time
   it was written, the event id, the channel, the provider and the level — and a damaged chunk costs its
@@ -14,9 +24,20 @@ and the project uses [Semantic Versioning](https://semver.org/).
   command lines live. The binary XML decoder is the `evtx` crate, whose error type stops inside the
   parser module; it brings the unmaintained `encoding` crate with it, and `deny.toml` now carries an
   ignore for RUSTSEC-2021-0153 that states the exposure rather than waving it away (ADR 0018).
-- `fuzz_evtx`, the fuzz layer's sixth target, seeded from the same `fixtures/evtx/` files the parser tests
+- The `evtx` crate is **vendored under `third_party/evtx/` with one patch**, rather than taken from the
+  registry. Its binary-XML reader sized a `Vec` from a record's substitution count without bounding it
+  against the bytes remaining, so an ordinary 68 KiB Event Log reached a 7.7 GB allocation — measured,
+  not estimated. That survives on macOS and **aborts on Windows**, and an abort is not an error a caller
+  can catch, which would have made this crate's "never panics, never aborts" contract false on the only
+  platform the tool runs on. The patch bounds the reservation by the bytes the input could actually
+  contain and is being sent upstream; the directory goes away when a release carries it. Everything else
+  in it is byte-identical to the published crate and `third_party/evtx/PROVENANCE.md` says how to check
+  that (ADR 0018).
+- `fuzz_evtx`, the fuzz layer's sixth target, seeded from the same `fixtures/evtx/` file the parser tests
   read. It covers more third-party code than any other target, and the RUSTSEC ignore above names it as
-  one of the things that bounds the risk of taking that dependency.
+  one of the things that bounds the risk of taking that dependency. It earned that billing immediately:
+  it found the unbounded allocation above before the parser was ever pushed, and with the patch reverted
+  it rediscovers it from the committed fixture alone in under 90 seconds.
 - `cargo xtask check-baseline`: the whole rule set is run against fixture hosts described as ordinary
   machines, through the same `scan::run` pipeline the CLI uses, and any `Found` evidence that is not
   recorded in `rules/known-fps.csv` with a written reason fails the gate — as does a row whose rule no
