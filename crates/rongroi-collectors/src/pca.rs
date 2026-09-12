@@ -37,6 +37,7 @@ use rongroi_parsers::pca::{self, PcaLaunchEntry};
 
 use crate::Collector;
 use crate::failure::{read_failure, reason_for};
+use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
 
 /// Environment variable holding the Windows directory.
 pub const WINDOWS_DIR: &str = "WinDir";
@@ -47,9 +48,6 @@ pub const PCA_RELATIVE_PATH: &str = r"appcompat\pca";
 pub const APP_LAUNCH_DIC: &str = "app_launch_dic";
 
 const ID: &str = "pca";
-
-/// What a path was replaced with when it is not a shape SS-mode redaction can reach.
-const UNREDACTABLE_FORM: &str = "unredactable_form";
 
 /// The three files PCA writes, each with the `source` value that names it in an observation.
 ///
@@ -267,29 +265,6 @@ fn parse_failure(error: &ParseError) -> &'static str {
         ParseError::Truncated { .. } => "truncated",
         ParseError::Malformed { .. } => "not_pca_text",
     }
-}
-
-/// The last segment of a Windows path, lower-cased.
-///
-/// Lower-cased because a rule matches by exact equality and Windows does not care about the case a
-/// program was launched with, so `Cheat.exe` and `cheat.exe` have to reach a rule as one string.
-/// `path` is left exactly as the file spelled it, which is what CONVENTIONS.md defines it as.
-fn file_name(path: &str) -> Option<String> {
-    let name = path.rsplit(['\\', '/']).next()?;
-    (!name.is_empty()).then(|| name.to_ascii_lowercase())
-}
-
-/// Whether a path starts `X:\` or `X:/`.
-///
-/// This is the only shape `rongroi_core::view::redact_user_paths` was written for, and it is
-/// deliberately narrower than what that function can reach: a path this refuses is withheld, and
-/// erring toward withholding is the direction that cannot leak a user name.
-fn is_drive_rooted(path: &str) -> bool {
-    let bytes = path.as_bytes();
-    bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && (bytes[2] == b'\\' || bytes[2] == b'/')
 }
 
 #[cfg(test)]
@@ -559,32 +534,5 @@ mod tests {
         // And the fixture hosts describe the folder this builds on an ordinary machine.
         let ordinary = fixture("pca-files-present");
         assert_eq!(pca_dir(&ordinary).as_deref(), Some(PCA_DIR));
-    }
-
-    #[test]
-    fn a_name_is_the_last_segment_lower_cased() {
-        assert_eq!(
-            file_name(r"C:\Users\alex\Game.EXE").as_deref(),
-            Some("game.exe")
-        );
-        assert_eq!(
-            file_name(r"\\nas\share\Tool.exe").as_deref(),
-            Some("tool.exe")
-        );
-        assert_eq!(file_name("bare.exe").as_deref(), Some("bare.exe"));
-        assert_eq!(file_name(r"C:\Users\alex\"), None);
-    }
-
-    #[test]
-    fn only_a_drive_rooted_path_is_emitted() {
-        assert!(is_drive_rooted(r"C:\Users\alex\x.exe"));
-        assert!(is_drive_rooted("d:/users/alex/x.exe"));
-        assert!(!is_drive_rooted(r"\\nas\share\x.exe"));
-        assert!(!is_drive_rooted(
-            r"\Device\HarddiskVolume3\Users\alex\x.exe"
-        ));
-        assert!(!is_drive_rooted(r"\??\C:\Users\alex\x.exe"));
-        assert!(!is_drive_rooted("C:"));
-        assert!(!is_drive_rooted(""));
     }
 }

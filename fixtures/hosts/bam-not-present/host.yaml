@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A Windows machine with no BAM state at all: the service is not there, or this build never had it.
+# Not the same as a machine whose BAM state was cleared, which is `bam-empty`.
+platform: windows
+os_build: "26100"
+elevated: true
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
+    UEFISecureBootEnabled: 1
