@@ -381,6 +381,43 @@ mod tests {
         bytes
     }
 
+    /// Closes two of the chunk's string-table entries into a cycle. The table is a set of linked
+    /// chains: each entry starts with the `u32` chunk offset of the next entry in its chain, then a
+    /// `u16` hash, then the name. `ThreadID` sits 1523 bytes into the chunk and links to `Task` at
+    /// 1052, which ends its chain with a zero; writing 1523 there closes the two into a loop.
+    ///
+    /// Built from good bytes here rather than vendored, the same way the damaged-chunk and
+    /// name-length cases are — and here it is not only a preference: `fixtures/evtx/` is both the L0
+    /// fixture set and the fuzz seed corpus, so everything in it has to parse (ADR 0021).
+    fn with_cyclic_string_table(source: &[u8]) -> Vec<u8> {
+        /// `ThreadID`'s entry, as an offset into the chunk.
+        const FIRST: u32 = 1523;
+        /// `Task`'s entry, which `FIRST` links to and which ends the chain.
+        const SECOND: u32 = 1052;
+
+        let next_entry = |bytes: &[u8], entry: u32| {
+            let at = FILE_HEADER_LEN + entry as usize;
+            u32::from_le_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]])
+        };
+
+        let mut bytes = source.to_vec();
+        assert_eq!(
+            next_entry(&bytes, FIRST),
+            SECOND,
+            "the fixture drifted: the string-table entry at {FIRST} no longer links to {SECOND}, so \
+             the test below would build something other than a cycle"
+        );
+        assert_eq!(
+            next_entry(&bytes, SECOND),
+            0,
+            "the fixture drifted: the string-table entry at {SECOND} no longer ends its chain"
+        );
+
+        let at = FILE_HEADER_LEN + SECOND as usize;
+        bytes[at..at + 4].copy_from_slice(&FIRST.to_le_bytes());
+        bytes
+    }
+
     /// Breaks one chunk's `ElfChnk\0` signature, leaving every other byte of the file alone.
     fn with_damaged_chunk(source: &[u8], chunk_number: usize) -> Vec<u8> {
         let mut bytes = two_chunk_file(source);
@@ -525,6 +562,47 @@ mod tests {
             file.rejected[0].reason,
             ParseError::Malformed { field: "chunk", .. }
         ));
+    }
+
+    /// A chunk's string table is walked chain by chain, and upstream guarded only against an entry
+    /// that points at **itself**. A chain closed into a loop of two or more was walked forever: the
+    /// same cache keys are overwritten each time round, so memory never grows and no allocator alarm
+    /// fires, which is why the stack samples taken of it landed in the allocator and said nothing.
+    /// This was the defect `third_party/evtx/PROVENANCE.md` carried as located nowhere until
+    /// 2026-09-12. The vendored crate now stops when the walk reaches a position it has already
+    /// cached, which loses no string: everything reachable from that position was cached by the walk
+    /// that first reached it.
+    ///
+    /// **A regression here is a hung test, not a red one.** Nothing in this file can time out, so if
+    /// the guard goes away `cargo nextest run` stops making progress on this test rather than
+    /// failing it. That is also why the assertions below are about the records that come back and not
+    /// merely about control returning: the file has to parse *as it did before the cycle was put in
+    /// it*, or the guard is throwing away strings the records need.
+    #[test]
+    fn a_string_table_chain_that_closes_into_a_cycle_still_terminates() {
+        let file = parsed(&with_cyclic_string_table(LANGUAGE_PACK));
+
+        assert!(
+            file.rejected.is_empty(),
+            "a cycle costs the strings past it nothing: both entries are cached before the walk stops"
+        );
+        assert_eq!(file.records.len(), 17);
+        assert_eq!(file.records[0].record_id, 1);
+        assert_eq!(file.records[0].event_id, Some(4000));
+        assert_eq!(
+            file.records[0].channel.as_deref(),
+            Some("Microsoft-Windows-LanguagePackSetup/Operational")
+        );
+        assert_eq!(
+            file.records[0].written.to_string(),
+            "2018-07-09T20:49:14.0577461Z"
+        );
+
+        // The two names the cycle is built from — `ThreadID` and `Task` — are in the `System` block
+        // of every record, so a walk that stopped short of caching them would show up as records
+        // that do not resolve rather than as a different count.
+        let clean = parsed(LANGUAGE_PACK);
+        assert_eq!(file.records, clean.records);
     }
 
     /// Bytes that are not an Event Log at all are the one thing that fails a whole file — there is

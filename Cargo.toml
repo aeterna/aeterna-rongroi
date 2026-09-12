@@ -11,7 +11,7 @@ default-members = ["crates/*", "xtask"]
 # `-Z sanitizer`). Excluding them is what keeps the 1.98.1 toolchain pinned in rust-toolchain.toml
 # building, linting and testing everything else exactly as before: `cargo clippy --all-targets` and
 # `cargo deny check` never see a nightly-only crate (ADR 0016).
-# `third_party/evtx` is a vendored copy of the `evtx` crate carrying two patches (ADR 0018). Excluding it
+# `third_party/evtx` is a vendored copy of the `evtx` crate carrying three patches (ADR 0018). Excluding it
 # keeps 13k lines of third-party source out of `cargo fmt --all`, `cargo clippy --all-targets` and
 # `[workspace.lints]`, which are this project's rules and not upstream's.
 exclude = ["fuzz", "third_party/evtx"]

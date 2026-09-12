@@ -13,13 +13,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   like any other damaged chunk. `fuzz_evtx` found it on `dev` minutes after the pull request that
   introduced the parser had merged with that same job green — the fuzzer takes a random seed, so the
   regression test added for it is deterministic rather than a saved crash input.
-
-### Known issues
-- A crafted `.evtx` input makes the Event Log parser **not return** — past 300 s under the sanitizer,
-  past 600 s without. It is a defect in the vendored `evtx` crate, present with and without both
-  patches carried here, and its location has not been found. `docs/testing.md`'s claim that the
-  parsers never hang is therefore false for EVTX today and has been marked as such. The `fuzz smoke`
-  job may go red on any run whose seed reaches it.
+- Vendored `evtx`: a crafted `.evtx` input made the Event Log parser **not return** — past 300 s under
+  the sanitizer, past 600 s without. A chunk's string table is a set of linked chains, and the walk of
+  them guarded only against an entry pointing at itself, so a chain closed into a cycle of two or more
+  was walked forever, overwriting the same cache keys each time round — which is why memory never grew
+  and no allocator alarm fired. The walk now stops at a position it has already cached, and that loses
+  no string. This defect was recorded here as open with its location not found; both saved reproducing
+  inputs now parse, and `docs/testing.md` records the exception as closed rather than open. One fixed
+  defect is not a proof that this parser cannot hang, and neither document claims it is.
 
 ### Removed
 - The `application-no-crc32.evtx` Event Log fixture, on finding that it carried a real machine SID

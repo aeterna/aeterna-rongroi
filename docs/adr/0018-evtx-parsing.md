@@ -74,10 +74,12 @@ Four options were weighed:
 | Hold EVTX until upstream releases a fix | Puts M2's tamper signals behind someone else's release schedule, for a two-line change |
 | Land it with `fuzz_evtx` excluded | Ships a known abort **and** removes the gate that caught it. The RUSTSEC reason below names this target as something that bounds the dependency's risk; deleting it would hollow out that argument |
 
-So: vendor, bound, upstream, delete when released. The upstream half is done —
-[omerbenamram/evtx#294](https://github.com/omerbenamram/evtx/pull/294), both patches, 2026-09-12 — and
-it credits the April 2026 reports (#291, #292, #293) instead of presenting the finding as new, because
-it is not.
+So: vendor, bound, upstream, delete when released. The upstream half is partly done —
+[omerbenamram/evtx#294](https://github.com/omerbenamram/evtx/pull/294), 2026-09-12 — and it credits the
+April 2026 reports (#291, #292, #293) instead of presenting the finding as new, because it is not. It
+carries the first two patches and **not** the third, which was still unlocated when it was opened;
+`third_party/evtx/PROVENANCE.md` records a recommendation for what to do about that and nothing has
+been opened on it.
 
 Whether it lands is outside our control, and the evidence points both ways: the maintainer has merged
 three fixes of exactly this class and shipped a `### Security`-labelled hardening in 0.12.2, but he also
@@ -118,10 +120,22 @@ carrying the branch's result forward. The regression test for this one is theref
 built in `evtx.rs` from the good fixture, the way the damaged-chunk cases are — rather than a saved
 crash input and a hope that the fuzzer finds it again.
 
+**A third patch followed it, and it is not the same kind of defect.** The first two are a number read
+off the wire and used in arithmetic without checking what the wire could hold. This one is a walk over
+a structure the file describes, with no record of where it had already been: a chunk's string table is
+a set of linked chains, and `StringCache::populate` guarded only against an entry pointing at *itself*,
+so a chain closed into a cycle of two or more was walked forever. The same cache keys are overwritten
+each time round, so memory never grows and no allocator alarm fires — which is why this was recorded in
+this ADR as open with its location unknown while the earlier stack samples kept landing in the
+allocator. The walk now stops when it reaches a position already in the cache, and that loses no
+string: everything reachable from such a position was cached by the walk that first reached it. The
+regression test is built from the good fixture by closing two of its string-table entries into a loop,
+and it is the one test in that file whose failure mode is a hung run rather than a red one; it says so.
+
 `third_party/evtx/` is excluded from the workspace, from `typos`, and from this project's lints, and
 `REUSE.toml` annotates it under **upstream's** licence rather than ours. It is Omer Ben-Amram's code; a
-`diff -r` against the published tarball must show `src/binxml/tokens.rs` and nothing else, and
-`third_party/evtx/PROVENANCE.md` gives the command.
+`diff -r` against the published tarball must show `src/binxml/tokens.rs`, `src/binxml/name.rs` and
+`src/string_cache.rs` and nothing else, and `third_party/evtx/PROVENANCE.md` gives the command.
 
 ### The RUSTSEC ignore, and what would end it
 
@@ -327,12 +341,15 @@ duplicates a known-good chunk and breaks its signature in four lines.
 - **One sample, not two.** Every Event Log test reads `languagepacksetup-operational.evtx` or bytes
   built from it, so a defect peculiar to that file has no second opinion. The `EventID`-as-object shape
   it does not contain is covered by a unit test over `scalar`/`number` rather than by a sample.
-- **A third defect is open: a parse that does not terminate.** A crafted input makes `records` never
-  return — past 300 s under the sanitizer, past 600 s without it — with and without both patches, so
-  it is upstream's and independent of them. Its location is unknown. It makes `docs/testing.md`'s
-  "never panic, abort or hang" false for EVTX today, and that document now says so. Two of the three
-  defects in this dependency are fixed; the count is going up rather than down, which is itself worth
-  weighing the next time a parser this size is taken on.
+- **This parser is not proven hang-free; it is a parser with no known hang.** The third defect — a
+  parse that did not return, past 300 s under the sanitizer and past 600 s without it — was recorded
+  here as open with its location unknown, and was located on 2026-09-12 in `StringCache::populate` and
+  fixed. Both saved reproducing inputs now parse, and `docs/testing.md` no longer carries the exception
+  to its "never panic, abort or hang" row. What is not established is that no fourth input exists: a
+  third reproducing artifact that CI produced on the same day was never retrieved and so was never
+  re-run against the fix, and a 30-second smoke per target is what looks for the next one. All three
+  defects found in this dependency are now fixed here; three of them in the day it took to vendor it is
+  itself worth weighing the next time a parser this size is taken on.
 - **The patch is verified against this repository's use, not against every use of the crate.** The
   bound was exercised by the full test suite, by the reverted-and-restored reproduction, and by a
   263 568-run campaign that found nothing further. Upstream may hold a different view of it, and until
