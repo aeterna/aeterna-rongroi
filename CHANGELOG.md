@@ -6,6 +6,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `process` collector: the processes running at scan time, each with its image name and, when Windows
+  will name it, the path of its image. Nothing is hashed and no process memory is read; a process whose
+  path cannot be resolved is still listed, without that field. No rule reads it yet (ADR 0010).
+- Own traces: aeterna-rongroi is itself running while it scans, so the report now separates the
+  observations that describe the tool from evidence about the machine, and shows them in an "own traces"
+  section of its own — in both Self and SS mode, because hiding "this was us" from the person watching a
+  screenshare would tell them less. The section is new in the CLI output and in the desktop report, and
+  `own_traces` is a new, additive field of the report format (ADR 0010).
 - `posture` collector: Windows test signing, memory integrity (HVCI) and whether a TPM is present, beside
   the Secure Boot state it already read. Memory integrity is read from the configured policy in the
   registry, which says what Windows was told to enforce and not that the hypervisor is enforcing it; a
