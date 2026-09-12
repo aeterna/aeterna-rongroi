@@ -39,6 +39,10 @@
     "title": "Own traces (excluded)",
     "note": "What this program itself left in what was read. It is not evidence about this PC."
   },
-  "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasured}} not measured",
+  "unmatched": {
+    "title": "Unmatched observations",
+    "note": "What the collectors saw that no rule matched. These are things that were seen, not findings."
+  },
+  "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasured}} not measured · {{unmatched}} unmatched observations",
   "empty": "No evidence to show."
 }

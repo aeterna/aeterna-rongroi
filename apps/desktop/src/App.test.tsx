@@ -102,7 +102,11 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
-    expect(screen.getByText("Hidden in SS mode: 1 not found · 0 not measured")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Hidden in SS mode: 1 not found · 0 not measured · 0 unmatched observations",
+      ),
+    ).toBeTruthy();
     expect(calls).toContain("report_view");
   });
 
@@ -163,6 +167,40 @@ describe("App", () => {
     expect(section.textContent).toContain("aeterna-rongroi.exe");
     // The evidence list above it is untouched.
     expect(screen.getByText("Check: Secure Boot is turned off")).toBeTruthy();
+  });
+
+  it("lists what the collectors saw that no rule matched, apart from the evidence", async () => {
+    viewOverride = {
+      ...selfView,
+      unmatched: [
+        {
+          collector: "fivem_dir",
+          observations: [
+            {
+              collector: "fivem_dir",
+              fields: {
+                location: "plugins",
+                path: "C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\overlay.dll",
+              },
+            },
+          ],
+        },
+      ],
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const section = await screen.findByRole("region", { name: "Unmatched observations" });
+    expect(section.textContent).toContain("overlay.dll");
+    // The evidence list above it is untouched.
+    expect(screen.getByText("Check: Secure Boot is turned off")).toBeTruthy();
+  });
+
+  it("shows no unmatched section when every observation matched a rule", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    // The evidence proves the view arrived, so the section is absent by choice and not by timing.
+    await screen.findByText("Check: Secure Boot is turned off");
+    expect(screen.queryByRole("region", { name: "Unmatched observations" })).toBeNull();
   });
 
   it("shows the look-back note of not-found evidence in the chosen language", async () => {
