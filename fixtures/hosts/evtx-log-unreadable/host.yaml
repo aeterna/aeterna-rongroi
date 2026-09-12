@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# One log is listed with no bytes — it is there and cannot be read — while another is readable. A
+# file entry with neither `content:` nor `from:` is how a fixture says that (ADR 0019).
+#
+# The unreadable one is `Security.evtx` on purpose: it is the channel a later tamper rule reads, and
+# a log that could not be read is the outcome such a rule must report as `unmeasured` rather than as
+# "the log was never cleared".
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\System32\winevt\Logs':
+    - name: Application.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+    - name: Security.evtx

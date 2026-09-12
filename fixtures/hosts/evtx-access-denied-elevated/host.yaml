@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Denied while the rights were already held. Restarting as administrator would not help, so the
+# reason is `access_denied` and not `not_admin`, and the report does not offer a remedy that is not
+# one.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\System32\winevt\Logs':
+    - name: Security.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+access_denied:
+  - 'C:\Windows\System32\winevt\Logs'
