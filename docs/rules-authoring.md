@@ -21,9 +21,9 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `title` | yes | short, English |
 | `description` | yes | what it means, why it matters, and what it does **not** prove |
 | `status` | yes | `experimental` · `test` · `stable` · `deprecated` |
-| `collector` | yes | must equal the first folder name |
+| `collector` | yes | must equal the first folder name, and must be a collector in this build |
 | `strength` | yes | `execution` · `presence` · `tamper` · `posture` · `context` |
-| `match` | yes | map of observation field → value; **all** must be equal to match. Strings compare without regard to ASCII case |
+| `match` | yes | map of observation field → value; **all** must be equal to match. Strings compare without regard to ASCII case (ADR 0025). Every field name must be one the collector declares it can emit — `check-rules` rejects the rest and names the one it meant (ADR 0026) |
 | `cased` | no | fields of `match` compared byte for byte instead; everything left out folds case |
 | `allow` | no | legitimate software excluded by `sha256` or `signer` — never by file name |
 | `retention` | yes | how far back the source can see, in words for the user |
@@ -96,6 +96,7 @@ translations are applied only when the report is displayed.
 
 ```bash
 cargo xtask check-rules
+cargo xtask check-baseline          # the rule must also be quiet on an ordinary machine
 cargo nextest run -p rongroi-core   # the embedded bundle must parse
 ```
 

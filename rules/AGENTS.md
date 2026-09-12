@@ -15,7 +15,13 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   keeps folding, and every field left out of it folds. A rule with no `cased` line is case-insensitive —
   write one only when the field's own vocabulary distinguishes case, and say in a `#` comment why. A
   `cased` entry naming a field `match` does not have fails `cargo xtask check-rules`.
+- `collector` must be a collector in this build and every `match` field name one that collector
+  declares it can emit (`Collector::fields`, ADR 0026). A misspelling is not a quiet mistake: the rule
+  becomes `not_found` on every machine, which this program shows a player as evidence that something
+  was looked for and was not there. `check-rules` rejects it and names the field it meant.
 - `status: test` or `stable` needs a positive and a negative fixture in `tests/`.
+- A new rule must also be quiet on every `fixtures/hosts/baseline-*` host, or carry a
+  `known-fps.csv` row with a reason (`cargo xtask check-baseline`, ADR 0017).
 - Fixtures are synthetic observations. Never commit cheat binaries, loaders or real player data.
 - **Out of scope:** rules, comments or fixtures that explain how to avoid a rule, and weakening a rule
   without a documented false-positive reason. Bypasses are reported privately via

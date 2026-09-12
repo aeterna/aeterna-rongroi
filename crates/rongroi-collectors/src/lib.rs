@@ -23,6 +23,18 @@ use rongroi_host::Host;
 pub trait Collector {
     /// Stable id, equal to the `collector` field of the rules that read it.
     fn id(&self) -> &'static str;
+    /// Every observation field name this collector can emit, sorted.
+    ///
+    /// This is the vocabulary a rule's `match` may name, and `cargo xtask check-rules` rejects a
+    /// rule that names anything outside it (ADR 0026). It is a declaration rather than something
+    /// derived from the code, so it can drift from what `collect` really puts in a field map; what
+    /// holds the two together is the `every_emitted_field_is_declared` test in this file, which
+    /// runs every collector over every fixture host and fails on a field no list names.
+    ///
+    /// There is deliberately no default implementation: a new collector that forgets this does not
+    /// compile, rather than declaring an empty vocabulary that would reject every rule written for
+    /// it.
+    fn fields(&self) -> &'static [&'static str];
     /// Looks at the host.
     fn collect(&self, host: &dyn Host) -> CollectorRun;
 }
@@ -38,4 +50,114 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::path::PathBuf;
+
+    use rongroi_core::model::CollectorRun;
+    use rongroi_host::FixtureHost;
+
+    use super::*;
+
+    /// Every fixture host in the repository, in name order.
+    fn fixture_hosts() -> Vec<(String, PathBuf)> {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/hosts");
+        let mut hosts: Vec<(String, PathBuf)> = std::fs::read_dir(&dir)
+            .expect("fixtures/hosts is readable")
+            .map(|entry| entry.expect("a readable directory entry"))
+            .filter(|entry| entry.path().join("host.yaml").is_file())
+            .map(|entry| {
+                (
+                    entry.file_name().to_string_lossy().into_owned(),
+                    entry.path(),
+                )
+            })
+            .collect();
+        hosts.sort();
+        assert!(!hosts.is_empty(), "no fixture host was found");
+        hosts
+    }
+
+    /// `Collector::fields` is a declaration, and `cargo xtask check-rules` rejects a rule that names
+    /// a field outside it (ADR 0026). A declaration that has drifted from what `collect` emits turns
+    /// that gate into a wrong answer in either direction — a real field rejected, or a renamed one
+    /// still accepted — so the two are bound here rather than by review.
+    ///
+    /// This proves one half: no collector emits a field it did not declare. The other half — that a
+    /// declared field is reachable at all — is what the fixture hosts cannot prove, since a name is
+    /// only seen on a host that produces it; `fields_are_sorted_and_unique` is what keeps the lists
+    /// readable, and ADR 0026 records the limit.
+    #[test]
+    fn every_emitted_field_is_declared() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeSet<&str> = collector.fields().iter().copied().collect();
+                let CollectorRun::Measured { observations, .. } = collector.collect(&host) else {
+                    continue;
+                };
+                for observation in &observations {
+                    for field in observation.fields.keys() {
+                        assert!(
+                            declared.contains(field.as_str()),
+                            "fixtures/hosts/{name}: collector `{}` emitted `{field}`, which `Collector::fields` does not declare",
+                            collector.id()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// A gap names the field it is a gap in, so a `gaps` key outside the declared list is the same
+    /// drift as an undeclared observation field: a rule matching that field would be `NotFound`
+    /// where the collector meant `Unmeasured`.
+    #[test]
+    fn every_gap_key_is_a_declared_field() {
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let declared: BTreeSet<&str> = collector.fields().iter().copied().collect();
+                let CollectorRun::Measured { gaps, .. } = collector.collect(&host) else {
+                    continue;
+                };
+                for field in gaps.keys() {
+                    assert!(
+                        declared.contains(field.as_str()),
+                        "fixtures/hosts/{name}: collector `{}` gapped `{field}`, which `Collector::fields` does not declare",
+                        collector.id()
+                    );
+                }
+            }
+        }
+    }
+
+    /// The lists are read by a person writing a rule and by `check-rules` when it names what a
+    /// collector can emit, so an unsorted or duplicated entry is a defect in both.
+    #[test]
+    fn fields_are_sorted_and_unique() {
+        for collector in all() {
+            let declared = collector.fields();
+            let mut sorted = declared.to_vec();
+            sorted.sort_unstable();
+            sorted.dedup();
+            assert_eq!(
+                sorted,
+                declared.to_vec(),
+                "collector `{}` declares fields that are unsorted or repeated",
+                collector.id()
+            );
+        }
+    }
+
+    /// Two collectors sharing an id would make `collector:` in a rule ambiguous, and `check-rules`
+    /// resolves a rule's collector by that id alone.
+    #[test]
+    fn collector_ids_are_unique() {
+        let ids: BTreeSet<&str> = all().iter().map(|collector| collector.id()).collect();
+        assert_eq!(ids.len(), all().len(), "two collectors share an id");
+    }
 }

@@ -87,6 +87,10 @@ impl Collector for Pca {
         ID
     }
 
+    fn fields(&self) -> &'static [&'static str] {
+        &FIELDS
+    }
+
     fn collect(&self, host: &dyn Host) -> CollectorRun {
         if host.platform() != Platform::Windows {
             return CollectorRun::Unmeasured {

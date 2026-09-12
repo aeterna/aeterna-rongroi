@@ -21,6 +21,13 @@ use crate::Collector;
 
 const ID: &str = "process";
 
+/// Every field this collector can emit.
+///
+/// The list is never a `gaps` key here: a process list that could not be read is the whole reading,
+/// so it is an `Unmeasured` run rather than a gap, and an unresolved image path omits `path` on that
+/// one process without saying anything about the rest (ADR 0010).
+const FIELDS: [&str; 2] = ["name", "path"];
+
 /// The `process` collector.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Process;
@@ -28,6 +35,10 @@ pub struct Process;
 impl Collector for Process {
     fn id(&self) -> &'static str {
         ID
+    }
+
+    fn fields(&self) -> &'static [&'static str] {
+        &FIELDS
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {

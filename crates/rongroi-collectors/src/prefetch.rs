@@ -87,6 +87,10 @@ impl Collector for Prefetch {
         ID
     }
 
+    fn fields(&self) -> &'static [&'static str] {
+        &FIELDS
+    }
+
     /// Lists `%SystemRoot%\Prefetch` and reads every `.pf` file in it.
     ///
     /// A failure to list the folder gaps every field: nothing was read, so no rule may conclude a

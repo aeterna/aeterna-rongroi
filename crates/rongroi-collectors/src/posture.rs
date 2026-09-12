@@ -33,6 +33,20 @@ pub const HVCI_VALUE: &str = "Enabled";
 
 const ID: &str = "posture";
 
+/// Every field this collector can emit.
+///
+/// Unlike the collectors that read one artifact, a setting this one could not read is a gap in that
+/// setting alone and in nothing else: one observation carries every setting that was readable, and
+/// each name below is both a field and a `gaps` key (ADR 0011). `tpm_spec_version` is the one name
+/// that is never a gap — an absent TPM has no version, and that is not a failure to measure.
+const FIELDS: [&str; 5] = [
+    "hvci",
+    "secure_boot",
+    "test_signing",
+    "tpm",
+    "tpm_spec_version",
+];
+
 /// The posture collector.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Posture;
@@ -40,6 +54,10 @@ pub struct Posture;
 impl Collector for Posture {
     fn id(&self) -> &'static str {
         ID
+    }
+
+    fn fields(&self) -> &'static [&'static str] {
+        &FIELDS
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {
