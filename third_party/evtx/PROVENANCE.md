@@ -1,7 +1,7 @@
 # Vendored `evtx` — provenance
 
 This directory is the `evtx` crate's own source, vendored into this repository and carrying **two
-patches**. It is not a fork: the intent is to carry the patch only until an upstream release includes it,
+patches**. It is not a fork: the intent is to carry them only until an upstream release includes them,
 then delete this directory and go back to the registry crate.
 
 Why it is here at all, and what the alternatives were, is `docs/adr/0018-evtx-parsing.md`.
@@ -136,11 +136,25 @@ the crate found these two to be the only allocations sized by an unchecked value
 every other one is bounded by `EVTX_CHUNK_SIZE`, by a slice length already in memory, or sits in the
 `wevt_templates` feature, which is off and which this parser never enters.
 
-**Upstream:** not yet reported. The patch is written to be sent to `omerbenamram/EVTX`, and this line
-should say so with a link once it has been — an unreported finding recorded as reported is how a fix
-stays vendored forever. When a release carries it, delete this directory, delete both
-`[patch.crates-io]` stanzas (root `Cargo.toml` and `fuzz/Cargo.toml`), and bump the registry
-dependency.
+**Upstream: reported 2026-09-12 as [omerbenamram/evtx#294](https://github.com/omerbenamram/evtx/pull/294).**
+Both patches, against `master`. The pull request also mentions the unterminating parse recorded above,
+as something found and not fixed, with an offer to send the input — it is not claimed as solved there
+any more than it is here.
+
+What that pull request does **not** do is claim novelty. The first defect was reported in April 2026 by
+`jupyterj0nes` as [#293](https://github.com/omerbenamram/evtx/issues/293), and as
+[#291](https://github.com/omerbenamram/evtx/issues/291) /
+[#292](https://github.com/omerbenamram/evtx/issues/292); those were closed with *"please reopen if it
+reproduces on latest. i think this is no longer the case."* It does reproduce on latest, which is what
+#294 supplies — a confirmation with patches, credited to the original reporter. Anyone here tempted to
+file a fourth report should read those three first.
+
+It also discloses that the patches and the pull request text were written by an AI assistant and opened
+on the account owner's instruction. That is stated because the maintainer has objected to unattributed
+AI-generated reports, and because it is true.
+
+When a release carries the fix, delete this directory, delete both `[patch.crates-io]` stanzas (root
+`Cargo.toml` and `fuzz/Cargo.toml`), and bump the registry dependency.
 
 ## What was removed, and what was not
 

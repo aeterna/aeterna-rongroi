@@ -74,7 +74,16 @@ Four options were weighed:
 | Hold EVTX until upstream releases a fix | Puts M2's tamper signals behind someone else's release schedule, for a two-line change |
 | Land it with `fuzz_evtx` excluded | Ships a known abort **and** removes the gate that caught it. The RUSTSEC reason below names this target as something that bounds the dependency's risk; deleting it would hollow out that argument |
 
-So: vendor, bound, upstream, delete when released. `sources ok` from `cargo deny` was verified with the
+So: vendor, bound, upstream, delete when released. The upstream half is done —
+[omerbenamram/evtx#294](https://github.com/omerbenamram/evtx/pull/294), both patches, 2026-09-12 — and
+it credits the April 2026 reports (#291, #292, #293) instead of presenting the finding as new, because
+it is not.
+
+Whether it lands is outside our control, and the evidence points both ways: the maintainer has merged
+three fixes of exactly this class and shipped a `### Security`-labelled hardening in 0.12.2, but he also
+closed #293 as an AI-generated report and no outside contributor has landed an allocation-bounds change.
+If it is declined or goes unanswered, `third_party/evtx/` stops being temporary, and that is the point
+at which a RustSec informational advisory becomes the reasonable next step rather than the rude one. `sources ok` from `cargo deny` was verified with the
 path source in place — a path inside the repository is reviewable in the same pull request as the code
 that uses it, which is what `unknown-git = "deny"` is protecting against in the first place.
 
