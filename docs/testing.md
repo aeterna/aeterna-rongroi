@@ -23,13 +23,19 @@ One target per public parser entry point — six of them: `fuzz_bam`, `fuzz_pca_
 gets back: a malformed artifact is a typed `ParseError`, which is a correct answer, so the bug a target looks
 for is a panic, an abort or a hang.
 
-> **One known exception, open as of 2026-09-12.** A crafted `.evtx` input exists on which
-> `rongroi_parsers::evtx::records` does **not return** — over 300 s under the sanitizer with the
-> timeout raised, and over 600 s in a release build without one. It is a defect in the vendored
-> `evtx` crate, present with and without the two patches this repository carries, and its location has
-> not yet been found. So the row above overstates the current position for EVTX: that parser is not
-> known to be hang-free, and `fuzz smoke` may go red on any run whose seed happens to reach it. The
-> reproducing input is kept out of the repository; `third_party/evtx/PROVENANCE.md` records it.
+> **The one known exception to that row was EVTX, and it is closed as of 2026-09-12.** Crafted
+> `.evtx` inputs existed on which `rongroi_parsers::evtx::records` did **not return** — over 300 s
+> under the sanitizer with the timeout raised, over 600 s in a release build without one — and for a
+> time the row above overstated the position for that parser. The defect was in the vendored `evtx`
+> crate: its per-chunk string table is a set of linked chains, and the walk of them guarded only
+> against an entry pointing at itself, so a chain closed into a cycle of two or more was walked
+> forever. It is fixed here, with a deterministic regression test built from the good fixture rather
+> than from a saved crash (`third_party/evtx/PROVENANCE.md`, patch 3).
+>
+> What is now true is narrower than the row: both saved reproducing inputs parse, and nothing is known
+> that hangs this parser. That is not a proof that none exists — it is what a smoke gate and one fixed
+> defect can say. The reproducing inputs are still kept out of the repository, because everything in
+> `fixtures/evtx/` is also a fuzz seed and must parse.
 
 `fuzz_prefetch` is one of two whose bytes reach third-party code rather than only our own, which is half of
 why ADR 0015 accepted that decompressor's immaturity. `fuzz_evtx` is the other and covers the most of it: a

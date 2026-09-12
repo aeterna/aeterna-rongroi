@@ -21,7 +21,19 @@ impl StringCache {
                 let link = BinXmlNameLink::from_cursor(&mut cursor)?;
                 let name = BinXmlName::from_cursor(&mut cursor)?;
 
-                cache.insert(string_position, name);
+                // A non-empty return from `insert` means this position has already been walked —
+                // earlier in this chain, or in an earlier one — and everything reachable from it was
+                // cached then, so stopping here loses no string while walking on would follow the
+                // same links again and never come back. Only a chain entry pointing at *itself* was
+                // caught below; a cycle of two or more was walked forever, and because the same keys
+                // are overwritten each time round, memory does not grow and nothing reports it. The
+                // `offset == string_position` check below is the one-element case of this and is
+                // left as upstream wrote it. What is *accepted* does not change: a chain that ends
+                // is walked to its end exactly as before, and a chunk is not refused for holding a
+                // cycle — the strings in it are cached and its records still resolve them.
+                if cache.insert(string_position, name).is_some() {
+                    break;
+                }
 
                 trace!("\tNext string will be at {:?}", link.next_string);
 

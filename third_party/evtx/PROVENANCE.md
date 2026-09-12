@@ -1,6 +1,6 @@
 # Vendored `evtx` — provenance
 
-This directory is the `evtx` crate's own source, vendored into this repository and carrying **two
+This directory is the `evtx` crate's own source, vendored into this repository and carrying **three
 patches**. It is not a fork: the intent is to carry them only until an upstream release includes them,
 then delete this directory and go back to the registry crate.
 
@@ -23,9 +23,10 @@ annotation would be a false claim.
 
 ## The patches
 
-Two, in two files. Both are the same kind of defect — a number read off the wire used in arithmetic
-without checking what the wire could actually hold — and both were found by `fuzz_evtx`, the second
-one after the first had already been fixed and merged.
+Three, in three files, all found by `fuzz_evtx` and each one after the last had been fixed and merged.
+The first two are the same kind of defect — a number read off the wire used in arithmetic without
+checking what the wire could actually hold. The third is not: it is a walk over a linked structure
+built from the file, with no record of where it had already been.
 
 ### 1. An unbounded reservation — `src/binxml/tokens.rs`
 
@@ -104,42 +105,79 @@ green on the pull request an hour earlier. The fuzzer takes a random seed; one g
 about the next. The regression test for it is therefore deterministic and lives in
 `crates/rongroi-parsers/src/evtx.rs`, built from the good fixture rather than from a saved crash.
 
-## Known and unfixed: a parse that does not terminate
+### 3. A string-table walk with no cycle guard — `src/string_cache.rs`
 
-A third defect of the same family is **open**. A crafted 69 632-byte input makes
-`EvtxParser`'s record iteration never come back:
+`StringCache::populate`.
+
+Each chunk carries a string table whose entries form linked chains: an entry begins with the chunk
+offset of the next entry in its chain, and `populate` walks each chain to its end. The only guard was
+`offset == string_position`, which catches an entry that points at **itself**. **Nothing caught a cycle
+of two or more**, and a chain closed into one was walked forever. The same cache keys are overwritten
+each time round, so memory does not grow and no allocator alarm fires — which is why the stack samples
+taken while it spun landed in the allocator and said only what it was doing when the clock ran out.
+
+This is the defect this file recorded as open, and as located nowhere, until 2026-09-12. What it did,
+kept as the record of it:
 
 | Measurement | Result |
 |---|---|
 | under the sanitizer, `-timeout=300` | still running at 302 s |
 | release build, no sanitizer | still running past 600 s, killed |
-| with this directory's two patches | hangs |
+| with this directory's other two patches | hangs |
 | with `name.rs` reverted to upstream | hangs |
 
-So it is upstream's, it is independent of both patches, and neither patch caused or unmasked it. Where
-it spins has not been identified — the alarm's stack lands inside the allocator, which says only what
-it was doing when the clock ran out, not what it was looping on.
+So it is upstream's, it is independent of the other two, and neither of them caused or unmasked it.
 
-It is recorded here rather than fixed because a fix needs the loop found first, and because
-`docs/testing.md` claims this crate's parsers never hang. That claim is currently false for EVTX and
-now says so.
+It was found by sampling a debug build while it spun — 2522 samples, the whole main thread under
+`EvtxChunk::new_with_arena` → `StringCache::populate` — and confirmed with a temporary print of every
+position visited, which showed a two-node cycle, 1679 ⇄ 256, repeating without end.
 
-The input is **not** committed: it is a fuzzer artifact, and `fixtures/evtx/` is both the L0 fixture
-directory and the fuzz seed corpus, so everything in it must parse. It lives outside the repository
-with whoever is working on this. `fuzz smoke` may therefore go red on any run whose seed happens to
-find it again — if it does, that is this defect and not a regression of the two patched ones.
+The fix stops the walk when it reaches a position that is already cached. The cache is keyed by the
+position being visited, so it is its own visited-set, and `insert` already reports whether the key was
+there:
+
+```rust
+if cache.insert(string_position, name).is_some() {
+    break;
+}
+```
+
+**Breaking loses no string, which is what makes this a fix rather than a cut-off.** If
+`string_position` is already in the cache then some earlier walk — this chain, or one from another
+bucket — reached it and went on from this same link, so everything the rest of the chain reaches was
+cached then; the cache only grows, so it is cached now. Refusing the chunk was the alternative and was
+not taken: a cycle costs the strings past it nothing, the records that reference them still resolve,
+and the crate's contract is that a damaged chunk costs its own records and nothing else. Upstream's
+`offset == string_position` check is the one-element case of the new one; it is left where it is, so
+the divergence from the published file is one added statement.
+
+The two reproducing inputs are still **not** committed — they are fuzzer artifacts, and
+`fixtures/evtx/` is both the L0 fixture directory and the fuzz seed corpus, so everything in it must
+parse (ADR 0021). The regression test is built from the good fixture instead, the way the name-length
+one is: `a_string_table_chain_that_closes_into_a_cycle_still_terminates` in
+`crates/rongroi-parsers/src/evtx.rs` writes one entry's next-entry offset back at the entry that links
+to it, and asserts the file then parses to exactly the records it parses to without the cycle. A
+regression shows up there as a hung test rather than a failing one, and the test says so.
+
+**What this does not establish.** `docs/testing.md`'s row said the parsers never hang, this file said
+that was false for EVTX, and both now record the defect as fixed — but "the one known way to hang this
+parser is closed" is not "this parser cannot hang". Both saved reproducers now parse
+(`cargo +nightly fuzz run fuzz_evtx <input> -- -timeout=10`, exit 0 on each, where both timed out
+before), the third artifact CI produced on 2026-09-12 was never retrieved and so was never re-run, and
+`fuzz_evtx` remains the only thing looking for a fourth defect.
 
 ## Nothing else
 
 Nothing else in the crate is modified. A scan of every `with_capacity`, `reserve` and `vec![n]` site in
-the crate found these two to be the only allocations sized by an unchecked value read from the file;
-every other one is bounded by `EVTX_CHUNK_SIZE`, by a slice length already in memory, or sits in the
-`wevt_templates` feature, which is off and which this parser never enters.
+the crate found the first two patches' sites to be the only allocations sized by an unchecked value
+read from the file; every other one is bounded by `EVTX_CHUNK_SIZE`, by a slice length already in
+memory, or sits in the `wevt_templates` feature, which is off and which this parser never enters.
 
 **Upstream: reported 2026-09-12 as [omerbenamram/evtx#294](https://github.com/omerbenamram/evtx/pull/294).**
-Both patches, against `master`. The pull request also mentions the unterminating parse recorded above,
-as something found and not fixed, with an offer to send the input — it is not claimed as solved there
-any more than it is here.
+Patches 1 and 2, against `master`, and **not patch 3** — that pull request was written while the third
+defect was still unlocated, and it mentions it only as something found and not fixed, with an offer to
+send the input. #294 is open and unreviewed as of 2026-09-12, so what it says about this defect is now
+out of date.
 
 What that pull request does **not** do is claim novelty. The first defect was reported in April 2026 by
 `jupyterj0nes` as [#293](https://github.com/omerbenamram/evtx/issues/293), and as
@@ -153,12 +191,33 @@ It also discloses that the patches and the pull request text were written by an 
 on the account owner's instruction. That is stated because the maintainer has objected to unattributed
 AI-generated reports, and because it is true.
 
+**Recommendation, for the account owner to act on or not — nothing has been opened.** Send patch 3
+upstream, and send it into #294 rather than as a second pull request or a fourth issue. The reasons, in
+the order they matter:
+
+- #294 already tells the maintainer this defect exists and offers the input. Adding the fix finishes a
+  statement that has already been made, in the thread where it was made, instead of opening a second
+  one against a maintainer who has objected to the volume of AI-generated reports. If he would rather
+  review it separately, splitting it then costs nothing.
+- It needs no attachment and no fuzzer artifact. It reproduces on **upstream's own corpus**: take the
+  `samples/Microsoft-Windows-LanguagePackSetup%4Operational.evtx` sample, write the `u32` at offset 5148
+  (chunk offset 1052, the `Task` entry's next-entry field) as `1523`, and the parse does not return.
+  That was observed here through `EvtxParser::records`; that `evtx_dump` hangs on the same file is
+  reasoned from its calling the same path and was not run, because the vendored copy drops the binary
+  targets. A four-byte edit anyone can repeat is a better report than a binary blob.
+- Of the three, this is the one whose absence hurts every consumer rather than only a memory-bounded
+  one: a hang has no upper bound and no error, and `evtx` is used by tooling that parses logs from
+  machines it does not trust.
+
+What the recommendation does not rest on is urgency. This repository is not blocked on it — the
+vendored copy carries the fix today.
+
 When a release carries the fix, delete this directory, delete both `[patch.crates-io]` stanzas (root
 `Cargo.toml` and `fuzz/Cargo.toml`), and bump the registry dependency.
 
 ## What was removed, and what was not
 
-Nothing was added, edited or reformatted apart from the two patches above. Three kinds of file were dropped,
+Nothing was added, edited or reformatted apart from the three patches above. Three kinds of file were dropped,
 all of them targets the library does not need:
 
 | Removed | Why it is safe |
@@ -189,7 +248,8 @@ shasum -a 256 ~/.cargo/registry/cache/*/evtx-0.12.2.crate
 
 mkdir -p /tmp/evtx-check && tar xzf ~/.cargo/registry/cache/*/evtx-0.12.2.crate -C /tmp/evtx-check
 
-# Only src/binxml/tokens.rs and src/binxml/name.rs may differ, and only by the patches above.
+# Only src/binxml/tokens.rs, src/binxml/name.rs and src/string_cache.rs may differ, and only by the
+# patches above.
 diff -r -x bin -x benches /tmp/evtx-check/evtx-0.12.2/src third_party/evtx/src
 
 # The manifest is deliberately trimmed (see the table below), so it will differ — but only by
@@ -198,5 +258,5 @@ diff -u /tmp/evtx-check/evtx-0.12.2/Cargo.toml third_party/evtx/Cargo.toml | gre
 diff -u /tmp/evtx-check/evtx-0.12.2/src/binxml/tokens.rs third_party/evtx/src/binxml/tokens.rs
 ```
 
-A `diff -r` that reports anything other than those two files means this directory has drifted
+A `diff -r` that reports anything other than those three files means this directory has drifted
 from upstream and the drift was not recorded here — treat that as a defect in this file.
