@@ -63,8 +63,13 @@ expression: view
             "entries": 17,
             "intact": true,
             "log": "Security.evtx",
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
             "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
-            "rejected": 0
+            "rejected": 0,
+            "size_bytes": 69632
           }
         },
         {
@@ -111,8 +116,13 @@ expression: view
             "entries": 17,
             "intact": true,
             "log": "Application.evtx",
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
             "path": "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
-            "rejected": 0
+            "rejected": 0,
+            "size_bytes": 69632
           }
         },
         {
@@ -158,8 +168,10 @@ expression: view
           "fields": {
             "budget_exhausted": false,
             "budget_seconds": 30,
+            "channels": 1,
             "examined": 2,
             "logs": 2,
+            "logs_without_records": 0,
             "refused": 0
           }
         }

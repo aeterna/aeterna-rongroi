@@ -26,9 +26,16 @@ when it starts with a drive letter, because that is the only shape SS mode knows
 written any other way can carry your account name with nothing to replace it, so it is withheld rather
 than shown — and the report says it was withheld, rather than leaving you to notice it is missing.
 Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
-wrote them, the event number, the severity and the first and last time one was written. **What each event
-says is not read into the report at all**: an event's own text is where user names, PC names, addresses,
-account identifiers and full command lines live, and none of it survives the step that reads the file.
+wrote them, the event number, the severity and the first and last time one was written — and, of each log
+itself, how far back it still reaches: the time and the record number of the oldest and the newest event
+that survives in it, and how large the file was. For the folder as a whole it counts how many of the logs
+it read hold no events at all and how many different channels have anything in them. None of that names a
+person, and none of it is a conclusion: a log that reaches back only a few days is the ordinary result of
+Windows overwriting the oldest events when the log fills, of a channel that was switched on recently, or of
+a Windows upgrade, and a PC with almost every log empty is what a "PC optimiser" script leaves behind — the
+report says which of these it cannot tell apart. **What each event says is not read into the report at
+all**: an event's own text is where user names, PC names, addresses, account identifiers and full command
+lines live, and none of it survives the step that reads the file.
 A log the tool could not read — because Windows refused it, because it is larger than the tool will open,
 or because the tool's own time limit ran out — is **named in the report as one it could not read**, rather
 than passed over in silence.

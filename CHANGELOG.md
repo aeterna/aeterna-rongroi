@@ -48,6 +48,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   contained were trimmed, since such an assertion passes whether or not the parser works.
 
 ### Added
+- The `evtx` collector now reports each log's **own state** beside the events in it — the time and record
+  id of the oldest and newest surviving record and the size of the file — and, per folder, how many logs
+  read held no record and how many channels have any. A rule about a cleared log has to match the log,
+  not one event: a gaming "optimiser" script clears every channel in one click, so a folder of empty logs
+  is evidence **for** that benign explanation and never corroboration. Each field's innocent explanation,
+  and the candidates rejected for having none, are in ADR 0028.
 - The `evtx` collector, the last of the four parsers to reach the product: it reads every `.evtx` file
   in `%SystemRoot%\System32\winevt\Logs` and reports, per log, **how many events of each kind** it
   holds — channel, provider, event id, level, a count and the first and last time one was written —
