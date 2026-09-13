@@ -1,0 +1,6 @@
+{
+  "description": "A machine policy sets script block logging to on",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "script_block_logging": "enabled" } }
+  ]
+}

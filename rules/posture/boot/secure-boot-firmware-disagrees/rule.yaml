@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 5ec56c3d-da70-4acc-99d6-2c41c0b75d71
+title: The firmware reports Secure Boot off while Windows reports it on
+description: >-
+  Secure Boot is read from two places. The Windows registry says it is on; the firmware's own Secure
+  Boot variable says it is off. The firmware is what decides whether Secure Boot is enforced, so while
+  they disagree the registry value does not describe how this PC started. This program cannot tell why
+  the two differ or which one changed last. Reading the firmware needs administrator rights, so a scan
+  without them cannot answer this. On its own this describes the machine — it is not evidence of
+  cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  secure_boot: enabled
+  secure_boot_firmware: disabled
+retention: >-
+  Current state only: what the firmware reports for this start of Windows and what the registry holds
+  now. It says nothing about earlier starts.
+unmeasured_when: [not_windows, not_admin, source_absent, access_denied]
+falsepositives:
+  - Virtual machines, whose virtual firmware may report Secure Boot differently from what Windows recorded
+  - Firmware that reports Secure Boot inconsistently, for example after a firmware update or a reset of its Secure Boot keys
+  - A Windows installation or disk moved to different hardware, or Secure Boot changed in the firmware settings, if Windows had not yet written the new state to the registry
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfirmwareenvironmentvariableexw
+  - https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-secure-boot-key-creation-and-management-guidance
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [posture, boot]

@@ -1,0 +1,6 @@
+{
+  "description": "Windows as it ships: no script block logging policy was ever written",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "script_block_logging": "not_configured" } }
+  ]
+}

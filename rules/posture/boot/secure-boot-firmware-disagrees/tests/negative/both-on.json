@@ -1,0 +1,9 @@
+{
+  "description": "An ordinary machine read with administrator rights: both readings report Secure Boot on",
+  "observations": [
+    {
+      "collector": "posture",
+      "fields": { "secure_boot": "enabled", "secure_boot_firmware": "enabled", "test_signing": "disabled" }
+    }
+  ]
+}
