@@ -89,7 +89,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   to a different file. Reading them needed two new reads, both disclosed in the consent question:
   **one attribute bit** of each `.pf` and `.evtx` file, amending ADR 0009's "no attributes", and **what
   the Event Log service states about a channel** — its file and its maximum size — through
-  `EvtOpenChannelConfig`, a new host source. The registry was measured first and rejected: on one Windows
+  `EvtOpenChannelConfig`, a new host source. That question is asked on a thread of its own and charged
+  to the `evtx` 30-second budget, so an Event Log service that never answers ends the collection with
+  the configuration `unmeasured / budget_spent` instead of stalling the scan. The registry was measured first and rejected: on one Windows
   11 machine no `WINEVT\Channels` key named a file, and the registry's `MaxSize` disagreed with the size
   Windows uses on 18 of the 94 keys carrying one. On that machine, elevated, all three rules were
   `not_found`: 243 `.pf` and 413 `.evtx` files none read-only, and 148 of 148 logs with records at the

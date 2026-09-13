@@ -64,13 +64,17 @@
 //! scans **before** it creates its window, so a parse that does not return is not a stalled progress
 //! bar — it is an application that never appears. [`PARSE_BUDGET`] bounds the whole collection, on
 //! one worker thread, and a log the budget did not reach is named in the report. See ADR 0024.
+//!
+//! Asking the Event Log service what file and size it sets for a channel (ADR 0042) is a call into
+//! another process, and a service that never answers would stall the scan the same way. Those
+//! questions run on a second worker thread and are charged to the same budget.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{ChannelConfig, Host, Platform};
+use rongroi_host::{ChannelConfig, ChannelConfigReader, Host, Platform};
 use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{self, EvtxFile, EvtxRecord};
 
@@ -353,6 +357,8 @@ struct Collection {
     /// What the service said about each channel asked about, so each is asked once. `None` is a
     /// channel the service does not have; a channel whose question failed is not kept.
     configs: BTreeMap<String, Option<ChannelConfig>>,
+    /// Who asks the service, once there has been a channel to ask about.
+    asker: Asker,
     /// Whether the wall-clock budget ended the collection before every log was read.
     budget_exhausted: bool,
     budget: Duration,
@@ -371,6 +377,7 @@ impl Collection {
             attribute_failure: None,
             config_failure: None,
             configs: BTreeMap::new(),
+            asker: Asker::NotStarted,
             budget_exhausted: false,
             budget,
         }
@@ -392,6 +399,10 @@ impl Collection {
             // and saying so is not the same statement as "the read of this log ran out of time"
             // (ADR 0030).
             if self.budget_exhausted {
+                // Usually an earlier log's parse already named the budget as the run's reason. When
+                // it was a question to the Event Log service that used the budget up instead, no log
+                // was refused for it, and the budget is still why this one was not read.
+                self.first_failure = self.first_failure.or(Some(UnmeasuredReason::BudgetSpent));
                 self.refuse(name, &path, NOT_ATTEMPTED, UnmeasuredReason::NotAttempted);
                 continue;
             }
@@ -468,7 +479,7 @@ impl Collection {
                     // record names none, and a log naming several is not the file of any one of
                     // them. Neither is reported as anything (ADR 0042).
                     if let [channel] = channels_of_log.into_iter().collect::<Vec<_>>().as_slice()
-                        && let Some(config) = self.config_of(host, channel)
+                        && let Some(config) = self.config_of(host, channel, deadline)
                     {
                         configured(&mut observation, &config, &path, root);
                     }
@@ -505,21 +516,69 @@ impl Collection {
         }
     }
 
-    /// What the service states about `channel`, asking it at most once per run.
+    /// What the service states about `channel`, asking it at most once per run and waiting no later
+    /// than `deadline`, the same deadline every parse is held to.
     ///
     /// `None` both for a channel the service does not have and for a question that failed; the
     /// second is remembered in `config_failure`, which gaps the fields for the run.
-    fn config_of(&mut self, host: &dyn Host, channel: &str) -> Option<ChannelConfig> {
+    ///
+    /// A question still unanswered at the deadline ends the collection as a parse that overran does:
+    /// the configuration fields are gapped `budget_spent`, `budget_exhausted` is set, and every log
+    /// after this one is refused unopened. The worker is abandoned where it waits and no further
+    /// question is sent to it (ADR 0042).
+    fn config_of(
+        &mut self,
+        host: &dyn Host,
+        channel: &str,
+        deadline: Instant,
+    ) -> Option<ChannelConfig> {
         if let Some(known) = self.configs.get(channel) {
             return known.clone();
         }
-        match host.channel_config(channel) {
-            Ok(config) => {
+        if matches!(self.asker, Asker::NotStarted) {
+            self.asker = match host.channel_config_reader() {
+                Ok(reader) => {
+                    if let Some(worker) = ConfigWorker::spawn(reader) {
+                        Asker::Ready(worker)
+                    } else {
+                        self.config_failure =
+                            self.config_failure.or(Some(UnmeasuredReason::NotAttempted));
+                        Asker::Unavailable
+                    }
+                }
+                Err(error) => {
+                    self.config_failure = self.config_failure.or(Some(reason_for(host, &error)));
+                    Asker::Unavailable
+                }
+            };
+        }
+        let asked = match &self.asker {
+            Asker::Ready(worker) => {
+                worker.ask(channel, deadline.saturating_duration_since(Instant::now()))
+            }
+            // Nothing new to record: whatever made the asker unavailable is in `config_failure`.
+            Asker::NotStarted | Asker::Unavailable => return None,
+        };
+        match asked {
+            Asked::Done(Ok(config)) => {
                 self.configs.insert(channel.to_owned(), config.clone());
                 config
             }
-            Err(error) => {
+            Asked::Done(Err(error)) => {
                 self.config_failure = self.config_failure.or(Some(reason_for(host, &error)));
+                None
+            }
+            Asked::OutOfBudget => {
+                self.config_failure = self.config_failure.or(Some(UnmeasuredReason::BudgetSpent));
+                self.budget_exhausted = true;
+                self.asker = Asker::Unavailable;
+                None
+            }
+            // Not expected: a reader that panicked. Reported as a question that was not asked,
+            // like a parse worker that stopped, and not as the budget.
+            Asked::WorkerGone => {
+                self.config_failure = self.config_failure.or(Some(UnmeasuredReason::NotAttempted));
+                self.asker = Asker::Unavailable;
                 None
             }
         }
@@ -624,6 +683,76 @@ impl ParseWorker {
             Ok(parsed) => Parsed::Done(parsed),
             Err(mpsc::RecvTimeoutError::Timeout) => Parsed::OutOfBudget,
             Err(mpsc::RecvTimeoutError::Disconnected) => Parsed::WorkerGone,
+        }
+    }
+}
+
+/// Whether the Event Log service can be asked about a channel in this run.
+enum Asker {
+    /// No log has named a single channel yet, so nobody has tried.
+    NotStarted,
+    Ready(ConfigWorker),
+    /// The host cannot be asked, no thread was given, or a question went unanswered. The reason is
+    /// in `Collection::config_failure`.
+    Unavailable,
+}
+
+/// What one question to the service produced, or why it produced nothing.
+enum Asked {
+    Done(Result<Option<ChannelConfig>, rongroi_host::SourceError>),
+    /// The budget ran out before the service answered.
+    OutOfBudget,
+    /// There is no worker thread to ask on any more.
+    WorkerGone,
+}
+
+/// The thread every question to the Event Log service is asked on, so that a service which accepts a
+/// question and never answers it costs the collection its budget rather than the whole program
+/// (ADR 0042).
+///
+/// The same shape as [`ParseWorker`], and for the same reason: a blocked call into another process
+/// has no cancellation point this program can reach. A question that overruns leaves the thread
+/// blocked inside the call, and the collection stops sending. Dropping the collection drops `jobs`
+/// and `results` without joining the thread. If the service ever answers, the thread finds nobody
+/// listening and ends; if it never does, the thread stays blocked, not spinning, until the process
+/// exits. The reader it holds opens and closes its own handle for each question, so an abandoned
+/// question holds at most the handle it had open.
+struct ConfigWorker {
+    jobs: mpsc::Sender<String>,
+    results: mpsc::Receiver<Result<Option<ChannelConfig>, rongroi_host::SourceError>>,
+}
+
+impl ConfigWorker {
+    /// `None` when the operating system would not give this program a thread.
+    fn spawn(reader: Box<dyn ChannelConfigReader>) -> Option<Self> {
+        let (jobs, queue) = mpsc::channel::<String>();
+        let (answers, results) = mpsc::channel();
+        std::thread::Builder::new()
+            .name("evtx-channel-config".to_owned())
+            .spawn(move || {
+                // Ends when the collector drops `jobs`, or when an answer finds nobody waiting.
+                for channel in queue {
+                    if answers.send(reader.channel_config(&channel)).is_err() {
+                        break;
+                    }
+                }
+            })
+            .ok()?;
+        Some(Self { jobs, results })
+    }
+
+    /// Asks about one channel, waiting at most `within`.
+    fn ask(&self, channel: &str, within: Duration) -> Asked {
+        if within.is_zero() {
+            return Asked::OutOfBudget;
+        }
+        if self.jobs.send(channel.to_owned()).is_err() {
+            return Asked::WorkerGone;
+        }
+        match self.results.recv_timeout(within) {
+            Ok(answer) => Asked::Done(answer),
+            Err(mpsc::RecvTimeoutError::Timeout) => Asked::OutOfBudget,
+            Err(mpsc::RecvTimeoutError::Disconnected) => Asked::WorkerGone,
         }
     }
 }
@@ -965,7 +1094,7 @@ fn parse_failure(error: &ParseError) -> &'static str {
 mod tests {
     use std::path::PathBuf;
 
-    use rongroi_host::{FixtureHost, NonWindowsHost};
+    use rongroi_host::{EventLogConfigSource, FixtureHost, NonWindowsHost};
 
     use super::*;
 
@@ -1719,6 +1848,87 @@ mod tests {
             );
         }
         assert_eq!(gaps.get("read_only"), None);
+    }
+
+    /// **A service that never answers ends the collection instead of stalling it** (ADR 0042). The
+    /// fixture's reader blocks forever on this channel, so the wait is exercised for real — what is
+    /// shortened is the budget, not the hang. The first log is parsed and its records stay
+    /// measured; what the service would have said is gapped `budget_spent`, and the log after it is
+    /// refused unopened, exactly as after a parse that overran.
+    ///
+    /// The budget has to outlast parsing the one small vendored log, which takes milliseconds, and
+    /// is otherwise as short as that allows: the test waits for all of it.
+    #[test]
+    fn a_service_that_never_answers_spends_the_budget_and_gaps_the_configuration() {
+        let fixture = TempFixture::new(
+            "config-never-answers",
+            &[
+                ("System.evtx", LANGUAGE_PACK),
+                ("Application.evtx", LANGUAGE_PACK),
+            ],
+        );
+        let yaml = std::fs::read_to_string(fixture.dir.join("host.yaml"))
+            .unwrap()
+            .replace(
+                "    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'\n    max_size_bytes: 1052672\n",
+                "    never_answers: true\n",
+            );
+        assert!(yaml.contains("never_answers"), "{yaml}");
+        std::fs::write(fixture.dir.join("host.yaml"), yaml).unwrap();
+
+        let budget = Duration::from_millis(500);
+        let started = Instant::now();
+        let run = Evtx::with_budget(budget).collect(&fixture.host());
+        let took = started.elapsed();
+        assert!(took >= budget, "returned before the budget: {took:?}");
+        assert!(took < budget * 10, "the wait was not bounded: {took:?}");
+
+        let (observations, gaps) = measured(&run);
+        let account = account_of(observations, "System.evtx");
+        assert_eq!(field(account, "entries"), Some(&17_u64.into()));
+        for name in CONFIG_FIELDS {
+            assert_eq!(field(account, name), None, "{name}");
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::BudgetSpent),
+                "{name}"
+            );
+        }
+
+        let refused = refusals(observations);
+        assert_eq!(refused.len(), 1, "{refused:?}");
+        assert_eq!(text(refused[0], "log"), Some("Application.evtx"));
+        assert_eq!(text(refused[0], "read"), Some(NOT_ATTEMPTED));
+
+        let folder = folder_of(observations);
+        assert_eq!(field(folder, "budget_exhausted"), Some(&true.into()));
+        assert_eq!(field(folder, "examined"), Some(&1_u64.into()));
+        // The run's reason is the budget, not "not attempted": that the second log was not read is a
+        // consequence of the service's silence, and a reviewer should read the cause.
+        assert_eq!(gaps.get("event_id"), Some(&UnmeasuredReason::BudgetSpent));
+    }
+
+    /// The worker on its own: a question that is never answered returns when its wait does, and a
+    /// wait that is already over does not send the question at all.
+    #[test]
+    fn a_question_to_a_reader_that_never_answers_returns_at_its_deadline() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nevent_log_channels:\n  Hung/Channel:\n    never_answers: true\n",
+            "inline",
+        )
+        .unwrap();
+        let worker = ConfigWorker::spawn(host.channel_config_reader().unwrap()).unwrap();
+        assert!(matches!(
+            worker.ask("Hung/Channel", Duration::ZERO),
+            Asked::OutOfBudget
+        ));
+        let within = Duration::from_millis(50);
+        let started = Instant::now();
+        assert!(matches!(
+            worker.ask("Hung/Channel", within),
+            Asked::OutOfBudget
+        ));
+        assert!(started.elapsed() >= within);
     }
 
     /// A fixture that never described the service, or a file's attribute, has not said "no such

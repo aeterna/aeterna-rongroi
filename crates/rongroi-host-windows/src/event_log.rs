@@ -51,6 +51,21 @@ pub fn win32_code(hresult: u32) -> Option<u32> {
 
 #[cfg(windows)]
 impl rongroi_host::EventLogConfigSource for crate::LiveHost {
+    fn channel_config_reader(
+        &self,
+    ) -> Result<Box<dyn rongroi_host::ChannelConfigReader>, rongroi_host::SourceError> {
+        Ok(Box::new(LiveChannelConfigReader))
+    }
+}
+
+/// Asks the local Event Log service. It holds nothing, so it can move to any thread; each question
+/// opens and closes its own handle on the thread that asks it.
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy)]
+struct LiveChannelConfigReader;
+
+#[cfg(windows)]
+impl rongroi_host::ChannelConfigReader for LiveChannelConfigReader {
     fn channel_config(
         &self,
         channel: &str,
@@ -252,7 +267,8 @@ mod tests {
     fn the_service_states_a_file_for_the_application_channel() {
         use rongroi_host::EventLogConfigSource;
 
-        let config = crate::LiveHost
+        let reader = crate::LiveHost.channel_config_reader().unwrap();
+        let config = reader
             .channel_config("Application")
             .unwrap()
             .expect("every Windows installation registers the Application channel");
@@ -265,7 +281,7 @@ mod tests {
         );
         assert!(config.max_size_bytes > 0, "{config:?}");
         assert_eq!(
-            crate::LiveHost.channel_config("Rongroi-No-Such-Channel/Operational"),
+            reader.channel_config("Rongroi-No-Such-Channel/Operational"),
             Ok(None)
         );
     }

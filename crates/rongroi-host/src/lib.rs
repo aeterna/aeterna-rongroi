@@ -208,12 +208,29 @@ pub struct ChannelConfig {
 /// A source of its own rather than a registry read: the service's answer is the one it acts on, and
 /// on the Windows 11 machine ADR 0042 measured, the registry's `MaxSize` differed from it for 18 of
 /// the 94 keys that carry one.
+///
+/// It hands out a [`ChannelConfigReader`] rather than answering itself, because asking the service is
+/// a call into another process that this program cannot interrupt. A reader can be moved to a thread
+/// of its own, so that a collector can stop waiting for a service that does not answer and report
+/// that it stopped, instead of never returning (ADR 0042).
 pub trait EventLogConfigSource {
+    /// A reader for channel configurations, which may be moved to another thread.
+    ///
+    /// An error means the service cannot be asked at all on this host — not that one channel failed.
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError>;
+}
+
+/// Asks the Event Log service about channels, from whichever thread holds it (ADR 0042).
+pub trait ChannelConfigReader: Send {
     /// The log file and maximum size the service states for `channel`, e.g. `Security` or
     /// `Microsoft-Windows-Kernel-Boot/Operational`.
     ///
     /// `Ok(None)` when the service has no channel of that name — which is an answer: a log file can
     /// outlive the software that registered its channel. Nothing is changed by asking.
+    ///
+    /// **This call may not return.** It waits on the Event Log service, and a service that accepts a
+    /// request and never answers it leaves this call blocked; a caller that must return bounds its wait
+    /// from another thread.
     fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError>;
 }
 
@@ -508,7 +525,7 @@ impl FilesystemSource for NonWindowsHost {
 }
 
 impl EventLogConfigSource for NonWindowsHost {
-    fn channel_config(&self, _channel: &str) -> Result<Option<ChannelConfig>, SourceError> {
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows Event Log on this platform".to_owned(),
         ))
@@ -610,7 +627,7 @@ mod tests {
             Err(SourceError::Unsupported(_))
         ));
         assert!(matches!(
-            NonWindowsHost.channel_config("Security"),
+            NonWindowsHost.channel_config_reader(),
             Err(SourceError::Unsupported(_))
         ));
         assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);

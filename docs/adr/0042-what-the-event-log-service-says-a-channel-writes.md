@@ -74,9 +74,17 @@ second, different machine: 127 of 127 compared logs `at_configured_path: true`, 
 pub struct ChannelConfig { pub log_file_path: String, pub max_size_bytes: u64 }
 
 pub trait EventLogConfigSource {
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError>;
+}
+
+pub trait ChannelConfigReader: Send {
     fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError>;
 }
 ```
+
+The host hands out a reader rather than answering itself so that the question can be asked from a
+thread of its own (section 5). An error from `channel_config_reader` means the service cannot be asked
+on this host at all; an error from `channel_config` is about one channel.
 
 `LiveHost` answers with `EvtOpenChannelConfig` and `EvtGetChannelConfigProperty` for
 `EvtChannelLoggingConfigLogFilePath` and `EvtChannelLoggingConfigMaxSize`
@@ -108,7 +116,10 @@ the returned string is read only inside that buffer.
 
 **`FixtureHost`** describes the service in an `event_log_channels:` block — a map from channel name
 to `log_file_path` and `max_size_bytes`. No block at all is `Unsupported`, never "no such channel"; a
-block that does not name a channel is `Ok(None)`; a channel named in `access_denied` is refused.
+block that does not name a channel is `Ok(None)`; a channel named in `access_denied` is refused. A
+channel written as `never_answers: true`, and nothing else, is a service that accepts the question and
+never replies: its reader blocks for as long as the process lives (section 5). Writing both, or
+neither, fails to load.
 
 ### 2. What `evtx` emits
 
@@ -194,6 +205,42 @@ be defended:
 The number is there for a person reading Self mode, and for a later rule that brings a population and
 a documented default with it.
 
+### 5. The question is bounded by the collector's budget
+
+`EvtOpenChannelConfig` and `EvtGetChannelConfigProperty` are calls into the Event Log service, and
+nothing in their documentation promises that they return. A service that accepts the call and never
+answers would, on the collector's own thread, stall the scan — and a stalled scan produces no report
+for the person being checked, where `crates/rongroi-collectors/AGENTS.md` requires an environment
+problem to become `Unmeasured`. The desktop app also scans before it shows a window (ADR 0024).
+
+- **Where it runs.** The first log whose records name one channel obtains a reader from the host and
+  moves it to a second worker thread, `evtx-channel-config`, beside the parse worker of ADR 0024. Every
+  question is sent to that thread, and the collector waits for the answer with `recv_timeout`.
+- **How long it waits.** Until the same deadline every parse is held to: `PARSE_BUDGET` is the time the
+  whole `evtx` collection may take, and a question to the service is part of the collection. No second
+  constant is introduced, because nothing was measured to set one; the report's `budget_seconds` stays
+  the one bound a reader needs to know.
+- **What an unanswered question reports.** The reason is `budget_spent`, which ADR 0030 already gives
+  `evtx` for "this program stopped reading before it finished" and ADR 0032 already makes undeclarable.
+  That is the statement: the program stopped waiting, and the machine may be fine. The three
+  configuration fields are gapped `budget_spent` for the run, so the configured-path rule is
+  `unmeasured` and never `not_found`. The log whose question went unanswered keeps everything already
+  read from it. `budget_exhausted` is `true`, and every later log is refused `not_attempted` with the
+  run's reason `budget_spent` — the same shape as a parse that overran, because the budget is gone
+  either way.
+- **What happens to the abandoned call and its thread.** Neither can be cancelled: the call is blocked
+  inside another process's reply, which has no cancellation point this program can reach. The collector
+  stops sending to the thread and drops its channel ends; the thread is never joined. If the service
+  answers later, the thread finds nobody listening, its handle is closed by the guard that owns it, and
+  the thread ends. If the service never answers, the thread stays blocked — waiting, not spinning —
+  until the process exits. Rust's documentation for `std::thread` states that when the main thread
+  terminates, "the entire program shuts down, even if other threads are still running", so the CLI's
+  exit is not delayed by it. In the desktop app it is one idle thread, and the handle it had open, for
+  the life of the window. No second question is sent to a thread that did not answer the first.
+- **Tested** with a `FixtureHost` channel that never answers and a budget of half a second: the test
+  waits on a reader that really blocks, and asserts the gaps, the refusal of the next log, and that
+  the collection returned within a bound. Only the budget is shortened.
+
 ## What was rejected
 
 | Alternative | Why not |
@@ -204,7 +251,10 @@ a documented default with it.
 | Precedence across the three keys | A precedence this program invented, over sources that each disagree with the service |
 | Derive a channel's default file name from its name (`/` → `%4`) and compare that | True on every channel of one machine and documented nowhere; a guess in a field a rule matches |
 | `EvtOpenChannelEnum` and a configuration for every channel | ~1 200 channel names is an inventory of installed software, which ADR 0028 declined to report |
-| Ask on the parse worker thread, inside the budget | The host is not `Send`, and the collector's budget protects against the parser, not against the service (see below) |
+| Ask the service on the collector's own thread | The first version of this ADR did. A service that never answers would then stall the scan with no report at all (section 5) |
+| Ask on the parse worker thread | That thread is typed around a file's bytes and has no host; a reader would have to travel with each job, for no gain over a thread of its own under the same deadline |
+| A deadline of its own for the service | A second constant with nothing measured to set it, beside a budget that already states how long `evtx` may take |
+| A new reason, such as "the service did not answer" | `budget_spent` already says what happened — this program stopped before it finished — and is already undeclarable (ADR 0030, ADR 0032). A new word would need a rule author to learn it for no difference in what a rule may do |
 | A `max_size_bytes` rule at the documented minimum, or below 20 MiB for `Security` | See section 4 |
 
 ## What is unverified
@@ -215,10 +265,11 @@ a documented default with it.
 - **Whether the positive shape looks like this on a real machine.** No log on the test machine was
   exported, moved, archived or reconfigured to see the rule fire — that would have changed the
   machine. The positive case is proven against fixtures only; the negative case against one machine.
-- **Whether `EvtOpenChannelConfig` can block.** The calls are local RPC to the Event Log service and
-  run on the collector's own thread, outside `PARSE_BUDGET`. A service that accepts the call and never
-  answers would stall the scan, and the desktop app scans before it shows a window (ADR 0024). Nothing
-  here measured a hung service, and nothing bounds it.
+- **Whether `EvtOpenChannelConfig` can block, and for how long.** Nothing here measured a hung Event
+  Log service, and none was produced on the test machine, which would have meant changing a service
+  there. The bound in section 5 is proven against a fixture reader that blocks forever, not against the
+  service itself; that the real call blocks rather than failing when the service stops answering is
+  assumed, and the bound holds either way.
 - **The failure codes.** That a missing channel yields `ERROR_EVT_CHANNEL_NOT_FOUND` wrapped as an
   `HRESULT`, and a refusal `ERROR_ACCESS_DENIED`, is read from the `windows` 0.62.2 constants and the
   .NET wrapper's behaviour on the test machine, and exercised by a live test on the Windows CI runner
@@ -231,10 +282,12 @@ a documented default with it.
 
 ## Consequences
 
-- `Host` gains the supertrait `EventLogConfigSource`; `LiveHost`, `NonWindowsHost` and `FixtureHost`
-  implement it. `rongroi-host-windows` enables the `Win32_System_EventLog` feature of `windows` and
+- `Host` gains the supertrait `EventLogConfigSource`, which hands out a `Send` `ChannelConfigReader`;
+  `LiveHost`, `NonWindowsHost` and `FixtureHost` implement it. `rongroi-host-windows` enables the `Win32_System_EventLog` feature of `windows` and
   contains the new `unsafe`, each block with its `SAFETY` comment. No dependency is added and
   `Cargo.lock` does not move.
+- `evtx` runs a second worker thread when a log names one channel, charged to `PARSE_BUDGET`. A service
+  that never answers costs the collection its remaining budget and one blocked thread (section 5).
 - `evtx` declares three more fields. Report snapshots gain the rule's row on every host; on the hosts
   with no `%SystemRoot%` it is `unmeasured / read_failed`, as the log-clearing rules' rows are.
 - The consent question, the desktop consent screen, `PRIVACY.md` and `docs/architecture.md` say that the
