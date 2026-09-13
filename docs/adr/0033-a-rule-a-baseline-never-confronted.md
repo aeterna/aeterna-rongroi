@@ -97,11 +97,22 @@ whose provider happened to match — a weaker claim that would be harder to expl
   value that admits the ordinary case — a posture rule against a machine with the opposite setting —
   and nothing was measured about how many rules of three or more conditions would be unreachable at
   that threshold on a fuller baseline set. There are two such rules today, and both are excused.
-- **The expectation that a `Security.evtx` confronts the 1102 rule is unverified.** The row says so and
-  says it is unverified: `Microsoft-Windows-Eventlog` is expected to write 1100 on the Security channel
-  when the Event Log service stops, which would confront the rule at two conditions of three without
-  any clearing having happened. For the System channel, not even that much has been established, and
-  it may turn out that no ordinary System log confronts that rule at all.
+- **The 1102 expectation was verified; the 104 one was refuted.** Both were unverified when this ADR
+  was written. On 2026-09-13 the CLI was run against one real Windows 11 machine (build 26220), once
+  elevated and once under a limited token, and its own report answered them:
+
+  | Question | Answer, on that machine |
+  |---|---|
+  | Does a Security log hold a `Microsoft-Windows-Eventlog` record that is not 1102? | **Yes** — event id 1100, four of them. Two conditions of three, with no clearing. The 1102 rule **would** be confronted |
+  | Does a System log hold any `Microsoft-Windows-Eventlog` record? | **No** — none, across 156 record groups on that channel. The 104 rule would **not** be confronted |
+
+  So the two rows in `rules/unconfronted.csv` are no longer the same problem. One has a fixture that
+  would close it. The other's way out may not exist: a second machine has to be checked before anyone
+  captures anything, and if it agrees, the question becomes whether that rule can be confronted at all
+  rather than which fixture to add. **One machine is one machine** — neither answer is a population.
+- **The distance between the baseline and a real machine is larger than this gate can express.** That
+  same scan produced 1421 `evtx` observation groups across 148 channels. The baseline holds one log.
+  A rule can be confronted on the baseline and still meet nothing like reality.
 - **The row's way out is harder than one sentence makes it sound.** `fixtures/evtx/PROVENANCE.md` is
   the constraint: Event Log is the highest-PII artifact vendored here, nothing may be captured from a
   player's machine, a record cannot be redacted after the fact because each is checksummed within its
@@ -110,6 +121,34 @@ whose provider happened to match — a weaker claim that would be harder to expl
   it. A capture therefore has to come from a Windows 11 installation made for the purpose, with a
   throwaway local account and no network sign-in. Both rows now say so; the first drafts of them said
   "captured from a real Windows 11 machine", which reads as permission this repository does not give.
+
+## What a real Windows machine says about these rules
+
+Recorded here because it is the first evidence in this repository about how the ADR 0031 rules behave
+outside a fixture, and because two of the three results were surprises.
+
+**On `windows-latest`, both log-clearing rules are `found`.** The `rust (windows)` live smoke prints
+every evidence row since #41, and the first run that did shows `f4c99b57` and `ff967b28` — the 104 and
+1102 rules — firing on a GitHub runner. That is not a defect: a runner is an imaged machine, and the
+first entry in both rules' `falsepositives` is "A prebuilt or repaired PC. The factory imaging step
+Windows itself provides deletes the event logs, so the maker, not the owner, cleared this log." The
+rules met the population they were written for and said what they were written to say. It is also a
+reminder of what `strength: tamper` costs: on a machine nobody is accusing of anything, two rows appear.
+
+**Under a limited token, both come out `unmeasured / not_admin` with `expected: true`.** That is
+`docs/testing.md`'s L5 non-admin half, which the CI job cannot exercise because a GitHub runner is
+always elevated. The four posture rules are unaffected: their registry reads need no elevation.
+
+**Six of the seven collectors produced observations on the real machine** — `evtx` 1421, `prefetch` 627,
+`process` 298, `bam` 83, `pca` 3, `posture` 1, plus one own trace. That is the first time PCA, Prefetch,
+BAM and the Event Log have met a real Windows install in this project; `docs/testing.md` said they never
+had, and now records what changed and what stayed open.
+
+**On the real machine, elevated, all six rules are `not_found`** — the machine's logs have not been
+cleared within what they still hold, and its posture is Secure Boot on, test signing off, HVCI
+configured on, TPM present. On `windows-latest` the same posture rules report Secure Boot off, test
+signing **on**, HVCI `source_absent` and no TPM, which is worth knowing before anyone reads a CI run as
+"what Windows looks like".
 
 ## Consequences
 

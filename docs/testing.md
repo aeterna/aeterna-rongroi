@@ -10,24 +10,34 @@
 | L2b baseline | the whole rule set stays quiet on machines described as ordinary, **and quiet for a reason**: each accepted match needs a `rules/known-fps.csv` row with a reason, an unused row fails, and each rule must be *confronted* by some baseline observation — one carrying the fields its `match` names and one unsatisfied condition away from firing — or carry a `rules/unconfronted.csv` row with a reason and a `resolved_when` (ADR 0033). Three profiles, one of which — `baseline-elevated-win11` — has every collector `Measured`, so a rule for `pca`, `prefetch`, `bam` or `evtx` is answerable here rather than `Unmeasured` (ADR 0026) | `fixtures/hosts/baseline-*/` via `cargo xtask check-baseline` | macOS · Linux · Windows |
 | L3 report | the full pipeline, as JSON snapshots; SS view never contains the fixture user name, lists no `unmeasured` result its rule expected, and carries the `not_admin` scope statement rather than a row per rule (ADR 0027) | `crates/rongroi-collectors/tests/`, `rongroi-core::view` | macOS · Linux · Windows |
 | L4 UI | the GUI renders the L3 report JSON through mocked IPC; WebView hardening settings | `apps/desktop` (vitest) | macOS · Linux |
-| L5 live | real Windows: no panic, non-admin gives `unmeasured(not_admin)`, scanned folders unchanged, no files left outside the run's temp folder | Windows CI job and a Windows test machine | Windows |
+| L5 live | real Windows: no panic, non-admin gives `unmeasured(not_admin)`, scanned folders unchanged, no files left outside the run's temp folder. The CI runner is **always elevated**, so the non-admin half is only ever evidenced by a Windows test machine — last run 2026-09-13, both log-clearing rules `unmeasured / not_admin` under a limited token (ADR 0033) | Windows CI job and a Windows test machine | Windows |
 | Fuzz | the parsers never panic, abort or hang on arbitrary bytes | `fuzz/fuzz_targets/`, seeded from `fixtures/parsers/`, `fixtures/prefetch/` and `fixtures/evtx/` | Linux CI — a **30-second smoke run per target**, not a campaign |
 
 GitHub's Windows runners disable the SysMain and PCA services, so Prefetch and PCA collectors are expected to
 be `unmeasured` there.
 
-> **Not true yet, as of 2026-09-12.** That paragraph used to end "those collectors are verified on a real
-> Windows 11 machine". It was written before any of them existed. None of the artifact collectors — PCA
-> (ADR 0020), Prefetch (ADR 0021), BAM (ADR 0023), Event Log (ADR 0024) — has been run against a real
-> Windows install by anyone here: every fixture is a vendored sample or synthetic, and the Windows CI job
-> cannot stand in for one, because it runs elevated with UAC off and with SysMain and PcaSvc disabled.
-> Which path shapes the artifacts really hold, and whether each source is readable without an elevated
-> token, are open questions, and each ADR says so.
+> **First run against a real Windows install: 2026-09-13.** Until then this paragraph said none of the
+> artifact collectors — PCA (ADR 0020), Prefetch (ADR 0021), BAM (ADR 0023), Event Log (ADR 0024) — had
+> ever met one, and that the Windows CI job could not stand in for one because it runs elevated, with
+> UAC off and with SysMain and PcaSvc disabled. That is no longer true, and what replaced it is one
+> machine, not a population.
 >
-> The Event Log is the one partial exception, and it is worth stating precisely: the runner has a real
-> `winevt\Logs` folder and an elevated token, so the Windows job is the first place this program parses a
-> real machine's event logs. That exercises the parser against real bytes. It says nothing about the
-> non-elevated branch, which is the one an ordinary scan takes (ADR 0024).
+> The CLI was cross-built and run on one Windows 11 machine (build 26220), elevated and then under a
+> limited token. Six of the seven collectors produced observations: `evtx` 1421, `prefetch` 627,
+> `process` 298, `bam` 83, `pca` 3, `posture` 1, and one own trace — the program recognising itself
+> (ADR 0010). `fivem_dir` produced none, which the report cannot distinguish from "could not look":
+> no rule reads that collector, so its run reaches the report only through `unmatched`.
+>
+> **What this does and does not settle.** It settles that each of those four artifacts exists, is
+> readable with an elevated token, and parses — on that machine. It does not settle which path shapes
+> the artifacts hold in general, nor whether each source is readable **without** an elevated token: the
+> non-elevated run answers that only for the Event Log, where both log-clearing rules came out
+> `unmeasured / not_admin` exactly as ADR 0024 says they should. The per-artifact questions in ADRs 0020,
+> 0021, 0023 and 0024 stay open, and one machine is why.
+>
+> The CI job remains a second, different machine rather than a substitute: it has a real `winevt\Logs`
+> folder and an elevated token, so it parses real event-log bytes on every run, and it says nothing about
+> the non-elevated branch an ordinary scan takes.
 
 ## The fuzz layer
 

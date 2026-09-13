@@ -5,6 +5,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- The Windows live smoke prints the `rule_id` and collector of every evidence row, not the state of the
+  posture rows alone. Four lines reading "found / found / unmeasured / found" said a machine had been
+  measured and not which rule saw what.
+
 ### Fixed
 - `cargo xtask check-baseline` was green for two rules it had never compared to anything (ADR 0033).
   The gate fails only on a rule that *matches* a baseline, which a rule that was never put a question
