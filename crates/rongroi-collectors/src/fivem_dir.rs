@@ -16,7 +16,7 @@
 //! timestamps, size, owner or subfolders (ADR 0009).
 //!
 //! It also reads **`FiveM.exe` itself**, in each edition's program folder, with the same four facts, so
-//! that a rule can ask whether the client carries the signature FiveM is published with (ADR 0036). Of
+//! that a rule can ask whether the client carries the signature `FiveM` is published with (ADR 0036). Of
 //! the program folder it reads only the names of its entries, to find that one file; nothing else in
 //! it is reported. Legitimate software puts files in the plugin folders too, which is why the rules on
 //! them describe a file and its signature and never what the file is (ADR 0036).
@@ -41,10 +41,10 @@ pub const PLUGINS_LOCATION: &str = "plugins";
 pub const ENHANCED_ASI_RELATIVE_PATH: &str = r"FiveM for GTAV Enhanced\gta5enhanced\asi";
 /// Value of the `location` field for the Enhanced `asi` folder.
 pub const ENHANCED_ASI_LOCATION: &str = "enhanced_asi";
-/// FiveM for GTA V Legacy's program folder, relative to `%LOCALAPPDATA%`; `FiveM.exe` is directly
+/// `FiveM` for GTA V Legacy's program folder, relative to `%LOCALAPPDATA%`; `FiveM.exe` is directly
 /// inside it. Measured on one Windows 11 machine (ADR 0035, ADR 0036).
 pub const LEGACY_PROGRAM_RELATIVE_PATH: &str = "FiveM";
-/// FiveM for GTA V Enhanced's program folder, relative to `%LOCALAPPDATA%` — local, although its user
+/// `FiveM` for GTA V Enhanced's program folder, relative to `%LOCALAPPDATA%` — local, although its user
 /// data is roaming. Measured on one Windows 11 machine (ADR 0035, ADR 0036).
 pub const ENHANCED_PROGRAM_RELATIVE_PATH: &str = "FiveM for GTAV Enhanced";
 /// The client executable's file name in both program folders (ADR 0036).
