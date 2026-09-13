@@ -6,6 +6,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Every CI job has a `timeout-minutes`, and `cargo nextest` fails a test that stops making progress
+  instead of running out the job's clock. Only the fuzz job was bounded. The vendored `evtx` parser's
+  cycle-guard regression test says in its own doc comment that a regression there is a **hung** test
+  rather than a red one, and removing the guard confirmed it — the test was still running after 100
+  seconds. Without a bound the answer to that regression was the runner's six-hour default, on a job
+  that then reports only that it timed out.
 - The Windows live smoke prints the `rule_id` and collector of every evidence row, not the state of the
   posture rows alone. Four lines reading "found / found / unmeasured / found" said a machine had been
   measured and not which rule saw what.
@@ -21,7 +27,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   to satisfies for free: the only Event Log sample in this repository is a LanguagePackSetup log, so
   the two log-clearing rules — which name the `Security` and `System` channels — agreed with none of
   their three conditions on every baseline and would have passed however they were written.
-  A `channel:` value with two of its letters transposed would have passed too. Each rule must now also be **confronted**: some baseline
+  A transposed letter in that `channel:` value passes every gate too, as long as the rule's own fixtures carry the same transposition — which is what happens when one person writes both. Each rule must now also be **confronted**: some baseline
   observation has to carry the fields the rule's `match` names and come within one unsatisfied
   condition of firing it. A rule nothing confronts fails unless `rules/unconfronted.csv` carries a row
   giving a reason and what would end it, and the row itself fails once a baseline does confront the

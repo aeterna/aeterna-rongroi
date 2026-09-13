@@ -2,5 +2,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
+# A test that stops making progress must fail, not run out the job's clock. The vendored `evtx`
+# parser carries a fix for a chain of string-table entries that closed into a cycle, and
+# `rongroi_parsers::evtx`'s regression test for it says in its own doc comment that "a regression
+# here is a hung test, not a red one" — nothing in that file can time out by itself. Removing the
+# guard was tried: the test was still running after 100 seconds. Without a bound here the answer to
+# that regression is the runner's default six-hour limit, on a job that then says only that it timed
+# out.
+#
+# 60 seconds is far above every honest test in this repository — the whole suite is 463 tests in
+# about 3.5 seconds — so a test that reaches it is stuck rather than slow. Three periods, because a
+# machine under load deserves more than one chance before its result is thrown away.
+[profile.default]
+slow-timeout = { period = "60s", terminate-after = 3 }
+
 [profile.ci]
 fail-fast = false
+slow-timeout = { period = "60s", terminate-after = 3 }

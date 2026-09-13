@@ -23,8 +23,16 @@ those three fields, so ADR 0026's check — does this collector emit the fields 
 satisfied. What is not satisfied is anything about the *values*: the rules ask for the `Security` and
 `System` channels and the `Microsoft-Windows-Eventlog` provider, and no observation on any baseline
 carries either channel or that provider. The rules agree with **none** of their three conditions and
-would be quiet however they were written. A `channel:` value with two of its letters transposed would pass
-every gate in this repository.
+would be quiet however they were written.
+
+How far a transposed letter in `channel:` gets was measured rather than asserted, because the first
+draft of this paragraph claimed it passed every gate and that is not true. Changing the value in the
+rule alone fails `check-rules` — the rule's own positive fixture stops matching, and the gate says so.
+Changing it in the rule **and** in its fixtures passes everything: `check-rules`, `check-baseline` and
+all 463 tests. That is the case this ADR is about, and it is not a corner case: a rule and its fixtures
+are written by the same person in the same sitting from the same understanding, so a mistake in that
+understanding lands in both. A baseline is the only artifact in the repository written from a
+description of a machine by somebody not looking at the rule.
 
 So the state that needs a name is not "unmeasured" and not "not found". It is **a rule the baseline
 never put a question to**, and until now nothing distinguished it from a rule the baseline answered.
