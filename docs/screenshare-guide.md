@@ -3,7 +3,8 @@
 For server staff checking a player's PC over a screenshare, and for the player. It covers
 aeterna-rongroi **0.2.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
-> ⚠️ **Pre-alpha.** Six rules ship today, and five of them are `experimental`. Do not ban anyone
+> ⚠️ **Pre-alpha.** Six rules ship in 0.2.0, and five of them are `experimental`; on `dev` there are eighteen,
+> seventeen of them `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
 
 ## 1. What it can and cannot show
@@ -102,7 +103,7 @@ Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player**
 ```
 aeterna-rongroi 0.2.0
 official build
-mode: ss · windows <build> · administrator · rules: 6 (<bundle hash>)
+mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
 exe sha256: <hash>
 Windows start: <time>, <days, hours, minutes> before this scan. Not reset by "Shut down" with Fast Startup (the Windows default), sleep or hibernation; reset by a restart.
 ```
@@ -155,7 +156,7 @@ Hidden in SS mode: NOT FOUND <n> · NOT MEASURED (expected here) <n> · NOT MEAS
 
 These are counts of what SS mode does not list. §7 says why.
 
-## 6. The six rules, and what else produces them
+## 6. The rules, and what else produces them
 
 | Rule | Strength | Status | Ordinary causes (from the rule itself) |
 |---|---|---|---|
@@ -165,13 +166,13 @@ These are counts of what SS mode does not list. §7 says why.
 | No TPM is present | context | `experimental` | older or self-built PCs, TPM off in firmware, virtual machines |
 | The Security log records that it was cleared | tamper | `experimental` | "optimiser" and "debloat" scripts, a prebuilt or repaired PC, troubleshooting in Event Viewer, Windows updates |
 | An event log file was cleared | tamper | `experimental` | the same, plus software whose setup resets the local log |
-| A file in FiveM's plugins folder has no embedded signature that verifies here | presence | `experimental` | ReShade or ENB installed as the Cfx.re forum guides say, their `.ini` and log files (text is never signed), overlays and FPS tools, a damaged file, a signature this PC cannot verify offline |
-| A file in FiveM's plugins folder carries a valid embedded signature | presence | `experimental` | signed overlays, capture and performance tools, signed graphics mods, a developer who signs in their own name |
-| A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here | presence | `experimental` | the same as for Legacy's plugins folder; whether Enhanced loads this folder at all is not known |
-| A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature | presence | `experimental` | the same as for Legacy's plugins folder |
-| A FiveM file's signature could not be checked | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
-| FiveM.exe has no embedded signature that verifies here | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
-| FiveM.exe is validly signed, but not with the certificate this rule knows | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
+| A file in FiveM's plugins folder has no embedded signature that verifies here — *after 0.2.0* | presence | `experimental` | ReShade or ENB installed as the Cfx.re forum guides say, their `.ini` and log files (text is never signed), overlays and FPS tools, a damaged file, a signature this PC cannot verify offline |
+| A file in FiveM's plugins folder carries a valid embedded signature — *after 0.2.0* | presence | `experimental` | signed overlays, capture and performance tools, signed graphics mods, a developer who signs in their own name |
+| A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here — *after 0.2.0* | presence | `experimental` | the same as for Legacy's plugins folder; whether Enhanced loads this folder at all is not known |
+| A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature — *after 0.2.0* | presence | `experimental` | the same as for Legacy's plugins folder |
+| A FiveM file's signature could not be checked — *after 0.2.0* | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
+| FiveM.exe has no embedded signature that verifies here — *after 0.2.0* | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
+| FiveM.exe is validly signed, but not with the certificate this rule knows — *after 0.2.0* | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
 | The firmware reports Secure Boot off while Windows reports it on — *after 0.2.0* | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
 | A machine policy turns PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
 | A Prefetch file is marked read-only — *after 0.2.0* | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
@@ -220,7 +221,7 @@ Every rule's full text, including exactly what it matches, is in the
 
 ## 7. What SS mode does not show, and why
 
-The program reads more than the six rules ask about. It reads what Windows recorded about programs
+The program reads more than the rules ask about. It reads what Windows recorded about programs
 that ran (Prefetch, BAM, the Program Compatibility Assistant), and the list of running programs. **No rule reads those today** — the one Prefetch rule asks whether a file is read-only, not what it records —
 so they are *unmatched observations*:
 
