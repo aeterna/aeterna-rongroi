@@ -54,6 +54,14 @@ launched (`EnablePrefetcher`). That is a machine setting and names no person. It
 is no record of this program" can be told apart from "Windows is not keeping such records on this PC",
 which are not the same statement about you.
 
+It also reads **when Windows last started counting** — one number Windows keeps about the machine, the
+time since it started — and puts it at the top of the report as a time, in both modes, so that the times
+on other rows can be read against it. It names no person and says nothing about who used the PC. It is
+not a conclusion and not "when you turned your PC on": a "Shut down" with Fast Startup, which is how
+Windows ships, and sleep and hibernation do not start the count again, so on an ordinary PC it is often
+days old. It does say roughly when the PC was last restarted, which is a small fact about your day, and
+two reports taken before the next restart show the same time. The consent question names it (ADR 0039).
+
 ### When the tool says it could not answer
 
 Every check that could not be answered says **why**, in one sentence, in your language. Several of the
@@ -94,6 +102,7 @@ or allow remote access.
 | Evidence shown | everything | rule matches, plus counts of what was not found or could not be answered for a reason the rule itself said is ordinary. A check this program stopped short of is shown, because that is its own limit and not a fact about your PC |
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` |
+| When Windows last started | shown | shown, as one time at the top of the report |
 
 ### Program names are not redacted, and that can matter
 

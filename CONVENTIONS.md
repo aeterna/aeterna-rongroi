@@ -29,6 +29,7 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **cased** | A `match` field a Rule compares byte for byte; every other string folds ASCII case (ADR 0025) | `Rule::cased` |
 | **operator** | How one `match` entry compares its value, written `field\|operator`: `gt`, `gte`, `lt`, `lte`, `startswith`, `endswith`, `contains`, `exists`. A key with no `\|` compares for equality, and a list value means **or** (ADR 0029) | `rongroi_core::rules::Operator` |
 | **field kind** | What a Collector declares one of its observation fields holds — text, a number, a boolean or a timestamp — so that `check-rules` can refuse an operator the field cannot take | `rongroi_collectors::FieldKind` |
+| **boot time** | Report-header context: when the running Windows kernel started counting — the scan's clock minus `GetTickCount64` — or why there is no value. Never evidence and never read by a rule. Not "when the PC was last turned on": a "Shut down" with Fast Startup, sleep and hibernation do not reset it (ADR 0039) | `rongroi_core::model::BootTime`, `rongroi_host::BootTimeSource`, header field `boot_time` |
 | **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |
 | **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `rongroi_core::bundle` |
 | **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `rongroi_core::provenance` |

@@ -102,10 +102,28 @@ aeterna-rongroi 0.2.0
 official build
 mode: ss · windows <build> · administrator · rules: 6 (<bundle hash>)
 exe sha256: <hash>
+Windows start: <time>, <days, hours, minutes> before this scan. Not reset by "Shut down" with Fast Startup (the Windows default), sleep or hibernation; reset by a restart.
 ```
 
 Check four things: `official build`, `mode: ss`, whether it says `administrator` or `standard user`,
 and the rule count.
+
+**`Windows start`** is context for reading the times on the rows, not a finding. Times in the report are
+UTC. A row that says a log's oldest record, or a clearing, is from before this time happened before
+Windows last started; one after it happened since. Four things about it:
+
+- **Days old is normal.** On Windows' default settings, **Shut down** does not end Windows: Fast Startup
+  saves it to disk and the next power-on resumes it. Microsoft: "fast startup is the default transition
+  when a system shutdown is requested". Only **Restart**, or a shutdown with Fast Startup off, starts the
+  count again. A player who shuts down every night can see "3d" here. On one Windows 11 machine this
+  project checked, 27 of the 48 starts its System log recorded were Fast Startup resumes
+  ([ADR 0039](adr/0039-a-time-anchor-for-the-report.md)).
+- **Sleep and hibernation do not reset it either**, and time spent asleep is counted.
+- **A clock change moves it.** It is worked out from the PC's clock now. If the clock was changed or
+  corrected since then, records written before the change carry times on the old clock. On the machine
+  above, the System log's own record of the start was 7 hours away from this time for that reason.
+- **A modified Windows can report any time.** Like everything else in the report, this is what Windows
+  told the program.
 
 ### Each row
 
@@ -218,6 +236,8 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 | both log-clearing rows | two separate clearings |
 | a large number of cleared logs | a more serious clearing |
 | a posture row | anything about the person |
+| `Windows start` days before the scan | the player avoided restarting, or is hiding anything |
+| `Windows start` minutes before the scan | the player restarted to hide something |
 
 Treat the report as one piece of evidence for a person to judge, next to everything else your
 server knows.
