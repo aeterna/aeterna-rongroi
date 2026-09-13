@@ -16,3 +16,9 @@ extend-exclude = [
   # the next re-sync harder to verify.
   "third_party/evtx/",
 ]
+
+[default.extend-words]
+# `.hve` is the registry hive file extension (`Amcache.hve`, ADR 0041), not a misspelling of "have".
+hve = "hve"
+# `notatin` is the name of a Rust registry-hive crate evaluated in ADR 0041.
+notatin = "notatin"
