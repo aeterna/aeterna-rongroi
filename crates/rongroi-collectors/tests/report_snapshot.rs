@@ -175,9 +175,20 @@ fn process_own_trace_self_view() {
     assert_eq!(report.own_traces.len(), 1);
     // Those other two are unmatched observations — no rule reads `process`. Own traces are taken
     // out before any rule runs, so the one that is ours is not repeated among them (ADR 0014).
-    assert_eq!(report.unmatched.len(), 1, "{:?}", report.unmatched);
-    assert_eq!(report.unmatched[0].collector, "process");
-    assert_eq!(report.unmatched[0].observations.len(), 2);
+    // The fixture describes no registry, so `posture` also has one unmatched observation: its
+    // `script_block_logging: not_configured`, which is an answer rather than a gap (ADR 0038).
+    let process = report
+        .unmatched
+        .iter()
+        .find(|group| group.collector == "process")
+        .unwrap_or_else(|| panic!("{:?}", report.unmatched));
+    assert_eq!(process.observations.len(), 2);
+    let collectors: Vec<&str> = report
+        .unmatched
+        .iter()
+        .map(|group| group.collector.as_str())
+        .collect();
+    assert_eq!(collectors, ["posture", "process"]);
     let unmatched = serde_json::to_string(&report.unmatched).unwrap();
     assert!(!unmatched.contains("aeterna-rongroi"), "{unmatched}");
     let view = view::for_mode(&report, Mode::SelfCheck);
