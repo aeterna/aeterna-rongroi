@@ -18,6 +18,8 @@ pub mod boot_time;
 
 pub mod elevate;
 
+pub mod event_log;
+
 pub mod firmware;
 
 pub mod process;

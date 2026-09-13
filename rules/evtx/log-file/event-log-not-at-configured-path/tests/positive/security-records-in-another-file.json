@@ -1,0 +1,14 @@
+{
+  "description": "A file named for no channel holding Security records, beside the Security log the service does write, as the evtx collector emits their accounts",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Security-old.evtx", "path": "C:\\Windows\\System32\\winevt\\Logs\\Security-old.evtx", "read_only": false,
+      "entries": 2210, "rejected": 0, "intact": true, "size_bytes": 5312512,
+      "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Security.evtx", "at_configured_path": false, "max_size_bytes": 20971520 } },
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx", "read_only": false,
+      "entries": 9142, "rejected": 0, "intact": true, "size_bytes": 20975616,
+      "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Security.evtx", "at_configured_path": true, "max_size_bytes": 20971520 } }
+  ],
+  "expect_matches": 1
+}

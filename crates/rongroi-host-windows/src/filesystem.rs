@@ -58,10 +58,56 @@ impl FilesystemSource for LiveHost {
         rongroi_host::read_bounded(std::io::BufReader::new(file), rongroi_host::MAX_FILE_BYTES)
             .map(Some)
     }
+
+    /// `symlink_metadata`, not `metadata`: the attribute of the directory entry the collector listed,
+    /// never of whatever a link points at. On Windows the standard library opens the entry with no
+    /// read or write access and every share mode, and falls back to the directory listing when even
+    /// that is refused, so asking neither reads the file's contents nor stands in the way of the
+    /// service writing it (ADR 0037).
+    fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError> {
+        match std::fs::symlink_metadata(path) {
+            Ok(metadata) => Ok(Some(metadata.permissions().readonly())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(SourceError::from_io(&error)),
+        }
+    }
 }
 
 impl EnvironmentSource for LiveHost {
     fn env_var(&self, name: &str) -> Option<String> {
         std::env::var(name).ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rongroi_host::FilesystemSource;
+
+    use crate::LiveHost;
+
+    /// Both answers on a real file system, and a file that is not there. The test sets the attribute
+    /// on a file it created in its own temporary folder, never on anything a scan reads.
+    #[test]
+    fn the_read_only_attribute_is_read_from_the_file_system() {
+        let dir = std::env::temp_dir().join(format!("rongroi-read-only-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let clear = dir.join("clear.txt");
+        let set = dir.join("set.txt");
+        std::fs::write(&clear, b"x").unwrap();
+        std::fs::write(&set, b"x").unwrap();
+        let mut permissions = std::fs::metadata(&set).unwrap().permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(&set, permissions).unwrap();
+
+        let answer = |path: &std::path::Path| LiveHost.is_read_only(path.to_str().unwrap());
+        assert_eq!(answer(&clear), Ok(Some(false)));
+        assert_eq!(answer(&set), Ok(Some(true)));
+        assert_eq!(answer(&dir.join("absent.txt")), Ok(None));
+
+        let mut permissions = std::fs::metadata(&set).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        std::fs::set_permissions(&set, permissions).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

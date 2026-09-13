@@ -1,0 +1,9 @@
+{
+  "description": "A log refused by Windows still says what its attribute is, and a read-only one is shown",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
+      "read": "access_denied", "read_only": true } }
+  ],
+  "expect_matches": 1
+}

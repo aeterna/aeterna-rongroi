@@ -71,7 +71,16 @@ only, never what any script contained.
 It also reads one Windows setting about itself: whether Windows is writing a record when a program is
 launched (`EnablePrefetcher`). That is a machine setting and names no person. It is read so that "there
 is no record of this program" can be told apart from "Windows is not keeping such records on this PC",
-which are not the same statement about you.
+which are not the same statement about you. The value, and whether the Prefetch folder is there at all,
+are shown in Self mode as they were read; nothing is concluded from them.
+
+Of each Prefetch file and each event log file it reads **one attribute: whether the file is marked
+read-only**. Not when the file was made or changed, not who owns it, not its other attributes. Of each
+event log whose events all belong to one channel, it asks Windows' Event Log service which file that
+channel is written to and how large the service lets it grow. That is how this PC is set up, not
+anything a log says, and asking changes nothing: the question is read-only. None of these names a
+person, and none is a conclusion — a file can be read-only because it was restored from a backup, and a
+log can be in a file Windows no longer writes because it was archived or exported.
 
 It also reads **when Windows last started counting** — one number Windows keeps about the machine, the
 time since it started — and puts it at the top of the report as a time, in both modes, so that the times

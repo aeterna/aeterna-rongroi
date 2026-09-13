@@ -144,6 +144,14 @@ pub trait FilesystemSource {
     /// The path must name a regular file; `list_dir` already says which entries are files. Anything
     /// else is an error rather than an answer.
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// Whether the file at `path` carries the read-only attribute (ADR 0037).
+    ///
+    /// One bit of a file's attributes and nothing else: no timestamps, no size, no owner, no other
+    /// attribute. `Ok(None)` means the file does not exist, the same fact [`FilesystemSource::read_file`]
+    /// reports for a file that is gone. The file's contents are not opened, and nothing about the file
+    /// is changed by asking.
+    fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError>;
 }
 
 /// What Windows says about the Authenticode signature **embedded in** one file, checked without the
@@ -183,6 +191,47 @@ pub trait SignatureSource {
     /// The error is about that one file, like [`FilesystemSource::file_sha256`]: a collector that
     /// cannot check one file still reports the file.
     fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError>;
+}
+
+/// What the Windows Event Log service states about one channel's log file (ADR 0042).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelConfig {
+    /// The path of the file the service writes this channel to, as the service spells it — normally
+    /// beginning `%SystemRoot%`, which is not expanded here.
+    pub log_file_path: String,
+    /// The largest the service lets this channel's file grow, in bytes.
+    pub max_size_bytes: u64,
+}
+
+/// Read-only access to the Event Log service's configuration of a channel (ADR 0042).
+///
+/// A source of its own rather than a registry read: the service's answer is the one it acts on, and
+/// on the Windows 11 machine ADR 0042 measured, the registry's `MaxSize` differed from it for 18 of
+/// the 94 keys that carry one.
+///
+/// It hands out a [`ChannelConfigReader`] rather than answering itself, because asking the service is
+/// a call into another process that this program cannot interrupt. A reader can be moved to a thread
+/// of its own, so that a collector can stop waiting for a service that does not answer and report
+/// that it stopped, instead of never returning (ADR 0042).
+pub trait EventLogConfigSource {
+    /// A reader for channel configurations, which may be moved to another thread.
+    ///
+    /// An error means the service cannot be asked at all on this host — not that one channel failed.
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError>;
+}
+
+/// Asks the Event Log service about channels, from whichever thread holds it (ADR 0042).
+pub trait ChannelConfigReader: Send {
+    /// The log file and maximum size the service states for `channel`, e.g. `Security` or
+    /// `Microsoft-Windows-Kernel-Boot/Operational`.
+    ///
+    /// `Ok(None)` when the service has no channel of that name — which is an answer: a log file can
+    /// outlive the software that registered its channel. Nothing is changed by asking.
+    ///
+    /// **This call may not return.** It waits on the Event Log service, and a service that accepts a
+    /// request and never answers it leaves this call blocked; a caller that must return bounds its wait
+    /// from another thread.
+    fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError>;
 }
 
 /// Read-only access to the process environment. Names are case-insensitive, like Windows.
@@ -396,6 +445,7 @@ pub trait Host:
     RegistrySource
     + FilesystemSource
     + SignatureSource
+    + EventLogConfigSource
     + EnvironmentSource
     + SystemIntegritySource
     + TpmSource
@@ -464,6 +514,20 @@ impl FilesystemSource for NonWindowsHost {
     fn read_file(&self, _path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn is_read_only(&self, _path: &str) -> Result<Option<bool>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+}
+
+impl EventLogConfigSource for NonWindowsHost {
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows Event Log on this platform".to_owned(),
         ))
     }
 }
@@ -556,6 +620,14 @@ mod tests {
         ));
         assert!(matches!(
             NonWindowsHost.file_signature(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.is_read_only(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.channel_config_reader(),
             Err(SourceError::Unsupported(_))
         ));
         assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);

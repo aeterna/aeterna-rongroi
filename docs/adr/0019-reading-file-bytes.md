@@ -175,7 +175,7 @@ that same constant. A test pins the constant so that changing it is a deliberate
   fixture directory. The corpora stay inputs: it references, and copies nothing.
 - **What is still deliberately not read.** This adds the bytes of a file a collector names. It does not
   add recursion, timestamps, size, owner, ACLs, attributes, alternate data streams, or reading a file the
-  collector did not name. Everything is opened for reading; nothing on the scanned machine is written,
+  collector did not name. (ADR 0037 later adds one attribute bit, read-only, and nothing else.) Everything is opened for reading; nothing on the scanned machine is written,
   renamed, locked or touched (AGENTS.md hard rule 2).
 - The bytes themselves never reach a report. What a collector may emit from them is the next PR's
   decision, and the PII boundary for Prefetch's loaded-file list, PCA's rejected-line text and Event Log

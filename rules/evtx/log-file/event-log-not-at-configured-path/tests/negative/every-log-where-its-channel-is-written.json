@@ -1,0 +1,18 @@
+{
+  "description": "Logs at the path the service writes their channel to, a log whose records name no single channel and so carries no comparison, and a summary",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-Kernel-Boot%4Operational.evtx",
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-Boot%4Operational.evtx", "read_only": false,
+      "entries": 612, "rejected": 0, "intact": true, "size_bytes": 1052672,
+      "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-Kernel-Boot%4Operational.evtx",
+      "at_configured_path": true, "max_size_bytes": 1052672 } },
+    { "collector": "evtx", "fields": {
+      "log": "State.evtx", "path": "C:\\Windows\\System32\\winevt\\Logs\\State.evtx", "read_only": false,
+      "entries": 0, "rejected": 0, "intact": true, "size_bytes": 69632 } },
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "channel": "System", "provider": "Microsoft-Windows-Kernel-General",
+      "event_id": 12, "level": 4, "count": 31,
+      "first_seen": "2026-03-02T11:04:51.109Z", "last_seen": "2026-09-11T22:19:03.774Z" } }
+  ]
+}

@@ -9,9 +9,10 @@
 //! nothing itself (ADR 0018). Reading the `Security` channel needs an elevated token, so `not_admin`
 //! is an expected outcome of an ordinary scan rather than a defect (ADR 0012, ADR 0024).
 //!
-//! Two rules read this collector — the Security log's own record that it was cleared, and the System
-//! log's record that some log file was (ADR 0031). Everything else it sees is listed in Self mode as
-//! unmatched observations and counted, never listed, in SS mode (ADR 0014).
+//! Four rules read this collector — the Security log's own record that it was cleared, and the System
+//! log's record that some log file was (ADR 0031); a log file marked read-only (ADR 0037); and a log
+//! file that is not the file its channel is written to (ADR 0042). Everything else it sees is listed
+//! in Self mode as unmatched observations and counted, never listed, in SS mode (ADR 0014).
 //!
 //! # One observation per kind of event, never one per record
 //!
@@ -37,6 +38,16 @@
 //! join across observations, so the facts a rule would need to reason about a log are computed here
 //! and matched flatly there.
 //!
+//! # What the service is told to write, beside what the folder holds
+//!
+//! Since ADR 0042 each log whose records name exactly one channel also carries what the Event Log
+//! service states about that channel — the file it writes the channel to (`configured_path`), whether
+//! that is this file (`at_configured_path`), and the largest it lets the file grow
+//! (`max_size_bytes`) — and since ADR 0037 each log carries `read_only`, the one attribute bit a rule
+//! reads. A log file named after its channel is the ordinary case; one whose records belong to a
+//! channel the service writes somewhere else is a file that was put or left there, and ADR 0042
+//! lists the ordinary ways that happens.
+//!
 //! # An unread log is evidence, not silence
 //!
 //! Three things can stop a log being read, and all three are reported as observations rather than
@@ -53,13 +64,17 @@
 //! scans **before** it creates its window, so a parse that does not return is not a stalled progress
 //! bar — it is an application that never appears. [`PARSE_BUDGET`] bounds the whole collection, on
 //! one worker thread, and a log the budget did not reach is named in the report. See ADR 0024.
+//!
+//! Asking the Event Log service what file and size it sets for a channel (ADR 0042) is a call into
+//! another process, and a service that never answers would stall the scan the same way. Those
+//! questions run on a second worker thread and are charged to the same budget.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform};
+use rongroi_host::{ChannelConfig, ChannelConfigReader, Host, Platform};
 use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{self, EvtxFile, EvtxRecord};
 
@@ -131,11 +146,13 @@ const REASONS: [UnmeasuredReason; 8] = [
 /// rule that read an unread `Security.evtx` as "not found" would be saying the log was never
 /// cleared, on evidence that was never read — which is the `pca` case (ADR 0020), not the `fivem_dir`
 /// one.
-const FIELDS: [Field; 25] = [
+const FIELDS: [Field; 29] = [
+    Field::boolean("at_configured_path"),
     Field::boolean("budget_exhausted"),
     Field::number("budget_seconds"),
     Field::text("channel"),
     Field::number("channels"),
+    Field::text("configured_path"),
     Field::number("count"),
     Field::number("entries"),
     Field::number("event_id"),
@@ -147,6 +164,7 @@ const FIELDS: [Field; 25] = [
     Field::text("log"),
     Field::number("logs"),
     Field::number("logs_without_records"),
+    Field::number("max_size_bytes"),
     Field::number("newest_record_id"),
     Field::timestamp("newest_record_time"),
     Field::number("oldest_record_id"),
@@ -154,6 +172,7 @@ const FIELDS: [Field; 25] = [
     Field::text("path"),
     Field::text("provider"),
     Field::text("read"),
+    Field::boolean("read_only"),
     Field::number("refused"),
     Field::number("rejected"),
     Field::number("size_bytes"),
@@ -164,8 +183,10 @@ const FIELDS: [Field; 25] = [
 /// The subset `source_empty` gaps: a folder that was listed and holds no `.evtx` file was **read**,
 /// so gapping `logs`, `examined`, `refused` or `budget_seconds` — which were measured — would claim
 /// it had not (ADR 0030).
-const RECORD_FIELDS: [&str; 15] = [
+const RECORD_FIELDS: [&str; 19] = [
+    "at_configured_path",
     "channel",
+    "configured_path",
     "count",
     "entries",
     "event_id",
@@ -173,14 +194,19 @@ const RECORD_FIELDS: [&str; 15] = [
     "intact",
     "last_seen",
     "level",
+    "max_size_bytes",
     "newest_record_id",
     "newest_record_time",
     "oldest_record_id",
     "oldest_record_time",
     "provider",
+    "read_only",
     "rejected",
     "size_bytes",
 ];
+
+/// The fields that carry what the Event Log service states about a log's channel (ADR 0042).
+const CONFIG_FIELDS: [&str; 3] = ["at_configured_path", "configured_path", "max_size_bytes"];
 
 /// The `evtx` collector.
 #[derive(Debug, Clone, Copy)]
@@ -250,8 +276,9 @@ impl Collector for Evtx {
             }
         };
 
+        let root = host.env_var(SYSTEM_ROOT).unwrap_or_default();
         let mut collection = Collection::new(self.budget);
-        collection.read_all(host, &dir, &names);
+        collection.read_all(host, &dir, &names, &root);
         collection.finish()
     }
 }
@@ -323,6 +350,15 @@ struct Collection {
     channels: BTreeSet<String>,
     /// The first reason a log could not be read, which is what `gaps` reports.
     first_failure: Option<UnmeasuredReason>,
+    /// The first reason some log's read-only attribute could not be read (ADR 0037).
+    attribute_failure: Option<UnmeasuredReason>,
+    /// The first reason the Event Log service would not describe some channel (ADR 0042).
+    config_failure: Option<UnmeasuredReason>,
+    /// What the service said about each channel asked about, so each is asked once. `None` is a
+    /// channel the service does not have; a channel whose question failed is not kept.
+    configs: BTreeMap<String, Option<ChannelConfig>>,
+    /// Who asks the service, once there has been a channel to ask about.
+    asker: Asker,
     /// Whether the wall-clock budget ended the collection before every log was read.
     budget_exhausted: bool,
     budget: Duration,
@@ -338,13 +374,17 @@ impl Collection {
             without_records: 0,
             channels: BTreeSet::new(),
             first_failure: None,
+            attribute_failure: None,
+            config_failure: None,
+            configs: BTreeMap::new(),
+            asker: Asker::NotStarted,
             budget_exhausted: false,
             budget,
         }
     }
 
     /// Reads every log, in order, until the folder or the budget runs out.
-    fn read_all(&mut self, host: &dyn Host, dir: &str, names: &[String]) {
+    fn read_all(&mut self, host: &dyn Host, dir: &str, names: &[String], root: &str) {
         self.listed = names.len();
         let deadline = Instant::now() + self.budget;
         let worker = if names.is_empty() {
@@ -359,9 +399,23 @@ impl Collection {
             // and saying so is not the same statement as "the read of this log ran out of time"
             // (ADR 0030).
             if self.budget_exhausted {
+                // Usually an earlier log's parse already named the budget as the run's reason. When
+                // it was a question to the Event Log service that used the budget up instead, no log
+                // was refused for it, and the budget is still why this one was not read.
+                self.first_failure = self.first_failure.or(Some(UnmeasuredReason::BudgetSpent));
                 self.refuse(name, &path, NOT_ATTEMPTED, UnmeasuredReason::NotAttempted);
                 continue;
             }
+            // Asked before the bytes, and answered by the file system without opening the log's
+            // contents, so a log that is refused below still says what its attribute is.
+            let read_only = match host.is_read_only(&path) {
+                Ok(read_only) => read_only,
+                Err(error) => {
+                    self.attribute_failure =
+                        self.attribute_failure.or(Some(reason_for(host, &error)));
+                    None
+                }
+            };
             let bytes = match host.read_file(&path) {
                 // Listed a moment ago and gone now: Windows rolls a log over while a scan runs, so
                 // this is ordinary (ADR 0019) and is counted as neither examined nor refused.
@@ -371,6 +425,13 @@ impl Collection {
                     // Denied, or larger than a host reads in one piece — which a `Security` log on a
                     // machine whose log size was raised can be. Both are named in the report.
                     self.refuse(name, &path, read_failure(&error), reason_for(host, &error));
+                    if let Some(read_only) = read_only
+                        && let Some(status) = self.observations.last_mut()
+                    {
+                        status
+                            .fields
+                            .insert("read_only".to_owned(), serde_json::Value::from(read_only));
+                    }
                     continue;
                 }
             };
@@ -397,17 +458,32 @@ impl Collection {
                     // Checked before cloning: a real log holds tens of thousands of records and
                     // names one channel, so `extend` over cloned names would allocate a string per
                     // record to throw all but one of them away.
+                    let mut channels_of_log: BTreeSet<&str> = BTreeSet::new();
                     for channel in file
                         .records
                         .iter()
                         .filter_map(|record| record.channel.as_deref())
                     {
+                        channels_of_log.insert(channel);
                         if !self.channels.contains(channel) {
                             self.channels.insert(channel.to_owned());
                         }
                     }
-                    self.observations
-                        .push(account(name, &path, &file, size_bytes));
+                    let mut observation = account(name, &path, &file, size_bytes);
+                    if let Some(read_only) = read_only {
+                        observation
+                            .fields
+                            .insert("read_only".to_owned(), serde_json::Value::from(read_only));
+                    }
+                    // Only a log whose records name exactly one channel is compared: a log with no
+                    // record names none, and a log naming several is not the file of any one of
+                    // them. Neither is reported as anything (ADR 0042).
+                    if let [channel] = channels_of_log.into_iter().collect::<Vec<_>>().as_slice()
+                        && let Some(config) = self.config_of(host, channel, deadline)
+                    {
+                        configured(&mut observation, &config, &path, root);
+                    }
+                    self.observations.push(observation);
                     self.observations.extend(summaries(name, &file.records));
                 }
                 // The bytes arrived and are not a readable Event Log file. Each way that happens has
@@ -440,6 +516,74 @@ impl Collection {
         }
     }
 
+    /// What the service states about `channel`, asking it at most once per run and waiting no later
+    /// than `deadline`, the same deadline every parse is held to.
+    ///
+    /// `None` both for a channel the service does not have and for a question that failed; the
+    /// second is remembered in `config_failure`, which gaps the fields for the run.
+    ///
+    /// A question still unanswered at the deadline ends the collection as a parse that overran does:
+    /// the configuration fields are gapped `budget_spent`, `budget_exhausted` is set, and every log
+    /// after this one is refused unopened. The worker is abandoned where it waits and no further
+    /// question is sent to it (ADR 0042).
+    fn config_of(
+        &mut self,
+        host: &dyn Host,
+        channel: &str,
+        deadline: Instant,
+    ) -> Option<ChannelConfig> {
+        if let Some(known) = self.configs.get(channel) {
+            return known.clone();
+        }
+        if matches!(self.asker, Asker::NotStarted) {
+            self.asker = match host.channel_config_reader() {
+                Ok(reader) => {
+                    if let Some(worker) = ConfigWorker::spawn(reader) {
+                        Asker::Ready(worker)
+                    } else {
+                        self.config_failure =
+                            self.config_failure.or(Some(UnmeasuredReason::NotAttempted));
+                        Asker::Unavailable
+                    }
+                }
+                Err(error) => {
+                    self.config_failure = self.config_failure.or(Some(reason_for(host, &error)));
+                    Asker::Unavailable
+                }
+            };
+        }
+        let asked = match &self.asker {
+            Asker::Ready(worker) => {
+                worker.ask(channel, deadline.saturating_duration_since(Instant::now()))
+            }
+            // Nothing new to record: whatever made the asker unavailable is in `config_failure`.
+            Asker::NotStarted | Asker::Unavailable => return None,
+        };
+        match asked {
+            Asked::Done(Ok(config)) => {
+                self.configs.insert(channel.to_owned(), config.clone());
+                config
+            }
+            Asked::Done(Err(error)) => {
+                self.config_failure = self.config_failure.or(Some(reason_for(host, &error)));
+                None
+            }
+            Asked::OutOfBudget => {
+                self.config_failure = self.config_failure.or(Some(UnmeasuredReason::BudgetSpent));
+                self.budget_exhausted = true;
+                self.asker = Asker::Unavailable;
+                None
+            }
+            // Not expected: a reader that panicked. Reported as a question that was not asked,
+            // like a parse worker that stopped, and not as the budget.
+            Asked::WorkerGone => {
+                self.config_failure = self.config_failure.or(Some(UnmeasuredReason::NotAttempted));
+                self.asker = Asker::Unavailable;
+                None
+            }
+        }
+    }
+
     /// One log that yielded nothing, named, counted, and gapping the run.
     fn refuse(&mut self, name: &str, path: &str, read: &'static str, reason: UnmeasuredReason) {
         self.refused += 1;
@@ -457,7 +601,7 @@ impl Collection {
             self.budget_exhausted,
             self.budget,
         ));
-        let gaps = match self.first_failure {
+        let mut gaps = match self.first_failure {
             Some(reason) => gaps(reason),
             // The folder is there and holds no `.evtx` file at all. Nothing was refused and nothing
             // was read, so no rule about what a log holds can be answered — but the folder itself
@@ -465,6 +609,18 @@ impl Collection {
             None if self.listed == 0 => record_gaps(UnmeasuredReason::SourceEmpty),
             None => BTreeMap::new(),
         };
+        // One log whose attribute, or one channel whose configuration, could not be read makes "no
+        // log here is read-only" or "every log is where its channel is written" a claim nobody
+        // measured about it, so each gaps its own fields for the run — after the reasons above,
+        // which already cover them when the run as a whole was not read.
+        if let Some(reason) = self.attribute_failure {
+            gaps.entry("read_only".to_owned()).or_insert(reason);
+        }
+        if let Some(reason) = self.config_failure {
+            for field in CONFIG_FIELDS {
+                gaps.entry(field.to_owned()).or_insert(reason);
+            }
+        }
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations: self.observations,
@@ -527,6 +683,76 @@ impl ParseWorker {
             Ok(parsed) => Parsed::Done(parsed),
             Err(mpsc::RecvTimeoutError::Timeout) => Parsed::OutOfBudget,
             Err(mpsc::RecvTimeoutError::Disconnected) => Parsed::WorkerGone,
+        }
+    }
+}
+
+/// Whether the Event Log service can be asked about a channel in this run.
+enum Asker {
+    /// No log has named a single channel yet, so nobody has tried.
+    NotStarted,
+    Ready(ConfigWorker),
+    /// The host cannot be asked, no thread was given, or a question went unanswered. The reason is
+    /// in `Collection::config_failure`.
+    Unavailable,
+}
+
+/// What one question to the service produced, or why it produced nothing.
+enum Asked {
+    Done(Result<Option<ChannelConfig>, rongroi_host::SourceError>),
+    /// The budget ran out before the service answered.
+    OutOfBudget,
+    /// There is no worker thread to ask on any more.
+    WorkerGone,
+}
+
+/// The thread every question to the Event Log service is asked on, so that a service which accepts a
+/// question and never answers it costs the collection its budget rather than the whole program
+/// (ADR 0042).
+///
+/// The same shape as [`ParseWorker`], and for the same reason: a blocked call into another process
+/// has no cancellation point this program can reach. A question that overruns leaves the thread
+/// blocked inside the call, and the collection stops sending. Dropping the collection drops `jobs`
+/// and `results` without joining the thread. If the service ever answers, the thread finds nobody
+/// listening and ends; if it never does, the thread stays blocked, not spinning, until the process
+/// exits. The reader it holds opens and closes its own handle for each question, so an abandoned
+/// question holds at most the handle it had open.
+struct ConfigWorker {
+    jobs: mpsc::Sender<String>,
+    results: mpsc::Receiver<Result<Option<ChannelConfig>, rongroi_host::SourceError>>,
+}
+
+impl ConfigWorker {
+    /// `None` when the operating system would not give this program a thread.
+    fn spawn(reader: Box<dyn ChannelConfigReader>) -> Option<Self> {
+        let (jobs, queue) = mpsc::channel::<String>();
+        let (answers, results) = mpsc::channel();
+        std::thread::Builder::new()
+            .name("evtx-channel-config".to_owned())
+            .spawn(move || {
+                // Ends when the collector drops `jobs`, or when an answer finds nobody waiting.
+                for channel in queue {
+                    if answers.send(reader.channel_config(&channel)).is_err() {
+                        break;
+                    }
+                }
+            })
+            .ok()?;
+        Some(Self { jobs, results })
+    }
+
+    /// Asks about one channel, waiting at most `within`.
+    fn ask(&self, channel: &str, within: Duration) -> Asked {
+        if within.is_zero() {
+            return Asked::OutOfBudget;
+        }
+        if self.jobs.send(channel.to_owned()).is_err() {
+            return Asked::WorkerGone;
+        }
+        match self.results.recv_timeout(within) {
+            Ok(answer) => Asked::Done(answer),
+            Err(mpsc::RecvTimeoutError::Timeout) => Asked::OutOfBudget,
+            Err(mpsc::RecvTimeoutError::Disconnected) => Asked::WorkerGone,
         }
     }
 }
@@ -646,6 +872,99 @@ fn account(log: &str, path: &str, file: &EvtxFile, size_bytes: usize) -> Observa
         collector: ID.to_owned(),
         fields,
     }
+}
+
+/// Adds what the service states about the log's one channel to its account (ADR 0042).
+///
+/// `configured_path` is the service's own spelling, normally beginning `%SystemRoot%`, so that a
+/// reader sees what the configuration says rather than this program's rewriting of it.
+/// `at_configured_path` compares that path — with `%SystemRoot%` and `%windir%` replaced by the
+/// Windows directory this collector listed — to the path of the file that was read, ignoring ASCII
+/// case as Windows does. A configured path holding any other variable is not compared, and the field
+/// is left out rather than guessed.
+fn configured(observation: &mut Observation, config: &ChannelConfig, path: &str, root: &str) {
+    observation.fields.insert(
+        "configured_path".to_owned(),
+        serde_json::Value::from(config.log_file_path.as_str()),
+    );
+    observation.fields.insert(
+        "max_size_bytes".to_owned(),
+        serde_json::Value::from(config.max_size_bytes),
+    );
+    if let Some(expanded) = expand_windows_directory(&config.log_file_path, root) {
+        let same = normalise(&expanded) == normalise(path);
+        observation.fields.insert(
+            "at_configured_path".to_owned(),
+            serde_json::Value::from(same),
+        );
+    }
+}
+
+/// `path` with `%SystemRoot%` and `%windir%` replaced by `root`, or `None` when it names any other
+/// environment variable, is not drive-rooted once expanded, or when `root` is unknown.
+///
+/// A `%` is not always a variable here: Windows names a channel's file after the channel with `/`
+/// written as `%4`, so `Microsoft-Windows-Kernel-Boot%4Operational.evtx` holds one. A `%` counts as the
+/// start of a variable only when a name beginning with a letter or `_`, made of letters, digits and
+/// `_`, runs up to the next `%`; every other `%` is kept as it is.
+fn expand_windows_directory(path: &str, root: &str) -> Option<String> {
+    let root = root.trim_end_matches(['\\', '/']);
+    if root.is_empty() {
+        return None;
+    }
+    let mut expanded = String::with_capacity(path.len() + root.len());
+    let mut rest = path;
+    while let Some(start) = rest.find('%') {
+        expanded.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let name = after.find('%').map(|end| &after[..end]);
+        match name {
+            Some(name)
+                if name.eq_ignore_ascii_case("SystemRoot")
+                    || name.eq_ignore_ascii_case("windir") =>
+            {
+                expanded.push_str(root);
+                rest = &after[name.len() + 1..];
+            }
+            Some(name) if is_variable_name(name) => return None,
+            _ => {
+                expanded.push('%');
+                rest = after;
+            }
+        }
+    }
+    expanded.push_str(rest);
+    // Only a drive-rooted path is compared: anything else is not a file this collector could have
+    // read, and saying it is or is not this one would be a guess.
+    let bytes = expanded.as_bytes();
+    let rooted = bytes.len() > 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'\\' | b'/');
+    rooted.then_some(expanded)
+}
+
+/// Whether `name` has the shape of an environment variable's name rather than of a file name's `%4`.
+fn is_variable_name(name: &str) -> bool {
+    let mut characters = name.chars();
+    characters
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic() || first == '_')
+        && characters.all(|character| character.is_ascii_alphanumeric() || character == '_')
+}
+
+/// A Windows path in the one form two spellings of it share: ASCII lower case, `\\` separators, no
+/// doubled separator.
+fn normalise(path: &str) -> String {
+    let mut normalised = String::with_capacity(path.len());
+    for character in path.chars() {
+        let character = if character == '/' { '\\' } else { character };
+        if character == '\\' && normalised.ends_with('\\') {
+            continue;
+        }
+        normalised.push(character.to_ascii_lowercase());
+    }
+    normalised
 }
 
 /// Which end of a log's surviving records is wanted.
@@ -775,7 +1094,7 @@ fn parse_failure(error: &ParseError) -> &'static str {
 mod tests {
     use std::path::PathBuf;
 
-    use rongroi_host::{FixtureHost, NonWindowsHost};
+    use rongroi_host::{EventLogConfigSource, FixtureHost, NonWindowsHost};
 
     use super::*;
 
@@ -784,6 +1103,10 @@ mod tests {
     /// The one vendored Event Log sample, as the fixture hosts here reference it.
     const LANGUAGE_PACK: &[u8] =
         include_bytes!("../../../fixtures/evtx/languagepacksetup-operational.evtx");
+
+    /// What the Event Log service states about the one channel the vendored sample's records name, as
+    /// measured on a Windows 11 machine (ADR 0042), in the fixture-host form.
+    const LANGUAGE_PACK_CHANNEL: &str = "event_log_channels:\n  Microsoft-Windows-LanguagePackSetup/Operational:\n    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'\n    max_size_bytes: 1052672\n";
 
     /// The fixed header block and one chunk, as `rongroi_parsers::evtx`'s own tests measure them.
     const FILE_HEADER_LEN: usize = 4096;
@@ -890,8 +1213,9 @@ mod tests {
                 yaml.push_str(log);
                 yaml.push_str("\n      from: '");
                 yaml.push_str(log);
-                yaml.push_str("'\n");
+                yaml.push_str("'\n      read_only: false\n");
             }
+            yaml.push_str(LANGUAGE_PACK_CHANNEL);
             std::fs::write(dir.join("host.yaml"), yaml).unwrap();
             Self { dir }
         }
@@ -1418,6 +1742,255 @@ mod tests {
         assert_eq!(
             log_files(entries(&["b.evtx", "A.EVTX", "c.evtx"])),
             ["A.EVTX", "b.evtx", "c.evtx"]
+        );
+    }
+
+    /// **What the service states about a log's channel, beside the log** (ADR 0042). On this host both
+    /// files hold records of the `LanguagePackSetup` channel and neither is named as the service writes
+    /// that channel, which is the shape `at_configured_path: false` exists to show.
+    #[test]
+    fn each_log_says_where_its_channel_is_written_and_whether_this_is_that_file() {
+        let run = Evtx::default().collect(&fixture("evtx-logs-present"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+
+        let account = account_of(observations, "Security.evtx");
+        assert_eq!(
+            text(account, "configured_path"),
+            Some(
+                r"%SystemRoot%\System32\Winevt\Logs\Microsoft-Windows-LanguagePackSetup%4Operational.evtx"
+            )
+        );
+        assert_eq!(
+            field(account, "max_size_bytes"),
+            Some(&1_052_672_u64.into())
+        );
+        assert_eq!(field(account, "at_configured_path"), Some(&false.into()));
+        assert_eq!(field(account, "read_only"), Some(&false.into()));
+    }
+
+    /// The same bytes under the file name the service writes their channel to: the ordinary case.
+    /// The service's `%SystemRoot%` and a different capitalisation of `System32` are the same path.
+    #[test]
+    fn a_log_named_as_its_channel_is_written_is_at_its_configured_path() {
+        let fixture = TempFixture::new(
+            "at-configured-path",
+            &[(
+                "Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+                LANGUAGE_PACK,
+            )],
+        );
+        let run = Evtx::default().collect(&fixture.host());
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        let account = account_of(
+            observations,
+            "Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+        );
+        assert_eq!(field(account, "at_configured_path"), Some(&true.into()));
+    }
+
+    /// A log with no records names no channel, and a channel the service does not have has no
+    /// configuration: neither is compared, neither is reported as anything, and neither is a gap.
+    /// A log file can outlive the software that registered its channel.
+    #[test]
+    fn a_log_with_no_channel_or_an_unregistered_one_carries_no_configuration() {
+        let fixture = TempFixture::new(
+            "no-configuration",
+            &[("Application.evtx", &LANGUAGE_PACK[..FILE_HEADER_LEN])],
+        );
+        let run = Evtx::default().collect(&fixture.host());
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        for absent in CONFIG_FIELDS {
+            assert_eq!(
+                field(account_of(observations, "Application.evtx"), absent),
+                None
+            );
+        }
+
+        let other = TempFixture::new("unregistered", &[("Application.evtx", LANGUAGE_PACK)]);
+        let yaml = std::fs::read_to_string(other.dir.join("host.yaml"))
+            .unwrap()
+            .replace(
+                "Microsoft-Windows-LanguagePackSetup/Operational",
+                "Some-Other/Channel",
+            );
+        std::fs::write(other.dir.join("host.yaml"), yaml).unwrap();
+        let run = Evtx::default().collect(&other.host());
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        let account = account_of(observations, "Application.evtx");
+        for absent in CONFIG_FIELDS {
+            assert_eq!(field(account, absent), None, "{absent}");
+        }
+    }
+
+    /// A service that would not describe a channel is not a service with no such channel: the three
+    /// fields are gapped with that reason, so a rule on them is unmeasured rather than not found.
+    #[test]
+    fn a_channel_the_service_would_not_describe_gaps_the_configuration() {
+        let fixture = TempFixture::new("config-denied", &[("Application.evtx", LANGUAGE_PACK)]);
+        let yaml = std::fs::read_to_string(fixture.dir.join("host.yaml")).unwrap()
+            + "access_denied:\n  - 'Microsoft-Windows-LanguagePackSetup/Operational'\n";
+        std::fs::write(fixture.dir.join("host.yaml"), yaml).unwrap();
+        let run = Evtx::default().collect(&fixture.host());
+        let (observations, gaps) = measured(&run);
+        for name in CONFIG_FIELDS {
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::AccessDenied),
+                "{name}"
+            );
+            assert_eq!(
+                field(account_of(observations, "Application.evtx"), name),
+                None
+            );
+        }
+        assert_eq!(gaps.get("read_only"), None);
+    }
+
+    /// **A service that never answers ends the collection instead of stalling it** (ADR 0042). The
+    /// fixture's reader blocks forever on this channel, so the wait is exercised for real — what is
+    /// shortened is the budget, not the hang. The first log is parsed and its records stay
+    /// measured; what the service would have said is gapped `budget_spent`, and the log after it is
+    /// refused unopened, exactly as after a parse that overran.
+    ///
+    /// The budget has to outlast parsing the one small vendored log, which takes milliseconds, and
+    /// is otherwise as short as that allows: the test waits for all of it.
+    #[test]
+    fn a_service_that_never_answers_spends_the_budget_and_gaps_the_configuration() {
+        let fixture = TempFixture::new(
+            "config-never-answers",
+            &[
+                ("System.evtx", LANGUAGE_PACK),
+                ("Application.evtx", LANGUAGE_PACK),
+            ],
+        );
+        let yaml = std::fs::read_to_string(fixture.dir.join("host.yaml"))
+            .unwrap()
+            .replace(
+                "    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'\n    max_size_bytes: 1052672\n",
+                "    never_answers: true\n",
+            );
+        assert!(yaml.contains("never_answers"), "{yaml}");
+        std::fs::write(fixture.dir.join("host.yaml"), yaml).unwrap();
+
+        let budget = Duration::from_millis(500);
+        let started = Instant::now();
+        let run = Evtx::with_budget(budget).collect(&fixture.host());
+        let took = started.elapsed();
+        assert!(took >= budget, "returned before the budget: {took:?}");
+        assert!(took < budget * 10, "the wait was not bounded: {took:?}");
+
+        let (observations, gaps) = measured(&run);
+        let account = account_of(observations, "System.evtx");
+        assert_eq!(field(account, "entries"), Some(&17_u64.into()));
+        for name in CONFIG_FIELDS {
+            assert_eq!(field(account, name), None, "{name}");
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::BudgetSpent),
+                "{name}"
+            );
+        }
+
+        let refused = refusals(observations);
+        assert_eq!(refused.len(), 1, "{refused:?}");
+        assert_eq!(text(refused[0], "log"), Some("Application.evtx"));
+        assert_eq!(text(refused[0], "read"), Some(NOT_ATTEMPTED));
+
+        let folder = folder_of(observations);
+        assert_eq!(field(folder, "budget_exhausted"), Some(&true.into()));
+        assert_eq!(field(folder, "examined"), Some(&1_u64.into()));
+        // The run's reason is the budget, not "not attempted": that the second log was not read is a
+        // consequence of the service's silence, and a reviewer should read the cause.
+        assert_eq!(gaps.get("event_id"), Some(&UnmeasuredReason::BudgetSpent));
+    }
+
+    /// The worker on its own: a question that is never answered returns when its wait does, and a
+    /// wait that is already over does not send the question at all.
+    #[test]
+    fn a_question_to_a_reader_that_never_answers_returns_at_its_deadline() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nevent_log_channels:\n  Hung/Channel:\n    never_answers: true\n",
+            "inline",
+        )
+        .unwrap();
+        let worker = ConfigWorker::spawn(host.channel_config_reader().unwrap()).unwrap();
+        assert!(matches!(
+            worker.ask("Hung/Channel", Duration::ZERO),
+            Asked::OutOfBudget
+        ));
+        let within = Duration::from_millis(50);
+        let started = Instant::now();
+        assert!(matches!(
+            worker.ask("Hung/Channel", within),
+            Asked::OutOfBudget
+        ));
+        assert!(started.elapsed() >= within);
+    }
+
+    /// A fixture that never described the service, or a file's attribute, has not said "no such
+    /// channel" or "not read-only". Both are gaps (ADR 0037, ADR 0042).
+    #[test]
+    fn a_host_that_does_not_describe_the_service_or_the_attribute_gaps_both() {
+        let run = Evtx::default().collect(&fixture("evtx-log-unreadable"));
+        let (_, gaps) = measured(&run);
+        // This host gaps every field already, for the unreadable log; the point is that nothing
+        // here reads as a measurement.
+        for name in CONFIG_FIELDS.iter().chain(&["read_only"]) {
+            assert!(gaps.contains_key(*name), "{name}");
+        }
+
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nelevated: true\nenv:\n  SystemRoot: 'C:\\Windows'\nfilesystem:\n  'C:\\Windows\\System32\\winevt\\Logs':\n    - name: Setup.evtx\n      read_only: true\n",
+            "inline",
+        )
+        .unwrap();
+        let run = Evtx::default().collect(&host);
+        let (observations, _) = measured(&run);
+        // Refused — it has no bytes — and it still says what its attribute is.
+        let refused = refusals(observations);
+        assert_eq!(field(refused[0], "read_only"), Some(&true.into()));
+    }
+
+    #[test]
+    fn only_the_windows_directory_is_expanded_in_a_configured_path() {
+        assert_eq!(
+            expand_windows_directory(r"%SystemRoot%\System32\Winevt\Logs\A.evtx", r"C:\Windows\")
+                .as_deref(),
+            Some(r"C:\Windows\System32\Winevt\Logs\A.evtx")
+        );
+        assert_eq!(
+            expand_windows_directory(
+                r"%SystemRoot%\Logs\Microsoft-Windows-A%4Operational%4B%4C.evtx",
+                r"C:\Windows"
+            )
+            .as_deref(),
+            Some(r"C:\Windows\Logs\Microsoft-Windows-A%4Operational%4B%4C.evtx")
+        );
+        assert_eq!(
+            expand_windows_directory(r"%WINDIR%\x.evtx", r"D:\Win").as_deref(),
+            Some(r"D:\Win\x.evtx")
+        );
+        assert_eq!(
+            expand_windows_directory(r"D:\Logs\Security.evtx", r"C:\Windows").as_deref(),
+            Some(r"D:\Logs\Security.evtx")
+        );
+        // Any other variable, an unterminated one, or an unknown Windows directory: not compared.
+        assert_eq!(
+            expand_windows_directory(r"%ProgramData%\x.evtx", r"C:\Windows"),
+            None
+        );
+        assert_eq!(
+            expand_windows_directory(r"%SystemRoot\x.evtx", r"C:\Windows"),
+            None
+        );
+        assert_eq!(expand_windows_directory(r"%SystemRoot%\x.evtx", ""), None);
+        assert_eq!(
+            normalise(r"C:\Windows\system32\\winevt/Logs\A.EVTX"),
+            normalise(r"c:\windows\System32\Winevt\Logs\a.evtx")
         );
     }
 

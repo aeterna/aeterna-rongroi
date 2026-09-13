@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 2 |
-| จำนวน rule | 15 |
-| SHA-256 | `9247b132494335513c6805154ff57cc4e06dc963e39bac71b3e76834f8c25d3d` |
+| จำนวน rule | 18 |
+| SHA-256 | `69f7da1433a794b5d6bee234f94a442cb47fe58da0690b2b18b6aeacff8f360d` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -40,6 +40,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 - `evtx`
   - [มี event log ไฟล์หนึ่งถูกล้าง](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [Security log มีบันทึกว่าตัวเองถูกล้าง](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
+  - [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
+  - [มีไฟล์ event log ที่ไม่ใช่ไฟล์ที่ Windows เขียน channel ของมันลงไป](#rule-87a53c8f-b0e4-477d-91e7-93b904ba965f) — `tamper` · `experimental`
 - `fivem_dir`
   - [FiveM.exe มีลายเซ็นที่ถูกต้อง แต่ไม่ได้เซ็นด้วยใบรับรองที่ rule นี้รู้จัก](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e) — `presence` · `experimental`
   - [FiveM.exe ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-148cbcdd-8d18-4af6-a541-71cc7f21b2eb) — `presence` · `experimental`
@@ -55,6 +57,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
+- `prefetch`
+  - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
 
 ## collector `evtx`
 
@@ -163,6 +167,102 @@ Security log มีบันทึกว่าบันทึกการตร�
 - <https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep-command-line-options>
 - <https://github.com/SigmaHQ/sigma/blob/master/rules/windows/builtin/security/win_security_audit_log_cleared.yml>
 - <https://learn.microsoft.com/en-us/answers/questions/531390/can-see-audit-logs-are-cleared-by-network-service>
+
+### `evtx` / `log-file`
+
+<a id="rule-9b318bfa-805d-4edd-81f1-602b57639a69"></a>
+
+#### มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว
+
+- ชื่อภาษาอังกฤษ: An event log file is marked read-only
+- id: `9b318bfa-805d-4edd-81f1-602b57639a69`
+- ไฟล์: [`rules/evtx/log-file/event-log-file-read-only/rule.yaml`](../rules/evtx/log-file/event-log-file-read-only/rule.yaml)
+- collector: `evtx`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `log-file`
+- เขียนเมื่อ: 2026-09-13
+
+**เกี่ยวกับการตรวจนี้**
+
+มีไฟล์ในโฟลเดอร์ event log ของ Windows ที่ติด attribute อ่านอย่างเดียว (read-only) ไฟล์เหล่านี้บริการ Event Log ของ Windows เขียนเอง และบนเครื่อง Windows 11 เครื่องเดียวที่โครงการนี้วัดมา ไม่มีไฟล์ไหนในหลายร้อยไฟล์ ติด attribute นี้เลย แถวนี้บอกชื่อ log แต่ไม่ได้บอกว่าใครตั้ง ตั้งเมื่อไร หรือตั้งทำไม และไม่ใช่หลักฐานว่ามีการซ่อนอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `read_only`: เป็น `true`
+
+**ย้อนดูได้**
+
+เป็น attribute ณ ตอนที่สแกนเท่านั้น และดูได้เฉพาะไฟล์ log ที่ยังอยู่ในโฟลเดอร์ บอกไม่ได้ว่าถูกตั้งไว้ตั้งแต่เมื่อไร และบอกอะไรไม่ได้เลยเกี่ยวกับไฟล์ที่ถูกลบไปแล้ว
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- มีคนเลือก "อ่านอย่างเดียว" ในหน้า Properties ของโฟลเดอร์ event log หรือโฟลเดอร์ที่อยู่เหนือขึ้นไป ซึ่ง Windows จะนำไปตั้งให้กับไฟล์ข้างในทั้งหมด
+- ไฟล์ log ถูกคัดลอกหรือกู้คืนกลับเข้าโฟลเดอร์ด้วยโปรแกรมสำรองข้อมูล ทำอิมเมจ หรือคัดลอกไฟล์ที่เก็บ attribute ของไฟล์ไว้ด้วย อย่างที่ robocopy ของ Windows เองทำเป็นค่าเริ่มต้น
+
+**rule ที่เกี่ยวข้อง**
+
+- คล้ายกับ [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2)
+- คล้ายกับ [มีไฟล์ event log ที่ไม่ใช่ไฟล์ที่ Windows เขียน channel ของมันลงไป](#rule-87a53c8f-b0e4-477d-91e7-93b904ba965f)
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+<a id="rule-87a53c8f-b0e4-477d-91e7-93b904ba965f"></a>
+
+#### มีไฟล์ event log ที่ไม่ใช่ไฟล์ที่ Windows เขียน channel ของมันลงไป
+
+- ชื่อภาษาอังกฤษ: An event log file is not the file Windows writes its channel to
+- id: `87a53c8f-b0e4-477d-91e7-93b904ba965f`
+- ไฟล์: [`rules/evtx/log-file/event-log-not-at-configured-path/rule.yaml`](../rules/evtx/log-file/event-log-not-at-configured-path/rule.yaml)
+- collector: `evtx`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `log-file`
+- เขียนเมื่อ: 2026-09-13
+
+**เกี่ยวกับการตรวจนี้**
+
+บันทึกในไฟล์ log นี้เป็นของ channel ที่บริการ Event Log ของ Windows เขียนลงอีกไฟล์หนึ่ง ซึ่งแสดงชื่อไว้คู่กับแถวนี้ Windows จึงไม่ได้เขียนอะไรเพิ่มลงไฟล์นี้แล้ว ไฟล์นี้เป็นสำเนา ไฟล์เก็บถาวร หรือ log ที่ channel ของมันถูกย้ายไปเขียนที่อื่น หลังจากบันทึกเหล่านี้ถูกเขียนไปแล้ว การเทียบทำเฉพาะสิ่งที่บริการระบุไว้เกี่ยวกับ channel กับไฟล์ที่อ่านมา และทำเฉพาะ log ที่บันทึกทั้งหมดเป็นของ channel เดียว แถวนี้ไม่ได้บอกว่าใครเอาไฟล์มาไว้ เมื่อไร หรือทำไม และไม่ใช่หลักฐานว่ามีการซ่อนอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `at_configured_path`: เป็น `false`
+
+**ย้อนดูได้**
+
+ดูได้เฉพาะไฟล์ log ที่ยังอยู่ในโฟลเดอร์ event log ของ Windows โดยเทียบกับการตั้งค่าของ Windows ณ ตอนที่สแกน บอกไม่ได้ว่าก่อนหน้านี้ log ถูกตั้งค่าไว้อย่างไร และบอกอะไรไม่ได้เลยเกี่ยวกับไฟล์ที่ถูกลบไปแล้ว
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ไฟล์เก็บถาวรที่ Windows ทำเองเมื่อ log ถูกตั้งให้สำรองอัตโนมัติเมื่อเต็ม โดยจะปิดไฟล์ที่เต็มแล้วเปลี่ยนชื่อไฟล์นั้น
+- log ที่ถูกบันทึกหรือส่งออกมาไว้ในโฟลเดอร์นี้ด้วย Event Viewer หรือ wevtutil เช่น เพื่อส่งให้คนอื่นดู
+- ผู้ดูแลระบบ Group Policy หรือซอฟต์แวร์จัดการเครื่อง ย้ายที่เก็บ log ไปที่อื่น ไฟล์เดิมจึงค้างอยู่พร้อมบันทึกที่เขียนไว้ก่อนย้าย
+- log ที่ถูกคัดลอกมาจากเครื่องอื่น หรือจากไฟล์สำรอง เพื่อเปิดดู
+
+**rule ที่เกี่ยวข้อง**
+
+- คล้ายกับ [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69)
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-eventlog>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winevt/ne-winevt-evt_channel_config_property_id>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil>
 
 ## collector `fivem_dir`
 
@@ -752,3 +852,54 @@ Windows ถูกตั้งค่าไม่ให้บังคับใช
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/tpm/trusted-platform-module-overview>
+
+## collector `prefetch`
+
+### `prefetch` / `file-attributes`
+
+<a id="rule-7d493537-7ecf-4f97-90a0-119e079d30d2"></a>
+
+#### มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว
+
+- ชื่อภาษาอังกฤษ: A Prefetch file is marked read-only
+- id: `7d493537-7ecf-4f97-90a0-119e079d30d2`
+- ไฟล์: [`rules/prefetch/file-attributes/prefetch-file-read-only/rule.yaml`](../rules/prefetch/file-attributes/prefetch-file-read-only/rule.yaml)
+- collector: `prefetch`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `prefetch`, `file-attributes`
+- เขียนเมื่อ: 2026-09-13
+
+**เกี่ยวกับการตรวจนี้**
+
+มีไฟล์ในโฟลเดอร์ Prefetch ของ Windows ที่ติด attribute อ่านอย่างเดียว (read-only) ไฟล์เหล่านี้ Windows เขียนและเขียนทับเอง และบนเครื่อง Windows 11 เครื่องเดียวที่โครงการนี้วัดมา ไม่มีไฟล์ไหนติด attribute นี้เลย แถวนี้บอกชื่อไฟล์และสิ่งที่ไฟล์บันทึกไว้ แต่ไม่ได้บอกว่าใครตั้ง ตั้งเมื่อไร หรือตั้งทำไม และไม่ใช่หลักฐานว่ามีการซ่อนอะไร หรือว่าโปรแกรมที่ไฟล์พูดถึงถูกใช้โกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `read_only`: เป็น `true`
+
+**ย้อนดูได้**
+
+เป็น attribute ณ ตอนที่สแกนเท่านั้น และดูได้เฉพาะไฟล์ Prefetch ที่ยังอยู่ในโฟลเดอร์ บอกไม่ได้ว่าถูกตั้งไว้ตั้งแต่เมื่อไร และบอกอะไรไม่ได้เลยเกี่ยวกับไฟล์ที่ถูกลบไปแล้ว
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `service_disabled` — บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- มีคนเลือก "อ่านอย่างเดียว" ในหน้า Properties ของโฟลเดอร์ Prefetch หรือโฟลเดอร์ที่อยู่เหนือขึ้นไป ซึ่ง Windows จะนำไปตั้งให้กับไฟล์ข้างในทั้งหมด
+- ไฟล์ถูกคัดลอกหรือกู้คืนกลับเข้าโฟลเดอร์ด้วยโปรแกรมสำรองข้อมูล ทำอิมเมจ หรือคัดลอกไฟล์ที่เก็บ attribute ของไฟล์ไว้ด้วย อย่างที่ robocopy ของ Windows เองทำเป็นค่าเริ่มต้น
+
+**rule ที่เกี่ยวข้อง**
+
+- คล้ายกับ [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69)
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>

@@ -193,8 +193,9 @@ pub fn consent(lang: Lang) -> String {
             This program will read, on this PC:\n\
             \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity and the PowerShell logging policy\n\
             \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
-            \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant)\n\
-            \x20 - how many events of each kind the Windows event logs hold, not what the events say\n\
+            \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on\n\
+            \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
+            \x20 - whether a Prefetch or event log file is marked read-only\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
             It shows only what matches a rule. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
             You may refuse.\n\
@@ -204,8 +205,9 @@ pub fn consent(lang: Lang) -> String {
             โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
             \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell\n\
             \x20 - โปรแกรมที่กำลังรันอยู่ ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
-            \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant)\n\
-            \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร\n\
+            \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่\n\
+            \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
+            \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
             แสดงเฉพาะสิ่งที่ตรง rule โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
             คุณปฏิเสธได้\n\
@@ -689,17 +691,22 @@ mod tests {
                 Lang::En,
                 "programs running now",
                 "when Windows last started",
+                ["read-only", "size Windows sets"],
             ),
             (
                 Lang::Th,
                 "โปรแกรมที่กำลังรันอยู่",
                 "เวลาที่ Windows เริ่มทำงานครั้งล่าสุด",
+                ["อ่านอย่างเดียว", "ขนาดที่ Windows ตั้งไว้"],
             ),
         ];
-        for (lang, process_words, boot_time_words) in running {
+        for (lang, process_words, boot_time_words, reads_since_adr_0037) in running {
             let question = consent(lang);
             assert!(question.contains(process_words), "{question}");
             assert!(question.contains(boot_time_words), "{question}");
+            for words in reads_since_adr_0037 {
+                assert!(question.contains(words), "{words} missing from {question}");
+            }
             for word in named.iter().flat_map(|(_, words)| words.iter()) {
                 assert!(question.contains(word), "{word} missing from {question}");
             }

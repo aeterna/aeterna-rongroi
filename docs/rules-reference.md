@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 2 |
-| Rules | 15 |
-| SHA-256 | `9247b132494335513c6805154ff57cc4e06dc963e39bac71b3e76834f8c25d3d` |
+| Rules | 18 |
+| SHA-256 | `69f7da1433a794b5d6bee234f94a442cb47fe58da0690b2b18b6aeacff8f360d` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -44,6 +44,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `evtx`
   - [An event log file was cleared](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [The Security log records that it was cleared](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
+  - [An event log file is marked read-only](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
+  - [An event log file is not the file Windows writes its channel to](#rule-87a53c8f-b0e4-477d-91e7-93b904ba965f) — `tamper` · `experimental`
 - `fivem_dir`
   - [FiveM.exe is validly signed, but not with the certificate this rule knows](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e) — `presence` · `experimental`
   - [FiveM.exe has no embedded signature that verifies here](#rule-148cbcdd-8d18-4af6-a541-71cc7f21b2eb) — `presence` · `experimental`
@@ -59,6 +61,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A machine policy turns PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [Memory integrity (HVCI) is configured off](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
+- `prefetch`
+  - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
 
 ## Collector `evtx`
 
@@ -165,6 +169,100 @@ Only clearings still recorded in the Security log as it stands today. The log ho
 - <https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep-command-line-options>
 - <https://github.com/SigmaHQ/sigma/blob/master/rules/windows/builtin/security/win_security_audit_log_cleared.yml>
 - <https://learn.microsoft.com/en-us/answers/questions/531390/can-see-audit-logs-are-cleared-by-network-service>
+
+### `evtx` / `log-file`
+
+<a id="rule-9b318bfa-805d-4edd-81f1-602b57639a69"></a>
+
+#### An event log file is marked read-only
+
+- Id: `9b318bfa-805d-4edd-81f1-602b57639a69`
+- File: [`rules/evtx/log-file/event-log-file-read-only/rule.yaml`](../rules/evtx/log-file/event-log-file-read-only/rule.yaml)
+- Collector: `evtx`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `log-file`
+- Written: 2026-09-13
+
+**About this check**
+
+A file in the Windows Event Log folder carries the read-only attribute. The Event Log service writes these files itself, and on the one Windows 11 machine this project measured, none of several hundred carried the attribute. This row names the log. It does not say who set the attribute, when, or why, and it is not evidence that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `read_only`: is `true`
+
+**Look-back**
+
+The attribute as it is at the moment of the scan, on the log files still in the folder. It says nothing about when it was set, or about files that were removed.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Read-only chosen in the Properties of the Event Log folder or of a folder above it, which Windows applies to the files inside
+- Log files copied or restored into the folder by backup, imaging or copy software that keeps file attributes, as Windows' own robocopy does unless told otherwise
+
+**Related rules**
+
+- similar to [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2)
+- similar to [An event log file is not the file Windows writes its channel to](#rule-87a53c8f-b0e4-477d-91e7-93b904ba965f)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+<a id="rule-87a53c8f-b0e4-477d-91e7-93b904ba965f"></a>
+
+#### An event log file is not the file Windows writes its channel to
+
+- Id: `87a53c8f-b0e4-477d-91e7-93b904ba965f`
+- File: [`rules/evtx/log-file/event-log-not-at-configured-path/rule.yaml`](../rules/evtx/log-file/event-log-not-at-configured-path/rule.yaml)
+- Collector: `evtx`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `log-file`
+- Written: 2026-09-13
+
+**About this check**
+
+The records in this log file belong to a channel that the Windows Event Log service writes to a different file, named beside this row. Windows is therefore not adding to this file: it is a copy, an archive, or a log whose channel was pointed somewhere else after these records were written. Only what the service states about the channel is compared with the file that was read, and only for a log whose records all belong to one channel. This row does not say who put the file there, when, or why, and it is not evidence that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `at_configured_path`: is `false`
+
+**Look-back**
+
+Only log files still in the Windows Event Log folder, compared with how Windows is set up at the moment of the scan. It says nothing about how a log was set up before, or about files that were removed.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- An archive Windows keeps itself when a log is set to be backed up automatically when full — it closes the full file and renames it
+- A log saved or exported into this folder with Event Viewer or wevtutil, for example to send it to someone
+- An administrator, Group Policy or management software moving where a log is kept; the file from before the move stays behind with the records written until then
+- A log copied here from another PC, or from a backup, to be looked at
+
+**Related rules**
+
+- similar to [An event log file is marked read-only](#rule-9b318bfa-805d-4edd-81f1-602b57639a69)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-eventlog>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winevt/ne-winevt-evt_channel_config_property_id>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil>
 
 ## Collector `fivem_dir`
 
@@ -741,3 +839,53 @@ Current hardware state only. It says nothing about earlier hardware or firmware 
 **References**
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/tpm/trusted-platform-module-overview>
+
+## Collector `prefetch`
+
+### `prefetch` / `file-attributes`
+
+<a id="rule-7d493537-7ecf-4f97-90a0-119e079d30d2"></a>
+
+#### A Prefetch file is marked read-only
+
+- Id: `7d493537-7ecf-4f97-90a0-119e079d30d2`
+- File: [`rules/prefetch/file-attributes/prefetch-file-read-only/rule.yaml`](../rules/prefetch/file-attributes/prefetch-file-read-only/rule.yaml)
+- Collector: `prefetch`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `prefetch`, `file-attributes`
+- Written: 2026-09-13
+
+**About this check**
+
+A file in the Windows Prefetch folder carries the read-only attribute. Windows writes and rewrites these files itself, and on the one Windows 11 machine this project measured, none of them carried the attribute. This row names the file and what it records. It does not say who set the attribute, when, or why, and it is not evidence that anything was hidden or that the program it names was used to cheat.
+
+**Matches when all of these hold for one observation**
+
+- `read_only`: is `true`
+
+**Look-back**
+
+The attribute as it is at the moment of the scan, on the Prefetch files still in the folder. It says nothing about when it was set, or about files that were removed.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+- `service_disabled` — the Windows service that writes this record is switched off
+
+**Ordinary things that also produce this**
+
+- Read-only chosen in the Properties of the Prefetch folder or of a folder above it, which Windows applies to the files inside
+- Files copied or restored into the folder by backup, imaging or copy software that keeps file attributes, as Windows' own robocopy does unless told otherwise
+
+**Related rules**
+
+- similar to [An event log file is marked read-only](#rule-9b318bfa-805d-4edd-81f1-602b57639a69)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>

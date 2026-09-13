@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 15
+      "rule_count": 18
     },
     "platform": "windows",
     "os_build": "26100",
@@ -27,6 +27,52 @@ expression: view
     }
   },
   "evidence": [
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "evtx",
+          "fields": {
+            "at_configured_path": false,
+            "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+            "entries": 17,
+            "intact": true,
+            "log": "Security.evtx",
+            "max_size_bytes": 1052672,
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
+            "read_only": false,
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "at_configured_path": false,
+            "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+            "entries": 17,
+            "intact": true,
+            "log": "Application.evtx",
+            "max_size_bytes": 1052672,
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
+            "read_only": false,
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        }
+      ]
+    },
     {
       "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
       "collector": "fivem_dir",
@@ -114,9 +160,9 @@ expression: view
     "not_attempted": 0
   },
   "hidden": {
-    "not_found": 2,
-    "unmeasured_expected": 3,
+    "not_found": 3,
+    "unmeasured_expected": 4,
     "unmeasured_unexpected": 0,
-    "unmatched": 10
+    "unmatched": 9
   }
 }

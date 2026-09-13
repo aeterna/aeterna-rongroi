@@ -1,0 +1,8 @@
+{
+  "description": "A Prefetch file this program could not decode still says what its attribute is, and a read-only one is shown",
+  "observations": [
+    { "collector": "prefetch", "fields": {
+      "path": "C:\\Windows\\Prefetch\\EXAMPLE.EXE-1A2B3C4D.pf", "read": "not_decompressible", "read_only": true } }
+  ],
+  "expect_matches": 1
+}

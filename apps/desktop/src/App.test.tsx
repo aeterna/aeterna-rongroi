@@ -111,6 +111,7 @@ describe("App", () => {
     expect(screen.getByText(/Prefetch, BAM, Program Compatibility Assistant/)).toBeTruthy();
     // The boot time is not a collector, and staff see it at the top of the report (ADR 0039).
     expect(screen.getByText(/when Windows last started, which staff will see/)).toBeTruthy();
+    expect(screen.getByText(/marked read-only/)).toBeTruthy();
     fireEvent.click(screen.getByText("I refuse"));
     expect(screen.getByText("Nothing was shown")).toBeTruthy();
     expect(calls).not.toContain("report_view");

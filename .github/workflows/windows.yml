@@ -171,3 +171,18 @@ jobs:
           }
           Write-Output "secure_boot_firmware: '$firmware' · Get-SecureBootUEFI: '$expected'"
           if ($firmware -ne $expected) { throw "the firmware reading '$firmware' disagrees with Get-SecureBootUEFI '$expected'" }
+          # What a second, different Windows says about the file-level facts ADR 0037 and ADR 0042 read:
+          # Prefetch's configuration, how many log files are read-only, and how many logs were compared
+          # with the file the Event Log service writes their channel to. Counts only — the channel names
+          # are a list of what is installed, and nothing here needs them.
+          $observations = @($report.evidence | ForEach-Object { $_.observations }) + @($report.unmatched | ForEach-Object { $_.observations }) | Where-Object { $_ }
+          $observations | Where-Object { $_.collector -eq 'prefetch' -and $_.fields.PSObject.Properties.Name -contains 'folder' } | ForEach-Object {
+            $switch = if ($_.fields.PSObject.Properties.Name -contains 'enable_prefetcher') { $_.fields.enable_prefetcher } else { 'absent' }
+            Write-Output "prefetch configuration: folder $($_.fields.folder) · EnablePrefetcher $switch"
+          }
+          foreach ($collector in 'prefetch', 'evtx') {
+            $bits = @($observations | Where-Object { $_.collector -eq $collector -and $_.fields.PSObject.Properties.Name -contains 'read_only' })
+            Write-Output "$collector read_only: $(@($bits | Where-Object { $_.fields.read_only }).Count) of $($bits.Count)"
+          }
+          $compared = @($observations | Where-Object { $_.collector -eq 'evtx' -and $_.fields.PSObject.Properties.Name -contains 'at_configured_path' })
+          Write-Output "evtx at_configured_path: $(@($compared | Where-Object { $_.fields.at_configured_path }).Count) of $($compared.Count)"

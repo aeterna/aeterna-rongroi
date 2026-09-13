@@ -10,10 +10,10 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    BootTimeSource, CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource,
-    FirmwareSecureBoot, FirmwareSource, Host, Platform, ProcessRecord, ProcessSource,
-    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
-    TpmSource,
+    BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DirEntryInfo,
+    EnvironmentSource, EventLogConfigSource, FilesystemSource, FirmwareSecureBoot, FirmwareSource,
+    Host, Platform, ProcessRecord, ProcessSource, RegistrySource, SignatureCheck, SignatureSource,
+    SourceError, SystemIntegritySource, TpmInfo, TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -66,6 +66,87 @@ struct HostFile {
     /// accessor reports as `Unsupported` rather than inventing a value (ADR 0039).
     #[serde(default)]
     milliseconds_since_boot: Option<u64>,
+    #[serde(default)]
+    event_log_channels: Option<BTreeMap<String, FixtureChannel>>,
+}
+
+/// What a fixture says the Event Log service states about one channel (ADR 0042). A fixture with no
+/// `event_log_channels:` block never modelled the service, which the accessor reports as
+/// `Unsupported`; a block that does not name a channel describes a service with no such channel.
+///
+/// `never_answers: true`, and nothing else, describes a service that accepts the question about this
+/// channel and never replies — the case a collector has to survive, and one no real machine can be
+/// made to produce on demand. A reader asked about it blocks for as long as the process lives.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureChannel {
+    #[serde(default)]
+    log_file_path: Option<String>,
+    #[serde(default)]
+    max_size_bytes: Option<u64>,
+    #[serde(default)]
+    never_answers: bool,
+}
+
+/// One channel as the fixture's reader answers it.
+#[derive(Debug, Clone)]
+enum StoredChannel {
+    Answers(ChannelConfig),
+    NeverAnswers,
+}
+
+/// Turns what a fixture wrote for one channel into what its reader answers, refusing a channel that
+/// both answers and does not.
+fn resolve_channel(
+    name: &str,
+    described: FixtureChannel,
+    origin: &str,
+) -> Result<StoredChannel, FixtureError> {
+    match (
+        described.never_answers,
+        described.log_file_path,
+        described.max_size_bytes,
+    ) {
+        (true, None, None) => Ok(StoredChannel::NeverAnswers),
+        (false, Some(log_file_path), Some(max_size_bytes)) => {
+            Ok(StoredChannel::Answers(ChannelConfig {
+                log_file_path,
+                max_size_bytes,
+            }))
+        }
+        _ => Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "channel `{name}`: write `log_file_path` and `max_size_bytes`, or `never_answers: true` alone"
+            ),
+        }),
+    }
+}
+
+/// The reader a fixture host hands out: its channels and its denials, owned, so it can move to
+/// another thread.
+#[derive(Debug, Clone)]
+struct FixtureChannelReader {
+    channels: BTreeMap<String, StoredChannel>,
+    access_denied: Vec<String>,
+}
+
+impl ChannelConfigReader for FixtureChannelReader {
+    fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError> {
+        let key = channel.to_ascii_lowercase();
+        if self.access_denied.contains(&key) {
+            return Err(SourceError::AccessDenied);
+        }
+        match self.channels.get(&key) {
+            None => Ok(None),
+            Some(StoredChannel::Answers(config)) => Ok(Some(config.clone())),
+            // Blocks without spinning. `park` may return spuriously, so it is asked again; nothing
+            // ever unparks this thread on purpose.
+            Some(StoredChannel::NeverAnswers) => loop {
+                std::thread::park();
+            },
+        }
+    }
 }
 
 /// Code-integrity settings a fixture describes. Absent means the fixture never modelled them, which
@@ -187,6 +268,8 @@ struct FixtureFile {
     content: Option<String>,
     #[serde(default)]
     from: Option<String>,
+    #[serde(default)]
+    read_only: Option<bool>,
 }
 
 /// What a fixture says Windows would report about a file's embedded signature (ADR 0035). An absent
@@ -274,6 +357,9 @@ struct FixtureEntry {
     directory: bool,
     /// The file's bytes. `None` describes a file that exists and cannot be read.
     content: Option<Vec<u8>>,
+    /// Whether the file carries the read-only attribute. `None` describes a fixture that never said,
+    /// which is not the same as saying it does not (ADR 0037).
+    read_only: Option<bool>,
 }
 
 /// Paths and registry keys are compared case-insensitively and without a trailing separator, like Windows.
@@ -350,6 +436,7 @@ fn resolve_file(
         signature,
         directory: described.directory,
         content,
+        read_only: described.read_only,
     })
 }
 
@@ -391,6 +478,8 @@ pub struct FixtureHost {
     firmware: Option<FixtureFirmware>,
     processes: Option<Vec<FixtureProcess>>,
     milliseconds_since_boot: Option<u64>,
+    /// Keyed by the lower-cased channel name, like every other name this host compares.
+    event_log_channels: Option<BTreeMap<String, StoredChannel>>,
 }
 
 impl FixtureHost {
@@ -463,6 +552,18 @@ impl FixtureHost {
             firmware: file.firmware,
             processes: file.processes,
             milliseconds_since_boot: file.milliseconds_since_boot,
+            event_log_channels: file
+                .event_log_channels
+                .map(|channels| {
+                    channels
+                        .into_iter()
+                        .map(|(name, channel)| {
+                            let stored = resolve_channel(&name, channel, origin)?;
+                            Ok((name.to_ascii_lowercase(), stored))
+                        })
+                        .collect::<Result<BTreeMap<_, _>, FixtureError>>()
+                })
+                .transpose()?,
         })
     }
 
@@ -684,6 +785,57 @@ impl FilesystemSource for FixtureHost {
             .as_ref()
             .ok_or_else(|| SourceError::Failed(format!("no content recorded for {path}")))?;
         crate::read_bounded(content.as_slice(), crate::MAX_FILE_BYTES).map(Some)
+    }
+
+    /// What the fixture wrote under `read_only:` for that file, behind the same access checks
+    /// `read_file` makes.
+    ///
+    /// A file the fixture never listed does not exist, which is `Ok(None)`. A file it listed without
+    /// `read_only:` is `Unsupported`: silence in a fixture is "never modelled", and answering `false`
+    /// for it would put a value in the report nobody wrote (ADR 0037).
+    fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(file) = self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+        }) else {
+            return Ok(None);
+        };
+        file.read_only.map(Some).ok_or_else(|| {
+            SourceError::Unsupported(format!(
+                "this fixture host does not describe the attributes of {path}"
+            ))
+        })
+    }
+}
+
+impl EventLogConfigSource for FixtureHost {
+    /// A reader over what the fixture wrote under `event_log_channels:`.
+    ///
+    /// No block at all is `Unsupported`, never a reader that knows no channel: a fixture written
+    /// before this source existed must not claim that the service knows none. A channel named in
+    /// `access_denied` is refused, as a key or a folder named there is.
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError> {
+        if self.platform != Platform::Windows {
+            return Err(SourceError::Unsupported(
+                "no Windows Event Log on this platform".to_owned(),
+            ));
+        }
+        let channels = self.event_log_channels.clone().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe the Event Log service".to_owned(),
+            )
+        })?;
+        Ok(Box::new(FixtureChannelReader {
+            channels,
+            access_denied: self.access_denied.clone(),
+        }))
     }
 }
 
@@ -1359,6 +1511,95 @@ processes:
             FixtureHost::from_yaml_str("platform: windows\nmilliseconds_since_boot: 0\n", "inline")
                 .unwrap();
         assert_eq!(host.since_boot(), Ok(std::time::Duration::ZERO));
+    }
+
+    /// Three answers, and they are three statements: the attribute is set, it is not, and the
+    /// fixture never said. The third must not read as the second (ADR 0037).
+    #[test]
+    fn the_read_only_attribute_is_what_the_fixture_wrote_and_silence_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: set.pf\n      read_only: true\n    - name: clear.pf\n      read_only: false\n    - name: silent.pf\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(host.is_read_only(r"C:\P\SET.PF"), Ok(Some(true)));
+        assert_eq!(host.is_read_only(r"C:\p\clear.pf"), Ok(Some(false)));
+        assert!(matches!(
+            host.is_read_only(r"C:\p\silent.pf"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert_eq!(host.is_read_only(r"C:\p\absent.pf"), Ok(None));
+    }
+
+    #[test]
+    fn a_denied_folder_denies_the_read_only_attribute_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['C:\\p']\nfilesystem:\n  'C:\\p':\n    - name: a.pf\n      read_only: false\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.is_read_only(r"C:\p\a.pf"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    /// A block that does not name a channel describes a service that has none of that name; no
+    /// block at all describes nothing, and must not be read as "no such channel" (ADR 0042).
+    #[test]
+    fn a_channel_is_what_the_fixture_wrote_and_no_block_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['Locked/Operational']\nevent_log_channels:\n  Security:\n    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Security.evtx'\n    max_size_bytes: 20971520\n",
+            "inline",
+        )
+        .unwrap();
+        let reader = host.channel_config_reader().unwrap();
+        assert_eq!(
+            reader.channel_config("security"),
+            Ok(Some(ChannelConfig {
+                log_file_path: r"%SystemRoot%\System32\Winevt\Logs\Security.evtx".to_owned(),
+                max_size_bytes: 20_971_520,
+            }))
+        );
+        assert_eq!(reader.channel_config("No-Such/Channel"), Ok(None));
+        assert_eq!(
+            reader.channel_config("locked/operational"),
+            Err(SourceError::AccessDenied)
+        );
+
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            silent.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
+        let other = FixtureHost::from_yaml_str("platform: other\n", "inline").unwrap();
+        assert!(matches!(
+            other.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// A channel either answers or never does, and a fixture that says both, or neither, fails to load.
+    #[test]
+    fn a_channel_that_never_answers_is_written_alone() {
+        let with = |channel: &str| {
+            FixtureHost::from_yaml_str(
+                &format!("platform: windows\nevent_log_channels:\n  A/B:\n    {channel}\n"),
+                "inline",
+            )
+        };
+        assert!(with("never_answers: true").is_ok());
+        for refused in [
+            "{ never_answers: true, max_size_bytes: 1 }",
+            "{ never_answers: false }",
+            "{ log_file_path: 'C:\\x.evtx' }",
+        ] {
+            let yaml = format!("platform: windows\nevent_log_channels:\n  A/B: {refused}\n");
+            assert!(
+                FixtureHost::from_yaml_str(&yaml, "inline").is_err(),
+                "{refused} loaded"
+            );
+        }
     }
 
     #[test]

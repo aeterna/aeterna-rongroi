@@ -11,8 +11,9 @@
 //! needs an elevated token, so `not_admin` is an expected outcome of an ordinary scan rather than a
 //! defect (ADR 0012, ADR 0021).
 //!
-//! No rule reads this collector (ADR 0021), so what it sees is listed in Self mode as unmatched
-//! observations and counted, never listed, in SS mode (ADR 0014).
+//! One rule reads this collector, and it asks whether a `.pf` file is marked read-only, never what the
+//! file records (ADR 0037); no rule names a program (ADR 0034). Everything else it sees is listed in
+//! Self mode as unmatched observations and counted, never listed, in SS mode (ADR 0014).
 //!
 //! # Two of the parser's fields never reach a report
 //!
@@ -29,6 +30,16 @@
 //!
 //! What is left — the program's name, how many times it ran and when it last ran — is what a rule
 //! could use and is what this collector emits.
+//!
+//! # The configuration, beside the records
+//!
+//! Since ADR 0037 each run that could look also says two things about Prefetch's own setup, as one
+//! observation of their own: whether the folder is there (`folder`, the vocabulary `fivem_dir` uses
+//! for its folders) and the `EnablePrefetcher` value, which is **absent from the observation when
+//! the value is absent from the registry**. Before, both facts reached the report only as the reason
+//! a rule was unmeasured, which no rule can match. Neither is a finding and no rule reads either: the
+//! observation is shown in Self mode and counted in SS mode (ADR 0014). And each `.pf` file carries
+//! `read_only`, the one attribute bit a rule reads.
 
 use std::collections::BTreeMap;
 
@@ -84,15 +95,18 @@ const REASONS: [UnmeasuredReason; 8] = [
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
 /// the comment on [`Prefetch::collect`].
-const FIELDS: [Field; 13] = [
+const FIELDS: [Field; 16] = [
+    Field::number("enable_prefetcher"),
     Field::number("entries"),
     Field::number("files"),
+    Field::text("folder"),
     Field::boolean("intact"),
     Field::timestamp("last_run"),
     Field::text("loaded_files_withheld"),
     Field::text("name"),
     Field::text("path"),
     Field::text("read"),
+    Field::boolean("read_only"),
     Field::number("recorded_runs"),
     Field::number("rejected"),
     Field::number("run_count"),
@@ -114,6 +128,22 @@ const RECORD_FIELDS: [&str; 6] = [
     "run_count",
     "scca_version",
 ];
+
+/// The fields of the configuration observation, which a reason about the folder's **contents** never
+/// gaps (ADR 0037).
+///
+/// `folder` is the answer to "is the folder there", so a folder that is absent, unlistable or empty
+/// leaves it measured. `enable_prefetcher` is a registry read of its own; it is gapped only when that
+/// read fails, and then with that read's reason.
+const CONFIG_FIELDS: [&str; 2] = ["enable_prefetcher", "folder"];
+
+/// Value of `folder` when the folder is there and was listed.
+const FOLDER_LISTED: &str = "listed";
+/// Value of `folder` when the folder is not there.
+const FOLDER_ABSENT: &str = "absent";
+/// Value of `folder` when the folder is there and could not be listed; why is in `gaps` and in the
+/// `read` observation beside it.
+const FOLDER_UNREADABLE: &str = "unreadable";
 
 /// The `prefetch` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -158,41 +188,60 @@ impl Collector for Prefetch {
         // Read before the folder is interpreted. A machine whose `EnablePrefetcher` says Windows is
         // not writing application-launch records has no such record to be missing, so the folder's
         // state is not the answer to "did this program run" on it either way (ADR 0030).
-        let launches_recorded = application_launches_recorded(host);
+        let setting = enable_prefetcher(host);
+        let launches_recorded = setting.value.map(|value| value & 1 == 1);
 
         let names = match host.list_dir(&dir) {
-            // Prefetch is not on this machine: it is switched off, or this installation never had
-            // it. That is not the statement "no program ran" — it is the absence of the record that
-            // would have said either way, so it must not reach a rule as `NotFound` (ADR 0021).
+            // Prefetch's folder is not on this machine. That is not the statement "no program ran" —
+            // it is the absence of the record that would have said either way, so every field about
+            // a record stays a gap (ADR 0021). Whether the folder is there, and what the switch says,
+            // were both measured, and since ADR 0037 they are reported rather than only turned into
+            // a reason.
             Ok(None) => {
-                return CollectorRun::Unmeasured {
+                let reason = if launches_recorded == Some(false) {
+                    UnmeasuredReason::ServiceDisabled
+                } else {
+                    UnmeasuredReason::SourceAbsent
+                };
+                return CollectorRun::Measured {
                     collector: ID.to_owned(),
-                    reason: if launches_recorded == Some(false) {
-                        UnmeasuredReason::ServiceDisabled
-                    } else {
-                        UnmeasuredReason::SourceAbsent
-                    },
+                    observations: vec![configuration(FOLDER_ABSENT, setting.value)],
+                    gaps: with_setting_gap(content_gaps(reason), &setting),
                 };
             }
             Ok(Some(entries)) => prefetch_files(entries),
             Err(error) => {
                 // The folder is there and Windows would not hand it over — the ordinary outcome of
                 // a scan without an elevated token (ADR 0015). It is emitted as an observation as
-                // well as gapped, because with no rule reading this collector a `gaps` entry
-                // reaches no screen, and "could not read the artifact" is what a reviewer needs.
+                // well as gapped, because a `gaps` entry reaches no screen unless a rule reads the
+                // field, and "could not read the artifact" is what a reviewer needs.
                 return CollectorRun::Measured {
                     collector: ID.to_owned(),
-                    observations: vec![status(None, read_failure(&error))],
-                    gaps: gaps(reason_for(host, &error)),
+                    observations: vec![
+                        status(None, read_failure(&error), None),
+                        configuration(FOLDER_UNREADABLE, setting.value),
+                    ],
+                    gaps: with_setting_gap(content_gaps(reason_for(host, &error)), &setting),
                 };
             }
         };
 
-        let mut observations = Vec::with_capacity(names.len() + 1);
+        let mut observations = Vec::with_capacity(names.len() + 2);
         let mut parsed = 0_usize;
         let mut rejected = 0_usize;
+        // The first reason the attribute of some `.pf` file could not be read. One file whose
+        // attribute is unknown makes "no `.pf` file here is read-only" a claim nobody measured, so it
+        // gaps `read_only` for the run, as an unreadable folder gaps everything.
+        let mut attribute_gap: Option<UnmeasuredReason> = None;
         for name in &names {
             let path = format!(r"{dir}\{name}");
+            let read_only = match host.is_read_only(&path) {
+                Ok(read_only) => read_only,
+                Err(error) => {
+                    attribute_gap = attribute_gap.or(Some(reason_for(host, &error)));
+                    None
+                }
+            };
             match host.read_file(&path) {
                 // Listed a moment ago and gone now. Windows rewrites this folder while a scan runs,
                 // so this is ordinary (ADR 0019) and is counted as neither read nor refused.
@@ -200,29 +249,34 @@ impl Collector for Prefetch {
                 Ok(Some(bytes)) => match prefetch::parse(&bytes) {
                     Ok(record) => {
                         parsed += 1;
-                        observations.push(execution(&path, &record));
+                        observations.push(execution(&path, &record, read_only));
                     }
                     // A `.pf` this parser cannot decode — an older Windows's version, a payload that
                     // does not decompress, bytes that are not a Prefetch file at all. Each is a
                     // legitimate input rather than a defect, and each is named rather than counted.
                     Err(error) => {
                         rejected += 1;
-                        observations.push(status(Some(&path), parse_failure(&error)));
+                        observations.push(status(Some(&path), parse_failure(&error), read_only));
                     }
                 },
                 Err(error) => {
                     rejected += 1;
-                    observations.push(status(Some(&path), read_failure(&error)));
+                    observations.push(status(Some(&path), read_failure(&error), read_only));
                 }
             }
         }
         observations.push(account(names.len(), parsed, rejected));
+        observations.push(configuration(FOLDER_LISTED, setting.value));
 
+        let mut gaps = content_gap(launches_recorded, names.len(), rejected)
+            .map_or_else(BTreeMap::new, record_gaps);
+        if let Some(reason) = attribute_gap {
+            gaps.insert("read_only".to_owned(), reason);
+        }
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
-            gaps: content_gap(launches_recorded, names.len(), rejected)
-                .map_or_else(BTreeMap::new, record_gaps),
+            gaps: with_setting_gap(gaps, &setting),
         }
     }
 }
@@ -254,22 +308,55 @@ fn content_gap(
     }
 }
 
-/// Whether Windows writes a `.pf` file when an application is launched on this machine.
+/// What the registry held for `EnablePrefetcher`, and why nothing, when it held nothing readable.
+struct Setting {
+    /// The value, when there is one and it could be read.
+    value: Option<u32>,
+    /// Why it could not be read. `None` together with no value means the value is not there — a
+    /// different statement, and the one `enable_prefetcher|exists: false` asks about.
+    unread: Option<UnmeasuredReason>,
+}
+
+/// Reads `EnablePrefetcher`: `0` off, `1` application launch only, `2` boot only and `3` both.
 ///
-/// `EnablePrefetcher` is `0` off, `1` application launch only, `2` boot only and `3` both, so the
-/// answer is the low bit. `None` when the value is not there or could not be read: a registry read
-/// this program could not do is not evidence about what Windows is recording, and answering `true`
-/// or `false` from it would put a guess where the report says it read something.
-fn application_launches_recorded(host: &dyn Host) -> Option<bool> {
+/// A value that is not there is an answer; a value that could not be read — denied, or of a type that
+/// is not a number — is not, and a guess in its place would put a value in the report nobody read.
+fn enable_prefetcher(host: &dyn Host) -> Setting {
     match host.read_u32(PREFETCH_PARAMETERS_KEY, ENABLE_PREFETCHER) {
-        Ok(Some(value)) => Some(value & 1 == 1),
-        Ok(None) | Err(_) => None,
+        Ok(value) => Setting {
+            value,
+            unread: None,
+        },
+        Err(error) => Setting {
+            value: None,
+            unread: Some(reason_for(host, &error)),
+        },
     }
 }
 
-fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
+/// Whether Windows writes a `.pf` file when an application is launched on this machine: the low bit
+/// of `EnablePrefetcher`, and `None` when there is no value to read it from.
+#[cfg(test)]
+fn application_launches_recorded(host: &dyn Host) -> Option<bool> {
+    enable_prefetcher(host).value.map(|value| value & 1 == 1)
+}
+
+/// Adds the gap a failed `EnablePrefetcher` read leaves, to whatever else the run gapped.
+fn with_setting_gap(
+    mut gaps: BTreeMap<String, UnmeasuredReason>,
+    setting: &Setting,
+) -> BTreeMap<String, UnmeasuredReason> {
+    if let Some(reason) = setting.unread {
+        gaps.insert("enable_prefetcher".to_owned(), reason);
+    }
+    gaps
+}
+
+/// Every field but the configuration's, for a folder nothing was read from (ADR 0037).
+fn content_gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
+        .filter(|field| !CONFIG_FIELDS.contains(&field.name))
         .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
@@ -312,8 +399,11 @@ fn prefetch_files(entries: Vec<rongroi_host::DirEntryInfo>) -> Vec<String> {
 }
 
 /// One program Prefetch recorded, from one `.pf` file that decoded.
-fn execution(path: &str, record: &PrefetchRecord) -> Observation {
+fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Observation {
     let mut fields = BTreeMap::new();
+    if let Some(read_only) = read_only {
+        fields.insert("read_only".to_owned(), serde_json::Value::from(read_only));
+    }
     if let Some(name) = executable_name(&record.executable) {
         fields.insert("name".to_owned(), serde_json::Value::from(name));
     }
@@ -379,12 +469,37 @@ fn account(files: usize, parsed: usize, rejected: usize) -> Observation {
 /// It carries no `name` and no `run_count`, so a rule written for a program that ran never matches
 /// one of these, and it carries `read`, which no other observation does, so a rule written for it
 /// never matches a program that ran.
-fn status(path: Option<&str>, read: &'static str) -> Observation {
+fn status(path: Option<&str>, read: &'static str, read_only: Option<bool>) -> Observation {
     let mut fields = BTreeMap::new();
     if let Some(path) = path {
         fields.insert("path".to_owned(), serde_json::Value::from(path));
     }
+    if let Some(read_only) = read_only {
+        fields.insert("read_only".to_owned(), serde_json::Value::from(read_only));
+    }
     fields.insert("read".to_owned(), serde_json::Value::from(read));
+    Observation {
+        collector: ID.to_owned(),
+        fields,
+    }
+}
+
+/// How Prefetch is set up on this machine: whether its folder is there, and the switch.
+///
+/// It carries `folder`, which no other observation of this collector does, so a rule scopes itself to
+/// this one with `folder|exists: true`. The switch is **left out when the registry holds no value**,
+/// rather than written as `null` or a default: `enable_prefetcher|exists: false` is then the one
+/// question "the value is absent", and it is a different question from `enable_prefetcher: 0`, which
+/// is Prefetch switched off (ADR 0037).
+fn configuration(folder: &'static str, enable_prefetcher: Option<u32>) -> Observation {
+    let mut fields = BTreeMap::new();
+    fields.insert("folder".to_owned(), serde_json::Value::from(folder));
+    if let Some(value) = enable_prefetcher {
+        fields.insert(
+            "enable_prefetcher".to_owned(),
+            serde_json::Value::from(value),
+        );
+    }
     Observation {
         collector: ID.to_owned(),
         fields,
@@ -572,17 +687,78 @@ mod tests {
         assert_eq!(text(account, "volumes_withheld"), Some(VOLUMES_WITHHELD));
     }
 
-    /// Prefetch is switched off, or this Windows never had it. Nothing was read, so nothing can be
-    /// said about what ran — a rule must not read this as "the program did not run".
+    /// The one observation that says how Prefetch is set up.
+    fn configuration_of(observations: &[Observation]) -> &Observation {
+        observations
+            .iter()
+            .find(|observation| observation.fields.contains_key("folder"))
+            .expect("every run that could look says how Prefetch is set up")
+    }
+
+    /// Prefetch's folder is not here. Nothing about a program was read, so every field about one is
+    /// a gap and a rule must not read this as "the program did not run" (ADR 0021). What **was**
+    /// measured — that the folder is absent, and that the registry holds no switch either — is an
+    /// observation since ADR 0037, and neither of its fields is gapped.
     #[test]
-    fn no_prefetch_folder_is_unmeasured() {
-        assert_eq!(
-            Prefetch.collect(&fixture("prefetch-not-present")),
-            CollectorRun::Unmeasured {
-                collector: "prefetch".to_owned(),
-                reason: UnmeasuredReason::SourceAbsent,
+    fn no_prefetch_folder_is_a_measured_absence_and_gaps_every_record_field() {
+        let run = Prefetch.collect(&fixture("prefetch-not-present"));
+        let (observations, gaps) = measured(&run);
+
+        assert_eq!(observations.len(), 1, "{observations:?}");
+        let configuration = configuration_of(observations);
+        assert_eq!(text(configuration, "folder"), Some(FOLDER_ABSENT));
+        // The value is not in the registry, so it is not in the observation — not `null`, not `0`.
+        assert_eq!(field(configuration, "enable_prefetcher"), None);
+        for field in FIELDS {
+            let name = field.name;
+            if CONFIG_FIELDS.contains(&name) {
+                assert_eq!(gaps.get(name), None, "{name}");
+            } else {
+                assert_eq!(
+                    gaps.get(name),
+                    Some(&UnmeasuredReason::SourceAbsent),
+                    "{name}"
+                );
             }
+        }
+    }
+
+    /// The switch as the registry holds it, on every run that could look — and nothing when there is
+    /// nothing, which is a different statement from `0`.
+    #[test]
+    fn the_configuration_reports_the_switch_as_read() {
+        let run = Prefetch.collect(&fixture("prefetch-folder-empty"));
+        let (observations, gaps) = measured(&run);
+        let configuration = configuration_of(observations);
+        assert_eq!(text(configuration, "folder"), Some(FOLDER_LISTED));
+        assert_eq!(
+            field(configuration, "enable_prefetcher"),
+            Some(&3_u64.into())
         );
+        assert_eq!(gaps.get("folder"), None);
+        assert_eq!(gaps.get("enable_prefetcher"), None);
+    }
+
+    /// A switch this program could not read is not a switch that is absent: the field is gapped with
+    /// the read's reason, so `enable_prefetcher|exists: false` comes out unmeasured, not found.
+    #[test]
+    fn a_switch_that_could_not_be_read_is_a_gap_not_an_absence() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nelevated: true\nenv:\n  SystemRoot: 'C:\\Windows'\nfilesystem:\n  'C:\\Windows\\Prefetch': []\naccess_denied:\n  - 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters'\n",
+            "inline",
+        )
+        .unwrap();
+        let run = Prefetch.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert_eq!(
+            field(configuration_of(observations), "enable_prefetcher"),
+            None
+        );
+        assert_eq!(
+            gaps.get("enable_prefetcher"),
+            Some(&UnmeasuredReason::AccessDenied)
+        );
+        assert_eq!(gaps.get("folder"), None);
     }
 
     /// The folder is there and holds no `.pf` file. Opposite statements, which one word used to make
@@ -640,12 +816,15 @@ mod tests {
             "inline",
         )
         .unwrap();
+        let run = Prefetch.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert_eq!(gaps.get("name"), Some(&UnmeasuredReason::ServiceDisabled));
+        assert_eq!(gaps.get("files"), Some(&UnmeasuredReason::ServiceDisabled));
+        let configuration = configuration_of(observations);
+        assert_eq!(text(configuration, "folder"), Some(FOLDER_ABSENT));
         assert_eq!(
-            Prefetch.collect(&host),
-            CollectorRun::Unmeasured {
-                collector: "prefetch".to_owned(),
-                reason: UnmeasuredReason::ServiceDisabled,
-            }
+            field(configuration, "enable_prefetcher"),
+            Some(&0_u64.into())
         );
     }
 
@@ -678,12 +857,19 @@ mod tests {
         let run = Prefetch.collect(&fixture("prefetch-access-denied"));
         let (observations, gaps) = measured(&run);
 
-        assert_eq!(observations.len(), 1, "{observations:?}");
-        assert_eq!(text(&observations[0], "read"), Some("access_denied"));
-        assert_eq!(observations[0].fields.get("path"), None);
+        let refused = refusals(observations);
+        assert_eq!(refused.len(), 1, "{observations:?}");
+        assert_eq!(text(refused[0], "read"), Some("access_denied"));
+        assert_eq!(refused[0].fields.get("path"), None);
+        // The folder is there — Windows refused it — and that much was measured (ADR 0037).
+        assert_eq!(
+            text(configuration_of(observations), "folder"),
+            Some(FOLDER_UNREADABLE)
+        );
         for field in FIELDS {
             let name = field.name;
-            assert_eq!(gaps.get(name), Some(&UnmeasuredReason::NotAdmin), "{name}");
+            let expected = (!CONFIG_FIELDS.contains(&name)).then_some(&UnmeasuredReason::NotAdmin);
+            assert_eq!(gaps.get(name), expected, "{name}");
         }
     }
 
@@ -694,14 +880,15 @@ mod tests {
         let run = Prefetch.collect(&fixture("prefetch-access-denied-elevated"));
         let (observations, gaps) = measured(&run);
 
-        assert_eq!(text(&observations[0], "read"), Some("access_denied"));
+        assert_eq!(
+            text(refusals(observations)[0], "read"),
+            Some("access_denied")
+        );
         for field in FIELDS {
             let name = field.name;
-            assert_eq!(
-                gaps.get(name),
-                Some(&UnmeasuredReason::AccessDenied),
-                "{name}"
-            );
+            let expected =
+                (!CONFIG_FIELDS.contains(&name)).then_some(&UnmeasuredReason::AccessDenied);
+            assert_eq!(gaps.get(name), expected, "{name}");
         }
     }
 
@@ -787,6 +974,46 @@ mod tests {
         assert_eq!(field(account, "entries"), Some(&0_u64.into()));
         assert_eq!(field(account, "rejected"), Some(&2_u64.into()));
         assert_eq!(field(account, "intact"), Some(&false.into()));
+    }
+
+    /// The one attribute bit a rule reads, on the file the observation is about (ADR 0037).
+    #[test]
+    fn each_prefetch_file_says_whether_it_is_read_only() {
+        let run = Prefetch.collect(&fixture("prefetch-files-present"));
+        let (observations, gaps) = measured(&run);
+        assert_eq!(
+            field(executions(observations)[0], "read_only"),
+            Some(&false.into())
+        );
+        assert_eq!(gaps.get("read_only"), None);
+
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nelevated: true\nenv:\n  SystemRoot: 'C:\\Windows'\nfilesystem:\n  'C:\\Windows\\Prefetch':\n    - name: A.EXE-11111111.pf\n      read_only: true\n",
+            "inline",
+        )
+        .unwrap();
+        let run = Prefetch.collect(&host);
+        let (observations, _) = measured(&run);
+        // The file has no bytes, so it is a refusal — and it still says what its attribute is.
+        assert_eq!(
+            field(refusals(observations)[0], "read_only"),
+            Some(&true.into())
+        );
+    }
+
+    /// A file whose attribute could not be read carries no `read_only`, and the run gaps the field:
+    /// "no `.pf` file here is read-only" was not measured about that file (ADR 0037).
+    #[test]
+    fn an_attribute_that_could_not_be_read_gaps_read_only() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nelevated: true\nenv:\n  SystemRoot: 'C:\\Windows'\nfilesystem:\n  'C:\\Windows\\Prefetch':\n    - name: A.EXE-11111111.pf\n",
+            "inline",
+        )
+        .unwrap();
+        let run = Prefetch.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert_eq!(field(refusals(observations)[0], "read_only"), None);
+        assert_eq!(gaps.get("read_only"), Some(&UnmeasuredReason::ReadFailed));
     }
 
     #[test]
