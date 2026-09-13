@@ -9,6 +9,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - The Windows live smoke prints the `rule_id` and collector of every evidence row, not the state of the
   posture rows alone. Four lines reading "found / found / unmeasured / found" said a machine had been
   measured and not which rule saw what.
+- Documentation caught up with what the gates and one real Windows machine now say. "Needs admin" in
+  `docs/architecture.md` is a measurement for PCA, BAM and Prefetch instead of "unverified" or "not
+  measured"; the README milestone table no longer says no collector reads the four parsers; and
+  `docs/rules-authoring.md`, `CONVENTIONS.md` and `AGENTS.md` describe the baseline gate's second
+  question — was this rule ever put one — rather than only its first.
 
 ### Fixed
 - `cargo xtask check-baseline` was green for two rules it had never compared to anything (ADR 0033).

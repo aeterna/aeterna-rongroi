@@ -104,6 +104,8 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
 | `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
 | `unmeasured_when` names only reasons the rule's collector can report, each once, and never `partial`, `budget_spent` or `read_failed` — a view lists those whatever a rule declares, so naming one is a failure rather than a line that changes nothing (ADR 0030, ADR 0032) | `check-rules` |
+| The rule is quiet on every `fixtures/hosts/baseline-*` host, or a `rules/known-fps.csv` row accepts the match with a reason; an unused row fails too (ADR 0017) | `cargo xtask check-baseline` |
+| The rule is **confronted** by some baseline observation — one carrying every field its `match` names and one unsatisfied condition away from firing — or a `rules/unconfronted.csv` row gives a reason and a `resolved_when`; a row for a rule that is confronted fails too. Quiet on a machine that was never put the question is not a measurement (ADR 0033) | `check-baseline` |
 
 ## 7. Git
 
