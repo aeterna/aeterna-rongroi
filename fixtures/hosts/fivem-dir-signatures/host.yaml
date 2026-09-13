@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# FiveM for GTA V Legacy's plugin folder holding one file for each answer a signature check gives
+# (ADR 0035). Every hash here is invented, including the signing certificate's: no real publisher and no
+# real certificate is described, and `Example Signer` is not anyone.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins':
+    - name: signed.dll
+      sha256: 1111111111111111111111111111111111111111111111111111111111111111
+      signature:
+        state: valid
+        signer: Example Signer
+        signer_cert_sha256: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    - name: tampered.dll
+      sha256: 2222222222222222222222222222222222222222222222222222222222222222
+      signature: { state: invalid }
+    - name: unsigned.asi
+      sha256: 3333333333333333333333333333333333333333333333333333333333333333
+      signature: { state: no_embedded_signature }
+    - name: unchained.dll
+      sha256: 4444444444444444444444444444444444444444444444444444444444444444
+      signature: { state: unverifiable_offline }

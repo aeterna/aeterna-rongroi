@@ -146,6 +146,45 @@ pub trait FilesystemSource {
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError>;
 }
 
+/// What Windows says about the Authenticode signature **embedded in** one file, checked without the
+/// network (ADR 0035).
+///
+/// Four answers, because "not valid" is three different statements and a reviewer has to be able to
+/// tell them apart. None of them is a finding on its own: most files in a plugin folder are unsigned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SignatureCheck {
+    /// The signature is intact and chains to a root this machine trusts.
+    Valid {
+        /// Simple display name of the signing certificate's subject, for a person to read. Never
+        /// compared by `allow`: a stolen certificate carries the same name as the real one.
+        signer: String,
+        /// SHA-256 of the signing certificate's encoded bytes, as lowercase hex — the identity `allow`
+        /// compares.
+        signer_cert_sha256: String,
+    },
+    /// The file carries no embedded signature, or is not a kind of file one can be embedded in.
+    ///
+    /// Not "unsigned": a file can be signed through a Windows catalog instead, and this check does not
+    /// look there.
+    NoEmbeddedSignature,
+    /// A signature is there and Windows does not trust it: the file changed after signing, the
+    /// certificate chains to a root this machine does not trust, it expired without a timestamp, or it
+    /// is explicitly distrusted.
+    Invalid,
+    /// The answer needed something this machine does not hold locally — an intermediate certificate or
+    /// revocation data — and this program does not fetch it. A fact about the check, not the file.
+    UnverifiableOffline,
+}
+
+/// Read-only access to the Authenticode signature embedded in a file (ADR 0035).
+pub trait SignatureSource {
+    /// Checks the signature embedded in the file at `path`, without the network.
+    ///
+    /// The error is about that one file, like [`FilesystemSource::file_sha256`]: a collector that
+    /// cannot check one file still reports the file.
+    fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError>;
+}
+
 /// Read-only access to the process environment. Names are case-insensitive, like Windows.
 pub trait EnvironmentSource {
     /// Value of `name`, or `None` when it is not set or is not valid Unicode.
@@ -313,6 +352,7 @@ pub fn bound_registry_value(bytes: Vec<u8>, limit: usize) -> Result<Vec<u8>, Sou
 pub trait Host:
     RegistrySource
     + FilesystemSource
+    + SignatureSource
     + EnvironmentSource
     + SystemIntegritySource
     + TpmSource
@@ -383,6 +423,14 @@ impl FilesystemSource for NonWindowsHost {
     }
 }
 
+impl SignatureSource for NonWindowsHost {
+    fn file_signature(&self, _path: &str) -> Result<SignatureCheck, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Authenticode verification on this platform".to_owned(),
+        ))
+    }
+}
+
 impl EnvironmentSource for NonWindowsHost {
     fn env_var(&self, _name: &str) -> Option<String> {
         None
@@ -443,6 +491,10 @@ mod tests {
         ));
         assert!(matches!(
             NonWindowsHost.read_file(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.file_signature(r"C:\Users\a\x.dll"),
             Err(SourceError::Unsupported(_))
         ));
         assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);

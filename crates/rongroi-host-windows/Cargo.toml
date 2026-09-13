@@ -27,10 +27,18 @@ windows-registry.workspace = true
 # `CreateToolhelp32Snapshot` and the `Process32*W` walk are gated on `Win32_System_Diagnostics_ToolHelp`,
 # and `OpenProcess`/`QueryFullProcessImageNameW` on `Win32_System_Threading` (ADR 0010); both names were
 # read from the same manifest, and `CloseHandle` comes with `Win32_Foundation`, already listed here.
+# `WinVerifyTrust` is under `Win32_Security_WinTrust`, but `WINTRUST_DATA` is gated on
+# `Win32_Security_Cryptography` and `WTHelperProvDataFromStateData`/`WTHelperGetProvSignerFromChain` on
+# `Win32_Security_Cryptography_Catalog` and `_Sip` as well; `CertGetNameStringW` is in `Cryptography`
+# (ADR 0035; each gate read from the `windows` 0.62.2 sources).
 windows = { workspace = true, features = [
   "Wdk_System_SystemInformation",
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_Security_Cryptography",
+  "Win32_Security_Cryptography_Catalog",
+  "Win32_Security_Cryptography_Sip",
+  "Win32_Security_WinTrust",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Registry",
   "Win32_System_Threading",

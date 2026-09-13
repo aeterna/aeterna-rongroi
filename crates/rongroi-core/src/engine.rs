@@ -481,10 +481,10 @@ fn value_matches(expected: &serde_json::Value, seen: &serde_json::Value, cased: 
 
 /// Whether a rule excuses this observation.
 ///
-/// `sha256` compares without regard to ASCII case because hex is written both ways; `signer` stays
-/// exact. ADR 0025 made a rule's `match` case-insensitive and deliberately left this alone: folding
-/// here widens an exclusion rather than a match, which is weakening a rule, and no collector in this
-/// repository has ever emitted a `signer` field to fold.
+/// Both identities are hex digests and compare without regard to ASCII case, because hex is written
+/// both ways. Folding here does not widen an exclusion the way folding a name would: two digests that
+/// differ only in case are the same digest. There is no name to compare — not the file's and, since
+/// ADR 0035, not the signer's either.
 fn is_allowed(rule: &Rule, observation: &Observation) -> bool {
     let field = |name: &str| {
         observation
@@ -492,18 +492,14 @@ fn is_allowed(rule: &Rule, observation: &Observation) -> bool {
             .get(name)
             .and_then(serde_json::Value::as_str)
     };
+    let same = |allowed: Option<&str>, seen: &str| {
+        allowed
+            .zip(field(seen))
+            .is_some_and(|(allowed, seen)| allowed.eq_ignore_ascii_case(seen))
+    };
     rule.allow.iter().any(|allow| {
-        let by_hash = allow
-            .sha256
-            .as_deref()
-            .zip(field("sha256"))
-            .is_some_and(|(allowed, seen)| allowed.eq_ignore_ascii_case(seen));
-        let by_signer = allow
-            .signer
-            .as_deref()
-            .zip(field("signer"))
-            .is_some_and(|(allowed, seen)| allowed == seen);
-        by_hash || by_signer
+        same(allow.sha256.as_deref(), "sha256")
+            || same(allow.signer_cert_sha256.as_deref(), "signer_cert_sha256")
     })
 }
 
@@ -1228,6 +1224,47 @@ date: 2026-09-12
         );
         assert!(found(&report.evidence[0]), "{:?}", report.evidence[0]);
         assert!(report.unmatched.is_empty(), "{:?}", report.unmatched);
+    }
+
+    /// ADR 0035: the certificate's hash excuses an observation, in either case; its signer's name
+    /// never does, and a certificate hash in the observation's `sha256` field is not the same claim.
+    #[test]
+    fn an_allowed_signing_certificate_is_excluded_and_a_signer_name_is_not() {
+        let cert = "b".repeat(64);
+        let rule = rule(&format!(
+            "allow:\n  - signer_cert_sha256: {}\n",
+            cert.to_uppercase()
+        ));
+        let signed_by = |cert: &str| {
+            measured(vec![observation(&[
+                ("secure_boot", "disabled"),
+                ("signer", "Example Corp"),
+                ("signer_cert_sha256", cert),
+            ])])
+        };
+        let excluded = evaluate_rule(&rule, &[signed_by(&cert)]);
+        assert!(matches!(excluded.state, EvidenceState::NotFound { .. }));
+
+        let other = evaluate_rule(&rule, &[signed_by(&"c".repeat(64))]);
+        assert!(
+            matches!(other.state, EvidenceState::Found { .. }),
+            "{other:?}"
+        );
+
+        let hash_field = evaluate_rule(
+            &rule,
+            &[measured(vec![observation(&[
+                ("secure_boot", "disabled"),
+                ("sha256", &cert),
+            ])])],
+        );
+        assert!(matches!(hash_field.state, EvidenceState::Found { .. }));
+    }
+
+    #[test]
+    fn a_signer_name_in_allow_does_not_parse() {
+        let yaml = "id: 8f2e1a47-0b6c-4d93-9a15-2c7e4f6b8d03\ntitle: t\ndescription: d\nstatus: experimental\ncollector: posture\nstrength: posture\nmatch:\n  secure_boot: disabled\nretention: r\nallow:\n  - signer: Example Corp\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-13\n";
+        assert!(serde_saphyr::from_str::<Rule>(yaml).is_err());
     }
 
     #[test]

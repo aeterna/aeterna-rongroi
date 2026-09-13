@@ -35,6 +35,8 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **build marker** | The text `aeterna-rongroi build marker: official=<flag>;commit=<sha>;` embedded in every binary; the report's provenance is read from it | `rongroi_core::provenance::build_marker` |
 | **path** | Observation field: the full path of the file the observation is about, as it was read. Redacted to `%USERPROFILE%` in SS mode | observation field `path` |
 | **sha256** | Observation field: SHA-256 of that file, 64 lowercase hex characters. The only file hash, and one of the two things `allow` may compare | observation field `sha256` |
+| **signature** | Observation field: what Windows says about the Authenticode signature **embedded** in that file — `valid`, `no_embedded_signature`, `invalid` or `unverifiable_offline` — checked without the network. Never "unsigned": a catalog signature is not looked at (ADR 0035) | `rongroi_host::SignatureCheck`, observation field `signature` |
+| **signer** / **signer_cert_sha256** | Observation fields of a `valid` signature: the signing certificate's display name, for the reader, and the SHA-256 of the certificate, the other thing `allow` may compare. A name is never compared: stolen certificates carry the real publisher's (ADR 0035) | observation fields `signer`, `signer_cert_sha256` |
 
 Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as "detection result",
 "hit", "finding" for Evidence.
@@ -101,7 +103,7 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | `match` strings compare without regard to ASCII case; `cased` names the fields compared exactly | `check-rules` · engine tests |
 | A `match` key is a field name, optionally `\|` and one of the eight operators; a list value means **or** | `check-rules` · engine tests |
 | An operator the field's declared kind cannot take, an empty list, and a `cased` entry `match` compares no text of are rejected | `check-rules` |
-| `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
+| `allow` entries identify software by `sha256` or `signer_cert_sha256` — exactly one, 64 hex characters — never by a file's or a signer's name (ADR 0035) | `check-rules` |
 | No rule on `prefetch`, `bam` or `pca` identifies a program by `name` or `path`: nothing they emit identifies software, so such a rule can neither `allow` a legitimate program nor survive a rename (ADR 0034). `check-rules` and `check-baseline` both accept one today | review |
 | `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
 | `unmeasured_when` names only reasons the rule's collector can report, each once, and never `partial`, `budget_spent` or `read_failed` — a view lists those whatever a rule declares, so naming one is a failure rather than a line that changes nothing (ADR 0030, ADR 0032) | `check-rules` |

@@ -13,7 +13,7 @@ expression: view
       "exe_sha256": null
     },
     "rules_bundle": {
-      "schema_version": 1,
+      "schema_version": 2,
       "sha256": "[bundle sha256]",
       "rule_count": 6
     },
@@ -66,6 +66,6 @@ expression: view
     "not_found": 0,
     "unmeasured_expected": 2,
     "unmeasured_unexpected": 0,
-    "unmatched": 2
+    "unmatched": 4
   }
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! Rule format v1 and the validation shared by the embedded bundle and `cargo xtask check-rules`.
+//! Rule format v2 and the validation shared by the embedded bundle and `cargo xtask check-rules`.
 //! The authoring guide is `docs/rules-authoring.md`.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,7 +13,11 @@ use serde::{Deserialize, Serialize};
 use crate::model::{Strength, UnmeasuredReason};
 
 /// Version of the rule format.
-pub const RULES_SCHEMA_VERSION: u32 = 1;
+///
+/// 2 since ADR 0035 replaced `allow.signer`, a name, with `allow.signer_cert_sha256`, a certificate's
+/// hash. No rule had used the old field, but a rule written for version 1 that did would no longer
+/// parse, and that is what a version number is for.
+pub const RULES_SCHEMA_VERSION: u32 = 2;
 
 /// Lifecycle of a rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -36,16 +40,18 @@ impl Status {
     }
 }
 
-/// Legitimate software excluded from a rule. Identified by hash or signer, never by file name.
+/// Legitimate software excluded from a rule. Identified by the file's hash or by the certificate that
+/// signed it, never by a name — of the file or of the signer (ADR 0035).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Allow {
     /// SHA-256 of the file, 64 hex characters.
     #[serde(default)]
     pub sha256: Option<String>,
-    /// Authenticode signer subject.
+    /// SHA-256 of the Authenticode signing certificate, 64 hex characters. A publisher's name is not
+    /// accepted here: certificates stolen from a real publisher carry its name.
     #[serde(default)]
-    pub signer: Option<String>,
+    pub signer_cert_sha256: Option<String>,
 }
 
 /// How a rule relates to another rule.
@@ -448,13 +454,20 @@ fn validate_rule(rule: &Rule, report: &mut impl FnMut(String)) {
         report(format!("`modified` `{modified}` must be YYYY-MM-DD"));
     }
     for allow in &rule.allow {
-        match (&allow.sha256, &allow.signer) {
-            (Some(hash), None) if is_sha256(hash) => {}
+        match (&allow.sha256, &allow.signer_cert_sha256) {
+            (Some(hash), None) | (None, Some(hash)) if is_sha256(hash) => {}
             (Some(hash), None) => {
                 report(format!("allow sha256 `{hash}` must be 64 hex characters"));
             }
-            (None, Some(signer)) if !signer.trim().is_empty() => {}
-            _ => report("each `allow` entry needs exactly one of `sha256` or `signer`".to_owned()),
+            (None, Some(hash)) => {
+                report(format!(
+                    "allow signer_cert_sha256 `{hash}` must be 64 hex characters"
+                ));
+            }
+            _ => report(
+                "each `allow` entry needs exactly one of `sha256` or `signer_cert_sha256`"
+                    .to_owned(),
+            ),
         }
     }
     for related in &rule.related {
@@ -738,6 +751,42 @@ date: 2026-09-11
         let rules = [sourced("posture/example/rule.yaml", VALID)];
         let problems = validate(&rules, &Translations::new());
         assert!(problems.iter().any(|p| p.message.contains("must live at")));
+    }
+
+    /// Each `allow` entry names one digest of 64 hex characters: the file's or its signing
+    /// certificate's (ADR 0035).
+    #[test]
+    fn an_allow_entry_names_exactly_one_well_formed_digest() {
+        let digest = "d".repeat(64);
+        let problems_for = |entry: &str| {
+            let yaml = format!("{VALID}allow:\n  - {entry}\n");
+            validate(
+                &[sourced("posture/boot/example/rule.yaml", &yaml)],
+                &Translations::new(),
+            )
+        };
+        assert_eq!(problems_for(&format!("sha256: {digest}")), vec![]);
+        assert_eq!(
+            problems_for(&format!("signer_cert_sha256: {digest}")),
+            vec![]
+        );
+        for (entry, expected) in [
+            (
+                "signer_cert_sha256: abc".to_owned(),
+                "must be 64 hex characters",
+            ),
+            (
+                format!("{{ sha256: {digest}, signer_cert_sha256: {digest} }}"),
+                "exactly one of",
+            ),
+            ("{}".to_owned(), "exactly one of"),
+        ] {
+            let problems = problems_for(&entry);
+            assert!(
+                problems.iter().any(|p| p.message.contains(expected)),
+                "{entry}: {problems:?}"
+            );
+        }
     }
 
     #[test]

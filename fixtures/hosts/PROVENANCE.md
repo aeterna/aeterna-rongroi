@@ -11,8 +11,10 @@ none contains a real person's user name, host name, SID or files.
 | `registry-access-denied` | Windows 11, Secure Boot key unreadable | posture collector tests |
 | `test-signing-on` | Windows 11 with test signing switched on; everything else ordinary | posture collector tests |
 | `tpm-absent` | Windows 11 with no TPM, so no specification version either; everything else ordinary | posture collector tests |
-| `fivem-dir-plugin-present` | Windows 11, FiveM installed; its plugin folder holds a file whose hash can be read, a file whose hash cannot, and a subdirectory | `fivem_dir` collector tests, report snapshots |
-| `fivem-dir-not-installed` | Windows 11 with no FiveM: `%LOCALAPPDATA%` is set and the plugin folder does not exist | `fivem_dir` collector tests |
+| `fivem-dir-plugin-present` | Windows 11, FiveM for GTA V Legacy installed; its plugin folder holds a file whose hash and signature can be read (an empty file, so nothing is embedded), a file whose hash and signature cannot, and a subdirectory. Enhanced is not installed | `fivem_dir` collector tests, report snapshots |
+| `fivem-dir-signatures` | Windows 11, Legacy's plugin folder holding one file for each answer a signature check gives (ADR 0035). Every hash, the signing certificate's included, is invented, and `Example Signer` is nobody | `fivem_dir` collector tests |
+| `fivem-dir-enhanced-asi` | Windows 11 with only FiveM for GTA V Enhanced: one file in `%APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi`, and one in the `mods` folder beside it, which the collector does not read (ADR 0035) | `fivem_dir` collector tests |
+| `fivem-dir-not-installed` | Windows 11 with neither FiveM edition: `%LOCALAPPDATA%` and `%APPDATA%` are set and neither plugin folder exists | `fivem_dir` collector tests |
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
 | `process-own-trace` | Windows 11 running three processes: one whose image path cannot be resolved, one ordinary program, and aeterna-rongroi itself | `process` collector tests, report snapshots |

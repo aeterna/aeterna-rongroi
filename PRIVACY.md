@@ -3,10 +3,17 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's own folders, the list of running processes, what the Program Compatibility Assistant, Windows
+FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, the list of running processes, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
+
+Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
+says about the digital signature embedded in it: whether it is valid and, when it is, the name on the
+signing certificate and a hash of that certificate. **Checking a signature does not use the internet** —
+the check is told to use only what Windows already holds, and the Windows CI job proves it on every
+change (ADR 0035). The name on a certificate is usually a company's; some developers sign in their own
+name, and that name is then what the report shows.
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
 is on disk. It does not read what a program is doing, what is in its memory, or what you typed into it.
@@ -109,7 +116,7 @@ tool did, not more. Paths in it are redacted in SS mode like any other.
 
 ### What a collector saw that no rule matched
 
-Some collectors read things no rule asks about — the files in FiveM's plugin folder, and the list of
+Some collectors read things no rule asks about — the files in FiveM's plugin folders, and the list of
 programs you are running. **Self mode lists them**, under "unmatched observations", so that you can read
 what the tool saw and judge it yourself.
 

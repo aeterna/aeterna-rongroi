@@ -13,7 +13,7 @@ expression: view
       "exe_sha256": null
     },
     "rules_bundle": {
-      "schema_version": 1,
+      "schema_version": 2,
       "sha256": "[bundle sha256]",
       "rule_count": 6
     },
@@ -80,9 +80,18 @@ expression: view
         {
           "collector": "fivem_dir",
           "fields": {
+            "files": 2,
+            "folder": "listed",
+            "location": "plugins"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
             "location": "plugins",
             "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
-            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "signature": "no_embedded_signature"
           }
         },
         {
@@ -90,6 +99,13 @@ expression: view
           "fields": {
             "location": "plugins",
             "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_asi"
           }
         }
       ]

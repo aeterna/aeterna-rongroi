@@ -898,7 +898,7 @@ date: 2026-09-11
         assert_eq!(distance("", "abc"), 3);
     }
 
-    /// Gate (3): an `allow` entry that is not `sha256` or `signer` (e.g. `file_name`) must be
+    /// Gate (3): an `allow` entry that is not `sha256` or `signer_cert_sha256` (e.g. `file_name`) must be
     /// rejected while parsing the rule, with a message naming the offending field.
     #[test]
     fn allow_entry_with_unknown_field_is_rejected() {
@@ -914,7 +914,8 @@ date: 2026-09-11
 
         let message = error.to_string();
         assert!(
-            message.contains("unknown field `file_name`, expected one of sha256, signer"),
+            message
+                .contains("unknown field `file_name`, expected one of sha256, signer_cert_sha256"),
             "{message}"
         );
     }

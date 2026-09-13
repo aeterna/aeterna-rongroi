@@ -55,6 +55,10 @@ hashes nor Authenticode signer checking exists yet — and `allow` may only iden
 `signer`, never by file name. Shipping the rule now would produce evidence that a reviewer could not act
 on. The rule follows once signer checking or a starter allow-list exists.
 
+**Signer checking exists since ADR 0035**, which also changes what `allow` compares — the signing
+certificate's SHA-256, never the signer's name — and extends this collector to FiveM for GTA V Enhanced's
+`asi` folder under `%APPDATA%`. The rule itself is still to be written.
+
 This ADR originally continued: *"The observations are still visible in Self mode, where a person reads
 them."* That was false when it was written. A `Report` held one `Evidence` per rule, and an
 observation reached it only inside `EvidenceState::Found`, so a collector with no rule produced

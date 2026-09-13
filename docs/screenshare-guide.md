@@ -162,7 +162,7 @@ its own, it is not evidence of cheating.
 
 The program reads more than the six rules ask about. It reads what Windows recorded about programs
 that ran (Prefetch, BAM, the Program Compatibility Assistant), the list of running programs, and the
-files in FiveM's plugins folder. **No rule reads those today**, so they are *unmatched observations*:
+files in FiveM's plugin folders for GTA V Legacy and Enhanced, with their signatures. **No rule reads those today**, so they are *unmatched observations*:
 
 - **Self mode** lists them, for the player.
 - **SS mode** shows only how many there were.
