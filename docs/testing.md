@@ -28,12 +28,24 @@ be `unmeasured` there.
 > (ADR 0010). `fivem_dir` produced none, which the report cannot distinguish from "could not look":
 > no rule reads that collector, so its run reaches the report only through `unmatched`.
 >
-> **What this does and does not settle.** It settles that each of those four artifacts exists, is
-> readable with an elevated token, and parses — on that machine. It does not settle which path shapes
-> the artifacts hold in general, nor whether each source is readable **without** an elevated token: the
-> non-elevated run answers that only for the Event Log, where both log-clearing rules came out
-> `unmeasured / not_admin` exactly as ADR 0024 says they should. The per-artifact questions in ADRs 0020,
-> 0021, 0023 and 0024 stay open, and one machine is why.
+> **Elevated against limited, same machine, same day.** The second run answers "does this need
+> administrator rights", which ADR 0015 asserted for Prefetch and ADRs 0020 and 0023 left unestablished
+> for PCA and BAM:
+>
+> | Collector | Elevated | Limited token |
+> |---|---|---|
+> | `pca` | 3 | **3** — readable without elevation |
+> | `process` | 298 | 295 — no elevation effect visible; the difference is three processes, which is also what a minute apart looks like |
+> | `evtx` | 1421 | 229 — partly readable; `Security` and `System` are not, and both log-clearing rules came out `unmeasured / not_admin` as ADR 0024 says |
+> | `bam` | 83 | **1** — needs elevation |
+> | `prefetch` | 627 | **1** — needs elevation, as ADR 0015 said |
+>
+> `docs/architecture.md`'s "Needs admin" column now carries these.
+>
+> **What one machine does not settle.** Which path shapes the artifacts hold in general; whether another
+> Windows build or edition answers differently; and what the single remaining observation is in the
+> `bam` and `prefetch` limited-token runs — it is one per collector and was not opened. The per-artifact
+> path questions in ADRs 0020, 0021, 0023 and 0024 stay open.
 >
 > The CI job remains a second, different machine rather than a substitute: it has a real `winevt\Logs`
 > folder and an elevated token, so it parses real event-log bytes on every run, and it says nothing about

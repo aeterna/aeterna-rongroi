@@ -61,7 +61,7 @@ system could fake what is displayed. Treat results as evidence for a person to j
 |---|---|---|
 | M0 | Repository, rule format, engine, Secure Boot posture check, CLI and GUI shell, release pipeline | released in 0.1.0 |
 | M1 | FiveM folder checks, running processes, more posture checks, admin re-launch | merged, not released yet |
-| M2 | Prefetch, BAM, PCA, event-log tamper signals | the four parsers are merged; no collector reads them, so a scan shows nothing from them yet |
+| M2 | Prefetch, BAM, PCA, event-log tamper signals | collectors merged and reading — a scan shows what all four hold. Two event-log rules ship, both `experimental`; no rule reads Prefetch, BAM or PCA yet, so those three appear only as observations nothing matched |
 | M3 | Vulnerable-driver list, USN journal, Amcache, screenshare guide | planned |
 
 "Merged" means the work is on the `dev` branch and is not in a release. 0.1.0 is the only release so far,

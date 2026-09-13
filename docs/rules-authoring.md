@@ -164,11 +164,35 @@ translations are applied only when the report is displayed.
   retention: เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
 ```
 
+## The baseline gate asks two questions
+
+`cargo xtask check-baseline` runs the whole rule set against every `fixtures/hosts/baseline-*` host —
+machines this project asserts are unremarkable. It asks:
+
+1. **Is your rule quiet there?** A `found` needs a `rules/known-fps.csv` row with a reason, and a row
+   whose rule no longer matches fails too.
+2. **Was your rule ever asked anything?** A rule is *confronted* when some baseline observation carries
+   every field your `match` names and comes within **one** unsatisfied condition of firing it — the
+   baseline was put the rule's question and answered no. A rule nothing confronts is quiet for a reason
+   that says nothing about it, and would stay quiet however it was written (ADR 0033).
+
+The second is the one that will surprise you. If your rule reads values no baseline holds — a channel,
+a folder, a registry key that no fixture describes — the gate fails and the fix is a baseline that holds
+the shape your rule reads. If no such fixture can be added, `rules/unconfronted.csv` takes a row naming
+your rule, **why** nothing confronts it, and **what would end the row**; the gate fails again once a
+baseline does confront it, so the fixture that closes the hole also deletes the note.
+
+**A row is not a pass.** It records that this gate is measuring nothing about your rule, which is a
+worse position than a rule that fails. Say so in the pull request.
+
+Fixtures are bound by their own rules — read `fixtures/hosts/PROVENANCE.md` before adding one, and
+`fixtures/evtx/PROVENANCE.md` before adding any Event Log sample.
+
 ## Check
 
 ```bash
 cargo xtask check-rules
-cargo xtask check-baseline          # the rule must also be quiet on an ordinary machine
+cargo xtask check-baseline          # quiet on an ordinary machine, and confronted by one
 cargo nextest run -p rongroi-core   # the embedded bundle must parse
 ```
 

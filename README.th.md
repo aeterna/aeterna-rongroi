@@ -55,7 +55,7 @@ Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
 |---|---|---|
 | M0 | repo, รูปแบบ rule, engine, ตรวจ Secure Boot, CLI และโครง GUI, ระบบ release | ออกใน 0.1.0 แล้ว |
 | M1 | ตรวจโฟลเดอร์ FiveM, process ที่รันอยู่, สถานะเครื่องเพิ่มเติม, เปิดใหม่ด้วยสิทธิ์ admin | merge แล้ว แต่ยังไม่ได้ออกเป็นรุ่น |
-| M2 | Prefetch, BAM, PCA, สัญญาณล้าง event log | parser ทั้งสี่ตัว merge แล้ว แต่ยังไม่มี collector ตัวไหนเรียกใช้ การสแกนจึงยังไม่แสดงอะไรจาก parser เหล่านี้ |
+| M2 | Prefetch, BAM, PCA, สัญญาณล้าง event log | collector merge แล้วและอ่านจริง การสแกนแสดงสิ่งที่ทั้งสี่ตัวเก็บได้ · มีกฎ event log สองตัว ทั้งคู่ยัง `experimental` · ยังไม่มีกฎตัวไหนอ่าน Prefetch, BAM หรือ PCA สามตัวนี้จึงขึ้นเป็นสิ่งที่เห็นแต่ไม่มีกฎตรงเท่านั้น |
 | M3 | รายชื่อ driver มีช่องโหว่, USN journal, Amcache, คู่มือ SS | วางแผนแล้ว |
 
 "merge แล้ว" หมายถึงงานอยู่บน branch `dev` แต่ยังไม่ได้ออกเป็นรุ่น ตอนนี้มีรุ่นเดียวคือ 0.1.0 และระบบ release
