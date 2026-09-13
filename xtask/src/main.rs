@@ -14,6 +14,7 @@ mod release;
 mod release_check;
 mod release_notes;
 mod release_verify;
+mod rules_reference;
 
 use std::path::{Path, PathBuf};
 
@@ -32,6 +33,8 @@ enum Command {
     CheckRules,
     /// Run the whole rule set against the baseline hosts; every match needs a `known-fps.csv` row.
     CheckBaseline,
+    /// Write the rule reference pages in `docs/` from the rules bundle; `--check` fails if they are stale.
+    RulesReference(rules_reference::Args),
     /// Check that every UI locale has the same keys as English.
     CheckLocales,
     /// Fail on zero-width and bidi control characters in any text file.
@@ -61,6 +64,7 @@ fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         Command::CheckRules => check_rules::run(&root),
         Command::CheckBaseline => check_baseline::run(&root),
+        Command::RulesReference(args) => rules_reference::run(&root, &args),
         Command::CheckLocales => check_locales::run(&root),
         Command::CheckUnicode => check_unicode::run(&root),
         Command::NewRule { collector, path } => new_rule::run(&root, &collector, &path),

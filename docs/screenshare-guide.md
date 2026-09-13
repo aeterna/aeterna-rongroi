@@ -158,6 +158,9 @@ Three things to know about the two log-clearing rules:
 The four posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
 
+Every rule's full text, including exactly what it matches, is in the
+[rule reference](rules-reference.md).
+
 ## 7. What SS mode does not show, and why
 
 The program reads more than the six rules ask about. It reads what Windows recorded about programs
@@ -218,6 +221,23 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 
 Treat the report as one piece of evidence for a person to judge, next to everything else your
 server knows.
+
+## 11. What a report does not prove about itself
+
+§10 is about what the rows say. This is about the report.
+
+- **A report is not signed.** A file someone sends you after the session is text. Anyone who had it
+  could have changed it, and nothing in it can show that they did not.
+- **`official build` and `exe sha256` are what the running program says about itself.** They make an
+  unofficial build easy to notice. A modified program could print the same lines (§2).
+- **An unmodified program still reports what Windows told it.** If Windows on that PC was modified to
+  lie to the programs that run on it, the real program shows, and writes, what it was told (§1).
+- **What you can rely on is what you watched:** the download from the Releases page, the hash, the
+  header, the player answering the consent question, the rows appearing. A file that arrives later is
+  worth what that session was worth.
+- **If you are offered "signed" or "unforgeable" reports, from any tool, ask where the key is and who
+  checks the signature.** A key inside a program the player runs is on the player's PC.
+  [ADR 0040](adr/0040-reports-are-not-signed.md) explains why this project does not sign reports.
 
 ## Found a mistake in this guide?
 

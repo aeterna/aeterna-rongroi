@@ -111,6 +111,10 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   that a machine like it is unremarkable (`fixtures/hosts/PROVENANCE.md`). A row is not a pass — it
   records that this gate is measuring nothing about your rule — so say so in the pull request
   (ADR 0031, ADR 0033).
+- **Run `cargo xtask rules-reference` after changing a rule** or `rules/i18n/`, and commit
+  `docs/rules-reference.md` and `docs/rules-reference.th.md` with it. The pages are generated from the
+  bundle and CI's `cargo xtask rules-reference --check` fails when they disagree. After a rebase onto a
+  `dev` that changed rules, run the command again rather than merging the pages by hand; never edit them.
 - Fixtures are synthetic observations. Never commit cheat binaries, loaders or real player data.
 - **Out of scope:** rules, comments or fixtures that explain how to avoid a rule, and weakening a rule
   without a documented false-positive reason. Bypasses are reported privately via

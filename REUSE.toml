@@ -54,6 +54,14 @@ precedence = "override"
 SPDX-FileCopyrightText = "2019 Omer Ben-Amram"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
 
+# The rule reference pages are rule text rendered by `cargo xtask rules-reference`, so they carry the
+# rules' licence rather than the documentation's.
+[[annotations]]
+path = ["docs/rules-reference.md", "docs/rules-reference.th.md"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
 [[annotations]]
 path = ["rules/**/tests/**", "rules/**/*.md"]
 precedence = "override"
