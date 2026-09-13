@@ -11,8 +11,8 @@ use serde::Deserialize;
 
 use crate::{
     CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource, Host, Platform,
-    ProcessRecord, ProcessSource, RegistrySource, SourceError, SystemIntegritySource, TpmInfo,
-    TpmSource,
+    ProcessRecord, ProcessSource, RegistrySource, SignatureCheck, SignatureSource, SourceError,
+    SystemIntegritySource, TpmInfo, TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -152,11 +152,87 @@ struct FixtureFile {
     #[serde(default)]
     sha256: Option<String>,
     #[serde(default)]
+    signature: Option<FixtureSignature>,
+    #[serde(default)]
     directory: bool,
     #[serde(default)]
     content: Option<String>,
     #[serde(default)]
     from: Option<String>,
+}
+
+/// What a fixture says Windows would report about a file's embedded signature (ADR 0035). An absent
+/// `signature:` describes a file whose signature cannot be checked, which a collector reports by
+/// omitting the fields — the same shape an absent `sha256` has.
+///
+/// `signer` and `signer_cert_sha256` belong to `state: valid` and to nothing else, and a fixture that
+/// writes them anywhere else fails to load: a live host never reports a signer it did not trust.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureSignature {
+    state: FixtureSignatureState,
+    #[serde(default)]
+    signer: Option<String>,
+    #[serde(default)]
+    signer_cert_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureSignatureState {
+    Valid,
+    NoEmbeddedSignature,
+    Invalid,
+    UnverifiableOffline,
+}
+
+/// Turns what a fixture wrote into what a host reports, refusing a combination no host produces.
+fn resolve_signature(
+    described: FixtureSignature,
+    file: &str,
+    origin: &str,
+) -> Result<SignatureCheck, FixtureError> {
+    let invalid = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message: format!("file `{file}`: {message}"),
+    };
+    let names_signer = described.signer.is_some() || described.signer_cert_sha256.is_some();
+    let quiet = |check: SignatureCheck| {
+        if names_signer {
+            Err(invalid(
+                "only a valid signature names a `signer` or a `signer_cert_sha256`".to_owned(),
+            ))
+        } else {
+            Ok(check)
+        }
+    };
+    match described.state {
+        FixtureSignatureState::NoEmbeddedSignature => quiet(SignatureCheck::NoEmbeddedSignature),
+        FixtureSignatureState::Invalid => quiet(SignatureCheck::Invalid),
+        FixtureSignatureState::UnverifiableOffline => quiet(SignatureCheck::UnverifiableOffline),
+        FixtureSignatureState::Valid => {
+            let (Some(signer), Some(cert)) = (described.signer, described.signer_cert_sha256)
+            else {
+                return Err(invalid(
+                    "a valid signature needs both `signer` and `signer_cert_sha256`".to_owned(),
+                ));
+            };
+            if signer.trim().is_empty() {
+                return Err(invalid(
+                    "a valid signature needs a non-empty `signer`".to_owned(),
+                ));
+            }
+            if cert.len() != 64 || !cert.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(invalid(format!(
+                    "`signer_cert_sha256` `{cert}` must be 64 hex characters"
+                )));
+            }
+            Ok(SignatureCheck::Valid {
+                signer,
+                signer_cert_sha256: cert.to_ascii_lowercase(),
+            })
+        }
+    }
 }
 
 /// One entry in a fixture directory with its `from:` already read from disk, so that a fixture with a
@@ -165,6 +241,8 @@ struct FixtureFile {
 struct FixtureEntry {
     name: String,
     sha256: Option<String>,
+    /// `None` describes a file whose signature cannot be checked.
+    signature: Option<SignatureCheck>,
     directory: bool,
     /// The file's bytes. `None` describes a file that exists and cannot be read.
     content: Option<Vec<u8>>,
@@ -234,9 +312,14 @@ fn resolve_file(
         origin,
         base,
     )?;
+    let signature = described
+        .signature
+        .map(|signature| resolve_signature(signature, &described.name, origin))
+        .transpose()?;
     Ok(FixtureEntry {
         name: described.name,
         sha256: described.sha256,
+        signature,
         directory: described.directory,
         content,
     })
@@ -349,6 +432,24 @@ impl FixtureHost {
             tpm: file.tpm,
             processes: file.processes,
         })
+    }
+
+    /// The entry the fixture wrote for one file, after the access checks every per-file read makes.
+    /// A file it never listed is a failure here, which is what hashing or checking one means.
+    fn described_file(&self, path: &str) -> Result<&FixtureEntry, SourceError> {
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        self.filesystem
+            .get(dir)
+            .and_then(|files| {
+                files
+                    .iter()
+                    .find(|file| file.name.eq_ignore_ascii_case(name))
+            })
+            .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))
     }
 
     /// The file system is only described for Windows fixtures.
@@ -517,20 +618,7 @@ impl FilesystemSource for FixtureHost {
 
     fn file_sha256(&self, path: &str) -> Result<String, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
-        let (dir, name) = split_parent(&normalised);
-        if self.is_denied(&normalised) || self.is_denied(dir) {
-            return Err(SourceError::AccessDenied);
-        }
-        let file = self
-            .filesystem
-            .get(dir)
-            .and_then(|files| {
-                files
-                    .iter()
-                    .find(|file| file.name.eq_ignore_ascii_case(name))
-            })
-            .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))?;
+        let file = self.described_file(path)?;
         file.sha256
             .clone()
             .ok_or_else(|| SourceError::Failed(format!("no sha256 recorded for {path}")))
@@ -599,6 +687,18 @@ impl TpmSource for FixtureHost {
     }
 }
 
+impl SignatureSource for FixtureHost {
+    /// What the fixture wrote under `signature:` for that file, behind the same access checks
+    /// `file_sha256` makes.
+    fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError> {
+        self.windows_filesystem()?;
+        let file = self.described_file(path)?;
+        file.signature
+            .clone()
+            .ok_or_else(|| SourceError::Failed(format!("no signature recorded for {path}")))
+    }
+}
+
 impl ProcessSource for FixtureHost {
     /// The processes the fixture lists, in file order.
     ///
@@ -639,6 +739,86 @@ impl Host for FixtureHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const CERT: &str = "ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789";
+
+    fn signed(signature: &str) -> Result<FixtureHost, FixtureError> {
+        FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.dll\n      signature: {signature}\n    - name: b.dll\n"
+            ),
+            "inline",
+        )
+    }
+
+    #[test]
+    fn a_valid_signature_reports_its_signer_and_a_lowercased_certificate_hash() {
+        let host = signed(&format!(
+            "{{ state: valid, signer: Example Corp, signer_cert_sha256: {CERT} }}"
+        ))
+        .unwrap();
+        assert_eq!(
+            host.file_signature(r"C:\P\A.DLL"),
+            Ok(SignatureCheck::Valid {
+                signer: "Example Corp".to_owned(),
+                signer_cert_sha256: CERT.to_ascii_lowercase(),
+            })
+        );
+    }
+
+    #[test]
+    fn the_three_other_states_carry_no_signer() {
+        for (written, expected) in [
+            ("no_embedded_signature", SignatureCheck::NoEmbeddedSignature),
+            ("invalid", SignatureCheck::Invalid),
+            ("unverifiable_offline", SignatureCheck::UnverifiableOffline),
+        ] {
+            let host = signed(&format!("{{ state: {written} }}")).unwrap();
+            assert_eq!(host.file_signature(r"C:\p\a.dll"), Ok(expected));
+        }
+    }
+
+    /// A live host never reports a signer it did not trust, so a fixture cannot describe one.
+    #[test]
+    fn a_fixture_cannot_describe_a_signature_no_host_would_report() {
+        for signature in [
+            "{ state: valid, signer: Example Corp }".to_owned(),
+            format!("{{ state: valid, signer_cert_sha256: {CERT} }}"),
+            format!("{{ state: valid, signer: '  ', signer_cert_sha256: {CERT} }}"),
+            "{ state: valid, signer: Example Corp, signer_cert_sha256: abc }".to_owned(),
+            "{ state: invalid, signer: Example Corp }".to_owned(),
+            format!("{{ state: unverifiable_offline, signer_cert_sha256: {CERT} }}"),
+            "{ state: unsigned }".to_owned(),
+        ] {
+            assert!(signed(&signature).is_err(), "{signature} loaded");
+        }
+    }
+
+    #[test]
+    fn a_file_with_no_signature_written_could_not_be_checked() {
+        let host = signed("{ state: invalid }").unwrap();
+        assert!(matches!(
+            host.file_signature(r"C:\p\b.dll"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.file_signature(r"C:\p\absent.dll"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_denied_folder_denies_its_signatures_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['C:\\p']\nfilesystem:\n  'C:\\p':\n    - name: a.dll\n      signature: { state: invalid }\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.file_signature(r"C:\p\a.dll"),
+            Err(SourceError::AccessDenied)
+        );
+    }
 
     const HOST: &str = r#"
 platform: windows

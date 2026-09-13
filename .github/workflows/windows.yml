@@ -54,6 +54,71 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Tests
         run: cargo nextest run --workspace --locked --profile ci
+      # ADR 0035. Checking a signature is the one read that could reach the network inside Windows,
+      # where cargo-deny and every lint are blind, so this proves it does not on a real machine: the
+      # CAPI2 log records a network retrieval as event 53 with the process that asked for it. The
+      # offline tests run with the log on and no event 53 may name their process. The online test is
+      # the positive twin — settings the product never uses, a cleared URL cache, and event 53 must
+      # appear — because a log that records nothing would otherwise pass for one that saw nothing.
+      # The runner is thrown away afterwards, so switching its CAPI2 log on changes no one's machine.
+      - name: Signature checks stay off the network (CAPI2 log)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function SecurityDirectorySize([string] $path) {
+            try { $bytes = [IO.File]::ReadAllBytes($path) } catch { return -1 }
+            if ($bytes.Length -lt 0x200) { return -1 }
+            $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            $magic = [BitConverter]::ToUInt16($bytes, $pe + 24)
+            $directories = if ($magic -eq 0x20b) { $pe + 24 + 112 } else { $pe + 24 + 96 }
+            [BitConverter]::ToUInt32($bytes, $directories + 4 * 8 + 4)
+          }
+          function CertSha256($signature) {
+            ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($signature.SignerCertificate.RawData))).Replace('-', '').ToLower()
+          }
+          # Chosen before the log is switched on: Get-AuthenticodeSignature does its own chain work.
+          $embedded = @("$PSHOME\pwsh.exe", "$env:ProgramFiles\Git\cmd\git.exe") |
+            Where-Object { (Test-Path $_) -and (Get-AuthenticodeSignature $_).Status -eq 'Valid' -and (SecurityDirectorySize $_) -gt 0 } |
+            Select-Object -First 1
+          if (-not $embedded) { throw 'no file with a valid embedded signature was found on this runner' }
+          # notepad.exe was catalog-only on the Windows 11 machine ADR 0035 measured; explorer.exe was not.
+          $catalog = @(Get-Item "$env:windir\System32\notepad.exe") + @(Get-ChildItem "$env:windir\System32\*.exe") |
+            Where-Object { (SecurityDirectorySize $_.FullName) -eq 0 -and (Get-AuthenticodeSignature $_.FullName).Status -eq 'Valid' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $catalog) { throw 'no catalog-only signed file was found on this runner' }
+          $env:RONGROI_SIGNED_FILE = $embedded
+          $env:RONGROI_SIGNED_FILE_CERT_SHA256 = CertSha256 (Get-AuthenticodeSignature $embedded)
+          $env:RONGROI_CATALOG_SIGNED_FILE = $catalog
+          Write-Output "embedded: $embedded · catalog only: $catalog"
+          cargo nextest list -p rongroi-host-windows --locked --run-ignored only | Out-Null
+
+          $log = 'Microsoft-Windows-CAPI2/Operational'
+          function OurEvents {
+            @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue |
+              Where-Object { $_.ToXml() -match 'rongroi_host_windows' })
+          }
+          wevtutil sl $log /e:true
+          wevtutil cl $log
+
+          cargo nextest run -p rongroi-host-windows --locked --profile ci --run-ignored only -E 'test(/live_offline_/)'
+          if ($LASTEXITCODE -ne 0) { throw 'the offline signature tests failed' }
+          $offline = OurEvents
+          Write-Output ("offline: {0} CAPI2 events from the test process, ids: {1}" -f $offline.Count, (($offline | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))
+          if ($offline.Count -eq 0) { throw 'CAPI2 recorded nothing from the offline tests, so their silence proves nothing' }
+          $fetched = @($offline | Where-Object Id -eq 53)
+          if ($fetched.Count -gt 0) {
+            $fetched | Select-Object -First 3 | ForEach-Object { Write-Output $_.ToXml() }
+            throw "the offline signature check retrieved objects from the network ($($fetched.Count) event 53)"
+          }
+
+          certutil -urlcache * delete | Out-Null
+          wevtutil cl $log
+          cargo nextest run -p rongroi-host-windows --locked --profile ci --run-ignored only -E 'test(/live_online_/)'
+          if ($LASTEXITCODE -ne 0) { throw 'the online positive-twin test failed' }
+          $online = @(OurEvents | Where-Object Id -eq 53)
+          Write-Output "online: $($online.Count) event 53 from the test process"
+          if ($online.Count -eq 0) { throw 'the positive twin fetched nothing the log recorded, so the offline result above is not evidence' }
+          wevtutil sl $log /e:false
       - name: Build the desktop app (unofficial build, no installer)
         run: pnpm -C apps/desktop tauri build --no-bundle
       - name: Live smoke — the CLI reads this machine

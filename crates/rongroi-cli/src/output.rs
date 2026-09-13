@@ -180,7 +180,7 @@ pub fn consent(lang: Lang) -> String {
         Lang::En => "SS mode — screenshare check\n\
             This program will read, on this PC:\n\
             \x20 - security settings such as Secure Boot and memory integrity\n\
-            \x20 - the programs running now, and the files in FiveM's plugins folder\n\
+            \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced, with their signatures (Authenticode)\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say\n\
             It shows only what matches a rule. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
@@ -190,7 +190,7 @@ pub fn consent(lang: Lang) -> String {
         Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
             โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
             \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot และ memory integrity\n\
-            \x20 - โปรแกรมที่กำลังรันอยู่ และไฟล์ในโฟลเดอร์ plugins ของ FiveM\n\
+            \x20 - โปรแกรมที่กำลังรันอยู่ และไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร\n\
             แสดงเฉพาะสิ่งที่ตรง rule โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
@@ -552,7 +552,10 @@ mod tests {
         let named: &[(&str, &[&str])] = &[
             ("bam", &["BAM"]),
             ("evtx", &["event log"]),
-            ("fivem_dir", &["FiveM", "plugins"]),
+            (
+                "fivem_dir",
+                &["FiveM", "plugin", "Legacy", "Enhanced", "Authenticode"],
+            ),
             ("pca", &["Program Compatibility Assistant"]),
             ("posture", &["Secure Boot", "memory integrity"]),
             ("prefetch", &["Prefetch"]),

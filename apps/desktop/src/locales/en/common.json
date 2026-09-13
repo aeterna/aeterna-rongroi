@@ -20,7 +20,7 @@
   },
   "consent": {
     "title": "Before you share your screen",
-    "reads": "When it started, this program read, on this PC: security settings such as Secure Boot and memory integrity; the programs running and the files in FiveM's plugins folder; what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant); and how many events of each kind the Windows event logs hold, not what the events say.",
+    "reads": "When it started, this program read, on this PC: security settings such as Secure Boot and memory integrity; the programs running and the files in FiveM's plugin folders for GTA V Legacy and Enhanced, with their signatures (Authenticode); what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant); and how many events of each kind the Windows event logs hold, not what the events say.",
     "shows": "Staff will see only what matches a rule. Your user name is hidden in file paths.",
     "sends": "aeterna-rongroi's own code sends nothing anywhere.",
     "webview": "This window uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The CLI version does not use WebView2.",

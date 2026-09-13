@@ -6,6 +6,23 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Signature checking, without the network (ADR 0035). `fivem_dir` reports, for each file in FiveM's plugin
+  folders, what Windows says about the Authenticode signature embedded in it: `valid` with the signer's
+  name and the SHA-256 of the signing certificate, `no_embedded_signature`, `invalid`, or
+  `unverifiable_offline`. `WinVerifyTrust` runs with no revocation checking and URL retrieval from the
+  local cache only. Checking a signature is the one read in this program that Windows could take to the
+  network by itself, where `cargo deny` and every lint are blind, so the Windows CI job switches the
+  CAPI2 log on and fails if the offline tests leave a network retrieval (event 53) behind — beside a
+  positive twin that must leave one. On a real Windows 11 machine the check agreed with PowerShell on
+  the signing certificate of an embedded-signed executable, called a copy with one changed byte
+  `invalid`, and found nothing embedded in a catalog-only Windows file. It also showed that PowerShell's
+  `Catalog` does not mean "nothing embedded": `explorer.exe` has both.
+- `fivem_dir` reads FiveM for GTA V **Enhanced**, which installs separately and keeps its user data under
+  `%APPDATA%` rather than `%LOCALAPPDATA%`. On a machine with only Enhanced, the collector used to report
+  that Legacy's plugin folder was absent and nothing about the one it never looked in. It now reads
+  Enhanced's `gta5enhanced\asi` folder under `location: enhanced_asi`, and reports each folder of both
+  editions — listed, absent or unreadable — by name. That the Enhanced client loads from that folder is
+  **not established**; the ADR says what was and was not found. `gta5enhanced\mods` is not read.
 - A screenshare guide, in English and Thai (`docs/screenshare-guide.md`, `docs/screenshare-guide.th.md`),
   for staff checking a PC over a screenshare and for the player being checked. It covers getting and
   verifying the real file, administrator rights, running SS mode, reading each row, what each of the six
@@ -16,6 +33,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   the player; and `--elevate` scans in a new console window this project has not checked stays open.
 
 ### Changed
+- **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
+  `allow.signer_cert_sha256`, the SHA-256 of the signing certificate (ADR 0035). Code-signing certificates
+  stolen from NVIDIA in 2022 signed malware under NVIDIA's own name, so a name-based exclusion would have
+  exempted it. No rule used the old field; one that did would no longer parse, which is why
+  `RULES_SCHEMA_VERSION` is now 2.
 - M2 is complete as scoped, and no Prefetch, BAM or PCA rule is planned (ADR 0034). The three
   collector ADRs each deferred that rule as "a separate decision" and nobody made it. What those
   collectors emit names a program only by file name or path, `allow` compares only `sha256` and

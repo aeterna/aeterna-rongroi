@@ -32,6 +32,7 @@ os_build: "26100"
 elevated: true
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
   SystemRoot: 'C:\Windows'
   WinDir: 'C:\Windows'
 registry:

@@ -7,3 +7,4 @@ os_build: "26100"
 elevated: false
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
