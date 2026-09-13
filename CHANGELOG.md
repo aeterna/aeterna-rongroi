@@ -27,6 +27,24 @@ and the project uses [Semantic Versioning](https://semver.org/).
   only release so far".
 
 ### Fixed
+- The SS-mode consent question named the wrong scan. In the CLI and in the window app it said the
+  check reads "machine security settings"; since 0.2.0 it also reads the programs running, FiveM's
+  plugins folder, what Prefetch, BAM and the Program Compatibility Assistant recorded about programs
+  that ran, and how many events of each kind the event logs hold. A player agreed to a narrower check
+  than the one that ran. Both now list every kind of source, in the words `PRIVACY.md` uses. The window
+  app's version says the reading already happened, which is true: it scans before its window opens. A
+  test keyed by collector id fails when a collector is added without the question saying so.
+- The CLI asked its SS-mode consent question on standard output, the stream `--json` writes the report
+  to. `scan --mode ss --json > report.json` put the question into the file and left the program waiting
+  for an answer to a question the player could not see. The question, the refusal line and the
+  `--elevate` status lines now go to standard error, and a test runs the binary and parses standard
+  output as JSON.
+- `scan --elevate` in the CLI lost its report. The copy it starts runs in a console window of its own,
+  and on a real Windows 11 machine that window closed less than a second after the scan finished. The
+  copy now waits for Enter before it exits, and prints an error before waiting rather than after. The
+  same measurement showed the window open with the report in it 5 seconds after the prompt appeared,
+  and closed after Enter (ADR 0012, amended). The path through the UAC prompt itself was not run,
+  because a program cannot answer the prompt.
 - `PRIVACY.md` told the reader that nothing is stored "unless you click **Export**". No export or save
   button exists in the window version; the only file is one a person redirects CLI output into.
 
