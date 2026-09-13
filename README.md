@@ -69,6 +69,7 @@ system could fake what is displayed. Treat results as evidence for a person to j
 why it is listed under M0.
 
 Checking someone's PC over a screenshare? Read the [screenshare guide](docs/screenshare-guide.md) first.
+What each rule looks for, and what else produces it: the [rule reference](docs/rules-reference.md).
 
 ## Contributing
 

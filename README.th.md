@@ -62,6 +62,7 @@ Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
 ระบบ release ออกมาพร้อม 0.1.0 ([ADR 0008](docs/adr/0008-release-pipeline.md)) จึงอยู่ในแถว M0
 
 จะตรวจเครื่องคนอื่นผ่านการแชร์หน้าจอ? อ่าน[คู่มือ SS](docs/screenshare-guide.th.md) ก่อน
+แต่ละ rule มองหาอะไร และมีเรื่องปกติอะไรที่ทำให้เกิดผลแบบเดียวกัน: [คู่มืออ้างอิง rule](docs/rules-reference.th.md)
 
 ## ร่วมพัฒนา
 

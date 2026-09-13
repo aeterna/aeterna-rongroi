@@ -100,6 +100,7 @@ is renamed, emptied, or no longer named by `ci.yml`. A fuzzer handed an empty co
 cargo nextest run                       # L0, L1, L3 (or: cargo test)
 cargo xtask check-rules                 # L2
 cargo xtask check-baseline              # L2b
+cargo xtask rules-reference --check     # generated rule reference pages match the rules
 cargo insta review                      # after an intended change to a report snapshot
 pnpm -C apps/desktop test               # L4
 cargo check --target x86_64-pc-windows-msvc -p rongroi-host-windows   # type-check Windows code from any OS

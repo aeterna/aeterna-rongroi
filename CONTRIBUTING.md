@@ -66,7 +66,7 @@ with a single `diff`.
 
 | You want to add | Run | Then |
 |---|---|---|
-| A detection rule | `cargo xtask new-rule <collector> <category>/<slug>` | Fill in `rule.yaml`, a positive and a negative fixture, and optional translations |
+| A detection rule | `cargo xtask new-rule <collector> <category>/<slug>` | Fill in `rule.yaml`, a positive and a negative fixture, and optional translations, then run `cargo xtask rules-reference` and commit the pages it rewrites |
 | A language | `cargo xtask new-locale <bcp47>` (e.g. `vi`, `pt-BR`) | Translate the generated files; missing keys fall back to English |
 | A collector | No scaffold — start from `crates/rongroi-collectors/src/process.rs` or `fivem_dir.rs` | Implement the `Collector` trait; write an ADR if it reads a new kind of source |
 
@@ -80,6 +80,7 @@ cargo fmt --all --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo nextest run
 cargo xtask check-rules && cargo xtask check-baseline
+cargo xtask rules-reference --check
 cargo xtask check-locales && cargo xtask check-unicode
 uvx --with chardet reuse lint
 pnpm -C apps/desktop typecheck && pnpm -C apps/desktop lint && pnpm -C apps/desktop test

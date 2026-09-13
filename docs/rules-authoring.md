@@ -188,11 +188,32 @@ worse position than a rule that fails. Say so in the pull request.
 Fixtures are bound by their own rules — read `fixtures/hosts/PROVENANCE.md` before adding one, and
 `fixtures/evtx/PROVENANCE.md` before adding any Event Log sample.
 
+## The reference page
+
+[`docs/rules-reference.md`](rules-reference.md) and [`docs/rules-reference.th.md`](rules-reference.th.md)
+describe every rule in the bundle for a reader who will not open YAML: its title, what `match` asks in
+words (operators and case included), its `retention`, `unmeasured_when`, `falsepositives`, `allow` and
+references, grouped by collector and category. They are **generated** from the same bundle the program
+embeds, the Thai one from `rules/i18n/th.yaml`, and the words for a strength or a reason from the desktop
+app's `report.json`.
+
+After changing a rule, a rule translation or one of those words, run:
+
+```bash
+cargo xtask rules-reference          # rewrites both pages; commit them with the rule
+```
+
+CI runs `cargo xtask rules-reference --check`, which fails on a page that does not match and names that
+command. Two pull requests that both change rules each regenerate the pages; whichever merges second
+reruns the command after rebasing instead of resolving the conflict by hand. Never edit the pages
+themselves: the page renders rule text, so what it says is fixed in the rule.
+
 ## Check
 
 ```bash
 cargo xtask check-rules
 cargo xtask check-baseline          # quiet on an ordinary machine, and confronted by one
+cargo xtask rules-reference --check # the reference pages match the rules
 cargo nextest run -p rongroi-core   # the embedded bundle must parse
 ```
 
