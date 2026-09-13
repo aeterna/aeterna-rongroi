@@ -91,8 +91,8 @@ One byte holding 1 is `enabled`, one byte holding 0 is `disabled`, and anything 
 read as either. `SetupMode` is not read; the rule compares the one variable both documents name.
 
 Feature gates, read in the crate: `GetFirmwareEnvironmentVariableExW` is in
-`Win32_System_WindowsProgramming`; `GetFirmwareType` in `Win32_System_SystemInformation`, which is the one
-feature this adds; `AdjustTokenPrivileges`, `LookupPrivilegeValueW`, `SE_SYSTEM_ENVIRONMENT_NAME` and
+`Win32_System_WindowsProgramming`; `GetFirmwareType` in `Win32_System_SystemInformation`, which ADR 0039
+added for `GetTickCount64`; `AdjustTokenPrivileges`, `LookupPrivilegeValueW`, `SE_SYSTEM_ENVIRONMENT_NAME` and
 `GetTokenInformation` in `Win32_Security`; `OpenProcessToken` in `Win32_System_Threading` behind
 `Win32_Security`. The `windows` crate declares no `NtQuerySystemInformation` class for Secure Boot, and
 Microsoft's page for that function documents none
@@ -217,6 +217,13 @@ read-only throughout. Nothing on the machine was changed.
   a limited token it was not held at all and the answer was `AccessDenied`.
 - The policy key was readable without elevation.
 
+**The GitHub `windows-latest` runner, on this pull request's first CI run** (run 34753088364): the
+privilege test found the privilege held and disabled (0), read `Ok(Disabled)`, and left it at 0 — the
+restoring path, on a second machine; the CLI reported `secure_boot: disabled`, `secure_boot_firmware:
+disabled`, `test_signing: enabled`, `tpm: absent` and `script_block_logging: not_configured`, and
+`Get-SecureBootUEFI -Name SecureBoot` agreed with the firmware reading. A runner is a virtual machine
+imaged for CI, not an ordinary PC.
+
 **One machine is one machine.** Nothing here says how other firmware, other builds, or virtual machines
 answer, or how often the rule would fire on a population.
 
@@ -260,7 +267,8 @@ answer, or how often the rule would fire on a population.
 - Every report snapshot gains the two rules, and a fixture host that describes no registry at all now
   carries a `posture` observation holding `script_block_logging: not_configured` — the answer ADR 0022 gave
   a fixture without a key, now visible because this field treats absence as an answer.
-- `windows` gains `Win32_System_SystemInformation`. No crate is added and `Cargo.lock` does not move.
+- No `windows` feature is added — `Win32_System_SystemInformation` arrived with ADR 0039 — no crate is
+  added, and `Cargo.lock` does not move.
 - The consent text in the CLI and the desktop app names the firmware reading and the PowerShell logging
   policy; `PRIVACY.md`, `docs/architecture.md` and the screenshare guide say what is read.
 - The Windows CI job runs the privilege test and compares the firmware reading with `Get-SecureBootUEFI`.
