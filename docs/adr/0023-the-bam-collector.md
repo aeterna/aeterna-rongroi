@@ -33,6 +33,9 @@ by `signer` (CONVENTIONS.md §6, `rules/AGENTS.md`). A rule saying "`cheat.exe` 
 to exclude a legitimate program of that name. Writing it is a separate decision with its own
 false-positive argument, and this pull request does not make it.
 
+**Decided in ADR 0034.** The separate decision this section defers was made: no rule on `prefetch`, `bam`
+or `pca` identifies a program by `name` or `path`.
+
 The observations land in the unmatched bucket: listed in Self mode, counted and never listed in SS
 mode (ADR 0014). That settles the privacy question for *this* pull request by construction, and it is
 not what the withholding below rests on, because a rule would change it and the withholding has to

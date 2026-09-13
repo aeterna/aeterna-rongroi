@@ -27,6 +27,10 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   removed: Windows' own scavenger empties BAM of entries older than seven days at every boot, and a
   Prefetch folder is routinely emptied by an optimiser the player ran.
 - `allow` identifies legitimate software by `sha256` or `signer` only — never by file name.
+- **No rule on `prefetch`, `bam` or `pca` names a program** by `name` or `path` (ADR 0034). Nothing those
+  collectors emit identifies software, so such a rule cannot `allow` the legitimate program with that name
+  and a rename defeats it. No gate refuses it — `check-rules` and `check-baseline` both accept a rule for
+  one named executable — so it is on the reviewer.
 - **`match` compares strings without regard to ASCII case.** `path: "C:\\Windows\\Temp\\x.exe"` matches
   `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in and a rule that
   missed one would report `not_found` — a thing looked for and not there. Non-ASCII letters are **not**

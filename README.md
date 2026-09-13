@@ -60,13 +60,15 @@ system could fake what is displayed. Treat results as evidence for a person to j
 | Milestone | Scope | State |
 |---|---|---|
 | M0 | Repository, rule format, engine, Secure Boot posture check, CLI and GUI shell, release pipeline | released in 0.1.0 |
-| M1 | FiveM folder checks, running processes, more posture checks, admin re-launch | merged, not released yet |
-| M2 | Prefetch, BAM, PCA, event-log tamper signals | collectors merged and reading — a scan shows what all four hold. Two event-log rules ship, both `experimental`; no rule reads Prefetch, BAM or PCA yet, so those three appear only as observations nothing matched |
-| M3 | Vulnerable-driver list, USN journal, Amcache, screenshare guide | planned |
+| M1 | FiveM folder checks, running processes, more posture checks, admin re-launch | released in 0.2.0 |
+| M2 | Prefetch, BAM, PCA, event-log tamper signals | released in 0.2.0: the four collectors and two event-log rules, both `experimental`. No Prefetch, BAM or PCA rule is planned. What those three record names a program only by its file name or path, so a rule on them cannot exclude legitimate software and renaming the file defeats it ([ADR 0034](docs/adr/0034-prefetch-bam-and-pca-carry-no-identity.md)). Self mode lists what they saw, and SS mode counts it |
+| M3 | Vulnerable-driver list, USN journal, Amcache, screenshare guide | the [screenshare guide](docs/screenshare-guide.md) is merged, not released yet; the rest is planned |
 
-"Merged" means the work is on the `dev` branch and is not in a release. 0.1.0 is the only release so far,
-and the release pipeline itself shipped with it ([ADR 0008](docs/adr/0008-release-pipeline.md)), which is
+"Merged" means the work is on the `dev` branch and is not in a release. The releases so far are 0.1.0 and
+0.2.0. The release pipeline shipped with 0.1.0 ([ADR 0008](docs/adr/0008-release-pipeline.md)), which is
 why it is listed under M0.
+
+Checking someone's PC over a screenshare? Read the [screenshare guide](docs/screenshare-guide.md) first.
 
 ## Contributing
 
