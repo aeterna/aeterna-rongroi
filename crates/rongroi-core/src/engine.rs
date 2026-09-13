@@ -235,20 +235,59 @@ fn absence_fields(rule: &Rule) -> impl Iterator<Item = &str> {
 /// `rules::parse_match_key` — never on the `match` key, so an operator suffix does not take a field
 /// out of the gap lookup (ADR 0025's objection to a suffix, answered in ADR 0029).
 fn matches(rule: &Rule, observation: &Observation) -> bool {
-    observation.collector == rule.collector
-        && rule.conditions().all(|(key, expected)| match key {
-            MatchKey::Known { field, operator } => condition_matches(
-                operator,
-                expected,
-                observation.fields.get(field),
-                rule.cased.contains(field),
-            ),
-            // `rules::validate` refuses such a key, so no loaded bundle holds one. If one ever
-            // reached here it must not be skipped: skipping a condition drops a restriction and
-            // widens the rule past what its title claims.
-            MatchKey::UnknownOperator { .. } => false,
-        })
-        && !is_allowed(rule, observation)
+    unmet_conditions(rule, observation) == Some(0) && !is_allowed(rule, observation)
+}
+
+/// How many of `rule`'s `match` conditions `observation` fails to satisfy, or `None` when the
+/// observation belongs to another collector and the question does not arise.
+///
+/// [`matches`] is the `Some(0)` case of this, and [`confronts`] the `Some(0 | 1)` one.
+fn unmet_conditions(rule: &Rule, observation: &Observation) -> Option<usize> {
+    (observation.collector == rule.collector).then(|| {
+        rule.conditions()
+            .filter(|(key, expected)| match key {
+                MatchKey::Known { field, operator } => !condition_matches(
+                    *operator,
+                    expected,
+                    observation.fields.get(*field),
+                    rule.cased.contains(*field),
+                ),
+                // `rules::validate` refuses such a key, so no loaded bundle holds one. If one ever
+                // reached here it must not be skipped: skipping a condition drops a restriction and
+                // widens the rule past what its title claims.
+                MatchKey::UnknownOperator { .. } => true,
+            })
+            .count()
+    })
+}
+
+/// Whether `observation` came close enough to firing `rule` to be evidence that the rule was tried.
+///
+/// **Two conditions, and the second is what makes this worth having.** The observation must come
+/// within one unsatisfied condition of matching, *and* it must carry every field the rule names —
+/// excepting the fields a rule asks to be absent, which an observation satisfies by carrying
+/// nothing. Without the second condition a one-condition rule would be confronted by every
+/// observation its collector produced, including one that carries none of the rule's fields at all,
+/// and the check would certify most loudly exactly where it knows least.
+///
+/// `cargo xtask check-baseline` asks this of every rule against every baseline observation. A rule
+/// no baseline confronts has never been compared to anything of its own shape, and is quiet there
+/// for a reason that says nothing about the rule (ADR 0033). The predicate lives here rather than in
+/// the gate because a second implementation of "does this condition hold" would drift from the one
+/// the product uses, which is the failure ADR 0017 exists to prevent.
+///
+/// `allow` is deliberately not consulted: an observation a rule matched and then allowed is still an
+/// observation the rule was compared against.
+pub fn confronts(rule: &Rule, observation: &Observation) -> bool {
+    let Some(unmet) = unmet_conditions(rule, observation) else {
+        return false;
+    };
+    if unmet > 1 {
+        return false;
+    }
+    let absent: Vec<&str> = absence_fields(rule).collect();
+    rule.match_fields()
+        .all(|field| absent.contains(&field) || observation.fields.contains_key(field))
 }
 
 /// Whether one `match` entry holds for the value an observation carries, or does not carry.
@@ -820,6 +859,14 @@ date: 2026-09-12
         serde_saphyr::from_str(&yaml).unwrap()
     }
 
+    /// `rule` with its `match` block replaced, for the tests that need more than one condition.
+    fn rule_matching(block: &str) -> Rule {
+        let yaml = format!(
+            "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7\ntitle: t\ndescription: d\nstatus: test\ncollector: posture\nstrength: posture\nmatch:\n{block}\nretention: Current setting only.\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-11\n"
+        );
+        serde_saphyr::from_str(&yaml).unwrap()
+    }
+
     fn observation(pairs: &[(&str, &str)]) -> Observation {
         Observation {
             collector: "posture".to_owned(),
@@ -836,6 +883,72 @@ date: 2026-09-12
             observations,
             gaps: BTreeMap::new(),
         }
+    }
+
+    /// A rule with one condition, against an observation carrying that field with another value.
+    /// This is the ordinary shape: the baseline was asked the rule's question and answered no.
+    #[test]
+    fn an_observation_one_value_away_confronts_the_rule() {
+        assert!(confronts(
+            &rule(""),
+            &observation(&[("secure_boot", "enabled")])
+        ));
+    }
+
+    /// The case the second half of the predicate exists for. The rule has one condition, so counting
+    /// unsatisfied conditions alone would call this a confrontation — the observation cannot fail
+    /// more than one. It carries none of the rule's fields, so it was never asked the question.
+    #[test]
+    fn an_observation_without_the_rules_field_does_not_confront_it() {
+        assert!(!confronts(&rule(""), &observation(&[("tpm", "present")])));
+    }
+
+    /// The shape `check-baseline` was blind to: a three-condition rule against an observation that
+    /// carries all three fields and matches none of them. Three unsatisfied is not "came close".
+    #[test]
+    fn an_observation_failing_more_than_one_condition_does_not_confront_the_rule() {
+        let rule = rule_matching(
+            "  provider: Microsoft-Windows-Eventlog\n  channel: Security\n  event_id: 1102",
+        );
+        let seen = observation(&[
+            ("provider", "Microsoft-Windows-LanguagePackSetup"),
+            ("channel", "Microsoft-Windows-LanguagePackSetup/Operational"),
+            ("event_id", "3001"),
+        ]);
+        assert!(!confronts(&rule, &seen));
+    }
+
+    /// The same rule against the same channel and provider, differing only in the event id — what a
+    /// real Security log holds, and what would end that rule's row in `rules/unconfronted.csv`.
+    #[test]
+    fn an_observation_matching_all_but_one_condition_confronts_the_rule() {
+        let rule = rule_matching(
+            "  provider: Microsoft-Windows-Eventlog\n  channel: Security\n  event_id: 1102",
+        );
+        let seen = observation(&[
+            ("provider", "Microsoft-Windows-Eventlog"),
+            ("channel", "Security"),
+            ("event_id", "1100"),
+        ]);
+        assert!(confronts(&rule, &seen));
+    }
+
+    /// A matching observation confronts its rule too: `confronts` is the wider question, and a rule
+    /// that fired is certainly one that was tried.
+    #[test]
+    fn a_matching_observation_confronts_the_rule() {
+        assert!(confronts(
+            &rule(""),
+            &observation(&[("secure_boot", "disabled")])
+        ));
+    }
+
+    /// Another collector's observation is not an answer to this rule at all.
+    #[test]
+    fn an_observation_from_another_collector_does_not_confront_the_rule() {
+        let mut seen = observation(&[("secure_boot", "enabled")]);
+        seen.collector = "evtx".to_owned();
+        assert!(!confronts(&rule(""), &seen));
     }
 
     #[test]
