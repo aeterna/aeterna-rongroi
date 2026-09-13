@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 282115fe-863d-4e2e-9cf5-4eaf8e7545e4
+title: A FiveM file's signature could not be checked
+description: >-
+  A file this program found in one of FiveM's plugin folders, or FiveM.exe itself, was listed, and
+  asking Windows about the signature embedded in it did not produce an answer. The file's path is
+  shown, and nothing about its signature is known — not that it has one, not that it lacks one. The
+  other rules on these files match on the signature Windows reported, so a file whose check failed
+  can match none of them; it is shown here instead, so that it is not left out of the report. It does
+  not say why the check failed, what the file is, or that anything was done to it.
+status: experimental
+collector: fivem_dir
+strength: context
+# `exists: false` on `signature`, beside `exists: true` on `path` so that only file observations — the
+# folder observations carry no path — can match. The engine checks `gaps` for an absent-field condition
+# before it matches, so a folder nobody could list makes this rule unmeasured rather than found
+# (ADR 0029). A failure on one file is not a gap (ADR 0009); this rule is where it becomes visible.
+match:
+  path|exists: true
+  signature|exists: false
+retention: >-
+  Only the files present when the scan ran, and only the attempt made during it. A second scan may
+  check the same file without trouble.
+unmeasured_when: [not_windows]
+falsepositives:
+  - A file another program held open without allowing others to read it at that moment — an
+    antivirus scanning it, an installer or updater still writing it, or FiveM updating itself
+  - A path too long, or a name Windows could not open, which some archive tools produce when they
+    unpack into a deep folder
+  - An answer from Windows this program does not classify. It names only the answers it has
+    documented, and every other one lands here rather than being guessed at
+  - Security software that intercepts or blocks programs reading other programs' files
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [fivem_dir, signature]

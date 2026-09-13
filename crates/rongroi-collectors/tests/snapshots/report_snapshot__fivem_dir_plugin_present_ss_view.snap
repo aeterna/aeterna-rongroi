@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 6
+      "rule_count": 13
     },
     "platform": "windows",
     "os_build": "26100",
@@ -44,6 +44,38 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "061797d3-161d-4783-89e6-caf658973436",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "location": "plugins",
+            "path": "%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "signature": "no_embedded_signature"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "282115fe-863d-4e2e-9cf5-4eaf8e7545e4",
+      "collector": "fivem_dir",
+      "strength": "context",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "location": "plugins",
+            "path": "%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll"
+          }
+        }
+      ]
+    },
+    {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
       "collector": "posture",
       "strength": "posture",
@@ -67,9 +99,9 @@ expression: view
     "not_attempted": 0
   },
   "hidden": {
-    "not_found": 0,
+    "not_found": 5,
     "unmeasured_expected": 2,
     "unmeasured_unexpected": 0,
-    "unmatched": 4
+    "unmatched": 2
   }
 }

@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# FiveM for GTA V Legacy installed with an empty plugin folder, and its program folder — where
+# `FiveM.exe` is — present and unreadable, so the collector cannot say whether the executable is there
+# (ADR 0036).
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+access_denied:
+  - 'C:\Users\fixtureuser\AppData\Local\FiveM'

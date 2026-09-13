@@ -202,6 +202,7 @@ from here", and `location` keeps them apart.
   matched such a file would show it.
 - **No rule reads any of this yet.** The `fivem_dir` rule ADR 0009 waits for is now writable, and it is
   a separate change with its own false-positive argument.
+  > Written by ADR 0036: seven rules, and `FiveM.exe` of both editions read beside the plugin folders.
 - **How long a check takes was measured only for a few files** — the three offline live tests took
   0.48 s together — not for a large plugin folder.
 

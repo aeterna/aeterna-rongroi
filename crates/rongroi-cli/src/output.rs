@@ -192,7 +192,7 @@ pub fn consent(lang: Lang) -> String {
         Lang::En => "SS mode — screenshare check\n\
             This program will read, on this PC:\n\
             \x20 - security settings such as Secure Boot and memory integrity\n\
-            \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced, with their signatures (Authenticode)\n\
+            \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
@@ -203,7 +203,7 @@ pub fn consent(lang: Lang) -> String {
         Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
             โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
             \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot และ memory integrity\n\
-            \x20 - โปรแกรมที่กำลังรันอยู่ และไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
+            \x20 - โปรแกรมที่กำลังรันอยู่ ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
@@ -658,7 +658,14 @@ mod tests {
             ("evtx", &["event log"]),
             (
                 "fivem_dir",
-                &["FiveM", "plugin", "Legacy", "Enhanced", "Authenticode"],
+                &[
+                    "FiveM",
+                    "plugin",
+                    "Legacy",
+                    "Enhanced",
+                    "FiveM.exe",
+                    "Authenticode",
+                ],
             ),
             ("pca", &["Program Compatibility Assistant"]),
             ("posture", &["Secure Boot", "memory integrity"]),
@@ -734,8 +741,8 @@ mod tests {
         assert!(thai.contains("ร่องรอยของโปรแกรมนี้เอง"), "{thai}");
     }
 
-    /// A plugin file the `fivem_dir` collector saw. No rule reads that collector, so nothing about
-    /// it matched one.
+    /// A plugin file the `fivem_dir` collector saw, written here as an unmatched observation. Rules read
+    /// that collector since ADR 0036; what this test needs is an entry in the bucket, not a real match.
     fn plugin_file() -> Vec<UnmatchedGroup> {
         vec![UnmatchedGroup {
             collector: "fivem_dir".to_owned(),

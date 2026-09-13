@@ -815,8 +815,8 @@ date: 2026-09-12
         assert_eq!(report.unmatched, unmatched_process(vec![theirs]));
     }
 
-    /// `fivem_dir` and `process` both ship without a rule. They read the machine on every scan, and
-    /// everything they saw is unmatched.
+    /// `process` ships without a rule (ADR 0010), and `fivem_dir` did until ADR 0036. Such a collector
+    /// reads the machine on every scan, and everything it saw is unmatched.
     #[test]
     fn with_no_rules_at_all_every_observation_is_unmatched() {
         let bundle = bundle_of(&[]);

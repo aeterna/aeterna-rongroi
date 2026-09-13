@@ -1,0 +1,41 @@
+{
+  "description": "A graphics mod installed as the Cfx.re forum guides describe: an unsigned DLL, its settings file (text never carries an embedded signature) and a DLL whose signature does not verify. Every answer but `valid` matches, and all three files are attached to one row. Every hash is invented.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 3
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\dxgi.dll",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\ReShade.ini",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\overlay.dll",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "invalid"
+      }
+    }
+  ],
+  "expect_matches": 3
+}

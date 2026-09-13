@@ -61,6 +61,13 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   false` included — there the gap is checked before anything is matched, because a field nobody could read
   is also a field that is not there, and the rule would otherwise be `found` and the report would say "we
   looked and it is not there" about it (ADR 0002, ADR 0029).
+- **A field a collector leaves out for one item is not a gap**, and no equality or value list matches
+  it. `fivem_dir` omits `signature` for a file whose check failed. Partition the field's values across
+  rules so each one lands somewhere, and give the omitted field its own rule with `<field>|exists: false`
+  — the pattern and its reasons are in `docs/rules-authoring.md` (ADR 0036).
+- **An `allow` entry is a measurement**: from a file its publisher released, with a `#` comment saying
+  when and how, never from memory. A certificate entry goes stale on renewal, and the rule's
+  `falsepositives` must tell a reviewer what that looks like (ADR 0036).
 - To compare one field byte for byte, list its name in `cased`. It is per field, so the rest of `match`
   keeps folding, every field left out of it folds, and one entry covers every comparison the rule makes
   against that field, `startswith` and `contains` included. A rule with no `cased` line is

@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 0999422f-8709-4d85-80e3-39410a85ed6b
+title: A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here
+description: >-
+  FiveM for GTA V Enhanced's folder %APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi holds a file, and
+  Windows found no signature embedded in it, one that does not verify, or one it could not verify
+  without the internet; each file shown says which. Whether the Enhanced client loads anything from
+  this folder is not established — it exists on a fresh install and is named for ASI plugins, and
+  nothing more is known — so a file here is a file in that folder and no more than that. The check
+  does not say what a file is or does, or who put it there. A file with a valid signature is shown
+  under "A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature", and one
+  whose signature could not be checked at all under "A FiveM file's signature could not be checked".
+status: experimental
+collector: fivem_dir
+strength: presence
+# The same three answers as the Legacy plugins rule, kept a separate rule so that its text can say the
+# folder is not known to be loaded, which the Legacy one does not need to say (ADR 0035, ADR 0036).
+match:
+  location: enhanced_asi
+  signature: [no_embedded_signature, invalid, unverifiable_offline]
+retention: >-
+  Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and
+  this check cannot say what the folder held earlier.
+# Left out deliberately: `access_denied`. The folder is inside the player's own profile.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Graphics mods and their settings or log files, placed here by a player following a guide written
+    for another game or for Legacy's plugins folder
+  - Text files of any kind — a readme, an .ini, a log — which never carry an embedded signature
+  - Tools that install files here for the Enhanced edition, signed or not by their authors
+  - A signature that does not verify because the file was damaged, or whose certificate expired
+    without a timestamp
+  - A signature this PC could not verify offline, because its certificate chain needs something
+    Windows has not already stored
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [fivem_dir, enhanced_asi, signature]
+related:
+  - id: 061797d3-161d-4783-89e6-caf658973436
+    type: similar
+  - id: 53528a11-5af7-4e75-94bf-fca07eec6fcc
+    type: similar

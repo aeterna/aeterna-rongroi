@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Both FiveM editions installed, each with `FiveM.exe` directly inside its program folder under
+# %LOCALAPPDATA% (ADR 0036). The folders hold the other entries a real install has beside the
+# executable, which the collector lists to find `FiveM.exe` and never reports. Legacy's executable is
+# written in lower case, as a file system that does not care about case may return it. Every hash here is
+# invented, the signing certificate's included, and `Example Signer` is nobody.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.app
+      directory: true
+    - name: fivem.exe
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+      signature:
+        state: valid
+        signer: Example Signer
+        signer_cert_sha256: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+    - name: FiveM.VisualElementsManifest.xml
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+  'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced':
+    - name: products
+      directory: true
+    - name: FiveM.exe
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+      signature: { state: no_embedded_signature }
+    - name: modify.exe
+      sha256: 7777777777777777777777777777777777777777777777777777777777777777
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Roaming\FiveM for GTAV Enhanced\gta5enhanced\asi': []

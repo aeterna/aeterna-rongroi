@@ -123,7 +123,8 @@ ordinary condition that produces each and how common it is. The two that most of
 `source_absent` ("this PC has no such record to read") and `source_empty` ("the place this is kept is
 there and holds nothing"). They mean opposite things — write the one you mean.
 
-No rule ships with `cased` today, and none uses an operator. `cased` looks like this, and needs a `#`
+No rule ships with `cased` today. The `fivem_dir` rules are the first to use a value list and an
+operator, `exists` (ADR 0036). `cased` looks like this, and needs a `#`
 comment saying why the field's own vocabulary distinguishes case:
 
 ```yaml
@@ -132,6 +133,36 @@ match:
   some_field: Exact Value
 cased: [some_field]
 ```
+
+## When a collector omits a field for one item
+
+Some collectors report a failure on **one** item by leaving a field out of that item's observation,
+not by a gap: `fivem_dir` omits `signature` for a file whose check failed, and `sha256` for one it could
+not hash (ADR 0009). `gaps` covers the whole run, so a gap there would silence every rule on that
+collector because of one file. The consequence for a rule author is that such an item satisfies **no**
+equality on the omitted field, and a rule that lists every value the field can take still falls to
+`not_found` for it. Nothing in the engine can tell you this happened.
+
+The pattern ADR 0036 uses:
+
+- **Partition the values.** Write one rule per group of values a reader should tell apart, and put
+  every value the field can take in some rule. `match` has no negation, so "anything but `valid`" is the
+  list of the other values.
+- **Give the missing field its own rule**, with `<field>|exists: false` beside a condition only the
+  items can meet (for `fivem_dir`, `path|exists: true`, which a folder observation does not carry). The
+  engine checks gaps before an absence condition, so a run that could not read at all makes that rule
+  `unmeasured`, not `found` (ADR 0029).
+- **Say so in `description`** of every rule in the group: an item whose field is missing is shown under
+  the other rule, and this row's `not_found` speaks only for the items that carried the field.
+
+## An `allow` entry is a measurement
+
+An `allow` entry names a file or a certificate by digest, and it is only as good as where the digest came
+from. Add one only when it was measured from a file its publisher released, and say in a `#` comment when
+and how — never from memory, a forum post or another tool's list. A certificate entry goes stale when the
+publisher renews: the rule's `falsepositives` has to say what a reviewer sees then and what they should
+do, and the entry for the new certificate is added **beside** the old one, which still signs the files
+people have not updated (ADR 0036).
 
 ## Fixtures
 

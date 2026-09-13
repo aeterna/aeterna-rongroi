@@ -1,0 +1,50 @@
+{
+  "description": "An unsigned file in Legacy's plugins folder is the Legacy rule's, and a validly signed asi file is the rule beside this one.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 1
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "folder": "listed",
+        "files": 1
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\dxgi.dll",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Roaming\\FiveM for GTAV Enhanced\\gta5enhanced\\asi\\signed.asi",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "valid",
+        "signer": "Example Signer",
+        "signer_cert_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM for GTAV Enhanced\\FiveM.exe",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "invalid"
+      }
+    }
+  ]
+}

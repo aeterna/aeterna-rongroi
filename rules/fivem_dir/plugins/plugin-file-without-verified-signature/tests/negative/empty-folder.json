@@ -1,0 +1,20 @@
+{
+  "description": "FiveM installed with an empty plugins folder, the state of the baselines: the folder observation carries no `signature` and no `path`.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 0
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "folder": "absent"
+      }
+    }
+  ]
+}

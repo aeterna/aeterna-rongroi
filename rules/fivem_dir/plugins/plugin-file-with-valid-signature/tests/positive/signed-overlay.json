@@ -1,0 +1,25 @@
+{
+  "description": "A plugin with a valid embedded signature. The signer and certificate are invented; `Example Signer` is nobody.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 1
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\signed.dll",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "valid",
+        "signer": "Example Signer",
+        "signer_cert_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

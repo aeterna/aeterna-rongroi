@@ -59,6 +59,9 @@ on. The rule follows once signer checking or a starter allow-list exists.
 certificate's SHA-256, never the signer's name — and extends this collector to FiveM for GTA V Enhanced's
 `asi` folder under `%APPDATA%`. The rule itself is still to be written.
 
+**The first rules are ADR 0036**, which also extends this collector to `FiveM.exe` in each edition's
+program folder.
+
 This ADR originally continued: *"The observations are still visible in Self mode, where a person reads
 them."* That was false when it was written. A `Report` held one `Evidence` per rule, and an
 observation reached it only inside `EvidenceState::Found`, so a collector with no rule produced

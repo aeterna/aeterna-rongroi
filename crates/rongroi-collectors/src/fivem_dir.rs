@@ -13,8 +13,13 @@
 //!
 //! Of each folder the collector reports whether it is there and how many files it holds, and of each
 //! file its path, its SHA-256 and what Windows says about the signature embedded in it. Nothing about
-//! timestamps, size, owner or subfolders (ADR 0009). Legitimate software puts files here too, which is
-//! why no rule reads this collector yet — the observations are shown in Self mode and read by a person.
+//! timestamps, size, owner or subfolders (ADR 0009).
+//!
+//! It also reads **`FiveM.exe` itself**, in each edition's program folder, with the same four facts, so
+//! that a rule can ask whether the client carries the signature `FiveM` is published with (ADR 0036). Of
+//! the program folder it reads only the names of its entries, to find that one file; nothing else in
+//! it is reported. Legitimate software puts files in the plugin folders too, which is why the rules on
+//! them describe a file and its signature and never what the file is (ADR 0036).
 
 use std::collections::BTreeMap;
 
@@ -36,8 +41,30 @@ pub const PLUGINS_LOCATION: &str = "plugins";
 pub const ENHANCED_ASI_RELATIVE_PATH: &str = r"FiveM for GTAV Enhanced\gta5enhanced\asi";
 /// Value of the `location` field for the Enhanced `asi` folder.
 pub const ENHANCED_ASI_LOCATION: &str = "enhanced_asi";
+/// `FiveM` for GTA V Legacy's program folder, relative to `%LOCALAPPDATA%`; `FiveM.exe` is directly
+/// inside it. Measured on one Windows 11 machine (ADR 0035, ADR 0036).
+pub const LEGACY_PROGRAM_RELATIVE_PATH: &str = "FiveM";
+/// `FiveM` for GTA V Enhanced's program folder, relative to `%LOCALAPPDATA%` — local, although its user
+/// data is roaming. Measured on one Windows 11 machine (ADR 0035, ADR 0036).
+pub const ENHANCED_PROGRAM_RELATIVE_PATH: &str = "FiveM for GTAV Enhanced";
+/// The client executable's file name in both program folders (ADR 0036).
+pub const CLIENT_EXE_NAME: &str = "FiveM.exe";
+/// Value of the `location` field for Legacy's `FiveM.exe`.
+pub const LEGACY_EXE_LOCATION: &str = "legacy_exe";
+/// Value of the `location` field for Enhanced's `FiveM.exe`.
+pub const ENHANCED_EXE_LOCATION: &str = "enhanced_exe";
 
 const ID: &str = "fivem_dir";
+
+/// What the collector reports of one folder it looks in.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Reads {
+    /// A plugin folder: an observation for the folder, and one for every file directly inside it.
+    EveryFile,
+    /// A program folder: an observation for the one file of this name, when it is there, and nothing
+    /// about the folder or anything else in it (ADR 0036).
+    OneFile(&'static str),
+}
 
 /// One folder this collector looks in.
 struct Location {
@@ -47,19 +74,35 @@ struct Location {
     base: &'static str,
     /// The folder, relative to that variable.
     relative: &'static str,
+    /// What is reported of it.
+    reads: Reads,
 }
 
 /// Every folder this collector looks in, in the order observations are reported.
-const LOCATIONS: [Location; 2] = [
+const LOCATIONS: [Location; 4] = [
     Location {
         name: PLUGINS_LOCATION,
         base: LOCAL_APP_DATA,
         relative: PLUGINS_RELATIVE_PATH,
+        reads: Reads::EveryFile,
     },
     Location {
         name: ENHANCED_ASI_LOCATION,
         base: ROAMING_APP_DATA,
         relative: ENHANCED_ASI_RELATIVE_PATH,
+        reads: Reads::EveryFile,
+    },
+    Location {
+        name: LEGACY_EXE_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: LEGACY_PROGRAM_RELATIVE_PATH,
+        reads: Reads::OneFile(CLIENT_EXE_NAME),
+    },
+    Location {
+        name: ENHANCED_EXE_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: ENHANCED_PROGRAM_RELATIVE_PATH,
+        reads: Reads::OneFile(CLIENT_EXE_NAME),
     },
 ];
 
@@ -78,7 +121,8 @@ const REASONS: [UnmeasuredReason; 3] = [
 ///
 /// Two kinds of observation, disjoint by the fields they carry, as `pca`'s are (ADR 0020): **a folder**
 /// (`location`, `folder`, and `files` when it was listed) and **a file** (`location`, `path`, and
-/// whichever of `sha256`, `signature`, `signer` and `signer_cert_sha256` could be read).
+/// whichever of `sha256`, `signature`, `signer` and `signer_cert_sha256` could be read). A program
+/// folder produces only the second kind, for `FiveM.exe` (ADR 0036).
 const FIELDS: [Field; 8] = [
     Field::number("files"),
     Field::text("folder"),
@@ -151,10 +195,12 @@ impl Collector for FivemDir {
                     ) => Err(UnmeasuredReason::ReadFailed),
                 },
             };
-            match listing {
+            match (listing, location.reads) {
                 // Not there — this edition is not installed for this user. The collector *did* look.
-                Ok(None) => observations.push(folder_observation(location, FOLDER_ABSENT, None)),
-                Ok(Some((folder, entries))) => {
+                (Ok(None), Reads::EveryFile) => {
+                    observations.push(folder_observation(location, FOLDER_ABSENT, None));
+                }
+                (Ok(Some((folder, entries))), Reads::EveryFile) => {
                     let files = file_observations(host, location, &folder, entries);
                     observations.push(folder_observation(
                         location,
@@ -163,8 +209,24 @@ impl Collector for FivemDir {
                     ));
                     observations.extend(files);
                 }
-                Err(reason) => {
-                    observations.push(folder_observation(location, FOLDER_UNREADABLE, None));
+                // A program folder that is not there, or holds no file of that name, is nothing to
+                // report: the plugin folders' own observations already say which editions are
+                // installed, and an observation per absent executable would be a second way of saying
+                // it that no rule reads (ADR 0036).
+                (Ok(None), Reads::OneFile(_)) => {}
+                (Ok(Some((folder, entries))), Reads::OneFile(name)) => {
+                    let named: Vec<DirEntryInfo> = entries
+                        .into_iter()
+                        .filter(|entry| entry.name.eq_ignore_ascii_case(name))
+                        .collect();
+                    observations.extend(file_observations(host, location, &folder, named));
+                }
+                (Err(reason), reads) => {
+                    // A program folder carries no folder observation, so the gap is what says it could
+                    // not be read, as it does for every field of the run.
+                    if reads == Reads::EveryFile {
+                        observations.push(folder_observation(location, FOLDER_UNREADABLE, None));
+                    }
                     unread = Some(match (unread, reason) {
                         (Some(UnmeasuredReason::AccessDenied), _) => UnmeasuredReason::AccessDenied,
                         (_, reason) => reason,
@@ -562,6 +624,70 @@ mod tests {
             },
         );
         assert!(fields.is_empty(), "{fields:?}");
+    }
+
+    /// Each edition's `FiveM.exe` is one file observation under its own `location`, with the same four
+    /// facts a plugin file has. Nothing else in a program folder is reported, and a program folder has
+    /// no folder observation (ADR 0036).
+    #[test]
+    fn each_editions_executable_is_observed_and_nothing_else_in_its_program_folder() {
+        let run = FivemDir.collect(&fixture("fivem-dir-client-exe"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        let paths: Vec<&str> = files(observations).into_iter().map(path_of).collect();
+        assert_eq!(
+            paths,
+            [
+                r"C:\Users\fixtureuser\AppData\Local\FiveM\fivem.exe",
+                r"C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe",
+            ]
+        );
+        let legacy = by_name(observations, r"\fivem.exe");
+        assert_eq!(field(legacy, "location"), Some(LEGACY_EXE_LOCATION));
+        assert_eq!(field(legacy, "signature"), Some("valid"));
+        assert_eq!(field(legacy, "signer"), Some("Example Signer"));
+        assert_eq!(
+            field(legacy, "signer_cert_sha256"),
+            Some("b".repeat(64).as_str())
+        );
+        assert_eq!(field(legacy, "sha256"), Some("5".repeat(64).as_str()));
+        let enhanced = by_name(observations, r"Enhanced\FiveM.exe");
+        assert_eq!(field(enhanced, "location"), Some(ENHANCED_EXE_LOCATION));
+        assert_eq!(field(enhanced, "signature"), Some("no_embedded_signature"));
+        let locations: Vec<&str> = observations
+            .iter()
+            .filter(|observation| observation.fields.contains_key("folder"))
+            .filter_map(|observation| field(observation, "location"))
+            .collect();
+        assert_eq!(locations, [PLUGINS_LOCATION, ENHANCED_ASI_LOCATION]);
+    }
+
+    /// No program folder, or one without `FiveM.exe`, reports nothing: the plugin folders' own
+    /// observations say whether an edition is installed.
+    #[test]
+    fn an_absent_executable_is_no_observation_and_no_gap() {
+        let host = inline(
+            "platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\n  APPDATA: 'C:\\Users\\a\\AppData\\Roaming'\nfilesystem:\n  'C:\\Users\\a\\AppData\\Local\\FiveM':\n    - name: FiveM.exe.old\n    - name: FiveM.exe\n      directory: true\n",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert!(files(observations).is_empty(), "{observations:?}");
+    }
+
+    /// A program folder that cannot be listed is a gap in every field, like a plugin folder that cannot
+    /// be: whether `FiveM.exe` is there was never answered, so no rule may read it as absent.
+    #[test]
+    fn an_unreadable_program_folder_is_a_gap() {
+        let run = FivemDir.collect(&fixture("fivem-dir-client-folder-denied"));
+        let (observations, gaps) = measured(&run);
+        assert!(files(observations).is_empty());
+        assert_eq!(gaps.get("signature"), Some(&UnmeasuredReason::AccessDenied));
+        assert_eq!(gaps.get("path"), Some(&UnmeasuredReason::AccessDenied));
+        assert_eq!(
+            folder(observations, PLUGINS_LOCATION),
+            ("listed".to_owned(), Some(0))
+        );
     }
 
     #[test]
