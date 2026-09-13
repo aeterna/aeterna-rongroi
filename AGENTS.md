@@ -41,7 +41,10 @@ see [`SECURITY.md`](SECURITY.md). Do not write bypass details into issues, PRs, 
 1. **No network code.** No HTTP/socket crates, no `std::net`, no `fetch`/`WebSocket` in the UI.
    `cargo deny check` and ESLint fail the build.
 2. **Collectors are read-only.** They never write, delete, move or lock files, keys or logs on the
-   scanned machine.
+   scanned machine. The one change they may make is to this program's own process token: enabling a
+   privilege the token already holds, for one read an ADR names, and putting it back straight after
+   (ADR 0038, the UEFI Secure Boot variable). The write calls that privilege would also permit are banned
+   in `clippy.toml`.
 3. **Evidence, never a verdict.** Every result is `Found`, `NotFound` (with its retention window) or
    `Unmeasured` (with a reason). Never add a score, a "clean" flag, or a pass/fail summary.
 4. **Environment problems are `Unmeasured`, not errors.** Missing admin rights, an absent log, or an

@@ -1,6 +1,6 @@
 # ADR 0038 — Secure Boot as the firmware reports it, the script block logging policy, and no Kernel DMA Protection
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-13
 
 ## Context
@@ -253,6 +253,24 @@ answer, or how often the rule would fire on a population.
   403), so any other length is refused rather than interpreted.
 - **Whether every UEFI firmware without Secure Boot support answers `ERROR_ENVVAR_NOT_FOUND`** rather than
   some other code. Another code is a `read_failed` gap, which SS mode lists.
+
+## Accepted by the owner
+
+On 2026-09-13 the project owner accepted this ADR's reading of hard rule 2: enabling a privilege the
+process token already holds, for one named read, and restoring it, is not a change to the scanned
+machine. Two things were made part of that acceptance, in the same change:
+
+- **The write calls are banned.** `clippy.toml` lists `SetFirmwareEnvironmentVariableA`, `…W`, `…ExA`
+  and `…ExW` under `disallowed-methods`. The ban was checked by adding a call to one of them in
+  `rongroi-host-windows` and running clippy for `x86_64-pc-windows-msvc`: it failed with "use of a
+  disallowed method". The call was then removed.
+- **The exception is written where the rule is.** `AGENTS.md` hard rule 2 and
+  `crates/rongroi-collectors/AGENTS.md` say that the one change a collector may make is to this
+  program's own token, for a read an ADR names, and that any further privilege needs its own ADR.
+
+Not established, and the condition for revisiting: whether security software flags a process that
+enables `SeSystemEnvironmentPrivilege`. If players report that it does, reading the firmware only when
+the person running the scan asks for it is the fallback to weigh.
 
 ## Consequences
 

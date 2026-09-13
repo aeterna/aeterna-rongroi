@@ -103,6 +103,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Both used to reach the report only as the reason a rule could not be answered. No rule reads either:
   a Windows 11 PC had the value at 3 and GitHub's Windows CI image has no value at all.
 
+- The Windows CI job suspends the Event Log service and runs a scan, which must finish and report the
+  configured-path rule as `unmeasured / budget_spent` (ADR 0042 §5). The bound on the channel-configuration
+  reads had been shown only against a fixture reader that never answers.
+- Amcache is decided against for now (ADR 0041, accepted): no collector and no hash rules until a hive
+  reader meets this repository's parser bar, and then only hashes already published elsewhere, each
+  with its source.
+- `clippy.toml` bans the four calls that write UEFI firmware variables. Reading the Secure Boot variable
+  enables `SeSystemEnvironmentPrivilege` in this program's own token, and that privilege permits writes too
+  (ADR 0038, now accepted). `AGENTS.md` hard rule 2 names the token as the one thing a collector may change.
+
 ### Changed
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
   `allow.signer_cert_sha256`, the SHA-256 of the signing certificate (ADR 0035). Code-signing certificates

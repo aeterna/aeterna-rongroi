@@ -246,7 +246,9 @@ and on the real machine above.
 - **Whether Enhanced loads from its `asi` folder** (ADR 0035), unchanged.
 - **Redaction outside `X:\Users\<name>`.** A profile redirected elsewhere keeps its account name in these
   paths in SS mode, as it does in every other collector's. Unchanged by this ADR.
-- **The Thai text of the seven rules has not been read by a native speaker.**
+- ~~The Thai text of the seven rules has not been read by a native speaker.~~ **Amended 2026-09-13:** the
+  project owner read the Thai text of every rule in the bundle, as `docs/rules-reference.th.md` renders it
+  (18 rules, these seven among them), and approved it.
 
 ## Consequences
 

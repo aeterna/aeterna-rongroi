@@ -5,7 +5,10 @@ Adds to the root [`AGENTS.md`](../../AGENTS.md); read that first.
 Collectors are the part of this project that reads a player's machine, so the boundary is strictest here.
 
 - **Read-only, always.** Open files, keys and logs for reading only. Never write, delete, rename, lock,
-  truncate or change timestamps — not even temporarily, not even "to restore it afterwards".
+  truncate or change timestamps — not even temporarily, not even "to restore it afterwards". The
+  exception is this process's own token, never the machine: a privilege the token already holds may be
+  enabled for one read that an ADR names and restored from the previous state straight after (ADR 0038).
+  A new one needs its own ADR, and a write that privilege would permit is banned in `clippy.toml`.
 - **Collect only what a rule needs.** No browser history, screenshots, documents, credentials, tokens or
   unrelated personal files. A new kind of source needs an ADR.
 - **No network, no child processes.** Do not shell out to other programs. Restarting the program itself with

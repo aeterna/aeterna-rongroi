@@ -186,3 +186,67 @@ jobs:
           }
           $compared = @($observations | Where-Object { $_.collector -eq 'evtx' -and $_.fields.PSObject.Properties.Name -contains 'at_configured_path' })
           Write-Output "evtx at_configured_path: $(@($compared | Where-Object { $_.fields.at_configured_path }).Count) of $($compared.Count)"
+      # ADR 0042 §5: the channel-configuration reads go to the Event Log service, and a service that never
+      # answers must cost the evtx budget, not the scan. The unit test proves that against a fixture reader
+      # that blocks; this is the positive twin on a real Windows, where the service process itself is
+      # suspended so that `EvtOpenChannelConfig` has nobody to answer it. The runner is throwaway, which is
+      # the only reason suspending a system service is acceptable here, and the service is resumed whatever
+      # happens. It runs last because nothing after it should depend on the Event Log.
+      - name: A suspended Event Log service costs the evtx budget, not the scan
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          cargo build --locked --quiet -p rongroi-cli
+          $exe = Join-Path $PWD 'target\debug\aeterna-rongroi-cli.exe'
+          if (-not (Test-Path $exe)) { throw "the CLI was not built at $exe" }
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class RongroiSuspend {
+            [DllImport("kernel32.dll", SetLastError = true)] public static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+            [DllImport("kernel32.dll", SetLastError = true)] public static extern bool CloseHandle(IntPtr handle);
+            [DllImport("ntdll.dll")] public static extern int NtSuspendProcess(IntPtr handle);
+            [DllImport("ntdll.dll")] public static extern int NtResumeProcess(IntPtr handle);
+          }
+          '@
+          $servicePid = (Get-CimInstance Win32_Service -Filter "Name='EventLog'").ProcessId
+          $sharing = @(Get-CimInstance Win32_Service | Where-Object { $_.ProcessId -eq $servicePid } | ForEach-Object { $_.Name })
+          Write-Output "EventLog runs in pid $servicePid with: $($sharing -join ', ')"
+          [System.Diagnostics.Process]::EnterDebugMode()
+          $PROCESS_SUSPEND_RESUME = 0x0800
+          $handle = [RongroiSuspend]::OpenProcess($PROCESS_SUSPEND_RESUME, $false, $servicePid)
+          if ($handle -eq [IntPtr]::Zero) { throw "OpenProcess on the EventLog service failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
+          $suspended = $false
+          try {
+            $status = [RongroiSuspend]::NtSuspendProcess($handle)
+            if ($status -ne 0) { throw ('NtSuspendProcess failed: 0x{0:X8}' -f $status) }
+            $suspended = $true
+            $clock = [System.Diagnostics.Stopwatch]::StartNew()
+            $scan = Start-Process -FilePath $exe -ArgumentList 'scan', '--json' -RedirectStandardOutput hung-service.json -RedirectStandardError hung-service.err -NoNewWindow -PassThru
+            $null = $scan.Handle  # held now, or ExitCode can come back empty after the process exits
+            $finished = $scan.WaitForExit(180000)
+            $clock.Stop()
+            if (-not $finished) {
+              $scan.Kill($true)
+              throw "the scan did not finish within 180 s with the Event Log service suspended"
+            }
+          } finally {
+            if ($suspended) {
+              $status = [RongroiSuspend]::NtResumeProcess($handle)
+              Write-Output ('NtResumeProcess: 0x{0:X8}' -f $status)
+            }
+            [void][RongroiSuspend]::CloseHandle($handle)
+          }
+          Write-Output "scan exit $($scan.ExitCode) after $([math]::Round($clock.Elapsed.TotalSeconds, 1)) s"
+          if ($scan.ExitCode -ne 0) { Get-Content hung-service.err; throw "the scan exited with $($scan.ExitCode)" }
+          $report = Get-Content hung-service.json -Raw | ConvertFrom-Json
+          $report.evidence | Where-Object { $_.collector -eq 'evtx' } | ForEach-Object {
+            $reason = if ($_.reason) { $_.reason } else { '-' }
+            Write-Output "evidence: $($_.rule_id) $($_.state) $reason"
+          }
+          # The rule that compares a log with the file its channel writes to reads only what the service said.
+          $rule = @($report.evidence | Where-Object { $_.rule_id -eq '87a53c8f-b0e4-477d-91e7-93b904ba965f' })
+          if ($rule.Count -ne 1) { throw "expected one row for event-log-not-at-configured-path, got $($rule.Count)" }
+          if ($rule[0].state -ne 'unmeasured' -or $rule[0].reason -ne 'budget_spent') {
+            throw "with the service suspended, event-log-not-at-configured-path must be unmeasured / budget_spent, got '$($rule[0].state)' / '$($rule[0].reason)'"
+          }
