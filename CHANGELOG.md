@@ -6,6 +6,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Two `posture` readings and two rules (ADR 0038). `secure_boot_firmware` is Secure Boot as the firmware's
+  own UEFI `SecureBoot` variable reports it, beside the registry's `secure_boot`; reading it enables
+  `SeSystemEnvironmentPrivilege` in this program's own token for the read and puts it back, and without
+  administrator rights it is `unmeasured / not_admin` — measured on one Windows 11 machine, elevated and
+  under a limited token. The rule `secure-boot-firmware-disagrees` (`experimental`) is the registry saying
+  on while the firmware says off. `script_block_logging` is the Windows PowerShell machine policy as
+  `enabled`, `disabled` or `not_configured`, which are three different statements; the rule
+  `script-block-logging-disabled-by-policy` (`experimental`) matches only a policy written to off. Kernel
+  DMA Protection was considered and is **not** read: Microsoft documents no programmatic interface for
+  its state, and the ADR declines to ship a guessed structure. The Windows CI job checks that the firmware
+  read leaves the privilege as it found it and agrees with `Get-SecureBootUEFI`.
 - The report header says when Windows last started counting, so the times on other rows can be read
   against it (ADR 0039): `boot_time`, the scan's clock minus `GetTickCount64`, or `unmeasured` with a
   reason — never a guessed time. It is context, not evidence, and no rule can read it. It is shown in both
