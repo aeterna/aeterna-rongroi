@@ -1,0 +1,29 @@
+{
+  "description": "A plugin file and FiveM.exe were listed, and neither signature check produced an answer, so neither carries `signature`; the plugin's hash could still be read. Both match, whichever folder they are in.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 1
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\locked.dll",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe"
+      }
+    }
+  ],
+  "expect_matches": 2
+}

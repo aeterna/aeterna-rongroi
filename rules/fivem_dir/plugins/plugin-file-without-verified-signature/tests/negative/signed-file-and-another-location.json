@@ -1,0 +1,49 @@
+{
+  "description": "A validly signed file in the plugins folder belongs to the rule beside this one, an unsigned file in the Enhanced edition's asi folder to that folder's own rule, an unsigned FiveM.exe to the client rule, and a file whose signature could not be checked at all carries no `signature` and matches none of them. The hashes and the certificate are invented.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 2
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\signed.dll",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "valid",
+        "signer": "Example Signer",
+        "signer_cert_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\locked.dll"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Roaming\\FiveM for GTAV Enhanced\\gta5enhanced\\asi\\example.asi",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "no_embedded_signature"
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "description": "A FiveM.exe this PC could not verify without the internet is shown, with that value, rather than counted as `not found`.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "unverifiable_offline"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

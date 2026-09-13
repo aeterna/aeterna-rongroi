@@ -55,9 +55,10 @@ fn unreported_secure_boot_is_unmeasured_not_not_found() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
-/// No rule reads `fivem_dir` (ADR 0009), so every file it saw is an unmatched observation. Self
-/// mode is where a person reads them — which is what ADR 0009 claimed and what, until ADR 0014,
-/// nothing in the code did: an observation reached a view only inside `Found` evidence.
+/// Rules read `fivem_dir` since ADR 0036. The fixture's readable plugin file has no embedded signature
+/// and matches the Legacy plugins rule; the file whose hash and signature could not be read matches the
+/// rule that says its signature could not be checked. Self mode shows both paths as they were read,
+/// and the folder observations, which no rule matches, as unmatched observations (ADR 0014).
 #[test]
 fn fivem_dir_plugin_present_self_view() {
     let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::SelfCheck);
@@ -66,17 +67,93 @@ fn fivem_dir_plugin_present_self_view() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
+/// Until ADR 0036 no plugin file reached an SS view, and this test asserted the file name was absent.
+/// Now each file matches a rule and is `found`, so its path **is** shown to the person watching — which
+/// is what the consent question names — and the property that carries the weight is redaction: the
+/// fixture's files live under `C:\Users\fixtureuser\...`, and the user name must not survive while
+/// the rest of the path does.
 #[test]
 fn fivem_dir_plugin_present_ss_view() {
     let view = view::for_mode(&report_for("fivem-dir-plugin-present"), Mode::Ss);
-    // The fixture's files live under `C:\Users\fixtureuser\...`. SS mode counts unmatched
-    // observations and lists none of them, so neither the user name nor the file names reach the
-    // person watching. This is the assertion the earlier version of this test could not make,
-    // because nothing of this collector reached a view at all (ADR 0014).
     let json = serde_json::to_string(&view).unwrap();
     assert!(!json.contains("fixtureuser"), "{json}");
-    assert!(!json.contains("example-plugin.dll"), "{json}");
+    for redacted in [
+        r"%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
+        r"%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll",
+    ] {
+        assert!(json.contains(redacted), "{redacted} is not in {json}");
+    }
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// Both editions' `FiveM.exe` reach an SS view through the client rules, with the user name redacted
+/// out of both paths, the signer's name shown beside a certificate the rule does not know, and nothing
+/// else from either program folder — `modify.exe` and the folder's other entries are listed to find
+/// the executable and are never observations (ADR 0036).
+#[test]
+fn fivem_dir_client_exe_ss_view_redacts_both_programs_and_shows_nothing_else() {
+    const WITHOUT_VERIFIED_SIGNATURE: &str = "148cbcdd-8d18-4af6-a541-71cc7f21b2eb";
+    const ANOTHER_CERTIFICATE: &str = "2dc11b64-72a2-48f5-a273-985e906d5a9e";
+
+    let report = report_for("fivem-dir-client-exe");
+    let everything = serde_json::to_string(&report).unwrap();
+    for never in ["modify.exe", "VisualElementsManifest", "products"] {
+        assert!(!everything.contains(never), "{never} reached the report");
+    }
+
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(!json.contains("fixtureuser"), "{json}");
+    let found = |rule: &str| {
+        view.evidence
+            .iter()
+            .find(|evidence| evidence.rule_id == rule)
+            .map(|evidence| serde_json::to_string(&evidence.state).unwrap())
+            .unwrap_or_default()
+    };
+    let unsigned = found(WITHOUT_VERIFIED_SIGNATURE);
+    assert!(
+        unsigned.contains(r"%USERPROFILE%\\AppData\\Local\\FiveM for GTAV Enhanced\\FiveM.exe"),
+        "{unsigned}"
+    );
+    let other = found(ANOTHER_CERTIFICATE);
+    assert!(
+        other.contains(r"%USERPROFILE%\\AppData\\Local\\FiveM\\fivem.exe"),
+        "{other}"
+    );
+    assert!(other.contains("Example Signer"), "{other}");
+}
+
+/// A plugin folder nobody could list is a gap in every field, so **every** `fivem_dir` rule is
+/// `unmeasured` — the one asking for an absent `signature` included, whose `exists: false` would
+/// otherwise be satisfied by a folder with nothing read in it. None of them declares `access_denied`,
+/// so SS mode lists each (ADR 0027, ADR 0029, ADR 0036). The same holds when the program folder that
+/// holds `FiveM.exe` is the one denied.
+#[test]
+fn a_fivem_folder_that_could_not_be_listed_leaves_every_fivem_dir_rule_unmeasured() {
+    for host in ["fivem-dir-access-denied", "fivem-dir-client-folder-denied"] {
+        let report = report_for(host);
+        let fivem: Vec<_> = report
+            .evidence
+            .iter()
+            .filter(|evidence| evidence.collector == "fivem_dir")
+            .collect();
+        assert_eq!(fivem.len(), 7, "{host}: {fivem:?}");
+        for evidence in fivem {
+            assert!(
+                matches!(
+                    evidence.state,
+                    rongroi_core::model::EvidenceState::Unmeasured {
+                        reason: rongroi_core::model::UnmeasuredReason::AccessDenied,
+                        expected: false,
+                    }
+                ),
+                "{host}: {} is {:?}",
+                evidence.rule_id,
+                evidence.state
+            );
+        }
+    }
 }
 
 /// Where the `process-own-trace` fixture says this program is running from.

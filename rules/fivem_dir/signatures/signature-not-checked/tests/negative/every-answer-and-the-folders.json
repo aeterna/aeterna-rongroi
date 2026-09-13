@@ -1,0 +1,57 @@
+{
+  "description": "Each of the four answers a signature check gives is a check that produced an answer, and a folder observation carries neither `path` nor `signature`. A file whose hash alone could not be read is not this rule's either.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 4
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "folder": "absent"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\a.dll",
+        "signature": "valid",
+        "signer": "Example Signer",
+        "signer_cert_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\b.dll",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "invalid"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\c.dll",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\d.dll",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "unverifiable_offline"
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "description": "An unsigned file and a text file in the Enhanced edition's asi folder. The hashes are invented.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "absent"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "folder": "listed",
+        "files": 2
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Roaming\\FiveM for GTAV Enhanced\\gta5enhanced\\asi\\example.asi",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_asi",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Roaming\\FiveM for GTAV Enhanced\\gta5enhanced\\asi\\readme.txt",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 2
+}

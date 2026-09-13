@@ -28,7 +28,7 @@ is arrives in `ScanContext` from each binary's `main`, so a fixture can exercise
 
 After the rules have run, every observation that **no** rule matched is kept as an *unmatched
 observation*, grouped by collector. Evidence carries observations only where a rule matched, so without
-this a collector that ships with no rule — `fivem_dir` and `process` both do — would read the machine on
+this a collector that ships with no rule — `process` does, and `fivem_dir` did until ADR 0036 — would read the machine on
 every scan and have its reading discarded. It is the complement of "matched at least one rule": an
 observation one rule matched is evidence under that rule and is not repeated here because a second rule
 did not match it. Own traces are taken out first, so one is never also an unmatched observation (ADR 0014).

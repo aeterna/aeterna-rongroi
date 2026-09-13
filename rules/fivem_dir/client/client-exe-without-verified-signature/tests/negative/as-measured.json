@@ -1,0 +1,44 @@
+{
+  "description": "FiveM.exe of both editions as measured on 2026-09-13: a valid signature from the certificate the other client rule knows. An unsigned plugin is not FiveM.exe. The file hashes are invented; the certificate hash is the measured one.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 1
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\dxgi.dll",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "valid",
+        "signer": "Rockstar Games, Inc.",
+        "signer_cert_sha256": "65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM for GTAV Enhanced\\FiveM.exe",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "valid",
+        "signer": "Rockstar Games, Inc.",
+        "signer_cert_sha256": "65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f"
+      }
+    }
+  ]
+}

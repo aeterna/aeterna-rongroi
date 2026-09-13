@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 6
+      "rule_count": 13
     },
     "platform": "windows",
     "os_build": "26100",
@@ -42,6 +42,73 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "not_found",
+      "retention": "The file as it was when the scan ran. FiveM replaces FiveM.exe when it updates, so this says nothing about the file at any earlier time."
+    },
+    {
+      "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "not_found",
+      "retention": "The file as it was when the scan ran. FiveM replaces FiveM.exe when it updates, so this says nothing about the file at any earlier time."
+    },
+    {
+      "rule_id": "53528a11-5af7-4e75-94bf-fca07eec6fcc",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "not_found",
+      "retention": "Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier."
+    },
+    {
+      "rule_id": "0999422f-8709-4d85-80e3-39410a85ed6b",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "not_found",
+      "retention": "Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier."
+    },
+    {
+      "rule_id": "d5531c55-1a65-4698-9f39-7cf79bbbb7ba",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "not_found",
+      "retention": "Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier."
+    },
+    {
+      "rule_id": "061797d3-161d-4783-89e6-caf658973436",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "location": "plugins",
+            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "signature": "no_embedded_signature"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "282115fe-863d-4e2e-9cf5-4eaf8e7545e4",
+      "collector": "fivem_dir",
+      "strength": "context",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "location": "plugins",
+            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll"
+          }
+        }
+      ]
     },
     {
       "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
@@ -87,22 +154,6 @@ expression: view
             "files": 2,
             "folder": "listed",
             "location": "plugins"
-          }
-        },
-        {
-          "collector": "fivem_dir",
-          "fields": {
-            "location": "plugins",
-            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
-            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "signature": "no_embedded_signature"
-          }
-        },
-        {
-          "collector": "fivem_dir",
-          "fields": {
-            "location": "plugins",
-            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll"
           }
         },
         {

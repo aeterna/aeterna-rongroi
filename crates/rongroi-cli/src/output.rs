@@ -734,8 +734,8 @@ mod tests {
         assert!(thai.contains("ร่องรอยของโปรแกรมนี้เอง"), "{thai}");
     }
 
-    /// A plugin file the `fivem_dir` collector saw. No rule reads that collector, so nothing about
-    /// it matched one.
+    /// A plugin file the `fivem_dir` collector saw, written here as an unmatched observation. Rules read
+    /// that collector since ADR 0036; what this test needs is an entry in the bucket, not a real match.
     fn plugin_file() -> Vec<UnmatchedGroup> {
         vec![UnmatchedGroup {
             collector: "fivem_dir".to_owned(),
