@@ -7,6 +7,7 @@
 mod output;
 
 use std::io::{BufRead, Write};
+use std::process::ExitCode;
 
 use anyhow::Context;
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -37,6 +38,9 @@ enum Command {
     Scan(ScanArgs),
 }
 
+// Each of these is an independent command-line switch, which is what a bool is for; the lint's
+// state-machine concern does not apply.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Args)]
 struct ScanArgs {
     /// `self`: see everything. `ss`: screenshare view — asks for consent, shows only matches.
@@ -54,6 +58,10 @@ struct ScanArgs {
     /// Restart with administrator rights before scanning (Windows only). Windows asks you to confirm.
     #[arg(long)]
     elevate: bool,
+    /// Wait for Enter before exiting. Added by `--elevate` to the copy it starts, whose console window
+    /// Windows closes as soon as that copy exits (ADR 0012, amended); not meant to be typed.
+    #[arg(long, hide = true)]
+    pause_at_exit: bool,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -72,10 +80,25 @@ impl From<ModeArg> for Mode {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        Command::Scan(args) => scan(&args),
+        Command::Scan(args) => {
+            let outcome = scan(&args);
+            // Printed here rather than by returning the error from `main`, because that would print
+            // it after the pause below — into a window that has already closed.
+            if let Err(error) = &outcome {
+                eprintln!("Error: {error:?}");
+            }
+            if args.pause_at_exit {
+                wait_for_enter(args.lang);
+            }
+            if outcome.is_ok() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
     }
 }
 
@@ -91,7 +114,7 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
     }
 
     if mode == Mode::Ss && !args.yes && !ask_consent(args.lang)? {
-        println!("{}", output::declined(args.lang));
+        eprintln!("{}", output::declined(args.lang));
         return Ok(());
     }
 
@@ -121,9 +144,14 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Asks the player on standard error, not standard output.
+///
+/// Standard output is the report, and with `--json` it is the file someone redirected it into.
+/// Written there, the question went into that file instead of in front of the player, and the
+/// program sat waiting for an answer to a question nobody could see.
 fn ask_consent(lang: Lang) -> anyhow::Result<bool> {
-    print!("{}", output::consent(lang));
-    std::io::stdout().flush()?;
+    eprint!("{}", output::consent(lang));
+    std::io::stderr().flush()?;
     let mut answer = String::new();
     std::io::stdin().lock().read_line(&mut answer)?;
     Ok(matches!(
@@ -132,26 +160,50 @@ fn ask_consent(lang: Lang) -> anyhow::Result<bool> {
     ))
 }
 
+/// Waits for Enter, on a window that would otherwise close with the report still unread.
+///
+/// End of input counts as Enter, so a copy whose input is not a keyboard exits instead of hanging.
+fn wait_for_enter(lang: Lang) {
+    eprint!("\n{}", output::pause_at_exit(lang));
+    // Neither failure matters: the program is exiting either way, and a failed read is no reason to
+    // keep a window open that nobody can answer.
+    std::io::stderr().flush().ok();
+    std::io::stdin().lock().read_line(&mut String::new()).ok();
+}
+
+/// The arguments the elevated copy is started with, given this process's own.
+///
+/// `--elevate` is dropped, so the new process cannot ask to elevate again: a token that is elevated
+/// but restricted reports `is_elevated() == false` and would otherwise relaunch in a loop.
+/// `--pause-at-exit` is added, because the copy runs in a console window of its own that Windows
+/// closes the moment the copy exits — measured on a real Windows 11 machine (ADR 0012, amended).
+#[cfg_attr(not(windows), allow(dead_code))]
+fn elevated_args(args: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut forwarded: Vec<String> = args
+        .into_iter()
+        .filter(|arg| arg != "--elevate" && arg != "--pause-at-exit")
+        .collect();
+    forwarded.push("--pause-at-exit".to_owned());
+    forwarded
+}
+
 /// Starts an elevated copy and returns without scanning; the new process scans from the beginning.
 #[cfg(windows)]
 fn relaunch_elevated(lang: Lang) -> anyhow::Result<()> {
     use rongroi_host_windows::elevate::{self, ElevateError};
 
-    // `--elevate` is not forwarded, so the new process cannot ask to elevate again: a token that is
-    // elevated but restricted reports `is_elevated() == false` and would otherwise relaunch in a loop.
-    let forwarded: Vec<String> = std::env::args()
-        .skip(1)
-        .filter(|arg| arg != "--elevate")
-        .collect();
+    let forwarded = elevated_args(std::env::args().skip(1));
 
+    // Both lines go to standard error for the reason `ask_consent` does: standard output is the
+    // report, and this process produces none.
     match elevate::relaunch_elevated(&forwarded) {
         Ok(()) => {
-            println!("{}", output::elevate_started(lang));
+            eprintln!("{}", output::elevate_started(lang));
             Ok(())
         }
         // Declining the prompt is a choice, not a failure (ADR 0012).
         Err(ElevateError::Declined) => {
-            println!("{}", output::elevate_declined(lang));
+            eprintln!("{}", output::elevate_declined(lang));
             Ok(())
         }
         Err(error) => Err(anyhow::Error::new(error).context(output::elevate_failed(lang))),
@@ -163,7 +215,7 @@ fn relaunch_elevated(lang: Lang) -> anyhow::Result<()> {
 #[cfg(not(windows))]
 #[allow(clippy::unnecessary_wraps)]
 fn relaunch_elevated(lang: Lang) -> anyhow::Result<()> {
-    println!("{}", output::elevate_not_windows(lang));
+    eprintln!("{}", output::elevate_not_windows(lang));
     Ok(())
 }
 
@@ -175,4 +227,30 @@ fn live_host() -> Box<dyn Host> {
 #[cfg(not(windows))]
 fn live_host() -> Box<dyn Host> {
     Box::new(rongroi_host::NonWindowsHost)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|arg| (*arg).to_owned()).collect()
+    }
+
+    #[test]
+    fn the_elevated_copy_does_not_elevate_again_and_waits_before_closing() {
+        assert_eq!(
+            elevated_args(args(&["scan", "--mode", "ss", "--elevate", "--lang", "th"])),
+            args(&["scan", "--mode", "ss", "--lang", "th", "--pause-at-exit"]),
+        );
+    }
+
+    /// A copy started from a copy still waits once, not twice.
+    #[test]
+    fn pause_at_exit_is_added_once() {
+        assert_eq!(
+            elevated_args(args(&["scan", "--pause-at-exit", "--elevate"])),
+            args(&["scan", "--pause-at-exit"]),
+        );
+    }
 }

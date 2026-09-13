@@ -111,6 +111,10 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::En, "elevate_not_windows") => {
             "Administrator rights are a Windows idea; --elevate does nothing on this system."
         }
+        // The elevated copy runs in a console window of its own, which Windows closes the moment
+        // the process exits (ADR 0012, amended).
+        (Lang::En, "pause_at_exit") => "Press Enter to close this window.",
+        (Lang::Th, "pause_at_exit") => "กด Enter เพื่อปิดหน้าต่างนี้",
         (Lang::Th, "elevate_not_windows") => "สิทธิ์ผู้ดูแลระบบเป็นเรื่องของ Windows --elevate ไม่มีผลบนระบบนี้",
         _ => "",
     }
@@ -166,21 +170,39 @@ fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
 }
 
 /// SS-mode consent question.
+///
+/// It names every kind of thing the scan reads, in the words `PRIVACY.md` uses. Until 0.2.0 the scan
+/// read machine settings and nothing else, and the question said so; the collectors that followed
+/// widened the scan and left the question describing the old one, which is consent to a different
+/// check. `consent_names_every_kind_of_source` keeps the list from going stale quietly again.
 pub fn consent(lang: Lang) -> String {
     match lang {
         Lang::En => "SS mode — screenshare check\n\
-            This program will read machine security settings on this PC and show only what matches a rule.\n\
-            Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
+            This program will read, on this PC:\n\
+            \x20 - security settings such as Secure Boot and memory integrity\n\
+            \x20 - the programs running now, and the files in FiveM's plugins folder\n\
+            \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant)\n\
+            \x20 - how many events of each kind the Windows event logs hold, not what the events say\n\
+            It shows only what matches a rule. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
         Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
-            โปรแกรมจะอ่านการตั้งค่าความปลอดภัยของเครื่องนี้ และแสดงเฉพาะสิ่งที่ตรง rule\n\
-            โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
+            โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
+            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot และ memory integrity\n\
+            \x20 - โปรแกรมที่กำลังรันอยู่ และไฟล์ในโฟลเดอร์ plugins ของ FiveM\n\
+            \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant)\n\
+            \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร\n\
+            แสดงเฉพาะสิ่งที่ตรง rule โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
     }
+}
+
+/// Line shown before an elevated copy waits for Enter, so its window does not close on the report.
+pub fn pause_at_exit(lang: Lang) -> &'static str {
+    text(lang, "pause_at_exit")
 }
 
 /// Message printed when consent is refused.
@@ -521,6 +543,41 @@ mod tests {
 
     /// What the tool itself left in what the collectors saw is listed apart from the evidence and
     /// said to be excluded, so that a reader cannot mistake it for something found on the PC.
+    /// Every collector in this build is named in the consent question, in both languages. The
+    /// words are keyed by collector id and the ids are compared with `rongroi_collectors::all()`, so
+    /// adding a collector without saying so here fails this test rather than widening what a player
+    /// agreed to without telling them.
+    #[test]
+    fn consent_names_every_kind_of_source() {
+        let named: &[(&str, &[&str])] = &[
+            ("bam", &["BAM"]),
+            ("evtx", &["event log"]),
+            ("fivem_dir", &["FiveM", "plugins"]),
+            ("pca", &["Program Compatibility Assistant"]),
+            ("posture", &["Secure Boot", "memory integrity"]),
+            ("prefetch", &["Prefetch"]),
+            ("process", &[]),
+        ];
+        let mut ids: Vec<&str> = rongroi_collectors::all().iter().map(|c| c.id()).collect();
+        ids.sort_unstable();
+        let listed: Vec<&str> = named.iter().map(|(id, _)| *id).collect();
+        assert_eq!(
+            ids, listed,
+            "a collector was added or removed; say what it reads in `consent`"
+        );
+        let running = [
+            (Lang::En, "programs running now"),
+            (Lang::Th, "โปรแกรมที่กำลังรันอยู่"),
+        ];
+        for (lang, process_words) in running {
+            let question = consent(lang);
+            assert!(question.contains(process_words), "{question}");
+            for word in named.iter().flat_map(|(_, words)| words.iter()) {
+                assert!(question.contains(word), "{word} missing from {question}");
+            }
+        }
+    }
+
     #[test]
     fn own_traces_are_rendered_in_their_own_section() {
         let (mut report, bundle) = report(false);

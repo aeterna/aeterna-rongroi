@@ -62,9 +62,11 @@ log-clearing rules came out *not measured*, and the four posture rules and PCA w
   prompt. The program closes, starts again with those rights and scans from the beginning. The
   button only appears when the current scan ran without administrator rights.
 - **CLI:** open **PowerShell as administrator** and run the scan in that window (§4).
-  `--elevate` also works, but it starts the scan in a **new** console window. This project has not
-  checked whether that window stays open once the scan finishes, so in a screenshare, run from an
-  administrator PowerShell.
+  With 0.2.0, do not use `--elevate`. It runs the scan in a **new** console window, and Windows
+  closes that window the moment the scan finishes, taking the report with it (measured on a real
+  Windows 11 machine, [ADR 0012](adr/0012-elevation-relaunch.md)). Releases after 0.2.0 keep the
+  window open until Enter is pressed. Either way, the report from `--elevate` stays in that window
+  and never reaches a file redirected with `>`.
 
 The player may decline administrator rights. The scan still runs, with more checks in the scope
 line.
@@ -188,12 +190,17 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   .\aeterna-rongroi-cli-0.2.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
-  **The consent question goes to the same output as the JSON.** With `>`, the player does not see the
-  question, the program waits for an answer with nothing on screen, and the question ends up at the top
-  of the file. So first run the SS-mode scan from §4 without `--json`, so the player reads the question
-  and answers it on screen. If they agree, run the command above with `--yes` added. That is what
-  `--yes` is for. It is a second scan, so a running-program list can differ slightly from the one on
-  screen.
+  **Releases after 0.2.0:** the consent question stays on screen, the player answers it there, and the
+  file holds only the JSON.
+
+  **0.2.0:** the consent question goes to the same output as the JSON. With `>`, the player does not
+  see the question, the program waits for an answer with nothing on screen, and the question ends up
+  at the top of the file. So with 0.2.0, first run the SS-mode scan from §4 without `--json`, so the
+  player reads the question and answers it on screen. If they agree, run the command above with
+  `--yes` added. That is what `--yes` is for. It is a second scan, so a running-program list can
+  differ slightly from the one on screen.
+
+  Either way, run it from an administrator PowerShell (§3), not with `--elevate`.
 - A file the player sends to staff becomes the server's responsibility, including how long it is
   kept ([PRIVACY.md](../PRIVACY.md)).
 

@@ -107,6 +107,8 @@ describe("App", () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
     expect(screen.getByText("You may refuse.")).toBeTruthy();
+    // The scan ran before this screen, so consent has to say what it read, not only settings.
+    expect(screen.getByText(/Prefetch, BAM, Program Compatibility Assistant/)).toBeTruthy();
     fireEvent.click(screen.getByText("I refuse"));
     expect(screen.getByText("Nothing was shown")).toBeTruthy();
     expect(calls).not.toContain("report_view");
