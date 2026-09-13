@@ -56,6 +56,27 @@ name suggests it, and that is all. A search of the 208 files under 80 MB in the 
 searched, and a path can be built at run time. The Cfx support section for Enhanced covers
 installation only.
 
+**Amended 2026-09-13 — what was learned since, and what still is not known.**
+
+- **Legacy's folder is confirmed from FiveM's own source.** In `citizenfx/fivem` on `master` (last push
+  2026-09-07), [`code/components/asi-five/src/Component.cpp`](https://github.com/citizenfx/fivem/blob/master/code/components/asi-five/src/Component.cpp)
+  iterates `MakeRelativeCitPath(L"plugins")` and calls `LoadLibrary` on every file whose extension is
+  `.asi`, after skipping a short list of names it refuses. `fivem_dir`'s `plugins` location is the folder
+  the Legacy client loads from.
+- **The public source says nothing about Enhanced.** GitHub code search of that repository found no
+  `gta5enhanced`, and `asi-five` is the only component that loads ASI files. Code search does not cover
+  every file, so this is an absence of evidence, not evidence of absence.
+- **Enhanced's game process starts only when a server is joined.** FiveM for GTA V Enhanced's server list
+  is a separate launcher. On one Windows 11 machine (build 26220), each of 11 client logs
+  (`fivem-for-gtav-enhanced.log-*`) began about ten seconds after the launcher logged a download into
+  `servercache` followed by `Starting game using store: 4`, and the two launcher sessions without that
+  line produced no client log. Watching file access while only the launcher is open therefore measures
+  nothing about the client. Two Process Monitor attempts made that way are discarded for that reason.
+- **Still not established: whether the Enhanced client reads `gta5enhanced\asi`.** Answering it by
+  observation means watching file access while joining a server. Whether Cfx.re's client protection
+  reacts to a file-access monitor running at that moment is not known, so that test is left to the
+  owner's decision and was not run.
+
 ## Decision
 
 ### 1. A signature source on `Host`
@@ -194,7 +215,8 @@ from here", and `location` keeps them apart.
   default without `WTD_LIFETIME_SIGNING_FLAG`. Nothing was measured about how the 2022 NVIDIA
   certificates' signatures verify in user mode.
 - **Whether Enhanced loads from `gta5enhanced\asi` is not established**, and neither is whether it
-  loads plugins from anywhere else. If it does, `fivem_dir` does not see that folder.
+  loads plugins from anywhere else. If it does, `fivem_dir` does not see that folder. Legacy's `plugins`
+  folder is confirmed from FiveM's source; see the amendment under Context.
 - **A catalog-signed file is `no_embedded_signature`.** That is accurate, and it is not "unsigned".
 - **A signer can be a person.** Individual developers get code-signing certificates in their own name;
   one of the embedded-signed programs on the measured machine is signed that way. The name is shown in
