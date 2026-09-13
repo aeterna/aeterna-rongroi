@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-13
+
 ### Changed
 - Every CI job has a `timeout-minutes`, and `cargo nextest` fails a test that stops making progress
   instead of running out the job's clock. Only the fuzz job was bounded. The vendored `evtx` parser's
