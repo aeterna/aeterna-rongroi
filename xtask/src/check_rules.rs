@@ -220,16 +220,24 @@ impl Vocabulary {
         self.check_unmeasured_when(path, rule, problems);
     }
 
-    /// Rejects an `unmeasured_when` entry naming a reason this rule can never be given.
+    /// Rejects an `unmeasured_when` entry naming a reason this rule can never be given, and one
+    /// naming a reason no rule may declare at all.
     ///
     /// Since ADR 0027 the field decides what an SS view lists: a declared reason is counted, an
     /// undeclared one is listed. A reason the rule's collector cannot produce is therefore a
     /// suppression that never fires — the author believes they have said "this one is ordinary
     /// here" and the report will list it anyway — and nothing in the rule file, in `check-baseline`
     /// or in a fixture shows it. Since ADR 0030 every one of the twelve reasons has a producer in
-    /// some collector, so the check is now entirely about which collector: `not_on_this_os` is `pca`
-    /// and nothing else, `service_disabled` is `prefetch` and nothing else, and `budget_spent` is
-    /// `evtx` and nothing else.
+    /// some collector, so that half of the check is now entirely about which collector:
+    /// `not_on_this_os` is `pca` and nothing else, `service_disabled` is `prefetch` and nothing
+    /// else, and `budget_spent` is `evtx` and nothing else.
+    ///
+    /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
+    /// true for is one a view lists whatever the rule said, so declaring it is a suppression that
+    /// never fires for the opposite reason — not because the reason cannot arrive, but because the
+    /// declaration is ignored when it does (ADR 0032). Left unchecked it reads, in the rule file, as
+    /// a decision an author made; every one of these rules carried such a line for `read_failed`
+    /// from before anything read the field.
     fn check_unmeasured_when(&self, path: &str, rule: &Rule, problems: &mut Vec<String>) {
         let Some(known) = self.reasons.get(rule.collector.as_str()) else {
             return;
@@ -240,6 +248,12 @@ impl Vocabulary {
             if !seen.insert(name) {
                 problems.push(format!(
                     "rules/{path}: `unmeasured_when` names `{name}` twice"
+                ));
+                continue;
+            }
+            if reason.is_always_listed() {
+                problems.push(format!(
+                    "rules/{path}: `unmeasured_when` names `{name}`, which no rule may declare; a view lists it whatever the rule says, because it names a read that did not finish rather than a kind of machine"
                 ));
                 continue;
             }
@@ -721,13 +735,14 @@ date: 2026-09-11
     }
 
     /// The reasons the four shipped rules declare, and the one the engine itself produces when a
-    /// build has no run for the collector at all.
+    /// build has no run for the collector at all. `read_failed` is not among them since ADR 0032 —
+    /// see `a_reason_a_view_always_lists_cannot_be_declared`.
     #[test]
     fn the_reasons_a_collector_declares_are_accepted() {
         let tmp = TempRoot::new("good-reasons");
         let rule = VALID_RULE.replace(
             "retention: Current setting only.",
-            "retention: Current setting only.\nunmeasured_when: [not_windows, source_absent, access_denied, read_failed, collector_unavailable]",
+            "retention: Current setting only.\nunmeasured_when: [not_windows, source_absent, access_denied, collector_unavailable]",
         );
         let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
         write(&dir.join("rule.yaml"), &rule);
@@ -737,6 +752,72 @@ date: 2026-09-11
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
         assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
+    }
+
+    /// The `posture` collector reports `read_failed`, so the collector half of this check accepts it
+    /// and the rule reads as though the author decided something. ADR 0032: a view lists the reason
+    /// whatever the rule said, so the line decides nothing and the gate says so. The four shipped
+    /// rules each carried one from before `unmeasured_when` was read by anything.
+    #[test]
+    fn a_reason_a_view_always_lists_cannot_be_declared() {
+        let tmp = TempRoot::new("always-listed-reason");
+        let rule = VALID_RULE.replace(
+            "retention: Current setting only.",
+            "retention: Current setting only.\nunmeasured_when: [read_failed]",
+        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write(&dir.join("tests/positive/on.json"), POSITIVE_FIXTURE);
+        write(&dir.join("tests/negative/off.json"), NEGATIVE_FIXTURE);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0]
+                .contains("`unmeasured_when` names `read_failed`, which no rule may declare"),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// Every reason a view always lists is refused, not `read_failed` alone — so a later addition to
+    /// `is_always_listed` is covered here without this test being edited. `budget_spent` is `evtx`'s
+    /// and `partial` is reported by more than one collector, so each is checked on a collector that
+    /// can produce it: without that, the message would be the collector one and this test would pass
+    /// while proving nothing.
+    #[test]
+    fn every_always_listed_reason_is_refused() {
+        for reason in [
+            UnmeasuredReason::Partial,
+            UnmeasuredReason::BudgetSpent,
+            UnmeasuredReason::ReadFailed,
+        ] {
+            assert!(
+                reason.is_always_listed(),
+                "{} is not always listed; this loop is asserting the wrong thing",
+                reason.as_str()
+            );
+        }
+        // The reverse direction: nothing outside that set may be refused by this check, or a rule
+        // would lose a declaration it is entitled to make.
+        for reason in [
+            UnmeasuredReason::NotWindows,
+            UnmeasuredReason::NotOnThisOs,
+            UnmeasuredReason::NotAdmin,
+            UnmeasuredReason::NotAttempted,
+            UnmeasuredReason::AccessDenied,
+            UnmeasuredReason::ServiceDisabled,
+            UnmeasuredReason::SourceAbsent,
+            UnmeasuredReason::SourceEmpty,
+            UnmeasuredReason::CollectorUnavailable,
+        ] {
+            assert!(
+                !reason.is_always_listed(),
+                "{} became always listed; a rule that declared it now fails check-rules",
+                reason.as_str()
+            );
+        }
     }
 
     /// ADR 0027 recorded `not_on_this_os` and `service_disabled` as having no producer anywhere in

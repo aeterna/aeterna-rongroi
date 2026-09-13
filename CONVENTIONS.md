@@ -103,7 +103,7 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | An operator the field's declared kind cannot take, an empty list, and a `cased` entry `match` compares no text of are rejected | `check-rules` |
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
 | `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
-| `unmeasured_when` names only reasons the rule's collector can report, each once; it decides what an SS view lists, except for `partial` and `budget_spent`, which are listed whatever a rule declares (ADR 0030) | `check-rules` |
+| `unmeasured_when` names only reasons the rule's collector can report, each once, and never `partial`, `budget_spent` or `read_failed` — a view lists those whatever a rule declares, so naming one is a failure rather than a line that changes nothing (ADR 0030, ADR 0032) | `check-rules` |
 
 ## 7. Git
 

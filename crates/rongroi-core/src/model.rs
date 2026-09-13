@@ -120,12 +120,19 @@ impl UnmeasuredReason {
 
     /// Whether a view must list this reason even when the rule declared it in `unmeasured_when`.
     ///
-    /// Both of these say that the artifact was reachable and that this program stopped short of it:
+    /// All three say that the artifact was reachable and that the read of it did not finish:
     /// [`Self::Partial`] because some of it did not yield a record, [`Self::BudgetSpent`] because a
-    /// limit **this program chose** ended the read. A rule author cannot declare either away, because
-    /// neither is a fact about the machine for them to have anticipated (ADR 0030).
+    /// limit **this program chose** ended the read, [`Self::ReadFailed`] because what was there could
+    /// not be read or understood. A rule author cannot declare any of them away, because none is a
+    /// fact about the machine for them to have anticipated: an ordinary Windows PC has a readable
+    /// `SecureBoot` key, so a rule saying it expects that key to be unreadable is not describing a
+    /// kind of machine, it is describing a fault — and a fault is what a reviewer needs as a row
+    /// (ADR 0030, ADR 0027).
+    ///
+    /// `check-rules` refuses to load a rule that names one of these in `unmeasured_when`, so the
+    /// declaration cannot rot back in. This is the answer for bundles that gate does not see.
     pub fn is_always_listed(self) -> bool {
-        matches!(self, Self::Partial | Self::BudgetSpent)
+        matches!(self, Self::Partial | Self::BudgetSpent | Self::ReadFailed)
     }
 }
 

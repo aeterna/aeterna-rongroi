@@ -6,6 +6,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- A failed read was counted instead of shown, if a rule happened to declare it (ADR 0032). All four
+  rules that ship today named `read_failed` in `unmeasured_when`, in lines written before anything
+  read that field; once ADR 0027 gave those lines teeth, a registry value this program genuinely
+  could not read became a number in SS mode rather than a row. `read_failed` now joins `partial` and
+  `budget_spent` as a reason a view lists whatever the rule said — all three say the artifact was
+  reachable and the read of it did not finish, which is a fault rather than a kind of machine — and
+  `cargo xtask check-rules` refuses a rule that names any of them, so the line cannot come back. On a
+  fixture host whose registry cannot be read, an SS view that showed nothing now shows the two rules
+  that could not be measured. `access_denied` stays declarable: a scan without administrator rights
+  is an ordinary machine, not a fault.
 - Twelve words for what could not be measured, where there were eight (ADR 0030). `source_missing` made
   two opposite statements and is now `source_absent` ("this PC has no such record to read") and
   `source_empty` ("the place this is kept is there and holds nothing"); `partial`, `not_attempted` and
