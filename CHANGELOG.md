@@ -99,7 +99,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `prefetch` reports its own configuration as an observation — whether the folder is `listed`, `absent`
   or `unreadable`, and the `EnablePrefetcher` value, left out when the registry holds none (ADR 0037).
   Both used to reach the report only as the reason a rule could not be answered. No rule reads either:
-  what ordinarily leaves the value absent is not documented, and one measured machine had it at 3.
+  a Windows 11 PC had the value at 3 and GitHub's Windows CI image has no value at all.
 
 ### Changed
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by

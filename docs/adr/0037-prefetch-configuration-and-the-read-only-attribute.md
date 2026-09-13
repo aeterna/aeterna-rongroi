@@ -47,10 +47,16 @@ Then this pull request's CLI, cross-built, was run there:
 | | Elevated | Limited token |
 |---|---|---|
 | Prefetch configuration | `folder: listed`, `enable_prefetcher: 3` | `folder: unreadable`, `enable_prefetcher: 3` |
-| `.pf` observations carrying `read_only` | 243, all `false` | none — the folder was not listed |
+| `.pf` observations carrying `read_only` | 243, all `false` (four more than the count above, which was taken earlier the same day; the difference was not examined) | none — the folder was not listed |
 | `.evtx` observations carrying `read_only` | 413 log accounts, all `false` | 413 refusals (`access_denied`), all `false` |
 | `prefetch-file-read-only` | `not_found` | `unmeasured / not_admin` |
 | `event-log-file-read-only` | `not_found` | `unmeasured / not_admin` |
+
+**A second machine, of a different kind.** This pull request's first Windows CI run (GitHub's
+`windows-latest`, build 26100, elevated, SysMain disabled by the image — `docs/testing.md`) printed:
+Prefetch `folder: listed` with no `.pf` file in it and **`EnablePrefetcher` absent**; 221 log files, none
+read-only; all three rules `not_found`. So an absent value is not something only a tampered machine
+has: at least one Windows image Microsoft and GitHub ship has no value at all.
 
 Microsoft's own documentation of the switch is an archived Windows Embedded page: `EnablePrefetcher`,
 `REG_DWORD`, under `…\Memory Management\PrefetchParameters`, "0 = Disabled, 1 = Application start
@@ -163,11 +169,11 @@ under `tamper` a `not_found` is counted rather than listed in SS mode. Neither n
 
 **Nothing reads `enable_prefetcher` or `folder`.** Three rules were considered and none is written:
 
-- **"`EnablePrefetcher` is absent."** No ordinary cause could be written down: no Microsoft page
-  states the default or the behaviour without the value, and the one machine measured has it. A rule
-  whose `falsepositives` cannot be filled honestly is a rule `rules/AGENTS.md` does not allow, and one
-  measured machine is not a population in which absence is unusual. It stays an observation: a person
-  reading Self mode sees it.
+- **"`EnablePrefetcher` is absent."** No Microsoft page states the default or what Windows does
+  without the value, and the two machines measured disagree: the Windows 11 PC has it at 3, and the
+  GitHub-hosted Windows image has **no value at all**. A rule would fire on an unaltered, vendor-built
+  image, and the one ordinary cause that can be named is "a Windows image built that way", which says
+  nothing a reviewer could weigh. It stays an observation: a person reading Self mode sees it.
 - **"`EnablePrefetcher` is `0` or `2`."** A performance setting, recommended by tweak guides and set by
   optimiser scripts (ADR 0028), and already what `service_disabled` says. As a finding it would be
   the optimiser's shape presented as a fact about a person.
@@ -212,9 +218,9 @@ stay `Unmeasured` there, as before.
 - **What Windows does with no `EnablePrefetcher` value.** No primary source found.
 - **The standard library's implementation in 1.98.1.** Read in the 1.90 source; the pinned toolchain
   has no source installed.
-- **`GetFileAttributes`-level behaviour on a file the Event Log service holds open** was exercised on
-  the test machine through PowerShell and through this program's CLI (413 accounts, no failure), which
-  is evidence for that machine and that build only.
+- **Reading the attribute of a log the Event Log service holds open** worked on the test machine,
+  through PowerShell and through this program's CLI (413 logs, no failure). That is evidence for that
+  machine and that build only.
 - **The folder-Properties false positive** rests on community answers, as said above.
 
 ## Consequences

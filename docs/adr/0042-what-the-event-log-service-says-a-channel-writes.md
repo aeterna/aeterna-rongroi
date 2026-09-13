@@ -62,6 +62,10 @@ no log with records named a channel the service did not know; 265 held no record
 compared. The rule below was `not_found`. Under a limited token every log was refused, so none was
 compared, and the rule was `unmeasured / not_admin`.
 
+The Windows CI runner for this pull request (GitHub's `windows-latest`, build 26100, elevated) is a
+second, different machine: 127 of 127 compared logs `at_configured_path: true`, and the rule
+`not_found`.
+
 ## Decision
 
 ### 1. A source of its own: `EventLogConfigSource`
