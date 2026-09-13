@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 2 |
-| Rules | 6 |
-| SHA-256 | `f52662030d8f2e45110d11145515540e39a6f7c17ab7fa00d1aef8636299cf2d` |
+| Rules | 13 |
+| SHA-256 | `2481f657d0076dc76b0bd2775bf683f1a9fb927c2cb330d796cc3434c06fd5d9` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -44,6 +44,14 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `evtx`
   - [An event log file was cleared](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [The Security log records that it was cleared](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
+- `fivem_dir`
+  - [FiveM.exe is validly signed, but not with the certificate this rule knows](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e) — `presence` · `experimental`
+  - [FiveM.exe has no embedded signature that verifies here](#rule-148cbcdd-8d18-4af6-a541-71cc7f21b2eb) — `presence` · `experimental`
+  - [A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature](#rule-53528a11-5af7-4e75-94bf-fca07eec6fcc) — `presence` · `experimental`
+  - [A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here](#rule-0999422f-8709-4d85-80e3-39410a85ed6b) — `presence` · `experimental`
+  - [A file in FiveM's plugins folder carries a valid embedded signature](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
+  - [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
+  - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [Windows test signing is turned on](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
@@ -155,6 +163,330 @@ Only clearings still recorded in the Security log as it stands today. The log ho
 - <https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep-command-line-options>
 - <https://github.com/SigmaHQ/sigma/blob/master/rules/windows/builtin/security/win_security_audit_log_cleared.yml>
 - <https://learn.microsoft.com/en-us/answers/questions/531390/can-see-audit-logs-are-cleared-by-network-service>
+
+## Collector `fivem_dir`
+
+### `fivem_dir` / `client`
+
+<a id="rule-2dc11b64-72a2-48f5-a273-985e906d5a9e"></a>
+
+#### FiveM.exe is validly signed, but not with the certificate this rule knows
+
+- Id: `2dc11b64-72a2-48f5-a273-985e906d5a9e`
+- File: [`rules/fivem_dir/client/client-exe-signed-with-another-certificate/rule.yaml`](../rules/fivem_dir/client/client-exe-signed-with-another-certificate/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `client`, `signature`
+- Written: 2026-09-13
+
+**About this check**
+
+FiveM.exe, in the program folder of FiveM for GTA V Legacy or of FiveM for GTA V Enhanced, carries a valid embedded signature, and the certificate that made it is not the one this rule expects. The row names the signer and the certificate's SHA-256. This rule knows one certificate: the one both editions' FiveM.exe were signed with when measured on 2026-09-13 — "Rockstar Games, Inc.", valid from 2026-07-21 to 2027-09-05. Publishers renew code-signing certificates, typically every one to three years, so a different certificate with the same signer name is most likely an older or a newer FiveM.exe, not a different program. A signer name on its own proves nothing either way, because stolen certificates carry the real company's name. This does not say that the file was changed or that it was run.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is one of `legacy_exe`, `enhanced_exe` (text, ASCII case ignored)
+- `signature`: is `valid` (text, ASCII case ignored)
+
+**Look-back**
+
+The file as it was when the scan ran. It says nothing about the file at any earlier time, and an update of FiveM can replace it.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- The publisher renewed its certificate. Every FiveM.exe signed after that carries a new certificate, and this row then appears for everyone who has updated until the rule is updated. A reviewer who sees the same signer name on many players' reports should treat the row as saying nothing, check the certificate on a FiveM.exe freshly installed from Cfx.re on a machine of their own, and report it to this project so the rule can be updated
+- A FiveM.exe that has not updated since before 2026-07-21, when the certificate this rule knows became valid. A signature made before then was made with an earlier certificate. FiveM updates itself, so this is most likely a player who has not launched FiveM since
+- A beta or test build of the client signed with a different certificate. Nothing was measured about those
+
+**Legitimate software excluded (`allow`)**
+
+- files signed with the certificate whose SHA-256 is `65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f`
+
+**Related rules**
+
+- similar to [FiveM.exe has no embedded signature that verifies here](#rule-148cbcdd-8d18-4af6-a541-71cc7f21b2eb)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/get-authenticodesignature>
+
+<a id="rule-148cbcdd-8d18-4af6-a541-71cc7f21b2eb"></a>
+
+#### FiveM.exe has no embedded signature that verifies here
+
+- Id: `148cbcdd-8d18-4af6-a541-71cc7f21b2eb`
+- File: [`rules/fivem_dir/client/client-exe-without-verified-signature/rule.yaml`](../rules/fivem_dir/client/client-exe-without-verified-signature/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `client`, `signature`
+- Written: 2026-09-13
+
+**About this check**
+
+FiveM.exe, in the program folder of FiveM for GTA V Legacy (%LOCALAPPDATA%\\FiveM) or of FiveM for GTA V Enhanced (%LOCALAPPDATA%\\FiveM for GTAV Enhanced), has no signature embedded in it, one that does not verify, or one Windows could not verify without the internet; the file shown says which and which edition. On the one machine this was measured on, both editions' FiveM.exe carried a valid embedded signature. This does not say that the file was changed, what it does, or that it was ever run. An install with no FiveM.exe — or no FiveM at all — is "not found" here too, and a FiveM.exe whose signature could not be checked at all is shown under "A FiveM file's signature could not be checked" instead.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is one of `legacy_exe`, `enhanced_exe` (text, ASCII case ignored)
+- `signature`: is one of `no_embedded_signature`, `invalid`, `unverifiable_offline` (text, ASCII case ignored)
+
+**Look-back**
+
+The file as it was when the scan ran. It says nothing about the file at any earlier time, and an update of FiveM can replace it.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- A PC whose Windows certificate store does not yet hold the certificate authority the signature chains to. Windows normally fetches those from the internet the first time they are needed, and this check never goes online, so a signature can come back unverifiable, or not verifying, on a machine that has not needed it yet. This was not measured
+- FiveM.exe damaged by an interrupted update, a disk problem, or security software that modified or partly quarantined it
+- A FiveM client a developer built from Cfx.re's published source code and put in place of the installed one, which carries no Rockstar Games signature
+- A beta or test build of the client, if one is shipped unsigned or signed differently. Nothing was measured about those
+
+**Related rules**
+
+- similar to [FiveM.exe is validly signed, but not with the certificate this rule knows](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e)
+- similar to [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+- <https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/certificate-trust>
+
+### `fivem_dir` / `enhanced-asi`
+
+<a id="rule-53528a11-5af7-4e75-94bf-fca07eec6fcc"></a>
+
+#### A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature
+
+- Id: `53528a11-5af7-4e75-94bf-fca07eec6fcc`
+- File: [`rules/fivem_dir/enhanced-asi/asi-file-with-valid-signature/rule.yaml`](../rules/fivem_dir/enhanced-asi/asi-file-with-valid-signature/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `enhanced_asi`, `signature`
+- Written: 2026-09-13
+
+**About this check**
+
+FiveM for GTA V Enhanced's folder %APPDATA%\\FiveM for GTAV Enhanced\\gta5enhanced\\asi holds a file with an embedded signature that Windows verified, and the row names the signer and the signing certificate's SHA-256. Whether the Enhanced client loads anything from this folder is not established. A valid signature says who signed the file and that it has not changed since — not what it does: certificates have been stolen from real companies and used to sign malware under their names, and revocation is not checked. The signer's name is for the reader to look up.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is `enhanced_asi` (text, ASCII case ignored)
+- `signature`: is `valid` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Overlays, capture and performance tools from established publishers that put a signed file here
+- Signed builds of graphics mods, placed here by a player
+- Software signed by an individual developer, whose certificate carries that person's own name
+
+**Related rules**
+
+- similar to [A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here](#rule-0999422f-8709-4d85-80e3-39410a85ed6b)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+<a id="rule-0999422f-8709-4d85-80e3-39410a85ed6b"></a>
+
+#### A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here
+
+- Id: `0999422f-8709-4d85-80e3-39410a85ed6b`
+- File: [`rules/fivem_dir/enhanced-asi/asi-file-without-verified-signature/rule.yaml`](../rules/fivem_dir/enhanced-asi/asi-file-without-verified-signature/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `enhanced_asi`, `signature`
+- Written: 2026-09-13
+
+**About this check**
+
+FiveM for GTA V Enhanced's folder %APPDATA%\\FiveM for GTAV Enhanced\\gta5enhanced\\asi holds a file, and Windows found no signature embedded in it, one that does not verify, or one it could not verify without the internet; each file shown says which. Whether the Enhanced client loads anything from this folder is not established — it exists on a fresh install and is named for ASI plugins, and nothing more is known — so a file here is a file in that folder and no more than that. The check does not say what a file is or does, or who put it there. A file with a valid signature is shown under "A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature", and one whose signature could not be checked at all under "A FiveM file's signature could not be checked".
+
+**Matches when all of these hold for one observation**
+
+- `location`: is `enhanced_asi` (text, ASCII case ignored)
+- `signature`: is one of `no_embedded_signature`, `invalid`, `unverifiable_offline` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Graphics mods and their settings or log files, placed here by a player following a guide written for another game or for Legacy's plugins folder
+- Text files of any kind — a readme, an .ini, a log — which never carry an embedded signature
+- Tools that install files here for the Enhanced edition, signed or not by their authors
+- A signature that does not verify because the file was damaged, or whose certificate expired without a timestamp
+- A signature this PC could not verify offline, because its certificate chain needs something Windows has not already stored
+
+**Related rules**
+
+- similar to [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436)
+- similar to [A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature](#rule-53528a11-5af7-4e75-94bf-fca07eec6fcc)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+### `fivem_dir` / `plugins`
+
+<a id="rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba"></a>
+
+#### A file in FiveM's plugins folder carries a valid embedded signature
+
+- Id: `d5531c55-1a65-4698-9f39-7cf79bbbb7ba`
+- File: [`rules/fivem_dir/plugins/plugin-file-with-valid-signature/rule.yaml`](../rules/fivem_dir/plugins/plugin-file-with-valid-signature/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `plugins`, `signature`
+- Written: 2026-09-13
+
+**About this check**
+
+FiveM for GTA V Legacy's plugins folder (%LOCALAPPDATA%\\FiveM\\FiveM.app\\plugins) holds a file with an embedded signature that Windows verified, and the row names the signer and the signing certificate's SHA-256. A valid signature says who signed the file and that it has not changed since — not what it does, and not that it belongs here: certificates have been stolen from real companies and used to sign cheats and malware under their names, and revocation is not checked. The signer's name is for the reader to look up. It is a separate row from files with no signature that verifies, because what a reviewer can do next is different. It does not say whether the file was ever loaded.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is `plugins` (text, ASCII case ignored)
+- `signature`: is `valid` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Overlays, capture and performance tools from established publishers that install a signed plugin here
+- Signed builds of graphics mods, installed here as the Cfx.re forum guides describe
+- Software signed by an individual developer, whose certificate carries that person's own name
+
+**Related rules**
+
+- similar to [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436)
+
+**References**
+
+- <https://forum.cfx.re/t/how-to-install-reshade/5352795>
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+<a id="rule-061797d3-161d-4783-89e6-caf658973436"></a>
+
+#### A file in FiveM's plugins folder has no embedded signature that verifies here
+
+- Id: `061797d3-161d-4783-89e6-caf658973436`
+- File: [`rules/fivem_dir/plugins/plugin-file-without-verified-signature/rule.yaml`](../rules/fivem_dir/plugins/plugin-file-without-verified-signature/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `plugins`, `signature`
+- Written: 2026-09-13
+
+**About this check**
+
+FiveM for GTA V Legacy's plugins folder (%LOCALAPPDATA%\\FiveM\\FiveM.app\\plugins) holds a file, and Windows found no signature embedded in it, one that does not verify, or one it could not verify without the internet; each file shown says which. This folder is where the Cfx.re forum's own guides tell players to put graphics mods such as ReShade, so a file here is as often one of those, its settings or its log as anything else. The check does not say what a file is or does, whether it was ever loaded, or who put it there. A file with a valid signature is shown under "A file in FiveM's plugins folder carries a valid embedded signature", and one whose signature could not be checked at all under "A FiveM file's signature could not be checked" — not here, so "not found" on this row speaks only for the files whose signature was checked.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is `plugins` (text, ASCII case ignored)
+- `signature`: is one of `no_embedded_signature`, `invalid`, `unverifiable_offline` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Graphics mods — ReShade's dxgi.dll or d3d11.dll, ENB — installed here as the Cfx.re forum guides describe. Many are not signed by their authors at all
+- The settings, preset and log files those mods keep beside themselves (ReShade.ini, a preset .ini, ReShade.log). They are text, not programs, and text files never carry an embedded signature
+- Overlays, FPS counters and performance or recording tools that install a plugin here
+- A signature that does not verify because the file was damaged in download or by a disk problem, or because its signing certificate expired without a timestamp
+- A signature this PC could not verify offline — its certificate chain needs something Windows has not already stored, and this check never goes to the internet to fetch it
+
+**Related rules**
+
+- similar to [A file in FiveM's plugins folder carries a valid embedded signature](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba)
+- similar to [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4)
+
+**References**
+
+- <https://forum.cfx.re/t/how-to-install-reshade/5352795>
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+### `fivem_dir` / `signatures`
+
+<a id="rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4"></a>
+
+#### A FiveM file's signature could not be checked
+
+- Id: `282115fe-863d-4e2e-9cf5-4eaf8e7545e4`
+- File: [`rules/fivem_dir/signatures/signature-not-checked/rule.yaml`](../rules/fivem_dir/signatures/signature-not-checked/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `signature`
+- Written: 2026-09-13
+
+**About this check**
+
+A file this program found in one of FiveM's plugin folders, or FiveM.exe itself, was listed, and asking Windows about the signature embedded in it did not produce an answer. The file's path is shown, and nothing about its signature is known — not that it has one, not that it lacks one. The other rules on these files match on the signature Windows reported, so a file whose check failed can match none of them; it is shown here instead, so that it is not left out of the report. It does not say why the check failed, what the file is, or that anything was done to it.
+
+**Matches when all of these hold for one observation**
+
+- `path|exists`: the field is present
+- `signature|exists`: the field is absent
+
+**Look-back**
+
+Only the files present when the scan ran, and only the attempt made during it. A second scan may check the same file without trouble.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- A file another program held open without allowing others to read it at that moment — an antivirus scanning it, an installer or updater still writing it, or FiveM updating itself
+- A path too long, or a name Windows could not open, which some archive tools produce when they unpack into a deep folder
+- An answer from Windows this program does not classify. It names only the answers it has documented, and every other one lands here rather than being guessed at
+- Security software that intercepts or blocks programs reading other programs' files
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
 
 ## Collector `posture`
 

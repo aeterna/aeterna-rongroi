@@ -8,9 +8,9 @@ description: >-
   valid embedded signature, and the certificate that made it is not the one this rule expects. The
   row names the signer and the certificate's SHA-256. This rule knows one certificate: the one both
   editions' FiveM.exe were signed with when measured on 2026-09-13 — "Rockstar Games, Inc.", valid
-  from 2026-07-21 to 2027-09-05. Publishers replace their certificates every year or two, so a
-  different certificate with the same signer name is most often an older or a newer FiveM.exe, not a
-  different program. A signer name on its own proves nothing either way, because stolen certificates
+  from 2026-07-21 to 2027-09-05. Publishers renew code-signing certificates, typically every one to
+  three years, so a different certificate with the same signer name is most likely an older or a newer
+  FiveM.exe, not a different program. A signer name on its own proves nothing either way, because stolen certificates
   carry the real company's name. This does not say that the file was changed or that it was run.
 status: experimental
 collector: fivem_dir
@@ -27,8 +27,8 @@ match:
 allow:
   - signer_cert_sha256: 65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f
 retention: >-
-  The file as it was when the scan ran. FiveM replaces FiveM.exe when it updates, so this says nothing
-  about the file at any earlier time.
+  The file as it was when the scan ran. It says nothing about the file at any earlier time, and an update
+  of FiveM can replace it.
 # Left out deliberately: `access_denied`. The program folder is inside the player's own profile.
 unmeasured_when: [not_windows]
 falsepositives:
@@ -39,7 +39,7 @@ falsepositives:
     it to this project so the rule can be updated
   - A FiveM.exe that has not updated since before 2026-07-21, when the certificate this rule knows
     became valid. A signature made before then was made with an earlier certificate. FiveM updates
-    FiveM.exe when it starts, so this is a player who has not launched FiveM since
+    itself, so this is most likely a player who has not launched FiveM since
   - A beta or test build of the client signed with a different certificate. Nothing was measured
     about those
 references:
