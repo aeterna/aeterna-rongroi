@@ -1,0 +1,9 @@
+{
+  "description": "The reverse disagreement — the registry says off, the firmware says on — is not this rule (ADR 0038)",
+  "observations": [
+    {
+      "collector": "posture",
+      "fields": { "secure_boot": "disabled", "secure_boot_firmware": "enabled" }
+    }
+  ]
+}

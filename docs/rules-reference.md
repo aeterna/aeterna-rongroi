@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 2 |
-| Rules | 13 |
-| SHA-256 | `2481f657d0076dc76b0bd2775bf683f1a9fb927c2cb330d796cc3434c06fd5d9` |
+| Rules | 15 |
+| SHA-256 | `9247b132494335513c6805154ff57cc4e06dc963e39bac71b3e76834f8c25d3d` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -54,7 +54,9 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
+  - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [Windows test signing is turned on](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
+  - [A machine policy turns PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [Memory integrity (HVCI) is configured off](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 
@@ -532,6 +534,49 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 - <https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-secure-boot>
 
+<a id="rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71"></a>
+
+#### The firmware reports Secure Boot off while Windows reports it on
+
+- Id: `5ec56c3d-da70-4acc-99d6-2c41c0b75d71`
+- File: [`rules/posture/boot/secure-boot-firmware-disagrees/rule.yaml`](../rules/posture/boot/secure-boot-firmware-disagrees/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `boot`
+- Written: 2026-09-13
+
+**About this check**
+
+Secure Boot is read from two places. The Windows registry says it is on; the firmware's own Secure Boot variable says it is off. The firmware is what decides whether Secure Boot is enforced, so while they disagree the registry value does not describe how this PC started. This program cannot tell why the two differ or which one changed last. Reading the firmware needs administrator rights, so a scan without them cannot answer this. On its own this describes the machine — it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `secure_boot`: is `enabled` (text, ASCII case ignored)
+- `secure_boot_firmware`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only: what the firmware reports for this start of Windows and what the registry holds now. It says nothing about earlier starts.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Virtual machines, whose virtual firmware may report Secure Boot differently from what Windows recorded
+- Firmware that reports Secure Boot inconsistently, for example after a firmware update or a reset of its Secure Boot keys
+- A Windows installation or disk moved to different hardware, or Secure Boot changed in the firmware settings, if Windows had not yet written the new state to the registry
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfirmwareenvironmentvariableexw>
+- <https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-secure-boot-key-creation-and-management-guidance>
+
 <a id="rule-75162c70-a6d1-47ec-94af-be25184d5ece"></a>
 
 #### Windows test signing is turned on
@@ -570,6 +615,49 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **References**
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option>
+
+### `posture` / `logging`
+
+<a id="rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d"></a>
+
+#### A machine policy turns PowerShell script block logging off
+
+- Id: `88eb2aca-a33e-414d-bd0f-cfb87af95a2d`
+- File: [`rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `logging`
+- Written: 2026-09-13
+
+**About this check**
+
+A machine policy for Windows PowerShell sets script block logging to off. Windows ships with no such policy, and a PC where nobody set one is not what this rule reports. With the policy set to off, PowerShell writes fewer records of the scripts it runs to the Windows event log, so a reviewer reading that log has less to read. It says nothing about which scripts ran or who set the policy, and PowerShell 7's own policy and a per-user policy are not read. On its own this describes the machine — it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `script_block_logging`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- PCs managed by an employer, school or other organisation whose policy turns script block logging off, for example to keep script contents that may hold passwords out of the event log
+- Security or privacy baselines, debloating guides and "PC optimiser" tools that set Windows logging policies
+- A PC that was once managed by an organisation and still carries its policies
+- Administrators who turned it off to reduce the size of the event log
+
+**References**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
 
 ### `posture` / `memory-integrity`
 

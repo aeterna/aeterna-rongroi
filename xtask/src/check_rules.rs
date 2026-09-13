@@ -643,7 +643,7 @@ date: 2026-09-11
         );
         assert!(
             outcome.problems[0]
-                .contains("it emits hvci, secure_boot, test_signing, tpm, tpm_spec_version"),
+                .contains("it emits hvci, script_block_logging, secure_boot, secure_boot_firmware, test_signing, tpm, tpm_spec_version"),
             "{:?}",
             outcome.problems
         );
@@ -701,14 +701,15 @@ date: 2026-09-11
         // The message names what it can report, so the fix does not need a grep.
         assert!(
             outcome.problems[0]
-                .contains("it reports access_denied, collector_unavailable, not_windows, read_failed, source_absent"),
+                .contains("it reports access_denied, collector_unavailable, not_admin, not_windows, read_failed, source_absent"),
             "{:?}",
             outcome.problems
         );
     }
 
-    /// A reason another collector produces is still wrong here: `posture` reads what any account may
-    /// read and never splits a denial by elevation, so it cannot report `not_admin`.
+    /// A reason another collector produces is still wrong here: `posture` reads settings, not a
+    /// place records are kept, so it cannot report `source_empty` — which `bam` and `pca` do. Until
+    /// ADR 0038 this test used `not_admin`, which `posture` now reports for the firmware reading.
     #[test]
     fn an_unmeasured_when_reason_another_collector_produces_is_rejected() {
         let tmp = TempRoot::new("wrong-collector-reason");
@@ -716,7 +717,7 @@ date: 2026-09-11
             .replace("status: test", "status: experimental")
             .replace(
                 "retention: Current setting only.",
-                "retention: Current setting only.\nunmeasured_when: [not_admin]",
+                "retention: Current setting only.\nunmeasured_when: [source_empty]",
             );
         write(
             &tmp.path()
@@ -728,7 +729,7 @@ date: 2026-09-11
 
         assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
         assert!(
-            outcome.problems[0].contains("`unmeasured_when` names `not_admin`"),
+            outcome.problems[0].contains("`unmeasured_when` names `source_empty`"),
             "{:?}",
             outcome.problems
         );

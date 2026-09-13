@@ -10,7 +10,7 @@ aeterna-rongroi **0.2.0**. อ่านภาษาไทย: [screenshare-guide
 
 | It can show | It cannot show |
 |---|---|
-| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM | Cheats running on a **second PC** (DMA). They leave nothing on the checked PC |
+| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. After 0.2.0 also whether the firmware agrees with Windows about Secure Boot, and whether a machine policy turns PowerShell script block logging off | Cheats running on a **second PC** (DMA). They leave nothing on the checked PC |
 | That the Security log or an event log file recorded being cleared | Overlays hidden from screen capture |
 | For each check, whether it was answered and, if not, why | Anything, if Windows on that PC was modified to lie to the programs that run on it |
 | | That a PC is clean. **No result means that** |
@@ -57,6 +57,8 @@ Some checks need administrator rights. The report says how many, once, above the
 That line is not a finding. It says this scan could not answer those checks. Measured on one
 Windows 11 machine without administrator rights: Prefetch and BAM gave almost nothing, both
 log-clearing rules came out *not measured*, and the four posture rules and PCA worked normally.
+After 0.2.0, one more posture check needs those rights: reading the firmware's own Secure Boot state.
+Without them it is *not measured*, and it counts in that line.
 
 - **Window version:** on the start screen, click **Scan as administrator** and accept the Windows
   prompt. The program closes, starts again with those rights and scans from the beginning. The
@@ -170,6 +172,8 @@ These are counts of what SS mode does not list. §7 says why.
 | A FiveM file's signature could not be checked | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
 | FiveM.exe has no embedded signature that verifies here | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
 | FiveM.exe is validly signed, but not with the certificate this rule knows | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
+| The firmware reports Secure Boot off while Windows reports it on — *after 0.2.0* | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
+| A machine policy turns PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
 
 Three things to know about the two log-clearing rules:
 
@@ -197,7 +201,11 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-The four posture rules describe the **machine**, not the person. Each rule's own text says that on
+The rows marked *after 0.2.0* are not in the 0.2.0 release. Neither of them means "a policy nobody wrote" or
+"Secure Boot is off" on its own: the first needs the two readings to disagree, the second needs a policy
+written to off. The firmware rule does not detect DMA hardware (§1) and says nothing about a second PC.
+
+The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
 
 Every rule's full text, including exactly what it matches, is in the

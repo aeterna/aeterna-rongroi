@@ -33,6 +33,10 @@ windows-registry.workspace = true
 # (ADR 0035; each gate read from the `windows` 0.62.2 sources).
 # `GetTickCount64` is gated on `Win32_System_SystemInformation` and on nothing else: it takes no argument
 # and returns a `u64` (ADR 0039; read from `src/Windows/Win32/System/SystemInformation/mod.rs` in 0.62.2).
+# `GetFirmwareType` is gated on `Win32_System_SystemInformation` as well; `GetFirmwareEnvironmentVariableExW`
+# is in `Win32_System_WindowsProgramming`, `AdjustTokenPrivileges` and `LookupPrivilegeValueW` in
+# `Win32_Security`, and `OpenProcessToken` in `Win32_System_Threading` behind `Win32_Security` — all
+# already listed (ADR 0038; read from the same sources).
 windows = { workspace = true, features = [
   "Wdk_System_SystemInformation",
   "Win32_Foundation",

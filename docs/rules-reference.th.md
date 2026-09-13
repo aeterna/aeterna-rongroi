@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 2 |
-| จำนวน rule | 13 |
-| SHA-256 | `2481f657d0076dc76b0bd2775bf683f1a9fb927c2cb330d796cc3434c06fd5d9` |
+| จำนวน rule | 15 |
+| SHA-256 | `9247b132494335513c6805154ff57cc4e06dc963e39bac71b3e76834f8c25d3d` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -50,7 +50,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [ตรวจลายเซ็นของไฟล์ FiveM ไม่ได้](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
+  - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [เปิดโหมด test signing ของ Windows อยู่](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
+  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 
@@ -538,6 +540,50 @@ Windows รายงานว่า UEFI Secure Boot ปิดอยู่ Secur
 
 - <https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-secure-boot>
 
+<a id="rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71"></a>
+
+#### เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด
+
+- ชื่อภาษาอังกฤษ: The firmware reports Secure Boot off while Windows reports it on
+- id: `5ec56c3d-da70-4acc-99d6-2c41c0b75d71`
+- ไฟล์: [`rules/posture/boot/secure-boot-firmware-disagrees/rule.yaml`](../rules/posture/boot/secure-boot-firmware-disagrees/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `boot`
+- เขียนเมื่อ: 2026-09-13
+
+**เกี่ยวกับการตรวจนี้**
+
+Secure Boot ถูกอ่านจากสองที่ registry ของ Windows บอกว่าเปิดอยู่ แต่ตัวแปร Secure Boot ของเฟิร์มแวร์เอง บอกว่าปิด เฟิร์มแวร์เป็นตัวตัดสินว่า Secure Boot ถูกบังคับใช้หรือไม่ ตราบใดที่สองค่านี้ไม่ตรงกัน ค่าใน registry จึงไม่ได้บอกว่าเครื่องนี้เริ่มระบบมาอย่างไร โปรแกรมนี้บอกไม่ได้ว่าทำไมสองค่าถึงต่างกัน หรือค่าไหนเปลี่ยนทีหลัง การอ่านเฟิร์มแวร์ต้องใช้สิทธิ์ผู้ดูแลระบบ การสแกนที่ไม่มีสิทธิ์นี้จึงตอบข้อนี้ไม่ได้ ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `secure_boot`: เป็น `enabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `secure_boot_firmware`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น คือสิ่งที่เฟิร์มแวร์รายงานสำหรับการเปิด Windows ครั้งนี้ และค่าที่อยู่ใน registry ตอนนี้ บอกไม่ได้ว่าการเปิดเครื่องครั้งก่อน ๆ เป็นอย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เครื่องเสมือน ซึ่งเฟิร์มแวร์เสมือนอาจรายงาน Secure Boot ต่างจากที่ Windows บันทึกไว้
+- เฟิร์มแวร์ที่รายงาน Secure Boot ไม่สม่ำเสมอ เช่น หลังอัปเดตเฟิร์มแวร์ หรือหลังรีเซ็ตคีย์ Secure Boot
+- Windows หรือดิสก์ที่ย้ายมาใช้กับฮาร์ดแวร์อื่น หรือมีการเปลี่ยน Secure Boot ในหน้าตั้งค่าเฟิร์มแวร์ โดยที่ Windows ยังไม่ได้เขียนสถานะใหม่ลง registry
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfirmwareenvironmentvariableexw>
+- <https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/windows-secure-boot-key-creation-and-management-guidance>
+
 <a id="rule-75162c70-a6d1-47ec-94af-be25184d5ece"></a>
 
 #### เปิดโหมด test signing ของ Windows อยู่
@@ -577,6 +623,50 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option>
+
+### `posture` / `logging`
+
+<a id="rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d"></a>
+
+#### นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell
+
+- ชื่อภาษาอังกฤษ: A machine policy turns PowerShell script block logging off
+- id: `88eb2aca-a33e-414d-bd0f-cfb87af95a2d`
+- ไฟล์: [`rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `logging`
+- เขียนเมื่อ: 2026-09-13
+
+**เกี่ยวกับการตรวจนี้**
+
+นโยบายระดับเครื่องของ Windows PowerShell ตั้งให้ปิดการบันทึก script block Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก และเครื่องที่ไม่มีใครตั้งนโยบายนี้ไว้ไม่ใช่สิ่งที่ข้อนี้รายงาน เมื่อนโยบายตั้งเป็นปิด PowerShell จะเขียนบันทึกของสคริปต์ที่รัน ลง event log ของ Windows น้อยลง ผู้ตรวจที่อ่าน log นั้นจึงมีข้อมูลให้อ่านน้อยลง ข้อนี้ไม่ได้บอกว่าสคริปต์ไหนเคยรัน หรือใครเป็นคนตั้งนโยบาย และไม่ได้อ่านนโยบายของ PowerShell 7 หรือนโยบายระดับผู้ใช้ ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `script_block_logging`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เครื่องที่บริษัท โรงเรียน หรือองค์กรอื่นดูแล และนโยบายขององค์กรปิดการบันทึกนี้ เช่น เพื่อไม่ให้เนื้อหาสคริปต์ ที่อาจมีรหัสผ่านไปอยู่ใน event log
+- ชุดค่าความปลอดภัยหรือความเป็นส่วนตัว คู่มือ debloat และโปรแกรม "เร่งความเร็วเครื่อง" ที่ตั้งนโยบายการบันทึกของ Windows
+- เครื่องที่เคยอยู่ภายใต้การดูแลขององค์กรและยังมีนโยบายเดิมค้างอยู่
+- ผู้ดูแลเครื่องที่ปิดไว้เพื่อลดขนาดของ event log
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
 
 ### `posture` / `memory-integrity`
 

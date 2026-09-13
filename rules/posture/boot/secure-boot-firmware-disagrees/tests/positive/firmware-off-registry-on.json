@@ -1,0 +1,10 @@
+{
+  "description": "The registry reports Secure Boot on and the firmware's own variable reports it off",
+  "observations": [
+    {
+      "collector": "posture",
+      "fields": { "secure_boot": "enabled", "secure_boot_firmware": "disabled", "test_signing": "disabled" }
+    }
+  ],
+  "expect_matches": 1
+}

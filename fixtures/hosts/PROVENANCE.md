@@ -7,7 +7,7 @@ none contains a real person's user name, host name, SID or files.
 |---|---|---|
 | `secure-boot-on` | Windows 11, Secure Boot reported on | posture collector tests, report snapshots |
 | `secure-boot-off` | Windows 11, Secure Boot reported off; the one host that describes how long Windows has been counting since it started (an invented 3 days, 2 hours, 3 minutes and 4 seconds), so that the report snapshots carry a measured boot time as well as an unmeasured one (ADR 0039) | posture collector tests, report snapshots |
-| `secure-boot-unreported` | Windows 10, Secure Boot state key absent (e.g. legacy BIOS boot) | posture collector tests, report snapshots |
+| `secure-boot-unreported` | Windows 10, Secure Boot state key absent (e.g. legacy BIOS boot), and so no firmware variables either (`firmware: not_uefi`, ADR 0038) | posture collector tests, report snapshots |
 | `registry-access-denied` | Windows 11, Secure Boot key unreadable | posture collector tests |
 | `test-signing-on` | Windows 11 with test signing switched on; everything else ordinary | posture collector tests |
 | `tpm-absent` | Windows 11 with no TPM, so no specification version either; everything else ordinary | posture collector tests |
@@ -74,6 +74,18 @@ name or other file from that machine is in the fixture. Only the entries the col
 described — the folder's shortcut and manifest are left out, as the collector never reports them. What
 this does not claim: that a player's `FiveM.exe` has this hash — it changes with every FiveM update —
 or that the certificate stays the same after 2027-09-05, when it expires.
+
+**Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
+posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,
+`registry-access-denied`, `baseline-hardened-win11` and `baseline-consumer-win11` — declares
+`firmware: { secure_boot: access_denied }`, and `baseline-elevated-win11` declares `enabled`. Both values are
+**measured**, not chosen: on 2026-09-13, one Windows 11 machine (build 26220), the CLI's firmware reading was
+`not_admin` under a limited token and `enabled` elevated, and PowerShell's `Get-SecureBootUEFI` read the same
+variable as the single byte `01`. No baseline writes a `ScriptBlockLogging` key, so all three report
+`script_block_logging: not_configured`. That absence is what the same machine held, under `HKLM` and under
+its account's `HKCU`, and what Microsoft's own enabling snippet assumes: it creates the key when `Test-Path`
+says it is not there ([about_Logging](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1)).
+One machine is one machine: none of these values is a statement about how other firmware answers.
 
 A host named `baseline-*` is read by `cargo xtask check-baseline` and means more than the others: it
 asserts that a machine like this is unremarkable, so the whole rule set must stay quiet on it (ADR 0017).

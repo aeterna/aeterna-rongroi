@@ -119,6 +119,11 @@ jobs:
           Write-Output "online: $($online.Count) event 53 from the test process"
           if ($online.Count -eq 0) { throw 'the positive twin fetched nothing the log recorded, so the offline result above is not evidence' }
           wevtutil sl $log /e:false
+      # ADR 0038. Reading the firmware's Secure Boot variable enables a privilege in this program's own
+      # token for the read. This proves the read leaves the token as it found it; on the elevated runner
+      # the privilege is held, so it also proves the read answers rather than reporting missing rights.
+      - name: Firmware read leaves its privilege as it found it
+        run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_firmware_/)'
       - name: Build the desktop app (unofficial build, no installer)
         run: pnpm -C apps/desktop tauri build --no-bundle
       - name: Live smoke — the CLI reads this machine
@@ -149,3 +154,20 @@ jobs:
             $reason = if ($_.reason) { $_.reason } else { '-' }
             Write-Output "evidence: $($_.rule_id) $($_.collector) $($_.state) $reason"
           }
+          # ADR 0038: the firmware reading compared with PowerShell's own reading of the same UEFI
+          # variable on this machine. A runner is not an ordinary Windows PC, so this says the two
+          # readers agree, not what an ordinary PC reports.
+          $postureFields = @(@($report.evidence | Where-Object { $_.collector -eq 'posture' } | ForEach-Object { $_.observations }) +
+            @($report.unmatched | Where-Object { $_.collector -eq 'posture' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ } | Select-Object -First 1 | ForEach-Object { $_.fields })
+          Write-Output "posture fields: $($postureFields | ConvertTo-Json -Compress)"
+          $firmware = if ($postureFields.Count -gt 0) { $postureFields[0].secure_boot_firmware } else { $null }
+          try {
+            $bytes = @((Get-SecureBootUEFI -Name SecureBoot -ErrorAction Stop).Bytes)
+            $expected = if ($bytes.Count -eq 1 -and $bytes[0] -eq 1) { 'enabled' } elseif ($bytes.Count -eq 1 -and $bytes[0] -eq 0) { 'disabled' } else { "unexpected bytes: $($bytes -join ' ')" }
+          } catch {
+            $expected = $null
+            Write-Output "Get-SecureBootUEFI SecureBoot: $($_.Exception.Message)"
+          }
+          Write-Output "secure_boot_firmware: '$firmware' · Get-SecureBootUEFI: '$expected'"
+          if ($firmware -ne $expected) { throw "the firmware reading '$firmware' disagrees with Get-SecureBootUEFI '$expected'" }

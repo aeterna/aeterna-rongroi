@@ -96,6 +96,11 @@ code_integrity:
 tpm:
   present: true
   spec_version: "2.0"
+# Firmware (ADR 0038): with administrator rights the firmware's own Secure Boot variable is read, and
+# on an ordinary machine it agrees with the registry — measured on a real Windows 11 machine, elevated.
+# No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
+firmware:
+  secure_boot: enabled
 processes:
   - pid: 4
     name: System

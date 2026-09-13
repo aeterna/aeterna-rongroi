@@ -59,6 +59,15 @@ than passed over in silence. A log the tool never opened at all, because that ti
 when its turn came, is named as one it did not look at — which is a different thing and is said in
 different words.
 
+Of the machine's security settings it also reads two more (ADR 0038). One is what the PC's **firmware**
+itself says about Secure Boot, beside what Windows says — one on/off value, nothing that names a person.
+Windows only lets a program read a firmware value with a special permission that administrators hold, so
+the tool switches that permission on inside its own process for that one read and switches it back; it
+changes nothing on the PC and writes nothing to the firmware. Without administrator rights the tool does
+not get the permission and says the check could not be answered. The other is whether a Windows
+**policy** turns PowerShell's script logging on or off, or whether no such policy was set: the setting
+only, never what any script contained.
+
 It also reads one Windows setting about itself: whether Windows is writing a record when a program is
 launched (`EnablePrefetcher`). That is a machine setting and names no person. It is read so that "there
 is no record of this program" can be told apart from "Windows is not keeping such records on this PC",

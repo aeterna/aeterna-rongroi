@@ -124,9 +124,11 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
+    // One not-measured rule is hidden too: the firmware reading needs administrator rights, which this
+    // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038).
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 0 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
+        "Hidden in SS mode: 1 not found · 1 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -398,6 +400,9 @@ describe("App", () => {
   });
 
   it("states nothing about administrator rights when every check was answerable", async () => {
+    // The snapshot's own scan could not read the firmware without those rights (ADR 0038), so the
+    // answerable case is written here: the same view with no rule stopped by them.
+    viewOverride = { ...selfView, scope: { not_admin: 0, not_attempted: 0 } };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
     // The evidence proves the view arrived, so the statement is absent by choice and not by timing.
