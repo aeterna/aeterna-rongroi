@@ -138,8 +138,8 @@ Windows last started; one after it happened since. Four things about it:
 - **`check:`** comes before the title because the title says what the rule looks for, not what was
   seen.
 - **Strength** says what kind of evidence the rule gives. `tamper`: traces were removed or altered.
-  `posture`: a machine setting that makes cheating easier. `context`: background for the reviewer.
-  (`execution` and `presence` exist, but no rule uses them yet.)
+  `posture`: a machine setting that makes cheating easier. `presence`: a file exists, which does not
+  show it ran. `context`: background for the reviewer. (`execution` exists, but no rule uses it yet.)
 - **Ordinary things that also produce this** appears beside every `FOUND` row. **Read it out loud.**
   Every rule has to have it, and it is the part most likely to be skipped.
 - **`NOT MEASURED (expected here)`** means the rule's author said this machine state is ordinary.
@@ -163,6 +163,13 @@ These are counts of what SS mode does not list. §7 says why.
 | No TPM is present | context | `experimental` | older or self-built PCs, TPM off in firmware, virtual machines |
 | The Security log records that it was cleared | tamper | `experimental` | "optimiser" and "debloat" scripts, a prebuilt or repaired PC, troubleshooting in Event Viewer, Windows updates |
 | An event log file was cleared | tamper | `experimental` | the same, plus software whose setup resets the local log |
+| A file in FiveM's plugins folder has no embedded signature that verifies here | presence | `experimental` | ReShade or ENB installed as the Cfx.re forum guides say, their `.ini` and log files (text is never signed), overlays and FPS tools, a damaged file, a signature this PC cannot verify offline |
+| A file in FiveM's plugins folder carries a valid embedded signature | presence | `experimental` | signed overlays, capture and performance tools, signed graphics mods, a developer who signs in their own name |
+| A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here | presence | `experimental` | the same as for Legacy's plugins folder; whether Enhanced loads this folder at all is not known |
+| A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature | presence | `experimental` | the same as for Legacy's plugins folder |
+| A FiveM file's signature could not be checked | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
+| FiveM.exe has no embedded signature that verifies here | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
+| FiveM.exe is validly signed, but not with the certificate this rule knows | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
 
 Three things to know about the two log-clearing rules:
 
@@ -173,6 +180,23 @@ Three things to know about the two log-clearing rules:
   anything.** Preparing a Windows image deletes the event logs. The rules did what they are written to do, and it shows
   what a `tamper` row on an ordinary PC looks like.
 
+Four things to know about the seven FiveM rules:
+
+- **Every file in a plugin folder appears in exactly one of them**: a valid signature, no signature that
+  verifies, or a check that failed. A ReShade install is typically several files — its DLL and its text
+  files — under one row.
+- **A valid signature says who signed a file, not what it does, and no signature is not a finding.**
+  Certificates stolen from real companies have signed malware and hacking tools; many graphics mods are
+  not signed at all. The signer's name is
+  there for you to look up.
+- **The Enhanced rules say less.** Nobody has established that FiveM for GTA V Enhanced loads anything
+  from its `asi` folder.
+- **"validly signed, but not with the certificate this rule knows" goes stale.** It knows the certificate
+  FiveM.exe carried on 2026-09-13, which expires on 2027-09-05. If you see it on many players' reports
+  with the same signer name, it is most likely a renewed certificate: treat it as saying nothing,
+  check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
+  project.
+
 The four posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
 
@@ -182,8 +206,8 @@ Every rule's full text, including exactly what it matches, is in the
 ## 7. What SS mode does not show, and why
 
 The program reads more than the six rules ask about. It reads what Windows recorded about programs
-that ran (Prefetch, BAM, the Program Compatibility Assistant), the list of running programs, and the
-files in FiveM's plugin folders for GTA V Legacy and Enhanced, with their signatures. **No rule reads those today**, so they are *unmatched observations*:
+that ran (Prefetch, BAM, the Program Compatibility Assistant), and the list of running programs. **No rule reads those today**,
+so they are *unmatched observations*:
 
 - **Self mode** lists them, for the player.
 - **SS mode** shows only how many there were.

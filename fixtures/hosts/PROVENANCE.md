@@ -14,6 +14,8 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-plugin-present` | Windows 11, FiveM for GTA V Legacy installed; its plugin folder holds a file whose hash and signature can be read (an empty file, so nothing is embedded), a file whose hash and signature cannot, and a subdirectory. Enhanced is not installed | `fivem_dir` collector tests, report snapshots |
 | `fivem-dir-signatures` | Windows 11, Legacy's plugin folder holding one file for each answer a signature check gives (ADR 0035). Every hash, the signing certificate's included, is invented, and `Example Signer` is nobody | `fivem_dir` collector tests |
 | `fivem-dir-enhanced-asi` | Windows 11 with only FiveM for GTA V Enhanced: one file in `%APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi`, and one in the `mods` folder beside it, which the collector does not read (ADR 0035) | `fivem_dir` collector tests |
+| `fivem-dir-client-exe` | Windows 11 with both FiveM editions, each program folder holding `FiveM.exe` beside the other entries a real one has (ADR 0036): Legacy's validly signed and spelled in lower case, Enhanced's with nothing embedded, and `modify.exe` beside it, which is never reported. Every hash and certificate is invented, and `Example Signer` is nobody | `fivem_dir` collector tests, report snapshot tests |
+| `fivem-dir-client-folder-denied` | Windows 11, Legacy installed with an empty plugin folder and its program folder, where `FiveM.exe` is, unreadable | `fivem_dir` collector tests, report snapshot tests |
 | `fivem-dir-not-installed` | Windows 11 with neither FiveM edition: `%LOCALAPPDATA%` and `%APPDATA%` are set and neither plugin folder exists | `fivem_dir` collector tests |
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
@@ -56,8 +58,22 @@ none contains a real person's user name, host name, SID or files.
 | `evtx-log-truncated` | Windows 11 whose Event Log folder holds a file shorter than the fixed 4 KiB header every `.evtx` begins with | `evtx` collector tests |
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
-| `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder | `cargo xtask check-baseline` |
-| `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder, and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable | `cargo xtask check-baseline` |
+| `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below) | `cargo xtask check-baseline` |
+| `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below), and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable | `cargo xtask check-baseline` |
+
+**`FiveM.exe` in `baseline-consumer-win11` and `baseline-elevated-win11` is measured, not written.**
+Measured 2026-09-13 on one Windows 11 machine, build 26220, read-only, with `Get-FileHash`,
+`Get-AuthenticodeSignature` and this program's own signature check, elevated and under a limited token
+(ADR 0036): Legacy's `%LOCALAPPDATA%\FiveM\FiveM.exe` as FiveM installed and updated it, its SHA-256
+`891e48128dc9c287aaa204757acac61d469eef9de82714cec4404d254a73c844`, an embedded signature that is valid,
+signer "Rockstar Games, Inc.", signing certificate SHA-256
+`65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f`, and `FiveM.app` beside it. Enhanced's
+`FiveM.exe` on the same machine carried the same certificate; neither baseline describes Enhanced. The
+file's hash identifies a FiveM build that Cfx.re distributes to everyone, not the machine; no path, user
+name or other file from that machine is in the fixture. Only the entries the collector reads are
+described — the folder's shortcut and manifest are left out, as the collector never reports them. What
+this does not claim: that a player's `FiveM.exe` has this hash — it changes with every FiveM update —
+or that the certificate stays the same after 2027-09-05, when it expires.
 
 A host named `baseline-*` is read by `cargo xtask check-baseline` and means more than the others: it
 asserts that a machine like this is unremarkable, so the whole rule set must stay quiet on it (ADR 0017).

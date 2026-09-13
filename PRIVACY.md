@@ -3,7 +3,7 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, the list of running processes, what the Program Compatibility Assistant, Windows
+FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, the list of running processes, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
@@ -14,6 +14,16 @@ signing certificate and a hash of that certificate. **Checking a signature does 
 the check is told to use only what Windows already holds, and the Windows CI job proves it on every
 change (ADR 0035). The name on a certificate is usually a company's; some developers sign in their own
 name, and that name is then what the report shows.
+
+It reads the same four things of `FiveM.exe` in the program folder of each FiveM edition, so that the
+report can say whether FiveM's own program carries the signature FiveM was measured with (ADR 0036). To
+find that one file it lists the names in the program folder; **no other file there is reported**, and
+nothing is read from inside it but what the hash and the signature check consume.
+
+**Since ADR 0036 rules read these files, so SS mode shows them.** Each file in a plugin folder, and
+`FiveM.exe` when its signature is not the expected one, matches a rule and is shown to the person
+watching — its path with your user name replaced, its hash, its signature and the signer's name. The
+consent question names them before anything is read.
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
 is on disk. It does not read what a program is doing, what is in its memory, or what you typed into it.
@@ -125,9 +135,9 @@ tool did, not more. Paths in it are redacted in SS mode like any other.
 
 ### What a collector saw that no rule matched
 
-Some collectors read things no rule asks about — the files in FiveM's plugin folders, and the list of
-programs you are running. **Self mode lists them**, under "unmatched observations", so that you can read
-what the tool saw and judge it yourself.
+Some collectors read things no rule asks about — the list of programs you are running, what Windows
+recorded about programs that ran, and whether each FiveM plugin folder was there. **Self mode lists
+them**, under "unmatched observations", so that you can read what the tool saw and judge it yourself.
 
 **SS mode does not list them.** It says how many there were and nothing more. That mode promises to show
 only what matches a rule, and the names of every file and every running program on your PC are not that:

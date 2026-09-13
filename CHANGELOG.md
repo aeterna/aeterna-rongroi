@@ -15,6 +15,22 @@ and the project uses [Semantic Versioning](https://semver.org/).
   second with `Win32_OperatingSystem.LastBootUpTime`, with and without administrator rights, while the
   System log's own start record was 7 hours away because the clock had been changed since; the
   screenshare guide now says both.
+- **The first rules on `fivem_dir`** (ADR 0036), all `experimental`. For Legacy's plugins folder and,
+  separately, Enhanced's `asi` folder: a file with no embedded signature that verifies here, and a file
+  with a valid one, each naming what Windows said. A file whose signature could not be checked at all is
+  its own row, so a failed check is shown rather than falling to "not found" under the others. Every rule
+  says in `falsepositives` that these folders ordinarily hold ReShade, ENB, overlays and their text files;
+  the Enhanced rules say that the folder is not known to be loaded. No `allow` entry for any plugin: none
+  was measured from a published file. In SS mode the files in these folders are now shown, redacted,
+  where they were only counted.
+- **`fivem_dir` reads `FiveM.exe`** in each edition's program folder under `%LOCALAPPDATA%`, with the same
+  hash and signature check, and two rules pin it: `FiveM.exe` with no embedded signature that verifies,
+  and `FiveM.exe` validly signed with a certificate other than the one both editions carried when
+  measured on 2026-09-13 ("Rockstar Games, Inc.", valid 2026-07-21 to 2027-09-05). That certificate will
+  be renewed, and the rule's text tells a reviewer what the row then means and what to do. Measured on
+  one real Windows 11 machine, elevated and under a limited token, and every rule was made to fire there
+  on copies of real files in a scratch folder. The consumer and elevated baselines describe `FiveM.exe`
+  as measured; the two unsigned-plugin rules are recorded in `rules/unconfronted.csv`.
 - Signature checking, without the network (ADR 0035). `fivem_dir` reports, for each file in FiveM's plugin
   folders, what Windows says about the Authenticode signature embedded in it: `valid` with the signer's
   name and the SHA-256 of the signing certificate, `no_embedded_signature`, `invalid`, or
