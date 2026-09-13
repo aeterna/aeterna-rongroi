@@ -243,7 +243,9 @@ and on the real machine above.
 - **The certificate that signed `FiveM.exe` before 2026-07-21.**
 - **The pin was not compared with a fresh download from Cfx.re.** It was measured from installed files
   on one machine.
-- **Whether Enhanced loads from its `asi` folder** (ADR 0035), unchanged.
+- **Whether Enhanced loads from its `asi` folder** (ADR 0035), unchanged. Legacy's `plugins` folder is
+  now confirmed from FiveM's source, and Enhanced's client is known to start only on joining a server
+  (ADR 0035, amendment of 2026-09-13).
 - **Redaction outside `X:\Users\<name>`.** A profile redirected elsewhere keeps its account name in these
   paths in SS mode, as it does in every other collector's. Unchanged by this ADR.
 - ~~The Thai text of the seven rules has not been read by a native speaker.~~ **Amended 2026-09-13:** the
