@@ -38,6 +38,22 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
     }
   ],
   "own_traces": [],
@@ -48,7 +64,7 @@ expression: view
   },
   "hidden": {
     "not_found": 0,
-    "unmeasured_expected": 4,
+    "unmeasured_expected": 2,
     "unmeasured_unexpected": 0,
     "unmatched": 2
   }

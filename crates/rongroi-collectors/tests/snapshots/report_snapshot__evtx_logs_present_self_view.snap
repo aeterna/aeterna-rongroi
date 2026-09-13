@@ -51,7 +51,7 @@ expression: view
       "strength": "posture",
       "state": "unmeasured",
       "reason": "read_failed",
-      "expected": true
+      "expected": false
     },
     {
       "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
@@ -67,7 +67,7 @@ expression: view
       "strength": "context",
       "state": "unmeasured",
       "reason": "read_failed",
-      "expected": true
+      "expected": false
     }
   ],
   "own_traces": [],

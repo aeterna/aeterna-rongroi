@@ -103,7 +103,7 @@ Both are mandatory in every rule and translated with the rest of its text (ADR 0
 |---|---|---|
 | Shows | every piece of evidence | `found` evidence, `posture` evidence that looked, and `unmeasured` evidence for a reason its rule did not name |
 | Other evidence | shown | counted in `hidden.not_found` / `hidden.unmeasured_expected` / `hidden.unmeasured_unexpected` |
-| `unmeasured` with reason `partial` or `budget_spent` | shown | **always** a row, declared or not: both say the artifact was reachable and that this program stopped short of it, which is not a rule author's to declare away (ADR 0030) |
+| `unmeasured` with reason `partial`, `budget_spent` or `read_failed` | shown | **always** a row, declared or not: each says the artifact was reachable and the read of it did not finish, which is not a rule author's to declare away. `check-rules` refuses the declaration outright (ADR 0030, ADR 0032) |
 | `unmeasured` with reason `not_admin` or `not_attempted` | shown, and in the scope statement | **not** a row — one fact about the scan, said once above the evidence in `scope.not_admin` / `scope.not_attempted` (ADR 0012, ADR 0027, ADR 0030) |
 | Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
 | Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |

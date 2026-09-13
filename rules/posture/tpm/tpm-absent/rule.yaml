@@ -14,7 +14,7 @@ strength: context
 match:
   tpm: absent
 retention: Current hardware state only. It says nothing about earlier hardware or firmware settings.
-unmeasured_when: [not_windows, access_denied, read_failed]
+unmeasured_when: [not_windows, access_denied]
 falsepositives:
   - PCs built without a TPM, which includes a great many older and self-assembled machines
   - A TPM switched off or hidden in firmware, which is a common factory default

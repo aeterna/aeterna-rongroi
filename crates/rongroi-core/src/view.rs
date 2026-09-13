@@ -106,9 +106,10 @@ fn scope_notes(report: &Report) -> ScopeNotes {
 ///
 /// - `not_admin` and `not_attempted` are never a row. Each is one fact about the **scan** that
 ///   applies to every rule it stopped, and each is stated once in [`ScopeNotes`].
-/// - `partial` and `budget_spent` are always a row, declared or not. They say the artifact was
-///   reachable and that **this program** stopped short of it, which is not something a rule author
-///   could have anticipated about the machine and so is not theirs to declare away.
+/// - `partial`, `budget_spent` and `read_failed` are always a row, declared or not. Each says the
+///   artifact was reachable and that the read of it did not finish, which is not something a rule
+///   author could have anticipated about the machine and so is not theirs to declare away
+///   (ADR 0030, ADR 0032).
 fn ss_lists(item: &Evidence) -> bool {
     match &item.state {
         EvidenceState::Found { .. } => true,
@@ -552,14 +553,41 @@ mod tests {
         );
     }
 
-    /// The two reasons a rule author cannot declare away. Both say the artifact was reachable and
-    /// that this program stopped short of it, which is a fact about the scan's own limits and not
-    /// one about the machine, so SS mode lists them even though the rule named them (ADR 0030).
+    /// The reasons a rule author cannot declare away. Each says the artifact was reachable and that
+    /// the read of it did not finish, which is a fact about the scan and not one about the machine,
+    /// so SS mode lists them even though the rule named them (ADR 0030).
     #[test]
     fn ss_view_lists_a_partial_result_even_though_its_rule_declared_it() {
         let view = for_mode(&report(), Mode::Ss);
         let ids: Vec<&str> = view.evidence.iter().map(|e| e.rule_id.as_str()).collect();
         assert!(ids.contains(&"partial"), "{ids:?}");
+    }
+
+    /// The case ADR 0032 added, from the far side of the gate that now refuses the declaration:
+    /// `expected: true` on a `read_failed` result is what an old bundle, or a rule set this build
+    /// did not check, still hands the view. It is listed regardless — the guarantee belongs here and
+    /// not only in `check-rules`.
+    #[test]
+    fn ss_view_lists_a_read_failed_result_even_though_its_rule_declared_it() {
+        let mut report = report();
+        report.evidence = vec![Evidence {
+            rule_id: "read-failed".to_owned(),
+            collector: "posture".to_owned(),
+            strength: Strength::Posture,
+            state: EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::ReadFailed,
+                expected: true,
+            },
+        }];
+
+        let view = for_mode(&report, Mode::Ss);
+
+        let ids: Vec<&str> = view.evidence.iter().map(|e| e.rule_id.as_str()).collect();
+        assert_eq!(ids, ["read-failed"]);
+        // Listed, so it is not also counted: every result is in exactly one of the two places. The
+        // report's unmatched observations are untouched by this and are counted as they always are.
+        assert_eq!(view.hidden.unmeasured_expected, 0);
+        assert_eq!(view.hidden.unmeasured_unexpected, 0);
     }
 
     /// A source the collector never looked at is the same shape as missing administrator rights:
@@ -614,7 +642,7 @@ mod tests {
             );
             assert_eq!(
                 listed,
-                matches!(reason, R::Partial | R::BudgetSpent),
+                matches!(reason, R::Partial | R::BudgetSpent | R::ReadFailed),
                 "{}",
                 reason.as_str()
             );

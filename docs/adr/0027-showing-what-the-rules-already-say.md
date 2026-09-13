@@ -226,6 +226,10 @@ is a defensible reading of `read_failed` for a posture check on a machine the to
 and it is also exactly the silence described above — it was not re-derived for this change, and whether
 each of those four declarations is still what its author meant is an open question.
 
+> **Answered for `read_failed` by ADR 0032**, which takes the reading above back: it is not a fact
+> about a kind of machine, so it is no longer a rule author's to declare, and the four lines are
+> deleted. The `access_denied` half of this paragraph stands as written and is still open.
+
 **Nothing was measured about whether the longer rows are read.** Every evidence row is now two to six
 lines instead of two, which is the opposite of the "reports people skim" failure this project worries
 about. The judgement that the alternatives are worth the length is taken from NIST SP 800-86 §3.4 and

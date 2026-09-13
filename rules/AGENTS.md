@@ -15,10 +15,12 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   reasons has a producer, so the check is entirely about *which* collector: `not_on_this_os` is `pca`
   alone, `service_disabled` is `prefetch` alone, `budget_spent` and `not_attempted` are `evtx` alone.
   Declaring a reason you have not thought about hides a result a reviewer should have seen.
-- **`partial` and `budget_spent` cannot be declared away.** Naming them in `unmeasured_when` is
-  accepted and changes nothing: SS mode lists them either way, because both say the artifact was
-  reachable and that this program stopped short of it — a fact about the scan, not one about the
-  machine that an author could have anticipated (ADR 0030).
+- **`partial`, `budget_spent` and `read_failed` cannot be declared away**, and since ADR 0032 naming
+  any of them is a `check-rules` failure rather than a line that changes nothing. All three say the
+  artifact was reachable and the read of it did not finish — a fact about the scan, not one about a
+  kind of machine that an author could have anticipated (ADR 0030, ADR 0032). `access_denied` and
+  `source_absent` are the other side of that line and stay declarable: they say the program never
+  reached the artifact, and why, in terms of how the machine is set up.
 - **`source_absent` and `source_empty` are opposite statements.** "This PC has no such record" and
   "the record's place is there and holds nothing" were one word until ADR 0030; a rule that means one
   must not declare the other. `source_empty` in particular is **never** evidence that anything was

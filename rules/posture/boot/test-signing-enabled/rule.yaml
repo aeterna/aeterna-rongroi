@@ -14,7 +14,7 @@ strength: posture
 match:
   test_signing: enabled
 retention: Current setting only. It says nothing about how the PC was configured in the past.
-unmeasured_when: [not_windows, access_denied, read_failed]
+unmeasured_when: [not_windows, access_denied]
 falsepositives:
   - People who write or test their own drivers, for whom this is a normal working setting
   - Hardware and firmware engineers using vendor or pre-release tools
