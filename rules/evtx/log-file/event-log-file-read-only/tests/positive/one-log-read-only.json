@@ -1,0 +1,17 @@
+{
+  "description": "One log whose file carries the read-only attribute, beside one that does not and a kind-of-event summary, as the evtx collector emits them",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Setup.evtx", "path": "C:\\Windows\\System32\\winevt\\Logs\\Setup.evtx", "read_only": true,
+      "entries": 120, "rejected": 0, "intact": true, "size_bytes": 1052672,
+      "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Setup.evtx", "at_configured_path": true, "max_size_bytes": 1052672 } },
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "path": "C:\\Windows\\System32\\winevt\\Logs\\System.evtx", "read_only": false,
+      "entries": 4417, "rejected": 0, "intact": true, "size_bytes": 20975616 } },
+    { "collector": "evtx", "fields": {
+      "log": "Setup.evtx", "channel": "Setup", "provider": "Microsoft-Windows-Servicing",
+      "event_id": 2, "level": 4, "count": 120,
+      "first_seen": "2026-03-02T11:04:51.109Z", "last_seen": "2026-09-11T22:19:03.774Z" } }
+  ],
+  "expect_matches": 1
+}

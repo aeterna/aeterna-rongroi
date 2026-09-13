@@ -1,0 +1,8 @@
+{
+  "description": "A file whose attribute could not be read carries no read_only, and is not shown as read-only",
+  "observations": [
+    { "collector": "prefetch", "fields": {
+      "name": "cmd.exe", "path": "C:\\Windows\\Prefetch\\CMD.EXE-D269B812.pf",
+      "run_count": 55, "recorded_runs": 8, "last_run": "2026-09-12T08:44:03Z", "scca_version": 31 } }
+  ]
+}

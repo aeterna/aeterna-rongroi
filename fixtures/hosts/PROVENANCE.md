@@ -29,7 +29,7 @@ none contains a real person's user name, host name, SID or files.
 | `pca-malformed-lines` | Windows 11 whose launch dictionary has good lines, a line with no delimiter, an impossible date, an empty path and a blank line | `pca` collector tests |
 | `pca-utf16-file` | Windows 11 whose launch dictionary is UTF-16 with a byte order mark — not a PCA text file at all | `pca` collector tests |
 | `pca-unredactable-path` | Windows 11 whose launch dictionary holds one drive-rooted path, one UNC path and one device path; only the first is a shape SS-mode redaction can reach | `pca` collector tests |
-| `prefetch-files-present` | Windows 11 with a readable Prefetch folder holding one `.pf` file, whose bytes are the vendored Windows 10 corpus file, plus the `ReadyBoot` directory and a non-`.pf` file that a real folder also has | `prefetch` collector tests, report snapshots |
+| `prefetch-files-present` | Windows 11 with a readable Prefetch folder holding one `.pf` file, whose bytes are the vendored Windows 10 corpus file and which is not read-only, plus the `ReadyBoot` directory and a non-`.pf` file that a real folder also has | `prefetch` collector tests, report snapshots |
 | `prefetch-not-present` | Windows with no Prefetch folder at all and no `EnablePrefetcher` value to explain it | `prefetch` collector tests |
 | `prefetch-folder-empty` | Windows 11 whose Prefetch folder is there, is readable and holds no `.pf` file, with `EnablePrefetcher` at Windows' default of 3. The state a "delete Prefetch for FPS" tip, a one-click optimiser or natural eviction at the 1024-file cap leaves — all ordinary on a gaming PC and none of them a statement about what ran | `prefetch` collector tests |
 | `prefetch-service-disabled` | Windows 11 with `EnablePrefetcher` at 2 — boot only. Windows writes no application-launch record at all and keeps whatever was written before the switch changed, so the folder is **not** empty and still answers nothing about what ran | `prefetch` collector tests |
@@ -49,7 +49,7 @@ none contains a real person's user name, host name, SID or files.
 | `bam-account-denied` | Two accounts, one of whose keys cannot be read, so an unknown number of records is missing | `bam` collector tests |
 | `bam-malformed-value` | One account holding a value that decodes, one a byte short of a timestamp, and one that is there and has no bytes | `bam` collector tests |
 | `bam-longer-value` | A BAM value longer than the public write-ups describe, as a newer Windows build might write | `bam` collector tests |
-| `evtx-logs-present` | Windows 11 with a readable Event Log folder holding two `.evtx` files, both referencing the one vendored Event Log sample, plus a file that is not a log | `evtx` collector tests, report snapshots |
+| `evtx-logs-present` | Windows 11 with a readable Event Log folder holding two `.evtx` files, both referencing the one vendored Event Log sample and neither read-only, plus a file that is not a log. It describes what the Event Log service states for the sample's channel, so both files — named `Application.evtx` and `Security.evtx`, holding LanguagePackSetup records — are files that are not where their channel is written (ADR 0042) | `evtx` collector tests, report snapshots |
 | `evtx-not-present` | Windows with no Event Log folder at all, so nothing can be said about what any log holds | `evtx` collector tests |
 | `evtx-logs-folder-empty` | Windows 11 whose Event Log folder is there, is readable and holds no `.evtx` file — the shape a one-click maintenance script leaves when it clears every log, and the shape Microsoft's own "delete corrupt Event Viewer log files" remedy leaves. The one file in it is not a log | `evtx` collector tests |
 | `evtx-access-denied` | Windows 11, the Event Log folder present and unlistable, by a process without administrator rights — the expected shape of an ordinary scan (ADR 0018) | `evtx` collector tests |
@@ -59,7 +59,7 @@ none contains a real person's user name, host name, SID or files.
 | `file-content-present` | Windows 11, one folder holding a file whose bytes are written inline, one whose bytes come from `fixtures/parsers/pca-app-launch/normal.txt`, and one listed without bytes — a file that is there and cannot be read | `rongroi-host` fixture tests |
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below) | `cargo xtask check-baseline` |
-| `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below), and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable | `cargo xtask check-baseline` |
+| `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below), and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable. Its `EnablePrefetcher`, its files' read-only attribute and the Event Log service's answer for its one channel are measured values (below) | `cargo xtask check-baseline` |
 
 **`FiveM.exe` in `baseline-consumer-win11` and `baseline-elevated-win11` is measured, not written.**
 Measured 2026-09-13 on one Windows 11 machine, build 26220, read-only, with `Get-FileHash`,
@@ -117,6 +117,21 @@ those four sources is readable without an elevated token — ADR 0021 and ADR 00
 Prefetch and for `Security.evtx`, ADR 0020 and ADR 0023 record PCA and BAM as unestablished — so a
 non-elevated host that read them all would assert something nobody here has measured. The two existing
 baselines stay `elevated: false` and remain the only description of a non-elevated scan.
+
+**Measured values in `baseline-elevated-win11`.** Four things in that host are not invented and not
+documented by Microsoft; each was read from one Windows 11 machine (build 26220, elevated, read-only, on
+2026-09-13) and nothing on that machine was changed:
+
+| Value in the host | What was measured |
+|---|---|
+| `EnablePrefetcher: 3` | the value in `PrefetchParameters`, a `REG_DWORD` (ADR 0037) |
+| `read_only: false` on the `.pf` file | 239 `.pf` files, none read-only (ADR 0037) |
+| `read_only: false` on the `.evtx` file | 413 `.evtx` files, none read-only (ADR 0037) |
+| `event_log_channels` for `Microsoft-Windows-LanguagePackSetup/Operational`: `log_file_path` `%SystemRoot%\System32\Winevt\Logs\Microsoft-Windows-LanguagePackSetup%4Operational.evtx`, `max_size_bytes` 1052672 | what the Event Log service stated for that channel; 1 166 of the machine's 1 243 channels had that size, and every channel's file was its name with `/` written `%4` (ADR 0042) |
+
+`evtx-logs-present` and the temporary hosts the `evtx` tests build describe the service with the same
+measured answer. One machine is one machine: these are values an ordinary PC was seen to have, not the
+only values an ordinary PC has.
 
 The user name `fixtureuser` in these paths is invented; it exists so that SS-mode redaction has something
 to replace.

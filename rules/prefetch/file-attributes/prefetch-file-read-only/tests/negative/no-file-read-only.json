@@ -1,0 +1,11 @@
+{
+  "description": "Every Prefetch file as Windows leaves it, and a configuration observation, which carries no read_only at all",
+  "observations": [
+    { "collector": "prefetch", "fields": {
+      "name": "cmd.exe", "path": "C:\\Windows\\Prefetch\\CMD.EXE-D269B812.pf", "read_only": false,
+      "run_count": 55, "recorded_runs": 8, "last_run": "2026-09-12T08:44:03Z", "scca_version": 31 } },
+    { "collector": "prefetch", "fields": {
+      "path": "C:\\Windows\\Prefetch\\OLD.EXE-11111111.pf", "read": "unsupported_version", "read_only": false } },
+    { "collector": "prefetch", "fields": { "folder": "listed", "enable_prefetcher": 3 } }
+  ]
+}

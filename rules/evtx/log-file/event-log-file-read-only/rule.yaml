@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 9b318bfa-805d-4edd-81f1-602b57639a69
+title: An event log file is marked read-only
+description: >-
+  A file in the Windows Event Log folder carries the read-only attribute. The Event Log service writes
+  these files itself, and on the one Windows 11 machine this project measured, none of several hundred
+  carried the attribute. This row names the log. It does not say who set the attribute, when, or why,
+  and it is not evidence that anything was hidden.
+status: experimental
+collector: evtx
+strength: tamper
+match:
+  read_only: true
+retention: >-
+  The attribute as it is at the moment of the scan, on the log files still in the folder. It says
+  nothing about when it was set, or about files that were removed.
+# As the log-clearing rules (ADR 0031): every Windows installation has an Event Log folder, so its
+# absence, or a folder holding no log, is worth a line of its own.
+unmeasured_when: [not_windows, not_admin, access_denied]
+falsepositives:
+  - Read-only chosen in the Properties of the Event Log folder or of a folder above it, which Windows
+    applies to the files inside
+  - Log files copied or restored into the folder by backup, imaging or copy software that keeps file
+    attributes, as Windows' own robocopy does unless told otherwise
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
+  - https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [evtx, log-file]
+related:
+  - id: 7d493537-7ecf-4f97-90a0-119e079d30d2
+    type: similar
+  - id: 87a53c8f-b0e4-477d-91e7-93b904ba965f
+    type: similar

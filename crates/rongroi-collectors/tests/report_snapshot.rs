@@ -242,8 +242,9 @@ fn pca_files_present_ss_view() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
-/// No rule reads `prefetch` either (ADR 0021). The programs it saw, and the account of what the
-/// folder held, reach Self mode through the unmatched bucket with no change to the CLI or the app.
+/// The one rule on `prefetch` asks whether a `.pf` file is read-only (ADR 0037), and here none is. The
+/// programs it saw, the account of what the folder held and Prefetch's configuration reach Self mode
+/// through the unmatched bucket with no change to the CLI or the app.
 #[test]
 fn prefetch_files_present_self_view() {
     let view = view::for_mode(&report_for("prefetch-files-present"), Mode::SelfCheck);
@@ -303,7 +304,7 @@ fn prefetch_files_present_ss_view() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
-/// Two rules read `evtx` (ADR 0031), and this host holds neither channel they name, so both are
+/// Two log-clearing rules read `evtx` (ADR 0031), and this host holds neither channel they name, so both are
 /// `not_found` here — which is the false green that ADR records: the one vendored sample is a
 /// `LanguagePackSetup` log, so no fixture in this repository can make either of them match. Everything
 /// else each log held reaches Self mode through the unmatched bucket, counted by kind of event rather
@@ -322,10 +323,13 @@ fn evtx_logs_present_self_view() {
 /// One Event Log record can carry a user name, a host name, an address, a SID and a command line.
 /// The parser drops every record's payload and its `Computer` field (ADR 0018), so **neither mode has
 /// anything to redact** — the host name of the machine that wrote the vendored sample reaches no part
-/// of the report. What SS mode adds on top is that it lists no unmatched observation at all, so not
-/// even the names of the channels on this PC reach the person watching. The two `evtx` rules are
-/// `tamper`, not `posture`, so their `not_found` is counted here rather than listed — a rule whose
-/// negative result means almost nothing does not get a row in front of a reviewer (ADR 0031).
+/// of the report. What SS mode adds on top is that it lists no unmatched observation at all, so the
+/// names of the channels on this PC reach the person watching only where a rule matched and the name
+/// is part of the evidence: here both logs hold records of a channel the service writes to another
+/// file, and that file's path — which names the channel — is what the row shows (ADR 0042). The two
+/// log-clearing rules are `tamper`, not `posture`, so their `not_found` is counted here rather than
+/// listed — a rule whose negative result means almost nothing does not get a row in front of a
+/// reviewer (ADR 0031).
 #[test]
 fn evtx_logs_present_ss_view() {
     let report = report_for("evtx-logs-present");
@@ -336,7 +340,12 @@ fn evtx_logs_present_ss_view() {
     );
 
     let view = view::for_mode(&report, Mode::Ss);
-    let json = serde_json::to_string(&view).unwrap();
+    let outside_the_evidence: Vec<_> = view
+        .evidence
+        .iter()
+        .filter(|row| row.rule_id != "87a53c8f-b0e4-477d-91e7-93b904ba965f")
+        .collect();
+    let json = serde_json::to_string(&outside_the_evidence).unwrap();
     assert!(!json.contains("LanguagePackSetup"), "{json}");
     assert!(view.hidden.unmatched > 0);
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
