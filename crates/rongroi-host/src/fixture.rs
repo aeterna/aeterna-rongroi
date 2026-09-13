@@ -10,9 +10,9 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    BootTimeSource, CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource, Host,
-    Platform, ProcessRecord, ProcessSource, RegistrySource, SignatureCheck, SignatureSource,
-    SourceError, SystemIntegritySource, TpmInfo, TpmSource,
+    BootTimeSource, CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource,
+    FirmwareSecureBoot, FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistrySource,
+    SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -58,6 +58,8 @@ struct HostFile {
     #[serde(default)]
     tpm: Option<FixtureTpm>,
     #[serde(default)]
+    firmware: Option<FixtureFirmware>,
+    #[serde(default)]
     processes: Option<Vec<FixtureProcess>>,
     /// What `GetTickCount64` would answer. Absent means the fixture never modelled it, which the
     /// accessor reports as `Unsupported` rather than inventing a value (ADR 0039).
@@ -81,6 +83,27 @@ struct FixtureTpm {
     present: bool,
     #[serde(default)]
     spec_version: Option<String>,
+}
+
+/// The firmware a fixture describes (ADR 0038). Absent means the fixture never modelled it, which the
+/// accessor reports as `Unsupported` rather than inventing a Secure Boot state.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureFirmware {
+    secure_boot: FixtureFirmwareSecureBoot,
+}
+
+/// Every answer a live host gives about the firmware's `SecureBoot` variable, including the two that
+/// are not answers: a process without the privilege to read it, and a read that failed.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureFirmwareSecureBoot {
+    Enabled,
+    Disabled,
+    VariableAbsent,
+    NotUefi,
+    AccessDenied,
+    ReadFailed,
 }
 
 /// One process a fixture describes. An absent `path` describes a process whose image path cannot be
@@ -364,6 +387,7 @@ pub struct FixtureHost {
     access_denied: Vec<String>,
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
+    firmware: Option<FixtureFirmware>,
     processes: Option<Vec<FixtureProcess>>,
     milliseconds_since_boot: Option<u64>,
 }
@@ -435,6 +459,7 @@ impl FixtureHost {
                 .collect(),
             code_integrity: file.code_integrity,
             tpm: file.tpm,
+            firmware: file.firmware,
             processes: file.processes,
             milliseconds_since_boot: file.milliseconds_since_boot,
         })
@@ -702,6 +727,24 @@ impl BootTimeSource for FixtureHost {
                     "this fixture host does not describe a boot time".to_owned(),
                 )
             })
+    }
+}
+
+impl FirmwareSource for FixtureHost {
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError> {
+        let described = self.firmware.ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe its firmware".to_owned())
+        })?;
+        match described.secure_boot {
+            FixtureFirmwareSecureBoot::Enabled => Ok(FirmwareSecureBoot::Enabled),
+            FixtureFirmwareSecureBoot::Disabled => Ok(FirmwareSecureBoot::Disabled),
+            FixtureFirmwareSecureBoot::VariableAbsent => Ok(FirmwareSecureBoot::VariableAbsent),
+            FixtureFirmwareSecureBoot::NotUefi => Ok(FirmwareSecureBoot::NotUefi),
+            FixtureFirmwareSecureBoot::AccessDenied => Err(SourceError::AccessDenied),
+            FixtureFirmwareSecureBoot::ReadFailed => Err(SourceError::Failed(
+                "this fixture host describes a firmware read that failed".to_owned(),
+            )),
+        }
     }
 }
 
@@ -1285,6 +1328,10 @@ processes:
         ));
         assert!(matches!(host.tpm_info(), Err(SourceError::Unsupported(_))));
         assert!(matches!(
+            host.firmware_secure_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
             host.running_processes(),
             Err(SourceError::Unsupported(_))
         ));
@@ -1378,6 +1425,43 @@ processes:
             )
             .is_err()
         );
+    }
+
+    /// Every state a fixture can write reaches the collector as the host reports it: four answers,
+    /// and the two ways of not getting one.
+    #[test]
+    fn firmware_secure_boot_is_read_from_the_fixture() {
+        let read = |state: &str| {
+            FixtureHost::from_yaml_str(
+                &format!("platform: windows\nfirmware:\n  secure_boot: {state}\n"),
+                "inline",
+            )
+            .unwrap()
+            .firmware_secure_boot()
+        };
+        assert_eq!(read("enabled"), Ok(FirmwareSecureBoot::Enabled));
+        assert_eq!(read("disabled"), Ok(FirmwareSecureBoot::Disabled));
+        assert_eq!(
+            read("variable_absent"),
+            Ok(FirmwareSecureBoot::VariableAbsent)
+        );
+        assert_eq!(read("not_uefi"), Ok(FirmwareSecureBoot::NotUefi));
+        assert_eq!(read("access_denied"), Err(SourceError::AccessDenied));
+        assert!(matches!(read("read_failed"), Err(SourceError::Failed(_))));
+    }
+
+    #[test]
+    fn unknown_fields_and_states_in_the_firmware_block_are_rejected() {
+        for yaml in [
+            "platform: windows\nfirmware:\n  secure_boot: enabled\n  bogus: 1\n",
+            "platform: windows\nfirmware:\n  secure_boot: on\n",
+            "platform: windows\nfirmware: {}\n",
+        ] {
+            assert!(
+                FixtureHost::from_yaml_str(yaml, "inline").is_err(),
+                "{yaml}"
+            );
+        }
     }
 
     #[test]

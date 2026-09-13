@@ -224,6 +224,34 @@ pub trait TpmSource {
     fn tpm_info(&self) -> Result<TpmInfo, SourceError>;
 }
 
+/// What the platform firmware itself says about UEFI Secure Boot (ADR 0038).
+///
+/// A second reading, independent of the `UEFISecureBootEnabled` registry value: this one is the UEFI
+/// `SecureBoot` variable in the EFI global-variable namespace, read from the firmware through
+/// Windows. Four answers, because "not enabled" is three different statements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FirmwareSecureBoot {
+    /// The `SecureBoot` variable holds 1.
+    Enabled,
+    /// The `SecureBoot` variable holds 0.
+    Disabled,
+    /// The firmware is UEFI and holds no `SecureBoot` variable.
+    VariableAbsent,
+    /// Windows was started through legacy BIOS, or through a UEFI compatibility module, so there are
+    /// no firmware variables to read at all.
+    NotUefi,
+}
+
+/// Read-only access to the platform firmware's own variables (ADR 0038). Nothing is ever written to
+/// the firmware.
+pub trait FirmwareSource {
+    /// What the firmware's `SecureBoot` variable says.
+    ///
+    /// Reading a firmware variable needs a privilege that a process without administrator rights does
+    /// not hold. That is [`SourceError::AccessDenied`], never a guessed value.
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError>;
+}
+
 /// One process that was running when the process list was read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessRecord {
@@ -371,6 +399,7 @@ pub trait Host:
     + EnvironmentSource
     + SystemIntegritySource
     + TpmSource
+    + FirmwareSource
     + ProcessSource
     + BootTimeSource
 {
@@ -469,6 +498,14 @@ impl TpmSource for NonWindowsHost {
     }
 }
 
+impl FirmwareSource for NonWindowsHost {
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows firmware interface on this platform".to_owned(),
+        ))
+    }
+}
+
 impl ProcessSource for NonWindowsHost {
     fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError> {
         Err(SourceError::Unsupported(
@@ -554,13 +591,17 @@ mod tests {
     }
 
     #[test]
-    fn non_windows_host_reports_no_code_integrity_and_no_tpm() {
+    fn non_windows_host_reports_no_code_integrity_no_tpm_and_no_firmware() {
         assert!(matches!(
             NonWindowsHost.code_integrity_options(),
             Err(SourceError::Unsupported(_))
         ));
         assert!(matches!(
             NonWindowsHost.tpm_info(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.firmware_secure_boot(),
             Err(SourceError::Unsupported(_))
         ));
     }
