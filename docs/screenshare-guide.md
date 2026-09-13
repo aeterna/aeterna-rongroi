@@ -174,6 +174,9 @@ These are counts of what SS mode does not list. §7 says why.
 | FiveM.exe is validly signed, but not with the certificate this rule knows | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
 | The firmware reports Secure Boot off while Windows reports it on — *after 0.2.0* | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
 | A machine policy turns PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
+| A Prefetch file is marked read-only — *after 0.2.0* | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
+| An event log file is marked read-only — *after 0.2.0* | tamper | `experimental` | the same two |
+| An event log file is not the file Windows writes its channel to — *after 0.2.0* | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
 
 Three things to know about the two log-clearing rules:
 
@@ -201,9 +204,13 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-The rows marked *after 0.2.0* are not in the 0.2.0 release. Neither of them means "a policy nobody wrote" or
-"Secure Boot is off" on its own: the first needs the two readings to disagree, the second needs a policy
+The rows marked *after 0.2.0* are not in the 0.2.0 release. Neither of the two posture rows among them means "a policy nobody wrote" or
+"Secure Boot is off" on its own: the firmware row needs the two readings to disagree, the PowerShell row needs a policy
 written to off. The firmware rule does not detect DMA hardware (§1) and says nothing about a second PC.
+
+The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
+what a record in it says. None of them says who changed it or when, and on the one Windows 11 machine
+this project measured, all three were "Not found".
 
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
@@ -214,7 +221,7 @@ Every rule's full text, including exactly what it matches, is in the
 ## 7. What SS mode does not show, and why
 
 The program reads more than the six rules ask about. It reads what Windows recorded about programs
-that ran (Prefetch, BAM, the Program Compatibility Assistant), and the list of running programs. **No rule reads those today**,
+that ran (Prefetch, BAM, the Program Compatibility Assistant), and the list of running programs. **No rule reads those today** — the one Prefetch rule asks whether a file is read-only, not what it records —
 so they are *unmatched observations*:
 
 - **Self mode** lists them, for the player.

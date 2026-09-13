@@ -121,6 +121,9 @@ that.** This section is the honest limit of the whole pull request.
   `auditpol`, and by the archive files — three sources this collector does not read and one it reads
   only as more `.evtx` files. Every field added here narrows nothing on its own; together they let a
   **person** see the ordinary explanation, which is the whole of the claim being made.
+- **Superseded in part by ADR 0042**, which reads each channel's maximum size and file from the Event
+  Log service. The paragraph below is left as written: no rule uses the size, and the conclusion that the
+  bytes alone cannot separate cleared, rotated and never-enabled still stands.
 - **`maxSize` is not read, so the single most informative corroborator in the research is absent.** A
   channel shrunk to its 1 MB floor truncates itself by rotation and leaves no 1102 and no 104 at all —
   and this program cannot see that a channel was shrunk.

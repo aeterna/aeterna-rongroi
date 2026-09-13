@@ -83,6 +83,23 @@ and the project uses [Semantic Versioning](https://semver.org/).
   machine; watching the scan run is the control. Both screenshare guides gain §11, "What a report does
   not prove about itself", PRIVACY.md says a report file is not signed, and the ADR lists what would make
   the question worth asking again without promising it.
+- Three rules about the state of a Prefetch or event log **file** rather than a record in it, all
+  `experimental` and `tamper` (ADR 0037, ADR 0042): a `.pf` file marked read-only, an `.evtx` file marked
+  read-only, and a log file whose records belong to a channel that the Windows Event Log service writes
+  to a different file. Reading them needed two new reads, both disclosed in the consent question:
+  **one attribute bit** of each `.pf` and `.evtx` file, amending ADR 0009's "no attributes", and **what
+  the Event Log service states about a channel** — its file and its maximum size — through
+  `EvtOpenChannelConfig`, a new host source. The registry was measured first and rejected: on one Windows
+  11 machine no `WINEVT\Channels` key named a file, and the registry's `MaxSize` disagreed with the size
+  Windows uses on 18 of the 94 keys carrying one. On that machine, elevated, all three rules were
+  `not_found`: 243 `.pf` and 413 `.evtx` files none read-only, and 148 of 148 logs with records at the
+  path their channel is written to. `max_size_bytes` is reported and **no rule reads it**: Windows'
+  documented minimum, 1 MiB, is the size 1 166 of that machine's 1 243 channels had, so there is no
+  "unusually small" to write down.
+- `prefetch` reports its own configuration as an observation — whether the folder is `listed`, `absent`
+  or `unreadable`, and the `EnablePrefetcher` value, left out when the registry holds none (ADR 0037).
+  Both used to reach the report only as the reason a rule could not be answered. No rule reads either:
+  what ordinarily leaves the value absent is not documented, and one measured machine had it at 3.
 
 ### Changed
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
@@ -99,6 +116,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   the baseline intends. `CONVENTIONS.md` §6 records the rule as enforced by review. README's milestone
   table now lists M1 and M2 as released in 0.2.0 instead of "merged, not released" and "0.1.0 is the
   only release so far".
+- A PC with no Prefetch folder is now a `prefetch` run that was **measured**, with every field about a
+  record gapped by the reason it used to be `Unmeasured` for (`source_absent`, or `service_disabled`),
+  instead of an `Unmeasured` run with nothing in it (ADR 0037). A rule on a Prefetch record comes out
+  exactly as before; the difference is the new configuration observation, listed in Self mode.
 
 ### Fixed
 - The SS-mode consent question named the wrong scan. In the CLI and in the window app it said the

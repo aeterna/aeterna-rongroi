@@ -49,6 +49,10 @@ file a collector names, bounded at 64 MiB, because three of the four parsers nee
 `Host` supplied them. The rest of the paragraph above stands: still no recursion, no timestamps, no size,
 no owner or ACL, no attributes, and nothing read that a collector did not name.
 
+**Amended by ADR 0037.** One attribute is now read: `FilesystemSource::is_read_only` returns whether a
+file a collector names carries the read-only attribute, and nothing else about its attributes. `prefetch`
+and `evtx` ask it of the files they read; `fivem_dir` does not.
+
 **No rule reads this collector yet.** A rule that says "there is a file in FiveM's plugin folder" matches
 ordinary overlay software on a great many legitimate machines, and neither an allow-list of known-good
 hashes nor Authenticode signer checking exists yet — and `allow` may only identify software by `sha256` or
