@@ -5,6 +5,31 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- A screenshare guide, in English and Thai (`docs/screenshare-guide.md`, `docs/screenshare-guide.th.md`),
+  for staff checking a PC over a screenshare and for the player being checked. It covers getting and
+  verifying the real file, administrator rights, running SS mode, reading each row, what each of the six
+  rules' ordinary causes are, what SS mode withholds and why, and what a report does not mean. It is the
+  M3 item README listed as planned, and the one `CONVENTIONS.md` §8 once said existed when it did not.
+  Two things the guide found are written into it rather than papered over: the CLI writes its SS-mode
+  consent question to the same output as `--json`, so `--json > report.json` hides the question from
+  the player; and `--elevate` scans in a new console window this project has not checked stays open.
+
+### Changed
+- M2 is complete as scoped, and no Prefetch, BAM or PCA rule is planned (ADR 0034). The three
+  collector ADRs each deferred that rule as "a separate decision" and nobody made it. What those
+  collectors emit names a program only by file name or path, `allow` compares only `sha256` and
+  `signer`, so such a rule cannot exclude a legitimate program of the same name and a rename defeats
+  it. **No gate refuses it**: a throwaway `prefetch` rule naming one executable passed both
+  `check-rules` and `check-baseline`, while a `pca` rule on `\Downloads\` failed `check-baseline` as
+  the baseline intends. `CONVENTIONS.md` §6 records the rule as enforced by review. README's milestone
+  table now lists M1 and M2 as released in 0.2.0 instead of "merged, not released" and "0.1.0 is the
+  only release so far".
+
+### Fixed
+- `PRIVACY.md` told the reader that nothing is stored "unless you click **Export**". No export or save
+  button exists in the window version; the only file is one a person redirects CLI output into.
+
 ## [0.2.0] - 2026-09-13
 
 ### Changed

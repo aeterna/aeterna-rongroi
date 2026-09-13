@@ -102,6 +102,7 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 | A `match` key is a field name, optionally `\|` and one of the eight operators; a list value means **or** | `check-rules` · engine tests |
 | An operator the field's declared kind cannot take, an empty list, and a `cased` entry `match` compares no text of are rejected | `check-rules` |
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
+| No rule on `prefetch`, `bam` or `pca` identifies a program by `name` or `path`: nothing they emit identifies software, so such a rule can neither `allow` a legitimate program nor survive a rename (ADR 0034). `check-rules` and `check-baseline` both accept one today | review |
 | `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
 | `unmeasured_when` names only reasons the rule's collector can report, each once, and never `partial`, `budget_spent` or `read_failed` — a view lists those whatever a rule declares, so naming one is a failure rather than a line that changes nothing (ADR 0030, ADR 0032) | `check-rules` |
 | The rule is quiet on every `fixtures/hosts/baseline-*` host, or a `rules/known-fps.csv` row accepts the match with a reason; an unused row fails too (ADR 0017) | `cargo xtask check-baseline` |
@@ -122,8 +123,8 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 ## 8. Docs and comments
 
-- Source docs are written in English. `README` also exists in Thai. The screenshare guide is M3 work and
-  is not written yet, in either language; it is to be written in both.
+- Source docs are written in English. `README` and the screenshare guide (`docs/screenshare-guide.md`)
+  also exist in Thai, and a change to either language's copy changes the other in the same pull request.
 - Comments explain *why*, not *what*.
 - Changing the architecture, the rule format or adding a new kind of source needs an ADR in `docs/adr/`.
 

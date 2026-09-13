@@ -42,6 +42,9 @@ It also settles the privacy question for this pull request by construction — n
 emits reaches an SS view at all today, because SS mode lists no unmatched observation. The exposure
 arrives with the rule, not with the collector, and the rule is a separate decision.
 
+**Decided in ADR 0034.** The separate decision this section defers was made: no rule on `prefetch`, `bam`
+or `pca` identifies a program by `name` or `path`.
+
 ### The observation shape, and what a matcher can do with it
 
 `rongroi_core::engine::matches` compares field values for **exact JSON equality**, and a rule's

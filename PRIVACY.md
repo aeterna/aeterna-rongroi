@@ -123,6 +123,7 @@ is nothing; what it removes is this list and the evidence that did not match.
 
 ## What is stored
 
-Nothing, unless you click **Export**. An export is a file you save yourself; it contains the view you were
-looking at (SS-mode exports are redacted). If you send an export to a server's staff, that server becomes
-responsible for how it keeps it.
+Nothing. The window version has no export or save button. The CLI prints the view it was asked for,
+as text or with `--json` as JSON, and writes a file only if you redirect that output into one yourself;
+it contains the view you asked for (SS-mode output is redacted). If you send such a file to a server's
+staff, that server becomes responsible for how it keeps it.
