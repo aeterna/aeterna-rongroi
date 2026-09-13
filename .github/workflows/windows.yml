@@ -25,6 +25,9 @@ jobs:
   windows:
     name: rust (windows)
     runs-on: windows-latest
+    # See ci.yml's `rust` job. Windows runners are the slowest here — the last runs took about
+    # eight minutes end to end — so this is generous and still far below the six-hour default.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

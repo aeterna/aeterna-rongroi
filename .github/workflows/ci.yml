@@ -24,6 +24,10 @@ jobs:
   rust:
     name: rust (ubuntu)
     runs-on: ubuntu-latest
+    # Bounded so that a test which stops making progress fails in minutes rather than at the
+    # runner's six-hour default. `.config/nextest.toml` bounds the individual test; this bounds
+    # everything else in the job (ADR 0016's fuzz job already had one).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -120,6 +124,7 @@ jobs:
   desktop-ui:
     name: desktop UI (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/desktop
@@ -146,6 +151,7 @@ jobs:
   reuse:
     name: licensing headers (REUSE)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

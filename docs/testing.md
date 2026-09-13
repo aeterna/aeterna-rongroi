@@ -135,7 +135,7 @@ collector that never reads is `Unmeasured` and a rule for it is then unmeasurabl
 > no `Security` or `System` channel at all — so `security-audit-log-cleared` and `event-log-file-cleared`
 > agree with none of their three conditions there, are `unmeasured` on the other two baselines, and
 > `check-baseline` fails only on `found`. Those two rules would pass that part of the gate whatever they
-> said, and so would a `channel:` value with two of its letters transposed. ADR 0033 adds the **confrontation** check — some baseline
+> said. A transposed letter in that `channel:` value passes every gate as well, provided the rule's own fixtures carry the same transposition — measured, not assumed. ADR 0033 adds the **confrontation** check — some baseline
 > observation must carry the fields a rule names and come within one condition of firing it — so the two
 > rules now fail unless `rules/unconfronted.csv` carries a row saying why and what would end it. They do,
 > and the hole is **open**: a row records that this gate is not measuring a rule, which is a worse
