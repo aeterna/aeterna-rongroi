@@ -11,8 +11,9 @@ use serde::Deserialize;
 
 use crate::{
     BootTimeSource, CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource,
-    FirmwareSecureBoot, FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistrySource,
-    SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
+    FirmwareSecureBoot, FirmwareSource, Host, Platform, ProcessRecord, ProcessSource,
+    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
+    TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
