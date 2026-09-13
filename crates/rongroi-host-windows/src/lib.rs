@@ -14,6 +14,8 @@ pub use live::LiveHost;
 #[cfg(windows)]
 pub mod filesystem;
 
+pub mod boot_time;
+
 pub mod elevate;
 
 pub mod process;

@@ -10,9 +10,9 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource, Host, Platform,
-    ProcessRecord, ProcessSource, RegistrySource, SignatureCheck, SignatureSource, SourceError,
-    SystemIntegritySource, TpmInfo, TpmSource,
+    BootTimeSource, CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource, Host,
+    Platform, ProcessRecord, ProcessSource, RegistrySource, SignatureCheck, SignatureSource,
+    SourceError, SystemIntegritySource, TpmInfo, TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -59,6 +59,10 @@ struct HostFile {
     tpm: Option<FixtureTpm>,
     #[serde(default)]
     processes: Option<Vec<FixtureProcess>>,
+    /// What `GetTickCount64` would answer. Absent means the fixture never modelled it, which the
+    /// accessor reports as `Unsupported` rather than inventing a value (ADR 0039).
+    #[serde(default)]
+    milliseconds_since_boot: Option<u64>,
 }
 
 /// Code-integrity settings a fixture describes. Absent means the fixture never modelled them, which
@@ -361,6 +365,7 @@ pub struct FixtureHost {
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
     processes: Option<Vec<FixtureProcess>>,
+    milliseconds_since_boot: Option<u64>,
 }
 
 impl FixtureHost {
@@ -431,6 +436,7 @@ impl FixtureHost {
             code_integrity: file.code_integrity,
             tpm: file.tpm,
             processes: file.processes,
+            milliseconds_since_boot: file.milliseconds_since_boot,
         })
     }
 
@@ -684,6 +690,18 @@ impl TpmSource for FixtureHost {
             present: described.present,
             spec_version: described.spec_version.clone(),
         })
+    }
+}
+
+impl BootTimeSource for FixtureHost {
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
+        self.milliseconds_since_boot
+            .map(std::time::Duration::from_millis)
+            .ok_or_else(|| {
+                SourceError::Unsupported(
+                    "this fixture host does not describe a boot time".to_owned(),
+                )
+            })
     }
 }
 
@@ -1270,6 +1288,29 @@ processes:
             host.running_processes(),
             Err(SourceError::Unsupported(_))
         ));
+        assert!(matches!(
+            host.since_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// A fixture writes what `GetTickCount64` would answer, in its unit, and the host hands it back
+    /// unchanged. Zero is an answer — a machine that has only just started — not a missing value.
+    #[test]
+    fn the_time_since_boot_is_read_from_the_fixture() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nmilliseconds_since_boot: 93784005\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.since_boot(),
+            Ok(std::time::Duration::from_millis(93_784_005))
+        );
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nmilliseconds_since_boot: 0\n", "inline")
+                .unwrap();
+        assert_eq!(host.since_boot(), Ok(std::time::Duration::ZERO));
     }
 
     #[test]

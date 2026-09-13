@@ -8,6 +8,12 @@
     "elevated_yes": "administrator",
     "elevated_no": "standard user",
     "elevated_unknown": "unknown",
+    "boot_time": "Windows start",
+    "boot_time_value": "{{at}}, {{since}} before this scan.",
+    "boot_time_note": "Not reset by \"Shut down\" with Fast Startup (the Windows default), sleep or hibernation; reset by a restart.",
+    "boot_time_unmeasured": "not measured — {{reason}}",
+    "elapsed": "{{hours}}h {{minutes}}m",
+    "elapsed_days": "{{days}}d {{hours}}h {{minutes}}m",
     "rules": "Rules",
     "exe_sha256": "Executable SHA-256"
   },

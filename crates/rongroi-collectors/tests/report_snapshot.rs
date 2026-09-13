@@ -291,3 +291,36 @@ fn a_log_that_could_not_be_read_leaves_the_clearing_rules_unmeasured() {
         assert_eq!(seen, 2, "{host}: both rules must reach the report");
     }
 }
+
+/// The boot time is a fact about the scan's context, so both views carry it unchanged: SS mode's
+/// filter is about evidence, and staff read the times on the rows they are shown against it
+/// (ADR 0039). A report written before the field existed reads back as never having tried, not as a
+/// start time nobody measured.
+#[test]
+fn the_boot_time_reaches_both_views_and_an_older_report_reads_back_not_attempted() {
+    use rongroi_core::model::{BootTime, UnmeasuredReason};
+
+    let report = report_for("secure-boot-off");
+    let expected = BootTime::Measured {
+        booted_at: "2025-12-28T21:56:56Z".to_owned(),
+        seconds_since_boot: 266_584,
+    };
+    assert_eq!(report.header.boot_time, expected);
+    for mode in [Mode::SelfCheck, Mode::Ss] {
+        assert_eq!(view::for_mode(&report, mode).header.boot_time, expected);
+    }
+
+    let mut older = serde_json::to_value(&report).unwrap();
+    older["header"]
+        .as_object_mut()
+        .unwrap()
+        .remove("boot_time")
+        .unwrap();
+    let older: rongroi_core::model::Report = serde_json::from_value(older).unwrap();
+    assert_eq!(
+        older.header.boot_time,
+        BootTime::Unmeasured {
+            reason: UnmeasuredReason::NotAttempted
+        }
+    );
+}

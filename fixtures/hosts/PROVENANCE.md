@@ -6,7 +6,7 @@ none contains a real person's user name, host name, SID or files.
 | Host | Describes | Used by |
 |---|---|---|
 | `secure-boot-on` | Windows 11, Secure Boot reported on | posture collector tests, report snapshots |
-| `secure-boot-off` | Windows 11, Secure Boot reported off | posture collector tests, report snapshots |
+| `secure-boot-off` | Windows 11, Secure Boot reported off; the one host that describes how long Windows has been counting since it started (an invented 3 days, 2 hours, 3 minutes and 4 seconds), so that the report snapshots carry a measured boot time as well as an unmeasured one (ADR 0039) | posture collector tests, report snapshots |
 | `secure-boot-unreported` | Windows 10, Secure Boot state key absent (e.g. legacy BIOS boot) | posture collector tests, report snapshots |
 | `registry-access-denied` | Windows 11, Secure Boot key unreadable | posture collector tests |
 | `test-signing-on` | Windows 11 with test signing switched on; everything else ordinary | posture collector tests |
