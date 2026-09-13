@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 13
+      "rule_count": 15
     },
     "platform": "windows",
     "os_build": "26100",
@@ -110,6 +110,7 @@ expression: view
           "collector": "posture",
           "fields": {
             "hvci": "enabled",
+            "script_block_logging": "not_configured",
             "secure_boot": "disabled",
             "test_signing": "disabled",
             "tpm": "present",
@@ -126,6 +127,13 @@ expression: view
       "retention": "Current setting only. It says nothing about how the PC was configured in the past."
     },
     {
+      "rule_id": "88eb2aca-a33e-414d-bd0f-cfb87af95a2d",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
       "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
       "collector": "posture",
       "strength": "posture",
@@ -136,12 +144,12 @@ expression: view
   "own_traces": [],
   "unmatched": [],
   "scope": {
-    "not_admin": 0,
+    "not_admin": 1,
     "not_attempted": 0
   },
   "hidden": {
     "not_found": 1,
-    "unmeasured_expected": 0,
+    "unmeasured_expected": 1,
     "unmeasured_unexpected": 0,
     "unmatched": 0
   }

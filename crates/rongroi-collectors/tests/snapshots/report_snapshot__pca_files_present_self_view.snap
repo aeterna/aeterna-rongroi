@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 13
+      "rule_count": 15
     },
     "platform": "windows",
     "os_build": "26100",
@@ -108,12 +108,27 @@ expression: view
       "expected": true
     },
     {
+      "rule_id": "5ec56c3d-da70-4acc-99d6-2c41c0b75d71",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
       "collector": "posture",
       "strength": "posture",
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "88eb2aca-a33e-414d-bd0f-cfb87af95a2d",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
     },
     {
       "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
@@ -189,6 +204,17 @@ expression: view
             "intact": true,
             "rejected": 0,
             "source": "general_db1"
+          }
+        }
+      ]
+    },
+    {
+      "collector": "posture",
+      "observations": [
+        {
+          "collector": "posture",
+          "fields": {
+            "script_block_logging": "not_configured"
           }
         }
       ]
