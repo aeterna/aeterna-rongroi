@@ -227,7 +227,9 @@ Specifically unverified:
   The gate fails only on `found`, so it would stay green whatever these rules said. This is the false
   green ADR 0026 was written to close, reappearing for this rule set because the one vendored sample is
   a LanguagePackSetup log. It is recorded here, in `docs/testing.md` beside the gate it defeats, and in
-  `rules/AGENTS.md`. It is **not** closed.
+  `rules/AGENTS.md`. It is **not** closed. **ADR 0033 makes it audible rather than closing it**: the gate
+  now reports both rules as unconfronted, and each carries a `rules/unconfronted.csv` row naming what
+  would end it.
 - **Whether a clearing of the Security channel always writes a 104 in the System log** is unresolved in
   the research, on every Windows build. The rules' text says the two rows *can* be one action, never
   that they are.

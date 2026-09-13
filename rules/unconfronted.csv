@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# Rules that `cargo xtask check-baseline` cannot measure, one row each, with what would end the row.
+# Lines starting with `#` and blank lines are ignored; a field containing a comma is double-quoted.
+#
+# A rule is **confronted** on a baseline when some observation of its collector carries the fields the
+# rule's `match` names and comes within one unsatisfied condition of firing it — the baseline was asked
+# the rule's question and answered no. A rule no baseline confronts is quiet there for a reason that
+# says nothing about the rule, so the gate's green is not evidence about it. ADR 0033 has the reasoning.
+#
+# The gate reads this file strictly, for the same reason `known-fps.csv` is read strictly:
+#   - `rule_id` must be a rule in the bundle.
+#   - `reason` must not be empty, and must say why no baseline confronts the rule — not that none does.
+#   - `resolved_when` must not be empty. A hole with no written way out is one nobody closes.
+#   - A row for a rule that a baseline confronts after all is a failure, not a warning.
+#
+# This file is not a way to quiet a rule. A row says "this gate is not measuring this rule", which is a
+# worse position than a rule that fails it — the fix is a baseline holding the shape the rule reads,
+# and a row exists only while that fixture does not.
+rule_id,reason,resolved_when,added
+ff967b28-984b-4de0-b361-58367ae0c2d5,"No baseline carries a Security channel. `baseline-elevated-win11` vendors one .evtx file, a LanguagePackSetup operational log, whose records agree with none of this rule's three conditions. Fabricating a Security log to give the gate something to measure is what fixtures/hosts/PROVENANCE.md forbids: a baseline is the claim that a machine like this is unremarkable, and an invented one claims nothing.","An ordinary Security.evtx captured from a real Windows 11 machine is added to a baseline, with its PROVENANCE row. A real Security log is expected to hold Microsoft-Windows-Eventlog records on the Security channel that are not 1102 — 1100 is written when the Event Log service stops — which would confront this rule at two conditions of three without any clearing having happened. That expectation is unverified and has to be checked against an actual log.",2026-09-13
+f4c99b57-02c8-4e53-82d0-dba8bdc13dda,"No baseline carries a System channel, for the same reason and with the same one vendored .evtx file as the rule above.","An ordinary System.evtx captured from a real Windows 11 machine is added to a baseline, with its PROVENANCE row. Which Microsoft-Windows-Eventlog records a real System log holds besides 104 has not been established, so unlike the rule above this one has no expected confronting record yet — that is part of what reading the captured log would settle.",2026-09-13

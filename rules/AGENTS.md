@@ -97,12 +97,15 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   and a fixture must not be manufactured to leave it (ADR 0031).
 - A new rule must also be quiet on every `fixtures/hosts/baseline-*` host, or carry a
   `known-fps.csv` row with a reason (`cargo xtask check-baseline`, ADR 0017). **Quiet is not the same as
-  measured, and for some rules the gate cannot tell you which you have.** The only Event Log sample in
-  this repository is a LanguagePackSetup log, so a rule naming the `Security` or `System` channel is
-  `not_found` on every baseline and the gate stays green whatever the rule says. Do not close that by
-  inventing a log: a baseline asserts that a machine like it is unremarkable
-  (`fixtures/hosts/PROVENANCE.md`). Say in the pull request which of your rules the gate could not
-  measure (ADR 0031).
+  measured**, and since ADR 0033 the gate tells you which you have: it requires each rule to be
+  *confronted* — some baseline observation must carry the fields your `match` names and come within one
+  condition of firing it. A rule nothing confronts fails until `rules/unconfronted.csv` carries a row
+  with a reason and a `resolved_when`, and the row fails once a baseline does confront it. The only
+  Event Log sample in this repository is a LanguagePackSetup log, so both rules naming the `Security`
+  or `System` channel have such a row today. Do not close that by inventing a log: a baseline asserts
+  that a machine like it is unremarkable (`fixtures/hosts/PROVENANCE.md`). A row is not a pass — it
+  records that this gate is measuring nothing about your rule — so say so in the pull request
+  (ADR 0031, ADR 0033).
 - Fixtures are synthetic observations. Never commit cheat binaries, loaders or real player data.
 - **Out of scope:** rules, comments or fixtures that explain how to avoid a rule, and weakening a rule
   without a documented false-positive reason. Bypasses are reported privately via

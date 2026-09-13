@@ -6,6 +6,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- `cargo xtask check-baseline` was green for two rules it had never compared to anything (ADR 0033).
+  The gate fails only on a rule that *matches* a baseline, which a rule that was never put a question
+  to satisfies for free: the only Event Log sample in this repository is a LanguagePackSetup log, so
+  the two log-clearing rules — which name the `Security` and `System` channels — agreed with none of
+  their three conditions on every baseline and would have passed however they were written.
+  `channel: Securtiy` would have passed too. Each rule must now also be **confronted**: some baseline
+  observation has to carry the fields the rule's `match` names and come within one unsatisfied
+  condition of firing it. A rule nothing confronts fails unless `rules/unconfronted.csv` carries a row
+  giving a reason and what would end it, and the row itself fails once a baseline does confront the
+  rule — so the fixture that closes a hole also deletes the note that recorded it. The two
+  log-clearing rules have rows today: the hole is not closed, it is now reported on every run instead
+  of only in an ADR.
 - A failed read was counted instead of shown, if a rule happened to declare it (ADR 0032). All four
   rules that ship today named `read_failed` in `unmeasured_when`, in lines written before anything
   read that field; once ADR 0027 gave those lines teeth, a registry value this program genuinely
