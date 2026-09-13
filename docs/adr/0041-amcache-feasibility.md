@@ -1,6 +1,6 @@
 # ADR 0041 — Amcache: whether it can be read, and what a hash rule would cost
 
-- Status: proposed
+- Status: accepted — no Amcache collector and no hash rules for now (option B)
 - Date: 2026-09-13
 
 ## Context
@@ -328,8 +328,8 @@ hash a rule needs.
 
 ## Question 3 — a list of cheat hashes in a public repository
 
-**This is the owner's decision and it is undecided.** The options are laid out below without a
-choice.
+**Decided by the owner on 2026-09-13: option B now, and option C if hash rules are ever wanted.**
+The options below were laid out before that decision and are kept as the reasoning.
 
 One fact constrains every option. **Whatever list this program matches against ships inside the
 executable.** The rules bundle is compiled in (ADR 0004) and the program runs offline on the player's
@@ -348,7 +348,7 @@ hash rule can only match a build nobody changed after the hash was listed.
 | **D. A list kept outside this repository**, compiled into a separate build | The list still ships in that build's binary, so it is not secret from its users. That build is not the official build (ADR 0007, NOTICE section 7), so its reports say **UNOFFICIAL BUILD**. Its rules are not reviewable in public. It is a fork, not a configuration |
 | **E. The program shows Amcache hashes and staff compare them against their own list** | Shows the player's whole inventory of programs to another person. That is what SS mode promises not to do (ADR 0014) |
 
-**Recommendation, for the owner to accept or reject:** **B** until a collector is otherwise
+**Recommendation, accepted by the owner on 2026-09-13:** **B** until a collector is otherwise
 acceptable, then **C** if hash rules are wanted at all. A and C disclose the same kind of thing, and C
 discloses only what is already out. D and E each break a property this project has already decided to
 keep.
@@ -388,11 +388,13 @@ Three ways to hold to `crates/rongroi-collectors/AGENTS.md` ("Collect only what 
 Only `InventoryApplicationFile` would be read. The consent question and `PRIVACY.md` would name
 Amcache in the same pull request as the collector.
 
-## What would make this accepted
+## What would reopen this
 
-All of these, each with its evidence written here or in a follow-up ADR:
+All of these, each with its evidence written in a follow-up ADR that supersedes this one:
 
-1. **Question 3 decided by the owner.** Without hash rules there is little reason for a collector.
+1. **Hash rules wanted, in the form Question 3 allows:** only hashes already published elsewhere, each
+   rule citing its public source, under a licence that permits reuse under CC-BY-SA-4.0. Without hash
+   rules there is little reason for a collector.
 2. **A parser that meets the bar above.** A crate from the table or a vendored and patched one, with
    `cargo deny check` passing on this workspace (not a scratch crate), allocations bounded by the
    bytes available, cycle-safe traversal, a fuzz target in `fuzz smoke`, and seeds that are
@@ -421,7 +423,6 @@ All of these, each with its evidence written here or in a follow-up ADR:
 ## Consequences
 
 - No code, no rule, no fixture, no dependency. `Cargo.lock`, `deny.toml` and the report are unchanged.
-- README's milestone table still lists Amcache in M3 as planned. That remains accurate while this ADR
-  is `proposed`. `docs/architecture.md` does not describe Amcache, so nothing there is wrong.
+- README's milestone table records Amcache in M3 as decided against for now, with a link here. `docs/architecture.md` does not describe Amcache, so nothing there is wrong.
 - The probe used for Question 1 is not in this repository. Its results are recorded above, and it
   printed nothing from the owner's hive but the four-byte `regf` signature check.

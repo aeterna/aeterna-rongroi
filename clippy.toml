@@ -12,3 +12,13 @@ disallowed-types = [
   { path = "std::net::TcpListener", reason = "aeterna-rongroi has no network code" },
   { path = "std::net::UdpSocket", reason = "aeterna-rongroi has no network code" },
 ]
+
+# ADR 0038: reading the UEFI Secure Boot variable enables SeSystemEnvironmentPrivilege in this program's own token
+# for one read. The same privilege lets a process write firmware variables, which no gate would otherwise notice,
+# so the write calls are banned outright (AGENTS.md hard rule 2).
+disallowed-methods = [
+  { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableA", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
+  { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableW", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
+  { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableExA", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
+  { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableExW", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
+]

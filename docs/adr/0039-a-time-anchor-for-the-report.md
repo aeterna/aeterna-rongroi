@@ -102,6 +102,11 @@ says it, in the CLI and the app, in both languages: *"when Windows last started,
 as one time at the top of the report"*. `consent_names_every_kind_of_source` checks it beside the
 collectors, and `PRIVACY.md` says what it is and what it is not.
 
+**Accepted by the owner on 2026-09-13**, with this weighed: a `found` Event Log row that SS mode lists already
+carries `first_seen` and `last_seen`, and `rongroi_core::view` redacts user paths, not times, so two reports could already be
+matched through those rows. The boot time adds one more such value; rounding it would blur the
+before-or-after comparison it exists for.
+
 ### 4. One line, with its caveat on the same line
 
 CLI (English):
