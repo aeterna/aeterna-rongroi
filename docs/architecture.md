@@ -15,7 +15,7 @@ Host ─► Collectors ─► CollectorRun ─► Engine (+ embedded rules bundl
    - `Measured { observations, gaps }` — what it saw, plus fields it could not read and why
    - `Unmeasured { reason }` — it could not look at all
 3. **Engine** — evaluates every rule in the embedded bundle against the runs. Pure: no I/O, no clock.
-4. **Report** — header (provenance, bundle hash, platform, elevation, time), one `Evidence` per rule,
+4. **Report** — header (provenance, bundle hash, platform, elevation, time, boot time), one `Evidence` per rule,
    the `own_traces` the engine separated out, and the `unmatched` observations no rule matched. The
    report is frozen before any UI starts.
 5. **View** — `view::for_mode` decides what an audience may see. The UI only renders a view.
@@ -33,6 +33,13 @@ every scan and have its reading discarded. It is the complement of "matched at l
 observation one rule matched is evidence under that rule and is not repeated here because a second rule
 did not match it. Own traces are taken out first, so one is never also an unmatched observation (ADR 0014).
 
+The header's **boot time** is when the running Windows kernel started counting: the scan's clock minus
+`GetTickCount64`, read before any collector runs. It is context for reading the times other rows carry,
+it is in the header rather than an observation so that no rule can match it and so that SS mode shows it
+with the rows it explains, and it is `unmeasured` with a reason rather than a guessed time. It is not when
+the PC was last turned on: a "Shut down" with Fast Startup, sleep and hibernation do not reset it
+(ADR 0039).
+
 The CLI and the desktop app both call `rongroi_collectors::scan::run`, so they cannot disagree about a result.
 
 ## Crates
@@ -40,7 +47,7 @@ The CLI and the desktop app both call `rongroi_collectors::scan::run`, so they c
 | Crate | Purpose | Depends on |
 |---|---|---|
 | `rongroi-core` | model, rule format and validation, embedded bundle, engine, views, provenance | — |
-| `rongroi-host` | `Host` and source traits (including `SignatureSource`, ADR 0035), `NonWindowsHost`, `FixtureHost` (feature `fixture`) | — |
+| `rongroi-host` | `Host` and source traits (including `SignatureSource`, ADR 0035, and `BootTimeSource`, ADR 0039), `NonWindowsHost`, `FixtureHost` (feature `fixture`) | — |
 | `rongroi-host-windows` | `LiveHost`: the only crate that calls Windows APIs or uses `unsafe` | `rongroi-host` |
 | `rongroi-parsers` | artifact formats decoded from bytes into plain structs (BAM, PCA, Prefetch, EVTX): no OS calls, no `Host`, no clock (ADR 0013, ADR 0015, ADR 0018) | — |
 | `rongroi-collectors` | `Collector` trait, collectors, `scan::run` | core, host |
@@ -106,6 +113,7 @@ Both are mandatory in every rule and translated with the rest of its text (ADR 0
 | `unmeasured` with reason `partial`, `budget_spent` or `read_failed` | shown | **always** a row, declared or not: each says the artifact was reachable and the read of it did not finish, which is not a rule author's to declare away. `check-rules` refuses the declaration outright (ADR 0030, ADR 0032) |
 | `unmeasured` with reason `not_admin` or `not_attempted` | shown, and in the scope statement | **not** a row — one fact about the scan, said once above the evidence in `scope.not_admin` / `scope.not_attempted` (ADR 0012, ADR 0027, ADR 0030) |
 | Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
+| Boot time (header) | shown | shown — context for the times on the rows SS mode lists, and named in the consent question (ADR 0039) |
 | Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |
 | Paths | as read | `X:\Users\<name>` → `%USERPROFILE%`, in evidence and own traces alike |
 

@@ -47,6 +47,14 @@ export interface Provenance {
   exe_sha256: string | null;
 }
 
+/**
+ * When the running Windows kernel started counting (ADR 0039). Context for reading the times on the
+ * rows, never evidence. A "Shut down" with Fast Startup, sleep and hibernation do not reset it.
+ */
+export type BootTime =
+  | { state: "measured"; booted_at: string; seconds_since_boot: number }
+  | { state: "unmeasured"; reason: UnmeasuredReason };
+
 export interface ReportHeader {
   schema_version: number;
   provenance: Provenance;
@@ -55,6 +63,7 @@ export interface ReportHeader {
   os_build: string | null;
   elevated: boolean | null;
   generated_at: string;
+  boot_time: BootTime;
 }
 
 /**

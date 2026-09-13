@@ -293,6 +293,7 @@ mod tests {
             os_build: None,
             elevated: Some(false),
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
+            boot_time: crate::model::BootTime::default(),
         }
     }
 

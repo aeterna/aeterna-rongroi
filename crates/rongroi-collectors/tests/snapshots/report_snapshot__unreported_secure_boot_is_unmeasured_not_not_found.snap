@@ -20,7 +20,11 @@ expression: view
     "platform": "windows",
     "os_build": "19045",
     "elevated": true,
-    "generated_at": "2026-01-01T00:00:00Z"
+    "generated_at": "2026-01-01T00:00:00Z",
+    "boot_time": {
+      "state": "unmeasured",
+      "reason": "read_failed"
+    }
   },
   "evidence": [
     {

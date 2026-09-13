@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 
 use clap::ValueEnum;
 use rongroi_core::bundle::Bundle;
-use rongroi_core::model::{EvidenceState, Mode, Observation, UnmeasuredReason};
+use rongroi_core::model::{BootTime, EvidenceState, Mode, Observation, UnmeasuredReason};
 use rongroi_core::view::ReportView;
 
 /// Output language.
@@ -75,6 +75,18 @@ fn text(lang: Lang, key: &str) -> &'static str {
             "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะโปรแกรมหยุดอ่านก่อนจะถึงส่วนที่รายการนั้นถาม \
              เป็นข้อจำกัดของโปรแกรมนี้เอง ไม่ใช่สิ่งที่ตรวจเจอในเครื่องนี้"
         }
+        // Context for reading every time below it, never a finding: the sentence after the time is
+        // what stops "started three days ago" being read as something the player did (ADR 0039).
+        (Lang::En, "boot_time") => {
+            "Windows start: {at}, {since} before this scan. Not reset by \"Shut down\" with Fast \
+             Startup (the Windows default), sleep or hibernation; reset by a restart."
+        }
+        (Lang::Th, "boot_time") => {
+            "Windows เริ่มทำงาน: {at} ({since} ก่อนการสแกนนี้) การกด \"Shut down\" ขณะเปิด Fast Startup \
+             (ค่าเริ่มต้นของ Windows) การ sleep และการ hibernate ไม่ทำให้ค่านี้เริ่มใหม่ การ restart ทำให้เริ่มใหม่"
+        }
+        (Lang::En, "boot_time_unmeasured") => "Windows start: not measured — {reason}",
+        (Lang::Th, "boot_time_unmeasured") => "Windows เริ่มทำงาน: ยังไม่ได้วัด — {reason}",
         (Lang::En, "own_traces") => "own traces (excluded)",
         (Lang::Th, "own_traces") => "ร่องรอยของโปรแกรมนี้เอง (แยกออกแล้ว)",
         (Lang::En, "own_traces_note") => {
@@ -183,6 +195,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced, with their signatures (Authenticode)\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say\n\
+            \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
             It shows only what matches a rule. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
             You may refuse.\n\
             Continue? [y/N] "
@@ -193,6 +206,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - โปรแกรมที่กำลังรันอยู่ และไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร\n\
+            \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
             แสดงเฉพาะสิ่งที่ตรง rule โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
@@ -268,6 +282,7 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     if let Some(sha) = &provenance.exe_sha256 {
         let _ = writeln!(out, "exe sha256: {sha}");
     }
+    let _ = writeln!(out, "{}", boot_time_line(&header.boot_time, lang));
     // Above the evidence, because it is a fact about the scan and not about the machine, and
     // because a reviewer who has made up their mind by the third row never reaches a footer
     // (ADR 0027).
@@ -308,6 +323,34 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     }
     let _ = writeln!(out, "\n{}", text(lang, "footer"));
     out
+}
+
+/// The one line of context that says when Windows last started counting (ADR 0039).
+fn boot_time_line(boot_time: &BootTime, lang: Lang) -> String {
+    match boot_time {
+        BootTime::Measured {
+            booted_at,
+            seconds_since_boot,
+        } => text(lang, "boot_time")
+            .replace("{at}", booted_at)
+            .replace("{since}", &elapsed(*seconds_since_boot, lang)),
+        BootTime::Unmeasured { reason: why } => {
+            text(lang, "boot_time_unmeasured").replace("{reason}", reason(lang, *why))
+        }
+    }
+}
+
+/// Whole seconds as days, hours and minutes; days only when there is at least one.
+fn elapsed(seconds: u64, lang: Lang) -> String {
+    let days = seconds / 86_400;
+    let hours = seconds % 86_400 / 3_600;
+    let minutes = seconds % 3_600 / 60;
+    match (lang, days) {
+        (Lang::En, 0) => format!("{hours}h {minutes}m"),
+        (Lang::En, _) => format!("{days}d {hours}h {minutes}m"),
+        (Lang::Th, 0) => format!("{hours} ชม. {minutes} นาที"),
+        (Lang::Th, _) => format!("{days} วัน {hours} ชม. {minutes} นาที"),
+    }
 }
 
 /// The evidence, one entry at a time, each with the rule's own text.
@@ -489,6 +532,10 @@ mod tests {
             os_build: Some("26100".to_owned()),
             elevated: Some(false),
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
+            boot_time: rongroi_core::model::BootTime::Measured {
+                booted_at: "2025-12-28T21:56:56Z".to_owned(),
+                seconds_since_boot: 266_584,
+            },
         };
         let evidence = Evidence {
             rule_id: rule.id.clone(),
@@ -523,6 +570,63 @@ mod tests {
         assert!(text.contains("UNOFFICIAL BUILD"), "{text}");
         let thai = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::Th);
         assert!(thai.contains("UNOFFICIAL BUILD"), "{thai}");
+    }
+
+    /// One line above the evidence, in both modes and both languages, carrying the caveat that stops
+    /// a start days ago being read as something the player did (ADR 0039).
+    #[test]
+    fn the_boot_time_is_one_line_of_context_above_the_evidence() {
+        let (report, bundle) = report(false);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let text = render(&view::for_mode(&report, mode), &bundle, Lang::En);
+            let (above, below) = text
+                .split_once("[FOUND]")
+                .expect("the evidence is rendered");
+            let lines: Vec<&str> = above
+                .lines()
+                .filter(|line| line.starts_with("Windows start:"))
+                .collect();
+            assert_eq!(lines.len(), 1, "{text}");
+            assert!(
+                lines[0].contains("2025-12-28T21:56:56Z, 3d 2h 3m before this scan"),
+                "{text}"
+            );
+            assert!(lines[0].contains("Fast Startup"), "{text}");
+            assert!(!below.contains("Windows start"), "{text}");
+
+            let thai = render(&view::for_mode(&report, mode), &bundle, Lang::Th);
+            assert!(
+                thai.contains("Windows เริ่มทำงาน: 2025-12-28T21:56:56Z"),
+                "{thai}"
+            );
+            assert!(thai.contains("3 วัน 2 ชม. 3 นาที"), "{thai}");
+            assert!(thai.contains("Fast Startup"), "{thai}");
+        }
+    }
+
+    /// No time is printed where none was measured, and the reason uses the words every other
+    /// unmeasured result uses.
+    #[test]
+    fn an_unmeasured_boot_time_says_why_and_prints_no_time() {
+        let (mut report, bundle) = report(false);
+        report.header.boot_time = rongroi_core::model::BootTime::Unmeasured {
+            reason: UnmeasuredReason::NotWindows,
+        };
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(
+            text.contains("Windows start: not measured — not running on Windows"),
+            "{text}"
+        );
+        assert!(!text.contains("before this scan"), "{text}");
+    }
+
+    #[test]
+    fn elapsed_time_leaves_out_days_when_there_are_none() {
+        assert_eq!(elapsed(0, Lang::En), "0h 0m");
+        assert_eq!(elapsed(59, Lang::En), "0h 0m");
+        assert_eq!(elapsed(32_571, Lang::En), "9h 2m");
+        assert_eq!(elapsed(86_400, Lang::En), "1d 0h 0m");
+        assert_eq!(elapsed(32_571, Lang::Th), "9 ชม. 2 นาที");
     }
 
     #[test]
@@ -568,13 +672,24 @@ mod tests {
             ids, listed,
             "a collector was added or removed; say what it reads in `consent`"
         );
+        // Not a collector, so not in the list above: the report header's boot time is a new read of
+        // its own, and a player agrees to it like any other (ADR 0039).
         let running = [
-            (Lang::En, "programs running now"),
-            (Lang::Th, "โปรแกรมที่กำลังรันอยู่"),
+            (
+                Lang::En,
+                "programs running now",
+                "when Windows last started",
+            ),
+            (
+                Lang::Th,
+                "โปรแกรมที่กำลังรันอยู่",
+                "เวลาที่ Windows เริ่มทำงานครั้งล่าสุด",
+            ),
         ];
-        for (lang, process_words) in running {
+        for (lang, process_words, boot_time_words) in running {
             let question = consent(lang);
             assert!(question.contains(process_words), "{question}");
+            assert!(question.contains(boot_time_words), "{question}");
             for word in named.iter().flat_map(|(_, words)| words.iter()) {
                 assert!(question.contains(word), "{word} missing from {question}");
             }

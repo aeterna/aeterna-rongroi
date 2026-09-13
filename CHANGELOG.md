@@ -6,6 +6,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The report header says when Windows last started counting, so the times on other rows can be read
+  against it (ADR 0039): `boot_time`, the scan's clock minus `GetTickCount64`, or `unmeasured` with a
+  reason — never a guessed time. It is context, not evidence, and no rule can read it. It is shown in both
+  modes and named in the consent question. The CLI and the app print it as one line with its caveat on
+  the same line: a "Shut down" with Fast Startup (the Windows default), sleep and hibernation do not
+  reset it, so a start days before the scan is ordinary. On a real Windows 11 machine it agreed to the
+  second with `Win32_OperatingSystem.LastBootUpTime`, with and without administrator rights, while the
+  System log's own start record was 7 hours away because the clock had been changed since; the
+  screenshare guide now says both.
 - Signature checking, without the network (ADR 0035). `fivem_dir` reports, for each file in FiveM's plugin
   folders, what Windows says about the Authenticode signature embedded in it: `valid` with the signer's
   name and the SHA-256 of the signing certificate, `no_embedded_signature`, `invalid`, or

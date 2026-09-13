@@ -245,6 +245,21 @@ pub trait ProcessSource {
     fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError>;
 }
 
+/// Read-only access to how long the running Windows kernel has been counting since it started
+/// (ADR 0039).
+///
+/// Context for the report header, never evidence: a person reads the times other rows carry against
+/// it. What "started" means is Windows' own, and it is not what a person means by "I turned the PC
+/// on": a "Shut down" with Fast Startup — the default — hibernates the kernel instead of ending it,
+/// and sleep and hibernation do not reset the count either. Only a restart, or a shutdown with Fast
+/// Startup off, starts it again.
+pub trait BootTimeSource {
+    /// Time elapsed since the system started, sleep and hibernation included.
+    ///
+    /// Nothing about who is logged on is read: it is one number about the machine.
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError>;
+}
+
 /// Size of one read when a file is streamed through SHA-256.
 const READ_BLOCK: usize = 64 * 1024;
 
@@ -357,6 +372,7 @@ pub trait Host:
     + SystemIntegritySource
     + TpmSource
     + ProcessSource
+    + BootTimeSource
 {
     /// Operating system family.
     fn platform(&self) -> Platform;
@@ -461,6 +477,14 @@ impl ProcessSource for NonWindowsHost {
     }
 }
 
+impl BootTimeSource for NonWindowsHost {
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows boot time on this platform".to_owned(),
+        ))
+    }
+}
+
 impl Host for NonWindowsHost {
     fn platform(&self) -> Platform {
         Platform::Other
@@ -517,6 +541,14 @@ mod tests {
         ));
         assert!(matches!(
             NonWindowsHost.read_bytes(key, r"C:\x.exe"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn non_windows_host_reports_no_boot_time_rather_than_zero() {
+        assert!(matches!(
+            NonWindowsHost.since_boot(),
             Err(SourceError::Unsupported(_))
         ));
     }

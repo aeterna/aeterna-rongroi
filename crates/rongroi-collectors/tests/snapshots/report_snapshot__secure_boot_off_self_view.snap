@@ -20,7 +20,12 @@ expression: view
     "platform": "windows",
     "os_build": "26100",
     "elevated": false,
-    "generated_at": "2026-01-01T00:00:00Z"
+    "generated_at": "2026-01-01T00:00:00Z",
+    "boot_time": {
+      "state": "measured",
+      "booted_at": "2025-12-28T21:56:56Z",
+      "seconds_since_boot": 266584
+    }
   },
   "evidence": [
     {
