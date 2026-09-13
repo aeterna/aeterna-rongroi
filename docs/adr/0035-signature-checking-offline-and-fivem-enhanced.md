@@ -152,7 +152,16 @@ report, not whether an embedded one exists. The first draft of that test used `e
 failed on the real machine.
 
 The CAPI2 check was **not** run on that machine. It turns on a Windows log, which is a setting change on
-a machine that is not thrown away afterwards, so it runs only on the CI runner.
+a machine that is not thrown away afterwards, so it runs only on the CI runner. Its first run, on the
+`windows-latest` runner for this change (run `34750047733`), picked `pwsh.exe` as the embedded-signed
+file and `notepad.exe` as the catalog-only one:
+
+| Phase | Tests | CAPI2 events from the test process |
+|---|---|---|
+| `live_offline_*` (the product's settings) | 4 run, 4 passed | 22 — ids 10 ×6, 11 ×6, 30 ×2, 80 ×3, 81 ×3, 90 ×2 — and **no event 53** |
+| `live_online_*` (settings the product never uses, URL cache cleared) | 1 run, 1 passed | **4 × event 53** |
+
+So the log saw the offline checks, and it records a network retrieval when one happens.
 
 ## What was rejected
 
