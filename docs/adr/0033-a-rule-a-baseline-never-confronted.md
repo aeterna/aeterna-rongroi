@@ -23,8 +23,8 @@ those three fields, so ADR 0026's check — does this collector emit the fields 
 satisfied. What is not satisfied is anything about the *values*: the rules ask for the `Security` and
 `System` channels and the `Microsoft-Windows-Eventlog` provider, and no observation on any baseline
 carries either channel or that provider. The rules agree with **none** of their three conditions and
-would be quiet however they were written. Writing `channel: Securtiy` would pass every gate in the
-repository.
+would be quiet however they were written. A `channel:` value with two of its letters transposed would pass
+every gate in this repository.
 
 So the state that needs a name is not "unmeasured" and not "not found". It is **a rule the baseline
 never put a question to**, and until now nothing distinguished it from a rule the baseline answered.
