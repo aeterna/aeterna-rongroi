@@ -16,3 +16,6 @@ code_integrity:
   test_signing: false
 tpm:
   present: false
+firmware:
+  # A process without administrator rights cannot read a firmware variable (ADR 0038).
+  secure_boot: access_denied

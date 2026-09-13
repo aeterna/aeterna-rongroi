@@ -13,3 +13,6 @@ code_integrity:
 tpm:
   present: true
   spec_version: "2.0"
+firmware:
+  # Legacy BIOS boot: there are no firmware variables to read (ADR 0038).
+  secure_boot: not_uefi

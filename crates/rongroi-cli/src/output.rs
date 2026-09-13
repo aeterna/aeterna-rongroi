@@ -191,7 +191,7 @@ pub fn consent(lang: Lang) -> String {
     match lang {
         Lang::En => "SS mode — screenshare check\n\
             This program will read, on this PC:\n\
-            \x20 - security settings such as Secure Boot and memory integrity\n\
+            \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity and the PowerShell logging policy\n\
             \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say\n\
@@ -202,7 +202,7 @@ pub fn consent(lang: Lang) -> String {
             .to_owned(),
         Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
             โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
-            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot และ memory integrity\n\
+            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell\n\
             \x20 - โปรแกรมที่กำลังรันอยู่ ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant)\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร\n\
@@ -668,7 +668,10 @@ mod tests {
                 ],
             ),
             ("pca", &["Program Compatibility Assistant"]),
-            ("posture", &["Secure Boot", "memory integrity"]),
+            (
+                "posture",
+                &["Secure Boot", "memory integrity", "PowerShell"],
+            ),
             ("prefetch", &["Prefetch"]),
             ("process", &[]),
         ];

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! Machine settings that make cheating easier: Secure Boot, test signing, memory integrity (HVCI) and
-//! the TPM.
+//! Machine settings that make cheating easier: Secure Boot — as Windows reports it and as the
+//! firmware reports it — test signing, memory integrity (HVCI), the TPM, and whether a machine policy
+//! turns PowerShell script block logging off.
 //!
 //! One run produces one observation holding every setting that could be read, so a rule can match on
 //! more than one at a time. A setting that could not be read is a `gaps` entry instead, never a
@@ -12,7 +13,7 @@
 use std::collections::BTreeMap;
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, SourceError};
+use rongroi_host::{FirmwareSecureBoot, Host, Platform, SourceError};
 
 use crate::{Collector, Field};
 
@@ -31,14 +32,29 @@ pub const HVCI_KEY: &str =
 /// DWORD value: 1 = configured on, 0 = configured off.
 pub const HVCI_VALUE: &str = "Enabled";
 
+/// Registry key holding the Windows PowerShell script block logging policy (ADR 0038).
+///
+/// Only a machine policy is read. The same policy under `HKCU` is a per-user one, and a machine policy
+/// takes precedence over it, so the value read here is decisive when it is set. When it is not set,
+/// a per-user policy this program does not read may still apply, which is why an absent value is
+/// reported as `not_configured` and never as "on" or "off". PowerShell 7 keeps its own policy under
+/// `…\Policies\Microsoft\PowerShellCore`, which is not read either.
+pub const SCRIPT_BLOCK_LOGGING_KEY: &str =
+    r"HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging";
+/// DWORD value: 1 = policy on, 0 = policy off, absent = policy not configured.
+pub const SCRIPT_BLOCK_LOGGING_VALUE: &str = "EnableScriptBlockLogging";
+
 const ID: &str = "posture";
 
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
 ///
 /// A value the machine does not report, or a registry or platform read that was denied or
-/// failed. `not_admin` is not here: this collector reads what any account may read.
-const REASONS: [UnmeasuredReason; 4] = [
+/// failed. `not_admin` is the firmware's Secure Boot variable alone: every other setting here is one
+/// any account may read, and reading a firmware variable needs a privilege only an elevated token
+/// holds (ADR 0038).
+const REASONS: [UnmeasuredReason; 5] = [
     UnmeasuredReason::NotWindows,
+    UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::SourceAbsent,
     UnmeasuredReason::ReadFailed,
@@ -50,9 +66,15 @@ const REASONS: [UnmeasuredReason; 4] = [
 /// setting alone and in nothing else: one observation carries every setting that was readable, and
 /// each name below is both a field and a `gaps` key (ADR 0011). `tpm_spec_version` is the one name
 /// that is never a gap — an absent TPM has no version, and that is not a failure to measure.
-const FIELDS: [Field; 5] = [
+///
+/// `secure_boot` and `secure_boot_firmware` are two readings of one setting from two places, kept as
+/// two fields so a rule can compare them (ADR 0038). `script_block_logging` has three values, because
+/// a policy nobody wrote and a policy written to off are different statements about a machine.
+const FIELDS: [Field; 7] = [
     Field::text("hvci"),
+    Field::text("script_block_logging"),
     Field::text("secure_boot"),
+    Field::text("secure_boot_firmware"),
     Field::text("test_signing"),
     Field::text("tpm"),
     Field::text("tpm_spec_version"),
@@ -88,6 +110,18 @@ impl Collector for Posture {
         record(&mut fields, &mut gaps, "secure_boot", secure_boot(host));
         record(&mut fields, &mut gaps, "hvci", hvci(host));
         record(&mut fields, &mut gaps, "test_signing", test_signing(host));
+        record(
+            &mut fields,
+            &mut gaps,
+            "secure_boot_firmware",
+            secure_boot_firmware(host),
+        );
+        record(
+            &mut fields,
+            &mut gaps,
+            "script_block_logging",
+            script_block_logging(host),
+        );
 
         match host.tpm_info() {
             Ok(info) => {
@@ -174,6 +208,39 @@ fn secure_boot(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
     registry_switch(host.read_u32(SECURE_BOOT_KEY, SECURE_BOOT_VALUE))
 }
 
+/// What the firmware's own `SecureBoot` variable says (ADR 0038).
+///
+/// A denial is split by elevation, as the artifact collectors split it: the privilege the read needs
+/// is one only an elevated token holds, so on an ordinary scan this is `not_admin` and restarting as
+/// administrator is what would answer it. Legacy BIOS boot, and UEFI firmware without the variable,
+/// are both a place the setting is not kept — `source_absent`, as the registry reading reports it.
+fn secure_boot_firmware(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
+    match host.firmware_secure_boot() {
+        Ok(FirmwareSecureBoot::Enabled) => Ok("enabled"),
+        Ok(FirmwareSecureBoot::Disabled) => Ok("disabled"),
+        Ok(FirmwareSecureBoot::VariableAbsent | FirmwareSecureBoot::NotUefi) => {
+            Err(UnmeasuredReason::SourceAbsent)
+        }
+        Err(error) => Err(crate::failure::reason_for(host, &error)),
+    }
+}
+
+/// Whether a machine policy turns Windows PowerShell script block logging on or off (ADR 0038).
+///
+/// Unlike the other registry settings here, an absent value is an answer: Windows ships with no such
+/// policy, and "nobody configured this" is what most machines say. It is `not_configured`, which is
+/// neither `enabled` nor `disabled`. A value of another type or another number is there and means
+/// nothing this program can name, so it is a gap rather than a guess.
+fn script_block_logging(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
+    match host.read_u32(SCRIPT_BLOCK_LOGGING_KEY, SCRIPT_BLOCK_LOGGING_VALUE) {
+        Ok(Some(1)) => Ok("enabled"),
+        Ok(Some(0)) => Ok("disabled"),
+        Ok(None) => Ok("not_configured"),
+        Ok(Some(_)) => Err(UnmeasuredReason::ReadFailed),
+        Err(error) => Err(reason_for(&error)),
+    }
+}
+
 /// Whether memory integrity (HVCI) is configured on. See [`HVCI_KEY`] for what that does not say.
 fn hvci(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
     registry_switch(host.read_u32(HVCI_KEY, HVCI_VALUE))
@@ -222,6 +289,8 @@ code_integrity:
 tpm:
   present: true
   spec_version: \"2.0\"
+firmware:
+  secure_boot: enabled
 ";
 
     fn field<'a>(run: &'a CollectorRun, name: &str) -> Option<&'a str> {
@@ -351,7 +420,7 @@ tpm:
     /// rule can match on more than one of them at once.
     #[test]
     fn every_setting_lands_in_one_observation() {
-        let run = Posture.collect(&fixture("secure-boot-on"));
+        let run = Posture.collect(&inline(ORDINARY));
         let CollectorRun::Measured { observations, .. } = &run else {
             panic!("expected a measured run, got {run:?}");
         };
@@ -361,11 +430,148 @@ tpm:
             names,
             [
                 "hvci",
+                "script_block_logging",
                 "secure_boot",
+                "secure_boot_firmware",
                 "test_signing",
                 "tpm",
                 "tpm_spec_version"
             ]
+        );
+    }
+
+    /// The named fixtures describe a scan without administrator rights, which is what a limited token
+    /// gets from the firmware.
+    #[test]
+    fn a_limited_fixture_host_cannot_read_the_firmware() {
+        let run = Posture.collect(&fixture("secure-boot-on"));
+        assert_eq!(
+            gap_for(&run, "secure_boot_firmware"),
+            Some(UnmeasuredReason::NotAdmin)
+        );
+        let run = Posture.collect(&fixture("secure-boot-unreported"));
+        assert_eq!(
+            gap_for(&run, "secure_boot_firmware"),
+            Some(UnmeasuredReason::SourceAbsent)
+        );
+    }
+
+    #[test]
+    fn firmware_secure_boot_on_and_off_are_reported() {
+        let run = Posture.collect(&inline(ORDINARY));
+        assert_eq!(field(&run, "secure_boot_firmware"), Some("enabled"));
+        let run = Posture.collect(&inline(
+            &ORDINARY.replace("secure_boot: enabled", "secure_boot: disabled"),
+        ));
+        assert_eq!(field(&run, "secure_boot_firmware"), Some("disabled"));
+        // The registry reading is its own field and is not overwritten by the firmware's.
+        assert_eq!(field(&run, "secure_boot"), Some("enabled"));
+    }
+
+    /// Legacy BIOS boot and UEFI firmware without the variable are both a place the setting is not
+    /// kept. Neither is "off".
+    #[test]
+    fn no_firmware_variable_to_read_is_source_absent() {
+        for state in ["not_uefi", "variable_absent"] {
+            let run = Posture.collect(&inline(
+                &ORDINARY.replace("secure_boot: enabled", &format!("secure_boot: {state}")),
+            ));
+            assert_eq!(field(&run, "secure_boot_firmware"), None, "{state}");
+            assert_eq!(
+                gap_for(&run, "secure_boot_firmware"),
+                Some(UnmeasuredReason::SourceAbsent),
+                "{state}"
+            );
+        }
+    }
+
+    /// The privilege a firmware read needs is one only an elevated token holds, so a denial without
+    /// administrator rights is `not_admin` — and the other settings, which need no elevation, are
+    /// still read.
+    #[test]
+    fn a_firmware_read_denied_without_admin_rights_is_not_admin() {
+        let denied = ORDINARY.replace("secure_boot: enabled", "secure_boot: access_denied");
+        let run = Posture.collect(&inline(&format!("elevated: false\n{denied}")));
+        assert_eq!(
+            gap_for(&run, "secure_boot_firmware"),
+            Some(UnmeasuredReason::NotAdmin)
+        );
+        assert_eq!(field(&run, "secure_boot"), Some("enabled"));
+        assert_eq!(gap_for(&run, "secure_boot"), None);
+
+        let run = Posture.collect(&inline(&format!("elevated: true\n{denied}")));
+        assert_eq!(
+            gap_for(&run, "secure_boot_firmware"),
+            Some(UnmeasuredReason::AccessDenied)
+        );
+    }
+
+    #[test]
+    fn a_firmware_read_that_fails_or_is_not_described_is_read_failed() {
+        let run = Posture.collect(&inline(
+            &ORDINARY.replace("secure_boot: enabled", "secure_boot: read_failed"),
+        ));
+        assert_eq!(
+            gap_for(&run, "secure_boot_firmware"),
+            Some(UnmeasuredReason::ReadFailed)
+        );
+        let run = Posture.collect(&inline("platform: windows\n"));
+        assert_eq!(
+            gap_for(&run, "secure_boot_firmware"),
+            Some(UnmeasuredReason::ReadFailed)
+        );
+    }
+
+    fn with_script_block_logging(value: &str) -> FixtureHost {
+        inline(&ORDINARY.replace(
+            "registry:\n",
+            &format!(
+                "registry:\n  'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging':\n    EnableScriptBlockLogging: {value}\n"
+            ),
+        ))
+    }
+
+    /// Windows ships with no such policy. That is an answer about the machine, not a gap, and it is a
+    /// different answer from a policy written to off.
+    #[test]
+    fn script_block_logging_not_configured_is_its_own_value() {
+        let run = Posture.collect(&inline(ORDINARY));
+        assert_eq!(field(&run, "script_block_logging"), Some("not_configured"));
+        assert_eq!(gap_for(&run, "script_block_logging"), None);
+    }
+
+    #[test]
+    fn script_block_logging_policy_on_and_off_are_reported() {
+        let run = Posture.collect(&with_script_block_logging("1"));
+        assert_eq!(field(&run, "script_block_logging"), Some("enabled"));
+        let run = Posture.collect(&with_script_block_logging("0"));
+        assert_eq!(field(&run, "script_block_logging"), Some("disabled"));
+    }
+
+    /// A number other than 0 or 1, or a value of another type, is there and names nothing this program
+    /// can name — never "off", and never "not configured".
+    #[test]
+    fn a_script_block_logging_value_that_means_nothing_known_is_a_gap() {
+        for value in ["2", "'0'"] {
+            let run = Posture.collect(&with_script_block_logging(value));
+            assert_eq!(field(&run, "script_block_logging"), None, "{value}");
+            assert_eq!(
+                gap_for(&run, "script_block_logging"),
+                Some(UnmeasuredReason::ReadFailed),
+                "{value}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_script_block_logging_policy_that_cannot_be_read_is_access_denied() {
+        let yaml = format!(
+            "{ORDINARY}access_denied:\n  - 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging'\n"
+        );
+        let run = Posture.collect(&inline(&yaml));
+        assert_eq!(
+            gap_for(&run, "script_block_logging"),
+            Some(UnmeasuredReason::AccessDenied)
         );
     }
 
