@@ -9,6 +9,9 @@
 # The `.pf` file's own string table holds the upstream author's account name and his machine's
 # volume serial numbers (fixtures/prefetch/PROVENANCE.md). That is exactly why this host exists: the
 # collector's tests assert that none of it reaches an observation.
+#
+# The `.pf` file does not carry the read-only attribute, which is what every `.pf` file measured on one
+# Windows 11 machine looked like (ADR 0037).
 platform: windows
 os_build: "26100"
 elevated: true
@@ -18,6 +21,7 @@ filesystem:
   'C:\Windows\Prefetch':
     - name: CMD.EXE-D269B812.pf
       from: '../../prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf'
+      read_only: false
     - name: AgAppLaunch.db
       content: "not a prefetch file\n"
     - name: ReadyBoot
