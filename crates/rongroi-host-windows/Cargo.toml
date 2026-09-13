@@ -37,6 +37,9 @@ windows-registry.workspace = true
 # is in `Win32_System_WindowsProgramming`, `AdjustTokenPrivileges` and `LookupPrivilegeValueW` in
 # `Win32_Security`, and `OpenProcessToken` in `Win32_System_Threading` behind `Win32_Security` — all
 # already listed (ADR 0038; read from the same sources).
+# `EvtOpenChannelConfig` and `EvtClose` are under `Win32_System_EventLog`; `EvtGetChannelConfigProperty`
+# and the `EVT_VARIANT` it fills are gated on `Win32_Security` as well, already listed (ADR 0042; read
+# from the same sources).
 windows = { workspace = true, features = [
   "Wdk_System_SystemInformation",
   "Win32_Foundation",
@@ -46,6 +49,7 @@ windows = { workspace = true, features = [
   "Win32_Security_Cryptography_Sip",
   "Win32_Security_WinTrust",
   "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_EventLog",
   "Win32_System_Registry",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
