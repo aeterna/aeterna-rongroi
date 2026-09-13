@@ -40,6 +40,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   a strength or a reason from the desktop app's `report.json`. The `rust (ubuntu)` job runs
   `cargo xtask rules-reference --check`, so a pull request that changes a rule without regenerating the
   pages fails, with an error naming the command to run.
+- ADR 0040: reports are not signed. A key inside an executable anyone can build is readable by the
+  person whose report it signs, a verifier that is the same executable checks itself, and a Windows
+  modified to lie would have a real key sign the lie. The official-build marker (ADR 0007) and the
+  release attestation (ADR 0008) say where a binary came from, not whether a report reflects the
+  machine; watching the scan run is the control. Both screenshare guides gain §11, "What a report does
+  not prove about itself", PRIVACY.md says a report file is not signed, and the ADR lists what would make
+  the question worth asking again without promising it.
 
 ### Changed
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
