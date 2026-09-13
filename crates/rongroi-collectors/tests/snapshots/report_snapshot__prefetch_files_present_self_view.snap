@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 15
+      "rule_count": 18
     },
     "platform": "windows",
     "os_build": "26100",
@@ -37,6 +37,22 @@ expression: view
     },
     {
       "rule_id": "ff967b28-984b-4de0-b361-58367ae0c2d5",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": false
+    },
+    {
+      "rule_id": "9b318bfa-805d-4edd-81f1-602b57639a69",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": false
+    },
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
       "collector": "evtx",
       "strength": "tamper",
       "state": "unmeasured",
@@ -145,6 +161,13 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
+      "collector": "prefetch",
+      "strength": "tamper",
+      "state": "not_found",
+      "retention": "The attribute as it is at the moment of the scan, on the Prefetch files still in the folder. It says nothing about when it was set, or about files that were removed."
     }
   ],
   "own_traces": [],
@@ -169,6 +192,7 @@ expression: view
             "last_run": "2016-01-12T20:07:03.9810694Z",
             "name": "cmd.exe",
             "path": "C:\\Windows\\Prefetch\\CMD.EXE-D269B812.pf",
+            "read_only": false,
             "recorded_runs": 8,
             "run_count": 55,
             "scca_version": 30
@@ -183,6 +207,12 @@ expression: view
             "loaded_files_withheld": "user_file_list",
             "rejected": 0,
             "volumes_withheld": "machine_identifier"
+          }
+        },
+        {
+          "collector": "prefetch",
+          "fields": {
+            "folder": "listed"
           }
         }
       ]

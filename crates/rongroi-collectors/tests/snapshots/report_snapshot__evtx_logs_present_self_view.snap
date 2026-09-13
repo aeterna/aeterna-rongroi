@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 15
+      "rule_count": 18
     },
     "platform": "windows",
     "os_build": "26100",
@@ -40,6 +40,59 @@ expression: view
       "strength": "tamper",
       "state": "not_found",
       "retention": "Only clearings still recorded in the Security log as it stands today. The log holds a limited window and overwrites its oldest records, and a later clearing removes the record of an earlier one — so nothing found here does not mean no log was ever cleared."
+    },
+    {
+      "rule_id": "9b318bfa-805d-4edd-81f1-602b57639a69",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "not_found",
+      "retention": "The attribute as it is at the moment of the scan, on the log files still in the folder. It says nothing about when it was set, or about files that were removed."
+    },
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "evtx",
+          "fields": {
+            "at_configured_path": false,
+            "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+            "entries": 17,
+            "intact": true,
+            "log": "Security.evtx",
+            "max_size_bytes": 1052672,
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
+            "read_only": false,
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "at_configured_path": false,
+            "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+            "entries": 17,
+            "intact": true,
+            "log": "Application.evtx",
+            "max_size_bytes": 1052672,
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
+            "read_only": false,
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        }
+      ]
     },
     {
       "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
@@ -143,6 +196,14 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
+      "collector": "prefetch",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
     }
   ],
   "own_traces": [],
@@ -150,21 +211,6 @@ expression: view
     {
       "collector": "evtx",
       "observations": [
-        {
-          "collector": "evtx",
-          "fields": {
-            "entries": 17,
-            "intact": true,
-            "log": "Security.evtx",
-            "newest_record_id": 17,
-            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
-            "oldest_record_id": 1,
-            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
-            "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
-            "rejected": 0,
-            "size_bytes": 69632
-          }
-        },
         {
           "collector": "evtx",
           "fields": {
@@ -201,21 +247,6 @@ expression: view
             "level": 4,
             "log": "Security.evtx",
             "provider": "Microsoft-Windows-LanguagePackSetup"
-          }
-        },
-        {
-          "collector": "evtx",
-          "fields": {
-            "entries": 17,
-            "intact": true,
-            "log": "Application.evtx",
-            "newest_record_id": 17,
-            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
-            "oldest_record_id": 1,
-            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
-            "path": "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
-            "rejected": 0,
-            "size_bytes": 69632
           }
         },
         {
@@ -277,6 +308,17 @@ expression: view
           "collector": "posture",
           "fields": {
             "script_block_logging": "not_configured"
+          }
+        }
+      ]
+    },
+    {
+      "collector": "prefetch",
+      "observations": [
+        {
+          "collector": "prefetch",
+          "fields": {
+            "folder": "absent"
           }
         }
       ]

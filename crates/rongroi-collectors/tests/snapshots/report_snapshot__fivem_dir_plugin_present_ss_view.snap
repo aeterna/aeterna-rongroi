@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 15
+      "rule_count": 18
     },
     "platform": "windows",
     "os_build": "26100",
@@ -37,6 +37,22 @@ expression: view
     },
     {
       "rule_id": "ff967b28-984b-4de0-b361-58367ae0c2d5",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "9b318bfa-805d-4edd-81f1-602b57639a69",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
       "collector": "evtx",
       "strength": "tamper",
       "state": "unmeasured",
@@ -94,6 +110,14 @@ expression: view
       "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
       "collector": "posture",
       "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
+      "collector": "prefetch",
+      "strength": "tamper",
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
