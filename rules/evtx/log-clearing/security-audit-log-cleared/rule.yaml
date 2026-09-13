@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: ff967b28-984b-4de0-b361-58367ae0c2d5
+title: The Security log records that it was cleared
+description: >-
+  The Security log holds a record saying the security audit log was cleared, with the time it
+  happened. Windows writes that record whatever the audit settings are, so it is the log's own
+  account of itself. It does not say who cleared it, why, or what the log held before — this tool
+  reads the file and not the record's details, and whatever was there is gone. Clearing a log is
+  something a great many ordinary tools and people do, and the list beside this row is not a
+  formality: read it. Clearing the Security log can also be recorded a second time in the System
+  log, so this row and "An event log file was cleared" can be one action rather than two.
+status: experimental
+collector: evtx
+strength: tamper
+# The three together, never the event id alone. Event ids are unique only per provider, and 1102 is
+# also an Exchange antimalware engine update in the Application log and an RDP client event on the
+# TerminalServices channel. A rule on the number alone would name those people.
+match:
+  provider: Microsoft-Windows-Eventlog
+  channel: Security
+  event_id: 1102
+retention: >-
+  Only clearings still recorded in the Security log as it stands today. The log holds a limited
+  window and overwrites its oldest records, and a later clearing removes the record of an earlier
+  one — so nothing found here does not mean no log was ever cleared.
+# Left out deliberately: `source_missing` — every Windows machine has an Event Log folder, so its
+# absence is worth a line. `read_failed` is not a choice made here: since ADR 0032 no rule may
+# declare it, because a view lists it whatever the rule says. Written out for the reader who wonders
+# why the obvious one is missing, and because these two rules were the first written after the field
+# had teeth.
+unmeasured_when: [not_windows, not_admin, access_denied]
+falsepositives:
+  - Gaming "optimiser", "debloat" and "tweak" scripts. Several popular ones clear every log on the
+    PC in one click, months before any of this, and the owner has usually forgotten running one
+  - A prebuilt or repaired PC. The factory imaging step Windows itself provides deletes the event
+    logs, so the maker, not the owner, cleared this log
+  - Installing software that resets the local event log as part of its setup — monitoring and
+    support agents commonly do
+  - The owner, a shop or a friend clicking "Clear Log" in Event Viewer while chasing a crash, which
+    is standard troubleshooting advice and can be done while keeping a backup copy
+  - A Windows feature update or in-place reinstall, and routine maintenance scripts and scheduled
+    tasks that tidy logs on a timer
+references:
+  - https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-1102
+  - https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/other-events
+  - https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep-command-line-options
+  - https://github.com/SigmaHQ/sigma/blob/master/rules/windows/builtin/security/win_security_audit_log_cleared.yml
+  - https://learn.microsoft.com/en-us/answers/questions/531390/can-see-audit-logs-are-cleared-by-network-service
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [evtx, log-clearing]
+related:
+  - id: f4c99b57-02c8-4e53-82d0-dba8bdc13dda
+    type: similar

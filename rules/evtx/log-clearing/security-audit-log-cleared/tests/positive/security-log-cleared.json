@@ -1,0 +1,22 @@
+{
+  "description": "A Security log holding one 1102 from the Event Log service, beside the log's own account and the folder's, as the evtx collector emits them together",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "channel": "Security", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 1102, "level": 4, "count": 1,
+      "first_seen": "2026-03-02T11:04:51.117Z", "last_seen": "2026-03-02T11:04:51.117Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "channel": "Security", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 1100, "level": 4, "count": 46,
+      "first_seen": "2026-03-02T11:05:02.881Z", "last_seen": "2026-09-11T22:17:40.006Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
+      "entries": 9142, "rejected": 0, "intact": true, "size_bytes": 20975616,
+      "oldest_record_time": "2026-03-02T11:04:51.117Z", "oldest_record_id": 1,
+      "newest_record_time": "2026-09-11T22:17:40.006Z", "newest_record_id": 9142 } },
+    { "collector": "evtx", "fields": {
+      "logs": 214, "examined": 214, "refused": 0, "logs_without_records": 171, "channels": 43,
+      "budget_exhausted": false, "budget_seconds": 30 } }
+  ],
+  "expect_matches": 1
+}

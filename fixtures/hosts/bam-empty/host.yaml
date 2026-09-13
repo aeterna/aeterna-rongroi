@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# The BAM key is there and holds no account: a machine whose execution history was cleared. The
+# empty map is the fixture's way of saying "this key exists and holds nothing" (ADR 0022).
+platform: windows
+os_build: "26100"
+elevated: true
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings': {}

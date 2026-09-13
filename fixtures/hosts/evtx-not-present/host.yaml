@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows with no Event Log folder at all. Nothing was read, so nothing can be said about what a log
+# does or does not hold, and the collector reports `source_absent` rather than an empty measurement
+# a rule would read as "the log was never cleared".
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'

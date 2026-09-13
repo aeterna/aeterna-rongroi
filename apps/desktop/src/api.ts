@@ -17,6 +17,17 @@ export function reportView(mode: Mode): Promise<ReportView> {
   return invoke<ReportView>("report_view", { mode });
 }
 
+/** What came of a request to restart with administrator rights. */
+export type ElevateOutcome = "started" | "declined" | "failed";
+
+/**
+ * Starts an elevated copy of this program and closes this one; the new process scans from the beginning.
+ * Declining the Windows prompt is reported as `declined`, a normal outcome rather than a failure.
+ */
+export function relaunchElevated(): Promise<ElevateOutcome> {
+  return invoke<ElevateOutcome>("relaunch_elevated");
+}
+
 /** Rule text in `lang`, keyed by rule id, English fallback applied in Rust. */
 export function ruleTexts(lang: string): Promise<Record<string, RuleText>> {
   return invoke<Record<string, RuleText>>("rule_texts", { lang });

@@ -24,6 +24,10 @@ jobs:
   rust:
     name: rust (ubuntu)
     runs-on: ubuntu-latest
+    # Bounded so that a test which stops making progress fails in minutes rather than at the
+    # runner's six-hour default. `.config/nextest.toml` bounds the individual test; this bounds
+    # everything else in the job (ADR 0016's fuzz job already had one).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,6 +50,8 @@ jobs:
         run: cargo insta test --unreferenced reject --test-runner nextest
       - name: Rules and fixtures
         run: cargo xtask check-rules
+      - name: Clean baseline (the rule set stays quiet on an ordinary machine)
+        run: cargo xtask check-baseline
       - name: Locales
         run: cargo xtask check-locales
       - name: No invisible or bidi characters
@@ -55,9 +61,70 @@ jobs:
       - name: Typos
         run: typos
 
+  # A smoke gate, not a fuzzing campaign: every target is built, and each one is run for a fixed 30
+  # seconds starting from the fixtures the L0 tests use. It proves the targets still compile against
+  # the parsers' public API and that neither the seed corpus nor a short mutation run around it
+  # produces a panic, an abort or a hang. Finding a deep bug takes hours of fuzzing and is not what
+  # this job is for (ADR 0016).
+  fuzz:
+    name: fuzz smoke (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Nightly for this job alone. cargo-fuzz drives libFuzzer through `-Z sanitizer`, which stable
+      # does not have, and its default `--build-std` needs `rust-src`. Everything else in the
+      # repository keeps building on the 1.98.1 toolchain pinned in rust-toolchain.toml: `fuzz/` is
+      # excluded from the root workspace, so no other job even sees it.
+      - name: Install a nightly toolchain for this job only
+        run: rustup toolchain install nightly --profile minimal --component rust-src
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: fuzz
+          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' }}
+      # Not taiki-e/install-action: it does not carry cargo-fuzz and would fall back to an unpinned
+      # cargo-binstall, so the version is pinned and built here instead.
+      - name: Install cargo-fuzz
+        run: cargo +nightly install --locked cargo-fuzz@0.13.2
+      - name: Build every fuzz target
+        run: cargo +nightly fuzz build
+      # One line per target rather than a loop, so the log names the target that failed. libFuzzer
+      # writes anything new it finds to the FIRST corpus directory and reads the rest as seeds, which
+      # is why the fixture directory is second: the fixtures are inputs, never an output. `-timeout=10`
+      # makes a hang a failure of the run rather than of the job's clock.
+      - name: Smoke-run each target on the fixtures the L0 tests use
+        run: |
+          mkdir -p fuzz/corpus/fuzz_bam fuzz/corpus/fuzz_pca_app_launch \
+                   fuzz/corpus/fuzz_pca_general fuzz/corpus/fuzz_filetime \
+                   fuzz/corpus/fuzz_prefetch fuzz/corpus/fuzz_evtx
+          cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam \
+            -- -max_total_time=30 -timeout=10
+          cargo +nightly fuzz run fuzz_pca_app_launch fuzz/corpus/fuzz_pca_app_launch fixtures/parsers/pca-app-launch \
+            -- -max_total_time=30 -timeout=10
+          cargo +nightly fuzz run fuzz_pca_general fuzz/corpus/fuzz_pca_general fixtures/parsers/pca-general \
+            -- -max_total_time=30 -timeout=10
+          cargo +nightly fuzz run fuzz_filetime fuzz/corpus/fuzz_filetime fixtures/parsers/bam \
+            -- -max_total_time=30 -timeout=10
+          cargo +nightly fuzz run fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch \
+            -- -max_total_time=30 -timeout=10
+          cargo +nightly fuzz run fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx \
+            -- -max_total_time=30 -timeout=10
+      # A crash leaves its input in fuzz/artifacts/. Keeping it is the difference between "a target
+      # failed" and being able to reproduce it with `cargo fuzz run <target> <file>`.
+      - name: Keep the crashing input, if there was one
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts/
+          if-no-files-found: ignore
+
   desktop-ui:
     name: desktop UI (ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/desktop
@@ -84,6 +151,7 @@ jobs:
   reuse:
     name: licensing headers (REUSE)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

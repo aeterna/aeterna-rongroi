@@ -1,0 +1,209 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: view
+---
+{
+  "mode": "self",
+  "header": {
+    "schema_version": 1,
+    "provenance": {
+      "official": false,
+      "version": "0.0.0-test",
+      "commit": null,
+      "exe_sha256": null
+    },
+    "rules_bundle": {
+      "schema_version": 1,
+      "sha256": "[bundle sha256]",
+      "rule_count": 6
+    },
+    "platform": "windows",
+    "os_build": "26100",
+    "elevated": true,
+    "generated_at": "2026-01-01T00:00:00Z"
+  },
+  "evidence": [
+    {
+      "rule_id": "f4c99b57-02c8-4e53-82d0-dba8bdc13dda",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "not_found",
+      "retention": "Only clearings still recorded in the System log as it stands today. The log holds a limited window and overwrites its oldest records, and clearing the System log removes these records along with everything else — so nothing found here does not mean no log was ever cleared."
+    },
+    {
+      "rule_id": "ff967b28-984b-4de0-b361-58367ae0c2d5",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "not_found",
+      "retention": "Only clearings still recorded in the Security log as it stands today. The log holds a limited window and overwrites its oldest records, and a later clearing removes the record of an earlier one — so nothing found here does not mean no log was ever cleared."
+    },
+    {
+      "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    }
+  ],
+  "own_traces": [],
+  "unmatched": [
+    {
+      "collector": "evtx",
+      "observations": [
+        {
+          "collector": "evtx",
+          "fields": {
+            "entries": 17,
+            "intact": true,
+            "log": "Security.evtx",
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "count": 1,
+            "event_id": 4000,
+            "first_seen": "2018-08-03T06:44:06.4185334Z",
+            "last_seen": "2018-08-03T06:44:06.4185334Z",
+            "level": 4,
+            "log": "Security.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "channel": "Microsoft-Windows-LanguagePackSetup/Operational",
+            "count": 8,
+            "event_id": 4000,
+            "first_seen": "2018-07-09T20:49:14.0577461Z",
+            "last_seen": "2018-07-31T06:42:06.5129262Z",
+            "level": 4,
+            "log": "Security.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "channel": "Microsoft-Windows-LanguagePackSetup/Operational",
+            "count": 8,
+            "event_id": 4001,
+            "first_seen": "2018-07-09T20:49:14.0598407Z",
+            "last_seen": "2018-07-31T06:42:06.5134595Z",
+            "level": 4,
+            "log": "Security.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "entries": 17,
+            "intact": true,
+            "log": "Application.evtx",
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "count": 1,
+            "event_id": 4000,
+            "first_seen": "2018-08-03T06:44:06.4185334Z",
+            "last_seen": "2018-08-03T06:44:06.4185334Z",
+            "level": 4,
+            "log": "Application.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "channel": "Microsoft-Windows-LanguagePackSetup/Operational",
+            "count": 8,
+            "event_id": 4000,
+            "first_seen": "2018-07-09T20:49:14.0577461Z",
+            "last_seen": "2018-07-31T06:42:06.5129262Z",
+            "level": 4,
+            "log": "Application.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "channel": "Microsoft-Windows-LanguagePackSetup/Operational",
+            "count": 8,
+            "event_id": 4001,
+            "first_seen": "2018-07-09T20:49:14.0598407Z",
+            "last_seen": "2018-07-31T06:42:06.5134595Z",
+            "level": 4,
+            "log": "Application.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "budget_exhausted": false,
+            "budget_seconds": 30,
+            "channels": 1,
+            "examined": 2,
+            "logs": 2,
+            "logs_without_records": 0,
+            "refused": 0
+          }
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "not_admin": 0,
+    "not_attempted": 0
+  },
+  "hidden": {
+    "not_found": 0,
+    "unmeasured_expected": 0,
+    "unmeasured_unexpected": 0,
+    "unmatched": 0
+  }
+}

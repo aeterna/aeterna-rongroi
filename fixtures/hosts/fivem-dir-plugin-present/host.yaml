@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# FiveM installed, three entries in its plugin folder: a file whose hash can be read, a file whose hash
+# cannot, and a subdirectory. The hash is the SHA-256 of an empty file, so nothing here describes real
+# software.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins':
+    - name: example-plugin.dll
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    - name: unreadable-plugin.dll
+    - name: cache
+      directory: true

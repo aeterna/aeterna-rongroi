@@ -1,0 +1,13 @@
+{
+  "description": "The shape a PC-optimiser script leaves: every channel on the machine cleared in one second, which the collector counts into one group with a high count and a first and last time seconds apart, beside a folder where nearly every log now holds nothing. The rule matches — and the finding is the optimiser, which is why its falsepositives lead with that and its description says a high count is not a worse finding.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "channel": "System", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 104, "level": 4, "count": 987,
+      "first_seen": "2026-01-19T21:40:12.006Z", "last_seen": "2026-01-19T21:40:19.884Z" } },
+    { "collector": "evtx", "fields": {
+      "logs": 214, "examined": 214, "refused": 0, "logs_without_records": 209, "channels": 5,
+      "budget_exhausted": false, "budget_seconds": 30 } }
+  ],
+  "expect_matches": 1
+}

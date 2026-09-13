@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 75162c70-a6d1-47ec-94af-be25184d5ece
+title: Windows test signing is turned on
+description: >-
+  Windows reports that test signing is on, so the kernel also starts drivers that no trusted publisher
+  signed, including self-signed ones. That lowers the bar for loading kernel-level software of any
+  kind. It is a setting the owner of the machine chose, and several ordinary kinds of work need it, so
+  on its own this describes the machine — it is not evidence of cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  test_signing: enabled
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - People who write or test their own drivers, for whom this is a normal working setting
+  - Hardware and firmware engineers using vendor or pre-release tools
+  - Software whose own installation instructions ask the owner to switch test signing on
+references:
+  - https://learn.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option
+author: aeterna-rongroi contributors
+date: 2026-09-12
+tags: [posture, boot]

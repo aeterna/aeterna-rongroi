@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Two ways a `.pf` file is not readable content.
+#
+# `CORRUPT.EXE-AAAAAAAA.pf` is an intact `MAM\x04` container declaring 4 096 decompressed bytes over
+# a payload of ASCII `A`s, which is not an Xpress-Huffman stream. It is written inline because every
+# byte of it is below 0x80, and it is deliberately *not* added to `fixtures/prefetch/`: that
+# directory is the seed corpus `fuzz_prefetch` reads, and these bytes exercise the collector's
+# reporting rather than the parser. It is the only fixture in this repository that reaches the
+# third-party decompressor with input it must refuse.
+#
+# `NOTPREFETCH.EXE-BBBBBBBB.pf` is the corpus's own deliberately bad file: 13 bytes that are neither
+# container.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: CORRUPT.EXE-AAAAAAAA.pf
+      content: "MAM\x04\x00\x10\x00\x00AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    - name: NOTPREFETCH.EXE-BBBBBBBB.pf
+      from: '../../prefetch/bad-notAPrefetch.pf'

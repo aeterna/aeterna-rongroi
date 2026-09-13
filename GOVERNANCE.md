@@ -26,8 +26,11 @@ second maintainer can act as release approver.
 
 The design and its reasons are in [ADR 0008](docs/adr/0008-release-pipeline.md).
 
-Before the first release, enable **immutable releases** in the repository settings, and run a rehearsal
-(`vYYYY.MM.DD-X.Y.Z-rc.N`) as described in ADR 0008, including the desktop-app gate failure test.
+Enabling **immutable releases** in the repository settings, and the rehearsal (`vYYYY.MM.DD-X.Y.Z-rc.N`)
+described in ADR 0008 including the desktop-app gate failure test, were one-time steps before the first
+release. 0.1.0 shipped on 2026-09-11 and ADR 0008 records what the rehearsal found; a later release
+repeats neither. Step 6 below assumes immutable releases are still enabled — check the repository
+settings if you have not seen that yourself.
 
 1. Open a pull request `chore(release): X.Y.Z` against `dev`. It renames `## [Unreleased]` in `CHANGELOG.md` to
    `## [X.Y.Z] - YYYY-MM-DD` and sets version `X.Y.Z` in `Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
@@ -38,8 +41,11 @@ Before the first release, enable **immutable releases** in the repository settin
    `git tag -a vYYYY.MM.DD-X.Y.Z -m "aeterna-rongroi X.Y.Z" <commit>`, then `git push origin vYYYY.MM.DD-X.Y.Z`.
    A rehearsal uses `vYYYY.MM.DD-X.Y.Z-rc.N`.
 4. Wait for the `release` workflow. It creates a **draft** release with both executables, `SHA256SUMS`, the SBOMs
-   and the notes. It never publishes.
-5. Open the draft, read the notes and the file list, and publish it. With immutable releases enabled, a published
+   and the notes. It never publishes. Do not re-run its `draft release` job: a re-run creates a second draft for
+   the same tag; delete a stray draft instead.
+5. Download the draft's files and check them on a real Windows machine (hash, no **UNOFFICIAL BUILD** banner,
+   version). Builds are not byte-for-byte reproducible, so a check of an earlier `-rc.N` build does not carry over.
+6. Open the draft, read the notes and the file list, and publish it. With immutable releases enabled, a published
    release cannot have its tag or files changed; a wrong file needs a new version.
 
 ## Becoming a maintainer

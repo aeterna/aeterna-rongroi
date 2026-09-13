@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 10 22H2 (build 19045), which predates PCA's files entirely: `C:\Windows\appcompat\pca`
+# arrived in Windows 11 22H2, build 22621. The folder is described as empty so that the fixture says
+# "these files are not here" rather than saying nothing about the file system — and the build number
+# is what makes the collector answer `not_on_this_os` rather than `source_empty`, because on this
+# machine the artifact has never existed to be empty (ADR 0030).
+platform: windows
+os_build: "19045"
+elevated: false
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca': []

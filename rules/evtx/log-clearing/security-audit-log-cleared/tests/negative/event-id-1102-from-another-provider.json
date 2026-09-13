@@ -1,0 +1,19 @@
+{
+  "description": "Event id 1102 is unique only per provider. Neither the Exchange antimalware engine update in the Application log nor the RDP client event on the TerminalServices channel is a cleared audit log, and a rule matching the number alone would name both of those people.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Application.evtx", "channel": "Application", "provider": "Microsoft-Filtering-FIPFS",
+      "event_id": 1102, "level": 4, "count": 7,
+      "first_seen": "2026-04-18T02:11:09.442Z", "last_seen": "2026-09-10T02:14:55.130Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-TerminalServices-RDPClient%4Operational.evtx",
+      "channel": "Microsoft-Windows-TerminalServices-RDPClient/Operational",
+      "provider": "Microsoft-Windows-TerminalServices-ClientActiveXCore",
+      "event_id": 1102, "level": 4, "count": 3,
+      "first_seen": "2026-08-01T19:02:44.008Z", "last_seen": "2026-08-29T20:41:12.771Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "channel": "Security", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 1104, "level": 4, "count": 2,
+      "first_seen": "2026-07-14T06:30:02.551Z", "last_seen": "2026-08-30T04:19:58.216Z" } }
+  ]
+}

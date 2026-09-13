@@ -14,6 +14,10 @@ path = [
   "**/*.json",
   "**/*.snap",
   "Cargo.lock",
+  "fuzz/Cargo.lock",
+  # Artifact bytes: a BAM registry value or a PCA text file is the artifact and nothing else, so it
+  # cannot carry a header. What they are and where they came from is in fixtures/parsers/PROVENANCE.md.
+  "fixtures/parsers/**",
   "pnpm-lock.yaml",
   "apps/desktop/pnpm-lock.yaml",
   "apps/desktop/pnpm-workspace.yaml",
@@ -22,6 +26,33 @@ path = [
 precedence = "closest"
 SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Vendored Prefetch test corpus: binary files that cannot carry a header, under their own licence.
+# Source, commit and per-file detail are in fixtures/prefetch/PROVENANCE.md.
+[[annotations]]
+path = ["fixtures/prefetch/*.pf"]
+precedence = "override"
+SPDX-FileCopyrightText = "2016 Eric Zimmerman"
+SPDX-License-Identifier = "MIT"
+
+# Vendored EVTX test corpus: the evtx crate's own samples, dual MIT/Apache-2.0 upstream, taken here
+# under Apache-2.0. Source, commit, per-file detail and what each file was scanned for are in
+# fixtures/evtx/PROVENANCE.md.
+[[annotations]]
+path = ["fixtures/evtx/*.evtx"]
+precedence = "override"
+SPDX-FileCopyrightText = "2019 Omer Ben-Amram"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Vendored `evtx` crate source (ADR 0018): upstream's own files, carrying one patch of ours. They keep
+# upstream's licence and copyright rather than this project's — a file here is Omer Ben-Amram's work,
+# not ours, and relicensing it by annotation would be a false claim. What was removed and how to verify
+# the rest against the published crate is in third_party/evtx/PROVENANCE.md.
+[[annotations]]
+path = ["third_party/evtx/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2019 Omer Ben-Amram"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
 
 [[annotations]]
 path = ["rules/**/tests/**", "rules/**/*.md"]

@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A value longer than the write-ups describe, as a newer Windows build might write. The parser
+# decodes what it understands and keeps the rest; the collector reports how long the value was
+# (ADR 0013).
+platform: windows
+os_build: "26100"
+elevated: true
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    'C:\Users\fixtureuser\Downloads\example.exe':
+      from: '../../parsers/bam/longer-than-documented.bin'

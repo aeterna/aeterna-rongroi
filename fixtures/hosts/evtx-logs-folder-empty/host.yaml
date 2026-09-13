@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 whose Event Log folder is there, is readable, and holds no `.evtx` file — the shape a
+# one-click maintenance script leaves when it clears every log as a routine cleanup step, and the
+# shape a machine has after Microsoft's own "delete corrupt Event Viewer log files" remedy. Neither
+# says anything about what was recorded before (ADR 0028, ADR 0030). The one file in it is not a log
+# and is not read.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\System32\winevt\Logs':
+    - name: Archive-readme.txt
+      content: "not an event log\n"

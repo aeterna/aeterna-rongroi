@@ -13,7 +13,7 @@ strength: posture
 match:
   secure_boot: disabled
 retention: Current setting only. It says nothing about how the PC was configured in the past.
-unmeasured_when: [not_windows, source_missing, access_denied, read_failed]
+unmeasured_when: [not_windows, source_absent, access_denied]
 falsepositives:
   - PCs that boot in legacy BIOS or CSM mode, or were never switched to Secure Boot
   - Dual-boot setups with operating systems that need it off

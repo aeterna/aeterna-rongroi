@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 1,
       "sha256": "[bundle sha256]",
-      "rule_count": 1
+      "rule_count": 6
     },
     "platform": "windows",
     "os_build": "26100",
@@ -23,6 +23,22 @@ expression: view
     "generated_at": "2026-01-01T00:00:00Z"
   },
   "evidence": [
+    {
+      "rule_id": "f4c99b57-02c8-4e53-82d0-dba8bdc13dda",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "ff967b28-984b-4de0-b361-58367ae0c2d5",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
     {
       "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
       "collector": "posture",
@@ -32,14 +48,40 @@ expression: view
         {
           "collector": "posture",
           "fields": {
-            "secure_boot": "disabled"
+            "hvci": "enabled",
+            "secure_boot": "disabled",
+            "test_signing": "disabled",
+            "tpm": "present",
+            "tpm_spec_version": "2.0"
           }
         }
       ]
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
     }
   ],
+  "own_traces": [],
+  "unmatched": [],
+  "scope": {
+    "not_admin": 0,
+    "not_attempted": 0
+  },
   "hidden": {
-    "not_found": 0,
-    "unmeasured": 0
+    "not_found": 1,
+    "unmeasured_expected": 0,
+    "unmeasured_unexpected": 0,
+    "unmatched": 0
   }
 }

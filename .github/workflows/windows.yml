@@ -25,6 +25,9 @@ jobs:
   windows:
     name: rust (windows)
     runs-on: windows-latest
+    # See ci.yml's `rust` job. Windows runners are the slowest here — the last runs took about
+    # eight minutes end to end — so this is generous and still far below the six-hour default.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,9 +69,18 @@ jobs:
           if ($posture.Count -eq 0) { throw 'posture evidence is missing' }
           foreach ($item in $posture) {
             if ($item.state -eq 'unmeasured' -and $item.reason -in @('not_windows', 'collector_unavailable')) {
-              throw "posture was not measured on Windows: $($item.reason)"
+              throw "posture was not measured on Windows: $($item.rule_id) $($item.reason)"
             }
           }
           if ($before -ne $after) { throw 'the scanned registry key changed during the scan' }
           Write-Output "build $($report.header.os_build) · elevated $($report.header.elevated)"
-          $posture | ForEach-Object { Write-Output "posture: $($_.state) $($_.reason)" }
+          # Every row, with the rule it belongs to. Printing the state alone made the log a list of
+          # outcomes nobody could attach to a rule: four posture rows reading "found found unmeasured
+          # found" say a machine was measured and not which rule saw what, and the order they arrive
+          # in is the bundle's, which is not a thing this log should ask a reader to know. The evtx
+          # rows are here for the same reason — this is the only place in CI where the log-clearing
+          # rules meet a real Windows machine.
+          $report.evidence | ForEach-Object {
+            $reason = if ($_.reason) { $_.reason } else { '-' }
+            Write-Output "evidence: $($_.rule_id) $($_.collector) $($_.state) $reason"
+          }

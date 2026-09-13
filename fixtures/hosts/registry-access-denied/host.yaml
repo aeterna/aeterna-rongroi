@@ -4,5 +4,14 @@
 platform: windows
 os_build: "26100"
 elevated: false
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
+    Enabled: 1
+code_integrity:
+  enabled: true
+  test_signing: false
+tpm:
+  present: true
+  spec_version: "2.0"
 access_denied:
   - 'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State'

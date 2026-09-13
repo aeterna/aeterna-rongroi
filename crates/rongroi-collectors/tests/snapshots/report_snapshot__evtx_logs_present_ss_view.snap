@@ -1,0 +1,55 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: view
+---
+{
+  "mode": "ss",
+  "header": {
+    "schema_version": 1,
+    "provenance": {
+      "official": false,
+      "version": "0.0.0-test",
+      "commit": null,
+      "exe_sha256": null
+    },
+    "rules_bundle": {
+      "schema_version": 1,
+      "sha256": "[bundle sha256]",
+      "rule_count": 6
+    },
+    "platform": "windows",
+    "os_build": "26100",
+    "elevated": true,
+    "generated_at": "2026-01-01T00:00:00Z"
+  },
+  "evidence": [
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    }
+  ],
+  "own_traces": [],
+  "unmatched": [],
+  "scope": {
+    "not_admin": 0,
+    "not_attempted": 0
+  },
+  "hidden": {
+    "not_found": 2,
+    "unmeasured_expected": 2,
+    "unmeasured_unexpected": 0,
+    "unmatched": 9
+  }
+}

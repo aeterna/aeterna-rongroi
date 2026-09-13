@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A file in the Event Log folder that is shorter than the fixed 4 KiB header every `.evtx` begins
+# with, so it is too short to be this artifact whatever its contents. Written inline because every
+# byte of it is ASCII, and deliberately not added to `fixtures/evtx/`: that directory is the seed
+# corpus `fuzz_evtx` reads and everything in it has to parse.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\System32\winevt\Logs':
+    - name: Application.evtx
+      content: "ElfFile but only this many bytes of it\n"

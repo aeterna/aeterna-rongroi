@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 
 use clap::ValueEnum;
 use rongroi_core::bundle::Bundle;
-use rongroi_core::model::{EvidenceState, Mode, UnmeasuredReason};
+use rongroi_core::model::{EvidenceState, Mode, Observation, UnmeasuredReason};
 use rongroi_core::view::ReportView;
 
 /// Output language.
@@ -43,10 +43,52 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::Th, "found") => "เจอ",
         (Lang::En, "not_found") => "NOT FOUND",
         (Lang::Th, "not_found") => "ไม่เจอ",
-        (Lang::En, "unmeasured") => "NOT MEASURED",
-        (Lang::Th, "unmeasured") => "ยังไม่ได้วัด",
         (Lang::En, "hidden") => "Hidden in SS mode",
         (Lang::Th, "hidden") => "ซ่อนในโหมด SS",
+        (Lang::En, "unmeasured_expected") => "NOT MEASURED (expected here)",
+        (Lang::Th, "unmeasured_expected") => "ยังไม่ได้วัด (เป็นเรื่องปกติของเครื่องนี้)",
+        (Lang::En, "unmeasured_unexpected") => "NOT MEASURED (not expected)",
+        (Lang::Th, "unmeasured_unexpected") => "ยังไม่ได้วัด (ไม่ได้คาดไว้)",
+        // The rule's own description, beside every state: it says what the check means and what it
+        // does not prove, which is the sentence that stops a single row being read as a verdict.
+        (Lang::En, "description") => "About this check",
+        (Lang::Th, "description") => "เกี่ยวกับการตรวจนี้",
+        // NIST SP 800-86 section 3.4's alternative explanations, beside a `found` row only.
+        (Lang::En, "falsepositives") => "Ordinary things that also produce this",
+        (Lang::Th, "falsepositives") => "เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน",
+        (Lang::En, "scope_not_admin") => {
+            "Scope: {n} check(s) could not be answered because this scan does not have administrator \
+             rights. Running it again as administrator answers them."
+        }
+        (Lang::Th, "scope_not_admin") => {
+            "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะการสแกนครั้งนี้ไม่มีสิทธิ์ผู้ดูแลระบบ \
+             เปิดใหม่ด้วยสิทธิ์ผู้ดูแลระบบแล้วจะตอบได้"
+        }
+        // The same shape as the line above and for the same reason: one fact about how far the scan
+        // got, said once, rather than a row per rule it stopped (ADR 0030).
+        (Lang::En, "scope_not_attempted") => {
+            "Scope: {n} check(s) could not be answered because this program stopped reading before \
+             it reached what they ask about. That is this program's limit, not a finding about \
+             this PC."
+        }
+        (Lang::Th, "scope_not_attempted") => {
+            "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะโปรแกรมหยุดอ่านก่อนจะถึงส่วนที่รายการนั้นถาม \
+             เป็นข้อจำกัดของโปรแกรมนี้เอง ไม่ใช่สิ่งที่ตรวจเจอในเครื่องนี้"
+        }
+        (Lang::En, "own_traces") => "own traces (excluded)",
+        (Lang::Th, "own_traces") => "ร่องรอยของโปรแกรมนี้เอง (แยกออกแล้ว)",
+        (Lang::En, "own_traces_note") => {
+            "what this program itself left in what was read; not evidence about this PC"
+        }
+        (Lang::Th, "own_traces_note") => "สิ่งที่โปรแกรมนี้ทิ้งไว้เองในสิ่งที่อ่านมา ไม่ใช่หลักฐานเกี่ยวกับเครื่องนี้",
+        (Lang::En, "unmatched") => "unmatched observations",
+        (Lang::Th, "unmatched") => "สิ่งที่เห็นแต่ไม่ตรง rule ใดเลย",
+        (Lang::En, "unmatched_note") => {
+            "what the collectors saw that no rule matched; these are things that were seen, not findings"
+        }
+        (Lang::Th, "unmatched_note") => {
+            "สิ่งที่ collector เห็นแต่ไม่มี rule ไหนตรงเลย เป็นสิ่งที่เห็น ไม่ใช่สิ่งที่ตรวจเจอ"
+        }
         (Lang::En, "footer") => "Evidence only. This report cannot prove that a PC is clean.",
         (Lang::Th, "footer") => "เป็นหลักฐานประกอบเท่านั้น รายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด",
         (Lang::En, "elevated_yes") => "administrator",
@@ -56,30 +98,70 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (_, "elevated_unknown") => "?",
         (Lang::En, "declined") => "Scan cancelled. Nothing was read.",
         (Lang::Th, "declined") => "ยกเลิกการสแกนแล้ว ไม่ได้อ่านอะไรเลย",
+        (Lang::En, "elevate_started") => {
+            "Starting again with administrator rights. The new window does the scan."
+        }
+        (Lang::Th, "elevate_started") => "กำลังเปิดใหม่ด้วยสิทธิ์ผู้ดูแลระบบ หน้าต่างใหม่จะเป็นตัวสแกน",
+        (Lang::En, "elevate_declined") => {
+            "The administrator prompt was declined. Nothing was scanned."
+        }
+        (Lang::Th, "elevate_declined") => "ไม่ได้อนุญาตสิทธิ์ผู้ดูแลระบบ ยังไม่ได้สแกนอะไร",
+        (Lang::En, "elevate_failed") => "could not start again with administrator rights",
+        (Lang::Th, "elevate_failed") => "เปิดใหม่ด้วยสิทธิ์ผู้ดูแลระบบไม่สำเร็จ",
+        (Lang::En, "elevate_not_windows") => {
+            "Administrator rights are a Windows idea; --elevate does nothing on this system."
+        }
+        (Lang::Th, "elevate_not_windows") => "สิทธิ์ผู้ดูแลระบบเป็นเรื่องของ Windows --elevate ไม่มีผลบนระบบนี้",
         _ => "",
     }
 }
 
+/// The one line a non-expert reads beside an unmeasured result.
+///
+/// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
+/// name the thing that was not seen and never the person, and say it about the record or about this
+/// program rather than about the machine's owner. The same twelve strings are in
+/// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
+/// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
+/// `check-locales` there.
 fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
     match (lang, reason) {
         (Lang::En, UnmeasuredReason::NotWindows) => "not running on Windows",
         (Lang::Th, UnmeasuredReason::NotWindows) => "ไม่ได้รันบน Windows",
-        (Lang::En, UnmeasuredReason::NotOnThisOs) => "not available on this Windows version",
-        (Lang::Th, UnmeasuredReason::NotOnThisOs) => "ไม่มีใน Windows รุ่นนี้",
-        (Lang::En, UnmeasuredReason::NotAdmin) => "needs administrator rights",
-        (Lang::Th, UnmeasuredReason::NotAdmin) => "ต้องใช้สิทธิ์ผู้ดูแลระบบ",
-        (Lang::En, UnmeasuredReason::AccessDenied) => "Windows denied access",
-        (Lang::Th, UnmeasuredReason::AccessDenied) => "Windows ไม่อนุญาตให้อ่าน",
-        (Lang::En, UnmeasuredReason::ServiceDisabled) => {
-            "the Windows service that records this is off"
+        (Lang::En, UnmeasuredReason::NotOnThisOs) => {
+            "this version of Windows does not keep this record"
         }
-        (Lang::Th, UnmeasuredReason::ServiceDisabled) => "บริการของ Windows ที่บันทึกข้อมูลนี้ถูกปิด",
-        (Lang::En, UnmeasuredReason::SourceMissing) => "not reported on this PC",
-        (Lang::Th, UnmeasuredReason::SourceMissing) => "เครื่องนี้ไม่ได้รายงานข้อมูลนี้",
-        (Lang::En, UnmeasuredReason::ReadFailed) => "could not be read",
-        (Lang::Th, UnmeasuredReason::ReadFailed) => "อ่านข้อมูลไม่ได้",
-        (Lang::En, UnmeasuredReason::CollectorUnavailable) => "not supported by this build",
-        (Lang::Th, UnmeasuredReason::CollectorUnavailable) => "build นี้ยังไม่รองรับ",
+        (Lang::Th, UnmeasuredReason::NotOnThisOs) => "Windows รุ่นนี้ไม่ได้เก็บข้อมูลส่วนนี้",
+        (Lang::En, UnmeasuredReason::NotAdmin) => {
+            "Windows would not show this without administrator rights"
+        }
+        (Lang::Th, UnmeasuredReason::NotAdmin) => "ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน",
+        (Lang::En, UnmeasuredReason::NotAttempted) => {
+            "this was not read — the scan stopped before reaching it"
+        }
+        (Lang::Th, UnmeasuredReason::NotAttempted) => "ไม่ได้อ่านส่วนนี้ เพราะการสแกนหยุดก่อนจะถึง",
+        (Lang::En, UnmeasuredReason::AccessDenied) => "Windows refused to open this",
+        (Lang::Th, UnmeasuredReason::AccessDenied) => "Windows ไม่อนุญาตให้เปิดอ่าน",
+        (Lang::En, UnmeasuredReason::ServiceDisabled) => {
+            "the Windows service that writes this record is switched off"
+        }
+        (Lang::Th, UnmeasuredReason::ServiceDisabled) => "บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่",
+        (Lang::En, UnmeasuredReason::SourceAbsent) => "this PC has no such record to read",
+        (Lang::Th, UnmeasuredReason::SourceAbsent) => "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน",
+        (Lang::En, UnmeasuredReason::SourceEmpty) => {
+            "the place this is kept is there and holds nothing"
+        }
+        (Lang::Th, UnmeasuredReason::SourceEmpty) => "มีที่เก็บข้อมูลอยู่ แต่ว่างเปล่า",
+        (Lang::En, UnmeasuredReason::Partial) => "part of this was read and part of it was not",
+        (Lang::Th, UnmeasuredReason::Partial) => "อ่านได้บางส่วน ไม่ครบ",
+        (Lang::En, UnmeasuredReason::BudgetSpent) => {
+            "this program stopped reading before it finished"
+        }
+        (Lang::Th, UnmeasuredReason::BudgetSpent) => "โปรแกรมนี้หยุดอ่านก่อนจะครบ",
+        (Lang::En, UnmeasuredReason::ReadFailed) => "this could not be read",
+        (Lang::Th, UnmeasuredReason::ReadFailed) => "อ่านข้อมูลนี้ไม่ได้",
+        (Lang::En, UnmeasuredReason::CollectorUnavailable) => "this build does not read that",
+        (Lang::Th, UnmeasuredReason::CollectorUnavailable) => "build นี้ยังไม่ได้อ่านส่วนนี้",
     }
 }
 
@@ -104,6 +186,30 @@ pub fn consent(lang: Lang) -> String {
 /// Message printed when consent is refused.
 pub fn declined(lang: Lang) -> &'static str {
     text(lang, "declined")
+}
+
+/// Message printed once the elevated restart has been requested.
+#[cfg(windows)]
+pub fn elevate_started(lang: Lang) -> &'static str {
+    text(lang, "elevate_started")
+}
+
+/// Message printed when the Windows consent prompt was dismissed.
+#[cfg(windows)]
+pub fn elevate_declined(lang: Lang) -> &'static str {
+    text(lang, "elevate_declined")
+}
+
+/// Context added to the error when Windows refused to start the elevated program.
+#[cfg(windows)]
+pub fn elevate_failed(lang: Lang) -> &'static str {
+    text(lang, "elevate_failed")
+}
+
+/// Message printed when `--elevate` is used on something other than Windows.
+#[cfg(not(windows))]
+pub fn elevate_not_windows(lang: Lang) -> &'static str {
+    text(lang, "elevate_not_windows")
 }
 
 /// Renders a view as text.
@@ -140,8 +246,51 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     if let Some(sha) = &provenance.exe_sha256 {
         let _ = writeln!(out, "exe sha256: {sha}");
     }
+    // Above the evidence, because it is a fact about the scan and not about the machine, and
+    // because a reviewer who has made up their mind by the third row never reaches a footer
+    // (ADR 0027).
+    for (count, key) in [
+        (view.scope.not_admin, "scope_not_admin"),
+        (view.scope.not_attempted, "scope_not_attempted"),
+    ] {
+        if count > 0 {
+            let _ = writeln!(
+                out,
+                "{}",
+                text(lang, key).replace("{n}", &count.to_string())
+            );
+        }
+    }
     out.push('\n');
 
+    out.push_str(&evidence_section(view, bundle, lang));
+
+    // Both sections come after the evidence and clearly apart from it, in this order.
+    out.push_str(&own_traces_section(view, lang));
+    out.push_str(&unmatched_section(view, lang));
+
+    if view.mode == Mode::Ss {
+        let _ = writeln!(
+            out,
+            "\n{}: {} {} · {} {} · {} {} · {} {}",
+            text(lang, "hidden"),
+            text(lang, "not_found"),
+            view.hidden.not_found,
+            text(lang, "unmeasured_expected"),
+            view.hidden.unmeasured_expected,
+            text(lang, "unmeasured_unexpected"),
+            view.hidden.unmeasured_unexpected,
+            text(lang, "unmatched"),
+            view.hidden.unmatched
+        );
+    }
+    let _ = writeln!(out, "\n{}", text(lang, "footer"));
+    out
+}
+
+/// The evidence, one entry at a time, each with the rule's own text.
+fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
+    let mut out = String::new();
     // A rule title states what the rule looks for, not what was seen; say so for every state.
     let check = match lang {
         Lang::En => "check",
@@ -164,10 +313,22 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
             // The report keeps the English source text; the rule text carries the translation.
             EvidenceState::NotFound { retention } => (
                 text(lang, "not_found"),
-                rule_text.map_or_else(|| retention.clone(), |t| t.retention),
+                rule_text
+                    .as_ref()
+                    .map_or_else(|| retention.clone(), |t| t.retention.clone()),
             ),
-            EvidenceState::Unmeasured { reason: why } => {
-                (text(lang, "unmeasured"), reason(lang, *why).to_owned())
+            EvidenceState::Unmeasured {
+                reason: why,
+                expected,
+            } => {
+                // A reason the rule itself named is a different statement from one it did not, and
+                // a reader cannot tell them apart from the reason alone (ADR 0027).
+                let label = if *expected {
+                    text(lang, "unmeasured_expected")
+                } else {
+                    text(lang, "unmeasured_unexpected")
+                };
+                (label, reason(lang, *why).to_owned())
             }
         };
         let _ = writeln!(
@@ -179,20 +340,82 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         if !detail.is_empty() {
             let _ = writeln!(out, "    {detail}");
         }
+        // What the rule means and what it does not prove, beside every state; what legitimately
+        // produces the same evidence, beside a match only. Both are mandatory in every rule and
+        // neither reached a screen before (ADR 0027).
+        if let Some(rule_text) = &rule_text {
+            if !rule_text.description.is_empty() {
+                let _ = writeln!(
+                    out,
+                    "    {}: {}",
+                    text(lang, "description"),
+                    rule_text.description
+                );
+            }
+            if matches!(evidence.state, EvidenceState::Found { .. })
+                && !rule_text.falsepositives.is_empty()
+            {
+                let _ = writeln!(out, "    {}:", text(lang, "falsepositives"));
+                for cause in &rule_text.falsepositives {
+                    let _ = writeln!(out, "      - {cause}");
+                }
+            }
+        }
     }
+    out
+}
 
-    if view.mode == Mode::Ss {
+/// One observation as `field=value, field=value`, the way both trailing sections list it.
+fn fields_of(observation: &Observation) -> String {
+    observation
+        .fields
+        .iter()
+        .map(|(k, v)| format!("{k}={}", plain(v)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// What this program itself left in what the collectors saw. Shown in both modes (ADR 0010).
+fn own_traces_section(view: &ReportView, lang: Lang) -> String {
+    let mut out = String::new();
+    if view.own_traces.is_empty() {
+        return out;
+    }
+    let _ = writeln!(
+        out,
+        "\n{} — {}",
+        text(lang, "own_traces"),
+        text(lang, "own_traces_note")
+    );
+    for entry in &view.own_traces {
         let _ = writeln!(
             out,
-            "\n{}: {} {} · {} {}",
-            text(lang, "hidden"),
-            text(lang, "not_found"),
-            view.hidden.not_found,
-            text(lang, "unmeasured"),
-            view.hidden.unmeasured
+            "    [{}] {}",
+            entry.collector,
+            fields_of(&entry.observation)
         );
     }
-    let _ = writeln!(out, "\n{}", text(lang, "footer"));
+    out
+}
+
+/// What the collectors saw that no rule matched. Self mode lists these; in SS mode the list arrives
+/// empty and they appear only as a number in the hidden line (ADR 0014).
+fn unmatched_section(view: &ReportView, lang: Lang) -> String {
+    let mut out = String::new();
+    if view.unmatched.is_empty() {
+        return out;
+    }
+    let _ = writeln!(
+        out,
+        "\n{} — {}",
+        text(lang, "unmatched"),
+        text(lang, "unmatched_note")
+    );
+    for group in &view.unmatched {
+        for observation in &group.observations {
+            let _ = writeln!(out, "    [{}] {}", group.collector, fields_of(observation));
+        }
+    }
     out
 }
 
@@ -209,17 +432,33 @@ fn short(sha: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use rongroi_core::model::{
-        Evidence, EvidenceState, Mode, Observation, REPORT_SCHEMA_VERSION, Report, ReportHeader,
-        Strength,
+        Evidence, EvidenceState, Mode, Observation, OwnTraceEntry, REPORT_SCHEMA_VERSION, Report,
+        ReportHeader, Strength, UnmatchedGroup,
     };
     use rongroi_core::provenance::Provenance;
+    use rongroi_core::rules::Rule;
     use rongroi_core::view;
 
     use super::*;
 
+    /// The rule these tests build a report around.
+    ///
+    /// Looked up by path, not taken as `rules()[0]`: the report below fabricates a
+    /// `secure_boot=disabled` observation and asserts this rule's own Thai `retention`, so it is
+    /// this rule the tests mean and not whichever one sorts first. Index 0 was that rule until
+    /// `rules/evtx/` existed, which is the kind of coupling a new rule is not supposed to break.
+    fn subject(bundle: &Bundle) -> &Rule {
+        &bundle
+            .rules()
+            .iter()
+            .find(|sourced| sourced.path == "posture/boot/secure-boot-disabled/rule.yaml")
+            .expect("the secure-boot rule is in the embedded bundle")
+            .rule
+    }
+
     fn report(official: bool) -> (Report, Bundle) {
         let bundle = Bundle::embedded().unwrap();
-        let rule = &bundle.rules()[0].rule;
+        let rule = subject(&bundle);
         let header = ReportHeader {
             schema_version: REPORT_SCHEMA_VERSION,
             provenance: Provenance::from_parts(official.then_some("1"), "0.0.0-test", None, None),
@@ -248,6 +487,8 @@ mod tests {
             Report {
                 header,
                 evidence: vec![evidence],
+                own_traces: Vec::new(),
+                unmatched: Vec::new(),
             },
             bundle,
         )
@@ -278,10 +519,199 @@ mod tests {
         assert!(text.contains("พิสูจน์ไม่ได้ว่าเครื่องสะอาด"), "{text}");
     }
 
+    /// What the tool itself left in what the collectors saw is listed apart from the evidence and
+    /// said to be excluded, so that a reader cannot mistake it for something found on the PC.
+    #[test]
+    fn own_traces_are_rendered_in_their_own_section() {
+        let (mut report, bundle) = report(false);
+        report.own_traces = vec![OwnTraceEntry {
+            collector: "process".to_owned(),
+            observation: Observation {
+                collector: "process".to_owned(),
+                fields: [
+                    (
+                        "name".to_owned(),
+                        serde_json::Value::from("aeterna-rongroi.exe"),
+                    ),
+                    (
+                        "path".to_owned(),
+                        serde_json::Value::from(r"C:\Users\a\aeterna-rongroi.exe"),
+                    ),
+                ]
+                .into(),
+            },
+        }];
+        let view = view::for_mode(&report, Mode::SelfCheck);
+        let text = render(&view, &bundle, Lang::En);
+
+        let (above, section) = text
+            .split_once("own traces (excluded)")
+            .expect("the own-traces section is announced");
+        // Nothing about the tool's own process appears among the evidence above it.
+        assert!(!above.contains("aeterna-rongroi.exe"), "{above}");
+        assert!(section.contains("aeterna-rongroi.exe"), "{section}");
+        assert!(
+            section.contains(r"C:\Users\a\aeterna-rongroi.exe"),
+            "{section}"
+        );
+
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(thai.contains("ร่องรอยของโปรแกรมนี้เอง"), "{thai}");
+    }
+
+    /// A plugin file the `fivem_dir` collector saw. No rule reads that collector, so nothing about
+    /// it matched one.
+    fn plugin_file() -> Vec<UnmatchedGroup> {
+        vec![UnmatchedGroup {
+            collector: "fivem_dir".to_owned(),
+            observations: vec![Observation {
+                collector: "fivem_dir".to_owned(),
+                fields: [(
+                    "path".to_owned(),
+                    serde_json::Value::from(
+                        r"C:\Users\a\AppData\Local\FiveM\FiveM.app\plugins\overlay.dll",
+                    ),
+                )]
+                .into(),
+            }],
+        }]
+    }
+
+    /// What the collectors saw that no rule matched is listed after the evidence and after the own
+    /// traces, in a section of its own that says these are not findings (ADR 0014).
+    #[test]
+    fn unmatched_observations_are_rendered_in_their_own_section() {
+        let (mut report, bundle) = report(false);
+        report.unmatched = plugin_file();
+        let view = view::for_mode(&report, Mode::SelfCheck);
+        let text = render(&view, &bundle, Lang::En);
+
+        let (above, section) = text
+            .split_once("unmatched observations")
+            .expect("the unmatched section is announced");
+        // Nothing about the file appears among the evidence above it.
+        assert!(!above.contains("overlay.dll"), "{above}");
+        assert!(section.contains("overlay.dll"), "{section}");
+        assert!(section.contains("fivem_dir"), "{section}");
+
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(thai.contains("ไม่ตรง rule ใดเลย"), "{thai}");
+    }
+
+    /// SS mode says how many there were and names none of them: a raw listing of what a collector
+    /// saw is exactly what that mode promises not to show (ADR 0014).
+    #[test]
+    fn ss_mode_counts_unmatched_observations_without_listing_them() {
+        let (mut report, bundle) = report(false);
+        report.unmatched = plugin_file();
+        let text = render(&view::for_mode(&report, Mode::Ss), &bundle, Lang::En);
+        assert!(!text.contains("overlay.dll"), "{text}");
+        assert!(text.contains("unmatched observations 1"), "{text}");
+    }
+
+    #[test]
+    fn no_unmatched_section_when_every_observation_matched_a_rule() {
+        let (report, bundle) = report(false);
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(!text.contains("unmatched observations"), "{text}");
+    }
+
+    /// A match shown without what else produces it is a match shown as an accusation. Both halves
+    /// are mandatory in every rule, both are translated, and neither reached a screen before
+    /// (NIST SP 800-86 section 3.4, ADR 0027).
+    #[test]
+    fn a_found_entry_shows_its_description_and_its_false_positives() {
+        let (report, bundle) = report(false);
+        let rule = subject(&bundle);
+        let view = view::for_mode(&report, Mode::SelfCheck);
+
+        let english = render(&view, &bundle, Lang::En);
+        assert!(english.contains("About this check"), "{english}");
+        assert!(english.contains(&rule.description), "{english}");
+        assert!(
+            english.contains("Ordinary things that also produce this"),
+            "{english}"
+        );
+        for cause in &rule.falsepositives {
+            assert!(english.contains(cause), "{english}");
+        }
+
+        let thai = render(&view, &bundle, Lang::Th);
+        let translated = bundle.text(&rule.id, "th").expect("the rule is translated");
+        assert!(thai.contains("เกี่ยวกับการตรวจนี้"), "{thai}");
+        assert!(thai.contains(&translated.description), "{thai}");
+        for cause in &translated.falsepositives {
+            assert!(thai.contains(cause), "{thai}");
+        }
+        // The English text is not shown alongside it.
+        assert!(!thai.contains(&rule.description), "{thai}");
+    }
+
+    /// `description` says what the check is, which a reader needs whatever the answer was.
+    /// `falsepositives` explains a match, and nothing matched here, so there is nothing to explain.
+    #[test]
+    fn a_not_found_entry_shows_the_description_and_not_the_false_positives() {
+        let (mut report, bundle) = report(false);
+        let rule = subject(&bundle).clone();
+        report.evidence[0].state = EvidenceState::NotFound {
+            retention: rule.retention.clone(),
+        };
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(text.contains(&rule.description), "{text}");
+        assert!(
+            !text.contains("Ordinary things that also produce this"),
+            "{text}"
+        );
+        for cause in &rule.falsepositives {
+            assert!(!text.contains(cause), "{text}");
+        }
+    }
+
+    /// Two rules that could not be measured for want of administrator rights are one fact about the
+    /// scan. It is stated once, above the evidence, and it names the remedy (ADR 0012, ADR 0027).
+    #[test]
+    fn missing_administrator_rights_is_one_scope_statement_above_the_evidence() {
+        let (mut report, bundle) = report(false);
+        let first = report.evidence[0].clone();
+        report.evidence = vec![first.clone(), first];
+        for item in &mut report.evidence {
+            item.state = EvidenceState::Unmeasured {
+                reason: rongroi_core::model::UnmeasuredReason::NotAdmin,
+                expected: false,
+            };
+        }
+        let view = view::for_mode(&report, Mode::SelfCheck);
+
+        let text = render(&view, &bundle, Lang::En);
+        let (scope, below) = text
+            .split_once("Scope: 2 check(s)")
+            .expect("the scope statement is printed once, with the count");
+        assert!(scope.contains("mode: self"), "{scope}");
+        assert!(!below.contains("Scope: "), "{below}");
+        assert!(below.contains("[NOT MEASURED (not expected)]"), "{below}");
+
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(thai.contains("ขอบเขตการตรวจ: มี 2 รายการ"), "{thai}");
+    }
+
+    /// A reason the rule named and a reason it did not are different statements, and the reason
+    /// alone does not tell them apart (ADR 0027).
+    #[test]
+    fn an_expected_unmeasured_result_is_labelled_apart_from_an_unexpected_one() {
+        let (mut report, bundle) = report(false);
+        report.evidence[0].state = EvidenceState::Unmeasured {
+            reason: rongroi_core::model::UnmeasuredReason::SourceAbsent,
+            expected: true,
+        };
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(text.contains("[NOT MEASURED (expected here)]"), "{text}");
+        assert!(!text.contains("(not expected)"), "{text}");
+    }
+
     #[test]
     fn not_found_retention_is_shown_in_the_chosen_language() {
         let (mut report, bundle) = report(false);
-        let english = bundle.rules()[0].rule.retention.clone();
+        let english = subject(&bundle).retention.clone();
         report.evidence[0].state = EvidenceState::NotFound {
             retention: english.clone(),
         };

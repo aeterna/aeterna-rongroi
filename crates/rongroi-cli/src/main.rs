@@ -12,6 +12,7 @@ use anyhow::Context;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use rongroi_collectors::scan::{self, ScanContext};
 use rongroi_core::bundle::Bundle;
+use rongroi_core::engine::SelfIdentity;
 use rongroi_core::model::Mode;
 use rongroi_core::provenance::Provenance;
 use rongroi_core::view;
@@ -50,6 +51,9 @@ struct ScanArgs {
     /// Skip the SS-mode consent question (the player has already agreed).
     #[arg(long)]
     yes: bool,
+    /// Restart with administrator rights before scanning (Windows only). Windows asks you to confirm.
+    #[arg(long)]
+    elevate: bool,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -78,16 +82,33 @@ fn main() -> anyhow::Result<()> {
 fn scan(args: &ScanArgs) -> anyhow::Result<()> {
     let bundle = Bundle::embedded().context("the embedded rules bundle is invalid")?;
     let mode = Mode::from(args.mode);
+    let host = live_host();
+
+    // Elevation is a property of a process token, so it takes a new process (ADR 0012). Asked before the
+    // consent question, so nobody answers that question for a scan that will not happen here.
+    if args.elevate && host.is_elevated() != Some(true) {
+        return relaunch_elevated(args.lang);
+    }
 
     if mode == Mode::Ss && !args.yes && !ask_consent(args.lang)? {
         println!("{}", output::declined(args.lang));
         return Ok(());
     }
 
-    let host = live_host();
+    let provenance = Provenance::current();
+    // This program is in its own process list while it scans. The engine needs to know what "this
+    // program" is to separate those traces from evidence about the PC (ADR 0010); the executable's
+    // digest is the one the header already carries, so it is not read twice.
+    let self_identity = SelfIdentity {
+        exe_path: std::env::current_exe()
+            .ok()
+            .map(|path| path.display().to_string()),
+        exe_sha256: provenance.exe_sha256.clone(),
+    };
     let context = ScanContext {
-        provenance: Provenance::current(),
+        provenance,
         generated_at: jiff::Timestamp::now().to_string(),
+        self_identity,
     };
     let report = scan::run(host.as_ref(), &bundle, context);
     let view = view::for_mode(&report, mode);
@@ -109,6 +130,41 @@ fn ask_consent(lang: Lang) -> anyhow::Result<bool> {
         answer.trim().to_ascii_lowercase().as_str(),
         "y" | "yes"
     ))
+}
+
+/// Starts an elevated copy and returns without scanning; the new process scans from the beginning.
+#[cfg(windows)]
+fn relaunch_elevated(lang: Lang) -> anyhow::Result<()> {
+    use rongroi_host_windows::elevate::{self, ElevateError};
+
+    // `--elevate` is not forwarded, so the new process cannot ask to elevate again: a token that is
+    // elevated but restricted reports `is_elevated() == false` and would otherwise relaunch in a loop.
+    let forwarded: Vec<String> = std::env::args()
+        .skip(1)
+        .filter(|arg| arg != "--elevate")
+        .collect();
+
+    match elevate::relaunch_elevated(&forwarded) {
+        Ok(()) => {
+            println!("{}", output::elevate_started(lang));
+            Ok(())
+        }
+        // Declining the prompt is a choice, not a failure (ADR 0012).
+        Err(ElevateError::Declined) => {
+            println!("{}", output::elevate_declined(lang));
+            Ok(())
+        }
+        Err(error) => Err(anyhow::Error::new(error).context(output::elevate_failed(lang))),
+    }
+}
+
+// Same signature as the Windows arm, so the caller does not need to know which one it got. There is
+// nothing here that can fail: saying so and exiting is the whole behaviour.
+#[cfg(not(windows))]
+#[allow(clippy::unnecessary_wraps)]
+fn relaunch_elevated(lang: Lang) -> anyhow::Result<()> {
+    println!("{}", output::elevate_not_windows(lang));
+    Ok(())
 }
 
 #[cfg(windows)]

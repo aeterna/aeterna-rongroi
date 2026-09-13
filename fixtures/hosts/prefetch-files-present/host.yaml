@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Windows 11 with a readable Prefetch folder, holding one `.pf` file whose bytes are the vendored
+# Windows 10 corpus file, referenced rather than copied (ADR 0019). Alongside it are the two things
+# a real Prefetch folder also holds and this collector does not read: the `ReadyBoot` directory and
+# a file that is not a `.pf` at all.
+#
+# The `.pf` file's own string table holds the upstream author's account name and his machine's
+# volume serial numbers (fixtures/prefetch/PROVENANCE.md). That is exactly why this host exists: the
+# collector's tests assert that none of it reaches an observation.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: CMD.EXE-D269B812.pf
+      from: '../../prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf'
+    - name: AgAppLaunch.db
+      content: "not a prefetch file\n"
+    - name: ReadyBoot
+      directory: true

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# One folder holding the three shapes a fixture can give a file's bytes (ADR 0019): written inline,
+# taken from a file under fixtures/, and not described at all — a file that is listed and whose bytes
+# cannot be read. Nothing here describes real software; the file it points at is a synthetic PCA
+# artifact from fixtures/parsers/.
+platform: windows
+os_build: "26100"
+elevated: false
+filesystem:
+  'C:\ProgramData\fixture':
+    - name: inline.txt
+      content: "hello\n"
+    - name: from-disk.txt
+      from: '../../parsers/pca-app-launch/normal.txt'
+    - name: unreadable.bin

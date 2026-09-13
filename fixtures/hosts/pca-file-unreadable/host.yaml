@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# One PCA file is listed with no bytes — it is there and cannot be read — while another is readable.
+# A file entry with neither `content:` nor `from:` is how a fixture says that (ADR 0019).
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  WinDir: 'C:\Windows'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+    - name: PcaGeneralDb0.txt
+      from: '../../parsers/pca-general/normal.txt'

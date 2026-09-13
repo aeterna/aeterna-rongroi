@@ -1,0 +1,15 @@
+{
+  "description": "Event id 104 is unique only per provider: on the Remote Desktop Services channel it is the client's timezone offset from UTC, which has nothing to do with a log being cleared. The Event Log service's own 105 — an automatic backup of a log, the opposite of destroying one — must not match either.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-RemoteDesktopServices-RdpCoreTS%4Operational.evtx",
+      "channel": "Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational",
+      "provider": "Microsoft-Windows-RemoteDesktopServices-RdpCoreTS",
+      "event_id": 104, "level": 4, "count": 12,
+      "first_seen": "2026-05-03T08:55:01.220Z", "last_seen": "2026-09-09T17:32:46.905Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "channel": "System", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 105, "level": 4, "count": 2,
+      "first_seen": "2026-06-21T03:00:11.740Z", "last_seen": "2026-08-24T03:00:09.318Z" } }
+  ]
+}

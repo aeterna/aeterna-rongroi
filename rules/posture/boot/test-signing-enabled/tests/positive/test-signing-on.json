@@ -1,0 +1,7 @@
+{
+  "description": "Windows reports test signing on",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "test_signing": "enabled" } }
+  ],
+  "expect_matches": 1
+}

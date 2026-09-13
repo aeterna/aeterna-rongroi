@@ -14,12 +14,29 @@ publish.workspace = true
 
 [dependencies]
 rongroi-host.workspace = true
+thiserror.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-registry.workspace = true
+# `ShellExecuteExW` is declared under `Win32_UI_Shell`, but its `SHELLEXECUTEINFOW` carries an `HKEY`, so
+# the generated function is gated on `Win32_System_Registry` as well.
+# `NtQuerySystemInformation` lives in the `Wdk` namespace, while `SYSTEM_CODEINTEGRITY_INFORMATION` — the
+# struct it fills for `SystemCodeIntegrityInformation` — is declared under `Win32_System_WindowsProgramming`,
+# so reading code integrity needs both. `Tbsi_GetDeviceInfo` is gated on `Win32_System_TpmBaseServices`
+# (ADR 0011; each feature name read from the `windows` 0.62.2 manifest rather than assumed).
+# `CreateToolhelp32Snapshot` and the `Process32*W` walk are gated on `Win32_System_Diagnostics_ToolHelp`,
+# and `OpenProcess`/`QueryFullProcessImageNameW` on `Win32_System_Threading` (ADR 0010); both names were
+# read from the same manifest, and `CloseHandle` comes with `Win32_Foundation`, already listed here.
 windows = { workspace = true, features = [
+  "Wdk_System_SystemInformation",
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Registry",
+  "Win32_System_Threading",
+  "Win32_System_TpmBaseServices",
+  "Win32_System_WindowsProgramming",
+  "Win32_UI_Shell",
 ] }
 
 [lints]

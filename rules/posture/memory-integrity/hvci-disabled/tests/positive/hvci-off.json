@@ -1,0 +1,7 @@
+{
+  "description": "Windows is configured not to enforce memory integrity",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "hvci": "disabled" } }
+  ],
+  "expect_matches": 1
+}

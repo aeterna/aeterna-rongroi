@@ -11,9 +11,13 @@ export type UnmeasuredReason =
   | "not_windows"
   | "not_on_this_os"
   | "not_admin"
+  | "not_attempted"
   | "access_denied"
   | "service_disabled"
-  | "source_missing"
+  | "source_absent"
+  | "source_empty"
+  | "partial"
+  | "budget_spent"
   | "read_failed"
   | "collector_unavailable";
 
@@ -27,7 +31,8 @@ export interface Observation {
 export type EvidenceState =
   | { state: "found"; observations: Observation[] }
   | { state: "not_found"; retention: string }
-  | { state: "unmeasured"; reason: UnmeasuredReason };
+  /** `expected` is whether the rule named this reason in its `unmeasured_when` (ADR 0027). */
+  | { state: "unmeasured"; reason: UnmeasuredReason; expected: boolean };
 
 export type Evidence = {
   rule_id: string;
@@ -52,11 +57,45 @@ export interface ReportHeader {
   generated_at: string;
 }
 
+/**
+ * One observation that describes aeterna-rongroi itself rather than the machine. The tool is running
+ * while it scans, so a collector that enumerates the machine sees it (ADR 0010).
+ */
+export interface OwnTraceEntry {
+  collector: string;
+  observation: Observation;
+}
+
+/**
+ * Observations of one collector that no rule matched. A collector reads the machine whether or not a
+ * rule asks about what it finds, and evidence carries observations only where a rule matched, so
+ * without this bucket what such a collector saw would be read and then discarded (ADR 0014).
+ */
+export interface UnmatchedGroup {
+  collector: string;
+  observations: Observation[];
+}
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
   evidence: Evidence[];
-  hidden: { not_found: number; unmeasured: number };
+  /** Shown in both modes: hiding "this was us" from an SS viewer would tell them less, not more. */
+  own_traces: OwnTraceEntry[];
+  /** Self mode lists these; SS mode leaves the list empty and counts them in `hidden.unmatched`. */
+  unmatched: UnmatchedGroup[];
+  /**
+   * Facts about the scan, above the evidence in both modes. `not_admin` is how many checks missing
+   * administrator rights left unanswered — one fact about the scan rather than one per rule, and the
+   * one with a remedy. It is not a fourth hidden count; the same checks are in `hidden` (ADR 0027).
+   */
+  scope: { not_admin: number; not_attempted: number };
+  hidden: {
+    not_found: number;
+    unmeasured_expected: number;
+    unmeasured_unexpected: number;
+    unmatched: number;
+  };
 }
 
 export interface RuleText {

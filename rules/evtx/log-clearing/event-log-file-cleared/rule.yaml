@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: f4c99b57-02c8-4e53-82d0-dba8bdc13dda
+title: An event log file was cleared
+description: >-
+  The System log holds a record saying an event log file was cleared, with the time it happened.
+  Windows names the cleared log inside that record, and this tool does not read record contents, so
+  it cannot say which of the PC's several hundred logs this was, and most of them hold nothing a
+  reviewer would care about. The count shown with this row is how many such records survive, and a
+  high one is not a worse finding: clearing every log at once, in a second, is what one click of a
+  PC "optimiser" does, so a large number is evidence for that explanation rather than against it. A
+  clearing of the Security log can be recorded here as well as there, so this row and "The Security
+  log records that it was cleared" can be one action rather than two.
+status: experimental
+collector: evtx
+strength: tamper
+# The three together, never the event id alone. Event ids are unique only per provider, and 104 is
+# also "client timezone bias from UTC" on the Remote Desktop Services channel.
+match:
+  provider: Microsoft-Windows-Eventlog
+  channel: System
+  event_id: 104
+retention: >-
+  Only clearings still recorded in the System log as it stands today. The log holds a limited window
+  and overwrites its oldest records, and clearing the System log removes these records along with
+  everything else — so nothing found here does not mean no log was ever cleared.
+# Left out deliberately: `source_missing` — every Windows machine has an Event Log folder, so its
+# absence is worth a line. `read_failed` is not a choice made here: since ADR 0032 no rule may
+# declare it, because a view lists it whatever the rule says. Written out for the reader who wonders
+# why the obvious one is missing, and because these two rules were the first written after the field
+# had teeth.
+unmeasured_when: [not_windows, not_admin, access_denied]
+falsepositives:
+  - Gaming "optimiser", "debloat" and "tweak" scripts. Several popular ones clear every log on the
+    PC in one click, which is why the count here reaches the hundreds, and the owner has usually
+    forgotten running one months ago
+  - A prebuilt or repaired PC. The factory imaging step Windows itself provides deletes the event
+    logs, so the maker, not the owner, cleared them
+  - Installing software that resets the local event log as part of its setup — monitoring and
+    support agents commonly do
+  - The owner, a shop or a friend clicking "Clear Log" in Event Viewer while chasing a crash, which
+    is standard troubleshooting advice and can be done while keeping a backup copy
+  - A Windows feature update or in-place reinstall, and routine maintenance scripts and scheduled
+    tasks that tidy logs on a timer
+references:
+  - https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil
+  - https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/sysprep-command-line-options
+  - https://github.com/SigmaHQ/sigma/blob/master/rules/windows/builtin/system/microsoft_windows_eventlog/win_system_eventlog_cleared.yml
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [evtx, log-clearing]
+related:
+  - id: ff967b28-984b-4de0-b361-58367ae0c2d5
+    type: similar

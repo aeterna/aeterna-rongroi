@@ -18,13 +18,23 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **Evidence** | The result of one Rule: `Found`, `NotFound` or `Unmeasured` | `rongroi_core::model::Evidence` |
 | **Found** | The Rule matched; the matching Observations are attached | `EvidenceState::Found` |
 | **NotFound** | The Collector ran and nothing matched; carries the **retention window** | `EvidenceState::NotFound` |
-| **Unmeasured** | The Collector could not look; carries a **reason** | `EvidenceState::Unmeasured` |
+| **Unmeasured** | The Collector could not look; carries a **reason** and whether the Rule **expected** it | `EvidenceState::Unmeasured` |
+| **expected unmeasured** | An Unmeasured result whose reason the Rule named in `unmeasured_when`; SS mode counts it. One whose reason it did not name is **unexpected** and SS mode lists it (ADR 0027) | `EvidenceState::Unmeasured::expected` |
+| **source absent** / **source empty** | Opposite Unmeasured reasons: the place the artifact is kept is not on this PC, versus it is there and holds nothing. One word until ADR 0030 | `UnmeasuredReason::SourceAbsent`, `::SourceEmpty` |
+| **scope statement** | An Unmeasured reason that is one fact about the **scan** — `not_admin`, `not_attempted` — stated once above the evidence and never as a row per Rule | `UnmeasuredReason::is_scope_statement`, `view::ScopeNotes` |
+| **scope statement** | A fact about the **scan** rather than about the machine, said once above the evidence in both modes. Today: how many Rules missing administrator rights left unanswered | `rongroi_core::view::ScopeNotes` |
+| **unmatched observation** | Something a Collector saw that no Rule matched; shown in Self mode only, counted in SS mode | `rongroi_core::model::UnmatchedGroup` |
 | **strength** | What the evidence can show: `execution`, `presence`, `tamper`, `posture`, `context` | `Strength` |
 | **retention window** | How far back a source can see, in words shown to the user | `Rule::retention` |
+| **cased** | A `match` field a Rule compares byte for byte; every other string folds ASCII case (ADR 0025) | `Rule::cased` |
+| **operator** | How one `match` entry compares its value, written `field\|operator`: `gt`, `gte`, `lt`, `lte`, `startswith`, `endswith`, `contains`, `exists`. A key with no `\|` compares for equality, and a list value means **or** (ADR 0029) | `rongroi_core::rules::Operator` |
+| **field kind** | What a Collector declares one of its observation fields holds — text, a number, a boolean or a timestamp — so that `check-rules` can refuse an operator the field cannot take | `rongroi_collectors::FieldKind` |
 | **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |
 | **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `rongroi_core::bundle` |
 | **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `rongroi_core::provenance` |
 | **build marker** | The text `aeterna-rongroi build marker: official=<flag>;commit=<sha>;` embedded in every binary; the report's provenance is read from it | `rongroi_core::provenance::build_marker` |
+| **path** | Observation field: the full path of the file the observation is about, as it was read. Redacted to `%USERPROFILE%` in SS mode | observation field `path` |
+| **sha256** | Observation field: SHA-256 of that file, 64 lowercase hex characters. The only file hash, and one of the two things `allow` may compare | observation field `sha256` |
 
 Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as "detection result",
 "hit", "finding" for Evidence.
@@ -55,7 +65,20 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 - Never print or log a raw user path outside Self mode. Redaction goes through `rongroi_core::view`.
 - Logging (when added) goes to local stderr only. No telemetry, no crash upload, no network.
-- Test fixtures never contain a real person's user name, host name or SID (`cargo xtask scrub-check`, from M1).
+- Test fixtures never contain a real person's user name, host name or SID. Nothing checks this
+  automatically: `cargo xtask scrub-check` has been named here since M1 and was never written, so what
+  holds the rule up is this sentence and the person who reviews a new fixture, together with the
+  provenance document every vendored fixture has to come with.
+
+> **An open gap, as of 2026-09-12.** An automated scrub check does not exist and no ADR has decided to
+> write one. The provenance document of each vendored fixture set records the same absence
+> (`fixtures/evtx/PROVENANCE.md`, `fixtures/prefetch/PROVENANCE.md`), and ADR 0016 counts
+> `cargo xtask scrub-check` among the promises this repository has made with no code behind them.
+> Review by hand is what there is, and it has already failed once: a vendored Event Log fixture was
+> committed carrying a real machine SID that a byte scan had missed, and was removed again
+> (`CHANGELOG.md`). A vendored artifact cannot be cleaned in place either: its records are checksummed
+> inside their container, so editing a string breaks the container. The choice is to vendor a file
+> whole or not at all.
 
 ## 5. TypeScript / React (`apps/desktop`)
 
@@ -72,10 +95,17 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 |---|---|
 | Path `rules/<collector>/<category>/<slug>/rule.yaml`, `slug` in kebab-case | `cargo xtask check-rules` |
 | `id` is a UUIDv4 and is never reused, even after deletion | `check-rules` |
+| `collector` is a collector in this build, and every `match` field name one it declares it can emit | `check-rules` |
 | English `title`, `description`, `falsepositives` live in the rule; translations in `rules/i18n/<lang>.yaml` | `check-rules` · `check-locales` |
 | `status: test` or `stable` requires at least one positive and one negative fixture in `tests/` | `check-rules` |
+| `match` strings compare without regard to ASCII case; `cased` names the fields compared exactly | `check-rules` · engine tests |
+| A `match` key is a field name, optionally `\|` and one of the eight operators; a list value means **or** | `check-rules` · engine tests |
+| An operator the field's declared kind cannot take, an empty list, and a `cased` entry `match` compares no text of are rejected | `check-rules` |
 | `allow` entries identify software by `sha256` or `signer`, never by file name | `check-rules` |
-| `falsepositives` is never empty — write what legitimately produces this evidence | `check-rules` |
+| `falsepositives` is never empty — write what legitimately produces this evidence; it is shown to the reader beside every `found` row | `check-rules` |
+| `unmeasured_when` names only reasons the rule's collector can report, each once, and never `partial`, `budget_spent` or `read_failed` — a view lists those whatever a rule declares, so naming one is a failure rather than a line that changes nothing (ADR 0030, ADR 0032) | `check-rules` |
+| The rule is quiet on every `fixtures/hosts/baseline-*` host, or a `rules/known-fps.csv` row accepts the match with a reason; an unused row fails too (ADR 0017) | `cargo xtask check-baseline` |
+| The rule is **confronted** by some baseline observation — one carrying every field its `match` names and one unsatisfied condition away from firing — or a `rules/unconfronted.csv` row gives a reason and a `resolved_when`; a row for a rule that is confronted fails too. Quiet on a machine that was never put the question is not a measurement (ADR 0033) | `check-baseline` |
 
 ## 7. Git
 
@@ -92,7 +122,8 @@ Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as 
 
 ## 8. Docs and comments
 
-- Source docs are written in English. `README` and the screenshare guide also exist in Thai.
+- Source docs are written in English. `README` also exists in Thai. The screenshare guide is M3 work and
+  is not written yet, in either language; it is to be written in both.
 - Comments explain *why*, not *what*.
 - Changing the architecture, the rule format or adding a new kind of source needs an ADR in `docs/adr/`.
 

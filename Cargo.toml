@@ -7,9 +7,17 @@ resolver = "3"
 members = ["crates/*", "xtask", "apps/desktop/src-tauri"]
 # The desktop app needs webkit2gtk to build on Linux; plain `cargo` commands skip it, `--workspace` includes it.
 default-members = ["crates/*", "xtask"]
+# The fuzz targets are their own workspace and need nightly (cargo-fuzz drives libFuzzer through
+# `-Z sanitizer`). Excluding them is what keeps the 1.98.1 toolchain pinned in rust-toolchain.toml
+# building, linting and testing everything else exactly as before: `cargo clippy --all-targets` and
+# `cargo deny check` never see a nightly-only crate (ADR 0016).
+# `third_party/evtx` is a vendored copy of the `evtx` crate carrying three patches (ADR 0018). Excluding it
+# keeps 13k lines of third-party source out of `cargo fmt --all`, `cargo clippy --all-targets` and
+# `[workspace.lints]`, which are this project's rules and not upstream's.
+exclude = ["fuzz", "third_party/evtx"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.98"
 license = "GPL-3.0-or-later"
@@ -21,11 +29,18 @@ rongroi-core = { path = "crates/rongroi-core" }
 rongroi-host = { path = "crates/rongroi-host" }
 rongroi-host-windows = { path = "crates/rongroi-host-windows" }
 rongroi-collectors = { path = "crates/rongroi-collectors" }
+rongroi-parsers = { path = "crates/rongroi-parsers" }
 
 anyhow = "1.0.104"
 clap = { version = "4.6", features = ["derive"] }
+# evtx: the binary-XML and chunk reader for Windows Event Log files (ADR 0018). `default-features = false`
+# drops the `evtx_dump` CLI (clap, dialoguer, indoc, simplelog, anyhow, tempfile) and `multithreading`
+# (rayon): this crate parses on the calling thread, which keeps chunk order deterministic and the parsers
+# crate free of a thread pool. It carries RUSTSEC-2021-0153 through `encoding`; see `deny.toml`.
+evtx = { version = "0.12.2", default-features = false }
 insta = { version = "1.48", features = ["json", "redactions"] }
 jiff = "0.2.35"
+prefetch-core = "0.1.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.151"
 serde-saphyr = "1.2"
@@ -56,3 +71,16 @@ undocumented_unsafe_blocks = "deny"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# The registry `evtx` 0.12.2 reserves a `Vec` from a record's substitution count without bounding it
+# against the bytes remaining, which a crafted 68 KiB file turns into a 7.7 GB allocation — measured on
+# macOS, where the reservation is lazy and the process survives. Windows was not tested; there the
+# commit is charged up front and a failed Rust allocation aborts uncatchably. Either way the size is
+# chosen by the file, and `rongroi-parsers` promises it never aborts on any input, so the crate is
+# vendored with that bound applied — and with a second patch for a `u16` multiplication in
+# `binxml/name.rs` that overflows on a name length above 32767, found later by the same fuzz target.
+# Both fixes are offered upstream as omerbenamram/evtx#294. `deny.toml` denies unknown *git* sources; a path source inside the repository is reviewable
+# in the same PR as the code that uses it. Remove this the moment an upstream release carries the fix.
+# See docs/adr/0018-evtx-parsing.md and third_party/evtx/PROVENANCE.md.
+[patch.crates-io]
+evtx = { path = "third_party/evtx" }
