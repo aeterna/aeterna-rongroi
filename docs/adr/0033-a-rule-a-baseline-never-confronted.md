@@ -97,11 +97,19 @@ whose provider happened to match — a weaker claim that would be harder to expl
   value that admits the ordinary case — a posture rule against a machine with the opposite setting —
   and nothing was measured about how many rules of three or more conditions would be unreachable at
   that threshold on a fuller baseline set. There are two such rules today, and both are excused.
-- **The expectation that a real `Security.evtx` confronts the 1102 rule is unverified.** The row says
-  so and says it is unverified: `Microsoft-Windows-Eventlog` is expected to write 1100 on the Security
-  channel when the Event Log service stops, which would confront the rule at two conditions of three
-  without any clearing having happened. For the System channel, not even that much has been
-  established.
+- **The expectation that a `Security.evtx` confronts the 1102 rule is unverified.** The row says so and
+  says it is unverified: `Microsoft-Windows-Eventlog` is expected to write 1100 on the Security channel
+  when the Event Log service stops, which would confront the rule at two conditions of three without
+  any clearing having happened. For the System channel, not even that much has been established, and
+  it may turn out that no ordinary System log confronts that rule at all.
+- **The row's way out is harder than one sentence makes it sound.** `fixtures/evtx/PROVENANCE.md` is
+  the constraint: Event Log is the highest-PII artifact vendored here, nothing may be captured from a
+  player's machine, a record cannot be redacted after the fact because each is checksummed within its
+  chunk, and both the rendered-record scan and the raw-string scan have to be run before anything is
+  vendored — one candidate was removed after vendoring when a second reading found a machine SID in
+  it. A capture therefore has to come from a Windows 11 installation made for the purpose, with a
+  throwaway local account and no network sign-in. Both rows now say so; the first drafts of them said
+  "captured from a real Windows 11 machine", which reads as permission this repository does not give.
 
 ## Consequences
 
