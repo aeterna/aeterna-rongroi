@@ -1,0 +1,17 @@
+{
+  "description": "What the Event Log service writes into an ordinary Security log without anyone clearing it: event 1100 each time the service shuts down with Windows, and 1101 when audit events were dropped. Both come from the same provider on the same channel as a clearing and differ only in the event id. Two ordinary Windows 11 machines measured on 2026-09-13 and 2026-09-14 held 1100 four times, and 1100 three times with 1101 once, and no 1102; the times and counts below are illustrative, not copied from either machine. A rule that also matched 1100 would name every player who has ever shut their PC down.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "channel": "Security", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 1100, "level": 4, "count": 3,
+      "first_seen": "2026-07-02T18:00:00.000Z", "last_seen": "2026-08-27T18:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "channel": "Security", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 1101, "level": 2, "count": 1,
+      "first_seen": "2026-08-15T09:00:00.000Z", "last_seen": "2026-08-15T09:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Security.evtx", "channel": "Security", "provider": "Microsoft-Windows-Security-Auditing",
+      "event_id": 4608, "level": 0, "count": 4,
+      "first_seen": "2026-07-03T08:00:00.000Z", "last_seen": "2026-08-28T08:00:00.000Z" } }
+  ]
+}
