@@ -31,12 +31,15 @@ export function CodeLink({ text, copy, qr = false }: Props) {
     // Carried fix (a): a response for a URL this effect has since moved on from (because `copy`
     // changed, or the component unmounted) must not set the image for the new URL.
     let cancelled = false;
-    void codeLinkQr(copy).then((svg) => {
-      if (cancelled) {
-        return;
-      }
-      setImage(svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null);
-    });
+    void codeLinkQr(copy)
+      .then((svg) => {
+        if (cancelled) {
+          return;
+        }
+        setImage(svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null);
+      })
+      // A refused call leaves no image, and the text and Copy button beside it still work.
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
