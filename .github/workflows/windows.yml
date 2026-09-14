@@ -339,6 +339,49 @@ jobs:
             RestoreAll
             wevtutil sl $log /e:false
           }
+      # ADR 0038, "Accepted by the owner": whether security software flags a process that enables
+      # SeSystemEnvironmentPrivilege was left unmeasured. This records Microsoft Defender's state before the
+      # two processes that enable it — the firmware test below and the CLI in the live smoke — and opens the
+      # window the step "What Microsoft Defender recorded…" reads — and which the CLI scans in the PowerShell
+      # step also fall inside. Real-time protection, behaviour monitoring and download scanning are switched
+      # on for the window where the image has them off, because a scanner that is not scanning would record
+      # nothing and its silence would pass for a verdict; the later step puts each back. What one Defender
+      # configuration on one runner does says nothing about other security products.
+      - name: Microsoft Defender's state before the privileged reads
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function DefenderState {
+            try { $status = Get-MpComputerStatus } catch { return "Get-MpComputerStatus failed: $($_.Exception.Message)" }
+            ('AMServiceEnabled', 'AntivirusEnabled', 'RealTimeProtectionEnabled', 'BehaviorMonitorEnabled',
+              'IoavProtectionEnabled', 'OnAccessProtectionEnabled', 'IsTamperProtected', 'AMRunningMode',
+              'AMProductVersion', 'AntivirusSignatureVersion' | ForEach-Object { "$_=$($status.$_)" }) -join ' · '
+          }
+          Write-Output "Defender before: $(DefenderState)"
+          # The first run of this step found real-time protection off and, once it was switched on, behaviour
+          # monitoring and download scanning still off; behaviour monitoring is the part that watches what a
+          # running process does. Each one found off is switched on and named, so the later step can put it back.
+          $changed = @()
+          foreach ($switch in @(
+              @{ State = 'RealTimeProtectionEnabled'; Preference = 'DisableRealtimeMonitoring' },
+              @{ State = 'BehaviorMonitorEnabled'; Preference = 'DisableBehaviorMonitoring' },
+              @{ State = 'IoavProtectionEnabled'; Preference = 'DisableIOAVProtection' })) {
+            try {
+              if (-not (Get-MpComputerStatus).($switch.State)) {
+                $preference = @{ $switch.Preference = $false }
+                Set-MpPreference @preference
+                $changed += $switch.Preference
+              }
+            } catch {
+              Write-Output "$($switch.State) could not be switched on: $($_.Exception.Message)"
+            }
+          }
+          if ($changed.Count -gt 0) {
+            Start-Sleep -Seconds 5
+            Write-Output "Defender after switching on $($changed -join ', '): $(DefenderState)"
+          }
+          "RONGROI_DEFENDER_CHANGED=$($changed -join ',')" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "RONGROI_DEFENDER_WINDOW_START=$((Get-Date).ToUniversalTime().ToString('o'))" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
       # ADR 0038. Reading the firmware's Secure Boot variable enables a privilege in this program's own
       # token for the read. This proves the read leaves the token as it found it; on the elevated runner
       # the privilege is held, so it also proves the read answers rather than reporting missing rights.
@@ -607,6 +650,31 @@ jobs:
           if ($coreOn.core_inert -eq '0') { throw 'pwsh recorded nothing with its machine policy on, so its zeros say nothing' }
           # `reg query` on a key that is absent leaves exit code 1 behind, which the runner would report.
           exit 0
+      - name: What Microsoft Defender recorded while the privilege was enabled
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $start = [datetime]::Parse($env:RONGROI_DEFENDER_WINDOW_START, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind)
+          $end = (Get-Date).ToUniversalTime()
+          Write-Output "window: $($start.ToString('o')) to $($end.ToString('o')) ($([math]::Round(($end - $start).TotalMinutes, 1)) min)"
+          $status = Get-MpComputerStatus
+          Write-Output "Defender now: RealTimeProtectionEnabled=$($status.RealTimeProtectionEnabled) BehaviorMonitorEnabled=$($status.BehaviorMonitorEnabled) IoavProtectionEnabled=$($status.IoavProtectionEnabled) AMRunningMode=$($status.AMRunningMode) IsTamperProtected=$($status.IsTamperProtected)"
+          $log = 'Microsoft-Windows-Windows Defender/Operational'
+          $events = @(Get-WinEvent -FilterHashtable @{ LogName = $log; StartTime = $start.ToLocalTime() } -ErrorAction SilentlyContinue)
+          Write-Output "Defender events in the window: $($events.Count) · ids: $((($events | Group-Object Id | Sort-Object { [int]$_.Name } | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))"
+          $detections = @($events | Where-Object { $_.Id -in 1006, 1007, 1008, 1015, 1116, 1117, 1118, 1119 })
+          $events | ForEach-Object { Write-Output "event $($_.Id) $($_.TimeCreated.ToUniversalTime().ToString('o')): $((($_.Message -split "`n")[0]).Trim())" }
+          Write-Output "detection events (1006-1008, 1015, 1116-1119): $($detections.Count)"
+          $naming = @($events | Where-Object { $_.ToXml() -match 'rongroi_host_windows|aeterna-rongroi-cli' })
+          Write-Output "events naming the firmware test binary or the CLI: $($naming.Count)"
+          $naming + $detections | Select-Object -First 5 | ForEach-Object { Write-Output $_.ToXml() }
+          $threats = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -ge $start.ToLocalTime() })
+          Write-Output "Get-MpThreatDetection since the window opened: $($threats.Count)"
+          foreach ($preference in @($env:RONGROI_DEFENDER_CHANGED -split ',' | Where-Object { $_ })) {
+            $restore = @{ $preference = $true }
+            Set-MpPreference @restore
+            Write-Output "$preference put back to true, as the image had it"
+          }
       # ADR 0042 §5, amended 2026-09-14: the channel-configuration reads go to the Event Log service, and a
       # service that never answers must cost its own bound (CONFIG_BUDGET, 5 s) and the three configuration
       # fields — not the scan, and not the evtx rules that read only the logs' bytes. The unit test proves

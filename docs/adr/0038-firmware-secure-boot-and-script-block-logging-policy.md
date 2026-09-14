@@ -270,7 +270,8 @@ machine. Two things were made part of that acceptance, in the same change:
   program's own token, for a read an ADR names, and that any further privilege needs its own ADR.
 
 Not established, and the condition for revisiting: whether security software flags a process that
-enables `SeSystemEnvironmentPrivilege`. If players report that it does, reading the firmware only when
+enables `SeSystemEnvironmentPrivilege`. *(One Defender configuration on one runner was measured on
+2026-09-14 — see the amendment below. That is not an answer for other security products.)* If players report that it does, reading the firmware only when
 the person running the scan asks for it is the fallback to weigh.
 
 ## Consequences
@@ -292,11 +293,12 @@ the person running the scan asks for it is the fallback to weigh.
   policy; `PRIVACY.md`, `docs/architecture.md` and the screenshare guide say what is read.
 - The Windows CI job runs the privilege test and compares the firmware reading with `Get-SecureBootUEFI`.
 
-## Amendment of 2026-09-14 — what each PowerShell does with the policy, and the scopes read
+## Amendment of 2026-09-14 — what each PowerShell does with the policy, the scopes read, and Defender
 
-Two questions this ADR left open are answered here, each by a measurement on the GitHub `windows-latest`
-runner rather than by one engine's source: how Windows PowerShell 5.1 treats the policy value, and which of
-the policy's other scopes a rule needs and what reading them means. A runner is an imaged virtual machine (Windows build
+Three questions this ADR left open are answered here, each by a measurement on the GitHub `windows-latest`
+runner rather than by one engine's source: how Windows PowerShell 5.1 treats the policy value; which of the
+policy's other scopes a rule needs and what reading them means; and what Microsoft Defender recorded while
+this program enabled `SeSystemEnvironmentPrivilege`. A runner is an imaged virtual machine (Windows build
 26100, `powershell.exe` 10.0.26100.33158, PowerShell 7.6.5), not a player's PC, and **one runner is one
 machine**. Nothing below was measured on a player's PC or on the owner's.
 
@@ -459,6 +461,32 @@ per-user policy. Whether that ACL is the same on a player's Windows 11 was not m
 `LiveHost` now opens `HKCU` as well as `HKLM`, for reading, and refuses every other root (ADR 0022 is
 amended to say so).
 
+### Microsoft Defender while the privilege was enabled
+
+The runner's Defender was measured, in the window from just before the firmware test to after the CLI's
+last scan in the PowerShell step. **One Defender configuration on one runner is what this says. It is not
+a statement about any other endpoint security product, or about Defender with other settings or
+signatures.**
+
+**Run 34806733664.** Before the window the image had Defender's service running
+(`AMRunningMode` Normal, product 4.18.26080.3, tamper protection off) with real-time protection, behaviour
+monitoring and download scanning all **off**. The step switched real-time protection on; behaviour
+monitoring and download scanning stayed off. The window, 14.8 minutes, held the firmware test — which found
+the privilege held and disabled, enabled it for the read and left it disabled — the live smoke's CLI scan
+and the PowerShell step's 36 CLI scans, each of which enables the privilege for the firmware read. Defender's
+Operational log recorded 4 events in it, ids 2000 ×2 and 5007 ×2; **no detection event** (1006–1008, 1015,
+1116–1119: 0), **no event naming** the test binary or the CLI, and `Get-MpThreatDetection` listed nothing
+since the window opened. The events' messages were not printed in that run.
+
+That run had behaviour monitoring off. Microsoft describes behaviour monitoring as the capability that
+"observes process, file, and service activity in real time", and says it "is enabled by default"
+([Behavior monitoring in Microsoft Defender Antivirus](https://learn.microsoft.com/en-us/defender-endpoint/behavior-monitor)),
+so that run neither had the part of Defender that watches a running process nor matched Defender's default
+configuration. The step now switches behaviour monitoring and download scanning on as well, and prints each
+event's first line.
+
+DEFENDER-RUN-3-PLACEHOLDER
+
 ### Still not established
 
 - How a player's Windows 11, rather than a runner, answers any row above; the rows are one build of each
@@ -467,6 +495,8 @@ amended to say so).
 - Whether other PowerShell 7 releases, or Windows PowerShell on other Windows builds, treat the value the
   same way.
 - Whether `HKCU\Software\Policies` refuses writes by a standard account on a player's PC.
+- Whether any security product other than the one Defender configuration above flags a process that
+  enables `SeSystemEnvironmentPrivilege`.
 
 ### Consequences of the amendment
 
@@ -479,4 +509,5 @@ amended to say so).
   the four keys, measured on the runner and consistent with the machine measured above (`PROVENANCE.md`);
   each new rule is confronted there.
 - The consent question in the CLI and the app, `PRIVACY.md`, `docs/architecture.md`, both screenshare guides
-  and `CHANGELOG.md` say what is read. The Windows CI job keeps the PowerShell step.
+  and `CHANGELOG.md` say what is read. The Windows CI job keeps the PowerShell step and the two Defender
+  steps.
