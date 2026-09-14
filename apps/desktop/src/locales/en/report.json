@@ -14,8 +14,7 @@
     "boot_time_unmeasured": "not measured — {{reason}}",
     "elapsed": "{{hours}}h {{minutes}}m",
     "elapsed_days": "{{days}}d {{hours}}h {{minutes}}m",
-    "rules": "Rules",
-    "exe_sha256": "Executable SHA-256"
+    "rules": "Rules"
   },
   "state": {
     "found": "Found",
@@ -61,5 +60,50 @@
     "note": "What the collectors saw that no rule matched. These are things that were seen, not findings."
   },
   "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasuredExpected}} not measured (expected) · {{unmeasuredUnexpected}} not measured (not expected) · {{unmatched}} unmatched observations",
-  "empty": "No evidence to show."
+  "empty": "No evidence to show.",
+  "summary": {
+    "title": "What this scan lists",
+    "found": "found — each one lists ordinary things that also produce it",
+    "not_found": "not found — each row says how far back it can see",
+    "unmeasured": "not measured — each row says why"
+  },
+  "toolbar": {
+    "technical_all": "Show technical details for every row",
+    "filtered": "Showing one state only.",
+    "clear": "Show every state"
+  },
+  "collector": {
+    "posture": "Security settings of this PC",
+    "fivem_dir": "FiveM files",
+    "process": "Running programs",
+    "evtx": "Windows event logs",
+    "prefetch": "Windows Prefetch",
+    "bam": "Background Activity Moderator (BAM)",
+    "pca": "Program Compatibility Assistant"
+  },
+  "group_count": {
+    "found": "{{count}} found",
+    "unmeasured": "{{count}} not measured",
+    "not_found": "{{count}} not found"
+  },
+  "fold_not_found": "Not found: {{count}} — show what was checked",
+  "layers": {
+    "technical": "Technical details",
+    "observation": "What the collector saw",
+    "field": "Field",
+    "value": "Value",
+    "rule_id": "Rule id",
+    "status": "Status",
+    "collector": "Collector",
+    "strength": "Strength",
+    "reason": "Reason code",
+    "code_title": "Where this is in the code",
+    "files_at_commit": "At the commit this program was built from.",
+    "files_commit_unknown": "The commit this program was built from is not known. These are where the files are in the repository.",
+    "files_unknown_build": "This build is not official, so the commit it was built from is not known. These are where the files are in the repository.",
+    "rule_file": "Rule",
+    "fixtures": "Fixtures",
+    "collector_file": "Collector",
+    "reference": "Reference"
+  }
 }

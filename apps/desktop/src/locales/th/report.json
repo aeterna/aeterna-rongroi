@@ -14,8 +14,7 @@
     "boot_time_unmeasured": "ยังไม่ได้วัด — {{reason}}",
     "elapsed": "{{hours}} ชม. {{minutes}} นาที",
     "elapsed_days": "{{days}} วัน {{hours}} ชม. {{minutes}} นาที",
-    "rules": "Rule",
-    "exe_sha256": "SHA-256 ของโปรแกรม"
+    "rules": "Rule"
   },
   "state": {
     "found": "เจอ",
@@ -61,5 +60,50 @@
     "note": "สิ่งที่ collector เห็นแต่ไม่มี rule ไหนตรงเลย เป็นสิ่งที่เห็น ไม่ใช่สิ่งที่ตรวจเจอ"
   },
   "hidden": "ซ่อนในโหมด SS: ไม่เจอ {{notFound}} · ยังไม่ได้วัด-ปกติ {{unmeasuredExpected}} · ยังไม่ได้วัด-ไม่ได้คาดไว้ {{unmeasuredUnexpected}} · ไม่ตรง rule ใดเลย {{unmatched}}",
-  "empty": "ไม่มีหลักฐานให้แสดง"
+  "empty": "ไม่มีหลักฐานให้แสดง",
+  "summary": {
+    "title": "สิ่งที่การสแกนนี้แสดง",
+    "found": "เจอ — แต่ละข้อมีเรื่องปกติที่ทำให้เกิดผลแบบนี้ได้",
+    "not_found": "ไม่เจอ — แต่ละข้อบอกว่าย้อนดูได้แค่ไหน",
+    "unmeasured": "ยังไม่ได้วัด — แต่ละข้อบอกเหตุผล"
+  },
+  "toolbar": {
+    "technical_all": "แสดงรายละเอียดทางเทคนิคทุกแถว",
+    "filtered": "กำลังแสดงสถานะเดียว",
+    "clear": "แสดงทุกสถานะ"
+  },
+  "collector": {
+    "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
+    "fivem_dir": "ไฟล์ของ FiveM",
+    "process": "โปรแกรมที่กำลังรัน",
+    "evtx": "Event log ของ Windows",
+    "prefetch": "Prefetch ของ Windows",
+    "bam": "Background Activity Moderator (BAM)",
+    "pca": "Program Compatibility Assistant"
+  },
+  "group_count": {
+    "found": "เจอ {{count}}",
+    "unmeasured": "ยังไม่ได้วัด {{count}}",
+    "not_found": "ไม่เจอ {{count}}"
+  },
+  "fold_not_found": "ไม่เจอ {{count}} รายการ — กดเพื่อดูว่าตรวจอะไรไปบ้าง",
+  "layers": {
+    "technical": "รายละเอียดทางเทคนิค",
+    "observation": "สิ่งที่ collector เห็น",
+    "field": "field",
+    "value": "ค่า",
+    "rule_id": "rule id",
+    "status": "status",
+    "collector": "collector",
+    "strength": "strength",
+    "reason": "รหัสเหตุผล",
+    "code_title": "อยู่ตรงไหนในโค้ด",
+    "files_at_commit": "ที่ commit ที่ใช้สร้างโปรแกรมนี้",
+    "files_commit_unknown": "ไม่รู้ว่าโปรแกรมนี้สร้างจาก commit ไหน path เหล่านี้คือที่อยู่ของไฟล์ใน repo",
+    "files_unknown_build": "build นี้ไม่ใช่รุ่นทางการ จึงไม่รู้ว่าสร้างจาก commit ไหน path เหล่านี้คือที่อยู่ของไฟล์ใน repo",
+    "rule_file": "rule",
+    "fixtures": "fixture",
+    "collector_file": "collector",
+    "reference": "แหล่งอ้างอิง"
+  }
 }

@@ -21,6 +21,7 @@ tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 jiff.workspace = true
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 rongroi-collectors.workspace = true
 rongroi-core.workspace = true
 rongroi-host.workspace = true

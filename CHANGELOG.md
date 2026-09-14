@@ -13,6 +13,19 @@ and the project uses [Semantic Versioning](https://semver.org/).
   code — the commit of an official build, or the repository with a note that the code of an unofficial
   build is not known. Rule text now carries each rule's status and where its rule, fixtures and
   collector are in the repository, checked to exist by a test (ADR 0045).
+- The desktop report reads in layers (ADR 0045). Three counts of what the view lists — found, not found,
+  not measured — each a filter, sit above the rows with the sentence that no report proves a PC clean.
+  Rows are grouped by collector under plain names; a match starts open with its ordinary causes, other
+  rows start closed with the description cut to two lines, and the not-found rows of a group fold into
+  one line. Each row opens technical details: the observation as a table, the rule id, status,
+  collector, strength and reason code, and where the rule, its fixtures and its collector are in the
+  repository. A new About & code screen shows the repository and this build's commit as copyable text and
+  QR codes drawn in Rust, how to check a downloaded file, and why no button opens a web page. No plugin,
+  no JavaScript dependency and no network code were added.
+
+### Changed
+- The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the
+  commit, the rules bundle SHA-256 and how to check a downloaded file (ADR 0045).
 
 ## [0.3.0] - 2026-09-14
 

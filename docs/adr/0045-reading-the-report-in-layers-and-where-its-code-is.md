@@ -109,7 +109,8 @@ the workspace manifest), `Provenance::code_commit()` — the commit, for an offi
 - anything else: `REPOSITORY_URL`, with the UI saying that the code of this build is not known.
 
 A link to a file is `REPOSITORY_URL/blob/<commit>/<path>` for an official build and is not shown for an
-unofficial one, because a path at `dev` may not be the code that ran.
+unofficial one, because a path at `dev` may not be the code that ran. The fixtures folder is a folder, so
+its link is `REPOSITORY_URL/tree/<commit>/<path>`.
 
 `CONVENTIONS.md` gains **rule files** and **code link** in the glossary. Neither uses the word *source*,
 which the glossary gives to where an artifact is kept on the PC (*source absent*, *source empty*).
@@ -129,7 +130,9 @@ A screen **About & code** is reachable from every screen. It shows: official bui
 commit, the executable's SHA-256, the rules bundle's count and SHA-256, the licence, the repository and
 the code link with Copy and QR, how to check a downloaded file against `SHA256SUMS` and with
 `gh attestation verify aeterna-rongroi-<version>-windows-x64.exe -R aeterna/aeterna-rongroi`, and why
-there is no button that opens a web page — using the ADR 0003 wording verbatim.
+there is no button that opens a web page — using the ADR 0003 wording verbatim. In the window that wording
+is the consent screen's form of it (`consent.sends`, `consent.webview`), so the two screens cannot drift
+apart.
 
 ### 6. The CLI
 

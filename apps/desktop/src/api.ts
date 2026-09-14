@@ -5,7 +5,7 @@
 // The only way the UI talks to Rust: local Tauri IPC commands. No network (ADR 0003).
 
 import { invoke } from "@tauri-apps/api/core";
-import type { Mode, ReportHeader, ReportView, RuleText } from "./types";
+import type { CodeLinks, Mode, ReportHeader, ReportView, RuleText } from "./types";
 
 /** Facts about the scan (provenance, platform) without any evidence. */
 export function reportHeader(): Promise<ReportHeader> {
@@ -31,4 +31,14 @@ export function relaunchElevated(): Promise<ElevateOutcome> {
 /** Rule text in `lang`, keyed by rule id, English fallback applied in Rust. */
 export function ruleTexts(lang: string): Promise<Record<string, RuleText>> {
   return invoke<Record<string, RuleText>>("rule_texts", { lang });
+}
+
+/** Where this binary's code can be read: the commit of an official build, the repository otherwise. */
+export function codeLinks(): Promise<CodeLinks> {
+  return invoke<CodeLinks>("code_links");
+}
+
+/** A QR code of a link into the repository as SVG text, drawn in Rust; `null` for any other text. */
+export function codeLinkQr(url: string): Promise<string | null> {
+  return invoke<string | null>("code_link_qr", { url });
 }

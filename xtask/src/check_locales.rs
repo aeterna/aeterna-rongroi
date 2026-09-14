@@ -4,6 +4,8 @@
 
 //! `cargo xtask check-locales`: every UI locale must use only keys that exist in English.
 //! Missing keys are warnings (they fall back to English); extra keys and extra files are errors.
+//! Every collector in this build must have a plain name in English (`report.json`, `collector.<id>`),
+//! because the report groups its rows under that name (ADR 0045 §3); a missing one is an error.
 //! Rule translations (`rules/i18n/`) are checked by `check-rules`.
 
 use std::collections::BTreeSet;
@@ -29,7 +31,11 @@ pub fn run(root: &Path) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let outcome = check(root)?;
+    let collector_ids: Vec<&'static str> = rongroi_collectors::all()
+        .iter()
+        .map(|collector| collector.id())
+        .collect();
+    let outcome = check(root, &collector_ids)?;
     if outcome.errors.is_empty() {
         println!(
             "check-locales: en + {} language(s) ok, {} untranslated key(s)",
@@ -44,7 +50,10 @@ pub fn run(root: &Path) -> anyhow::Result<()> {
     }
 }
 
-fn check(root: &Path) -> anyhow::Result<CheckLocalesOutcome> {
+/// The English locale file that names each collector.
+const COLLECTOR_NAMES_FILE: &str = "report.json";
+
+fn check(root: &Path, collector_ids: &[&str]) -> anyhow::Result<CheckLocalesOutcome> {
     let dir = root.join(LOCALES);
     let english_dir = dir.join("en");
     let english_files = json_file_names(&english_dir)?;
@@ -53,6 +62,18 @@ fn check(root: &Path) -> anyhow::Result<CheckLocalesOutcome> {
     }
 
     let mut errors = Vec::new();
+    let english_names = if english_files.contains(COLLECTOR_NAMES_FILE) {
+        keys(&english_dir.join(COLLECTOR_NAMES_FILE))?
+    } else {
+        BTreeSet::new()
+    };
+    for id in collector_ids {
+        if !english_names.contains(&format!("collector.{id}")) {
+            errors.push(format!(
+                "{LOCALES}/en/{COLLECTOR_NAMES_FILE}: collector `{id}` has no plain name (key `collector.{id}`)"
+            ));
+        }
+    }
     let mut warnings = 0;
     let mut languages = 0;
     for entry in std::fs::read_dir(&dir)? {
@@ -194,11 +215,66 @@ mod tests {
         write_locale(tmp.path(), "en", "common.json", r#"{"app":{"name":"x"}}"#);
         write_locale(tmp.path(), "th", "common.json", r#"{"app":{"name":"y"}}"#);
 
-        let outcome = check(tmp.path()).expect("check-locales should run to completion");
+        let outcome = check(tmp.path(), &[]).expect("check-locales should run to completion");
 
         assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
         assert_eq!(outcome.languages, 1);
         assert_eq!(outcome.warnings, 0);
+    }
+
+    /// ADR 0045 §3: the report groups rows under a collector's plain name, so a collector of this
+    /// build without one in English is rejected, and the error names it.
+    #[test]
+    fn collector_without_a_plain_name_is_rejected() {
+        let tmp = TempRoot::new("collector-name-missing");
+        write_locale(
+            tmp.path(),
+            "en",
+            "report.json",
+            r#"{"collector":{"posture":"Security settings"}}"#,
+        );
+
+        let outcome =
+            check(tmp.path(), &["posture", "bam"]).expect("check-locales should run to completion");
+
+        assert_eq!(outcome.errors.len(), 1, "{:?}", outcome.errors);
+        assert!(
+            outcome.errors[0].contains(
+                "apps/desktop/src/locales/en/report.json: collector `bam` has no plain name (key `collector.bam`)"
+            ),
+            "{:?}",
+            outcome.errors
+        );
+    }
+
+    #[test]
+    fn every_collector_with_a_plain_name_passes() {
+        let tmp = TempRoot::new("collector-names-complete");
+        write_locale(
+            tmp.path(),
+            "en",
+            "report.json",
+            r#"{"collector":{"posture":"Security settings","bam":"BAM"}}"#,
+        );
+
+        let outcome =
+            check(tmp.path(), &["posture", "bam"]).expect("check-locales should run to completion");
+
+        assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
+    }
+
+    /// The real repository: every collector `rongroi_collectors::all()` returns has its name.
+    #[test]
+    fn this_repository_names_every_collector() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let ids: Vec<&'static str> = rongroi_collectors::all()
+            .iter()
+            .map(|collector| collector.id())
+            .collect();
+
+        let outcome = check(&root, &ids).expect("check-locales should run to completion");
+
+        assert!(outcome.errors.is_empty(), "{:?}", outcome.errors);
     }
 
     /// Gate (4): a non-English locale key that does not exist in English must be rejected.
@@ -213,7 +289,7 @@ mod tests {
             r#"{"app":{"name":"y","tagline":"z"}}"#,
         );
 
-        let outcome = check(tmp.path()).expect("check-locales should run to completion");
+        let outcome = check(tmp.path(), &[]).expect("check-locales should run to completion");
 
         assert_eq!(outcome.errors.len(), 1, "{:?}", outcome.errors);
         assert!(

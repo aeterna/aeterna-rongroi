@@ -143,6 +143,10 @@ The asymmetry is deliberate:
   people skim. The claim it guards against — reading a match as proof — only exists where there is a
   match.
 
+**Amended by ADR 0045.** The desktop report shows the description beside every row cut to two lines
+until the row is opened; a match starts open, with its false positives. The CLI still prints both in
+full.
+
 ### `check-rules` rejects an `unmeasured_when` entry the collector cannot report
 
 `Collector` gains `fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason]`, mirroring
