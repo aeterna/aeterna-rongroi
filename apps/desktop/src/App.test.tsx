@@ -50,6 +50,10 @@ function subject(view: ReportView) {
 let calls: string[] = [];
 let viewOverride: ReportView | null = null;
 let headerOverride: ReportHeader | null = null;
+let linksOverride: { repository: string; code: string; commit: string | null } | null = null;
+let clipboardWrites: string[] = [];
+const REPOSITORY = "https://github.com/aeterna/aeterna-rongroi";
+const COMMIT = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
 
 beforeAll(async () => {
   await initI18n("en");
@@ -59,6 +63,8 @@ beforeEach(async () => {
   calls = [];
   viewOverride = null;
   headerOverride = null;
+  linksOverride = null;
+  clipboardWrites = [];
   await i18n.changeLanguage("en");
   mockIPC((cmd, args) => {
     calls.push(cmd);
@@ -75,8 +81,19 @@ beforeEach(async () => {
             description: payload.lang === "th" ? THAI_DESCRIPTION : ENGLISH_DESCRIPTION,
             falsepositives: [payload.lang === "th" ? THAI_FALSEPOSITIVE : ENGLISH_FALSEPOSITIVE],
             retention: payload.lang === "th" ? THAI_RETENTION : ENGLISH_RETENTION,
+            status: "test",
+            files: {
+              rule: "rules/posture/boot/secure-boot-disabled/rule.yaml",
+              fixtures: "rules/posture/boot/secure-boot-disabled/tests",
+              collector: "crates/rongroi-collectors/src/posture.rs",
+              references: [],
+            },
           },
         };
+      case "code_links":
+        return linksOverride ?? { repository: REPOSITORY, code: REPOSITORY, commit: null };
+      case "code_link_qr":
+        return `<?xml version="1.0" standalone="yes"?><svg xmlns="http://www.w3.org/2000/svg"></svg>`;
       default:
         throw new Error(`unexpected command ${cmd}`);
     }
@@ -87,6 +104,26 @@ afterEach(() => {
   cleanup();
   clearMocks();
 });
+
+/** Opens a closed row by clicking its title. */
+function openRow(title: string) {
+  fireEvent.click(screen.getByText(title));
+}
+
+function stubClipboard(result: "ok" | "refused") {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      writeText: (text: string) => {
+        if (result === "refused") {
+          return Promise.reject(new Error("refused"));
+        }
+        clipboardWrites.push(text);
+        return Promise.resolve();
+      },
+    },
+  });
+}
 
 describe("App", () => {
   it("snapshots are the Rust pipeline output", () => {
@@ -309,6 +346,8 @@ describe("App", () => {
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Not found: 1 — show what was checked"));
+    openRow("Check: Secure Boot is turned off");
     expect(await screen.findByText(`About this check: ${ENGLISH_DESCRIPTION}`)).toBeTruthy();
     expect(screen.queryByText("Ordinary things that also produce this:")).toBeNull();
     expect(screen.queryByText(ENGLISH_FALSEPOSITIVE)).toBeNull();
@@ -397,6 +436,7 @@ describe("App", () => {
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText(/^Check: /));
     expect(await screen.findByText(new RegExp(sentence))).toBeTruthy();
   });
 
@@ -430,7 +470,103 @@ describe("App", () => {
       await i18n.changeLanguage("th");
     });
     fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    fireEvent.click(await screen.findByText("ไม่เจอ 1 รายการ — กดเพื่อดูว่าตรวจอะไรไปบ้าง"));
+    fireEvent.click(screen.getByText("ตรวจ: Secure Boot ถูกปิดอยู่"));
     expect(await screen.findByText(`ย้อนดูได้: ${THAI_RETENTION}`)).toBeTruthy();
     expect(screen.queryByText(ENGLISH_RETENTION, { exact: false })).toBeNull();
+  });
+
+  // Three counts of states and the sentence that no report proves a PC clean, above the rows; never
+  // one number (ADR 0002, ADR 0045).
+  it("lists how many rows are in each state, beside the sentence that it proves nothing clean", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const summary = await screen.findByRole("region", { name: "What this scan lists" });
+    const buttons = Array.from(summary.querySelectorAll("button"));
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      `${selfView.listed.found}found — each one lists ordinary things that also produce it`,
+      `${selfView.listed.not_found}not found — each row says how far back it can see`,
+      `${selfView.listed.unmeasured}not measured — each row says why`,
+    ]);
+    expect(summary.textContent).toContain("This report cannot prove that a PC is clean.");
+  });
+
+  it("filters the rows to one state from its count", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const summary = await screen.findByRole("region", { name: "What this scan lists" });
+    const found = summary.querySelector("button");
+    if (!found) throw new Error("no count");
+    fireEvent.click(found);
+    expect(found.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Check: Secure Boot is turned off")).toBeTruthy();
+    expect(screen.queryByText(/— show what was checked$/)).toBeNull();
+    fireEvent.click(screen.getByText("Show every state"));
+    expect(found.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("groups rows under a plain name for their collector", async () => {
+    render(<App />);
+    await act(async () => {
+      await i18n.changeLanguage("th");
+    });
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(await screen.findByRole("region", { name: "การตั้งค่าความปลอดภัยของเครื่อง" })).toBeTruthy();
+  });
+
+  it("starts a not-found row closed, with the description cut short and not labelled", async () => {
+    const first = subject(selfView);
+    viewOverride = {
+      ...selfView,
+      evidence: [
+        {
+          rule_id: first.rule_id,
+          collector: first.collector,
+          strength: first.strength,
+          state: "not_found",
+          retention: ENGLISH_RETENTION,
+        },
+      ],
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Not found: 1 — show what was checked"));
+    const head = screen.getByText("Check: Secure Boot is turned off").closest("button");
+    expect(head?.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByText(ENGLISH_DESCRIPTION)).toBeTruthy();
+    expect(screen.queryByText(`About this check: ${ENGLISH_DESCRIPTION}`)).toBeNull();
+  });
+
+  it("opens technical details and the rule's files at this build's commit", async () => {
+    linksOverride = {
+      repository: REPOSITORY,
+      code: `${REPOSITORY}/tree/${COMMIT}`,
+      commit: COMMIT,
+    };
+    stubClipboard("ok");
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByLabelText("Show technical details for every row"));
+    expect(screen.getAllByText(RULE_ID).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("secure_boot").length).toBeGreaterThan(0);
+    const rulePath = screen.getByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
+    const copy = rulePath.parentElement?.querySelector("button");
+    if (!copy) throw new Error("no copy button");
+    await act(async () => {
+      fireEvent.click(copy);
+    });
+    expect(clipboardWrites).toEqual([
+      `${REPOSITORY}/blob/${COMMIT}/rules/posture/boot/secure-boot-disabled/rule.yaml`,
+    ]);
+    expect(copy.textContent).toBe("Copied");
+  });
+
+  it("shows no file links for an unofficial build and says why", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByLabelText("Show technical details for every row"));
+    const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
+    expect(rulePath.parentElement?.querySelector("button")).toBeNull();
+    expect(screen.getAllByText(/This build is not official/).length).toBeGreaterThan(0);
   });
 });
