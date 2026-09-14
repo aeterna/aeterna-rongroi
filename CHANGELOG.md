@@ -34,6 +34,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   already read, with file names dropped in the parser and no journal identifier in the report. No code
   until it is measured whether the journal can be read on a volume handle opened without write access;
   if it cannot, the M3 item closes as decided against.
+- ADR 0046 and ADR 0047 carry measurements from a GitHub-hosted Windows Server 2025 runner under an
+  elevated token, a restricted token and a standard account. Driver services and their files were readable
+  without Administrators there, and hashing them took 15.5 seconds cold. The USN journal read on a volume
+  handle opened without write access, returned only version 3 records, and matched folders by their 128-bit
+  identifier; without Administrators the volume could not be opened.
 
 ## [0.3.0] - 2026-09-14
 

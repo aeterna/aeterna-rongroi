@@ -2,6 +2,7 @@
 
 - Status: accepted — the recommendation below, and no collector code until the measurements under "Before any code" exist
 - Date: 2026-09-14
+- Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner")
 
 ## Context
 
@@ -286,10 +287,77 @@ Each of these is a measurement or a decision, written into the collector's own A
    pinned commit when the file is made.
 5. **A baseline** from the runner, with its limitation written in `fixtures/hosts/PROVENANCE.md`.
 
+## Measured on a runner
+
+**Where and how.** One GitHub-hosted runner, image `windows-2025-vs2026`, Windows Server 2025 Datacenter
+build 26100, on 2026-09-14: workflow run [`34868203532`](https://github.com/aeterna/aeterna-rongroi/actions/runs/34868203532), commit `077a7e0` on a throwaway branch that was deleted afterwards. The
+probe was a PowerShell script compiling C# at run time. It printed counts, forms and error codes and
+nothing else, and it is not kept in this repository. It ran under three tokens:
+
+- **elevated:** the runner's own token. GitHub's runners run as administrator with UAC off
+  (`.github/workflows/windows.yml`);
+- **restricted:** a token made from that one with `CreateRestrictedToken`, Administrators and
+  `S-1-5-114` deny-only and privileges removed with `DISABLE_MAX_PRIVILEGE`, used by impersonation. It keeps the
+  elevated token's integrity level, so it is not a UAC limited token;
+- **standard user:** a local account created for the run, not a member of Administrators, running the
+  probe through a scheduled task. That is the closest the runner comes to an ordinary account.
+
+The runner and the account were discarded with it.
+
+| | Elevated | Restricted | Standard user |
+|---|---|---|---|
+| Keys directly under `HKLM\SYSTEM\CurrentControlSet\Services` | 764 | 764 | 764 |
+| Of those, opened for reading | 764 | 764 | 764 |
+| Driver services: `Type` 1 or 2 | 422 | 422 | 422 |
+| Driver files resolved, opened and hashed with SHA-256 | 422 | 422 | 422 |
+| Bytes hashed | 147 217 632 | 147 217 632 | 147 217 632 |
+| Time for all of the above | 15.5 s | 0.23 s | 0.28 s |
+| `EnumDeviceDrivers`: entries / with a non-null base | 257 / 257 | 257 / 0 | 257 / 0 |
+
+The first pass read the files cold. The later passes read files the system had just cached, so their
+times say nothing about a scan.
+
+**`ImagePath` forms**, of the 422 driver services:
+
+| Form | Services |
+|---|---|
+| `System32\…`, relative | 218 |
+| `\SystemRoot\…` | 188 |
+| absent | 14 |
+| `\??\…` | 2 |
+| a drive letter, `%…%`, quoted, or anything else | 0 |
+
+Every `ImagePath` present was `REG_EXPAND_SZ` (408).
+
+**An absent `ImagePath`.** For all 14, `%SystemRoot%\System32\drivers\<service name>.sys` existed and was
+hashed, and 9 of the 14 were loaded under that file name (`EnumDeviceDrivers`, elevated). That fits Windows
+using that path when the value is absent. It is one image's evidence, not a documented rule.
+
+### What that settles, and what it does not
+
+1. **Rights, on this image:** a token without Administrators lists every driver service, reads `Type`
+   and `ImagePath`, and hashes every driver file. Measurement 1 asked this of a real Windows 11 PC. A
+   runner has only Microsoft's drivers under `%SystemRoot%`; a gaming PC keeps third-party drivers in other
+   folders with other ACLs, and those were not reached. Measurement 1 stays open for a PC.
+2. **Resolver cases:** the four forms above. Forms that did not occur here, a drive letter from a
+   third-party installer among them, are not handled by guessing: a form the resolver does not know leaves
+   that file's `sha256` a gap.
+3. **Cost:** 422 files and about 140 MiB, 15.5 seconds cold. That is half of `evtx`'s whole 30-second budget
+   (ADR 0024) on a machine with no third-party drivers, so the collector needs a budget of its own, and
+   hashing is where it goes.
+4. **`EnumDeviceDrivers` without Administrators returns no base addresses on build 26100**, as
+   Microsoft's page says of 24H2. Question 2's reason for not proposing it now rests on a measurement too.
+5. **The data file** (measurement 4) was not counted: that needs the LOLDrivers data downloaded, which is
+   done in the pull request that makes the file.
+6. **A baseline** (measurement 5): this run shows the runner has 422 driver services to describe. The
+   baseline fixture is made from a run of the collector itself, so that its observations have the
+   collector's shape, not from this probe's counts.
+
 ## What is not established
 
-- Every rights statement about the registry path and the driver files. Nothing was run on Windows.
-- The `ImagePath` forms and the default for an absent `ImagePath`.
+- Rights on a Windows 11 PC, and for driver files outside `%SystemRoot%`.
+- `ImagePath` forms on a PC with third-party drivers, and a primary source for the default when it is
+  absent.
 - How many hashes LOLDrivers holds per category, and how many samples lack a `SHA256`.
 - Whether any Microsoft document names the blocklist switch. The pages read here do not.
 - The download terms of Microsoft's blocklist.
