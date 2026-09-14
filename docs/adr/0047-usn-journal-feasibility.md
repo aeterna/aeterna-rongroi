@@ -2,6 +2,7 @@
 
 - Status: accepted — the recommendation below; no code until measurement 1 under "Before any code" passes
 - Date: 2026-09-14
+- Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner"): measurement 1 passed
 
 ## Context
 
@@ -319,14 +320,87 @@ account; `tamper` only for a shape a baseline shows ordinary machines do not hav
 6. **A baseline.** Counts per watched folder from the runner, with no names, in a `baseline-*` host whose
    `fixtures/hosts/PROVENANCE.md` row says it is a runner image and not a gaming PC.
 
+## Measured on a runner
+
+**Where and how.** One GitHub-hosted runner, image `windows-2025-vs2026`, Windows Server 2025 Datacenter
+build 26100, on 2026-09-14: workflow run [`34868203532`](https://github.com/aeterna/aeterna-rongroi/actions/runs/34868203532), commit `077a7e0` on a throwaway branch that was deleted afterwards. The
+probe was a PowerShell script compiling C# at run time. It printed counts, forms and error codes and
+nothing else, and it is not kept in this repository. It ran under three tokens:
+
+- **elevated:** the runner's own token. GitHub's runners run as administrator with UAC off
+  (`.github/workflows/windows.yml`);
+- **restricted:** a token made from that one with `CreateRestrictedToken`, Administrators and
+  `S-1-5-114` deny-only and privileges removed with `DISABLE_MAX_PRIVILEGE`, used by impersonation. It keeps the
+  elevated token's integrity level, so it is not a UAC limited token;
+- **standard user:** a local account created for the run, not a member of Administrators, running the
+  probe through a scheduled task. That is the closest the runner comes to an ordinary account.
+
+The runner and the account were discarded with it.
+
+The same run carried ADR 0046's measurements. Every volume handle below was opened with `GENERIC_READ` and
+`FILE_SHARE_READ | FILE_SHARE_WRITE`, `OPEN_EXISTING`. The probe had a control that opens with
+`GENERIC_WRITE` as well, and it runs only if the read-only attempt fails. **It never ran.**
+
+| | Elevated | Restricted | Standard user |
+|---|---|---|---|
+| Open `\\.\C:` (NTFS, system volume) | ok | failed, 5 (`ERROR_ACCESS_DENIED`) | failed, 5 |
+| Open `\\.\D:` (NTFS) | ok | failed, 5 | failed, 5 |
+| `FSCTL_QUERY_USN_JOURNAL` on C: | ok, 80 bytes back | — | — |
+| `FSCTL_QUERY_USN_JOURNAL` on D: | failed, 1179 (`ERROR_JOURNAL_NOT_ACTIVE`) | — | — |
+| `FSCTL_READ_USN_JOURNAL` on C:, from `FirstUsn` to the query's `NextUsn` | ok | — | — |
+
+**The journal on C:.** `MaximumSize` 33 554 432 bytes (32 MiB), `AllocationDelta` 8 388 608. `NextUsn` minus
+`FirstUsn` was 35 781 184 bytes. `FirstUsn` was not equal to `LowestValidUsn`, so records had been trimmed
+since the journal was made. Supported major versions 2 to 4.
+
+**The read.** `READ_USN_JOURNAL_DATA_V1` was accepted at 48 bytes, asking for major versions 2 to 3. With a
+1 MiB output buffer it took 40 calls and 1.04 seconds, and returned 371 278 records in 41 321 568 bytes.
+**Every record was major version 3**; none was version 2, and none was malformed. The oldest record was
+from 2026-09-08T01:11Z and the newest from the moment of the read: about six and a half days on a runner
+image, which is not a measurement of a PC.
+
+**Folder identifiers.** Before the read, the probe made a folder on C:, created a file in it, renamed the
+file and deleted it. The folder's 128-bit identifier from `GetFileInformationByHandleEx` with `FileIdInfo`
+was compared with each version 3 record's `ParentFileReferenceNumber`:
+
+| Folder | Records whose parent matched | With a create | Rename | Delete | Data change |
+|---|---|---|---|---|---|
+| the probe's own folder | 7 | 3 | 3 | 1 | 2 |
+| `%SystemRoot%\System32\winevt\Logs` | 723 | 3 | 0 | 0 | 722 |
+| `%SystemRoot%\Prefetch` | 0 | | | | |
+| `%WinDir%\appcompat\pca` | 0 | | | | |
+
+A record can carry several reasons, so a row's columns do not add up to its total. The probe's folder got
+exactly the create, rename and delete it made. The runner's Prefetch and PCA folders got none in six and a
+half days, which is consistent with a runner image and says nothing about a PC. Without Administrators the
+Prefetch folder itself could not be opened (5); the Event Log and PCA folders could.
+
+### What that settles, and what it does not
+
+1. **Measurement 1 passed.** Both read operations work on a volume handle opened without `GENERIC_WRITE`.
+   The M3 item stays open, and Recommendation 2 onward applies.
+2. **Rights:** without Administrators the volume cannot be opened, with error 5, under a restricted token
+   and under a standard account. A collector reports `not_admin`.
+3. **Folder identifiers:** the 128-bit identifier matches, shown by a folder with known changes in it.
+   The 64-bit comparison for version 2 records was not exercised, because none arrived.
+4. **Versions:** this image returned version 3 when asked for 2 to 3. Whether a Windows 11 PC returns
+   version 2 is not known. A collector that asks for 3 to 3 would need only the 128-bit comparison, if a PC
+   honours that request, which is also not known.
+5. **No journal:** a volume without one answers the query with 1179, `ERROR_JOURNAL_NOT_ACTIVE`. That is
+   `source_absent`. Whether any other error means the same is not known.
+6. **Cost:** about 39 MiB of records in about a second, for a journal whose `MaximumSize` is 32 MiB. A read to `NextUsn` fits inside a
+   scan without cutting off the newest records.
+7. **A baseline** (measurement 6): the per-folder counts above are the runner's. The fixture is made from a
+   run of the collector itself.
+
 ## What is not established
 
-- Every rights and behaviour statement above beyond what Microsoft's pages say. Nothing was run on
-  Windows.
-- Whether the journal is on by default on Windows 10 and 11, and its default size.
-- Whether a read on a `GENERIC_READ` volume handle succeeds.
-- Whether record parent references match folder identifiers.
-- How long an ordinary journal retains, and how many records a scan reads.
+- Every rights and behaviour statement on a Windows 10 or 11 PC. The runner is Windows Server 2025.
+- Whether the journal is on by default on Windows 10 and 11, and its default size there.
+- Whether a PC returns version 2 records, whether it honours a request for version 3 only, and the 64-bit
+  parent comparison.
+- How long an ordinary journal retains on a PC, and how many records a scan of one reads.
+- Records in a Prefetch folder on a machine where Prefetch is on.
 - The contract of `FSCTL_READ_UNPRIVILEGED_USN_JOURNAL`.
 
 ## Consequences
