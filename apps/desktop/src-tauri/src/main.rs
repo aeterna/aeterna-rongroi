@@ -7,6 +7,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod qr;
 mod webview_hardening;
 
 use rongroi_collectors::scan::{self, ScanContext};
@@ -52,7 +53,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::report_header,
             commands::report_view,
             commands::rule_texts,
-            commands::relaunch_elevated
+            commands::relaunch_elevated,
+            commands::code_links,
+            commands::code_link_qr
         ])
         .setup(move |app| {
             webview_hardening::build_main_window(app, &window_dir)?;

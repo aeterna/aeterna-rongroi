@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 
 use rongroi_core::model::{Mode, ReportHeader};
+use rongroi_core::provenance::REPOSITORY_URL;
 use rongroi_core::rules::RuleText;
 use rongroi_core::view::{self, ReportView};
 use tauri::State;
@@ -87,4 +88,32 @@ pub fn rule_texts(state: State<'_, AppState>, lang: &str) -> BTreeMap<String, Ru
             state.bundle.text(id, lang).map(|text| (id.clone(), text))
         })
         .collect()
+}
+
+/// Where this binary's code can be read (ADR 0045).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct CodeLinks {
+    /// The repository.
+    pub repository: String,
+    /// The commit of an official build, the repository otherwise.
+    pub code: String,
+    /// The commit whose code this binary is; `None` unless this is an official build.
+    pub commit: Option<String>,
+}
+
+/// Where this binary's code can be read.
+#[tauri::command]
+pub fn code_links(state: State<'_, AppState>) -> CodeLinks {
+    let provenance = &state.report.header.provenance;
+    CodeLinks {
+        repository: REPOSITORY_URL.to_owned(),
+        code: provenance.code_url(),
+        commit: provenance.code_commit().map(str::to_owned),
+    }
+}
+
+/// A QR code of a link into the repository, as SVG text (ADR 0045).
+#[tauri::command]
+pub fn code_link_qr(url: &str) -> Option<String> {
+    crate::qr::svg(url)
 }
