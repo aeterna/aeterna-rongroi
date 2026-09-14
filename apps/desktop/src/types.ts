@@ -115,10 +115,20 @@ export interface ReportView {
   };
 }
 
+/** Where a rule, its fixtures and its collector are in the repository, from its root (ADR 0045). */
+export interface RuleFiles {
+  rule: string;
+  fixtures: string;
+  collector: string;
+  references: string[];
+}
+
 export interface RuleText {
   title: string;
   description: string;
   falsepositives: string[];
   /** Look-back note for `not_found`, translated. Evidence keeps the English source. */
   retention: string;
+  status: "experimental" | "test" | "stable" | "deprecated";
+  files: RuleFiles;
 }

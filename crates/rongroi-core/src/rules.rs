@@ -346,6 +346,36 @@ pub struct RuleTextOverride {
 /// `language -> rule id -> translated text`.
 pub type Translations = BTreeMap<String, BTreeMap<String, RuleTextOverride>>;
 
+/// Where a rule, its fixtures and the collector it reads are in the repository, as paths from the
+/// repository root with `/` separators, and the rule's own references (ADR 0045).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuleFiles {
+    /// The rule's `rule.yaml`.
+    pub rule: String,
+    /// The folder of the rule's fixtures.
+    pub fixtures: String,
+    /// The file of the collector the rule reads.
+    pub collector: String,
+    /// The rule's `references`, unchanged.
+    pub references: Vec<String>,
+}
+
+impl RuleFiles {
+    /// The files of `sourced`, derived from its path and its collector.
+    pub fn of(sourced: &SourcedRule) -> Self {
+        let dir = sourced.path.rsplit_once('/').map_or("", |(dir, _)| dir);
+        Self {
+            rule: format!("rules/{}", sourced.path),
+            fixtures: format!("rules/{dir}/tests"),
+            collector: format!(
+                "crates/rongroi-collectors/src/{}.rs",
+                sourced.rule.collector
+            ),
+            references: sourced.rule.references.clone(),
+        }
+    }
+}
+
 /// Text of a rule in one language, with English fallback already applied.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuleText {
@@ -357,6 +387,10 @@ pub struct RuleText {
     pub falsepositives: Vec<String>,
     /// How far back the source can see. Reports keep the English `retention`; this is for display.
     pub retention: String,
+    /// Lifecycle status, for the technical layer of a row.
+    pub status: Status,
+    /// Where the rule, its fixtures and its collector are in the repository (ADR 0045).
+    pub files: RuleFiles,
 }
 
 /// A validation problem in the rules tree.

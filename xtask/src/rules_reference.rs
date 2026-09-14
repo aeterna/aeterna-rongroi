@@ -21,7 +21,8 @@ use std::path::Path;
 use anyhow::{Context, bail};
 use rongroi_core::bundle::{Bundle, BundleError, BundleInfo};
 use rongroi_core::rules::{
-    MatchKey, Operator, RelatedKind, Rule, RuleText, SourcedRule, Status, parse_match_key,
+    MatchKey, Operator, RelatedKind, Rule, RuleFiles, RuleText, SourcedRule, Status,
+    parse_match_key,
 };
 use rongroi_core::source_tree::collect_bundle_json;
 
@@ -546,6 +547,8 @@ fn render_rule(
             description: rule.description.clone(),
             falsepositives: rule.falsepositives.clone(),
             retention: rule.retention.clone(),
+            status: rule.status,
+            files: RuleFiles::of(sourced),
         });
     // `Bundle::text` falls back to English per field; the page says where it did.
     let marker = |same: bool| {
