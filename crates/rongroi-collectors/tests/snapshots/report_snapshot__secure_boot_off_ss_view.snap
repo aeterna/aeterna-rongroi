@@ -195,6 +195,11 @@ expression: view
     "not_admin": 1,
     "not_attempted": 0
   },
+  "listed": {
+    "found": 1,
+    "not_found": 6,
+    "unmeasured": 12
+  },
   "hidden": {
     "not_found": 1,
     "unmeasured_expected": 1,

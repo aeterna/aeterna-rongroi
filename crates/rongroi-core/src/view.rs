@@ -55,6 +55,33 @@ pub struct ScopeNotes {
     pub not_attempted: usize,
 }
 
+/// How many pieces of the evidence a view lists are in each state (ADR 0045).
+///
+/// Three counts of states, never added into one number: each still needs its rows read, which is
+/// what separates them from the pass/fail total ADR 0002 rules out. SS mode counts what its view
+/// lists here and everything else in [`HiddenCounts`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ListedCounts {
+    /// Listed evidence whose rule matched.
+    pub found: usize,
+    /// Listed evidence that looked and found nothing.
+    pub not_found: usize,
+    /// Listed evidence that could not look, for any reason.
+    pub unmeasured: usize,
+}
+
+fn listed_counts(evidence: &[Evidence]) -> ListedCounts {
+    let mut counts = ListedCounts::default();
+    for item in evidence {
+        match item.state {
+            EvidenceState::Found { .. } => counts.found += 1,
+            EvidenceState::NotFound { .. } => counts.not_found += 1,
+            EvidenceState::Unmeasured { .. } => counts.unmeasured += 1,
+        }
+    }
+    counts
+}
+
 /// A report as one audience may see it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportView {
@@ -73,6 +100,9 @@ pub struct ReportView {
     /// Facts about the scan itself, above the evidence in both modes.
     #[serde(default)]
     pub scope: ScopeNotes,
+    /// How many of `evidence` are in each state (ADR 0045). Additive; the report schema stays at 1.
+    #[serde(default)]
+    pub listed: ListedCounts,
     /// What this view does not list.
     pub hidden: HiddenCounts,
 }
@@ -138,6 +168,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
             own_traces: report.own_traces.clone(),
             unmatched: report.unmatched.clone(),
             scope: scope_notes(report),
+            listed: listed_counts(&report.evidence),
             hidden: HiddenCounts::default(),
         },
         Mode::Ss => {
@@ -166,6 +197,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
                 .iter()
                 .map(|group| group.observations.len())
                 .sum();
+            let listed = listed_counts(&evidence);
             ReportView {
                 mode,
                 header: report.header.clone(),
@@ -173,6 +205,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
                 own_traces: report.own_traces.iter().map(redacted_own_trace).collect(),
                 unmatched: Vec::new(),
                 scope: scope_notes(report),
+                listed,
                 hidden,
             }
         }
@@ -655,5 +688,41 @@ mod tests {
         let json = serde_json::to_string(&for_mode(&report(), Mode::Ss)).unwrap();
         assert!(!json.contains(USER), "{json}");
         assert!(json.contains("%USERPROFILE%"));
+    }
+
+    /// Three counts of what each view lists, never one number (ADR 0045).
+    #[test]
+    fn listed_counts_are_the_states_of_what_each_view_lists() {
+        let own = for_mode(&report(), Mode::SelfCheck);
+        assert_eq!(
+            own.listed,
+            ListedCounts {
+                found: 1,
+                not_found: 1,
+                unmeasured: 5
+            }
+        );
+        let ss = for_mode(&report(), Mode::Ss);
+        assert_eq!(
+            ss.listed,
+            ListedCounts {
+                found: 1,
+                not_found: 0,
+                unmeasured: 2
+            }
+        );
+    }
+
+    /// In SS mode the listed counts and the hidden counts together account for every rule once.
+    #[test]
+    fn ss_listed_and_hidden_counts_account_for_every_result() {
+        let report = report();
+        let view = for_mode(&report, Mode::Ss);
+        let listed = view.listed.found + view.listed.not_found + view.listed.unmeasured;
+        let hidden = view.hidden.not_found
+            + view.hidden.unmeasured_expected
+            + view.hidden.unmeasured_unexpected;
+        assert_eq!(listed + hidden, report.evidence.len());
+        assert_eq!(listed, view.evidence.len());
     }
 }

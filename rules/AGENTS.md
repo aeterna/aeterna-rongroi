@@ -110,7 +110,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   a log-clearing rule, whose record a later clearing removes — must not be `posture`, or the report
   grows a row that reads as "we looked and it is clean", which is the closest this program can come to a
   verdict (ADR 0002, ADR 0031).
-- `status: test` or `stable` needs a positive and a negative fixture in `tests/`. Fixtures are
+- `status: test` or `stable` needs a positive and a negative fixture in `tests/`. Every rule,
+  `experimental` included, needs a `tests/` folder holding at least one fixture file, because the report
+  links to it and `check-rules` refuses a rule without one (ADR 0045). Fixtures are
   hand-written observations, so they test the engine and the predicate — **not** that a real machine
   produces the strings the rule matches. Where the matched value comes from Windows rather than from our
   own collector, and no file in this repository carries it, `experimental` is what the evidence supports

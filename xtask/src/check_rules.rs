@@ -83,6 +83,17 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         let positive = json_files(&tests_dir.join("positive"))?;
         let negative = json_files(&tests_dir.join("negative"))?;
 
+        // Every rule links to `tests/` from the report, `experimental` ones included (ADR 0045), and
+        // git keeps no empty folder — so a rule missing this one can never have been given even one
+        // fixture. `status.needs_fixtures()` below asks a stricter question (a positive *and* a
+        // negative fixture) that only `test` and `stable` must answer; this one is unconditional.
+        if !tests_dir.is_dir() {
+            problems.push(format!(
+                "rules/{}: every rule needs a tests/ folder with at least one fixture file; the report links to it (ADR 0045)",
+                sourced.path
+            ));
+        }
+
         if sourced.rule.status.needs_fixtures() {
             if positive.is_empty() {
                 problems.push(format!(
@@ -459,6 +470,14 @@ mod tests {
         fs::write(path, contents).expect("write fixture file");
     }
 
+    /// A rule directory's `tests/` folder, present but holding nothing. Used by tests whose fixture
+    /// content is beside the point, so the unconditional "every rule needs a tests/ folder" check
+    /// (ADR 0045) does not add a second, unrelated problem to their assertions. Git itself never keeps
+    /// a folder this empty; only this in-process temp tree can.
+    fn write_empty_tests_dir(rule_dir: &Path) {
+        fs::create_dir_all(rule_dir.join("tests")).expect("create empty tests dir");
+    }
+
     /// Modelled on the real `rules/posture/boot/secure-boot-disabled/rule.yaml`.
     const VALID_RULE: &str = "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7
 title: Secure Boot is turned off
@@ -564,18 +583,17 @@ date: 2026-09-11
     #[test]
     fn duplicate_rule_id_is_rejected() {
         let tmp = TempRoot::new("dup-id");
-        // `experimental` does not need fixtures, so the only expected problem is the duplicate id.
+        // `experimental` does not need fixtures, so with a tests/ folder present the only expected
+        // problem is the duplicate id.
         let rule = VALID_RULE.replace("status: test", "status: experimental");
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled-copy/rule.yaml"),
-            &rule,
-        );
+        let first = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        let second = tmp
+            .path()
+            .join("rules/posture/boot/secure-boot-disabled-copy");
+        write(&first.join("rule.yaml"), &rule);
+        write(&second.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&first);
+        write_empty_tests_dir(&second);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -587,6 +605,46 @@ date: 2026-09-11
             "{:?}",
             outcome.problems
         );
+    }
+
+    /// An `experimental` rule needs no positive or negative fixture, but it still needs the `tests/`
+    /// folder itself: the report links to it for every rule (ADR 0045), and git keeps no folder this
+    /// empty, so a rule missing it can never have even one fixture committed for it.
+    #[test]
+    fn an_experimental_rule_without_a_tests_folder_is_rejected() {
+        let tmp = TempRoot::new("no-tests-folder");
+        let rule = VALID_RULE.replace("status: test", "status: experimental");
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        // No `tests/` folder at all — not even an empty one.
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains(
+                "rules/posture/boot/secure-boot-disabled/rule.yaml: every rule needs a tests/ folder with at least one fixture file; the report links to it (ADR 0045)"
+            ),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// The mirror of the rejection above: once the `tests/` folder exists — even empty, which git
+    /// cannot actually keep, but which is enough for this gate — an `experimental` rule passes without
+    /// a positive or negative fixture. `status: test` and `stable` are the ones that need more, in
+    /// `status_test_without_negative_fixture_is_rejected` below.
+    #[test]
+    fn an_experimental_rule_with_only_an_empty_tests_folder_passes() {
+        let tmp = TempRoot::new("empty-tests-folder");
+        let rule = VALID_RULE.replace("status: test", "status: experimental");
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
     }
 
     /// Gate (2): a `status: test` rule with no negative fixture must be rejected.
@@ -618,15 +676,14 @@ date: 2026-09-11
     #[test]
     fn a_rule_naming_a_collector_this_build_does_not_have_is_rejected() {
         let tmp = TempRoot::new("unknown-collector");
-        // `experimental` needs no fixtures, so the collector id is the only expected problem.
+        // `experimental` needs no fixtures, so with a tests/ folder present the collector id is the
+        // only expected problem.
         let rule = VALID_RULE
             .replace("status: test", "status: experimental")
             .replace("collector: posture", "collector: postures");
-        write(
-            &tmp.path()
-                .join("rules/postures/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/postures/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -657,11 +714,9 @@ date: 2026-09-11
         let rule = VALID_RULE
             .replace("status: test", "status: experimental")
             .replace("  secure_boot: disabled", "  secure_boo: disabled");
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -683,11 +738,9 @@ date: 2026-09-11
         let rule = VALID_RULE
             .replace("status: test", "status: experimental")
             .replace("  secure_boot: disabled", "  wallpaper: blue");
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -738,11 +791,9 @@ date: 2026-09-11
                 "retention: Current setting only.",
                 "retention: Current setting only.\nunmeasured_when: [service_disabled]",
             );
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -775,11 +826,9 @@ date: 2026-09-11
                 "retention: Current setting only.",
                 "retention: Current setting only.\nunmeasured_when: [source_empty]",
             );
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -987,11 +1036,9 @@ date: 2026-09-11
 
     fn problems_for(label: &str, rule: &str) -> Vec<String> {
         let tmp = TempRoot::new(label);
-        write(
-            &tmp.path()
-                .join("rules/prefetch/execution/example/rule.yaml"),
-            rule,
-        );
+        let dir = tmp.path().join("rules/prefetch/execution/example");
+        write(&dir.join("rule.yaml"), rule);
+        write_empty_tests_dir(&dir);
         check(tmp.path())
             .expect("check-rules should run to completion")
             .problems

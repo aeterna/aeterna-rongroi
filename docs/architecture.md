@@ -127,6 +127,10 @@ Both are mandatory in every rule and translated with the rest of its text (ADR 0
 The `scope` numbers are not hidden counts: in SS mode those rules are counted in `hidden.unmeasured_*`
 as well, so the hidden counts keep accounting for everything the view leaves out.
 
+`listed.found` / `listed.not_found` / `listed.unmeasured` count the evidence the view lists, in both
+modes; in SS mode listed plus hidden accounts for every rule once; they are three counts and never
+added into one number (ADR 0002, ADR 0045).
+
 Redaction is implemented and tested in `rongroi-core::view` (AGENTS.md hard rule 5).
 
 ## Rules bundle

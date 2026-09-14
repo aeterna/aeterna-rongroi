@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::provenance::sha256_hex;
 use crate::rules::{
-    self, Problem, RULES_SCHEMA_VERSION, Rule, RuleText, SourcedRule, Translations,
+    self, Problem, RULES_SCHEMA_VERSION, Rule, RuleFiles, RuleText, SourcedRule, Translations,
 };
 
 const EMBEDDED: &str = include_str!(concat!(env!("OUT_DIR"), "/rules_bundle.json"));
@@ -143,7 +143,8 @@ impl Bundle {
 
     /// Text of a rule in `lang`, falling back to English for anything not translated.
     pub fn text(&self, rule_id: &str, lang: &str) -> Option<RuleText> {
-        let rule = &self.rules.iter().find(|s| s.rule.id == rule_id)?.rule;
+        let sourced = self.rules.iter().find(|s| s.rule.id == rule_id)?;
+        let rule = &sourced.rule;
         let translated = self
             .translations
             .get(lang)
@@ -161,6 +162,8 @@ impl Bundle {
             retention: translated
                 .and_then(|t| t.retention.clone())
                 .unwrap_or_else(|| rule.retention.clone()),
+            status: rule.status,
+            files: RuleFiles::of(sourced),
         })
     }
 }
@@ -233,5 +236,35 @@ mod tests {
         let a = Bundle::from_bundle_json(&bundle_json("")).unwrap();
         let b = Bundle::from_bundle_json(&bundle_json("# changed\n")).unwrap();
         assert_ne!(a.info().sha256, b.info().sha256);
+    }
+
+    #[test]
+    fn text_carries_the_status_and_files_of_the_rule() {
+        let bundle = Bundle::from_bundle_json(&bundle_json("")).unwrap();
+        let text = bundle
+            .text("7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7", "th")
+            .unwrap();
+        assert_eq!(text.status, crate::rules::Status::Test);
+        assert_eq!(text.files.rule, "rules/posture/boot/example/rule.yaml");
+        assert_eq!(text.files.fixtures, "rules/posture/boot/example/tests");
+        assert_eq!(
+            text.files.collector,
+            "crates/rongroi-collectors/src/posture.rs"
+        );
+        assert!(text.files.references.is_empty());
+    }
+
+    /// A path the UI shows must lead somewhere: every embedded rule names files that exist in the
+    /// workspace it was built from (ADR 0045).
+    #[test]
+    fn every_embedded_rule_names_files_that_exist() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let bundle = Bundle::embedded().unwrap();
+        for sourced in bundle.rules() {
+            let files = crate::rules::RuleFiles::of(sourced);
+            assert!(root.join(&files.rule).is_file(), "{}", files.rule);
+            assert!(root.join(&files.fixtures).is_dir(), "{}", files.fixtures);
+            assert!(root.join(&files.collector).is_file(), "{}", files.collector);
+        }
     }
 }

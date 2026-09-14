@@ -32,6 +32,9 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **boot time** | Report-header context: when the running Windows kernel started counting — the scan's clock minus `GetTickCount64` — or why there is no value. Never evidence and never read by a rule. Not "when the PC was last turned on": a "Shut down" with Fast Startup, sleep and hibernation do not reset it (ADR 0039) | `rongroi_core::model::BootTime`, `rongroi_host::BootTimeSource`, header field `boot_time` |
 | **Self mode / SS mode** | Full local view / screenshare view with consent, matches only, redacted paths | `Mode::SelfCheck`, `Mode::Ss` |
 | **rules bundle** | All rules compiled and embedded in the executable, identified by its SHA-256 | `rongroi_core::bundle` |
+| **listed counts** | How many pieces of the evidence a view lists are in each state — found, not found, unmeasured. Three numbers, never added into one: not a pass/fail total (ADR 0045) | `rongroi_core::view::ListedCounts` |
+| **rule files** | Where a Rule's `rule.yaml`, its fixtures folder and its Collector's file are in the repository, with its references | `rongroi_core::rules::RuleFiles` |
+| **code link** | Where to read this binary's code: the commit of an official build, the repository otherwise | `Provenance::code_url`, `REPOSITORY_URL` |
 | **official build** | A binary built by the upstream release workflow; anything else is **unofficial** | `rongroi_core::provenance` |
 | **build marker** | The text `aeterna-rongroi build marker: official=<flag>;commit=<sha>;` embedded in every binary; the report's provenance is read from it | `rongroi_core::provenance::build_marker` |
 | **path** | Observation field: the full path of the file the observation is about, as it was read. Redacted to `%USERPROFILE%` in SS mode | observation field `path` |

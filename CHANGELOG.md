@@ -5,6 +5,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Listed counts: every report view carries how many of the evidence it lists are found, not found and
+  not measured, and the text report prints them on one line above the evidence. Three numbers, never
+  one (ADR 0045).
+- The code link: the text report prints, above its closing footer line, where to read this binary's
+  code — the commit of an official build, or the repository with a note that the code of an unofficial
+  build is not known. Rule text now carries each rule's status and where its rule, fixtures and
+  collector are in the repository, checked to exist by a test (ADR 0045).
+
 ## [0.3.0] - 2026-09-14
 
 ### Added

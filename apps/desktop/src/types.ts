@@ -85,6 +85,13 @@ export interface UnmatchedGroup {
   observations: Observation[];
 }
 
+/** How many of the evidence a view lists are in each state (ADR 0045). Never added into one number. */
+export interface ListedCounts {
+  found: number;
+  not_found: number;
+  unmeasured: number;
+}
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
@@ -99,6 +106,7 @@ export interface ReportView {
    * one with a remedy. It is not a fourth hidden count; the same checks are in `hidden` (ADR 0027).
    */
   scope: { not_admin: number; not_attempted: number };
+  listed: ListedCounts;
   hidden: {
     not_found: number;
     unmeasured_expected: number;
@@ -107,10 +115,20 @@ export interface ReportView {
   };
 }
 
+/** Where a rule, its fixtures and its collector are in the repository, from its root (ADR 0045). */
+export interface RuleFiles {
+  rule: string;
+  fixtures: string;
+  collector: string;
+  references: string[];
+}
+
 export interface RuleText {
   title: string;
   description: string;
   falsepositives: string[];
   /** Look-back note for `not_found`, translated. Evidence keeps the English source. */
   retention: string;
+  status: "experimental" | "test" | "stable" | "deprecated";
+  files: RuleFiles;
 }
