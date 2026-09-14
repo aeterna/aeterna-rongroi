@@ -103,11 +103,32 @@ fn text(lang: Lang, key: &str) -> &'static str {
         }
         (Lang::En, "footer") => "Evidence only. This report cannot prove that a PC is clean.",
         (Lang::Th, "footer") => "เป็นหลักฐานประกอบเท่านั้น รายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด",
+        // Three counts of what this view lists, never one number (ADR 0045).
+        (Lang::En, "listed") => {
+            "Listed: {found} found · {not_found} not found · {unmeasured} not measured"
+        }
+        (Lang::Th, "listed") => {
+            "รายการที่แสดง: เจอ {found} · ไม่เจอ {not_found} · ยังไม่ได้วัด {unmeasured}"
+        }
+        (Lang::En, "code") => "Code: {url}",
+        (Lang::Th, "code") => "โค้ด: {url}",
+        (Lang::En, "code_unknown") => {
+            "Code: {url} (the code this build was made from is not known)"
+        }
+        (Lang::Th, "code_unknown") => "โค้ด: {url} (ไม่รู้ว่า build นี้สร้างจากโค้ดส่วนไหน)",
         (Lang::En, "elevated_yes") => "administrator",
         (Lang::Th, "elevated_yes") => "สิทธิ์ผู้ดูแลระบบ",
         (Lang::En, "elevated_no") => "standard user",
         (Lang::Th, "elevated_no") => "ผู้ใช้ทั่วไป",
         (_, "elevated_unknown") => "?",
+        _ => text_elevate(lang, key),
+    }
+}
+
+/// Text for the elevation and consent flow, kept apart from [`text`] so that function stays under
+/// clippy's line limit.
+fn text_elevate(lang: Lang, key: &str) -> &'static str {
+    match (lang, key) {
         (Lang::En, "declined") => "Scan cancelled. Nothing was read.",
         (Lang::Th, "declined") => "ยกเลิกการสแกนแล้ว ไม่ได้อ่านอะไรเลย",
         (Lang::En, "elevate_started") => {
@@ -300,6 +321,14 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
             );
         }
     }
+    let _ = writeln!(
+        out,
+        "{}",
+        text(lang, "listed")
+            .replace("{found}", &view.listed.found.to_string())
+            .replace("{not_found}", &view.listed.not_found.to_string())
+            .replace("{unmeasured}", &view.listed.unmeasured.to_string())
+    );
     out.push('\n');
 
     out.push_str(&evidence_section(view, bundle, lang));
@@ -323,7 +352,17 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
             view.hidden.unmatched
         );
     }
-    let _ = writeln!(out, "\n{}", text(lang, "footer"));
+    let code = if provenance.code_commit().is_some() {
+        "code"
+    } else {
+        "code_unknown"
+    };
+    let _ = writeln!(
+        out,
+        "\n{}",
+        text(lang, code).replace("{url}", &provenance.code_url())
+    );
+    let _ = writeln!(out, "{}", text(lang, "footer"));
     out
 }
 
@@ -906,6 +945,63 @@ mod tests {
         let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
         assert!(text.contains("[NOT MEASURED (expected here)]"), "{text}");
         assert!(!text.contains("(not expected)"), "{text}");
+    }
+
+    /// Three counts above the evidence, in both languages, never summed (ADR 0045).
+    #[test]
+    fn listed_counts_are_one_line_above_the_evidence() {
+        let (report, bundle) = report(true);
+        for (lang, marker, line) in [
+            (
+                Lang::En,
+                "[FOUND]",
+                "Listed: 1 found · 0 not found · 0 not measured",
+            ),
+            (
+                Lang::Th,
+                "[เจอ]",
+                "รายการที่แสดง: เจอ 1 · ไม่เจอ 0 · ยังไม่ได้วัด 0",
+            ),
+        ] {
+            let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, lang);
+            let (above, _) = text.split_once(marker).expect("the evidence is rendered");
+            assert_eq!(above.lines().filter(|l| *l == line).count(), 1, "{text}");
+        }
+    }
+
+    #[test]
+    fn the_code_link_is_the_commit_of_an_official_build() {
+        let (mut report, bundle) = report(true);
+        report.header.provenance.commit =
+            Some("2c673c54aeb084cd3773057efbb9ed3b98fd2dbc".to_owned());
+        let text = render(&view::for_mode(&report, Mode::Ss), &bundle, Lang::En);
+        let (before_footer, _) = text.split_once("Evidence only.").expect("footer");
+        assert!(
+            before_footer.contains(
+                "\nCode: https://github.com/aeterna/aeterna-rongroi/tree/2c673c54aeb084cd3773057efbb9ed3b98fd2dbc\n"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn an_unofficial_build_links_the_repository_and_says_its_code_is_not_known() {
+        let (report, bundle) = report(false);
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(
+            text.contains(
+                "Code: https://github.com/aeterna/aeterna-rongroi (the code this build was made from is not known)"
+            ),
+            "{text}"
+        );
+        assert!(!text.contains("/tree/"), "{text}");
+        let thai = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::Th);
+        assert!(
+            thai.contains(
+                "โค้ด: https://github.com/aeterna/aeterna-rongroi (ไม่รู้ว่า build นี้สร้างจากโค้ดส่วนไหน)"
+            ),
+            "{thai}"
+        );
     }
 
     #[test]
