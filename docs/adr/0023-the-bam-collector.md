@@ -306,3 +306,67 @@ denied BAM key is assumed from the classification `LiveHost` already applies to 
 - Ten fixture hosts are added. All are synthetic; all reference `fixtures/parsers/bam/` with `from:`
   and copy nothing. Their SIDs and account names are invented and are written out in full so that a
   test asserting no part of one reaches an observation has something to assert against.
+
+## Amendment (2026-09-14) — each account key's own `Version` and `SequenceNumber`
+
+**What was wrong.** This ADR and ADR 0022 describe an account key as holding one value per program and
+nothing else. It does not. Every account key measured also holds two values named `Version` and
+`SequenceNumber`, both `REG_DWORD`. The collector read them as candidate records: `read_bytes` refuses a
+value that is not `REG_BINARY` (ADR 0022), `LiveHost` passes that on as a failure (`windows-registry`
+0.100's `Key::get_bytes` answers `ERROR_INVALID_DATA` for any other type), and the collector counted
+each as a value that was there and yielded nothing. So **every ordinary PC reported `intact: false`**,
+the run was gapped `partial`, and Self mode listed two rows `{ path_withheld: unredactable_form, read:
+failed }` per account — `path_withheld` because a name like `Version` does not begin with a drive letter.
+No rule reads this collector (ADR 0034), so no evidence changed; what was misleading was the account a
+reviewer reads and the noise in Self mode.
+
+**Measured, read-only, on two Windows 11 machines** (the first read through this program's own report,
+the second directly):
+
+| Build | Source | What it showed |
+|---|---|---|
+| 26200 | a Self-mode report from release 0.2.0 | the account observation `users: 8, values: 63, entries: 47, rejected: 16, intact: false`, and 16 observations `path_withheld: unredactable_form, read: failed`. Sixteen is two per account; the report attributes no row to an account and names no value, so it is consistent with the pair on every key rather than a reading of it |
+| 26220 | PowerShell's `RegistryKey.GetValueKind` and `GetValue` over every account key, elevated, 2026-09-14 | 7 account keys; every one holds `Version` and `SequenceNumber` as `REG_DWORD`; `Version` is 1 in all 7 and `SequenceNumber` between 59 and 170; every other value (74 of them) is `REG_BINARY` of exactly 24 bytes; 2 of the 7 keys hold the two values and nothing else |
+
+The second measurement printed counts, types, lengths and the two numbers only — no SID and no value
+name other than these two. Nothing on either machine was changed.
+
+**Microsoft documents neither value.** A search of Microsoft Learn on 2026-09-14 found no description of
+either; the only pages mentioning this key are community answers about the program entries. So this
+program gives them no meaning — not "the layout version of the records", not "a write counter" — and
+does not report their numbers.
+
+**Decision.**
+
+- A value is set aside as the account key's own only when its name is `Version` or `SequenceNumber`,
+  compared without case as the registry compares value names, **and** `read_u32` reads it as a number.
+  A value of one of those names and any other type is read like every other value and, when it does not
+  decode, is counted in `rejected` with its `read:` row, so a damaged or unexpected value stays visible.
+  On `LiveHost`, `read_u32` also accepts a `REG_QWORD` whose number fits in 32 bits (`Key::get_u32`
+  in `windows-registry` 0.100), so such a value with one of those names would be set aside too; none was
+  seen.
+- The two are neither `entries` nor `rejected`, emit no observation of their own, and **are counted in a
+  new account field, `metadata_values`**, rather than dropped silently — the same reason the account says
+  `sid_withheld` out loud.
+- **`values` now counts only the values read as candidate records**, so `values == entries + rejected`
+  apart from a value that disappears between listing and reading. The alternative, keeping the pair in
+  `values`, was declined: `values: 0` is this ADR's one matchable question (a key holding no record) and
+  the `source_empty` gap rests on it, and on every measured machine the pair would make that answer
+  `values: 2 × users` for a key that holds no record — which is what 2 of the 7 keys measured on build
+  26220 were.
+
+**Fixtures.** `bam-account-metadata` is new: two accounts, both holding the pair with measured numbers,
+one of them also a record. `bam-entries-present` and `baseline-elevated-win11` gain the pair, because
+both describe an ordinary machine and an ordinary machine's key holds it
+(`fixtures/hosts/PROVENANCE.md`). The one snapshot that moves is
+`report_snapshot__bam_entries_present_self_view`, which gains `metadata_values: 2`; the SS-mode snapshot
+counts the account and does not change.
+
+**What this does not establish.** Whether every Windows build that has BAM writes these two values, or
+only the builds measured; what either number means; whether an account key can hold other non-record
+values on other machines. Such a value would be counted in `rejected` and turn `intact` false, which is
+the direction that stays visible. Two machines are two machines.
+
+**Also learned, and not a decision.** Every one of the 74 `REG_BINARY` values on build 26220 was 24 bytes
+long. That is the length ADR 0013 asked about, on one machine; it says nothing about whether the bytes
+are still laid out the way `rongroi_parsers::bam` decodes them.
