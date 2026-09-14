@@ -1,0 +1,6 @@
+{
+  "description": "Windows as it ships: no PowerShell 7 per-user policy",
+  "observations": [
+    { "collector": "posture", "fields": { "script_block_logging_pwsh": "not_configured", "script_block_logging_pwsh_user": "not_configured" } }
+  ]
+}

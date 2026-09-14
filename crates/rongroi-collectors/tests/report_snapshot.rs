@@ -280,7 +280,8 @@ fn process_own_trace_self_view() {
     // Those other two are unmatched observations — no rule reads `process`. Own traces are taken
     // out before any rule runs, so the one that is ours is not repeated among them (ADR 0014).
     // The fixture describes no registry, so `posture` also has one unmatched observation: its
-    // `script_block_logging: not_configured`, which is an answer rather than a gap (ADR 0038).
+    // four `script_block_logging` fields, each `not_configured`, which is an answer rather than a gap
+    // (ADR 0038).
     let process = report
         .unmatched
         .iter()

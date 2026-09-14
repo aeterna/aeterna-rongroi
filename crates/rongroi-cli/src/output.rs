@@ -191,7 +191,7 @@ pub fn consent(lang: Lang) -> String {
     match lang {
         Lang::En => "SS mode — screenshare check\n\
             This program will read, on this PC:\n\
-            \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity and the PowerShell logging policy\n\
+            \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity, and the PowerShell logging policies of this PC and of the Windows account running the scan\n\
             \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
@@ -203,7 +203,7 @@ pub fn consent(lang: Lang) -> String {
             .to_owned(),
         Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
             โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
-            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell\n\
+            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell ทั้งของเครื่องและของบัญชี Windows ที่ใช้รันการสแกน\n\
             \x20 - โปรแกรมที่กำลังรันอยู่ ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
@@ -691,20 +691,28 @@ mod tests {
                 Lang::En,
                 "programs running now",
                 "when Windows last started",
-                ["read-only", "size Windows sets"],
+                [
+                    "read-only",
+                    "size Windows sets",
+                    "Windows account running the scan",
+                ],
             ),
             (
                 Lang::Th,
                 "โปรแกรมที่กำลังรันอยู่",
                 "เวลาที่ Windows เริ่มทำงานครั้งล่าสุด",
-                ["อ่านอย่างเดียว", "ขนาดที่ Windows ตั้งไว้"],
+                [
+                    "อ่านอย่างเดียว",
+                    "ขนาดที่ Windows ตั้งไว้",
+                    "บัญชี Windows ที่ใช้รันการสแกน",
+                ],
             ),
         ];
-        for (lang, process_words, boot_time_words, reads_since_adr_0037) in running {
+        for (lang, process_words, boot_time_words, later_reads) in running {
             let question = consent(lang);
             assert!(question.contains(process_words), "{question}");
             assert!(question.contains(boot_time_words), "{question}");
-            for words in reads_since_adr_0037 {
+            for words in later_reads {
                 assert!(question.contains(words), "{words} missing from {question}");
             }
             for word in named.iter().flat_map(|(_, words)| words.iter()) {

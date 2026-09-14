@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 18
+      "rule_count": 21
     },
     "platform": "windows",
     "os_build": "26100",
@@ -100,11 +100,32 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "98ee9213-39f3-4219-b2ac-f2bb3d21d6cc",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
       "rule_id": "88eb2aca-a33e-414d-bd0f-cfb87af95a2d",
       "collector": "posture",
       "strength": "posture",
       "state": "not_found",
       "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "869c34b6-7b32-4f56-a281-9f5ac00e43c4",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
     },
     {
       "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",

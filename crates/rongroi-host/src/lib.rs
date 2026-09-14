@@ -73,7 +73,28 @@ impl SourceError {
     }
 }
 
-/// Read-only access to the registry. Keys are written as `HKLM\...`.
+/// One registry value as its type and data, for a caller whose answer depends on the type as well as on
+/// what the value holds (ADR 0038).
+///
+/// Windows PowerShell 5.1 and PowerShell 7 read the same policy value differently: measured on one
+/// runner, 5.1 honours a `REG_SZ` `"0"` and a `REG_QWORD` 0 as it honours a `REG_DWORD` 0, and PowerShell 7
+/// honours only the `REG_DWORD`. [`RegistrySource::read_u32`] cannot tell those apart, because a live
+/// host's reader accepts a `REG_QWORD` there too.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryData {
+    /// `REG_DWORD`.
+    Dword(u32),
+    /// `REG_QWORD`.
+    Qword(u64),
+    /// `REG_SZ` or `REG_EXPAND_SZ`, as stored: environment variables in an expandable string are not
+    /// expanded.
+    Text(String),
+    /// Any other type. Its data is not read.
+    OtherType,
+}
+
+/// Read-only access to the registry. Keys are written as `HKLM\...` or, for the account this program
+/// runs as, `HKCU\...` (ADR 0038). A live host refuses every other root.
 pub trait RegistrySource {
     /// Reads a `REG_DWORD`. `Ok(None)` when the key or value does not exist.
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError>;
@@ -107,6 +128,13 @@ pub trait RegistrySource {
     /// A value larger than the limit is [`SourceError::TooLarge`]; nothing is truncated, because a
     /// truncated artifact parses as a damaged one.
     fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// One value's type, and its data when it is a number or a string (ADR 0038).
+    ///
+    /// `Ok(None)` when the key or the value does not exist, like [`RegistrySource::read_u32`]. A string
+    /// longer than [`MAX_REGISTRY_VALUE_BYTES`] bytes is [`SourceError::TooLarge`], as a binary value
+    /// is; what that bounds is the same as for [`RegistrySource::read_bytes`].
+    fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError>;
 }
 
 /// One entry directly inside a directory. Only what collectors need: nothing about times, size or ACLs
@@ -444,6 +472,15 @@ pub fn bound_registry_value(bytes: Vec<u8>, limit: usize) -> Result<Vec<u8>, Sou
     Ok(bytes)
 }
 
+/// Refuses a string value longer than `limit` bytes, as [`bound_registry_value`] refuses a binary one.
+/// The other kinds of [`RegistryData`] are a number or no data at all and pass unchanged.
+pub fn bound_registry_data(data: RegistryData, limit: usize) -> Result<RegistryData, SourceError> {
+    match data {
+        RegistryData::Text(text) if text.len() > limit => Err(SourceError::TooLarge { limit }),
+        other => Ok(other),
+    }
+}
+
 /// A machine that collectors can read. More source traits are added as collectors need them.
 pub trait Host:
     RegistrySource
@@ -496,6 +533,12 @@ impl RegistrySource for NonWindowsHost {
     }
 
     fn read_bytes(&self, _key: &str, _value: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
+
+    fn read_value(&self, _key: &str, _value: &str) -> Result<Option<RegistryData>, SourceError> {
         Err(SourceError::Unsupported(
             "no registry on this platform".to_owned(),
         ))
@@ -656,6 +699,28 @@ mod tests {
             NonWindowsHost.read_bytes(key, r"C:\x.exe"),
             Err(SourceError::Unsupported(_))
         ));
+        assert!(matches!(
+            NonWindowsHost.read_value(key, "Anything"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn registry_text_is_bounded_like_registry_bytes() {
+        let limit = 4;
+        assert_eq!(
+            bound_registry_data(RegistryData::Text("1234".to_owned()), limit),
+            Ok(RegistryData::Text("1234".to_owned()))
+        );
+        assert_eq!(
+            bound_registry_data(RegistryData::Text("12345".to_owned()), limit),
+            Err(SourceError::TooLarge { limit })
+        );
+        // Numbers and a type whose data is not read have nothing to bound.
+        assert_eq!(
+            bound_registry_data(RegistryData::Qword(u64::MAX), limit),
+            Ok(RegistryData::Qword(u64::MAX))
+        );
     }
 
     #[test]
