@@ -259,7 +259,8 @@ distribution of ordinary machines was sampled. The claim that `source_empty` on 
 on most PCs rests on the scavenger trimming rather than emptying, which is reverse-engineering
 reported by one source and re-reported by three.
 
-**The Thai wordings have not been read by a native speaker**, which ADR 0027 records for the two
+~~The Thai wordings have not been read by a native speaker~~ **(amended 2026-09-14: the project owner
+approved the Thai wordings the app shows on screen)**, which ADR 0027 records for the two
 strings it added and which is true again for the ten changed here and the two new scope statements.
 
 **Nothing bounds a rule author who declares every reason.** `check-baseline` still fails only on

@@ -1,6 +1,6 @@
 # ADR 0037 — Prefetch's configuration as an observation, and the read-only attribute
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-13
 
 ## Context
@@ -222,6 +222,9 @@ stay `Unmeasured` there, as before.
   through PowerShell and through this program's CLI (413 logs, no failure). That is evidence for that
   machine and that build only.
 - **The folder-Properties false positive** rests on community answers, as said above.
+
+**Accepted by the project owner on 2026-09-14.** The code this ADR describes was merged in #55 while
+the status still read `proposed`; acceptance was recorded afterwards, not before the merge.
 
 ## Consequences
 
