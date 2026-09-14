@@ -180,10 +180,20 @@ and no type-1 record has one, and each of the four most recent type-1 records ha
 
 ## What is not established
 
-- **That `GetTickCount64` keeps counting across a Fast Startup on a real machine was not measured.** The
-  last start on the test machine was a cold one, and producing a Fast Startup there means shutting the
+- ~~That `GetTickCount64` keeps counting across a Fast Startup on a real machine was not measured.~~
+  **Amended 2026-09-14 — measured, without shutting anything down for the test.** The same Windows 11
+  machine (build 26220) was shut down by its owner in the ordinary way the evening before and powered on
+  the next morning. Read-only, from its System log and two clocks: `User32` event 1074 recorded a
+  shutdown of type "power off"; `Kernel-Power` event 42 followed; the next morning `Kernel-Boot` event
+  27 recorded boot type `1`, and no `Kernel-General` event 12 (operating system start) was written in
+  between. After that start, the boot time derived from `GetTickCount64` and
+  `Win32_OperatingSystem.LastBootUpTime` still agreed to the second and both still named the previous
+  morning, about 26 hours before the reading. A "Shut down" with Fast Startup on did not reset the count,
+  as the Microsoft sentences quoted above say. Still reading rather than measurement: what the numeric
+  `TargetState`/`EffectiveState` values in event 42 name. Original text:
+  *The last start on the test machine was a cold one, and producing a Fast Startup there means shutting the
   owner's PC down, which is a change this project does not make on it. The claim rests on the Microsoft
-  sentences quoted above. The EventLog service's daily uptime record (event 6013) on the same machine
+  sentences quoted above.* The EventLog service's daily uptime record (event 6013) on the same machine
   did **not** return to near zero after the type-1 starts and did after every type-0 one — but which
   counter event 6013 reads is not documented, and the clock changes above make its day-to-day
   differences unusable for deciding whether hibernated time is included.
