@@ -162,11 +162,25 @@ impl rongroi_host::SignatureSource for crate::LiveHost {
 /// Runs `WinVerifyTrust` on the file at `path` with `settings`, reads the signer when it verified, and
 /// always closes the state data it opened.
 #[cfg(windows)]
-#[allow(unsafe_code)]
 fn verify(
     path: &str,
     settings: TrustSettings,
 ) -> Result<rongroi_host::SignatureCheck, rongroi_host::SourceError> {
+    verify_with_code(path, settings).1
+}
+
+/// [`verify`], also returning the code `WinVerifyTrust` gave, or `None` when the call was not made. The
+/// live tests print it: ADR 0035's table maps codes, and the mapped answer alone cannot say which code
+/// produced it.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn verify_with_code(
+    path: &str,
+    settings: TrustSettings,
+) -> (
+    Option<u32>,
+    Result<rongroi_host::SignatureCheck, rongroi_host::SourceError>,
+) {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
 
@@ -183,9 +197,12 @@ fn verify(
         u32::try_from(size_of::<WINTRUST_DATA>()),
         u32::try_from(size_of::<WINTRUST_FILE_INFO>()),
     ) else {
-        return Err(SourceError::Failed(
-            "WINTRUST structures do not fit in a u32".to_owned(),
-        ));
+        return (
+            None,
+            Err(SourceError::Failed(
+                "WINTRUST structures do not fit in a u32".to_owned(),
+            )),
+        );
     };
 
     // Owned here and outliving both calls: `file` and `data` only hold pointers into these.
@@ -239,7 +256,7 @@ fn verify(
     unsafe {
         WinVerifyTrust(no_window, &raw mut action, (&raw mut data).cast());
     }
-    outcome
+    (Some(result.cast_unsigned()), outcome)
 }
 
 /// The signing certificate of a verified file: its subject's display name and the SHA-256 of its
@@ -556,6 +573,32 @@ mod tests {
             verify(&path, OFFLINE),
             Ok(rongroi_host::SignatureCheck::NoEmbeddedSignature)
         );
+    }
+
+    /// What the product's settings answer for a file whose certificate chain the machine's stores do not
+    /// complete (ADR 0035, amendment of 2026-09-14). The Windows CI job sets the case up — a root or an
+    /// intermediate taken out of every store it is in, a copy signed with a self-signed certificate, or
+    /// the stores put back — and names it in `RONGROI_CHAIN_CASE`; the file is `RONGROI_CHAIN_FILE`.
+    /// It runs between readings of the CAPI2 log like the other offline tests, under its own prefix so
+    /// that the CAPI2 step, which runs with every store intact, does not pick it up.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "needs RONGROI_CHAIN_FILE, RONGROI_CHAIN_CASE and stores the Windows CI job changed"]
+    fn live_chain_offline_what_an_incomplete_chain_answers() {
+        let path = std::env::var("RONGROI_CHAIN_FILE")
+            .expect("RONGROI_CHAIN_FILE names a file with an embedded signature");
+        let case = std::env::var("RONGROI_CHAIN_CASE").expect("RONGROI_CHAIN_CASE names the case");
+        let (code, check) = verify_with_code(&path, OFFLINE);
+        let shown = code.map_or_else(|| "no call".to_owned(), |code| format!("{code:#010x}"));
+        println!("chain case {case}: WinVerifyTrust {shown} -> {check:?}");
+        match case.as_str() {
+            "intact" | "restored" => assert!(
+                matches!(check, Ok(rongroi_host::SignatureCheck::Valid { .. })),
+                "with every store put back the file must verify again, got {shown} {check:?}"
+            ),
+            "root_removed" | "intermediate_removed" | "self_signed" => {}
+            other => panic!("unknown RONGROI_CHAIN_CASE {other}"),
+        }
     }
 
     /// Not a check of the product: the settings here are ones the product never uses. It exists so the
