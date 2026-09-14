@@ -328,6 +328,12 @@ the second directly):
 | 26200 | a Self-mode report from release 0.2.0 | the account observation `users: 8, values: 63, entries: 47, rejected: 16, intact: false`, and 16 observations `path_withheld: unredactable_form, read: failed`. Sixteen is two per account; the report attributes no row to an account and names no value, so it is consistent with the pair on every key rather than a reading of it |
 | 26220 | PowerShell's `RegistryKey.GetValueKind` and `GetValue` over every account key, elevated, 2026-09-14 | 7 account keys; every one holds `Version` and `SequenceNumber` as `REG_DWORD`; `Version` is 1 in all 7 and `SequenceNumber` between 59 and 170; every other value (74 of them) is `REG_BINARY` of exactly 24 bytes; 2 of the 7 keys hold the two values and nothing else |
 
+After the fix, the Windows CI job's live smoke (run `34805188481`, GitHub's `windows-latest` runner, build
+26100, elevated) printed the account observation `users: 7, values: 54, metadata_values: 14, entries: 54,
+rejected: 0, intact: true`, no `read:` row, and PowerShell counting 7 account keys holding 54
+`REG_BINARY` and 14 `REG_DWORD` values. A runner is not a player's PC; it is a third Windows install whose
+keys have the same shape, read by the fixed collector.
+
 The second measurement printed counts, types, lengths and the two numbers only — no SID and no value
 name other than these two. Nothing on either machine was changed.
 
