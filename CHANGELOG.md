@@ -154,6 +154,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   because a program cannot answer the prompt.
 - `PRIVACY.md` told the reader that nothing is stored "unless you click **Export**". No export or save
   button exists in the window version; the only file is one a person redirects CLI output into.
+- An Event Log service that did not answer took the other `evtx` rules down with it. With the service
+  suspended on the Windows CI runner, the question about a channel's configuration waited out the whole
+  30-second `evtx` budget, and `event-log-file-cleared` and `event-log-file-read-only` — which read only
+  the logs — came out `unmeasured / budget_spent` beside the configured-path rule. The questions now have a
+  5-second bound of their own that is not taken from the 30 seconds; once it is spent the service is not
+  asked again, only `configured_path`, `at_configured_path` and `max_size_bytes` are gapped
+  `budget_spent`, and every log is still read (ADR 0042, amended). The bound was set against a
+  measurement: on one Windows 11 machine the same two properties of all 1 243 channels took 237 ms in
+  total. The CI step now also requires the other `evtx` rules not to be `budget_spent`.
 
 ## [0.2.0] - 2026-09-13
 

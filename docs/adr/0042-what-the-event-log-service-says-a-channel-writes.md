@@ -207,6 +207,12 @@ a documented default with it.
 
 ### 5. The question is bounded by the collector's budget
 
+> **Amended 2026-09-14** (see the amendment at the end). The question now has a bound of its own,
+> `CONFIG_BUDGET`, which is not charged to `PARSE_BUDGET`, and a question that outlasts it gaps the three
+> configuration fields and ends nothing else. "How long it waits" and "What an unanswered question
+> reports" below, and the rejected row "A deadline of its own for the service", describe the first
+> version and are left as written.
+
 `EvtOpenChannelConfig` and `EvtGetChannelConfigProperty` are calls into the Event Log service, and
 nothing in their documentation promises that they return. A service that accepts the call and never
 answers would, on the collector's own thread, stall the scan — and a stalled scan produces no report
@@ -295,3 +301,100 @@ problem to become `Unmeasured`. The desktop app also scans before it shows a win
 - ADR 0028's "`maxSize` is not read" is no longer true; its conclusion — that the bytes alone cannot
   separate cleared, rotated and never-enabled — is unchanged, because this ADR adds the configured size
   and does not add any rule that uses it.
+
+## Amendment (2026-09-14) — a service that does not answer costs the service's fields, not the logs
+
+### What was measured
+
+**The first version cost rules that never read the service.** The Windows CI job added by PR #57
+suspends the Event Log service process and runs the CLI. On `dev` at `c2ea69a` (run 34760845289,
+GitHub's `windows-latest`, build 26100, elevated) the scan finished in 30.3 s, and three of the four
+`evtx` rules were `unmeasured / budget_spent`: `event-log-not-at-configured-path`, which reads the
+service, and also `event-log-file-cleared` and `event-log-file-read-only`, which read only the logs'
+records and attributes. The first question to the service waited out the whole `PARSE_BUDGET`, and
+every log after it was refused unopened. `security-audit-log-cleared` was `found` in the same run,
+because a match survives a gap; had it not matched, it would have been `unmeasured` too. In the live
+smoke step just before, on the same runner with the service running, the three had been `not_found`,
+`found` and `not_found`.
+
+**How long the service takes to answer, when it answers.** The two properties this collector reads,
+for every channel the service lists, timed one channel at a time through .NET's
+`EventLogConfiguration`, which opens the channel with `EvtOpenChannelConfig` and reads each property
+with `EvtGetChannelConfigProperty` (read in `dotnet/runtime`, `System.Diagnostics.EventLog`), under
+PowerShell 7, read-only:
+
+| Machine | Channels | Not described | Whole sweep | Median | p99 | Slowest |
+|---|---|---|---|---|---|---|
+| one Windows 11 machine, build 26220, elevated, 2026-09-14, first pass | 1 243 | 0 | 237 ms | 0.13 ms | 1.29 ms | 4.89 ms |
+| the same machine, second pass | 1 243 | 0 | 223 ms | 0.12 ms | 0.28 ms | 1.32 ms |
+
+A collection asks only about the channels a log's records name, once each — 148 on that machine
+(section "What was measured, and where") — so a scan asks for a fraction of that sweep. The Windows CI
+job now prints the same sweep for the runner before it suspends the service.
+
+### Decision
+
+- **The questions have a bound of their own: `CONFIG_BUDGET`, 5 seconds, for all of them together in
+  one collection.** Each question waits at most what is left of it. A total rather than a limit per
+  question, so a service that answers every question slowly is bounded as well as one that answers
+  none. Five seconds is about twenty times the whole-inventory sweep above and a thousand times its
+  slowest channel.
+- **The wait is not charged to `PARSE_BUDGET`.** The parse deadline is recomputed before each log as
+  the start of the collection, plus `PARSE_BUDGET`, plus the time spent waiting for the service so
+  far. The collector's thread does nothing else while it waits, so the parse budget is spent reading
+  and parsing logs and on nothing else. `budget_seconds` still reports `PARSE_BUDGET`, and
+  `budget_exhausted` is still set only by a log that was not read in time.
+- **Once the bound is spent, the service is treated as not answering for the rest of the run.** No
+  further question is sent to the thread that did not answer or to any other. `configured_path`,
+  `at_configured_path` and `max_size_bytes` are gapped `budget_spent` for the run, so the configured-path
+  rule is `unmeasured` and never `not_found`. No log is refused for it, nothing else is gapped, and
+  every later log is read and parsed as on a host whose service answers.
+- **The worst case of the collection is now both bounds together**: 35 seconds of wall clock, where it
+  was 30. ADR 0024 chose 30 s as the edge of what a person waits through with no window. Five more is
+  the price of not losing the logs to the service; the other way to keep 30 s — take the wait out of
+  the parse budget — is the version this amendment replaces, and the CI run above is what it costs.
+
+### The reason: `budget_spent`, still
+
+What happened is that this program waited as long as it had decided to and stopped. The candidates:
+
+| Reason | Why not, or why |
+|---|---|
+| `budget_spent` — "a limit this program chose ended the read" | **Chosen.** It says what this program did and nothing about the machine: the service may have answered a moment later. It is undeclarable (ADR 0032), so an SS view lists the row whatever the rule says, which is the weight ADR 0042 section 3 already gave a service that does not answer |
+| `read_failed` — "it is there and could not be read or understood" | Nothing failed that this program saw. A question still open is not a failed one, and the reason would claim an outcome that was not observed |
+| `not_attempted` — "the collector never looked" | The first question was asked. Only the later ones were not, and they are not reported one by one |
+| `service_disabled` | `prefetch`'s word for a switch the registry shows is off (ADR 0030). A service that does not answer has not been shown to be switched off |
+| `access_denied` | Nothing refused anything |
+
+### What this does not add
+
+**A report field for the 5 seconds.** `budget_seconds` exists so that a reader of the folder account
+sees the bound that ended a collection (ADR 0024). This bound ends no collection, and the one rule it
+reaches already carries `budget_spent` in a row SS mode lists. If a reviewer needs the number beside
+the row, that is a field of its own and a snapshot change on every `evtx` host; it is not done here.
+
+### How it is tested
+
+- `a_service_that_never_answers_costs_the_configuration_and_not_the_logs`: the fixture reader of
+  section 1 blocks forever; the configuration budget is set to one second and the parse budget to half
+  a second, **shorter** than the wait. Both logs must still be read, only the three fields gapped, no
+  log refused, `budget_exhausted` false, and the collection must return in less than two waits. With the
+  deadline left as it was before the amendment — not moved by the time waited — the test fails, which
+  was run once to see it bite.
+- `a_spent_parse_budget_is_still_the_runs_reason_beside_a_service_that_never_answers`: a parse budget of
+  zero still refuses the logs `budget_exhausted` / `not_attempted` and gaps every field `budget_spent`.
+- The Windows CI step now also requires every `evtx` rule other than the configured-path rule not to be
+  `budget_spent`, the folder account's `budget_exhausted` to be false, and the scan to finish in less
+  than 90 s, with the service suspended; it prints each rule's state.
+
+### What is unverified
+
+- **Two machines for the answer times**, one of them a CI runner, both idle when measured. How long the
+  service takes on a machine busy starting up, or with many more channels, is not established. If it
+  exceeds 5 s in total, the configured-path rule is `unmeasured / budget_spent` there and nothing else
+  changes.
+- **A suspended process is one way for the service not to answer.** A service that answers slowly
+  rather than never was not produced; the total bound covers it by construction, not by measurement.
+- **Threads.** ADR 0024's "never both" — one spinning parse thread or one blocked service thread — no
+  longer holds: a service that did not answer no longer ends the collection, so a later parse can still
+  overrun, and the process can hold one of each until it exits.
