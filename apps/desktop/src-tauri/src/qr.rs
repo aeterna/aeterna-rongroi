@@ -9,12 +9,25 @@ use qrcode::render::svg;
 use qrcode::{EcLevel, QrCode};
 use rongroi_core::provenance::REPOSITORY_URL;
 
+/// The longest URL this draws, in bytes.
+const MAX_URL_BYTES: usize = 512;
+
 /// An SVG QR code of `url`, or `None` when `url` is not the repository or a page inside it, so that
 /// the window cannot use this to encode anything else.
+///
+/// Inside means: `url` is at most [`MAX_URL_BYTES`] long and is `REPOSITORY_URL` followed by nothing,
+/// or by `/` and only ASCII letters, digits, `/`, `.`, `_` and `-`, with no `..` anywhere. So no
+/// query, fragment, space, control character or step out of the repository reaches a QR code.
 pub fn svg(url: &str) -> Option<String> {
-    let inside = url
-        .strip_prefix(REPOSITORY_URL)
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'));
+    let inside = url.len() <= MAX_URL_BYTES
+        && url.strip_prefix(REPOSITORY_URL).is_some_and(|rest| {
+            rest.is_empty()
+                || (rest.starts_with('/')
+                    && !rest.contains("..")
+                    && rest.bytes().all(|b| {
+                        b.is_ascii_alphanumeric() || matches!(b, b'/' | b'.' | b'_' | b'-')
+                    }))
+        });
     if !inside {
         return None;
     }
@@ -43,6 +56,19 @@ mod tests {
         assert!(image.contains("<svg"), "{image}");
         assert!(image.contains("#000000"), "{image}");
         assert!(svg(REPOSITORY_URL).is_some());
+        assert!(svg(&format!("{REPOSITORY_URL}/")).is_some());
+        assert!(
+            svg(&format!(
+                "{REPOSITORY_URL}/blob/2c673c54aeb084cd3773057efbb9ed3b98fd2dbc/rules/posture/boot/secure-boot-disabled/rule.yaml"
+            ))
+            .is_some()
+        );
+        let longest = format!(
+            "{REPOSITORY_URL}/{}",
+            "a".repeat(MAX_URL_BYTES - REPOSITORY_URL.len() - 1)
+        );
+        assert_eq!(longest.len(), MAX_URL_BYTES);
+        assert!(svg(&longest).is_some());
     }
 
     #[test]
@@ -53,8 +79,19 @@ mod tests {
             "https://example.com",
             "https://github.com/aeterna/aeterna-rongroi-fork",
             "https://github.com/aeterna",
+            "https://github.com/aeterna/aeterna-rongroi/../../other",
+            "https://github.com/aeterna/aeterna-rongroi/tree/main/a b",
+            "https://github.com/aeterna/aeterna-rongroi/tree/main\nhello",
+            "https://github.com/aeterna/aeterna-rongroi/tree?x=1",
+            "https://github.com/aeterna/aeterna-rongroi/tree#x",
         ] {
             assert_eq!(svg(other), None, "{other}");
         }
+        let too_long = format!(
+            "{REPOSITORY_URL}/{}",
+            "a".repeat(MAX_URL_BYTES - REPOSITORY_URL.len())
+        );
+        assert_eq!(too_long.len(), MAX_URL_BYTES + 1);
+        assert_eq!(svg(&too_long), None);
     }
 }
