@@ -115,7 +115,7 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::En, "code_unknown") => {
             "Code: {url} (the code this build was made from is not known)"
         }
-        (Lang::Th, "code_unknown") => "โค้ด: {url} (ไม่รู้ว่า build นี้สร้างจากโค้ดส่วนไหน)",
+        (Lang::Th, "code_unknown") => "โค้ด: {url} (ไม่รู้ว่า build นี้สร้างจากโค้ดของ commit ไหน)",
         (Lang::En, "elevated_yes") => "administrator",
         (Lang::Th, "elevated_yes") => "สิทธิ์ผู้ดูแลระบบ",
         (Lang::En, "elevated_no") => "standard user",
@@ -998,7 +998,7 @@ mod tests {
         let thai = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::Th);
         assert!(
             thai.contains(
-                "โค้ด: https://github.com/aeterna/aeterna-rongroi (ไม่รู้ว่า build นี้สร้างจากโค้ดส่วนไหน)"
+                "โค้ด: https://github.com/aeterna/aeterna-rongroi (ไม่รู้ว่า build นี้สร้างจากโค้ดของ commit ไหน)"
             ),
             "{thai}"
         );
