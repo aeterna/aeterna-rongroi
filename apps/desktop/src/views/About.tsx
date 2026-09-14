@@ -39,6 +39,8 @@ export function About({ onBack }: { onBack: () => void }) {
           <h3>{t("about.this_build_code")}</h3>
           {links.commit ? (
             <CodeLink text={links.code} copy={links.code} qr />
+          ) : provenance.official ? (
+            <p>{t("about.code_commit_unknown")}</p>
           ) : (
             <p>{t("about.code_unknown")}</p>
           )}

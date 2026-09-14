@@ -61,6 +61,7 @@ export function Report({ mode, onBack }: Props) {
   const treeBase = links?.commit ? `${links.repository}/tree/${links.commit}` : null;
   // Carried fix (b): whether `codeLinks()` has arrived at all, independent of what it said.
   const linksKnown = links !== null;
+  const official = header.provenance.official;
 
   return (
     <section className="report">
@@ -126,6 +127,7 @@ export function Report({ mode, onBack }: Props) {
           fileBase={fileBase}
           treeBase={treeBase}
           linksKnown={linksKnown}
+          official={official}
           technicalAll={technicalAll}
           unfold={filter === "not_found"}
         />
@@ -195,6 +197,7 @@ function Group({
   fileBase,
   treeBase,
   linksKnown,
+  official,
   technicalAll,
   unfold,
 }: {
@@ -203,6 +206,7 @@ function Group({
   fileBase: string | null;
   treeBase: string | null;
   linksKnown: boolean;
+  official: boolean;
   technicalAll: boolean;
   unfold: boolean;
 }) {
@@ -224,6 +228,7 @@ function Group({
       fileBase={fileBase}
       treeBase={treeBase}
       linksKnown={linksKnown}
+      official={official}
       technicalAll={technicalAll}
     />
   );

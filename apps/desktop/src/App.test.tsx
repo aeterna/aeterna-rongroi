@@ -586,6 +586,27 @@ describe("App", () => {
     expect(screen.getAllByText(/This build is not official/).length).toBeGreaterThan(0);
   });
 
+  // An official build whose commit was not recorded is still official: the sentence says the commit
+  // is not known, never that the build is not official.
+  it("says the commit is not known, not that the build is unofficial, for an official build without one", async () => {
+    const official = {
+      ...selfView.header,
+      provenance: { ...selfView.header.provenance, official: true, commit: null },
+    };
+    headerOverride = official;
+    viewOverride = { ...selfView, header: official };
+    linksOverride = { repository: REPOSITORY, code: REPOSITORY, commit: null };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByLabelText("Show technical details for every row"));
+    const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
+    expect(rulePath.parentElement?.querySelector("button")).toBeNull();
+    expect(
+      (await screen.findAllByText(/The commit this program was built from is not known\./)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/This build is not official/)).toBeNull();
+  });
+
   // Carried fix (b): before `codeLinks()` has arrived (or after it has failed), the report does not
   // yet know whether this build is official, so it must not say either thing about the commit.
   it("says nothing about the build's commit before the code links resolve", async () => {
@@ -609,7 +630,8 @@ describe("App", () => {
     expect(qr.getAttribute("src")).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
     // The snapshot's build is unofficial: its code is not known, and the page says so.
     expect(screen.getByText(/The code this build was made from is not known/)).toBeTruthy();
-    // ADR 0003's wording, verbatim.
+    // The window uses the consent screen's form of the ADR 0003 statement (`consent.sends`,
+    // `consent.webview`), which ADR 0045 §7 keeps unchanged.
     expect(screen.getByText("aeterna-rongroi's own code sends nothing anywhere.")).toBeTruthy();
     await act(async () => {
       fireEvent.click(screen.getAllByText("Copy link")[0] as HTMLElement);
@@ -636,6 +658,20 @@ describe("App", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText(/The code this build was made from is not known/)).toBeNull();
+  });
+
+  it("says on About & code that an official build's commit is not known, without calling it unofficial", async () => {
+    headerOverride = {
+      ...selfView.header,
+      provenance: { ...selfView.header.provenance, official: true, commit: null },
+    };
+    linksOverride = { repository: REPOSITORY, code: REPOSITORY, commit: null };
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    expect(
+      await screen.findByText("The commit this build was made from is not known."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/not built by the release workflow/)).toBeNull();
   });
 
   // About & code is reachable from every screen, so leaving it returns to the screen it was opened

@@ -56,6 +56,7 @@
     "intro": "aeterna-rongroi is open source: anyone can read what it reads on a PC and what each check decides from.",
     "repository": "All of the code",
     "this_build_code": "The code of this build",
+    "code_commit_unknown": "The commit this build was made from is not known.",
     "code_unknown": "The code this build was made from is not known: it was not built by the release workflow.",
     "this_file": "This program",
     "build": "Build",

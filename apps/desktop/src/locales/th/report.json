@@ -99,6 +99,7 @@
     "reason": "รหัสเหตุผล",
     "code_title": "อยู่ตรงไหนในโค้ด",
     "files_at_commit": "ที่ commit ที่ใช้สร้างโปรแกรมนี้",
+    "files_commit_unknown": "ไม่รู้ว่าโปรแกรมนี้สร้างจาก commit ไหน path เหล่านี้คือที่อยู่ของไฟล์ใน repo",
     "files_unknown_build": "build นี้ไม่ใช่รุ่นทางการ จึงไม่รู้ว่าสร้างจาก commit ไหน path เหล่านี้คือที่อยู่ของไฟล์ใน repo",
     "rule_file": "rule",
     "fixtures": "fixture",

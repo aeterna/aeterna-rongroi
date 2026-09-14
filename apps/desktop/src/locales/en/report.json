@@ -99,6 +99,7 @@
     "reason": "Reason code",
     "code_title": "Where this is in the code",
     "files_at_commit": "At the commit this program was built from.",
+    "files_commit_unknown": "The commit this program was built from is not known. These are where the files are in the repository.",
     "files_unknown_build": "This build is not official, so the commit it was built from is not known. These are where the files are in the repository.",
     "rule_file": "Rule",
     "fixtures": "Fixtures",

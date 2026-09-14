@@ -16,6 +16,8 @@ interface Props {
   treeBase: string | null;
   /** Whether `codeLinks()` has arrived (successfully or not) — `false` while still in flight. */
   linksKnown: boolean;
+  /** Whether the report header says this is an official build — apart from whether its commit is known. */
+  official: boolean;
   technicalAll: boolean;
 }
 
@@ -24,7 +26,15 @@ interface Props {
  * where it is in the code. A match starts open, because the sentence saying a rule proves no
  * cheating usually ends the description, which the two-line cut of a closed row hides.
  */
-export function EvidenceRow({ item, text, fileBase, treeBase, linksKnown, technicalAll }: Props) {
+export function EvidenceRow({
+  item,
+  text,
+  fileBase,
+  treeBase,
+  linksKnown,
+  official,
+  technicalAll,
+}: Props) {
   const { t } = useTranslation("report");
   const [open, setOpen] = useState(item.state === "found");
   const [technical, setTechnical] = useState(false);
@@ -81,6 +91,7 @@ export function EvidenceRow({ item, text, fileBase, treeBase, linksKnown, techni
               fileBase={fileBase}
               treeBase={treeBase}
               linksKnown={linksKnown}
+              official={official}
             />
           )}
         </div>
@@ -124,12 +135,14 @@ function Technical({
   fileBase,
   treeBase,
   linksKnown,
+  official,
 }: {
   item: Evidence;
   text: RuleText | undefined;
   fileBase: string | null;
   treeBase: string | null;
   linksKnown: boolean;
+  official: boolean;
 }) {
   const { t } = useTranslation("report");
   const observations: Observation[] = item.state === "found" ? item.observations : [];
@@ -189,7 +202,13 @@ function Technical({
         )}
       </dl>
       {text && (
-        <Files files={text.files} fileBase={fileBase} treeBase={treeBase} linksKnown={linksKnown} />
+        <Files
+          files={text.files}
+          fileBase={fileBase}
+          treeBase={treeBase}
+          linksKnown={linksKnown}
+          official={official}
+        />
       )}
     </div>
   );
@@ -200,11 +219,13 @@ function Files({
   fileBase,
   treeBase,
   linksKnown,
+  official,
 }: {
   files: RuleFiles;
   fileBase: string | null;
   treeBase: string | null;
   linksKnown: boolean;
+  official: boolean;
 }) {
   const { t } = useTranslation("report");
   const paths: [string, string, string | null][] = [
@@ -212,15 +233,20 @@ function Files({
     ["layers.fixtures", files.fixtures, treeBase && `${treeBase}/${files.fixtures}`],
     ["layers.collector_file", files.collector, fileBase && `${fileBase}/${files.collector}`],
   ];
+  // Whether the commit is known and whether the build is official are two facts: an official build
+  // whose commit was not recorded is still official.
+  const filesSentence = fileBase
+    ? t("layers.files_at_commit")
+    : official
+      ? t("layers.files_commit_unknown")
+      : t("layers.files_unknown_build");
   return (
     <section className="rule-files" aria-label={t("layers.code_title")}>
       <p className="muted">
         {t("layers.code_title")}
         {/* Carried fix (b): neither statement until it is known whether this build's commit is
             known — a call still in flight, or one that failed, is not evidence either way. */}
-        {linksKnown && (
-          <> · {fileBase ? t("layers.files_at_commit") : t("layers.files_unknown_build")}</>
-        )}
+        {linksKnown && <> · {filesSentence}</>}
       </p>
       <ul>
         {paths.map(([label, path, link]) => (
