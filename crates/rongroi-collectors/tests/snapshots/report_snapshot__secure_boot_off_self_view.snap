@@ -210,6 +210,11 @@ expression: view
     "not_admin": 1,
     "not_attempted": 0
   },
+  "listed": {
+    "found": 1,
+    "not_found": 7,
+    "unmeasured": 13
+  },
   "hidden": {
     "not_found": 0,
     "unmeasured_expected": 0,
