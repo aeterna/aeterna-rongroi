@@ -505,7 +505,7 @@ fn read_known_fps(root: &Path, problems: &mut Vec<String>) -> anyhow::Result<Vec
 
 /// Splits one CSV row. A field may be double-quoted, which is how a `reason` carries a comma; `""`
 /// inside a quoted field is one quote character.
-fn parse_csv_line(line: &str) -> Vec<String> {
+pub(crate) fn parse_csv_line(line: &str) -> Vec<String> {
     let mut fields = Vec::new();
     let mut field = String::new();
     let mut quoted = false;

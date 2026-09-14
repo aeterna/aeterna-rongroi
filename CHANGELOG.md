@@ -6,6 +6,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The pinned `FiveM.exe` signing certificate can no longer go stale silently (ADR 0036, amendment of
+  2026-09-14). `rules/certificate-pins.csv` records each certificate an `allow` names with its subject,
+  validity and measurement date; `cargo xtask check-rules` requires a row for every such entry and none
+  for a certificate no rule allows, without reading a clock. A new monthly workflow, `certificate pins`,
+  runs `cargo xtask check-pin-expiry`, which fails 90 days before a rule's newest pinned certificate
+  expires — for the certificate pinned today, from 2027-06-07. It is not a required check and does not
+  run on pull requests. It watches the last date the certificate can sign, not the day the publisher
+  actually switches, which nothing here can see.
 - Two `posture` readings and two rules (ADR 0038). `secure_boot_firmware` is Secure Boot as the firmware's
   own UEFI `SecureBoot` variable reports it, beside the registry's `secure_boot`; reading it enables
   `SeSystemEnvironmentPrivilege` in this program's own token for the read and puts it back, and without

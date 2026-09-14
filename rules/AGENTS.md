@@ -72,7 +72,10 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   — the pattern and its reasons are in `docs/rules-authoring.md` (ADR 0036).
 - **An `allow` entry is a measurement**: from a file its publisher released, with a `#` comment saying
   when and how, never from memory. A certificate entry goes stale on renewal, and the rule's
-  `falsepositives` must tell a reviewer what that looks like (ADR 0036).
+  `falsepositives` must tell a reviewer what that looks like (ADR 0036). Every `signer_cert_sha256`
+  entry also needs a row in `rules/certificate-pins.csv` — subject, `not_before`, `not_after`,
+  `measured_on`, all measured — which `check-rules` requires and a monthly workflow reads to warn 90 days
+  before `not_after` (ADR 0036, amendment of 2026-09-14).
 - To compare one field byte for byte, list its name in `cased`. It is per field, so the rest of `match`
   keeps folding, every field left out of it folds, and one entry covers every comparison the rule makes
   against that field, `startswith` and `contains` included. A rule with no `cased` line is

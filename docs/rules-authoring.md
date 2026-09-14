@@ -169,6 +169,12 @@ publisher renews: the rule's `falsepositives` has to say what a reviewer sees th
 do, and the entry for the new certificate is added **beside** the old one, which still signs the files
 people have not updated (ADR 0036).
 
+A certificate entry also takes a row in `rules/certificate-pins.csv`, measured with it: the rule's id, the
+certificate's SHA-256, its subject, `not_before`, `not_after` and the date you read them. `check-rules`
+fails on an entry without a row and on a row without an entry, and reads no clock. The monthly
+`certificate-pins` workflow runs `cargo xtask check-pin-expiry`, which fails once a rule's newest pinned
+certificate is within 90 days of `not_after`; `--today YYYY-MM-DD` shows what it will say on another day.
+
 ## Fixtures
 
 `tests/positive/*.json` must make the rule `found`; `tests/negative/*.json` must make it `not_found`.

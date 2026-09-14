@@ -71,6 +71,10 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
 
     let vocabulary = Vocabulary::of_this_build();
     let mut problems = Vec::new();
+    // No clock: the dates are validated here and compared with today only by the scheduled
+    // `check-pin-expiry`, so a pull request is never red because of the calendar.
+    let pins = crate::certificate_pins::read(root, &mut problems)?;
+    crate::certificate_pins::check_against_bundle(&pins, &bundle, &mut problems);
     let mut fixture_count = 0;
     for sourced in bundle.rules() {
         vocabulary.check(&sourced.path, &sourced.rule, &mut problems);
@@ -503,6 +507,57 @@ date: 2026-09-11
         assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
         assert_eq!(outcome.rule_count, 1);
         assert_eq!(outcome.fixture_count, 2);
+    }
+
+    /// An `allow` entry naming a certificate needs a row in `rules/certificate-pins.csv`, and the row
+    /// needs the entry: otherwise the certificate's expiry is watched by nothing, or a date warns
+    /// about a certificate no rule allows (ADR 0036).
+    #[test]
+    fn a_certificate_allow_entry_and_its_pin_row_go_together() {
+        let cert = "b".repeat(64);
+        let tmp = TempRoot::new("pins");
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(
+            &dir.join("rule.yaml"),
+            &format!("{VALID_RULE}allow:\n  - signer_cert_sha256: {cert}\n"),
+        );
+        write(&dir.join("tests/positive/on.json"), POSITIVE_FIXTURE);
+        write(&dir.join("tests/negative/off.json"), NEGATIVE_FIXTURE);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains("has no row in `rules/certificate-pins.csv`"),
+            "{:?}",
+            outcome.problems
+        );
+
+        let header = "rule_id,signer_cert_sha256,subject,not_before,not_after,measured_on";
+        let row = |id: &str| {
+            format!("{id},{cert},CN=Example,2026-07-21T00:00:00Z,2027-09-05T23:59:59Z,2026-09-13\n")
+        };
+        write(
+            &tmp.path().join("rules/certificate-pins.csv"),
+            &format!("{header}\n{}", row("7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7")),
+        );
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+        assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
+
+        write(
+            &tmp.path().join("rules/certificate-pins.csv"),
+            &format!(
+                "{header}\n{}{}",
+                row("7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7"),
+                row("00000000-0000-4000-8000-000000000000")
+            ),
+        );
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains("watches nothing"),
+            "{:?}",
+            outcome.problems
+        );
     }
 
     /// Gate (1): two rules sharing the same `id` must be rejected.
