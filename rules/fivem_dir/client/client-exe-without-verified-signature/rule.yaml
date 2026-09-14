@@ -9,8 +9,8 @@ description: >-
   not verify, or one Windows could not verify without the internet; the file shown says which and
   which edition. "Could not verify without the internet" includes a certificate chain that ends at a
   root certificate this PC does not hold as trusted, which offline cannot be told apart from a root
-  nobody trusts: a self-signed signature reads that way too. On the one machine this was measured on, both editions' FiveM.exe carried a valid
-  embedded signature. This does not say that the file was changed, what it does, or that it was ever
+  nobody trusts: a self-signed signature reads that way too. On the one machine this was measured on,
+  both editions' FiveM.exe carried a valid embedded signature. This does not say that the file was changed, what it does, or that it was ever
   run. An install with no FiveM.exe — or no FiveM at all — is "not found" here too, and a FiveM.exe
   whose signature could not be checked at all is shown under "A FiveM file's signature could not be
   checked" instead.
