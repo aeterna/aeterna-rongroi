@@ -132,3 +132,10 @@ export interface RuleText {
   status: "experimental" | "test" | "stable" | "deprecated";
   files: RuleFiles;
 }
+
+/** Where this binary's code can be read (ADR 0045). `commit` is set for an official build only. */
+export interface CodeLinks {
+  repository: string;
+  code: string;
+  commit: string | null;
+}
