@@ -6,6 +6,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Two negative fixtures for the log-clearing rules, each the shape an ordinary log holds from the Event Log
+  service without anyone clearing it: `1100` and `1101` on Security, and `30` plus the classic `EventLog`
+  provider's start and stop records on System, both measured on ordinary Windows 11 machines. Widening either
+  rule to one of those event ids now fails `cargo xtask check-rules`. The owner decided not to build a machine
+  to capture a publishable log for a baseline; `rules/unconfronted.csv` records that.
 - The pinned `FiveM.exe` signing certificate can no longer go stale silently (ADR 0036, amendment of
   2026-09-14). `rules/certificate-pins.csv` records each certificate an `allow` names with its subject,
   validity and measurement date; `cargo xtask check-rules` requires a row for every such entry and none
