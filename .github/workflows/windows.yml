@@ -225,7 +225,17 @@ jobs:
             wevtutil cl $log
             cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_chain_offline_/)'
             $exit = $LASTEXITCODE
-            $events = @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue | Where-Object { $_.ToXml() -match 'rongroi_host_windows' })
+            # The log is written asynchronously: read until two readings a second apart agree, for up to
+            # 20 seconds, so a slow write is not mistaken for no events.
+            $events = @(); $all = @()
+            for ($try = 0; $try -lt 20; $try++) {
+              Start-Sleep -Seconds 1
+              $now = @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue)
+              if ($now.Count -gt 0 -and $now.Count -eq $all.Count) { break }
+              $all = $now
+            }
+            $events = @($all | Where-Object { $_.ToXml() -match 'rongroi_host_windows' })
+            Write-Output ("  ${case}: {0} CAPI2 events in the log from any process" -f $all.Count)
             Write-Output ("  ${case}: {0} CAPI2 events from the test process, ids: {1}" -f $events.Count, (($events | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))
             $events | Where-Object { $_.Id -in 11, 30, 81 } | ForEach-Object {
               $found = [regex]::Matches($_.ToXml(), '<(ErrorStatus|Result)\b[^>]*>') | ForEach-Object Value
@@ -270,6 +280,7 @@ jobs:
               if ($after.Count -gt 0) { throw "${case}: the certificate came back into a store during the check" }
             } finally {
               RestoreAll
+              Write-Output "  ${case}: stores restored"
             }
             $restored = @(StoreKeys $thumbprint)
             if ((($before | Sort-Object) -join ';') -ne (($restored | Sort-Object) -join ';')) { throw "${case}: the stores were not restored: before $($before -join '; '), after $($restored -join '; ')" }
