@@ -1,6 +1,6 @@
 # ADR 0045 — Reading the report in layers, and where its code is
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-14
 - Amends: ADR 0027 (where a rule's description and false positives are shown)
 
@@ -88,7 +88,7 @@ is listed, so they live in the UI.
 
 ### 4. Rule files and the code link
 
-`RuleText` gains `files: RuleFiles`, filled by `Bundle::text` from the `SourcedRule` path and the rule:
+`RuleText` gains `status` and `files: RuleFiles`, filled by `Bundle::text` from the `SourcedRule` path and the rule:
 
 | Field | Value |
 |---|---|
@@ -101,7 +101,8 @@ A test in `rongroi-core` walks the embedded bundle and fails if any of the first
 exist in the workspace, so a moved collector file or fixture folder fails CI instead of producing a
 dead link.
 
-`rongroi_core::provenance` gains `REPOSITORY_URL` (`https://github.com/aeterna/aeterna-rongroi`) and
+`rongroi_core::provenance` gains `REPOSITORY_URL` (`https://github.com/aeterna/aeterna-rongroi`, read from
+the workspace manifest), `Provenance::code_commit()` — the commit, for an official build only — and
 `Provenance::code_url()`:
 
 - an official build with a commit: `REPOSITORY_URL/tree/<commit>` — the code this binary was built from;
