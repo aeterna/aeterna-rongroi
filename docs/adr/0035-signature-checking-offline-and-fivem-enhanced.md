@@ -193,16 +193,18 @@ So the log saw the offline checks, and it records a network retrieval when one h
 ### The question
 
 ADR 0036 left open what this check says about a genuine file on a PC whose certificate stores do not
-hold the root its signature chains to. Microsoft documents that Windows fetches trusted roots from the
-internet when they are first needed, and this check never goes online, so such a PC is ordinary. Decision
+hold the root its signature chains to. Microsoft documents that Windows downloads its lists of trusted
+roots from the internet (ADR 0036 quotes it), and this check never goes online, so such a PC is plausible;
+how common it is was not measured. Decision
 1 mapped `CERT_E_UNTRUSTEDROOT` to `invalid`, so a genuine `FiveM.exe` there might read as a signature that
 does not verify, for a reason that has nothing to do with the file.
 
 ### What was measured
 
 On the `windows-latest` runner (Windows Server 2025, image `windows-2025-vs2026` version 20260907.229.1), on
-2026-09-14, in the CI step "What an
-incomplete certificate chain answers offline", run `34804835053`. For each embedded-signed file, the chain
+2026-09-14, in the CI step "What an incomplete certificate chain answers offline": run `34804835053`, which
+printed the codes without asserting any, and run `34805172959`, which gave the same codes with the test
+asserting them. For each embedded-signed file, the chain
 was read with .NET's `X509Chain` (no revocation, certificate downloads disabled) and the certificates the
 signature carries were read from its PKCS #7 blob. The root was then exported from every registry
 certificate store it was in — `SystemCertificates`, its policy and enterprise counterparts, for the machine
@@ -214,17 +216,18 @@ settings in a fresh process. Afterwards every export was imported back and the f
 |---|---|---|---|---|---|---|
 | `pwsh.exe`, signed by Microsoft Corporation through Microsoft Code Signing PCA 2024 | Microsoft Root Certificate Authority 2011 | machine `ROOT` | no | `0x800B010A` `CERT_E_CHAINING` | `CERT_TRUST_IS_PARTIAL_CHAIN` | `S_OK`, valid |
 | `git.exe`, signed by an individual developer through Microsoft ID Verified CS EOC CA 04 and Microsoft ID Verified Code Signing PCA 2021 | Microsoft Identity Verification Root Certificate Authority 2020 | machine `AuthRoot` | yes | `0x800B0109` `CERT_E_UNTRUSTEDROOT` | `CERT_TRUST_IS_UNTRUSTED_ROOT` | `S_OK`, valid |
-| a copy of the unsigned test binary, signed in the step with a self-signed code-signing certificate made for it and removed from the stores before the check | that certificate | none | yes | `0x800B0109` `CERT_E_UNTRUSTEDROOT` | `CERT_TRUST_IS_UNTRUSTED_ROOT` | — |
+| a copy of the unsigned test binary, signed in the step with a self-signed code-signing certificate made for it | that certificate | none — deleted after signing; the first run left a copy in the user's intermediate store, the second deleted that too | yes | `0x800B0109` `CERT_E_UNTRUSTEDROOT` | `CERT_TRUST_IS_UNTRUSTED_ROOT` | — |
 
 In every row CAPI2 recorded events from the test process and **no event 53** (retrieval from the network),
-and after each check the removed root was still in no store, so nothing was fetched or put back while it
-ran. The intact checks before removal were `S_OK`.
+and after each check with a root removed that root was still in no store, so nothing was fetched or put
+back while it ran. The intact checks before removal were `S_OK`.
 
-- **Which of the two codes a missing root gives depends on whether the signature carries the root**, not
-  on which store it was missing from: with the root absent and not in the signature the chain stops at
-  the last intermediate (a partial chain); with the root in the signature the chain reaches it and finds
-  it untrusted. The local AuthRoot list of roots Microsoft trusts did not make `git.exe`'s root trusted
-  without the network.
+- **A missing root gave two different codes.** The two files differ both in where their root was and in
+  whether their signature carries it, so two files cannot separate those. The chain status points at the
+  second: a partial chain is a chain that stopped at the last intermediate because the root was nowhere to
+  be found, and an untrusted root is a chain that reached a root — here, one the signature supplied — and
+  found it not trusted. Whatever list of trusted roots the runner holds locally did not make `git.exe`'s
+  root trusted without the network; whether that list names the root was not read.
 - **A genuine signature that carries its root and a self-signed signature give the same code and the same
   chain status.** Nothing in `WinVerifyTrust`'s answer, offline, separates them.
 - **No intermediate could be removed.** Every intermediate of both chains was carried in its signature and
@@ -252,9 +255,10 @@ whose own signature does not verify (`TRUST_E_CERT_SIGNATURE`).
 - **Keeping `invalid`.** It would tell a reviewer that a genuine `FiveM.exe` on an ordinary PC carries a
   signature that does not verify, which is the kind of statement about someone's software decision 1 set
   out not to make.
-- **Telling the two apart by looking the root up in the machine's cached AuthRoot list.** It is more
-  `unsafe` code to read a list that is itself fetched from the internet and can be absent or out of date on
-  exactly the PCs in question, and a root Microsoft does not list would still be undecidable.
+- **Telling the two apart by looking the root up in the machine's own list of trusted roots.** It is more
+  `unsafe` code to read a list Windows downloads from the internet, and so one that is likely to be out of
+  date on exactly the PCs in question (not measured), and a root the list does not name would still be
+  undecidable offline.
 - **A fifth `signature` value for an untrusted root.** It names a mechanism rather than an answer, every
   rule's `match` would have to list it, and it would still not separate a genuine root from a forged one.
 
