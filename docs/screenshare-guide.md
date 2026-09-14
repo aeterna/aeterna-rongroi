@@ -1,17 +1,16 @@
 # Screenshare guide
 
 For server staff checking a player's PC over a screenshare, and for the player. It covers
-aeterna-rongroi **0.2.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
+aeterna-rongroi **0.3.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
-> ⚠️ **Pre-alpha.** Six rules ship in 0.2.0, and five of them are `experimental`; on `dev` there are twenty-one,
-> twenty of them `experimental`. Do not ban anyone
+> ⚠️ **Pre-alpha.** Twenty-one rules ship in 0.3.0, and twenty of them are `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
 
 ## 1. What it can and cannot show
 
 | It can show | It cannot show |
 |---|---|
-| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. After 0.2.0 also whether the firmware agrees with Windows about Secure Boot, and whether a machine or per-user policy turns script block logging off for Windows PowerShell or PowerShell 7 | Cheats running on a **second PC** (DMA). They leave nothing on the checked PC |
+| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. Also whether the firmware agrees with Windows about Secure Boot, and whether a machine or per-user policy turns script block logging off for Windows PowerShell or PowerShell 7 | Cheats running on a **second PC** (DMA). They leave nothing on the checked PC |
 | That the Security log or an event log file recorded being cleared | Overlays hidden from screen capture |
 | For each check, whether it was answered and, if not, why | Anything, if Windows on that PC was modified to lie to the programs that run on it |
 | | That a PC is clean. **No result means that** |
@@ -24,9 +23,9 @@ never does.
 
 1. The player downloads it from the project's GitHub **Releases** page. Send the player the page,
    not a copy of the file.
-   - `aeterna-rongroi-cli-0.2.0-windows-x64.exe` is the command-line version. It does not use
+   - `aeterna-rongroi-cli-0.3.0-windows-x64.exe` is the command-line version. It does not use
      WebView2.
-   - `aeterna-rongroi-0.2.0-windows-x64.exe` is the version with a window.
+   - `aeterna-rongroi-0.3.0-windows-x64.exe` is the version with a window.
 2. Do not open it from the browser. Windows SmartScreen will warn, because releases are not
    code-signed yet, and the hash check comes first.
 3. Before running it, the player opens PowerShell in the download folder and runs:
@@ -57,19 +56,23 @@ Some checks need administrator rights. The report says how many, once, above the
 
 That line is not a finding. It says this scan could not answer those checks. Measured on one
 Windows 11 machine without administrator rights: Prefetch and BAM gave almost nothing, both
-log-clearing rules came out *not measured*, and the four posture rules and PCA worked normally.
-After 0.2.0, one more posture check needs those rights: reading the firmware's own Secure Boot state.
-Without them it is *not measured*, and it counts in that line.
+log-clearing rules came out *not measured*, and the four posture rules 0.2.0 had and PCA worked normally.
+Four rules that are new in 0.3.0 were also *not measured* under a limited token, and count in that line:
+the one that reads the firmware's own Secure Boot state, the two about a Prefetch or event log file marked
+read-only, and the one about an event log file that is not the file Windows writes its channel to
+([ADR 0037](adr/0037-prefetch-configuration-and-the-read-only-attribute.md),
+[ADR 0038](adr/0038-firmware-secure-boot-and-script-block-logging-policy.md),
+[ADR 0042](adr/0042-what-the-event-log-service-says-a-channel-writes.md)).
 
 - **Window version:** on the start screen, click **Scan as administrator** and accept the Windows
   prompt. The program closes, starts again with those rights and scans from the beginning. The
   button only appears when the current scan ran without administrator rights.
 - **CLI:** open **PowerShell as administrator** and run the scan in that window (§4).
-  With 0.2.0, do not use `--elevate`. It runs the scan in a **new** console window, and Windows
-  closes that window the moment the scan finishes, taking the report with it (measured on a real
-  Windows 11 machine, [ADR 0012](adr/0012-elevation-relaunch.md)). Releases after 0.2.0 keep the
-  window open until Enter is pressed. Either way, the report from `--elevate` stays in that window
-  and never reaches a file redirected with `>`.
+  `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stays open
+  until Enter is pressed ([ADR 0012](adr/0012-elevation-relaunch.md)), but the report from
+  `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
+  use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
+  (measured on a real Windows 11 machine).
 
 The player may decline administrator rights. The scan still runs, with more checks in the scope
 line.
@@ -86,7 +89,7 @@ change the results. The consent screen decides what is shown.
 **CLI:**
 
 ```powershell
-.\aeterna-rongroi-cli-0.2.0-windows-x64.exe scan --mode ss
+.\aeterna-rongroi-cli-0.3.0-windows-x64.exe scan --mode ss
 ```
 
 Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
@@ -101,7 +104,7 @@ Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player**
 ### The header
 
 ```
-aeterna-rongroi 0.2.0
+aeterna-rongroi 0.3.0
 official build
 mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
 exe sha256: <hash>
@@ -166,21 +169,21 @@ These are counts of what SS mode does not list. §7 says why.
 | No TPM is present | context | `experimental` | older or self-built PCs, TPM off in firmware, virtual machines |
 | The Security log records that it was cleared | tamper | `experimental` | "optimiser" and "debloat" scripts, a prebuilt or repaired PC, troubleshooting in Event Viewer, Windows updates |
 | An event log file was cleared | tamper | `experimental` | the same, plus software whose setup resets the local log |
-| A file in FiveM's plugins folder has no embedded signature that verifies here — *after 0.2.0* | presence | `experimental` | ReShade or ENB installed as the Cfx.re forum guides say, their `.ini` and log files (text is never signed), overlays and FPS tools, a damaged file, a signature this PC cannot verify offline |
-| A file in FiveM's plugins folder carries a valid embedded signature — *after 0.2.0* | presence | `experimental` | signed overlays, capture and performance tools, signed graphics mods, a developer who signs in their own name |
-| A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here — *after 0.2.0* | presence | `experimental` | the same as for Legacy's plugins folder; whether Enhanced loads this folder at all is not known |
-| A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature — *after 0.2.0* | presence | `experimental` | the same as for Legacy's plugins folder |
-| A FiveM file's signature could not be checked — *after 0.2.0* | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
-| FiveM.exe has no embedded signature that verifies here — *after 0.2.0* | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
-| FiveM.exe is validly signed, but not with the certificate this rule knows — *after 0.2.0* | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
-| The firmware reports Secure Boot off while Windows reports it on — *after 0.2.0* | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
-| A machine policy turns Windows PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
-| A per-user policy turns Windows PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | the same, and a scan restarted with a different administrator's password, which reads that administrator's policy |
-| A machine policy turns PowerShell 7 script block logging off — *after 0.2.0* | posture | `experimental` | the same as the Windows PowerShell row, a PowerShell 7 policy set to use the Windows PowerShell one, and a policy left on a PC without PowerShell 7 |
-| A per-user policy turns PowerShell 7 script block logging off — *after 0.2.0* | posture | `experimental` | the same, and a scan restarted with a different administrator's password |
-| A Prefetch file is marked read-only — *after 0.2.0* | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
-| An event log file is marked read-only — *after 0.2.0* | tamper | `experimental` | the same two |
-| An event log file is not the file Windows writes its channel to — *after 0.2.0* | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
+| A file in FiveM's plugins folder has no embedded signature that verifies here | presence | `experimental` | ReShade or ENB installed as the Cfx.re forum guides say, their `.ini` and log files (text is never signed), overlays and FPS tools, a damaged file, a signature this PC cannot verify offline |
+| A file in FiveM's plugins folder carries a valid embedded signature | presence | `experimental` | signed overlays, capture and performance tools, signed graphics mods, a developer who signs in their own name |
+| A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here | presence | `experimental` | the same as for Legacy's plugins folder; whether Enhanced loads this folder at all is not known |
+| A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature | presence | `experimental` | the same as for Legacy's plugins folder |
+| A FiveM file's signature could not be checked | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
+| FiveM.exe has no embedded signature that verifies here | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
+| FiveM.exe is validly signed, but not with the certificate this rule knows | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
+| The firmware reports Secure Boot off while Windows reports it on | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
+| A machine policy turns Windows PowerShell script block logging off | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
+| A per-user policy turns Windows PowerShell script block logging off | posture | `experimental` | the same, and a scan restarted with a different administrator's password, which reads that administrator's policy |
+| A machine policy turns PowerShell 7 script block logging off | posture | `experimental` | the same as the Windows PowerShell row, a PowerShell 7 policy set to use the Windows PowerShell one, and a policy left on a PC without PowerShell 7 |
+| A per-user policy turns PowerShell 7 script block logging off | posture | `experimental` | the same, and a scan restarted with a different administrator's password |
+| A Prefetch file is marked read-only | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
+| An event log file is marked read-only | tamper | `experimental` | the same two |
+| An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
 
 Three things to know about the two log-clearing rules:
 
@@ -208,9 +211,10 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-The rows marked *after 0.2.0* are not in the 0.2.0 release. None of the five posture rows among them means "a policy nobody wrote" or
-"Secure Boot is off" on its own: the firmware row needs the two readings to disagree, each PowerShell row needs a policy
-written to off. The two per-user rows read the Windows account the scan ran as, which is the player's only when the
+A 0.2.0 report has only the first six rules in this table; the other fifteen are new in 0.3.0. None of the
+firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
+firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
+per-user rows read the Windows account the scan ran as, which is the player's only when the
 scan was not restarted with somebody else's administrator password. The firmware rule does not detect DMA hardware (§1) and says nothing about a second PC.
 
 The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
@@ -248,24 +252,21 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 
 ## 9. Keeping a record
 
-- **The window version has no export or save button** in 0.2.0.
+- **The window version has no export or save button** in 0.3.0.
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
   ```powershell
-  .\aeterna-rongroi-cli-0.2.0-windows-x64.exe scan --mode ss --json > report.json
+  .\aeterna-rongroi-cli-0.3.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
-  **Releases after 0.2.0:** the consent question stays on screen, the player answers it there, and the
-  file holds only the JSON.
+  The consent question stays on screen, the player answers it there, and the file holds only the JSON.
+  Run it from an administrator PowerShell (§3), not with `--elevate`.
 
-  **0.2.0:** the consent question goes to the same output as the JSON. With `>`, the player does not
-  see the question, the program waits for an answer with nothing on screen, and the question ends up
-  at the top of the file. So with 0.2.0, first run the SS-mode scan from §4 without `--json`, so the
-  player reads the question and answers it on screen. If they agree, run the command above with
-  `--yes` added. That is what `--yes` is for. It is a second scan, so a running-program list can
+  **With 0.2.0** the consent question goes to the same output as the JSON: with `>`, the player does not
+  see it, the program waits with nothing on screen, and the question ends up at the top of the file. With
+  0.2.0, first run the SS-mode scan from §4 without `--json`, so the player answers on screen; if they
+  agree, run the command above with `--yes` added. It is a second scan, so a running-program list can
   differ slightly from the one on screen.
-
-  Either way, run it from an administrator PowerShell (§3), not with `--elevate`.
 - A file the player sends to staff becomes the server's responsibility, including how long it is
   kept ([PRIVACY.md](../PRIVACY.md)).
 
