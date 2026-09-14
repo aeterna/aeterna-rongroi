@@ -14,6 +14,8 @@ interface Props {
   fileBase: string | null;
   /** `https://…/tree/<commit>` for an official build, `null` otherwise. */
   treeBase: string | null;
+  /** Whether `codeLinks()` has arrived (successfully or not) — `false` while still in flight. */
+  linksKnown: boolean;
   technicalAll: boolean;
 }
 
@@ -22,7 +24,7 @@ interface Props {
  * where it is in the code. A match starts open, because the sentence saying a rule proves no
  * cheating usually ends the description, which the two-line cut of a closed row hides.
  */
-export function EvidenceRow({ item, text, fileBase, treeBase, technicalAll }: Props) {
+export function EvidenceRow({ item, text, fileBase, treeBase, linksKnown, technicalAll }: Props) {
   const { t } = useTranslation("report");
   const [open, setOpen] = useState(item.state === "found");
   const [technical, setTechnical] = useState(false);
@@ -43,6 +45,9 @@ export function EvidenceRow({ item, text, fileBase, treeBase, technicalAll }: Pr
         type="button"
         className="row-head"
         aria-expanded={shown}
+        // Carried fix (c): while every row is already forced open by the technical switch, a click
+        // here must not silently change the row's own hidden `open` state for when it is switched off.
+        disabled={technicalAll}
         onClick={() => setOpen(!shown)}
       >
         <span className={`mark mark-${item.state}`} aria-hidden="true" />
@@ -70,7 +75,13 @@ export function EvidenceRow({ item, text, fileBase, treeBase, technicalAll }: Pr
             {t("layers.technical")}
           </button>
           {showTechnical && (
-            <Technical item={item} text={text} fileBase={fileBase} treeBase={treeBase} />
+            <Technical
+              item={item}
+              text={text}
+              fileBase={fileBase}
+              treeBase={treeBase}
+              linksKnown={linksKnown}
+            />
           )}
         </div>
       )}
@@ -112,11 +123,13 @@ function Technical({
   text,
   fileBase,
   treeBase,
+  linksKnown,
 }: {
   item: Evidence;
   text: RuleText | undefined;
   fileBase: string | null;
   treeBase: string | null;
+  linksKnown: boolean;
 }) {
   const { t } = useTranslation("report");
   const observations: Observation[] = item.state === "found" ? item.observations : [];
@@ -175,7 +188,9 @@ function Technical({
           </>
         )}
       </dl>
-      {text && <Files files={text.files} fileBase={fileBase} treeBase={treeBase} />}
+      {text && (
+        <Files files={text.files} fileBase={fileBase} treeBase={treeBase} linksKnown={linksKnown} />
+      )}
     </div>
   );
 }
@@ -184,10 +199,12 @@ function Files({
   files,
   fileBase,
   treeBase,
+  linksKnown,
 }: {
   files: RuleFiles;
   fileBase: string | null;
   treeBase: string | null;
+  linksKnown: boolean;
 }) {
   const { t } = useTranslation("report");
   const paths: [string, string, string | null][] = [
@@ -198,8 +215,12 @@ function Files({
   return (
     <section className="rule-files" aria-label={t("layers.code_title")}>
       <p className="muted">
-        {t("layers.code_title")} ·{" "}
-        {fileBase ? t("layers.files_at_commit") : t("layers.files_unknown_build")}
+        {t("layers.code_title")}
+        {/* Carried fix (b): neither statement until it is known whether this build's commit is
+            known — a call still in flight, or one that failed, is not evidence either way. */}
+        {linksKnown && (
+          <> · {fileBase ? t("layers.files_at_commit") : t("layers.files_unknown_build")}</>
+        )}
       </p>
       <ul>
         {paths.map(([label, path, link]) => (

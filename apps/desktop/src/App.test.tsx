@@ -51,9 +51,15 @@ let calls: string[] = [];
 let viewOverride: ReportView | null = null;
 let headerOverride: ReportHeader | null = null;
 let linksOverride: { repository: string; code: string; commit: string | null } | null = null;
+// Carried fix (b): a `code_links` call that never resolves, so `links` stays `null` — the same shape
+// the UI sees while the call is still in flight or after it failed.
+let linksNeverResolve = false;
 let clipboardWrites: string[] = [];
 const REPOSITORY = "https://github.com/aeterna/aeterna-rongroi";
 const COMMIT = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
+// Carried fix (d): the real descriptor before any test stubs it, so it can be restored afterwards
+// instead of leaking a fake `navigator.clipboard` into the next test file.
+const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 
 beforeAll(async () => {
   await initI18n("en");
@@ -64,6 +70,7 @@ beforeEach(async () => {
   viewOverride = null;
   headerOverride = null;
   linksOverride = null;
+  linksNeverResolve = false;
   clipboardWrites = [];
   await i18n.changeLanguage("en");
   mockIPC((cmd, args) => {
@@ -91,6 +98,9 @@ beforeEach(async () => {
           },
         };
       case "code_links":
+        if (linksNeverResolve) {
+          return new Promise(() => {});
+        }
         return linksOverride ?? { repository: REPOSITORY, code: REPOSITORY, commit: null };
       case "code_link_qr":
         return `<?xml version="1.0" standalone="yes"?><svg xmlns="http://www.w3.org/2000/svg"></svg>`;
@@ -103,6 +113,12 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   clearMocks();
+  if (originalClipboardDescriptor) {
+    Object.defineProperty(navigator, "clipboard", originalClipboardDescriptor);
+  } else {
+    // jsdom had no `navigator.clipboard` of its own before any test stubbed it.
+    (navigator as { clipboard?: unknown }).clipboard = undefined;
+  }
 });
 
 /** Opens a closed row by clicking its title. */
@@ -568,6 +584,19 @@ describe("App", () => {
     const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
     expect(rulePath.parentElement?.querySelector("button")).toBeNull();
     expect(screen.getAllByText(/This build is not official/).length).toBeGreaterThan(0);
+  });
+
+  // Carried fix (b): before `codeLinks()` has arrived (or after it has failed), the report does not
+  // yet know whether this build is official, so it must not say either thing about the commit.
+  it("says nothing about the build's commit before the code links resolve", async () => {
+    linksNeverResolve = true;
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByLabelText("Show technical details for every row"));
+    const rulePath = await screen.findByText("rules/posture/boot/secure-boot-disabled/rule.yaml");
+    expect(rulePath.parentElement?.querySelector("button")).toBeNull();
+    expect(screen.queryByText(/This build is not official/)).toBeNull();
+    expect(screen.queryByText(/At the commit this program was built from/)).toBeNull();
   });
 
   it("opens About & code from the start screen, with the repository and its QR code", async () => {

@@ -40,7 +40,11 @@ export function Report({ mode, onBack }: Props) {
   }, [i18n.language]);
 
   useEffect(() => {
-    void codeLinks().then(setLinks);
+    // Carried fix (b): a failed call leaves `links` at `null`, the same as one still in flight —
+    // both mean "not known yet", never a build guessed to be one thing or the other.
+    void codeLinks()
+      .then(setLinks)
+      .catch(() => {});
   }, []);
 
   if (!view) {
@@ -55,6 +59,8 @@ export function Report({ mode, onBack }: Props) {
         : t("header.elevated_no");
   const fileBase = links?.commit ? `${links.repository}/blob/${links.commit}` : null;
   const treeBase = links?.commit ? `${links.repository}/tree/${links.commit}` : null;
+  // Carried fix (b): whether `codeLinks()` has arrived at all, independent of what it said.
+  const linksKnown = links !== null;
 
   return (
     <section className="report">
@@ -119,6 +125,7 @@ export function Report({ mode, onBack }: Props) {
           texts={texts}
           fileBase={fileBase}
           treeBase={treeBase}
+          linksKnown={linksKnown}
           technicalAll={technicalAll}
           unfold={filter === "not_found"}
         />
@@ -187,6 +194,7 @@ function Group({
   texts,
   fileBase,
   treeBase,
+  linksKnown,
   technicalAll,
   unfold,
 }: {
@@ -194,6 +202,7 @@ function Group({
   texts: Record<string, RuleText>;
   fileBase: string | null;
   treeBase: string | null;
+  linksKnown: boolean;
   technicalAll: boolean;
   unfold: boolean;
 }) {
@@ -214,6 +223,7 @@ function Group({
       text={texts[item.rule_id]}
       fileBase={fileBase}
       treeBase={treeBase}
+      linksKnown={linksKnown}
       technicalAll={technicalAll}
     />
   );

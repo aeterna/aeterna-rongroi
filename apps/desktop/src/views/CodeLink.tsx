@@ -24,12 +24,22 @@ export function CodeLink({ text, copy, qr = false }: Props) {
   const [image, setImage] = useState<string | null>(null);
 
   useEffect(() => {
+    setImage(null);
     if (!qr || !copy) {
       return;
     }
-    void codeLinkQr(copy).then((svg) =>
-      setImage(svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null),
-    );
+    // Carried fix (a): a response for a URL this effect has since moved on from (because `copy`
+    // changed, or the component unmounted) must not set the image for the new URL.
+    let cancelled = false;
+    void codeLinkQr(copy).then((svg) => {
+      if (cancelled) {
+        return;
+      }
+      setImage(svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [qr, copy]);
 
   async function onCopy(value: string) {
