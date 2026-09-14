@@ -160,6 +160,22 @@ signing **on**, HVCI `source_absent` and no TPM, which is worth knowing before a
 
 ## Consequences
 
+- `check-baseline` reports 12 confronted rules and 6 excused, where it reported 14 and 4. The gate
+  measures two fewer rules than it said it did; nothing about the rules changed.
+- The `plugni` change above **still passes every gate** after this amendment — now because a row says
+  the gate measures nothing about that rule, which is what is true, rather than because a confrontation
+  claimed otherwise.
+- No other rule changes state: only `fivem_dir` declares a discriminator, and its other five rules are
+  confronted, or excused, through conditions other than `location`.
+
+### Not established
+
+- **Whether another collector has a field that should be a discriminator.** `evtx`'s `channel` says
+  which log an observation is about; its two rules are excused for other reasons today, and whether a
+  near miss in `channel` alone should confront them was not examined.
+
+## Consequences
+
 - `cargo xtask check-baseline` gains two failure modes and a longer success line naming how many rules
   were confronted and how many are excused.
 - `rongroi_core::engine::confronts` is public API of the core crate; `matches` is now its `Some(0)`
@@ -169,3 +185,67 @@ signing **on**, HVCI `source_absent` and no TPM, which is worth knowing before a
   `REPORT_SCHEMA_VERSION` are untouched.
 - ADR 0031's "it is **not** closed" stands. `docs/testing.md`'s blockquote beside the gate is rewritten:
   the hole is the same, and it is now reported by the gate rather than only by that paragraph.
+
+## Amendment 2026-09-14 — a near miss about another place is not a confrontation
+
+### The question
+
+ADR 0036 recorded that the two `fivem_dir` rules for a validly signed plugin file — Legacy's `plugins`
+folder (`d5531c55`) and Enhanced's `asi` folder (`53528a11`) — were confronted on the baselines "only by
+`location`": the one baseline observation carrying both of their fields is Legacy's `FiveM.exe`
+(`location: legacy_exe`, `signature: valid`), and it differs from each rule in `location` alone. By the
+letter of decision 1 that is a confrontation. Decision 1 also says what a confrontation is meant to
+be: *the baseline was put the rule's question and answered no*. Whether those two agree here was
+decided on evidence, not on the wording.
+
+### What was measured
+
+On this repository at the commit that introduced ADR 0044, before this amendment:
+
+| Change, made in the rule **and** in its fixtures, then reverted | `check-rules` | `check-baseline` |
+|---|---|---|
+| `location: plugins` → `location: plugni` in `plugin-file-with-valid-signature` | passes | **passes**, and counts the rule confronted |
+| `signature: valid` → `signature: valdi` in the same rule and its positive fixture | passes | **fails**: no baseline confronts the rule |
+
+`plugni` is a place the collector never emits, so that rule would be `not_found` on every machine for
+ever, which a player is shown as "looked for and not there". The confrontation caught a misspelt
+signature answer and was blind to a misspelt place — the condition that makes the rule about plugin
+files at all.
+
+### Two readings, and the one the evidence supports
+
+- **Honest.** The observation carries the rule's fields and answered "no"; `secure-boot-disabled` is
+  also confronted through its one unsatisfied condition, and "a confronted rule is not a correct rule"
+  already says the unsatisfied condition goes unchecked.
+- **An artefact of the gate.** In `secure-boot-disabled` the unsatisfied condition is the property asked
+  about — Secure Boot's state — of the same thing the rule is about. Here it is *which thing*: the
+  observation is about `FiveM.exe`, and the rule asks about files in a plugin folder. The baseline was
+  asked "is `FiveM.exe` validly signed", which is not the rule's question, and a baseline that holds no
+  plugin file cannot have answered the rule's question at all.
+
+The measurement decides it for the second reading: the one condition that decides where the rule looks
+was the one no baseline could ever check, and the gate reported the rule as measured.
+
+### Decision
+
+A confronting observation's one unsatisfied condition **may not be on the rule's collector's
+discriminator** — the field a collector declares says which place an observation is about (ADR 0044).
+`engine::confronts` takes the discriminator as a parameter, because the engine does not know collectors;
+`check-baseline` passes `Collector::discriminator()` for the rule's collector. A match still confronts,
+and a near miss in any other field still confronts. When a rule's only near misses were in the
+discriminator, the gate's message says that by name.
+
+The discriminator is the criterion, rather than a list of fields kept by the gate, because ADR 0044
+already needs the collector to declare which field says where an observation comes from, for its gaps.
+One declaration answers both, so they cannot drift apart.
+
+### What was not done
+
+- **A plugin file was not added to a baseline.** No real plugin file was measured from a published
+  release, and a baseline is the claim that a machine like it is unremarkable
+  (`fixtures/hosts/PROVENANCE.md`). The two rules carry `rules/unconfronted.csv` rows instead, whose
+  `resolved_when` is the same measured fixture that ends the rows of the two rules beside them.
+- **`FiveM.exe` was not copied into a plugin location** in a baseline to confront them: nothing measured
+  puts it there.
+
+#

@@ -153,6 +153,9 @@ snapshot.
 
 - `rongroi_core::model::DiscriminatorGaps`; `CollectorRun::Measured::discriminator_gaps`;
   `rongroi_collectors::Collector::discriminator`. The glossary gains **discriminator**.
+- The same declaration decides one more thing, recorded where the definition it changes lives: a
+  baseline observation that differs from a rule in the discriminator alone does not confront it
+  (ADR 0033, amendment of 2026-09-14).
 - `engine::evaluate_rule` and the unmatched bucket use `matches_in_run`; `could_match_there` is private
   to the engine.
 - ADR 0036's "Recorded, not fixed" paragraph and ADR 0009's per-run sentence carry a pointer here.

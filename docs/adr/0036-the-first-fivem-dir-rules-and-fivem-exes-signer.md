@@ -212,6 +212,13 @@ What `check-baseline` then confronts, measured:
 | The two valid-signature plugin rules | **yes, but only by `location`**: `FiveM.exe` differs from them in that condition alone. That checks the spelling `signature: valid` and says nothing about plugin folders — ADR 0033's "a confronted rule is not a correct rule" applies with force |
 | The two "does not verify" plugin rules | **no** — two conditions away. `rules/unconfronted.csv` rows say why and what ends them: a baseline plugin file measured from a published release, never an invented "ordinary plugin" |
 
+> **Amended 2026-09-14.** The third row was a gate artefact, not a confrontation. With `location: plugins`
+> misspelt in the Legacy rule and its fixtures, `check-baseline` still passed and counted the rule
+> confronted; with `signature: valid` misspelt it failed. `check-baseline` no longer counts a near miss
+> in `location` alone — `fivem_dir`'s discriminator — and both valid-signature plugin rules now carry
+> `rules/unconfronted.csv` rows (ADR 0033, amendment of 2026-09-14; ADR 0044). All four plugin-folder
+> rules are unconfronted until a baseline holds a plugin file measured from a published release.
+
 That the pin is checked was proven by breaking it: changing its last hex digit made `check-baseline`
 fail with the rule `found` on both baselines.
 

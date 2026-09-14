@@ -210,7 +210,10 @@ machines this project asserts are unremarkable. It asks:
 2. **Was your rule ever asked anything?** A rule is *confronted* when some baseline observation carries
    every field your `match` names and comes within **one** unsatisfied condition of firing it — the
    baseline was put the rule's question and answered no. A rule nothing confronts is quiet for a reason
-   that says nothing about it, and would stay quiet however it was written (ADR 0033).
+   that says nothing about it, and would stay quiet however it was written (ADR 0033). **The one
+   condition may not be the collector's discriminator** (`fivem_dir`: `location`): an observation that
+   differs from your rule only in the place it is about was asked about another place, and a misspelt
+   `location:` would stay "confronted" by it (ADR 0033 as amended, ADR 0044).
 
 The second is the one that will surprise you. If your rule reads values no baseline holds — a channel,
 a folder, a registry key that no fixture describes — the gate fails and the fix is a baseline that holds

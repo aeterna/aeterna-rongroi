@@ -126,9 +126,12 @@ pub trait Collector {
     /// The **discriminator**: the field whose value says which of several places this collector reads
     /// an observation is about, when it reads more than one, or `None` (ADR 0044).
     ///
-    /// A place that could not be read is then reported as `DiscriminatorGaps` for that value rather
-    /// than as a gap for the whole run, so a rule whose `match` rules that place out keeps the answer
-    /// the other places give it.
+    /// Two things follow from declaring one. A place that could not be read is reported as
+    /// `DiscriminatorGaps` for that value rather than as a gap for the whole run, so a rule whose
+    /// `match` rules that place out keeps the answer the other places give it. And
+    /// `cargo xtask check-baseline` does not count an observation that differs from a rule **only** in
+    /// the discriminator as confronting that rule: it is about another place, so it was never asked
+    /// the rule's question (ADR 0033, amended).
     ///
     /// The collector promises that every observation it emits carries the field. That promise is bound
     /// by `every_observation_carries_its_collectors_discriminator` in this file, and

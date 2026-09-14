@@ -116,7 +116,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   `known-fps.csv` row with a reason (`cargo xtask check-baseline`, ADR 0017). **Quiet is not the same as
   measured**, and since ADR 0033 the gate tells you which you have: it requires each rule to be
   *confronted* — some baseline observation must carry the fields your `match` names and come within one
-  condition of firing it. A rule nothing confronts fails until `rules/unconfronted.csv` carries a row
+  condition of firing it — and that one condition may not be the collector's discriminator
+  (`fivem_dir`: `location`), because an observation differing only there is about another place. A rule
+  nothing confronts fails until `rules/unconfronted.csv` carries a row
   with a reason and a `resolved_when`, and the row fails once a baseline does confront it. The only
   Event Log sample in this repository is a LanguagePackSetup log, so both rules naming the `Security`
   or `System` channel have such a row today. Do not close that by inventing a log: a baseline asserts

@@ -258,7 +258,8 @@ fn absence_fields(rule: &Rule) -> impl Iterator<Item = &str> {
 /// `rules::parse_match_key` — never on the `match` key, so an operator suffix does not take a field
 /// out of the gap lookup (ADR 0025's objection to a suffix, answered in ADR 0029).
 fn matches(rule: &Rule, observation: &Observation) -> bool {
-    unmet_conditions(rule, observation) == Some(0) && !is_allowed(rule, observation)
+    unmet_conditions(rule, observation).is_some_and(|mut unmet| unmet.next().is_none())
+        && !is_allowed(rule, observation)
 }
 
 /// [`matches`], within a run whose discriminator gaps are `places`.
@@ -300,26 +301,31 @@ fn could_match_there(rule: &Rule, gaps: &DiscriminatorGaps) -> bool {
         })
 }
 
-/// How many of `rule`'s `match` conditions `observation` fails to satisfy, or `None` when the
-/// observation belongs to another collector and the question does not arise.
+/// The fields of `rule`'s `match` conditions that `observation` fails to satisfy, one entry per
+/// unsatisfied condition, or `None` when the observation belongs to another collector and the question
+/// does not arise.
 ///
-/// [`matches`] is the `Some(0)` case of this, and [`confronts`] the `Some(0 | 1)` one.
-fn unmet_conditions(rule: &Rule, observation: &Observation) -> Option<usize> {
+/// [`matches`] is the "none" case of this, and [`confronts`] the "at most one" one.
+fn unmet_conditions<'r>(
+    rule: &'r Rule,
+    observation: &'r Observation,
+) -> Option<impl Iterator<Item = &'r str> + 'r> {
     (observation.collector == rule.collector).then(|| {
-        rule.conditions()
-            .filter(|(key, expected)| match key {
+        rule.conditions().filter_map(|(key, expected)| {
+            let unmet = match key {
                 MatchKey::Known { field, operator } => !condition_matches(
-                    *operator,
+                    operator,
                     expected,
-                    observation.fields.get(*field),
-                    rule.cased.contains(*field),
+                    observation.fields.get(field),
+                    rule.cased.contains(field),
                 ),
                 // `rules::validate` refuses such a key, so no loaded bundle holds one. If one ever
                 // reached here it must not be skipped: skipping a condition drops a restriction and
                 // widens the rule past what its title claims.
                 MatchKey::UnknownOperator { .. } => true,
-            })
-            .count()
+            };
+            unmet.then(|| key.field())
+        })
     })
 }
 
@@ -332,6 +338,14 @@ fn unmet_conditions(rule: &Rule, observation: &Observation) -> Option<usize> {
 /// observation its collector produced, including one that carries none of the rule's fields at all,
 /// and the check would certify most loudly exactly where it knows least.
 ///
+/// **The one unsatisfied condition may not be on `discriminator`**, the field the rule's collector
+/// declares says which place an observation is about (ADR 0044). An observation that differs from a
+/// rule there alone is about another place: it was asked the rule's question about somewhere the rule
+/// does not look, and a misspelt place in the rule would go on being "confronted" by it for ever —
+/// measured on `fivem_dir`'s valid-signature plugin rule, ADR 0033 as amended on 2026-09-14. The engine
+/// does not know collectors, so the caller passes the discriminator; `None` is the definition as
+/// ADR 0033 first wrote it.
+///
 /// `cargo xtask check-baseline` asks this of every rule against every baseline observation. A rule
 /// no baseline confronts has never been compared to anything of its own shape, and is quiet there
 /// for a reason that says nothing about the rule (ADR 0033). The predicate lives here rather than in
@@ -340,11 +354,16 @@ fn unmet_conditions(rule: &Rule, observation: &Observation) -> Option<usize> {
 ///
 /// `allow` is deliberately not consulted: an observation a rule matched and then allowed is still an
 /// observation the rule was compared against.
-pub fn confronts(rule: &Rule, observation: &Observation) -> bool {
+pub fn confronts(rule: &Rule, observation: &Observation, discriminator: Option<&str>) -> bool {
     let Some(unmet) = unmet_conditions(rule, observation) else {
         return false;
     };
-    if unmet > 1 {
+    let close = match unmet.take(2).collect::<Vec<_>>().as_slice() {
+        [] => true,
+        [field] => Some(*field) != discriminator,
+        _ => false,
+    };
+    if !close {
         return false;
     }
     let absent: Vec<&str> = absence_fields(rule).collect();
@@ -952,7 +971,8 @@ date: 2026-09-12
     fn an_observation_one_value_away_confronts_the_rule() {
         assert!(confronts(
             &rule(""),
-            &observation(&[("secure_boot", "enabled")])
+            &observation(&[("secure_boot", "enabled")]),
+            None
         ));
     }
 
@@ -961,7 +981,11 @@ date: 2026-09-12
     /// more than one. It carries none of the rule's fields, so it was never asked the question.
     #[test]
     fn an_observation_without_the_rules_field_does_not_confront_it() {
-        assert!(!confronts(&rule(""), &observation(&[("tpm", "present")])));
+        assert!(!confronts(
+            &rule(""),
+            &observation(&[("tpm", "present")]),
+            None
+        ));
     }
 
     /// The shape `check-baseline` was blind to: a three-condition rule against an observation that
@@ -976,7 +1000,7 @@ date: 2026-09-12
             ("channel", "Microsoft-Windows-LanguagePackSetup/Operational"),
             ("event_id", "3001"),
         ]);
-        assert!(!confronts(&rule, &seen));
+        assert!(!confronts(&rule, &seen, None));
     }
 
     /// The same rule against the same channel and provider, differing only in the event id — what a
@@ -991,7 +1015,7 @@ date: 2026-09-12
             ("channel", "Security"),
             ("event_id", "1100"),
         ]);
-        assert!(confronts(&rule, &seen));
+        assert!(confronts(&rule, &seen, None));
     }
 
     /// A matching observation confronts its rule too: `confronts` is the wider question, and a rule
@@ -1000,7 +1024,8 @@ date: 2026-09-12
     fn a_matching_observation_confronts_the_rule() {
         assert!(confronts(
             &rule(""),
-            &observation(&[("secure_boot", "disabled")])
+            &observation(&[("secure_boot", "disabled")]),
+            None
         ));
     }
 
@@ -1009,7 +1034,55 @@ date: 2026-09-12
     fn an_observation_from_another_collector_does_not_confront_the_rule() {
         let mut seen = observation(&[("secure_boot", "enabled")]);
         seen.collector = "evtx".to_owned();
-        assert!(!confronts(&rule(""), &seen));
+        assert!(!confronts(&rule(""), &seen, None));
+    }
+
+    /// ADR 0033, amended 2026-09-14. The baseline's `FiveM.exe` differs from the valid-signature
+    /// plugins rule in `location` alone. Without a discriminator that counts as a confrontation; with
+    /// one it does not, because the observation is about another place.
+    #[test]
+    fn a_near_miss_in_the_discriminator_alone_does_not_confront_the_rule() {
+        let rule = fivem_rule("  location: plugins\n  signature: valid\n");
+        let exe = fivem_observation(serde_json::json!({
+            "location": "legacy_exe",
+            "path": r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe",
+            "signature": "valid",
+        }));
+        assert!(confronts(&rule, &exe, None));
+        assert!(!confronts(&rule, &exe, Some("location")));
+    }
+
+    /// The positive twin: in the same place and one signature answer away, the observation was asked
+    /// the rule's question and answered no, discriminator or not. And a match confronts, as ever.
+    #[test]
+    fn a_near_miss_in_another_field_still_confronts_the_rule_that_has_a_discriminator() {
+        let rule = fivem_rule("  location: plugins\n  signature: valid\n");
+        let plugin = |signature: &str| {
+            fivem_observation(serde_json::json!({
+                "location": "plugins",
+                "path": r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins\x.dll",
+                "signature": signature,
+            }))
+        };
+        assert!(confronts(
+            &rule,
+            &plugin("no_embedded_signature"),
+            Some("location")
+        ));
+        assert!(confronts(&rule, &plugin("valid"), Some("location")));
+    }
+
+    /// A discriminator the rule does not name changes nothing: the one unsatisfied condition is
+    /// elsewhere, so the definition is ADR 0033's.
+    #[test]
+    fn a_rule_without_a_condition_on_the_discriminator_is_confronted_as_before() {
+        let rule = fivem_rule("  path|exists: true\n  signature|exists: false\n");
+        let exe = fivem_observation(serde_json::json!({
+            "location": "legacy_exe",
+            "path": r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe",
+            "signature": "valid",
+        }));
+        assert!(confronts(&rule, &exe, Some("location")));
     }
 
     #[test]

@@ -121,6 +121,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   report a refusal at all. A refusal on any of these rules is now a row SS mode lists instead of a number
   it counts. A scan without administrator rights still reads as `not_admin`, which stays declared where it
   was. No rule's matching or text changed.
+- `cargo xtask check-baseline` no longer counts a rule as confronted by an observation that differs from it
+  only in the collector's discriminator, `fivem_dir`'s `location` (ADR 0033, amended; ADR 0044). The two
+  valid-signature plugin rules were "confronted" only by the baselines' `FiveM.exe`, which is about
+  another place: with `location: plugni` written into the Legacy rule and its fixtures every gate still
+  passed. Both rules now carry an honest `rules/unconfronted.csv` row, which ends when a baseline holds a
+  plugin file measured from a published release. **The gate measures two fewer rules than it said it
+  did**; no fixture was invented to change that.
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
   `allow.signer_cert_sha256`, the SHA-256 of the signing certificate (ADR 0035). Code-signing certificates
   stolen from NVIDIA in 2022 signed malware under NVIDIA's own name, so a name-based exclusion would have
