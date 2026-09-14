@@ -201,6 +201,7 @@ expression: view
           "fields": {
             "entries": 2,
             "intact": true,
+            "metadata_values": 2,
             "rejected": 0,
             "sid_withheld": "per_user_identifier",
             "users": 1,

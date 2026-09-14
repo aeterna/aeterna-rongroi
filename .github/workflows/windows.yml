@@ -186,6 +186,21 @@ jobs:
           }
           $compared = @($observations | Where-Object { $_.collector -eq 'evtx' -and $_.fields.PSObject.Properties.Name -contains 'at_configured_path' })
           Write-Output "evtx at_configured_path: $(@($compared | Where-Object { $_.fields.at_configured_path }).Count) of $($compared.Count)"
+          # ADR 0023, amendment of 2026-09-14: the BAM account observation beside what the registry
+          # itself says the account keys hold, by value type. Counts only — no SID, no value name.
+          $observations | Where-Object { $_.collector -eq 'bam' -and $_.fields.PSObject.Properties.Name -contains 'users' } | ForEach-Object {
+            $f = $_.fields
+            Write-Output "bam account: users $($f.users) · values $($f.values) · metadata_values $($f.metadata_values) · entries $($f.entries) · rejected $($f.rejected) · intact $($f.intact)"
+          }
+          Write-Output "bam read rows: $(@($observations | Where-Object { $_.collector -eq 'bam' -and $_.fields.PSObject.Properties.Name -contains 'read' }).Count)"
+          $bamKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings'
+          if (Test-Path $bamKey) {
+            $kinds = @(Get-ChildItem $bamKey | ForEach-Object { $key = $_; $key.GetValueNames() | ForEach-Object { $key.GetValueKind($_).ToString() } })
+            $byKind = ($kinds | Group-Object | ForEach-Object { "$($_.Name) $($_.Count)" }) -join ' · '
+            Write-Output "bam registry: $(@(Get-ChildItem $bamKey).Count) account keys · $byKind"
+          } else {
+            Write-Output 'bam registry: no UserSettings key'
+          }
       # ADR 0042 §5, amended 2026-09-14: the channel-configuration reads go to the Event Log service, and a
       # service that never answers must cost its own bound (CONFIG_BUDGET, 5 s) and the three configuration
       # fields — not the scan, and not the evtx rules that read only the logs' bytes. The unit test proves

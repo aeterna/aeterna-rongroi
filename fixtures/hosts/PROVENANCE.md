@@ -39,7 +39,8 @@ none contains a real person's user name, host name, SID or files.
 | `prefetch-unsupported-version` | Windows 11 whose Prefetch folder holds one SCCA v26 file from an older Windows, which this parser does not decode | `prefetch` collector tests |
 | `prefetch-corrupt-files` | Windows 11 whose Prefetch folder holds an intact `MAM` container over a payload that is not Xpress-Huffman, and the corpus's deliberately bad file | `prefetch` collector tests |
 | `registry-bytes-present` | Windows 11, one registry key holding a binary value whose bytes come from `fixtures/parsers/bam/documented-24-byte-value.bin`, one written inline, and one described without bytes — a value that is there and cannot be read | `rongroi-host` fixture tests |
-| `bam-entries-present` | Windows 11 whose BAM state holds one account with two executables in it, their value bytes taken from `fixtures/parsers/bam/` | `bam` collector tests, report snapshots |
+| `bam-entries-present` | Windows 11 whose BAM state holds one account with two executables in it, their value bytes taken from `fixtures/parsers/bam/`, beside the account key's own `Version` and `SequenceNumber` with measured numbers (below) | `bam` collector tests, report snapshots |
+| `bam-account-metadata` | Windows 11, build 26220, two accounts whose keys both hold `Version` and `SequenceNumber` as `REG_DWORD` with measured numbers (below), one of them beside a record and the other holding nothing else — the two shapes an account key was measured in | `bam` collector tests |
 | `bam-device-paths` | The same with the value name spelled as a device path, the form no SS-mode redaction can reach | `bam` collector tests |
 | `bam-two-accounts` | Two accounts with BAM records, so that the report's count of them can be asserted and their SIDs asserted absent | `bam` collector tests |
 | `bam-not-present` | A Windows machine with no BAM state at all: the service is not there, or this build never had it | `bam` collector tests |
@@ -118,15 +119,16 @@ Prefetch and for `Security.evtx`, ADR 0020 and ADR 0023 record PCA and BAM as un
 non-elevated host that read them all would assert something nobody here has measured. The two existing
 baselines stay `elevated: false` and remain the only description of a non-elevated scan.
 
-**Measured values in `baseline-elevated-win11`.** Four things in that host are not invented and not
+**Measured values in `baseline-elevated-win11`.** Five things in that host are not invented and not
 documented by Microsoft; each was read from one Windows 11 machine (build 26220, elevated, read-only, on
-2026-09-13) and nothing on that machine was changed:
+2026-09-13, the BAM values on 2026-09-14) and nothing on that machine was changed:
 
 | Value in the host | What was measured |
 |---|---|
 | `EnablePrefetcher: 3` | the value in `PrefetchParameters`, a `REG_DWORD` (ADR 0037) |
 | `read_only: false` on the `.pf` file | 239 `.pf` files, none read-only (ADR 0037) |
 | `read_only: false` on the `.evtx` file | 413 `.evtx` files, none read-only (ADR 0037) |
+| `Version: 1` and `SequenceNumber: 115` in the BAM account key | the two `REG_DWORD` values every one of the machine's 7 account keys held beside its records: `Version` was 1 in all 7 and `SequenceNumber` between 59 and 170, of which 115 is one. A 0.2.0 report from a second Windows 11 machine (build 26200) is consistent with the same pair in its 8 account keys — 16 refused values whose names were not drive-rooted — though a report names neither the values nor their accounts. Microsoft documents neither (ADR 0023, amendment of 2026-09-14). `bam-entries-present` carries the same pair, and `bam-account-metadata` it and the measured 59 |
 | `event_log_channels` for `Microsoft-Windows-LanguagePackSetup/Operational`: `log_file_path` `%SystemRoot%\System32\Winevt\Logs\Microsoft-Windows-LanguagePackSetup%4Operational.evtx`, `max_size_bytes` 1052672 | what the Event Log service stated for that channel; 1 166 of the machine's 1 243 channels had that size, and every channel's file was its name with `/` written `%4` (ADR 0042) |
 
 `evtx-logs-present` and the temporary hosts the `evtx` tests build describe the service with the same

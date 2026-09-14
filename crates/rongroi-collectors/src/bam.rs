@@ -11,6 +11,10 @@
 //! each value's bytes through the `Host` and hands them to that parser; it decodes nothing itself
 //! (ADR 0013, ADR 0022).
 //!
+//! Each account key also holds two values that are not programs: `Version` and `SequenceNumber`, both
+//! `REG_DWORD`, on every account key measured (ADR 0023, amendment of 2026-09-14). They are counted in
+//! `metadata_values` and not read as records; see [`ACCOUNT_METADATA`].
+//!
 //! No rule reads this collector (ADR 0023), so what it sees is listed in Self mode as unmatched
 //! observations and counted, never listed, in SS mode (ADR 0014).
 //!
@@ -52,6 +56,20 @@ const ID: &str = "bam";
 /// Why the account a record belongs to is not in the report, as the account observation states it.
 const SID_WITHHELD: &str = "per_user_identifier";
 
+/// The names of the two values an account key holds beside its records, as Windows spells them.
+///
+/// **Microsoft documents neither.** They are here because they were measured: on one Windows 11
+/// machine (build 26220) every account key held both, as `REG_DWORD`, and a report from another
+/// (build 26200) held two refused values per account, which is the shape the pair gave before this
+/// (ADR 0023, amendment of 2026-09-14). This collector gives them no meaning and does not report
+/// their numbers — it only declines to count them as programs whose record it could not read.
+///
+/// Set aside only when the name matches, compared without case as the registry compares value names,
+/// **and** the value reads as a number ([`is_account_metadata`]). A value with one of these names
+/// and any other type is read like every other value, so a damaged or unexpected value stays counted
+/// in `rejected`.
+const ACCOUNT_METADATA: [&str; 2] = ["SequenceNumber", "Version"];
+
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
 ///
 /// The BAM key is not there; it is there and holds no record; some of its values decoded and some
@@ -75,10 +93,11 @@ const REASONS: [UnmeasuredReason; 7] = [
 ///
 /// A key it could not enumerate is a gap in all of them. One value it could not read or decode is
 /// not: see the comment on [`Bam::collect`].
-const FIELDS: [Field; 13] = [
+const FIELDS: [Field; 14] = [
     Field::number("entries"),
     Field::boolean("intact"),
     Field::timestamp("last_run"),
+    Field::number("metadata_values"),
     Field::number("moderation_state"),
     Field::text("name"),
     Field::text("path"),
@@ -168,6 +187,7 @@ impl Collector for Bam {
         let mut observations = Vec::new();
         let mut first_failure = None;
         let mut values = 0_usize;
+        let mut metadata = 0_usize;
         let mut parsed = 0_usize;
         let mut rejected = 0_usize;
 
@@ -186,8 +206,18 @@ impl Collector for Bam {
                     continue;
                 }
             };
-            values += names.len();
             for name in &names {
+                match is_account_metadata(host, &key, name) {
+                    Some(true) => {
+                        metadata += 1;
+                        continue;
+                    }
+                    // Gone between the listing and the read, as `read_bytes` answering `Ok(None)`
+                    // is below.
+                    None => continue,
+                    Some(false) => {}
+                }
+                values += 1;
                 match host.read_bytes(&key, name) {
                     Ok(None) => {}
                     Ok(Some(bytes)) => match bam::parse_value(&bytes) {
@@ -207,14 +237,23 @@ impl Collector for Bam {
                 }
             }
         }
-        observations.push(account_of(accounts.len(), values, parsed, rejected));
+        observations.push(account_of(
+            accounts.len(),
+            &Counts {
+                values,
+                metadata,
+                parsed,
+                rejected,
+            },
+        ));
 
         let gaps = match first_failure {
             Some(reason) => gaps(reason),
             // The key is there and nothing at all is recorded under it. That is not "no program
             // ran": Windows' own `BampScavengeUserSettings` deletes every entry older than seven
             // days at each boot, so a key that holds nothing is what a machine unused for a week
-            // looks like the moment it starts (ADR 0030).
+            // looks like the moment it starts (ADR 0030). An account key holding only its own
+            // `Version` and `SequenceNumber` holds no record either.
             None if values == 0 => record_gaps(UnmeasuredReason::SourceEmpty),
             // Some of the values decoded and some did not, so an unknown number of programs is
             // missing from what was read.
@@ -226,6 +265,31 @@ impl Collector for Bam {
             observations,
             gaps,
         }
+    }
+}
+
+/// Whether `name` is one of an account key's own two values ([`ACCOUNT_METADATA`]).
+///
+/// `Some(true)` when the name is one of the two and the value reads as a number; `None` when the name
+/// is one of the two and the value is gone by the time it is read; `Some(false)` for everything else,
+/// which the caller reads as a candidate record. A value of one of those names that does not read as
+/// a number — a string, bytes, a value Windows would not hand over — is `Some(false)`, so its refusal
+/// is reported by the ordinary path rather than hidden here.
+///
+/// `read_u32` is the type test. On `LiveHost` it also accepts a `REG_QWORD` whose number fits in 32
+/// bits (`windows-registry`'s `Key::get_u32`), so such a value with one of the two names would be set
+/// aside as well; none was seen.
+fn is_account_metadata(host: &dyn Host, key: &str, name: &str) -> Option<bool> {
+    if !ACCOUNT_METADATA
+        .iter()
+        .any(|metadata| metadata.eq_ignore_ascii_case(name))
+    {
+        return Some(false);
+    }
+    match host.read_u32(key, name) {
+        Ok(Some(_)) => Some(true),
+        Ok(None) => None,
+        Err(_) => Some(false),
     }
 }
 
@@ -282,18 +346,43 @@ fn execution(path: &str, value_bytes: usize, entry: &BamEntry) -> Observation {
     }
 }
 
+/// What the account keys held, as the account observation counts it.
+#[derive(Debug, Clone, Copy)]
+struct Counts {
+    /// Values read as candidate records: every value except the account keys' own two.
+    values: usize,
+    /// The account keys' own `Version` and `SequenceNumber` ([`ACCOUNT_METADATA`]).
+    metadata: usize,
+    /// Values that decoded.
+    parsed: usize,
+    /// Values that were there and yielded nothing.
+    rejected: usize,
+}
+
 /// What BAM held, how much of it decoded, and whose records these are not.
 ///
 /// `values: 0` under a key that exists is the one question about this artifact that exact equality
-/// can usefully ask: a machine whose BAM state was cleared. `intact` is `rejected == 0`, the same
-/// field and the same meaning `pca` and `prefetch` give it.
+/// can usefully ask: a machine whose BAM state was cleared. `values` therefore leaves out each
+/// account key's own `Version` and `SequenceNumber`, which a key with no record still holds, and
+/// `metadata_values` counts those instead of dropping them silently. `intact` is `rejected == 0`,
+/// the same field and the same meaning `pca` and `prefetch` give it.
 ///
 /// `users` is how many accounts had a key, which is a count and not an identifier — the only thing
 /// this collector says about whose records it read.
-fn account_of(users: usize, values: usize, parsed: usize, rejected: usize) -> Observation {
+fn account_of(users: usize, counts: &Counts) -> Observation {
+    let Counts {
+        values,
+        metadata,
+        parsed,
+        rejected,
+    } = *counts;
     let mut fields = BTreeMap::new();
     fields.insert("users".to_owned(), serde_json::Value::from(users));
     fields.insert("values".to_owned(), serde_json::Value::from(values));
+    fields.insert(
+        "metadata_values".to_owned(),
+        serde_json::Value::from(metadata),
+    );
     fields.insert("entries".to_owned(), serde_json::Value::from(parsed));
     fields.insert("rejected".to_owned(), serde_json::Value::from(rejected));
     fields.insert("intact".to_owned(), serde_json::Value::from(rejected == 0));
@@ -440,6 +529,7 @@ mod tests {
         let account = account(observations);
         assert_eq!(field(account, "users"), Some(&1_u64.into()));
         assert_eq!(field(account, "values"), Some(&2_u64.into()));
+        assert_eq!(field(account, "metadata_values"), Some(&2_u64.into()));
         assert_eq!(field(account, "entries"), Some(&2_u64.into()));
         assert_eq!(field(account, "rejected"), Some(&0_u64.into()));
         assert_eq!(field(account, "intact"), Some(&true.into()));
@@ -481,6 +571,103 @@ mod tests {
         assert_eq!(text(records[0], "name"), Some("tool.exe"));
         assert_eq!(field(records[0], "path"), None);
         assert_eq!(text(records[0], "path_withheld"), Some(UNREDACTABLE_FORM));
+    }
+
+    /// **Every account key measured on Windows 11 holds `Version` and `SequenceNumber`, two
+    /// `REG_DWORD` values, beside its records** (ADR 0023, amendment of 2026-09-14). They are the
+    /// key's own values, not programs: counted in `metadata_values`, never in `values` or
+    /// `rejected`, and no `read:` row names them. Before this, a machine holding them reported
+    /// `intact: false` with two `read: failed` rows per account.
+    #[test]
+    fn an_account_keys_own_version_and_sequence_number_are_not_records() {
+        let run = Bam.collect(&fixture("bam-account-metadata"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert!(refusals(observations).is_empty(), "{observations:?}");
+
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(text(records[0], "name"), Some("example.exe"));
+
+        let account = account(observations);
+        assert_eq!(field(account, "users"), Some(&2_u64.into()));
+        assert_eq!(field(account, "values"), Some(&1_u64.into()));
+        assert_eq!(field(account, "metadata_values"), Some(&4_u64.into()));
+        assert_eq!(field(account, "entries"), Some(&1_u64.into()));
+        assert_eq!(field(account, "rejected"), Some(&0_u64.into()));
+        assert_eq!(field(account, "intact"), Some(&true.into()));
+    }
+
+    /// Account keys that hold the two values and no record hold no record: the key was read and a
+    /// program that ran would have been there, which is `source_empty` — not `partial`, which is
+    /// what counting the pair as refused values made of it.
+    #[test]
+    fn account_keys_holding_only_their_own_values_are_source_empty() {
+        let host = FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nelevated: true\nregistry:\n  \
+                 '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1001':\n    \
+                 Version: 1\n    SequenceNumber: 59\n"
+            ),
+            "inline",
+        )
+        .unwrap();
+
+        let run = Bam.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert_eq!(observations.len(), 1, "{observations:?}");
+        let account = account(observations);
+        assert_eq!(field(account, "values"), Some(&0_u64.into()));
+        assert_eq!(field(account, "metadata_values"), Some(&2_u64.into()));
+        assert_eq!(field(account, "intact"), Some(&true.into()));
+        for name in RECORD_FIELDS {
+            assert_eq!(
+                gaps.get(name),
+                Some(&UnmeasuredReason::SourceEmpty),
+                "{name}"
+            );
+        }
+        assert_eq!(gaps.get("values"), None);
+    }
+
+    /// Only the two names **and** the type they were measured with are set aside. A `Version` that is
+    /// a string, or a `SequenceNumber` that is there and cannot be read as a number, is not the pair
+    /// Windows was seen to write, so it is read like every other value and its refusal stays
+    /// visible. The name compares without case, as the registry does; a name that only resembles
+    /// one of the two is an ordinary value.
+    #[test]
+    fn a_value_with_one_of_those_names_and_another_type_is_still_refused() {
+        let host = FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nelevated: true\nregistry:\n  \
+                 '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1001':\n    \
+                 VERSION: '1'\n    SequenceNumber: {{}}\n    sequencenumber2: 7\n  \
+                 '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1002':\n    \
+                 version: 1\n    SEQUENCENUMBER: 59\n"
+            ),
+            "inline",
+        )
+        .unwrap();
+
+        let run = Bam.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert_eq!(
+            gaps.get("name"),
+            Some(&UnmeasuredReason::Partial),
+            "{gaps:?}"
+        );
+
+        let refused = refusals(observations);
+        assert_eq!(refused.len(), 3, "{refused:?}");
+        for observation in &refused {
+            assert_eq!(text(observation, "read"), Some("failed"));
+        }
+
+        let account = account(observations);
+        assert_eq!(field(account, "values"), Some(&3_u64.into()));
+        assert_eq!(field(account, "metadata_values"), Some(&2_u64.into()));
+        assert_eq!(field(account, "rejected"), Some(&3_u64.into()));
+        assert_eq!(field(account, "intact"), Some(&false.into()));
     }
 
     /// Two accounts are two keys, and the report says how many there were and nothing else about

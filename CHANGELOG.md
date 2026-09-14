@@ -141,6 +141,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   exactly as before; the difference is the new configuration observation, listed in Self mode.
 
 ### Fixed
+- Every ordinary PC reported BAM `intact: false`, with two `read: failed` rows per account in Self mode.
+  Each account key under `bam\State\UserSettings` holds, beside its program records, two `REG_DWORD`
+  values named `Version` and `SequenceNumber` that Microsoft does not document, and `bam` counted them as
+  records it could not read. They are now counted in a new account field, `metadata_values`, and no
+  longer in `values` or `rejected`; a value with one of those names that is not a number is still
+  refused and shown. Measured on every account key of one Windows 11 machine (build 26220), and the same
+  two refusals per account were in a 0.2.0 report from another (build 26200) (ADR 0023, amended). No
+  rule reads BAM, so no evidence changed.
 - The SS-mode consent question named the wrong scan. In the CLI and in the window app it said the
   check reads "machine security settings"; since 0.2.0 it also reads the programs running, FiveM's
   plugins folder, what Prefetch, BAM and the Program Compatibility Assistant recorded about programs
