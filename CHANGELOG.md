@@ -114,6 +114,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   (ADR 0038, now accepted). `AGENTS.md` hard rule 2 names the token as the one thing a collector may change.
 
 ### Changed
+- No rule declares `access_denied` any more (ADR 0032, amended). Eleven rules did, in lines never checked
+  against their collectors. Each was: on `evtx` and `prefetch` the reason means a refusal **with**
+  administrator rights, which two elevated scans never met; the `posture` registry keys grant every
+  account read access and a limited-token scan read them; and the test-signing and TPM queries never
+  report a refusal at all. A refusal on any of these rules is now a row SS mode lists instead of a number
+  it counts. A scan without administrator rights still reads as `not_admin`, which stays declared where it
+  was. No rule's matching or text changed.
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
   `allow.signer_cert_sha256`, the SHA-256 of the signing certificate (ADR 0035). Code-signing certificates
   stolen from NVIDIA in 2022 signed malware under NVIDIA's own name, so a name-based exclusion would have

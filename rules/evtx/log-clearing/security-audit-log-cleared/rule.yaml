@@ -30,7 +30,8 @@ retention: >-
 # declare it, because a view lists it whatever the rule says. Written out for the reader who wonders
 # why the obvious one is missing, and because these two rules were the first written after the field
 # had teeth.
-unmeasured_when: [not_windows, not_admin, access_denied]
+# `access_denied` removed (ADR 0032, amended 2026-09-14): `evtx` gives it only to a refusal with administrator rights, and two elevated scans read every log, so here it would hide the unreadable log a reviewer of this rule most needs to see.
+unmeasured_when: [not_windows, not_admin]
 falsepositives:
   - Gaming "optimiser", "debloat" and "tweak" scripts. Several popular ones clear every log on the
     PC in one click, months before any of this, and the owner has usually forgotten running one

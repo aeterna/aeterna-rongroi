@@ -156,6 +156,61 @@ fn a_fivem_folder_that_could_not_be_listed_leaves_every_fivem_dir_rule_unmeasure
     }
 }
 
+/// **A refusal no rule declares is a row a reviewer sees** (ADR 0032, amended 2026-09-14). Since the
+/// review of every `access_denied` declaration, no rule names it: on `evtx` and `prefetch` it is a
+/// refusal with administrator rights, and on `posture` a refusal of a key every account may read or a
+/// query that never reports one. On each of these hosts the rules the refusal reaches are
+/// `unmeasured / access_denied` with `expected: false`, and SS mode lists every one of them.
+#[test]
+fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason};
+
+    for (host, rules) in [
+        ("evtx-access-denied-elevated", 4),
+        ("prefetch-access-denied-elevated", 1),
+        // `secure-boot-disabled` and `secure-boot-firmware-disagrees`: the fixture denies the
+        // registry's Secure Boot key.
+        ("registry-access-denied", 2),
+    ] {
+        let report = report_for(host);
+        let refused: Vec<_> = report
+            .evidence
+            .iter()
+            .filter(|evidence| {
+                matches!(
+                    evidence.state,
+                    EvidenceState::Unmeasured {
+                        reason: UnmeasuredReason::AccessDenied,
+                        ..
+                    }
+                )
+            })
+            .collect();
+        assert_eq!(refused.len(), rules, "{host}: {refused:?}");
+        let ss = view::for_mode(&report, Mode::Ss);
+        for evidence in refused {
+            assert!(
+                matches!(
+                    evidence.state,
+                    EvidenceState::Unmeasured {
+                        expected: false,
+                        ..
+                    }
+                ),
+                "{host}: {} still expects a refusal",
+                evidence.rule_id
+            );
+            assert!(
+                ss.evidence
+                    .iter()
+                    .any(|row| row.rule_id == evidence.rule_id),
+                "{host}: SS mode does not list {}",
+                evidence.rule_id
+            );
+        }
+    }
+}
+
 /// Where the `process-own-trace` fixture says this program is running from.
 const OWN_EXE: &str = r"C:\Users\fixtureuser\Downloads\aeterna-rongroi.exe";
 
