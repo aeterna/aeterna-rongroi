@@ -38,7 +38,8 @@ still hold the record of it going, for as long as the journal's size keeps it.
 
 Every such record has ordinary causes too. Prefetch keeps a bounded number of files (research note 03
 records up to 1,024, from a secondary source), the Event Log service writes to its own folder whenever it
-records anything, and a player removes a ReShade preset from the plugins folder. That is why this ADR proposes observations and no rule (Question 3).
+records anything, and a player removes a ReShade preset from the plugins folder. That is why this ADR
+proposes observations and no rule (Question 3).
 
 ### The questions
 
