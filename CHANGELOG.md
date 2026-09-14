@@ -30,6 +30,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   matched against registered driver services as `posture`, vendored as a data file under its own licence.
   No collector code until its rights, `ImagePath` forms and cost are measured. Loaded modules, the
   Authenticode hash and Microsoft's blocklist switch are not read.
+- The USN change journal is designed (ADR 0047, accepted): counts of records per folder other collectors
+  already read, with file names dropped in the parser and no journal identifier in the report. No code
+  until it is measured whether the journal can be read on a volume handle opened without write access;
+  if it cannot, the M3 item closes as decided against.
 
 ## [0.3.0] - 2026-09-14
 

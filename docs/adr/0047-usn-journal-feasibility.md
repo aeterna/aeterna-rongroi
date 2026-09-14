@@ -1,6 +1,6 @@
 # ADR 0047 — The USN change journal: what can be read, and what it may say
 
-- Status: proposed
+- Status: accepted — the recommendation below; no code until measurement 1 under "Before any code" passes
 - Date: 2026-09-14
 
 ## Context
@@ -333,4 +333,6 @@ account; `tamper` only for a shape a baseline shows ordinary machines do not hav
 
 - No code, no rule, no fixture, no dependency. `Cargo.lock`, `deny.toml`, `clippy.toml` and the report are
   unchanged.
-- README's M3 row changes only when the owner decides.
+- Accepted by the owner on 2026-09-14, with the five points of the recommendation as written.
+- README's M3 row, in both languages, links here: the USN journal is designed, and waits on the
+  measurements under "Before any code".
