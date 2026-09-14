@@ -638,6 +638,24 @@ describe("App", () => {
     expect(screen.queryByText(/The code this build was made from is not known/)).toBeNull();
   });
 
+  // About & code is reachable from every screen, so leaving it returns to the screen it was opened
+  // from: an SS report stays an SS report, without asking for consent a second time.
+  it("returns from About & code to the report it was opened from", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(await screen.findByText("Found")).toBeTruthy();
+    fireEvent.click(screen.getByText("About & code"));
+    expect(await screen.findByText("About this program and its code")).toBeTruthy();
+    // Opening it again from itself must not make it its own way back.
+    fireEvent.click(screen.getByText("About & code"));
+    fireEvent.click(screen.getByText("Back"));
+    expect(await screen.findByText("Found")).toBeTruthy();
+    expect(screen.getByText(/^Hidden in SS mode:/)).toBeTruthy();
+    expect(screen.queryByText("You may refuse.")).toBeNull();
+    expect(screen.queryByText("What do you want to do?")).toBeNull();
+  });
+
   it("says a refused copy and leaves the text to select", async () => {
     stubClipboard("refused");
     render(<App />);

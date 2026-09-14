@@ -18,6 +18,9 @@ export function App() {
   const { t, i18n } = useTranslation();
   const [header, setHeader] = useState<ReportHeader | null>(null);
   const [screen, setScreen] = useState<Screen>("start");
+  // The screen About & code was opened from, so Back returns there: an open report keeps its mode,
+  // and an SS report does not ask for consent again.
+  const [beforeAbout, setBeforeAbout] = useState<Exclude<Screen, "about">>("start");
   const [elevation, setElevation] = useState<ElevateOutcome | null>(null);
 
   useEffect(() => {
@@ -32,7 +35,12 @@ export function App() {
           <p className="muted">{t("app.tagline")}</p>
         </div>
         <div className="top-actions">
-          <button type="button" className="nav" onClick={() => setScreen("about")}>
+          <button type="button" className="nav" onClick={() => {
+              if (screen !== "about") {
+                setBeforeAbout(screen);
+              }
+              setScreen("about");
+            }}>
             {t("nav.about")}
           </button>
           <label className="language">
@@ -96,7 +104,7 @@ export function App() {
         </section>
       )}
 
-      {screen === "about" && <About onBack={() => setScreen("start")} />}
+      {screen === "about" && <About onBack={() => setScreen(beforeAbout)} />}
 
       {typeof screen === "object" && (
         <Report mode={screen.report} onBack={() => setScreen("start")} />
