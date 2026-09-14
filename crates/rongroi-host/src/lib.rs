@@ -175,12 +175,16 @@ pub enum SignatureCheck {
     /// Not "unsigned": a file can be signed through a Windows catalog instead, and this check does not
     /// look there.
     NoEmbeddedSignature,
-    /// A signature is there and Windows does not trust it: the file changed after signing, the
-    /// certificate chains to a root this machine does not trust, it expired without a timestamp, or it
-    /// is explicitly distrusted.
+    /// A signature is there and Windows does not trust it: the file changed after signing, a
+    /// certificate's own signature does not verify, it expired without a timestamp, it is not for code
+    /// signing, or it is explicitly distrusted.
     Invalid,
-    /// The answer needed something this machine does not hold locally — an intermediate certificate or
-    /// revocation data — and this program does not fetch it. A fact about the check, not the file.
+    /// The answer needed something this machine does not hold locally — an intermediate certificate, a
+    /// root it holds as trusted, or revocation data — and this program does not fetch it. A fact about
+    /// the check, not the file. A chain that ends at a root this machine does not trust is here too,
+    /// because offline that cannot be told apart from a root it has not fetched yet: a self-signed
+    /// signature reads this way as well as a genuine one on such a PC (ADR 0035, amendment of
+    /// 2026-09-14).
     UnverifiableOffline,
 }
 

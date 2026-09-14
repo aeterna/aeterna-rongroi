@@ -126,8 +126,9 @@ jobs:
       # is in and deleted, the ignored `live_chain_offline_` test prints what `WinVerifyTrust` said, and
       # the export is imported back. The URL cache is cleared first, and CAPI2 must record no network
       # retrieval from the test process, so nothing could have come back from the network either. The
-      # runner is thrown away afterwards; the stores are still restored, whatever happens, because the
-      # steps after this one build and run on the same machine.
+      # test asserts the codes this step measured, per case; the ADR has the table. The runner is thrown
+      # away afterwards; the stores are still restored, whatever happens, because the steps after this
+      # one build and run on the same machine.
       - name: What an incomplete certificate chain answers offline
         shell: pwsh
         run: |
@@ -299,7 +300,9 @@ jobs:
               $elements = @((ChainOf $file).Chain.ChainElements | ForEach-Object { $_.Certificate })
               $root = $elements[-1]
               if ($root.Subject -ne $root.Issuer) { throw "the chain of $file does not end in a self-signed root" }
-              RemovedCase $file $root.Thumbprint 'root_removed'
+              # Whether the signature carries its root decides the code, so the case says which.
+              $carried = @((ChainOf $file).Cms.Certificates | ForEach-Object Thumbprint) -contains $root.Thumbprint
+              RemovedCase $file $root.Thumbprint ($(if ($carried) { 'root_removed_carried_in_signature' } else { 'root_removed_not_in_signature' }))
               foreach ($intermediate in @($elements | Select-Object -Skip 1 -First ([Math]::Max(0, $elements.Count - 2)))) {
                 RemovedCase $file $intermediate.Thumbprint 'intermediate_removed'
               }
@@ -322,6 +325,8 @@ jobs:
             Write-Output "Set-AuthenticodeSignature: $($result.Status) $($result.StatusMessage)"
           } finally {
             Remove-Item "Cert:\CurrentUser\My\$($cert.Thumbprint)" -DeleteKey
+            # The first run found the certificate in the current user's intermediate store after signing too.
+            Get-ChildItem Cert:\CurrentUser\CA | Where-Object Thumbprint -eq $cert.Thumbprint | Remove-Item
           }
           '@
             powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$work\sign.ps1" -Path $selfSigned
@@ -333,7 +338,8 @@ jobs:
           } finally {
             RestoreAll
             wevtutil sl $log /e:false
-          } Reading the firmware's Secure Boot variable enables a privilege in this program's own
+          }
+      # ADR 0038. Reading the firmware's Secure Boot variable enables a privilege in this program's own
       # token for the read. This proves the read leaves the token as it found it; on the elevated runner
       # the privilege is held, so it also proves the read answers rather than reporting missing rights.
       - name: Firmware read leaves its privilege as it found it
