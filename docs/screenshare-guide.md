@@ -43,7 +43,8 @@ never does.
 5. When it runs, the header must say **official build**. If it says **UNOFFICIAL BUILD**, or the
    hash does not match, **stop**. The result means nothing.
 
-The report header also prints the program's own `exe sha256`. It should match `SHA256SUMS`. A
+The CLI report header also prints the program's own `exe sha256`. In the window version it is not in
+the report header: open **About & code**, which shows it as **SHA-256**. It should match `SHA256SUMS`. A
 match shows the running file is consistent with the release. It cannot prove it: a modified program
 could print any value.
 

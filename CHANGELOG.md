@@ -23,6 +23,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   QR codes drawn in Rust, how to check a downloaded file, and why no button opens a web page. No plugin,
   no JavaScript dependency and no network code were added.
 
+### Changed
+- The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the
+  commit, the rules bundle SHA-256 and how to check a downloaded file (ADR 0045).
+
 ## [0.3.0] - 2026-09-14
 
 ### Added
