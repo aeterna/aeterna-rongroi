@@ -46,8 +46,13 @@ registry:
     EnablePrefetcher: 3
   # One account with BAM records, in the two path shapes BAM writes: the device path it normally uses
   # (ADR 0023), which no SS-mode redaction can reach and which is therefore withheld, and a
-  # drive-rooted one. The SID is invented and the collector emits no part of it.
+  # drive-rooted one. The SID is invented and the collector emits no part of it. Beside them, the two
+  # `REG_DWORD` values every account key held on the Windows 11 machines measured, with measured
+  # numbers (../PROVENANCE.md): an ordinary machine's key holds them, so a baseline without them would
+  # not be an ordinary machine's.
   'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    Version: 1
+    SequenceNumber: 115
     '\Device\HarddiskVolume3\Windows\System32\notepad.exe':
       from: '../../parsers/bam/documented-24-byte-value.bin'
     'C:\Program Files\FiveM\FiveM.exe':
