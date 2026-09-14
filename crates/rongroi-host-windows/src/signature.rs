@@ -33,7 +33,9 @@ pub mod codes {
     pub const TRUST_E_CERT_SIGNATURE: u32 = 0x8009_6004;
     /// `TRUST_E_NO_SIGNER_CERT`: the signature names no signing certificate.
     pub const TRUST_E_NO_SIGNER_CERT: u32 = 0x8009_6002;
-    /// `CERT_E_UNTRUSTEDROOT`: the chain ends in a root this machine does not trust.
+    /// `CERT_E_UNTRUSTEDROOT`: the chain ends in a self-signed root this machine does not trust. Measured
+    /// both for a genuine signature that carries its own root on a machine whose stores lack it, and for
+    /// a self-signed one (ADR 0035, amendment of 2026-09-14).
     pub const CERT_E_UNTRUSTEDROOT: u32 = 0x800B_0109;
     /// `CERT_E_EXPIRED`: the certificate expired and the signature carries no timestamp from before.
     pub const CERT_E_EXPIRED: u32 = 0x800B_0101;
@@ -41,7 +43,8 @@ pub mod codes {
     pub const CERT_E_WRONG_USAGE: u32 = 0x800B_0110;
     /// `CERT_E_REVOKED`: revoked, according to revocation data this machine already holds.
     pub const CERT_E_REVOKED: u32 = 0x800B_010C;
-    /// `CERT_E_CHAINING`: a chain to a trusted root could not be built from what is held locally.
+    /// `CERT_E_CHAINING`: a chain to a trusted root could not be built from what is held locally. Measured
+    /// for a genuine signature that does not carry its root, on a machine whose stores lack it.
     pub const CERT_E_CHAINING: u32 = 0x800B_010A;
     /// `CRYPT_E_REVOCATION_OFFLINE`: revocation data was needed and not available.
     pub const CRYPT_E_REVOCATION_OFFLINE: u32 = 0x8009_2013;
@@ -62,7 +65,8 @@ pub enum Verdict {
     NoEmbeddedSignature,
     /// A signature is there and is not trusted.
     Invalid,
-    /// Needed something this machine does not hold locally.
+    /// Needed something this machine does not hold locally, or ended at a root it does not hold as
+    /// trusted — which offline cannot tell apart from a root nobody trusts.
     UnverifiableOffline,
     /// The file could not be opened.
     AccessDenied,
@@ -90,11 +94,15 @@ pub fn classify(result: u32) -> Verdict {
         | TRUST_E_SUBJECT_NOT_TRUSTED
         | TRUST_E_CERT_SIGNATURE
         | TRUST_E_NO_SIGNER_CERT
-        | CERT_E_UNTRUSTEDROOT
         | CERT_E_EXPIRED
         | CERT_E_WRONG_USAGE
         | CERT_E_REVOKED => Verdict::Invalid,
+        // A root this machine does not hold as trusted is `CERT_E_CHAINING` when the signature does not
+        // carry the root and `CERT_E_UNTRUSTEDROOT` when it does; a self-signed signature is the second
+        // too. Offline, the two cannot be told apart, and a genuine publisher's file must not read as
+        // `invalid` on a PC that has not fetched its root yet (ADR 0035, amendment of 2026-09-14).
         CERT_E_CHAINING
+        | CERT_E_UNTRUSTEDROOT
         | CRYPT_E_REVOCATION_OFFLINE
         | CERT_E_REVOCATION_FAILURE
         | CRYPT_E_NO_REVOCATION_CHECK => Verdict::UnverifiableOffline,
@@ -162,11 +170,25 @@ impl rongroi_host::SignatureSource for crate::LiveHost {
 /// Runs `WinVerifyTrust` on the file at `path` with `settings`, reads the signer when it verified, and
 /// always closes the state data it opened.
 #[cfg(windows)]
-#[allow(unsafe_code)]
 fn verify(
     path: &str,
     settings: TrustSettings,
 ) -> Result<rongroi_host::SignatureCheck, rongroi_host::SourceError> {
+    verify_with_code(path, settings).1
+}
+
+/// [`verify`], also returning the code `WinVerifyTrust` gave, or `None` when the call was not made. The
+/// live tests print it: ADR 0035's table maps codes, and the mapped answer alone cannot say which code
+/// produced it.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn verify_with_code(
+    path: &str,
+    settings: TrustSettings,
+) -> (
+    Option<u32>,
+    Result<rongroi_host::SignatureCheck, rongroi_host::SourceError>,
+) {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
 
@@ -183,9 +205,12 @@ fn verify(
         u32::try_from(size_of::<WINTRUST_DATA>()),
         u32::try_from(size_of::<WINTRUST_FILE_INFO>()),
     ) else {
-        return Err(SourceError::Failed(
-            "WINTRUST structures do not fit in a u32".to_owned(),
-        ));
+        return (
+            None,
+            Err(SourceError::Failed(
+                "WINTRUST structures do not fit in a u32".to_owned(),
+            )),
+        );
     };
 
     // Owned here and outliving both calls: `file` and `data` only hold pointers into these.
@@ -239,7 +264,7 @@ fn verify(
     unsafe {
         WinVerifyTrust(no_window, &raw mut action, (&raw mut data).cast());
     }
-    outcome
+    (Some(result.cast_unsigned()), outcome)
 }
 
 /// The signing certificate of a verified file: its subject's display name and the SHA-256 of its
@@ -352,7 +377,6 @@ mod tests {
             TRUST_E_SUBJECT_NOT_TRUSTED,
             TRUST_E_CERT_SIGNATURE,
             TRUST_E_NO_SIGNER_CERT,
-            CERT_E_UNTRUSTEDROOT,
             CERT_E_EXPIRED,
             CERT_E_WRONG_USAGE,
             CERT_E_REVOKED,
@@ -362,11 +386,15 @@ mod tests {
     }
 
     /// Something this machine does not hold is a fact about the offline check, never "invalid": a
-    /// legitimate publisher whose intermediate certificate is not cached must not read as tampered.
+    /// legitimate publisher whose intermediate certificate is not cached must not read as tampered, and
+    /// neither must one whose root this machine has not fetched. `CERT_E_UNTRUSTEDROOT` is what the
+    /// Windows CI job measured for a genuine signature carrying its own root on a runner whose stores
+    /// had lost that root (ADR 0035, amendment of 2026-09-14).
     #[test]
     fn what_needs_the_network_is_unverifiable_offline_not_invalid() {
         for code in [
             CERT_E_CHAINING,
+            CERT_E_UNTRUSTEDROOT,
             CRYPT_E_REVOCATION_OFFLINE,
             CERT_E_REVOCATION_FAILURE,
             CRYPT_E_NO_REVOCATION_CHECK,
@@ -556,6 +584,51 @@ mod tests {
             verify(&path, OFFLINE),
             Ok(rongroi_host::SignatureCheck::NoEmbeddedSignature)
         );
+    }
+
+    /// What the product's settings answer for a file whose certificate chain the machine's stores do not
+    /// complete (ADR 0035, amendment of 2026-09-14). The Windows CI job sets each case up and names it in
+    /// `RONGROI_CHAIN_CASE`; the file is `RONGROI_CHAIN_FILE`. It runs between readings of the CAPI2 log
+    /// like the other offline tests, under its own prefix so that the CAPI2 step, which runs with every
+    /// store intact, does not pick it up. The asserted codes are the ones the job measured:
+    ///
+    /// | Case | Set up | Code |
+    /// |---|---|---|
+    /// | `intact`, `restored` | nothing removed, or every removed certificate imported back | `S_OK` |
+    /// | `root_removed_not_in_signature` | the root, which the signature does not carry, deleted from every registry store | `CERT_E_CHAINING` |
+    /// | `root_removed_carried_in_signature` | the root, which the signature carries, deleted the same way | `CERT_E_UNTRUSTEDROOT` |
+    /// | `self_signed` | a copy of an unsigned binary signed with a certificate made for it | `CERT_E_UNTRUSTEDROOT` |
+    ///
+    /// `intermediate_removed` is set up only when an intermediate sits in a store, which on the runner
+    /// none did — each was carried in its signature — so no code for it has been measured and none is
+    /// asserted.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "needs RONGROI_CHAIN_FILE, RONGROI_CHAIN_CASE and stores the Windows CI job changed"]
+    fn live_chain_offline_what_an_incomplete_chain_answers() {
+        use rongroi_host::SignatureCheck;
+        let path = std::env::var("RONGROI_CHAIN_FILE")
+            .expect("RONGROI_CHAIN_FILE names a file with an embedded signature");
+        let case = std::env::var("RONGROI_CHAIN_CASE").expect("RONGROI_CHAIN_CASE names the case");
+        let (code, check) = verify_with_code(&path, OFFLINE);
+        let shown = code.map_or_else(|| "no call".to_owned(), |code| format!("{code:#010x}"));
+        println!("chain case {case}: WinVerifyTrust {shown} -> {check:?}");
+        let unverifiable = |expected: u32| {
+            assert_eq!(code, Some(expected), "{case}: got {shown} {check:?}");
+            assert_eq!(check, Ok(SignatureCheck::UnverifiableOffline), "{case}");
+        };
+        match case.as_str() {
+            "intact" | "restored" => {
+                assert_eq!(code, Some(codes::S_OK), "{case}: got {shown} {check:?}");
+                assert!(matches!(check, Ok(SignatureCheck::Valid { .. })), "{case}");
+            }
+            "root_removed_not_in_signature" => unverifiable(codes::CERT_E_CHAINING),
+            "root_removed_carried_in_signature" | "self_signed" => {
+                unverifiable(codes::CERT_E_UNTRUSTEDROOT);
+            }
+            "intermediate_removed" => {}
+            other => panic!("unknown RONGROI_CHAIN_CASE {other}"),
+        }
     }
 
     /// Not a check of the product: the settings here are ones the product never uses. It exists so the

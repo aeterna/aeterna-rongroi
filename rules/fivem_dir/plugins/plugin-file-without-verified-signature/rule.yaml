@@ -6,7 +6,9 @@ title: A file in FiveM's plugins folder has no embedded signature that verifies 
 description: >-
   FiveM for GTA V Legacy's plugins folder (%LOCALAPPDATA%\FiveM\FiveM.app\plugins) holds a file, and
   Windows found no signature embedded in it, one that does not verify, or one it could not verify
-  without the internet; each file shown says which. This folder is where the Cfx.re forum's own guides
+  without the internet; each file shown says which. "Could not verify without the internet" includes a
+  certificate chain that ends at a root certificate this PC does not hold as trusted, which offline
+  cannot be told apart from a root nobody trusts: a self-signed signature reads that way too. This folder is where the Cfx.re forum's own guides
   tell players to put graphics mods such as ReShade, so a file here is as often one of those, its
   settings or its log as anything else. The check does not say what a file is or does, whether it was
   ever loaded, or who put it there. A file with a valid signature is shown under "A file in FiveM's
@@ -37,7 +39,8 @@ falsepositives:
   - A signature that does not verify because the file was damaged in download or by a disk problem,
     or because its signing certificate expired without a timestamp
   - A signature this PC could not verify offline — its certificate chain needs something Windows has
-    not already stored, and this check never goes to the internet to fetch it
+    not already stored, such as its root certificate, and this check never goes to the internet to
+    fetch it
 references:
   - https://forum.cfx.re/t/how-to-install-reshade/5352795
   - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust

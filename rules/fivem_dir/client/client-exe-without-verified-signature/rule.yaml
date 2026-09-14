@@ -7,8 +7,10 @@ description: >-
   FiveM.exe, in the program folder of FiveM for GTA V Legacy (%LOCALAPPDATA%\FiveM) or of FiveM for GTA
   V Enhanced (%LOCALAPPDATA%\FiveM for GTAV Enhanced), has no signature embedded in it, one that does
   not verify, or one Windows could not verify without the internet; the file shown says which and
-  which edition. On the one machine this was measured on, both editions' FiveM.exe carried a valid
-  embedded signature. This does not say that the file was changed, what it does, or that it was ever
+  which edition. "Could not verify without the internet" includes a certificate chain that ends at a
+  root certificate this PC does not hold as trusted, which offline cannot be told apart from a root
+  nobody trusts: a self-signed signature reads that way too. On the one machine this was measured on,
+  both editions' FiveM.exe carried a valid embedded signature. This does not say that the file was changed, what it does, or that it was ever
   run. An install with no FiveM.exe — or no FiveM at all — is "not found" here too, and a FiveM.exe
   whose signature could not be checked at all is shown under "A FiveM file's signature could not be
   checked" instead.
@@ -27,10 +29,11 @@ retention: >-
 # Left out deliberately: `access_denied`. The program folder is inside the player's own profile.
 unmeasured_when: [not_windows]
 falsepositives:
-  - A PC whose Windows certificate store does not yet hold the certificate authority the signature
-    chains to. Windows normally fetches those from the internet the first time they are needed, and
-    this check never goes online, so a signature can come back unverifiable, or not verifying, on a
-    machine that has not needed it yet. This was not measured
+  - A PC whose Windows certificate store does not yet hold the root certificate the signature chains
+    to. Windows normally fetches those from the internet the first time they are needed, and this
+    check never goes online. Measured on a test machine with a root removed from its stores, other
+    publishers' signatures then read unverifiable_offline — whether or not they carried the root
+    themselves — and not invalid. What FiveM.exe's own signature carries was not measured
   - FiveM.exe damaged by an interrupted update, a disk problem, or security software that modified or
     partly quarantined it
   - A FiveM client a developer built from Cfx.re's published source code and put in place of the

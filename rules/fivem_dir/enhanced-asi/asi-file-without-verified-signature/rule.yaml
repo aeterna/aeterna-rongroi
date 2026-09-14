@@ -6,7 +6,10 @@ title: A file in FiveM for GTA V Enhanced's asi folder has no embedded signature
 description: >-
   FiveM for GTA V Enhanced's folder %APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi holds a file, and
   Windows found no signature embedded in it, one that does not verify, or one it could not verify
-  without the internet; each file shown says which. Whether the Enhanced client loads anything from
+  without the internet; each file shown says which. "Could not verify without the internet" includes a
+  certificate chain that ends at a root certificate this PC does not hold as trusted, which offline
+  cannot be told apart from a root nobody trusts: a self-signed signature reads that way too. Whether
+  the Enhanced client loads anything from
   this folder is not established — it exists on a fresh install and is named for ASI plugins, and
   nothing more is known — so a file here is a file in that folder and no more than that. The check
   does not say what a file is or does, or who put it there. A file with a valid signature is shown
@@ -33,7 +36,7 @@ falsepositives:
   - A signature that does not verify because the file was damaged, or whose certificate expired
     without a timestamp
   - A signature this PC could not verify offline, because its certificate chain needs something
-    Windows has not already stored
+    Windows has not already stored, such as its root certificate
 references:
   - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
 author: aeterna-rongroi contributors

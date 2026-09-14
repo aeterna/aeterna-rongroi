@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 2 |
 | Rules | 18 |
-| SHA-256 | `9e7d5d594dc2ac78e39de9957a3c5d77fb3624ddbb08db5408ba55973477b1fd` |
+| SHA-256 | `12d7f965e0d8f11efde98d869ed5be9fa6b7a6cd69b33557cb88ab2a502139e0` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -326,7 +326,7 @@ The file as it was when the scan ran. It says nothing about the file at any earl
 
 **About this check**
 
-FiveM.exe, in the program folder of FiveM for GTA V Legacy (%LOCALAPPDATA%\\FiveM) or of FiveM for GTA V Enhanced (%LOCALAPPDATA%\\FiveM for GTAV Enhanced), has no signature embedded in it, one that does not verify, or one Windows could not verify without the internet; the file shown says which and which edition. On the one machine this was measured on, both editions' FiveM.exe carried a valid embedded signature. This does not say that the file was changed, what it does, or that it was ever run. An install with no FiveM.exe — or no FiveM at all — is "not found" here too, and a FiveM.exe whose signature could not be checked at all is shown under "A FiveM file's signature could not be checked" instead.
+FiveM.exe, in the program folder of FiveM for GTA V Legacy (%LOCALAPPDATA%\\FiveM) or of FiveM for GTA V Enhanced (%LOCALAPPDATA%\\FiveM for GTAV Enhanced), has no signature embedded in it, one that does not verify, or one Windows could not verify without the internet; the file shown says which and which edition. "Could not verify without the internet" includes a certificate chain that ends at a root certificate this PC does not hold as trusted, which offline cannot be told apart from a root nobody trusts: a self-signed signature reads that way too. On the one machine this was measured on, both editions' FiveM.exe carried a valid embedded signature. This does not say that the file was changed, what it does, or that it was ever run. An install with no FiveM.exe — or no FiveM at all — is "not found" here too, and a FiveM.exe whose signature could not be checked at all is shown under "A FiveM file's signature could not be checked" instead.
 
 **Matches when all of these hold for one observation**
 
@@ -343,7 +343,7 @@ The file as it was when the scan ran. It says nothing about the file at any earl
 
 **Ordinary things that also produce this**
 
-- A PC whose Windows certificate store does not yet hold the certificate authority the signature chains to. Windows normally fetches those from the internet the first time they are needed, and this check never goes online, so a signature can come back unverifiable, or not verifying, on a machine that has not needed it yet. This was not measured
+- A PC whose Windows certificate store does not yet hold the root certificate the signature chains to. Windows normally fetches those from the internet the first time they are needed, and this check never goes online. Measured on a test machine with a root removed from its stores, other publishers' signatures then read unverifiable\_offline — whether or not they carried the root themselves — and not invalid. What FiveM.exe's own signature carries was not measured
 - FiveM.exe damaged by an interrupted update, a disk problem, or security software that modified or partly quarantined it
 - A FiveM client a developer built from Cfx.re's published source code and put in place of the installed one, which carries no Rockstar Games signature
 - A beta or test build of the client, if one is shipped unsigned or signed differently. Nothing was measured about those
@@ -417,7 +417,7 @@ Only the files in the folder when the scan ran. A file removed before then leave
 
 **About this check**
 
-FiveM for GTA V Enhanced's folder %APPDATA%\\FiveM for GTAV Enhanced\\gta5enhanced\\asi holds a file, and Windows found no signature embedded in it, one that does not verify, or one it could not verify without the internet; each file shown says which. Whether the Enhanced client loads anything from this folder is not established — it exists on a fresh install and is named for ASI plugins, and nothing more is known — so a file here is a file in that folder and no more than that. The check does not say what a file is or does, or who put it there. A file with a valid signature is shown under "A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature", and one whose signature could not be checked at all under "A FiveM file's signature could not be checked".
+FiveM for GTA V Enhanced's folder %APPDATA%\\FiveM for GTAV Enhanced\\gta5enhanced\\asi holds a file, and Windows found no signature embedded in it, one that does not verify, or one it could not verify without the internet; each file shown says which. "Could not verify without the internet" includes a certificate chain that ends at a root certificate this PC does not hold as trusted, which offline cannot be told apart from a root nobody trusts: a self-signed signature reads that way too. Whether the Enhanced client loads anything from this folder is not established — it exists on a fresh install and is named for ASI plugins, and nothing more is known — so a file here is a file in that folder and no more than that. The check does not say what a file is or does, or who put it there. A file with a valid signature is shown under "A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature", and one whose signature could not be checked at all under "A FiveM file's signature could not be checked".
 
 **Matches when all of these hold for one observation**
 
@@ -438,7 +438,7 @@ Only the files in the folder when the scan ran. A file removed before then leave
 - Text files of any kind — a readme, an .ini, a log — which never carry an embedded signature
 - Tools that install files here for the Enhanced edition, signed or not by their authors
 - A signature that does not verify because the file was damaged, or whose certificate expired without a timestamp
-- A signature this PC could not verify offline, because its certificate chain needs something Windows has not already stored
+- A signature this PC could not verify offline, because its certificate chain needs something Windows has not already stored, such as its root certificate
 
 **Related rules**
 
@@ -509,7 +509,7 @@ Only the files in the folder when the scan ran. A file removed before then leave
 
 **About this check**
 
-FiveM for GTA V Legacy's plugins folder (%LOCALAPPDATA%\\FiveM\\FiveM.app\\plugins) holds a file, and Windows found no signature embedded in it, one that does not verify, or one it could not verify without the internet; each file shown says which. This folder is where the Cfx.re forum's own guides tell players to put graphics mods such as ReShade, so a file here is as often one of those, its settings or its log as anything else. The check does not say what a file is or does, whether it was ever loaded, or who put it there. A file with a valid signature is shown under "A file in FiveM's plugins folder carries a valid embedded signature", and one whose signature could not be checked at all under "A FiveM file's signature could not be checked" — not here, so "not found" on this row speaks only for the files whose signature was checked.
+FiveM for GTA V Legacy's plugins folder (%LOCALAPPDATA%\\FiveM\\FiveM.app\\plugins) holds a file, and Windows found no signature embedded in it, one that does not verify, or one it could not verify without the internet; each file shown says which. "Could not verify without the internet" includes a certificate chain that ends at a root certificate this PC does not hold as trusted, which offline cannot be told apart from a root nobody trusts: a self-signed signature reads that way too. This folder is where the Cfx.re forum's own guides tell players to put graphics mods such as ReShade, so a file here is as often one of those, its settings or its log as anything else. The check does not say what a file is or does, whether it was ever loaded, or who put it there. A file with a valid signature is shown under "A file in FiveM's plugins folder carries a valid embedded signature", and one whose signature could not be checked at all under "A FiveM file's signature could not be checked" — not here, so "not found" on this row speaks only for the files whose signature was checked.
 
 **Matches when all of these hold for one observation**
 
@@ -530,7 +530,7 @@ Only the files in the folder when the scan ran. A file removed before then leave
 - The settings, preset and log files those mods keep beside themselves (ReShade.ini, a preset .ini, ReShade.log). They are text, not programs, and text files never carry an embedded signature
 - Overlays, FPS counters and performance or recording tools that install a plugin here
 - A signature that does not verify because the file was damaged in download or by a disk problem, or because its signing certificate expired without a timestamp
-- A signature this PC could not verify offline — its certificate chain needs something Windows has not already stored, and this check never goes to the internet to fetch it
+- A signature this PC could not verify offline — its certificate chain needs something Windows has not already stored, such as its root certificate, and this check never goes to the internet to fetch it
 
 **Related rules**
 

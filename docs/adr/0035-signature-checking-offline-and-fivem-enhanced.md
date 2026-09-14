@@ -89,8 +89,12 @@ four:
 |---|---|
 | `Valid { signer, signer_cert_sha256 }` | `S_OK`. `signer` is the signing certificate's simple display name, for a person to read. `signer_cert_sha256` is the SHA-256 of the certificate's encoded bytes, as lowercase hex |
 | `NoEmbeddedSignature` | `TRUST_E_NOSIGNATURE`, `TRUST_E_SUBJECT_FORM_UNKNOWN` (not a kind of file a signature can be embedded in) |
-| `Invalid` | `TRUST_E_BAD_DIGEST`, `TRUST_E_EXPLICIT_DISTRUST`, `TRUST_E_SUBJECT_NOT_TRUSTED`, `TRUST_E_CERT_SIGNATURE`, `TRUST_E_NO_SIGNER_CERT`, `CERT_E_UNTRUSTEDROOT`, `CERT_E_EXPIRED`, `CERT_E_WRONG_USAGE`, `CERT_E_REVOKED` |
-| `UnverifiableOffline` | `CERT_E_CHAINING`, `CRYPT_E_REVOCATION_OFFLINE`, `CERT_E_REVOCATION_FAILURE`, `CRYPT_E_NO_REVOCATION_CHECK` |
+| `Invalid` | `TRUST_E_BAD_DIGEST`, `TRUST_E_EXPLICIT_DISTRUST`, `TRUST_E_SUBJECT_NOT_TRUSTED`, `TRUST_E_CERT_SIGNATURE`, `TRUST_E_NO_SIGNER_CERT`, `CERT_E_EXPIRED`, `CERT_E_WRONG_USAGE`, `CERT_E_REVOKED` |
+| `UnverifiableOffline` | `CERT_E_CHAINING`, `CERT_E_UNTRUSTEDROOT`, `CRYPT_E_REVOCATION_OFFLINE`, `CERT_E_REVOCATION_FAILURE`, `CRYPT_E_NO_REVOCATION_CHECK` |
+
+> **Amended 2026-09-14:** `CERT_E_UNTRUSTEDROOT` moved from `Invalid` to `UnverifiableOffline`, after it was
+> measured for a genuine signature on a machine whose stores lack its root. See
+> [What a missing root answers](#amendment-of-2026-09-14--what-a-missing-root-answers).
 
 `E_ACCESSDENIED` is `SourceError::AccessDenied`. **Every other code is `SourceError::Failed`**, never
 one of the four: calling a file's signature invalid on a code nobody here read would be a guess about
@@ -184,6 +188,89 @@ file and `notepad.exe` as the catalog-only one:
 
 So the log saw the offline checks, and it records a network retrieval when one happens.
 
+## Amendment of 2026-09-14 — what a missing root answers
+
+### The question
+
+ADR 0036 left open what this check says about a genuine file on a PC whose certificate stores do not
+hold the root its signature chains to. Microsoft documents that Windows downloads its lists of trusted
+roots from the internet (ADR 0036 quotes it), and this check never goes online, so such a PC is plausible;
+how common it is was not measured. Decision
+1 mapped `CERT_E_UNTRUSTEDROOT` to `invalid`, so a genuine `FiveM.exe` there might read as a signature that
+does not verify, for a reason that has nothing to do with the file.
+
+### What was measured
+
+On the `windows-latest` runner (Windows Server 2025, image `windows-2025-vs2026` version 20260907.229.1), on
+2026-09-14, in the CI step "What an incomplete certificate chain answers offline": run `34804835053`, which
+printed the codes without asserting any, and run `34805172959`, which gave the same codes with the test
+asserting them. For each embedded-signed file, the chain
+was read with .NET's `X509Chain` (no revocation, certificate downloads disabled) and the certificates the
+signature carries were read from its PKCS #7 blob. The root was then exported from every registry
+certificate store it was in — `SystemCertificates`, its policy and enterprise counterparts, for the machine
+and the user — and deleted, the URL cache was cleared, and the ignored test
+`live_chain_offline_what_an_incomplete_chain_answers` ran `WinVerifyTrust` with the product's `OFFLINE`
+settings in a fresh process. Afterwards every export was imported back and the file checked again.
+
+| File | Root | Where the root was | Signature carries the root | `WinVerifyTrust`, root removed | CAPI2 chain status | Restored |
+|---|---|---|---|---|---|---|
+| `pwsh.exe`, signed by Microsoft Corporation through Microsoft Code Signing PCA 2024 | Microsoft Root Certificate Authority 2011 | machine `ROOT` | no | `0x800B010A` `CERT_E_CHAINING` | `CERT_TRUST_IS_PARTIAL_CHAIN` | `S_OK`, valid |
+| `git.exe`, signed by an individual developer through Microsoft ID Verified CS EOC CA 04 and Microsoft ID Verified Code Signing PCA 2021 | Microsoft Identity Verification Root Certificate Authority 2020 | machine `AuthRoot` | yes | `0x800B0109` `CERT_E_UNTRUSTEDROOT` | `CERT_TRUST_IS_UNTRUSTED_ROOT` | `S_OK`, valid |
+| a copy of the unsigned test binary, signed in the step with a self-signed code-signing certificate made for it | that certificate | none — deleted after signing; the first run left a copy in the user's intermediate store, the second deleted that too | yes | `0x800B0109` `CERT_E_UNTRUSTEDROOT` | `CERT_TRUST_IS_UNTRUSTED_ROOT` | — |
+
+In every row CAPI2 recorded events from the test process and **no event 53** (retrieval from the network),
+and after each check with a root removed that root was still in no store, so nothing was fetched or put
+back while it ran. The intact checks before removal were `S_OK`.
+
+- **A missing root gave two different codes.** The two files differ both in where their root was and in
+  whether their signature carries it, so two files cannot separate those. The chain status points at the
+  second: a partial chain is a chain that stopped at the last intermediate because the root was nowhere to
+  be found, and an untrusted root is a chain that reached a root — here, one the signature supplied — and
+  found it not trusted. Whatever list of trusted roots the runner holds locally did not make `git.exe`'s
+  root trusted without the network; whether that list names the root was not read.
+- **A genuine signature that carries its root and a self-signed signature give the same code and the same
+  chain status.** Nothing in `WinVerifyTrust`'s answer, offline, separates them.
+- **No intermediate could be removed.** Every intermediate of both chains was carried in its signature and
+  in no store, so what a missing intermediate answers was not measured. The step sets that case up only
+  when an intermediate sits in a store.
+
+### Decision
+
+`CERT_E_UNTRUSTEDROOT` is `UnverifiableOffline`. Decision 1's own reason for keeping that state apart from
+`Invalid` was that a legitimate publisher whose intermediate the machine does not hold must not read as
+tampered; the measurement shows the same holds for its root, and that the answer for it is sometimes
+`CERT_E_UNTRUSTEDROOT`. Offline, a root this machine does not hold as trusted cannot be told apart from a
+root nobody trusts, so the check says it could not verify the chain rather than that the signature does
+not verify.
+
+**What this costs.** A self-signed signature, or any chain ending at a root no one trusts, now reads
+`unverifiable_offline` instead of `invalid`. No rule outcome changes: every rule that reads `signature`
+matches the two values together (ADR 0036), so such a file is `found` under the same row as before, and
+only the value printed with it is weaker. `TRUST_E_EXPLICIT_DISTRUST` — a certificate this machine
+explicitly distrusts — stays `invalid`, as do a changed file (`TRUST_E_BAD_DIGEST`) and a certificate
+whose own signature does not verify (`TRUST_E_CERT_SIGNATURE`).
+
+**Rejected.**
+
+- **Keeping `invalid`.** It would tell a reviewer that a genuine `FiveM.exe` on an ordinary PC carries a
+  signature that does not verify, which is the kind of statement about someone's software decision 1 set
+  out not to make.
+- **Telling the two apart by looking the root up in the machine's own list of trusted roots.** It is more
+  `unsafe` code to read a list Windows downloads from the internet, and so one that is likely to be out of
+  date on exactly the PCs in question (not measured), and a root the list does not name would still be
+  undecidable offline.
+- **A fifth `signature` value for an untrusted root.** It names a mechanism rather than an answer, every
+  rule's `match` would have to list it, and it would still not separate a genuine root from a forged one.
+
+### Still not established
+
+- **What `FiveM.exe`'s own signature carries**, and so which of the two codes it would give. Either way it
+  is now `unverifiable_offline`. That its chain ends at a DigiCert root was stated earlier and is not
+  verified here.
+- **What a missing intermediate answers**, as above.
+- **How often a player's PC lacks the root** of a given publisher. The runner is one machine with its
+  stores changed by hand, not a population.
+
 ## What was rejected
 
 **Comparing the signer's name, alone or beside the hash.** A name-only `allow` exempts stolen
@@ -245,3 +332,8 @@ from here", and `location` keeps them apart.
 - The SS consent question, in the CLI and in the desktop app, names both editions' plugin folders and
   their signatures.
 - The Windows CI job gains the CAPI2 step.
+- **Amendment of 2026-09-14:** `classify` maps `CERT_E_UNTRUSTEDROOT` to `UnverifiableOffline`, and the job gains
+  the step "What an incomplete certificate chain answers offline", which removes roots from the stores of
+  the runner, runs `live_chain_offline_what_an_incomplete_chain_answers` against the measured codes and
+  restores the stores. The descriptions and `falsepositives` of the three "no embedded signature that
+  verifies" rules, and ADR 0036's open item, say what was measured.

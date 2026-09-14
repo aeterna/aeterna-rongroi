@@ -136,6 +136,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   passed. Both rules now carry an honest `rules/unconfronted.csv` row, which ends when a baseline holds a
   plugin file measured from a published release. **The gate measures two fewer rules than it said it
   did**; no fixture was invented to change that.
+- **A signature whose chain ends at a root this PC does not trust is `unverifiable_offline`, no longer
+  `invalid`** (ADR 0035, amendment of 2026-09-14). Measured on the Windows CI runner with a root deleted
+  from every certificate store it was in: a genuine signature that does not carry its root answers
+  `CERT_E_CHAINING`, and one that carries it answers `CERT_E_UNTRUSTEDROOT` — the same code a self-signed
+  signature gives — with no network retrieval in either case. Offline the two cannot be told apart, so a
+  genuine `FiveM.exe` on a PC that has not fetched its publisher's root no longer reads as a signature
+  that does not verify. No rule outcome changes: every rule that reads `signature` matches both values;
+  a self-signed signature is now shown as `unverifiable_offline`. The CI step and its live test assert the
+  measured codes; the three "no embedded signature that verifies" rules say what that value covers.
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
   `allow.signer_cert_sha256`, the SHA-256 of the signing certificate (ADR 0035). Code-signing certificates
   stolen from NVIDIA in 2022 signed malware under NVIDIA's own name, so a name-based exclusion would have

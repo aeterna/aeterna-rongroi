@@ -246,13 +246,18 @@ and on the real machine above.
 ## What is not established
 
 - **One machine.** Both editions, both tokens, one Windows build. Nothing here is a population.
-- **Whether `unverifiable_offline` or `invalid` happens to `FiveM.exe` on a machine that has never
-  fetched DigiCert's root.** Microsoft documents that *"By default, Windows downloads the CTLs from the
-  Internet via an automatic mechanism called the CTL Updater"*
+- ~~**Whether `unverifiable_offline` or `invalid` happens to `FiveM.exe` on a machine that has never
+  fetched DigiCert's root.**~~ **Amended 2026-09-14:** measured, for other files, on the CI runner with a
+  root deleted from every store it was in (ADR 0035, amendment of 2026-09-14). A missing root gives
+  `CERT_E_CHAINING` when the signature does not carry the root and `CERT_E_UNTRUSTEDROOT` when it does —
+  the same code a self-signed signature gives. ADR 0035 now maps both to `unverifiable_offline`, so a
+  genuine `FiveM.exe` on such a PC reads `unverifiable_offline`, never `invalid`, and is still `found`
+  under the "no embedded signature that verifies" rule, whose `falsepositives` says so. Microsoft documents
+  that *"By default, Windows downloads the CTLs from the Internet via an automatic mechanism called the CTL
+  Updater"*
   ([Certificates and trust](https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/certificate-trust)),
-  and this check never goes online. Which of ADR 0035's codes a missing root produces was not measured,
-  and ADR 0035 maps `CERT_E_UNTRUSTEDROOT` to `invalid`; a missing root could therefore read as "does not
-  verify". The client rule's `falsepositives` says so.
+  and this check never goes online. Still not established: what `FiveM.exe`'s own signature carries, that
+  its root is DigiCert's, and how often a player's PC lacks that root.
 - **Beta or test builds of the client**, and whether they are signed with the same certificate.
 - **The certificate that signed `FiveM.exe` before 2026-07-21.**
 - **The pin was not compared with a fresh download from Cfx.re.** It was measured from installed files
