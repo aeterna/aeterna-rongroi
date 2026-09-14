@@ -207,6 +207,7 @@ impl Collector for Prefetch {
                     collector: ID.to_owned(),
                     observations: vec![configuration(FOLDER_ABSENT, setting.value)],
                     gaps: with_setting_gap(content_gaps(reason), &setting),
+                    discriminator_gaps: Vec::new(),
                 };
             }
             Ok(Some(entries)) => prefetch_files(entries),
@@ -222,6 +223,7 @@ impl Collector for Prefetch {
                         configuration(FOLDER_UNREADABLE, setting.value),
                     ],
                     gaps: with_setting_gap(content_gaps(reason_for(host, &error)), &setting),
+                    discriminator_gaps: Vec::new(),
                 };
             }
         };
@@ -277,6 +279,7 @@ impl Collector for Prefetch {
             collector: ID.to_owned(),
             observations,
             gaps: with_setting_gap(gaps, &setting),
+            discriminator_gaps: Vec::new(),
         }
     }
 }

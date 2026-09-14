@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# Every signing certificate a rule's `allow` names, with what was measured about it: its subject, the
+# window it is valid in, and the date those were read. Lines starting with `#` and blank lines are
+# ignored; a field containing a comma or a quote is double-quoted, and a quote inside it is doubled.
+#
+# Why this file exists (ADR 0036, amendment of 2026-09-14): an `allow: signer_cert_sha256` entry goes
+# stale for every player at once when the publisher starts signing with a renewed certificate. The last
+# day the pinned certificate can sign anything new is its `not_after`.
+#
+#   - `cargo xtask check-rules` (every pull request) requires one row per certificate an `allow` names,
+#     and no row for a certificate no rule allows. It reads no clock.
+#   - `cargo xtask check-pin-expiry` (monthly, .github/workflows/certificate-pins.yml, never a required
+#     check) fails when a rule's newest pinned certificate is within 90 days of `not_after`.
+#
+# A row is a measurement, like the `allow` entry it describes: from a file its publisher released, never
+# from memory. When a renewed certificate is measured, add its `allow` entry beside the old one and its
+# row here; keep the old row while the old entry stays.
+rule_id,signer_cert_sha256,subject,not_before,not_after,measured_on
+2dc11b64-72a2-48f5-a273-985e906d5a9e,65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f,"CN=""Rockstar Games, Inc."", O=""Rockstar Games, Inc."", L=New York, S=New York, C=US",2026-07-21T00:00:00Z,2027-09-05T23:59:59Z,2026-09-13

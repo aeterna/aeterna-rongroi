@@ -169,6 +169,13 @@ related rule's `description` says the failed file is shown there and not in its 
 Enhanced program folder makes the Legacy plugins rules `unmeasured` too, though that folder was read.
 Per-location gaps would need a change to `CollectorRun`, which is not this ADR's.
 
+> **Amended 2026-09-14 by ADR 0044.** Fixed there. `location` is `fivem_dir`'s declared discriminator,
+> and a place that could not be read is a gap for the observations about that place only: a rule whose
+> `location` rules the place out keeps the answer the places that were read give it, and a rule that
+> could match there — the could-not-be-checked rule, which names no location, included — is still
+> `unmeasured`. When no place at all could be read, the gap is run-wide as before. The first row of the
+> table above therefore now reads "the rules that could match in that place `unmeasured`".
+
 ### 4. The pin
 
 `allow: signer_cert_sha256: 65866007…c4208f` is the one `allow` entry in this ADR, measured as above
@@ -204,6 +211,13 @@ What `check-baseline` then confronts, measured:
 | Could not be checked | **yes**, by `FiveM.exe`: it carries `signature` |
 | The two valid-signature plugin rules | **yes, but only by `location`**: `FiveM.exe` differs from them in that condition alone. That checks the spelling `signature: valid` and says nothing about plugin folders — ADR 0033's "a confronted rule is not a correct rule" applies with force |
 | The two "does not verify" plugin rules | **no** — two conditions away. `rules/unconfronted.csv` rows say why and what ends them: a baseline plugin file measured from a published release, never an invented "ordinary plugin" |
+
+> **Amended 2026-09-14.** The third row was a gate artefact, not a confrontation. With `location: plugins`
+> misspelt in the Legacy rule and its fixtures, `check-baseline` still passed and counted the rule
+> confronted; with `signature: valid` misspelt it failed. `check-baseline` no longer counts a near miss
+> in `location` alone — `fivem_dir`'s discriminator — and both valid-signature plugin rules now carry
+> `rules/unconfronted.csv` rows (ADR 0033, amendment of 2026-09-14; ADR 0044). All four plugin-folder
+> rules are unconfronted until a baseline holds a plugin file measured from a published release.
 
 That the pin is checked was proven by breaking it: changing its last hex digit made `check-baseline`
 fail with the rule `found` on both baselines.
@@ -265,3 +279,74 @@ and on the real machine above.
   guides and `docs/rules-authoring.md` name `FiveM.exe` and the per-item-failure rule pattern.
 - ADR 0009's "The rule itself is still to be written" and ADR 0035's "No rule reads any of this yet" are
   answered here; both keep their text, with a pointer.
+
+## Amendment 2026-09-14 — the pin must not go stale silently
+
+### The problem decision 4 left
+
+Decision 4 says what a reviewer should do when the certificate is renewed. Nothing told a maintainer
+that the date was coming. The pin's validity was measured — 2026-07-21 to 2027-09-05 — and written in
+a rule's `description`, a `#` comment and this ADR, where no check reads it.
+
+### Decision
+
+**A table, checked without a clock on every pull request.** `rules/certificate-pins.csv` holds one row
+per certificate an `allow` names: `rule_id`, `signer_cert_sha256`, `subject`, `not_before`, `not_after`,
+`measured_on`. `cargo xtask check-rules` fails when an `allow: signer_cert_sha256` entry has no row, when
+a row names a certificate its rule does not allow, and when a value does not parse or `not_before` is not
+before `not_after`. It reads no clock, so no pull request can turn red because of a date. Breaking it
+both ways on the real tree was measured: deleting the row failed `check-rules` naming the rule, and
+changing the last hex digit of the `allow` entry failed it naming both the orphaned row and the entry.
+The first row is the certificate measured in this ADR, with the subject and window from the table under
+"What was measured".
+
+**A scheduled check with a date.** `cargo xtask check-pin-expiry` fails when the pin with the latest
+`not_after` of some rule is within **90 days** of that date, or past it; `--today` runs it as of another
+day. `.github/workflows/certificate-pins.yml` runs it at 06:17 UTC on the first of every month and on
+manual dispatch — never on `pull_request` or `push`, and it is not a required check. Run locally: as of
+2026-09-14 it passes, and with `--today 2027-06-07`, 90 days before `not_after`, it fails and names the
+rule, the certificate and what to do. Only a rule's newest pin counts: once a renewed certificate is
+pinned beside the old one, the old one stays allowed for players who have not updated, and its date
+stops warning about anything.
+
+### Why 90 days
+
+- **The schedule's own spacing.** Two monthly runs are at most 31 days apart, so a 90-day window always
+  holds at least two failing runs before `not_after`, and usually three. GitHub documents that a
+  scheduled run can be delayed or, under enough load, dropped; with 90 days one dropped run still leaves
+  a warning.
+- **What the warning is for.** The fix needs the renewed certificate, which can be measured only once
+  the publisher has shipped a `FiveM.exe` signed with it, and then a pull request and a release that
+  players install. None of those durations has been measured here: this project has released twice, two
+  days apart, which says nothing about a normal cadence.
+- **Why not longer.** The window is a fraction of the certificate's own life — 90 of the roughly 412 days between
+  `not_before` and `not_after` — and a warning that is red for a third of a year would be learned as
+  noise before it mattered.
+
+**The date the check watches is the last possible one, not the likely one.** A publisher can start
+signing with a renewed certificate at any time before `not_after`; the scheduled check cannot see that,
+and the rule then fires before the warning. What covers that case is still decision 4: the rule's
+`falsepositives` tells a reviewer what many players showing the same signer means.
+
+### Limits of the scheduled check
+
+Quoted from GitHub Docs, "Events that trigger workflows", `schedule`:
+
+- *"Scheduled workflows run on the latest commit on the default branch."* The workflow does nothing until
+  this change reaches `dev`, and it has **not run** on GitHub at the time of writing: a workflow can be
+  dispatched only once it exists on the default branch.
+- *"In a public repository, scheduled workflows are automatically disabled when no repository activity
+  has occurred in 60 days."* A quiet repository stops warning. Nothing here detects that.
+- *"Notifications for scheduled workflows are sent to the user who last modified the cron syntax in the
+  workflow file."* Whoever that is receives the failure; nobody else is notified by it.
+
+### Still not established
+
+- **The certificate that signed `FiveM.exe` before 2026-07-21.** Not measured, not even its signer name.
+  A player whose `FiveM.exe` predates that date meets the other-certificate rule today, and no pin row
+  can describe that certificate until someone measures it.
+- **Beta or test builds of the client**, and which certificate signs them.
+- **A fresh download from Cfx.re.** The pin was measured from files FiveM installed and updated on one
+  machine. No fresh installer was downloaded for this amendment either.
+- **When the publisher will switch certificates.** Only the latest possible date is known.
+

@@ -156,7 +156,9 @@ confirm it fails:
 | `cargo deny check` | adding `reqwest` to a crate |
 | `fuzz smoke` | giving a parser a panicking path — e.g. indexing `bytes[TAIL_OFFSET]` in `bam::parse_value`, slicing `bytes[4..MAM_HEADER_LEN]` in `prefetch::reject_implausible_declared_size`, or indexing `bytes[FILE_HEADER_LEN]` in `evtx::records` instead of comparing the length, rather than reaching for it with `get` |
 | `check-rules` | duplicating a rule id, deleting a negative fixture, allowing by `name:`, misspelling a `match` field (`run_cout`) or a `collector` (`postures`), declaring an `unmeasured_when` reason the collector cannot report (`service_disabled` or `source_empty` on `posture`, both of which other collectors do report), writing an operator that is not one (`secure_boot\|matches:`), an empty value list (`secure_boot: []`), or an operator the field's kind cannot take (`secure_boot\|gt: 1`) |
-| `check-baseline` | pointing a rule's `match` at a value a baseline host carries — `prefetch` / `name: cmd.exe` fires on `baseline-elevated-win11` — leaving a `known-fps.csv` row in place once its rule no longer matches, or writing a rule no baseline confronts and no `unconfronted.csv` row excuses |
+| `check-baseline` | pointing a rule's `match` at a value a baseline host carries — `prefetch` / `name: cmd.exe` fires on `baseline-elevated-win11` — leaving a `known-fps.csv` row in place once its rule no longer matches, or writing a rule no baseline confronts and no `unconfronted.csv` row excuses — including one whose only near miss differs from it in the collector's discriminator, such as a `fivem_dir` rule on `location: plugins` against a baseline that holds only `FiveM.exe` |
+| `check-rules`, certificate pins | deleting the row in `rules/certificate-pins.csv`, or changing one hex digit of the `allow: signer_cert_sha256` entry it describes |
+| `check-pin-expiry` (scheduled) | `cargo xtask check-pin-expiry --today` with a date 90 days or less before a pin's `not_after` |
 | `check-locales` | adding a key to a translation that English does not have |
 | `check-unicode` | inserting U+200B into any file |
 | `reuse lint` | deleting a file's SPDX header |

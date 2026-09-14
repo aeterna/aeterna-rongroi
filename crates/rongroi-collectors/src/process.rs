@@ -68,6 +68,7 @@ impl Collector for Process {
                 collector: ID.to_owned(),
                 observations: processes.iter().map(observation).collect(),
                 gaps: BTreeMap::new(),
+                discriminator_gaps: Vec::new(),
             },
             // The list is the whole reading. A `Measured` run with nothing in it would say "the
             // machine was running no processes", which no machine ever is.

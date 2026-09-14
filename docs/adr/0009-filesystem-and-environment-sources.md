@@ -31,6 +31,11 @@ cannot be read says nothing about the other files, so that observation is emitte
 `location` and without `sha256`. The file is never dropped and a hash is never invented. A folder that
 could not be listed at all is the opposite case: every field is then a gap.
 
+**Amended by ADR 0044.** When the collector reads several places and only some could not be listed,
+the gap is confined to the observations about those places — `DiscriminatorGaps`, keyed by the
+collector's declared discriminator, `location` — rather than the whole run. A run where nothing could be
+listed is still a gap in every field.
+
 **Hashes are streamed and well-formed.** `sha256_file` reads a file in blocks rather than into memory, so
 a large plugin costs a buffer rather than its own size. It lives in `rongroi-host` next to the trait, not
 in `rongroi-host-windows`, so that every implementation produces the same digest in the same form and so

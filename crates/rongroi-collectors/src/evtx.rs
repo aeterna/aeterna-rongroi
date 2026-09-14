@@ -294,6 +294,7 @@ impl Collector for Evtx {
                     collector: ID.to_owned(),
                     observations: vec![status(None, read_failure(&error))],
                     gaps: gaps(reason_for(host, &error)),
+                    discriminator_gaps: Vec::new(),
                 };
             }
         };
@@ -656,6 +657,7 @@ impl Collection {
             collector: ID.to_owned(),
             observations: self.observations,
             gaps,
+            discriminator_gaps: Vec::new(),
         }
     }
 }

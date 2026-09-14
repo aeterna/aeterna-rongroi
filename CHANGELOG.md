@@ -6,6 +6,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The pinned `FiveM.exe` signing certificate can no longer go stale silently (ADR 0036, amendment of
+  2026-09-14). `rules/certificate-pins.csv` records each certificate an `allow` names with its subject,
+  validity and measurement date; `cargo xtask check-rules` requires a row for every such entry and none
+  for a certificate no rule allows, without reading a clock. A new monthly workflow, `certificate pins`,
+  runs `cargo xtask check-pin-expiry`, which fails 90 days before a rule's newest pinned certificate
+  expires — for the certificate pinned today, from 2027-06-07. It is not a required check and does not
+  run on pull requests. It watches the last date the certificate can sign, not the day the publisher
+  actually switches, which nothing here can see.
 - Two `posture` readings and two rules (ADR 0038). `secure_boot_firmware` is Secure Boot as the firmware's
   own UEFI `SecureBoot` variable reports it, beside the registry's `secure_boot`; reading it enables
   `SeSystemEnvironmentPrivilege` in this program's own token for the read and puts it back, and without
@@ -121,6 +129,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   report a refusal at all. A refusal on any of these rules is now a row SS mode lists instead of a number
   it counts. A scan without administrator rights still reads as `not_admin`, which stays declared where it
   was. No rule's matching or text changed.
+- `cargo xtask check-baseline` no longer counts a rule as confronted by an observation that differs from it
+  only in the collector's discriminator, `fivem_dir`'s `location` (ADR 0033, amended; ADR 0044). The two
+  valid-signature plugin rules were "confronted" only by the baselines' `FiveM.exe`, which is about
+  another place: with `location: plugni` written into the Legacy rule and its fixtures every gate still
+  passed. Both rules now carry an honest `rules/unconfronted.csv` row, which ends when a baseline holds a
+  plugin file measured from a published release. **The gate measures two fewer rules than it said it
+  did**; no fixture was invented to change that.
 - **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
   `allow.signer_cert_sha256`, the SHA-256 of the signing certificate (ADR 0035). Code-signing certificates
   stolen from NVIDIA in 2022 signed malware under NVIDIA's own name, so a name-based exclusion would have
@@ -149,6 +164,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   refused and shown. Measured on every account key of one Windows 11 machine (build 26220), and the same
   two refusals per account were in a 0.2.0 report from another (build 26200) (ADR 0023, amended). No
   rule reads BAM, so no evidence changed.
+- One FiveM folder that could not be listed made **every** `fivem_dir` rule `unmeasured`, including the
+  rules about folders that were read (ADR 0036 recorded it). A gap can now be confined to one place a
+  collector reads, keyed by the field that says which place — `fivem_dir`'s `location` (ADR 0044). The
+  rules that could match in the unreadable place stay `unmeasured`, the rule for a file whose signature
+  could not be checked among them; the others answer from the places that were read. On the fixture
+  where Legacy's program folder is denied, four of the seven rules that SS mode used to list as "could not
+  check" are now `not_found` about folders that were checked. When no place at all could be read, every
+  rule is `unmeasured` as before. No other collector declares such a field, and no report snapshot
+  changed.
 - The SS-mode consent question named the wrong scan. In the CLI and in the window app it said the
   check reads "machine security settings"; since 0.2.0 it also reads the programs running, FiveM's
   plugins folder, what Prefetch, BAM and the Program Compatibility Assistant recorded about programs

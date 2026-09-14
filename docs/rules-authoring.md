@@ -43,6 +43,11 @@ Unknown fields are errors. Use `#` comments for notes.
 - If nothing matched but a field in `match` is listed in the run's `gaps`, the rule is `unmeasured` — never
   `not_found`. That is true of **every** operator; the table below says so one by one, and `exists: false`
   is checked against `gaps` before anything is matched at all (ADR 0029).
+- A collector that reads several places may report a gap for **one place** only, keyed by its
+  discriminator (`fivem_dir`: `location`). Such a gap makes the rule `unmeasured` only if the rule could
+  match an observation from that place — every condition the rule puts on `location` holds for that
+  place's value, which is true of a rule that puts none. An observation from that place never satisfies
+  `exists: false` for a field the place could not read (ADR 0044).
 - Otherwise the rule is `not_found`, and the report shows its `retention`.
 
 ### The operators
@@ -138,7 +143,7 @@ cased: [some_field]
 
 Some collectors report a failure on **one** item by leaving a field out of that item's observation,
 not by a gap: `fivem_dir` omits `signature` for a file whose check failed, and `sha256` for one it could
-not hash (ADR 0009). `gaps` covers the whole run, so a gap there would silence every rule on that
+not hash (ADR 0009). A gap covers the whole run, or since ADR 0044 one whole place, so a gap there would silence every rule on that
 collector because of one file. The consequence for a rule author is that such an item satisfies **no**
 equality on the omitted field, and a rule that lists every value the field can take still falls to
 `not_found` for it. Nothing in the engine can tell you this happened.
@@ -163,6 +168,12 @@ and how — never from memory, a forum post or another tool's list. A certificat
 publisher renews: the rule's `falsepositives` has to say what a reviewer sees then and what they should
 do, and the entry for the new certificate is added **beside** the old one, which still signs the files
 people have not updated (ADR 0036).
+
+A certificate entry also takes a row in `rules/certificate-pins.csv`, measured with it: the rule's id, the
+certificate's SHA-256, its subject, `not_before`, `not_after` and the date you read them. `check-rules`
+fails on an entry without a row and on a row without an entry, and reads no clock. The monthly
+`certificate-pins` workflow runs `cargo xtask check-pin-expiry`, which fails once a rule's newest pinned
+certificate is within 90 days of `not_after`; `--today YYYY-MM-DD` shows what it will say on another day.
 
 ## Fixtures
 
@@ -205,7 +216,10 @@ machines this project asserts are unremarkable. It asks:
 2. **Was your rule ever asked anything?** A rule is *confronted* when some baseline observation carries
    every field your `match` names and comes within **one** unsatisfied condition of firing it — the
    baseline was put the rule's question and answered no. A rule nothing confronts is quiet for a reason
-   that says nothing about it, and would stay quiet however it was written (ADR 0033).
+   that says nothing about it, and would stay quiet however it was written (ADR 0033). **The one
+   condition may not be the collector's discriminator** (`fivem_dir`: `location`): an observation that
+   differs from your rule only in the place it is about was asked about another place, and a misspelt
+   `location:` would stay "confronted" by it (ADR 0033 as amended, ADR 0044).
 
 The second is the one that will surprise you. If your rule reads values no baseline holds — a channel,
 a folder, a registry key that no fixture describes — the gate fails and the fix is a baseline that holds

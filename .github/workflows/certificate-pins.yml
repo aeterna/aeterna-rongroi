@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# Warns the maintainers before a signing certificate a rule's `allow` names reaches `not_after`
+# (ADR 0036, amendment of 2026-09-14). When FiveM's publisher starts signing with a renewed certificate,
+# the rule that pins the old one fires for every player who has updated; this is the reminder to go and
+# measure the new one before that date.
+#
+# Deliberately NOT on pull_request or push, and never a required check: a gate that turned every open
+# pull request red on a calendar date would be a failure nobody's change caused. `cargo xtask check-rules`
+# already checks the pin table's contents on every pull request, without a clock.
+#
+# GitHub runs a schedule on the default branch's latest commit, may delay or drop a scheduled run under
+# load, disables schedules in a public repository after 60 days without activity, and sends a failed
+# scheduled run's notification to whoever last changed the cron line below (GitHub Docs, "Events that
+# trigger workflows", `schedule`). The 90-day window in `xtask/src/certificate_pins.rs` is sized so that
+# at least two monthly runs fall inside it.
+
+name: certificate pins
+
+on:
+  schedule:
+    # 06:17 UTC on the first day of every month.
+    - cron: "17 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  expiry:
+    name: pinned certificates are not near expiry
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the toolchain pinned in rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: false
+      - name: No pinned certificate within 90 days of not_after
+        run: cargo xtask check-pin-expiry

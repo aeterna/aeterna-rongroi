@@ -23,7 +23,7 @@
 
 use std::collections::BTreeMap;
 
-use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
+use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
 use rongroi_host::{DirEntryInfo, Host, Platform, SignatureCheck, SourceError};
 
 use crate::{Collector, Field};
@@ -55,6 +55,10 @@ pub const LEGACY_EXE_LOCATION: &str = "legacy_exe";
 pub const ENHANCED_EXE_LOCATION: &str = "enhanced_exe";
 
 const ID: &str = "fivem_dir";
+
+/// The field that says which place an observation is about: every observation carries it, and a place
+/// that could not be read is a gap for the observations carrying its value only (ADR 0044).
+const DISCRIMINATOR: &str = "location";
 
 /// What the collector reports of one folder it looks in.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -116,8 +120,9 @@ const REASONS: [UnmeasuredReason; 3] = [
     UnmeasuredReason::ReadFailed,
 ];
 
-/// Every field this collector can emit. A folder it could not read is a gap in all of them: a rule
-/// that matches on any one of them must come out `Unmeasured`, never `NotFound`.
+/// Every field this collector can emit. A folder it could not read is a gap in all of them, for the
+/// observations about that folder (ADR 0044): a rule that could match there and matches on any one of
+/// them must come out `Unmeasured`, never `NotFound`.
 ///
 /// Two kinds of observation, disjoint by the fields they carry, as `pca`'s are (ADR 0020): **a folder**
 /// (`location`, `folder`, and `files` when it was listed) and **a file** (`location`, `path`, and
@@ -158,6 +163,10 @@ impl Collector for FivemDir {
         &REASONS
     }
 
+    fn discriminator(&self) -> Option<&'static str> {
+        Some(DISCRIMINATOR)
+    }
+
     fn collect(&self, host: &dyn Host) -> CollectorRun {
         if host.platform() != Platform::Windows {
             return CollectorRun::Unmeasured {
@@ -178,9 +187,8 @@ impl Collector for FivemDir {
         }
 
         let mut observations = Vec::new();
-        // The worst reason any folder gave. `access_denied` outranks `read_failed` because it is the
-        // one a rule may declare as expected; a run that met both is not better than its denial.
-        let mut unread: Option<UnmeasuredReason> = None;
+        // Every place that could not be read, with its reason, in the order `LOCATIONS` lists them.
+        let mut unread: Vec<(&Location, UnmeasuredReason)> = Vec::new();
         for (location, folder) in folders {
             let listing = match folder {
                 None => Err(UnmeasuredReason::ReadFailed),
@@ -223,23 +231,63 @@ impl Collector for FivemDir {
                 }
                 (Err(reason), reads) => {
                     // A program folder carries no folder observation, so the gap is what says it could
-                    // not be read, as it does for every field of the run.
+                    // not be read.
                     if reads == Reads::EveryFile {
                         observations.push(folder_observation(location, FOLDER_UNREADABLE, None));
                     }
-                    unread = Some(match (unread, reason) {
-                        (Some(UnmeasuredReason::AccessDenied), _) => UnmeasuredReason::AccessDenied,
-                        (_, reason) => reason,
-                    });
+                    unread.push((location, reason));
                 }
             }
         }
+        let (gaps, discriminator_gaps) = unread_gaps(unread);
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
-            gaps: unread.map(gaps).unwrap_or_default(),
+            gaps,
+            discriminator_gaps,
         }
     }
+}
+
+/// The gaps of a run, from the places that could not be read.
+///
+/// **Some places read, some not:** each unread place is a gap in every field for the observations
+/// about that place only — `location` is the discriminator — so a rule whose `match` rules that place
+/// out keeps the answer the places that were read give it (ADR 0044). Until ADR 0044 this was a gap
+/// in every field for the whole run, and an unreadable Enhanced program folder made the Legacy plugin
+/// rules `unmeasured` although that folder was read (ADR 0036).
+///
+/// **No place read:** a gap in every field for the whole run, as before. Nothing was read, so there
+/// is no answer from any place for a discriminator to keep apart, and a rule naming a `location` this
+/// collector never emits stays `unmeasured` rather than becoming `not_found`.
+///
+/// `access_denied` is listed before `read_failed`, and wins the run-wide reason, because it is the
+/// reason a rule may declare as expected; a run that met both is not better than its denial
+/// (ADR 0035). The engine takes the first place that reaches a rule, so the order is the ranking.
+fn unread_gaps(
+    unread: Vec<(&Location, UnmeasuredReason)>,
+) -> (BTreeMap<String, UnmeasuredReason>, Vec<DiscriminatorGaps>) {
+    let denied_first = |reason: &UnmeasuredReason| *reason != UnmeasuredReason::AccessDenied;
+    if unread.len() == LOCATIONS.len() {
+        let worst = unread
+            .iter()
+            .map(|(_, reason)| *reason)
+            .min_by_key(denied_first)
+            .map(gaps)
+            .unwrap_or_default();
+        return (worst, Vec::new());
+    }
+    let mut places: Vec<DiscriminatorGaps> = unread
+        .into_iter()
+        .map(|(location, reason)| DiscriminatorGaps {
+            discriminator: DISCRIMINATOR.to_owned(),
+            value: serde_json::Value::from(location.name),
+            gaps: gaps(reason),
+        })
+        .collect();
+    // Stable, so places with the same reason keep the order `LOCATIONS` lists them in.
+    places.sort_by_key(|place| place.gaps.values().any(denied_first));
+    (BTreeMap::new(), places)
 }
 
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
@@ -384,6 +432,33 @@ mod tests {
         }
     }
 
+    /// The places a run could not read, as `(location, reason of every field)`, in the run's order.
+    /// Each place must be a gap in every declared field with one reason, which this asserts.
+    fn unread_places(run: &CollectorRun) -> Vec<(String, UnmeasuredReason)> {
+        let CollectorRun::Measured {
+            discriminator_gaps, ..
+        } = run
+        else {
+            panic!("expected a measured run, got {run:?}");
+        };
+        discriminator_gaps
+            .iter()
+            .map(|place| {
+                assert_eq!(place.discriminator, "location");
+                let mut reasons: Vec<UnmeasuredReason> = place.gaps.values().copied().collect();
+                reasons.dedup();
+                let fields: Vec<&str> = place.gaps.keys().map(String::as_str).collect();
+                let declared: Vec<&str> = FIELDS.iter().map(|field| field.name).collect();
+                assert_eq!(fields, declared, "{place:?}");
+                assert_eq!(reasons.len(), 1, "{place:?}");
+                (
+                    place.value.as_str().unwrap_or_default().to_owned(),
+                    reasons.into_iter().next().unwrap(),
+                )
+            })
+            .collect()
+    }
+
     fn field<'a>(observation: &'a Observation, name: &str) -> Option<&'a str> {
         observation
             .fields
@@ -481,8 +556,11 @@ mod tests {
         );
     }
 
+    /// The plugins folder is denied and the other three places were looked at. What could not be read
+    /// is a gap in every field for the observations about the plugins folder only, so a rule about
+    /// another place keeps the answer that place gives (ADR 0044).
     #[test]
-    fn access_denied_is_a_gap_and_the_folder_says_it_was_unreadable() {
+    fn access_denied_is_a_gap_for_that_folder_and_the_folder_says_it_was_unreadable() {
         let run = FivemDir.collect(&fixture("fivem-dir-access-denied"));
         let (observations, gaps) = measured(&run);
         assert!(files(observations).is_empty());
@@ -490,16 +568,43 @@ mod tests {
             folder(observations, PLUGINS_LOCATION),
             ("unreadable".to_owned(), None)
         );
-        // Nothing in the folder could be read, so every field a rule might match on is a gap and no
-        // rule may read this run as "not found".
+        assert_eq!(
+            folder(observations, ENHANCED_ASI_LOCATION),
+            ("absent".to_owned(), None)
+        );
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(
+            unread_places(&run),
+            [(PLUGINS_LOCATION.to_owned(), UnmeasuredReason::AccessDenied)]
+        );
+    }
+
+    /// Nothing the collector looks in could be read: then no place answered anything, and the gap is
+    /// every field of the whole run with the worst reason — exactly as before ADR 0044.
+    #[test]
+    fn every_place_unreadable_is_a_gap_for_the_whole_run() {
+        let host = inline(
+            "platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\naccess_denied:\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\plugins'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced'\n",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(unread_places(&run).is_empty());
         for field in FIELDS {
-            let name = field.name;
             assert_eq!(
-                gaps.get(name),
+                gaps.get(field.name),
                 Some(&UnmeasuredReason::AccessDenied),
-                "{name}"
+                "{}",
+                field.name
             );
         }
+        assert_eq!(
+            folder(observations, PLUGINS_LOCATION),
+            ("unreadable".to_owned(), None)
+        );
+        assert_eq!(
+            folder(observations, ENHANCED_ASI_LOCATION),
+            ("unreadable".to_owned(), None)
+        );
     }
 
     #[test]
@@ -524,8 +629,8 @@ mod tests {
         );
     }
 
-    /// One variable missing is one folder nobody could look in: a gap, not a quiet absence, and the
-    /// other edition's folder is still read.
+    /// One variable missing is one folder nobody could look in: a gap for that folder, not a quiet
+    /// absence, and the other edition's folder is still read.
     #[test]
     fn one_app_data_folder_unset_is_a_gap_and_the_other_is_still_read() {
         let host = inline(
@@ -533,7 +638,14 @@ mod tests {
         );
         let run = FivemDir.collect(&host);
         let (observations, gaps) = measured(&run);
-        assert_eq!(gaps.get("path"), Some(&UnmeasuredReason::ReadFailed));
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(
+            unread_places(&run),
+            [(
+                ENHANCED_ASI_LOCATION.to_owned(),
+                UnmeasuredReason::ReadFailed
+            )]
+        );
         assert_eq!(
             folder(observations, PLUGINS_LOCATION),
             ("listed".to_owned(), Some(1))
@@ -544,15 +656,24 @@ mod tests {
         );
     }
 
-    /// A denial outranks a failed read in `gaps`, because it is the reason a rule may declare.
+    /// A denial is listed before a failed read, because it is the reason a rule may declare and the
+    /// engine takes the first place that reaches a rule (ADR 0035, ADR 0044).
     #[test]
-    fn a_denied_folder_and_an_unset_variable_report_the_denial() {
+    fn a_denied_folder_and_an_unset_variable_list_the_denial_first() {
         let host = inline(
             "platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\naccess_denied:\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\plugins'\n",
         );
         let run = FivemDir.collect(&host);
-        let (_, gaps) = measured(&run);
-        assert_eq!(gaps.get("sha256"), Some(&UnmeasuredReason::AccessDenied));
+        assert_eq!(
+            unread_places(&run),
+            [
+                (PLUGINS_LOCATION.to_owned(), UnmeasuredReason::AccessDenied),
+                (
+                    ENHANCED_ASI_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+            ]
+        );
     }
 
     #[test]
@@ -675,15 +796,22 @@ mod tests {
         assert!(files(observations).is_empty(), "{observations:?}");
     }
 
-    /// A program folder that cannot be listed is a gap in every field, like a plugin folder that cannot
-    /// be: whether `FiveM.exe` is there was never answered, so no rule may read it as absent.
+    /// A program folder that cannot be listed is a gap in every field for its own `location`, like a
+    /// plugin folder that cannot be: whether `FiveM.exe` is there was never answered, so no rule that
+    /// could match there may read it as absent (ADR 0044).
     #[test]
     fn an_unreadable_program_folder_is_a_gap() {
         let run = FivemDir.collect(&fixture("fivem-dir-client-folder-denied"));
         let (observations, gaps) = measured(&run);
         assert!(files(observations).is_empty());
-        assert_eq!(gaps.get("signature"), Some(&UnmeasuredReason::AccessDenied));
-        assert_eq!(gaps.get("path"), Some(&UnmeasuredReason::AccessDenied));
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(
+            unread_places(&run),
+            [(
+                LEGACY_EXE_LOCATION.to_owned(),
+                UnmeasuredReason::AccessDenied
+            )]
+        );
         assert_eq!(
             folder(observations, PLUGINS_LOCATION),
             ("listed".to_owned(), Some(0))

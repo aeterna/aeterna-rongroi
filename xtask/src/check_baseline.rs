@@ -23,7 +23,12 @@
 //! [`rongroi_core::engine::confronts`]. A rule no baseline confronts is reported unless
 //! `rules/unconfronted.csv` carries a row saying why and what would end it, and a row for a rule that
 //! *is* confronted is reported too, exactly as an unused `known-fps.csv` row is.
-use std::collections::BTreeSet;
+//!
+//! An observation that differs from a rule only in its collector's **discriminator** — `fivem_dir`'s
+//! `location` — does not confront it: it is about another place (ADR 0033 as amended, ADR 0044). The
+//! gate says so by name when that is the only near miss a rule has, so the author is not left to work
+//! out why a rule that looks confronted is not.
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, bail};
@@ -119,6 +124,13 @@ fn check(root: &Path, bundle: &Bundle) -> anyhow::Result<CheckBaselineOutcome> {
     let mut known_fps = read_known_fps(root, &mut problems)?;
     let mut unconfronted = read_unconfronted(root, &mut problems)?;
     let mut confronted: BTreeSet<String> = BTreeSet::new();
+    // Rules some baseline observation came one condition from firing, where that condition was the
+    // discriminator: confronted by ADR 0033's first definition and not by its amended one.
+    let mut other_place_only: BTreeSet<String> = BTreeSet::new();
+    let discriminators: BTreeMap<&'static str, &'static str> = rongroi_collectors::all()
+        .iter()
+        .filter_map(|collector| Some((collector.id(), collector.discriminator()?)))
+        .collect();
     let baselines = baseline_hosts(root)?;
 
     if baselines.is_empty() {
@@ -138,8 +150,17 @@ fn check(root: &Path, bundle: &Bundle) -> anyhow::Result<CheckBaselineOutcome> {
         let seen = observations_in(&report);
         for sourced in bundle.rules() {
             let rule = &sourced.rule;
-            if seen.iter().any(|observation| confronts(rule, observation)) {
+            let discriminator = discriminators.get(rule.collector.as_str()).copied();
+            if seen
+                .iter()
+                .any(|observation| confronts(rule, observation, discriminator))
+            {
                 confronted.insert(rule.id.clone());
+            } else if seen
+                .iter()
+                .any(|observation| confronts(rule, observation, None))
+            {
+                other_place_only.insert(rule.id.clone());
             }
         }
         for evidence in &report.evidence {
@@ -175,7 +196,18 @@ fn check(root: &Path, bundle: &Bundle) -> anyhow::Result<CheckBaselineOutcome> {
     // Only worth asking once there is a baseline to ask it of: with none, every rule is unconfronted
     // for the reason already reported above, and repeating it per rule would bury it.
     if !baselines.is_empty() {
-        report_unconfronted(bundle, &confronted, &unconfronted, &mut problems);
+        other_place_only.retain(|id| !confronted.contains(id));
+        let near_misses = NearMisses {
+            other_place_only: &other_place_only,
+            discriminators: &discriminators,
+        };
+        report_unconfronted(
+            bundle,
+            &confronted,
+            &near_misses,
+            &unconfronted,
+            &mut problems,
+        );
     }
 
     Ok(CheckBaselineOutcome {
@@ -213,11 +245,19 @@ fn observations_in(report: &Report) -> Vec<&Observation> {
         .collect()
 }
 
+/// The rules whose only near misses on the baselines were about another place, and the field that
+/// says which place for each collector that has one.
+struct NearMisses<'a> {
+    other_place_only: &'a BTreeSet<String>,
+    discriminators: &'a BTreeMap<&'static str, &'static str>,
+}
+
 /// Reports every rule no baseline confronted and has no row for, and every row for a rule that was
 /// confronted after all.
 fn report_unconfronted(
     bundle: &Bundle,
     confronted: &BTreeSet<String>,
+    near_misses: &NearMisses<'_>,
     rows: &[Unconfronted],
     problems: &mut Vec<String>,
 ) {
@@ -226,8 +266,15 @@ fn report_unconfronted(
         if confronted.contains(&rule.id) || rows.iter().any(|row| row.rule_id == rule.id) {
             continue;
         }
+        let why = match near_misses.discriminators.get(rule.collector.as_str()) {
+            Some(field) if near_misses.other_place_only.contains(&rule.id) => format!(
+                "the only observations one condition from firing it differ from it in `{field}`, the `{}` collector's discriminator, so they are about another place and were never asked this rule's question (ADR 0033, ADR 0044)",
+                rule.collector
+            ),
+            _ => "no observation carries the fields its `match` names and comes within one condition of firing it".to_owned(),
+        };
         problems.push(format!(
-            "rules/{}: no baseline confronts rule `{}` — no observation carries the fields its `match` names and comes within one condition of firing it, so this gate cannot tell a correct rule from a wrong one here. Add a baseline that holds the shape it reads, or a `{UNCONFRONTED}` row saying why not and what would end it",
+            "rules/{}: no baseline confronts rule `{}` — {why}, so this gate cannot tell a correct rule from a wrong one here. Add a baseline that holds the shape it reads, or a `{UNCONFRONTED}` row saying why not and what would end it",
             sourced.path, rule.id
         ));
     }
@@ -458,7 +505,7 @@ fn read_known_fps(root: &Path, problems: &mut Vec<String>) -> anyhow::Result<Vec
 
 /// Splits one CSV row. A field may be double-quoted, which is how a `reason` carries a comma; `""`
 /// inside a quoted field is one quote character.
-fn parse_csv_line(line: &str) -> Vec<String> {
+pub(crate) fn parse_csv_line(line: &str) -> Vec<String> {
     let mut fields = Vec::new();
     let mut field = String::new();
     let mut quoted = false;
@@ -889,6 +936,97 @@ tpm:
             "{:?}",
             outcome.problems
         );
+    }
+
+    const PLUGIN_RULE_ID: &str = "d5531c55-1a65-4698-9f39-7cf79bbbb7ba";
+
+    /// Modelled on `rules/fivem_dir/plugins/plugin-file-with-valid-signature/rule.yaml`.
+    const PLUGIN_RULE: &str = "id: d5531c55-1a65-4698-9f39-7cf79bbbb7ba
+title: A file in FiveM's plugins folder carries a valid embedded signature
+description: A file in the plugins folder has a valid embedded signature.
+status: experimental
+collector: fivem_dir
+strength: presence
+match:
+  location: plugins
+  signature: valid
+retention: Only the files in the folder when the scan ran.
+falsepositives:
+  - Signed overlays
+author: aeterna-rongroi contributors
+date: 2026-09-14
+";
+
+    /// A `FiveM` install as the consumer baseline describes it: an empty plugins folder, and `FiveM.exe`
+    /// validly signed. `plugins` is the listing of the plugins folder, as YAML.
+    fn fivem_host(plugins: &str) -> String {
+        format!(
+            r"platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': {plugins}
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.exe
+      signature:
+        state: valid
+        signer: Example Signer
+        signer_cert_sha256: {cert}
+",
+            cert = "b".repeat(64)
+        )
+    }
+
+    fn fivem_tree(root: &Path, host: &str) -> Bundle {
+        write(
+            &root.join("rules/fivem_dir/plugins/plugin-file-with-valid-signature/rule.yaml"),
+            PLUGIN_RULE,
+        );
+        write(&root.join("fixtures/hosts/baseline-fivem/host.yaml"), host);
+        let json = collect_bundle_json(&root.join("rules")).expect("collect the temporary bundle");
+        Bundle::from_bundle_json(&json).expect("the temporary bundle is valid")
+    }
+
+    /// ADR 0033, amended 2026-09-14. The only observation carrying both fields is `FiveM.exe`, which
+    /// differs from the rule in `location` alone. Before the amendment this counted as confronted, and
+    /// a misspelt `location:` in the rule would have gone on counting — measured on the shipped rule.
+    /// The gate now refuses it and says the near miss was about another place.
+    #[test]
+    fn a_rule_near_missed_only_in_the_discriminator_is_not_confronted() {
+        let tmp = TempRoot::new("discriminator-only");
+        let bundle = fivem_tree(tmp.path(), &fivem_host("[]"));
+
+        let outcome = check(tmp.path(), &bundle).expect("check-baseline should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains(&format!("no baseline confronts rule `{PLUGIN_RULE_ID}`"))
+                && outcome.problems[0].contains(
+                    "differ from it in `location`, the `fivem_dir` collector's discriminator"
+                ),
+            "{:?}",
+            outcome.problems
+        );
+        assert_eq!(outcome.confronted_count, 0);
+    }
+
+    /// The positive twin: a baseline plugin file whose signature is another answer is in the rule's
+    /// own place and one condition away, so it confronts the rule.
+    #[test]
+    fn a_rule_near_missed_in_its_own_place_is_confronted() {
+        let tmp = TempRoot::new("discriminator-same-place");
+        let bundle = fivem_tree(
+            tmp.path(),
+            &fivem_host(
+                "\n    - name: dxgi.dll\n      signature:\n        state: no_embedded_signature",
+            ),
+        );
+
+        let outcome = check(tmp.path(), &bundle).expect("check-baseline should run to completion");
+
+        assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
+        assert_eq!(outcome.confronted_count, 1);
     }
 
     /// A `reason` is prose and will contain commas, so the quoting has to survive a round trip.
