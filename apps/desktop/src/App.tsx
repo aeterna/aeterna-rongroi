@@ -35,12 +35,16 @@ export function App() {
           <p className="muted">{t("app.tagline")}</p>
         </div>
         <div className="top-actions">
-          <button type="button" className="nav" onClick={() => {
+          <button
+            type="button"
+            className="nav"
+            onClick={() => {
               if (screen !== "about") {
                 setBeforeAbout(screen);
               }
               setScreen("about");
-            }}>
+            }}
+          >
             {t("nav.about")}
           </button>
           <label className="language">
