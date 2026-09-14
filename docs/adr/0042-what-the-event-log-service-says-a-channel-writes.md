@@ -1,6 +1,6 @@
 # ADR 0042 — What the Event Log service says a channel writes to
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-09-13
 
 ## Context
@@ -279,6 +279,9 @@ problem to become `Unmeasured`. The desktop app also scans before it shows a win
 - **Channel names with non-ASCII letters.** The comparison folds ASCII case only, as Windows paths are
   compared elsewhere in this program (ADR 0025); a path differing only in the case of a non-ASCII
   letter would read as a different file.
+
+**Accepted by the project owner on 2026-09-14.** The code this ADR describes was merged in #55 while
+the status still read `proposed`; acceptance was recorded afterwards, not before the merge.
 
 ## Consequences
 

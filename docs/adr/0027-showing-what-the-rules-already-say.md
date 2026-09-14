@@ -210,7 +210,8 @@ own declaration is what makes it usable in a rule, and no gate has to be edited.
 also produce this" reads as a caveat or as a hedge to a Thai-speaking server admin during a
 screenshare is not established by any test here; the tests establish that the text is present, in the
 right language, beside the right rows. The Thai wordings for the two new labels and the scope statement
-were written for this change and have not been reviewed by a native speaker.
+were written for this change and have not been reviewed by a native speaker. **Amended 2026-09-14:** the
+project owner approved the Thai wordings the app shows on screen.
 
 **The `expected` / `unexpected` split is only as good as the rule authors' `unmeasured_when` lines.** A
 rule that declares nothing gets every unmeasured result listed in SS mode, which is the behaviour
