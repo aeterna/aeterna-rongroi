@@ -485,7 +485,29 @@ so that run neither had the part of Defender that watches a running process nor 
 configuration. The step now switches behaviour monitoring and download scanning on as well, and prints each
 event's first line.
 
-DEFENDER-RUN-3-PLACEHOLDER
+**Run 34808373469** (this pull request's three-commit head, `99b8cf8`). The image was as before; the step
+switched real-time protection, behaviour monitoring and download scanning on, and `Get-MpComputerStatus`
+reported all three `True` for the whole window, at its start and at its end. The window, 15.2 minutes,
+held the same privileged reads: the firmware test (privilege held and disabled, restored to disabled), the
+live smoke's scan and 36 CLI scans. Defender's Operational log recorded 5 events:
+
+| Id | Count | First line of the message |
+|---|---|---|
+| 5000 | 1 | Real-time Protection scanning … was enabled — the step's own change, five seconds into the window |
+| 5007 | 2 | Configuration has changed — at 1 and 4 minutes into the window, after the step's last change; what changed was not read |
+| 2000 | 2 | security intelligence version updated |
+
+**No detection event** (1006–1008, 1015, 1116–1119: 0), **no event naming** the test binary or the CLI, and
+`Get-MpThreatDetection` listed nothing since the window opened. Each setting was put back afterwards.
+
+What this is: on one runner, Defender platform 4.18.26080.3 with real-time protection, behaviour monitoring
+and download scanning on, cloud-delivered protection and tamper protection as the image had them (tamper
+protection off; cloud protection not read), recorded nothing about 38 processes that enabled
+`SeSystemEnvironmentPrivilege` for a firmware read. What it is not: evidence about other endpoint security
+products, about Defender with cloud protection or attack surface reduction rules configured differently,
+about later signatures, or about a player's PC. The fallback named in "Accepted by the owner" — reading the
+firmware only when the person running the scan asks — is not needed on this evidence, and is still the one
+to weigh if a report says otherwise.
 
 ### Still not established
 

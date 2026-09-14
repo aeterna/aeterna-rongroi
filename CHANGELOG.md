@@ -36,8 +36,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   PowerShell 7.6 were measured to do on the Windows CI runner, where a new step writes each case, runs both
   engines and counts event 4104, and the CLI's reading is printed beside it.
 - The Windows CI job records Microsoft Defender's state and what its Operational log recorded while this
-  program enabled `SeSystemEnvironmentPrivilege` for the firmware read (ADR 0038). One Defender configuration
-  on one runner; nothing about other security products.
+  program enabled `SeSystemEnvironmentPrivilege` for the firmware read (ADR 0038). With real-time protection,
+  behaviour monitoring and download scanning switched on, 38 such processes in 15 minutes left no detection
+  and no event naming them. One Defender configuration on one runner; nothing about other security products.
 - The report header says when Windows last started counting, so the times on other rows can be read
   against it (ADR 0039): `boot_time`, the scan's clock minus `GetTickCount64`, or `unmeasured` with a
   reason — never a guessed time. It is context, not evidence, and no rule can read it. It is shown in both
