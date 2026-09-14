@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 2 |
 | Rules | 18 |
-| SHA-256 | `69f7da1433a794b5d6bee234f94a442cb47fe58da0690b2b18b6aeacff8f360d` |
+| SHA-256 | `9e7d5d594dc2ac78e39de9957a3c5d77fb3624ddbb08db5408ba55973477b1fd` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -98,7 +98,6 @@ Only clearings still recorded in the System log as it stands today. The log hold
 
 - `not_windows` — not running on Windows
 - `not_admin` — Windows would not show this without administrator rights
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -148,7 +147,6 @@ Only clearings still recorded in the Security log as it stands today. The log ho
 
 - `not_windows` — not running on Windows
 - `not_admin` — Windows would not show this without administrator rights
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -200,7 +198,6 @@ The attribute as it is at the moment of the scan, on the log files still in the 
 
 - `not_windows` — not running on Windows
 - `not_admin` — Windows would not show this without administrator rights
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -245,7 +242,6 @@ Only log files still in the Windows Event Log folder, compared with how Windows 
 
 - `not_windows` — not running on Windows
 - `not_admin` — Windows would not show this without administrator rights
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -620,7 +616,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 - `not_windows` — not running on Windows
 - `source_absent` — this PC has no such record to read
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -662,7 +657,6 @@ Current state only: what the firmware reports for this start of Windows and what
 - `not_windows` — not running on Windows
 - `not_admin` — Windows would not show this without administrator rights
 - `source_absent` — this PC has no such record to read
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -702,7 +696,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -743,7 +736,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -787,7 +779,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 - `not_windows` — not running on Windows
 - `source_absent` — this PC has no such record to read
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -828,7 +819,6 @@ Current hardware state only. It says nothing about earlier hardware or firmware 
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 
 **Ordinary things that also produce this**
 
@@ -872,7 +862,6 @@ The attribute as it is at the moment of the scan, on the Prefetch files still in
 
 - `not_windows` — not running on Windows
 - `not_admin` — Windows would not show this without administrator rights
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 - `service_disabled` — the Windows service that writes this record is switched off
 

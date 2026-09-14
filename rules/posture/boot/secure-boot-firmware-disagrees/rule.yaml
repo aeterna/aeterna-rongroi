@@ -19,7 +19,8 @@ match:
 retention: >-
   Current state only: what the firmware reports for this start of Windows and what the registry holds
   now. It says nothing about earlier starts.
-unmeasured_when: [not_windows, not_admin, source_absent, access_denied]
+# `access_denied` removed (ADR 0032, amended 2026-09-14): the registry key grants Users read, and the firmware read is `not_admin` without elevation and was allowed on every elevated token measured, so a refusal is not an ordinary machine.
+unmeasured_when: [not_windows, not_admin, source_absent]
 falsepositives:
   - Virtual machines, whose virtual firmware may report Secure Boot differently from what Windows recorded
   - Firmware that reports Secure Boot inconsistently, for example after a firmware update or a reset of its Secure Boot keys

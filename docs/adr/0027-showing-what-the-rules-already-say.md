@@ -230,6 +230,9 @@ each of those four declarations is still what its author meant is an open questi
 > **Answered for `read_failed` by ADR 0032**, which takes the reading above back: it is not a fact
 > about a kind of machine, so it is no longer a rule author's to declare, and the four lines are
 > deleted. The `access_denied` half of this paragraph stands as written and is still open.
+>
+> **Answered for `access_denied` by ADR 0032's amendment of 2026-09-14**, which checked each of the
+> eleven declarations then in the bundle against its collector and the measurements, and removed all eleven.
 
 **Nothing was measured about whether the longer rows are read.** Every evidence row is now two to six
 lines instead of two, which is the opposite of the "reports people skim" failure this project worries

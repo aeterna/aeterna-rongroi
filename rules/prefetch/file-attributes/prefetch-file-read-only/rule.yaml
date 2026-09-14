@@ -22,7 +22,8 @@ retention: >-
 # `source_absent` and `service_disabled`: a PC with no Prefetch folder, or with Prefetch switched off
 # and no folder, has no file to ask about, and both are ordinary. `source_empty` is not listed because
 # it does not gap this field: an empty folder holds no read-only file, and saying so is true.
-unmeasured_when: [not_windows, not_admin, access_denied, source_absent, service_disabled]
+# `access_denied` removed (ADR 0032, amended 2026-09-14): `prefetch` gives it only to a refusal with administrator rights, which Administrators' full control of the folder and two elevated scans do not show on an ordinary machine.
+unmeasured_when: [not_windows, not_admin, source_absent, service_disabled]
 falsepositives:
   - Read-only chosen in the Properties of the Prefetch folder or of a folder above it, which Windows
     applies to the files inside

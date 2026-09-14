@@ -18,7 +18,8 @@ retention: >-
   nothing about when it was set, or about files that were removed.
 # As the log-clearing rules (ADR 0031): every Windows installation has an Event Log folder, so its
 # absence, or a folder holding no log, is worth a line of its own.
-unmeasured_when: [not_windows, not_admin, access_denied]
+# `access_denied` removed (ADR 0032, amended 2026-09-14): `evtx` gives it only to a refusal with administrator rights, which neither of two elevated scans met on any log, so it is not a kind of machine to count away.
+unmeasured_when: [not_windows, not_admin]
 falsepositives:
   - Read-only chosen in the Properties of the Event Log folder or of a folder above it, which Windows
     applies to the files inside

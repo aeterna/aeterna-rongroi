@@ -186,19 +186,45 @@ jobs:
           }
           $compared = @($observations | Where-Object { $_.collector -eq 'evtx' -and $_.fields.PSObject.Properties.Name -contains 'at_configured_path' })
           Write-Output "evtx at_configured_path: $(@($compared | Where-Object { $_.fields.at_configured_path }).Count) of $($compared.Count)"
-      # ADR 0042 §5: the channel-configuration reads go to the Event Log service, and a service that never
-      # answers must cost the evtx budget, not the scan. The unit test proves that against a fixture reader
-      # that blocks; this is the positive twin on a real Windows, where the service process itself is
-      # suspended so that `EvtOpenChannelConfig` has nobody to answer it. The runner is throwaway, which is
-      # the only reason suspending a system service is acceptable here, and the service is resumed whatever
-      # happens. It runs last because nothing after it should depend on the Event Log.
-      - name: A suspended Event Log service costs the evtx budget, not the scan
+      # ADR 0042 §5, amended 2026-09-14: the channel-configuration reads go to the Event Log service, and a
+      # service that never answers must cost its own bound (CONFIG_BUDGET, 5 s) and the three configuration
+      # fields — not the scan, and not the evtx rules that read only the logs' bytes. The unit test proves
+      # that against a fixture reader that blocks; this is the positive twin on a real Windows, where the
+      # service process itself is suspended so that `EvtOpenChannelConfig` has nobody to answer it. The
+      # runner is throwaway, which is the only reason suspending a system service is acceptable here, and
+      # the service is resumed whatever happens. It runs last because nothing after it should depend on the
+      # Event Log. Before suspending, it times the same two properties for every channel while the service
+      # answers, so the bound can be read against this machine too (counts and times only, no names).
+      - name: A suspended Event Log service costs the configuration fields, not the other evtx rules
         shell: pwsh
         timeout-minutes: 10
         run: |
           cargo build --locked --quiet -p rongroi-cli
           $exe = Join-Path $PWD 'target\debug\aeterna-rongroi-cli.exe'
           if (-not (Test-Path $exe)) { throw "the CLI was not built at $exe" }
+          # EventLogConfiguration opens the channel with EvtOpenChannelConfig and reads each property with
+          # EvtGetChannelConfigProperty (dotnet/runtime, System.Diagnostics.EventLog).
+          $channels = [System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.GetLogNames()
+          $times = [System.Collections.Generic.List[double]]::new()
+          $unanswered = 0
+          $sweep = [System.Diagnostics.Stopwatch]::StartNew()
+          foreach ($channel in $channels) {
+            $one = [System.Diagnostics.Stopwatch]::StartNew()
+            try {
+              $config = [System.Diagnostics.Eventing.Reader.EventLogConfiguration]::new($channel)
+              $null = $config.LogFilePath
+              $null = $config.MaximumSizeInBytes
+              $config.Dispose()
+            } catch { $unanswered++ }
+            $one.Stop()
+            $times.Add($one.Elapsed.TotalMilliseconds)
+          }
+          $sweep.Stop()
+          $sorted = @($times | Sort-Object)
+          if ($sorted.Count -gt 0) {
+            $at = { param($share) $sorted[[math]::Min($sorted.Count - 1, [int][math]::Floor($share * $sorted.Count))] }
+            Write-Output ('service answer times: {0} channels, {1} not described, total {2:N1} ms, median {3:N3} ms, p99 {4:N3} ms, max {5:N3} ms' -f $sorted.Count, $unanswered, $sweep.Elapsed.TotalMilliseconds, (& $at 0.5), (& $at 0.99), $sorted[-1])
+          }
           Add-Type -TypeDefinition @'
           using System;
           using System.Runtime.InteropServices;
@@ -244,9 +270,28 @@ jobs:
             $reason = if ($_.reason) { $_.reason } else { '-' }
             Write-Output "evidence: $($_.rule_id) $($_.state) $reason"
           }
+          # The most evtx can now take is the 30 s parse budget plus the 5 s service bound; before the amendment
+          # this scan took 30.3 s. 90 s leaves room for the other, unbounded collectors on a debug build and is
+          # half of the 180 s kill above.
+          if ($clock.Elapsed.TotalSeconds -ge 90) { throw "the scan took $([math]::Round($clock.Elapsed.TotalSeconds, 1)) s with the service suspended; expected well under 90 s" }
           # The rule that compares a log with the file its channel writes to reads only what the service said.
-          $rule = @($report.evidence | Where-Object { $_.rule_id -eq '87a53c8f-b0e4-477d-91e7-93b904ba965f' })
+          $configuredPathRule = '87a53c8f-b0e4-477d-91e7-93b904ba965f'
+          $rule = @($report.evidence | Where-Object { $_.rule_id -eq $configuredPathRule })
           if ($rule.Count -ne 1) { throw "expected one row for event-log-not-at-configured-path, got $($rule.Count)" }
           if ($rule[0].state -ne 'unmeasured' -or $rule[0].reason -ne 'budget_spent') {
             throw "with the service suspended, event-log-not-at-configured-path must be unmeasured / budget_spent, got '$($rule[0].state)' / '$($rule[0].reason)'"
           }
+          # Every other evtx rule reads only the logs' own bytes and attributes. Whether each is found or not
+          # depends on this runner; what the suspended service must not do is take their measurement away.
+          $others = @($report.evidence | Where-Object { $_.collector -eq 'evtx' -and $_.rule_id -ne $configuredPathRule })
+          if ($others.Count -lt 3) { throw "expected at least three evtx rules that do not read the service, got $($others.Count)" }
+          foreach ($other in $others) {
+            if ($other.reason -eq 'budget_spent') {
+              throw "evtx rule $($other.rule_id) is unmeasured / budget_spent: the suspended service cost a rule that does not read it"
+            }
+          }
+          $folder = @(@($report.evidence | ForEach-Object { $_.observations }) + @($report.unmatched | ForEach-Object { $_.observations }) |
+            Where-Object { $_ -and $_.collector -eq 'evtx' -and $_.fields.PSObject.Properties.Name -contains 'budget_exhausted' })
+          if ($folder.Count -ne 1) { throw "expected one evtx folder account, got $($folder.Count)" }
+          Write-Output "evtx folder: logs $($folder[0].fields.logs) · examined $($folder[0].fields.examined) · refused $($folder[0].fields.refused) · budget_exhausted $($folder[0].fields.budget_exhausted)"
+          if ($folder[0].fields.budget_exhausted) { throw 'the parse budget was exhausted with the service suspended: the wait was charged to the logs' }

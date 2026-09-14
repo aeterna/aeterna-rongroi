@@ -21,7 +21,8 @@ retention: >-
   removed.
 # As the log-clearing rules (ADR 0031). A service that could not be asked at all — for one, because it
 # is not running — reaches the report as `read_failed`, which no rule may declare (ADR 0032).
-unmeasured_when: [not_windows, not_admin, access_denied]
+# `access_denied` removed (ADR 0032, amended 2026-09-14): `evtx` gives it only to a refusal with administrator rights, and elevated scans read every log and the service described every channel asked, so it is not a kind of machine to count away.
+unmeasured_when: [not_windows, not_admin]
 falsepositives:
   - An archive Windows keeps itself when a log is set to be backed up automatically when full — it
     closes the full file and renames it

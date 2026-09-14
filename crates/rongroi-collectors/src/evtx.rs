@@ -67,7 +67,9 @@
 //!
 //! Asking the Event Log service what file and size it sets for a channel (ADR 0042) is a call into
 //! another process, and a service that never answers would stall the scan the same way. Those
-//! questions run on a second worker thread and are charged to the same budget.
+//! questions run on a second worker thread under a bound of their own, [`CONFIG_BUDGET`], which is not
+//! charged to [`PARSE_BUDGET`]: a service that stops answering costs the three configuration fields
+//! and nothing a log's own bytes say (ADR 0042, amended 2026-09-14).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc;
@@ -98,7 +100,23 @@ const LOG_EXTENSION: &str = ".evtx";
 /// the collector, and a per-file limit would need a new thread for every file that overran, since a
 /// parse that does not return cannot be cancelled. A log this collector did not reach inside the
 /// budget is reported, by name, as a log that was not examined.
+///
+/// Time spent waiting for the Event Log service is not part of it: that wait has [`CONFIG_BUDGET`].
 pub const PARSE_BUDGET: Duration = Duration::from_secs(30);
+
+/// How long one collection may spend, in total, waiting for the Event Log service to describe
+/// channels (ADR 0042, amended 2026-09-14).
+///
+/// Its own bound rather than a share of [`PARSE_BUDGET`], so that a service that stops answering
+/// costs the fields that need the service and not the logs read after it. Once it is spent, the
+/// service is treated as not answering for the rest of the run: nothing more is asked, and the
+/// configuration fields are gapped `budget_spent`. The time waited is added back to the parse
+/// deadline, so the worst case for the whole collection is the two bounds together.
+///
+/// Five seconds against a measurement: on one Windows 11 machine the same two properties of all
+/// 1 243 channels took 237 ms in total, the slowest single channel 4.9 ms, and a collection asks
+/// about far fewer channels than that — only those a log's records name.
+pub const CONFIG_BUDGET: Duration = Duration::from_secs(5);
 
 const ID: &str = "evtx";
 
@@ -211,14 +229,18 @@ const CONFIG_FIELDS: [&str; 3] = ["at_configured_path", "configured_path", "max_
 /// The `evtx` collector.
 #[derive(Debug, Clone, Copy)]
 pub struct Evtx {
-    /// How long the whole collection may take. [`PARSE_BUDGET`] unless a test says otherwise.
+    /// How long reading and parsing logs may take. [`PARSE_BUDGET`] unless a test says otherwise.
     budget: Duration,
+    /// How long waiting for the Event Log service may take. [`CONFIG_BUDGET`] unless a test says
+    /// otherwise.
+    config_budget: Duration,
 }
 
 impl Default for Evtx {
     fn default() -> Self {
         Self {
             budget: PARSE_BUDGET,
+            config_budget: CONFIG_BUDGET,
         }
     }
 }
@@ -237,7 +259,7 @@ impl Collector for Evtx {
     }
 
     /// Lists `%SystemRoot%\System32\winevt\Logs` and reads every `.evtx` file in it, within
-    /// [`PARSE_BUDGET`].
+    /// [`PARSE_BUDGET`], asking the Event Log service about channels within [`CONFIG_BUDGET`].
     fn collect(&self, host: &dyn Host) -> CollectorRun {
         if host.platform() != Platform::Windows {
             return CollectorRun::Unmeasured {
@@ -277,7 +299,7 @@ impl Collector for Evtx {
         };
 
         let root = host.env_var(SYSTEM_ROOT).unwrap_or_default();
-        let mut collection = Collection::new(self.budget);
+        let mut collection = Collection::new(self.budget, self.config_budget);
         collection.read_all(host, &dir, &names, &root);
         collection.finish()
     }
@@ -359,13 +381,19 @@ struct Collection {
     configs: BTreeMap<String, Option<ChannelConfig>>,
     /// Who asks the service, once there has been a channel to ask about.
     asker: Asker,
-    /// Whether the wall-clock budget ended the collection before every log was read.
+    /// Whether the parse budget ended the collection before every log was read. Never set by the
+    /// Event Log service's silence, which has a bound of its own.
     budget_exhausted: bool,
     budget: Duration,
+    /// How long questions to the service may be waited for, in total.
+    config_budget: Duration,
+    /// How long questions to the service have been waited for so far. Added to the parse deadline,
+    /// because none of it was spent reading or parsing a log.
+    config_waited: Duration,
 }
 
 impl Collection {
-    fn new(budget: Duration) -> Self {
+    fn new(budget: Duration, config_budget: Duration) -> Self {
         Self {
             observations: Vec::new(),
             listed: 0,
@@ -380,13 +408,15 @@ impl Collection {
             asker: Asker::NotStarted,
             budget_exhausted: false,
             budget,
+            config_budget,
+            config_waited: Duration::ZERO,
         }
     }
 
     /// Reads every log, in order, until the folder or the budget runs out.
     fn read_all(&mut self, host: &dyn Host, dir: &str, names: &[String], root: &str) {
         self.listed = names.len();
-        let deadline = Instant::now() + self.budget;
+        let started = Instant::now();
         let worker = if names.is_empty() {
             None
         } else {
@@ -397,12 +427,8 @@ impl Collection {
             let path = format!(r"{dir}\{name}");
             // The budget is already gone, spent by an earlier log. This one is not opened at all,
             // and saying so is not the same statement as "the read of this log ran out of time"
-            // (ADR 0030).
+            // (ADR 0030). The earlier log's parse already named the budget as the run's reason.
             if self.budget_exhausted {
-                // Usually an earlier log's parse already named the budget as the run's reason. When
-                // it was a question to the Event Log service that used the budget up instead, no log
-                // was refused for it, and the budget is still why this one was not read.
-                self.first_failure = self.first_failure.or(Some(UnmeasuredReason::BudgetSpent));
                 self.refuse(name, &path, NOT_ATTEMPTED, UnmeasuredReason::NotAttempted);
                 continue;
             }
@@ -449,6 +475,9 @@ impl Collection {
             // the length of what was read, and ADR 0019 caps that at 64 MiB — a file past the cap is
             // refused rather than truncated, so this is never a short count of a long file.
             let size_bytes = bytes.len();
+            // Recomputed for every log: waiting for the service moves it later by exactly the time
+            // waited, so that wait is never paid for with a log that was not read.
+            let deadline = started + self.budget + self.config_waited;
             match worker.parse(bytes, deadline.saturating_duration_since(Instant::now())) {
                 Parsed::Done(Ok(file)) => {
                     self.examined += 1;
@@ -479,7 +508,7 @@ impl Collection {
                     // record names none, and a log naming several is not the file of any one of
                     // them. Neither is reported as anything (ADR 0042).
                     if let [channel] = channels_of_log.into_iter().collect::<Vec<_>>().as_slice()
-                        && let Some(config) = self.config_of(host, channel, deadline)
+                        && let Some(config) = self.config_of(host, channel)
                     {
                         configured(&mut observation, &config, &path, root);
                     }
@@ -516,22 +545,17 @@ impl Collection {
         }
     }
 
-    /// What the service states about `channel`, asking it at most once per run and waiting no later
-    /// than `deadline`, the same deadline every parse is held to.
+    /// What the service states about `channel`, asking it at most once per run and waiting no longer
+    /// than what is left of the configuration budget.
     ///
     /// `None` both for a channel the service does not have and for a question that failed; the
     /// second is remembered in `config_failure`, which gaps the fields for the run.
     ///
-    /// A question still unanswered at the deadline ends the collection as a parse that overran does:
-    /// the configuration fields are gapped `budget_spent`, `budget_exhausted` is set, and every log
-    /// after this one is refused unopened. The worker is abandoned where it waits and no further
-    /// question is sent to it (ADR 0042).
-    fn config_of(
-        &mut self,
-        host: &dyn Host,
-        channel: &str,
-        deadline: Instant,
-    ) -> Option<ChannelConfig> {
+    /// A question still unanswered when the configuration budget is spent ends the questions, not
+    /// the collection: the configuration fields are gapped `budget_spent`, the worker is abandoned
+    /// where it waits, no further question is sent to anyone, and every later log is still read and
+    /// parsed under the parse budget, which the wait did not use (ADR 0042, amended 2026-09-14).
+    fn config_of(&mut self, host: &dyn Host, channel: &str) -> Option<ChannelConfig> {
         if let Some(known) = self.configs.get(channel) {
             return known.clone();
         }
@@ -554,7 +578,13 @@ impl Collection {
         }
         let asked = match &self.asker {
             Asker::Ready(worker) => {
-                worker.ask(channel, deadline.saturating_duration_since(Instant::now()))
+                let asking = Instant::now();
+                let asked = worker.ask(
+                    channel,
+                    self.config_budget.saturating_sub(self.config_waited),
+                );
+                self.config_waited += asking.elapsed();
+                asked
             }
             // Nothing new to record: whatever made the asker unavailable is in `config_failure`.
             Asker::NotStarted | Asker::Unavailable => return None,
@@ -568,9 +598,10 @@ impl Collection {
                 self.config_failure = self.config_failure.or(Some(reason_for(host, &error)));
                 None
             }
+            // The service is treated as not answering for the rest of the run. Only the fields that
+            // need it are gapped; `budget_exhausted` stays about the logs.
             Asked::OutOfBudget => {
                 self.config_failure = self.config_failure.or(Some(UnmeasuredReason::BudgetSpent));
-                self.budget_exhausted = true;
                 self.asker = Asker::Unavailable;
                 None
             }
@@ -692,22 +723,22 @@ enum Asker {
     /// No log has named a single channel yet, so nobody has tried.
     NotStarted,
     Ready(ConfigWorker),
-    /// The host cannot be asked, no thread was given, or a question went unanswered. The reason is
-    /// in `Collection::config_failure`.
+    /// The host cannot be asked, no thread was given, or the configuration budget was spent waiting.
+    /// The reason is in `Collection::config_failure`.
     Unavailable,
 }
 
 /// What one question to the service produced, or why it produced nothing.
 enum Asked {
     Done(Result<Option<ChannelConfig>, rongroi_host::SourceError>),
-    /// The budget ran out before the service answered.
+    /// The configuration budget ran out before the service answered.
     OutOfBudget,
     /// There is no worker thread to ask on any more.
     WorkerGone,
 }
 
 /// The thread every question to the Event Log service is asked on, so that a service which accepts a
-/// question and never answers it costs the collection its budget rather than the whole program
+/// question and never answers it costs the configuration budget rather than the whole program
 /// (ADR 0042).
 ///
 /// The same shape as [`ParseWorker`], and for the same reason: a blocked call into another process
@@ -1119,7 +1150,18 @@ mod tests {
         /// reproducer is in this repository — so the budget is exercised by shrinking it rather than
         /// by slowing the parse down.
         fn with_budget(budget: Duration) -> Self {
-            Self { budget }
+            Self {
+                budget,
+                config_budget: CONFIG_BUDGET,
+            }
+        }
+
+        /// A collector with both bounds of a test's choosing.
+        fn with_budgets(budget: Duration, config_budget: Duration) -> Self {
+            Self {
+                budget,
+                config_budget,
+            }
         }
     }
 
@@ -1222,6 +1264,19 @@ mod tests {
 
         fn host(&self) -> FixtureHost {
             FixtureHost::load(&self.dir).unwrap()
+        }
+
+        /// Rewrites the service's description of the sample's channel into one that accepts the
+        /// question and never answers it.
+        fn service_never_answers(&self) {
+            let yaml = std::fs::read_to_string(self.dir.join("host.yaml"))
+                .unwrap()
+                .replace(
+                    "    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'\n    max_size_bytes: 1052672\n",
+                    "    never_answers: true\n",
+                );
+            assert!(yaml.contains("never_answers"), "{yaml}");
+            std::fs::write(self.dir.join("host.yaml"), yaml).unwrap();
         }
     }
 
@@ -1850,16 +1905,21 @@ mod tests {
         assert_eq!(gaps.get("read_only"), None);
     }
 
-    /// **A service that never answers ends the collection instead of stalling it** (ADR 0042). The
-    /// fixture's reader blocks forever on this channel, so the wait is exercised for real — what is
-    /// shortened is the budget, not the hang. The first log is parsed and its records stay
-    /// measured; what the service would have said is gapped `budget_spent`, and the log after it is
-    /// refused unopened, exactly as after a parse that overran.
+    /// **A service that never answers costs the configuration and nothing else** (ADR 0042, amended
+    /// 2026-09-14). The fixture's reader blocks forever on this channel, so the wait is exercised for
+    /// real — what is shortened is the bound, not the hang.
     ///
-    /// The budget has to outlast parsing the one small vendored log, which takes milliseconds, and
-    /// is otherwise as short as that allows: the test waits for all of it.
+    /// The configuration budget is set **longer** than the parse budget on purpose. If the wait were
+    /// still charged to the parse budget, as it was before the amendment, the second log would be
+    /// refused unopened; it is read and parsed, which is only possible because the time waited was
+    /// added back to the parse deadline. The one small vendored log parses in milliseconds, far
+    /// inside the half second the two of them are given.
+    ///
+    /// The first log's records stay measured, the three configuration fields are gapped
+    /// `budget_spent` and nothing else is gapped, the second log naming the same channel does not
+    /// wait again, and `budget_exhausted` stays `false` because no log went unread.
     #[test]
-    fn a_service_that_never_answers_spends_the_budget_and_gaps_the_configuration() {
+    fn a_service_that_never_answers_costs_the_configuration_and_not_the_logs() {
         let fixture = TempFixture::new(
             "config-never-answers",
             &[
@@ -1867,45 +1927,73 @@ mod tests {
                 ("Application.evtx", LANGUAGE_PACK),
             ],
         );
-        let yaml = std::fs::read_to_string(fixture.dir.join("host.yaml"))
-            .unwrap()
-            .replace(
-                "    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'\n    max_size_bytes: 1052672\n",
-                "    never_answers: true\n",
-            );
-        assert!(yaml.contains("never_answers"), "{yaml}");
-        std::fs::write(fixture.dir.join("host.yaml"), yaml).unwrap();
+        fixture.service_never_answers();
 
         let budget = Duration::from_millis(500);
+        let config_budget = Duration::from_secs(1);
         let started = Instant::now();
-        let run = Evtx::with_budget(budget).collect(&fixture.host());
+        let run = Evtx::with_budgets(budget, config_budget).collect(&fixture.host());
         let took = started.elapsed();
-        assert!(took >= budget, "returned before the budget: {took:?}");
-        assert!(took < budget * 10, "the wait was not bounded: {took:?}");
+        assert!(
+            took >= config_budget,
+            "returned before the configuration budget: {took:?}"
+        );
+        // One wait, not one per log: a second wait would take at least twice the bound.
+        assert!(
+            took < config_budget * 2,
+            "the service was waited for more than once: {took:?}"
+        );
 
         let (observations, gaps) = measured(&run);
-        let account = account_of(observations, "System.evtx");
-        assert_eq!(field(account, "entries"), Some(&17_u64.into()));
-        for name in CONFIG_FIELDS {
-            assert_eq!(field(account, name), None, "{name}");
+        for log in ["System.evtx", "Application.evtx"] {
+            let account = account_of(observations, log);
+            assert_eq!(field(account, "entries"), Some(&17_u64.into()), "{log}");
+            for name in CONFIG_FIELDS {
+                assert_eq!(field(account, name), None, "{log} {name}");
+            }
+        }
+        assert!(refusals(observations).is_empty(), "{observations:?}");
+
+        let expected: BTreeMap<String, UnmeasuredReason> = CONFIG_FIELDS
+            .iter()
+            .map(|name| ((*name).to_owned(), UnmeasuredReason::BudgetSpent))
+            .collect();
+        assert_eq!(gaps, &expected);
+
+        let folder = folder_of(observations);
+        assert_eq!(field(folder, "budget_exhausted"), Some(&false.into()));
+        assert_eq!(field(folder, "examined"), Some(&2_u64.into()));
+        assert_eq!(field(folder, "refused"), Some(&0_u64.into()));
+    }
+
+    /// The parse budget still ends the collection when parsing is what uses it, whatever the
+    /// service did: a zero parse budget refuses both logs exactly as it does on a host whose service
+    /// answers, and the configuration is never asked about because no log was parsed.
+    #[test]
+    fn a_spent_parse_budget_is_still_the_runs_reason_beside_a_service_that_never_answers() {
+        let fixture = TempFixture::new(
+            "config-never-answers-no-parse-budget",
+            &[
+                ("System.evtx", LANGUAGE_PACK),
+                ("Application.evtx", LANGUAGE_PACK),
+            ],
+        );
+        fixture.service_never_answers();
+
+        let run =
+            Evtx::with_budgets(Duration::ZERO, Duration::from_secs(60)).collect(&fixture.host());
+        let (observations, gaps) = measured(&run);
+        let refused = refusals(observations);
+        assert_eq!(text(refused[0], "read"), Some(BUDGET_EXHAUSTED));
+        assert_eq!(text(refused[1], "read"), Some(NOT_ATTEMPTED));
+        for field in FIELDS {
+            let name = field.name;
             assert_eq!(
                 gaps.get(name),
                 Some(&UnmeasuredReason::BudgetSpent),
                 "{name}"
             );
         }
-
-        let refused = refusals(observations);
-        assert_eq!(refused.len(), 1, "{refused:?}");
-        assert_eq!(text(refused[0], "log"), Some("Application.evtx"));
-        assert_eq!(text(refused[0], "read"), Some(NOT_ATTEMPTED));
-
-        let folder = folder_of(observations);
-        assert_eq!(field(folder, "budget_exhausted"), Some(&true.into()));
-        assert_eq!(field(folder, "examined"), Some(&1_u64.into()));
-        // The run's reason is the budget, not "not attempted": that the second log was not read is a
-        // consequence of the service's silence, and a reviewer should read the cause.
-        assert_eq!(gaps.get("event_id"), Some(&UnmeasuredReason::BudgetSpent));
     }
 
     /// The worker on its own: a question that is never answered returns when its wait does, and a
