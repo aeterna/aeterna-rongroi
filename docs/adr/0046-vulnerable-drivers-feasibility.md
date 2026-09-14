@@ -1,6 +1,6 @@
 # ADR 0046 — Vulnerable drivers: what can be read, and what a list would cost
 
-- Status: proposed
+- Status: accepted — the recommendation below, and no collector code until the measurements under "Before any code" exist
 - Date: 2026-09-14
 
 ## Context
@@ -298,4 +298,6 @@ Each of these is a measurement or a decision, written into the collector's own A
 ## Consequences
 
 - No code, no rule, no fixture, no dependency. `Cargo.lock`, `deny.toml` and the report are unchanged.
-- README's M3 row stays "planned" until the owner decides. When they do, it links here.
+- Accepted by the owner on 2026-09-14, with all seven points of the recommendation as written.
+- README's M3 row links here: the vulnerable-driver list is designed, and waits on the measurements under
+  "Before any code".

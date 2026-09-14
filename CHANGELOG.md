@@ -26,6 +26,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ### Changed
 - The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the
   commit, the rules bundle SHA-256 and how to check a downloaded file (ADR 0045).
+- The vulnerable-driver list is designed (ADR 0046, accepted): LOLDrivers' vulnerable drivers by SHA-256,
+  matched against registered driver services as `posture`, vendored as a data file under its own licence.
+  No collector code until its rights, `ImagePath` forms and cost are measured. Loaded modules, the
+  Authenticode hash and Microsoft's blocklist switch are not read.
 
 ## [0.3.0] - 2026-09-14
 
