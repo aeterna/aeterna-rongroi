@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-14
+
 ### Added
 - Two negative fixtures for the log-clearing rules, each the shape an ordinary log holds from the Event Log
   service without anyone clearing it: `1100` and `1101` on Security, and `30` plus the classic `EventLog`
