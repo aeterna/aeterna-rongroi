@@ -610,6 +610,10 @@ mod tests {
         let path = std::env::var("RONGROI_CHAIN_FILE")
             .expect("RONGROI_CHAIN_FILE names a file with an embedded signature");
         let case = std::env::var("RONGROI_CHAIN_CASE").expect("RONGROI_CHAIN_CASE names the case");
+        // The CI job finds this process's CAPI2 events by its id, which only the process itself knows.
+        if let Ok(pid_file) = std::env::var("RONGROI_CHAIN_PID_FILE") {
+            std::fs::write(pid_file, std::process::id().to_string()).expect("write the process id");
+        }
         let (code, check) = verify_with_code(&path, OFFLINE);
         let shown = code.map_or_else(|| "no call".to_owned(), |code| format!("{code:#010x}"));
         println!("chain case {case}: WinVerifyTrust {shown} -> {check:?}");

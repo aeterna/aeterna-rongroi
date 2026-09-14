@@ -97,6 +97,11 @@ jobs:
             @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue |
               Where-Object { $_.ToXml() -match 'rongroi_host_windows' })
           }
+          # At the log's default maximum a burst of events from another process overwrites the test's
+          # (measured; see the next step), so it is raised here and put back at the end.
+          $originalMaxSize = (Get-WinEvent -ListLog $log).MaximumSizeInBytes
+          wevtutil sl $log /ms:104857600
+          if ($LASTEXITCODE -ne 0) { throw 'could not raise the CAPI2 log size' }
           wevtutil sl $log /e:true
           wevtutil cl $log
 
@@ -119,6 +124,8 @@ jobs:
           Write-Output "online: $($online.Count) event 53 from the test process"
           if ($online.Count -eq 0) { throw 'the positive twin fetched nothing the log recorded, so the offline result above is not evidence' }
           wevtutil sl $log /e:false
+          wevtutil cl $log
+          wevtutil sl $log /ms:$originalMaxSize
       # ADR 0035, amendment of 2026-09-14. What the product's offline settings answer for a genuine
       # signature whose chain this machine's certificate stores do not complete — a PC that never held
       # the root, or the intermediate — and for a copy signed with a self-signed certificate, the case an
@@ -220,31 +227,63 @@ jobs:
           }
 
           $log = 'Microsoft-Windows-CAPI2/Operational'
+          # The test writes its own process id to a file. CAPI2 stamps every event with the id of the
+          # process that raised it, so the events are found by that id — a query the log answers
+          # directly, without reading every event's XML. The binary's name, which the step matched before,
+          # is still matched, so an event 53 attributed either way fails the step; on run 34813384625 the
+          # two agreed in every case.
+          function TestEvents([int] $testPid) {
+            @(Get-WinEvent -LogName $log -FilterXPath "*[System[Execution[@ProcessID=$testPid]]]" -ErrorAction SilentlyContinue)
+          }
+          function LogState {
+            $info = Get-WinEvent -ListLog $log
+            "file {0} of {1} bytes, {2} records, full {3}" -f $info.FileSize, $info.MaximumSizeInBytes, $info.RecordCount, $info.IsLogFull
+          }
           function RunCase([string] $file, [string] $case) {
             $env:RONGROI_CHAIN_FILE = $file
             $env:RONGROI_CHAIN_CASE = $case
+            $pidFile = Join-Path $work 'test.pid'
+            Remove-Item $pidFile -ErrorAction SilentlyContinue
+            $env:RONGROI_CHAIN_PID_FILE = $pidFile
             wevtutil cl $log
             cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_chain_offline_/)'
             $exit = $LASTEXITCODE
-            # The log is written asynchronously: read until two readings a second apart agree, for up to
-            # 20 seconds, so a slow write is not mistaken for no events.
-            $events = @(); $all = @()
-            for ($try = 0; $try -lt 20; $try++) {
-              Start-Sleep -Seconds 1
-              $now = @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue)
-              if ($now.Count -gt 0 -and $now.Count -eq $all.Count) { break }
-              $all = $now
+            if (-not (Test-Path $pidFile)) { throw "${case}: the test did not record its process id (exit $exit)" }
+            $testPid = [int] (Get-Content $pidFile -Raw).Trim()
+            # The log is written asynchronously. Wait until the test process's events stop arriving:
+            # the same non-zero count on readings two seconds apart, for at most 60 seconds. What other
+            # processes write meanwhile does not hold the wait open, as waiting for the whole log to go
+            # quiet did.
+            $events = @(); $clock = [Diagnostics.Stopwatch]::StartNew()
+            while ($clock.Elapsed.TotalSeconds -lt 60) {
+              Start-Sleep -Seconds 2
+              $now = TestEvents $testPid
+              if ($now.Count -gt 0 -and $now.Count -eq $events.Count) { break }
+              $events = $now
             }
-            $events = @($all | Where-Object { $_.ToXml() -match 'rongroi_host_windows' })
-            Write-Output ("  ${case}: {0} CAPI2 events in the log from any process" -f $all.Count)
-            Write-Output ("  ${case}: {0} CAPI2 events from the test process, ids: {1}" -f $events.Count, (($events | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))
+            $all = @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue)
+            $named = @($all | Where-Object { $_.ProcessId -ne $testPid -and $_.ToXml() -match 'rongroi_host_windows' })
+            Write-Output ("  ${case}: test process {0}: {1} CAPI2 events after {2:n1} s, ids: {3} · named but another process id: {4} · whole log: {5}" -f
+              $testPid, $events.Count, $clock.Elapsed.TotalSeconds, (($events | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '),
+              $named.Count, (LogState))
+            $others = @($all | Where-Object ProcessId -ne $testPid | Group-Object ProcessId | Sort-Object Count -Descending | Select-Object -First 3)
+            if ($others) {
+              Write-Output ("  ${case}: busiest other processes: {0}" -f (($others | ForEach-Object {
+                $name = (Get-Process -Id ([int] $_.Name) -ErrorAction SilentlyContinue).ProcessName
+                "pid $($_.Name) ($(if ($name) { $name } else { 'exited' })) x$($_.Count)"
+              }) -join ', '))
+            }
             $events | Where-Object { $_.Id -in 11, 30, 81 } | ForEach-Object {
               $found = [regex]::Matches($_.ToXml(), '<(ErrorStatus|Result)\b[^>]*>') | ForEach-Object Value
               if ($found) { Write-Output "    event $($_.Id): $($found -join ' ')" }
             }
-            $fetched = @($events | Where-Object Id -eq 53)
+            $fetched = @(@($events) + @($named) | Where-Object Id -eq 53)
             if ($fetched.Count -gt 0) { throw "${case}: the offline check retrieved objects from the network ($($fetched.Count) event 53)" }
-            if ($events.Count -eq 0) { throw "${case}: CAPI2 recorded nothing from the test process, so its silence proves nothing" }
+            if ($events.Count -eq 0) {
+              $info = Get-WinEvent -ListLog $log
+              if ($info.FileSize -ge $info.MaximumSizeInBytes) { throw "${case}: the CAPI2 log reached its maximum and overwrites its oldest events, so the test process's may have been lost" }
+              throw "${case}: CAPI2 recorded nothing from the test process within 60 s, so its silence proves nothing"
+            }
             if ($exit -ne 0) { throw "${case}: the test failed" }
           }
           $exported = [Collections.Generic.List[object]]::new()
@@ -291,6 +330,16 @@ jobs:
           $candidates = @("$PSHOME\pwsh.exe", "$env:ProgramFiles\Git\cmd\git.exe") |
             Where-Object { (Test-Path $_) -and (Get-AuthenticodeSignature $_).Status -eq 'Valid' -and (SecurityDirectory $_).Size -gt 0 }
           if (-not $candidates) { throw 'no file with a valid embedded signature was found on this runner' }
+          # The log's maximum on the runner is 1,052,672 bytes, and it overwrites its oldest events when
+          # full. Measured on run 34814580314: the test's 11 events were in the log, a burst of
+          # Get-AuthenticodeSignature calls from another process then filled it (474 records, file at the
+          # maximum, IsLogFull still False), and none of the 11 were left; with a 100 MB maximum the same
+          # burst left 12,869 records and all 11. That is what attempt 1 of run 34811492106 looks like, so
+          # the maximum is raised for this step and put back afterwards.
+          $originalMaxSize = (Get-WinEvent -ListLog $log).MaximumSizeInBytes
+          Write-Output "CAPI2 log maximum size before this step: $originalMaxSize bytes"
+          wevtutil sl $log /ms:104857600
+          if ($LASTEXITCODE -ne 0) { throw 'could not raise the CAPI2 log size' }
           wevtutil sl $log /e:true
           try {
             foreach ($file in $candidates) {
@@ -338,6 +387,8 @@ jobs:
           } finally {
             RestoreAll
             wevtutil sl $log /e:false
+            wevtutil cl $log
+            wevtutil sl $log /ms:$originalMaxSize
           }
       # ADR 0038, "Accepted by the owner": whether security software flags a process that enables
       # SeSystemEnvironmentPrivilege was left unmeasured. This records Microsoft Defender's state before the
