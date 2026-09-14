@@ -73,7 +73,7 @@ script block logging can write passwords used by a script into the event log, wh
 organisation turns it off), security and privacy baselines, debloat guides and optimiser tools, policies
 left from earlier management, and administrators reducing log size. None of them is "no normal reason".
 
-**Not read:** the per-user policy under `HKCU` — `LiveHost` refuses every hive but `HKLM` (ADR 0022), and
+**Not read** *(until the amendment of 2026-09-14, which reads both)*: the per-user policy under `HKCU` — `LiveHost` refuses every hive but `HKLM` (ADR 0022), and
 the user an elevated scan runs as need not be the player — and PowerShell 7's own policy under
 `…\Policies\Microsoft\PowerShellCore`, including its fallback to the Windows PowerShell key. Both are named
 in the rule's description so a reader knows the edges.
@@ -292,13 +292,13 @@ the person running the scan asks for it is the fallback to weigh.
   policy; `PRIVACY.md`, `docs/architecture.md` and the screenshare guide say what is read.
 - The Windows CI job runs the privilege test and compares the firmware reading with `Get-SecureBootUEFI`.
 
-## Amendment of 2026-09-14 — what Windows PowerShell 5.1 does with the policy
+## Amendment of 2026-09-14 — what each PowerShell does with the policy, and the scopes read
 
-The first "not established" item above — how Windows PowerShell 5.1 treats the policy value — is answered
-here by a measurement on the GitHub `windows-latest` runner rather than by PowerShell 7's source. A runner is
-an imaged virtual machine (Windows build 26100, `powershell.exe` 10.0.26100.33158, PowerShell 7.6.5), not a
-player's PC, and **one runner is one machine**. Nothing below was measured on a player's PC or on the
-owner's.
+Two questions this ADR left open are answered here, each by a measurement on the GitHub `windows-latest`
+runner rather than by one engine's source: how Windows PowerShell 5.1 treats the policy value, and which of
+the policy's other scopes a rule needs and what reading them means. A runner is an imaged virtual machine (Windows build
+26100, `powershell.exe` 10.0.26100.33158, PowerShell 7.6.5), not a player's PC, and **one runner is one
+machine**. Nothing below was measured on a player's PC or on the owner's.
 
 ### How it was measured
 
@@ -311,7 +311,7 @@ writes one case at a time to the policy keys, clears `Microsoft-Windows-PowerShe
   records on its own when no policy says otherwise.
 
 Each line carries a nonce, and the step counts event 4104 carrying it, with its level. It then runs the CLI
-and prints every `script_block_logging*` field and the policy rules' states, so the collector's reading sits
+and prints every `script_block_logging*` field and the four rules' states, so the collector's reading sits
 beside what the engines did in the same case. Every key is exported first and put back afterwards, and the
 step fails if a key that was absent is present at the end. Both engines' logs recorded the inert line when
 their machine policy was 1, so their zeros are measurements and not a log that records nothing.
@@ -330,51 +330,50 @@ cases they share; the first run's CLI columns are the collector before this chan
 ### What was measured
 
 "Inert" and "listed" are the two lines; a count is events 4104 carrying the nonce, `L5` verbose and `L3`
-warning. "5.1" is Windows PowerShell's result and "7" PowerShell 7's; the last column is what the CLI reported in
-the same case. PowerShell 7's column and the per-user and PowerShell 7 rows are measured in the same step and
-are there for the record; this change reads only Windows PowerShell's machine value.
+warning. "5.1" is Windows PowerShell's result and "7" PowerShell 7's; the four columns on the right are what
+the CLI reported in the same case.
 
-| Case (keys written) | 5.1 inert / listed | 7 inert / listed | `script_block_logging` |
-|---|---|---|---|
-| no policy | 0 / 1 L3 | 0 / 1 L3 | `not_configured` |
-| machine `REG_DWORD` 1 | 1 L5 / 1 L3 | 0 / 1 | `enabled` |
-| machine `REG_DWORD` 0 | **0 / 0** | 0 / 1 | `disabled` |
-| machine `REG_DWORD` 2 | 0 / 1 | 0 / 1 | `not_configured` |
-| machine `REG_SZ` "1" | 1 / 1 | 0 / 1 | `enabled` |
-| machine `REG_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` |
-| machine `REG_SZ` "01" | 0 / 1 | 0 / 1 | `not_configured` |
-| machine `REG_EXPAND_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` |
-| machine `REG_MULTI_SZ` "0" | 0 / 1 | 0 / 1 | `not_configured` |
-| machine `REG_QWORD` 1 | 1 / 1 | 0 / 1 | `enabled` |
-| machine `REG_QWORD` 0 | **0 / 0** | 0 / 1 | `disabled` |
-| machine key with no value | 0 / 1 | 0 / 1 | `not_configured` |
-| user `REG_DWORD` 1 | 1 / 1 | 0 / 1 | `not_configured` |
-| user `REG_DWORD` 0 | **0 / 0** | 0 / 1 | `not_configured` |
-| user `REG_SZ` "0" | **0 / 0** | 0 / 1 | `not_configured` |
-| machine 1, user 0 | 1 / 1 | 0 / 1 | `enabled` |
-| machine 0, user 1 | **0 / 0** | 0 / 1 | `disabled` |
-| machine key with no value, user 0 | 0 / 1 | 0 / 1 | `not_configured` |
-| machine 2, user 0 | 0 / 1 | 0 / 1 | `not_configured` |
-| PowerShell 7 machine `REG_DWORD` 1 | 0 / 1 | 1 L5 / 1 L3 | `not_configured` |
-| PowerShell 7 machine `REG_DWORD` 0 | 0 / 1 | **0 / 0** | `not_configured` |
-| PowerShell 7 machine `REG_SZ` "0" | 0 / 1 | 0 / 1 | `not_configured` |
-| PowerShell 7 machine `REG_QWORD` 0 | 0 / 1 | 0 / 1 | `not_configured` |
-| PowerShell 7 machine `UseWindowsPowerShellPolicySetting` 1, machine 0 | **0 / 0** | **0 / 0** | `disabled` |
-| PowerShell 7 machine fallback 1, machine 1 | 1 / 1 | 1 / 1 | `enabled` |
-| PowerShell 7 machine fallback 1, no Windows PowerShell key | 0 / 1 | 0 / 1 | `not_configured` |
-| PowerShell 7 machine fallback 1 and its own 0, machine 1 | 1 / 1 | 1 / 1 | `enabled` |
-| PowerShell 7 machine fallback 1, machine `REG_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` |
-| PowerShell 7 machine fallback `REG_SZ` "1", machine 0 | **0 / 0** | 0 / 0 — **`pwsh` exited `0xE0434352`** | `disabled` |
-| PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
-| PowerShell 7 machine 1, PowerShell 7 user 0 | 0 / 1 | 1 / 1 | `not_configured` |
-| PowerShell 7 machine `REG_SZ` "0", PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
-| PowerShell 7 machine 2, PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
-| PowerShell 7 machine `EnableScriptBlockInvocationLogging` 1 only, PowerShell 7 user 0 | 0 / 1 | 0 / 1 | `not_configured` |
-| PowerShell 7 machine fallback 1 (no Windows PowerShell machine key), PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
-| PowerShell 7 user fallback 1, user 0 | **0 / 0** | **0 / 0** | `not_configured` |
+| Case (keys written) | 5.1 inert / listed | 7 inert / listed | `script_block_logging` | `…_user` | `…_pwsh` | `…_pwsh_user` |
+|---|---|---|---|---|---|---|
+| no policy | 0 / 1 L3 | 0 / 1 L3 | `not_configured` | `not_configured` | `not_configured` | `not_configured` |
+| machine `REG_DWORD` 1 | 1 L5 / 1 L3 | 0 / 1 | `enabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_DWORD` 0 | **0 / 0** | 0 / 1 | `disabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_DWORD` 2 | 0 / 1 | 0 / 1 | `not_configured` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_SZ` "1" | 1 / 1 | 0 / 1 | `enabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_SZ` "01" | 0 / 1 | 0 / 1 | `not_configured` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_EXPAND_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_MULTI_SZ` "0" | 0 / 1 | 0 / 1 | `not_configured` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_QWORD` 1 | 1 / 1 | 0 / 1 | `enabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine `REG_QWORD` 0 | **0 / 0** | 0 / 1 | `disabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine key with no value | 0 / 1 | 0 / 1 | `not_configured` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| user `REG_DWORD` 1 | 1 / 1 | 0 / 1 | `not_configured` | `enabled` | `not_configured` | `not_configured` |
+| user `REG_DWORD` 0 | **0 / 0** | 0 / 1 | `not_configured` | `disabled` | `not_configured` | `not_configured` |
+| user `REG_SZ` "0" | **0 / 0** | 0 / 1 | `not_configured` | `disabled` | `not_configured` | `not_configured` |
+| machine 1, user 0 | 1 / 1 | 0 / 1 | `enabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine 0, user 1 | **0 / 0** | 0 / 1 | `disabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine key with no value, user 0 | 0 / 1 | 0 / 1 | `not_configured` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| machine 2, user 0 | 0 / 1 | 0 / 1 | `not_configured` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| PowerShell 7 machine `REG_DWORD` 1 | 0 / 1 | 1 L5 / 1 L3 | `not_configured` | `not_configured` | `enabled` | `machine_takes_precedence` |
+| PowerShell 7 machine `REG_DWORD` 0 | 0 / 1 | **0 / 0** | `not_configured` | `not_configured` | `disabled` | `machine_takes_precedence` |
+| PowerShell 7 machine `REG_SZ` "0" | 0 / 1 | 0 / 1 | `not_configured` | `not_configured` | `not_configured` | `not_configured` |
+| PowerShell 7 machine `REG_QWORD` 0 | 0 / 1 | 0 / 1 | `not_configured` | `not_configured` | `not_configured` | `not_configured` |
+| PowerShell 7 machine `UseWindowsPowerShellPolicySetting` 1, machine 0 | **0 / 0** | **0 / 0** | `disabled` | `machine_takes_precedence` | `disabled` | `machine_takes_precedence` |
+| PowerShell 7 machine fallback 1, machine 1 | 1 / 1 | 1 / 1 | `enabled` | `machine_takes_precedence` | `enabled` | `machine_takes_precedence` |
+| PowerShell 7 machine fallback 1, no Windows PowerShell key | 0 / 1 | 0 / 1 | `not_configured` | `not_configured` | `not_configured` | `not_configured` |
+| PowerShell 7 machine fallback 1 and its own 0, machine 1 | 1 / 1 | 1 / 1 | `enabled` | `machine_takes_precedence` | `enabled` | `machine_takes_precedence` |
+| PowerShell 7 machine fallback 1, machine `REG_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` | `machine_takes_precedence` | `not_configured` | `not_configured` |
+| PowerShell 7 machine fallback `REG_SZ` "1", machine 0 | **0 / 0** | 0 / 0 — **`pwsh` exited `0xE0434352`** | `disabled` | `machine_takes_precedence` | gap `read_failed` | gap `read_failed` |
+| PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` | `not_configured` | `not_configured` | `disabled` |
+| PowerShell 7 machine 1, PowerShell 7 user 0 | 0 / 1 | 1 / 1 | `not_configured` | `not_configured` | `enabled` | `machine_takes_precedence` |
+| PowerShell 7 machine `REG_SZ` "0", PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` | `not_configured` | `not_configured` | `disabled` |
+| PowerShell 7 machine 2, PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` | `not_configured` | `not_configured` | `disabled` |
+| PowerShell 7 machine `EnableScriptBlockInvocationLogging` 1 only, PowerShell 7 user 0 | 0 / 1 | 0 / 1 | `not_configured` | `not_configured` | `not_configured` | `machine_takes_precedence` |
+| PowerShell 7 machine fallback 1 (no Windows PowerShell machine key), PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` | `not_configured` | `not_configured` | `disabled` |
+| PowerShell 7 user fallback 1, user 0 | **0 / 0** | **0 / 0** | `not_configured` | `disabled` | `not_configured` | `disabled` |
 
-The machine rows' last column is the collector's unit test
-`script_block_logging_follows_what_windows_powershell_was_measured_to_do`.
+Every row's four fields are the collector's unit test `script_block_logging_follows_what_each_powershell_was_measured_to_do`,
+except the malformed-fallback row, which is `a_pwsh_fallback_switch_that_is_not_a_dword_is_a_gap`.
 
 ### What the measurement settles
 
@@ -405,37 +404,79 @@ The machine rows' last column is the collector's unit test
   PowerShell 7 then goes on to the next hive.
 - **A `REG_SZ` `UseWindowsPowerShellPolicySetting` stops PowerShell 7 from starting.** Both `pwsh`
   processes exited with `0xE0434352`, the code of an unhandled .NET exception, and ran nothing. The source
-  casts the value with `(int)`.
+  casts the value with `(int)`. The collector reports both PowerShell 7 fields as `read_failed` there: there
+  is no policy state to name for an engine that does not run. This is the one row where the answer is a
+  gap by design.
 
 ### The mapping, and a registry read that keeps the type
 
 `script_block_logging` keeps its meaning — Windows PowerShell's machine policy — and now follows the 5.1
 rows: 1 or 0 as text is `enabled` or `disabled`, and any other value, type, or no value is
-`not_configured`.
+`not_configured`. `script_block_logging_user`, `script_block_logging_pwsh` and
+`script_block_logging_pwsh_user` are new, each as its engine applies it. A per-user field is
+`machine_takes_precedence` when its engine takes the policy from `HKLM` and never reads the account's key —
+a statement about precedence, not about what the account's key holds, which is then not read.
 
 `RegistrySource::read_u32` cannot carry this: a live host's `windows-registry` reader accepts a `REG_QWORD`
 there as well (`Key::get_u32` calls `get_u64`, which "Accepts `REG_DWORD` … and `REG_QWORD`", 0.100.0), and a
 string is an error. `RegistrySource` gains `read_value`, which hands back `RegistryData::{Dword, Qword, Text,
 OtherType}` — `REG_SZ` and `REG_EXPAND_SZ` are `Text`, unexpanded, and any other type's data is not read — with
 a string bounded by the same 64 KiB as a binary value (ADR 0022). A fixture writes a `REG_QWORD` as
-`{ qword: 0 }`.
+`{ qword: 0 }`. Whether a key exists is read with `value_names`, whose names are discarded.
 
 `REG_EXPAND_SZ` is read unexpanded, and 5.1 is .NET, which expands it on read; a value whose `%variable%`
 expands to 0 or 1 would be `not_configured` here and honoured by 5.1. That case was not measured.
+
+### Which scopes, and what `HKCU` means
+
+The rule is about a policy turning logging **off**. From the rows above, four places can do that, for two
+engines: Windows PowerShell's key in `HKLM`, the same key in `HKCU` when `HKLM` has none, PowerShell 7's key
+in `HKLM` (or Windows PowerShell's through its fallback), and PowerShell 7's in `HKCU` when `HKLM` decides
+nothing. PowerShell 7 also reads its `powershell.config.json` after both hives; that is a file in its install
+folder and in the user's documents, not a policy, and is not read. Each place gets a field and a rule —
+`script-block-logging-disabled-by-user-policy`, `pwsh-script-block-logging-disabled-by-policy` and
+`pwsh-script-block-logging-disabled-by-user-policy`, all `posture` and `experimental` — because a rule has
+no `or` between fields and a reader should see which engine and which hive.
+
+**`HKCU` is the account this program runs as.** A scan without elevation, or one elevated by the same
+account through the consent prompt, reads the player's own per-user policy. A scan restarted with a
+**different** administrator's password (ADR 0012) reads that administrator's, and the player's is not read —
+and the report cannot tell those apart. Both per-user rules say so in `description` and `falsepositives`,
+and the consent question and `PRIVACY.md` name the account.
+
+On the runner, `HKCU\Software\Policies` granted the account itself `ReadKey` only and `Administrators` and
+`SYSTEM` `FullControl`, so on that machine an account without administrator rights could not write its own
+per-user policy. Whether that ACL is the same on a player's Windows 11 was not measured.
+
+| Alternative | Why not |
+|---|---|
+| Read `HKLM` only, as before | Leaves the per-user policy, which the CSP documents as a Group Policy of its own and which 5.1 was measured to apply, as a `not_found` a reader takes for "looked, not there" |
+| Read the interactive user's hive through `HKEY_USERS\<SID>` | Needs the SID of the person at the keyboard, which the elevated process does not have without asking Windows for the session's user — a new read of an identity this program deliberately never reports (ADR 0023) |
+| Skip `HKCU` when elevated | The recommended scan is elevated, so the per-user rules would almost never answer; and a same-account elevation, the common case, reads the right hive |
+| One field per engine with the precedence resolved and no per-hive detail | Hides which hive said off, and the two per-user cases carry a false positive the machine cases do not |
+| Per-hive raw values, with the precedence in the rules | `match` has no negation, and 5.1's "the machine key exists" is not a value any field could hold without becoming this design |
+
+`LiveHost` now opens `HKCU` as well as `HKLM`, for reading, and refuses every other root (ADR 0022 is
+amended to say so).
 
 ### Still not established
 
 - How a player's Windows 11, rather than a runner, answers any row above; the rows are one build of each
   engine.
 - `REG_EXPAND_SZ` whose `%variable%` expands to 0 or 1.
-- Whether Windows PowerShell on other Windows builds treats the value the same way.
-- The per-user policy and PowerShell 7's are still not read by this program.
+- Whether other PowerShell 7 releases, or Windows PowerShell on other Windows builds, treat the value the
+  same way.
+- Whether `HKCU\Software\Policies` refuses writes by a standard account on a player's PC.
 
 ### Consequences of the amendment
 
 - `rongroi-host`: `RegistryData`, `RegistrySource::read_value`, `bound_registry_data`; the fixture host
-  reads `{ qword: }`. No dependency or `windows` feature is added.
-- `script_block_logging` is `enabled` or `disabled` for a `REG_SZ` 1 or 0 where it was a `read_failed` gap,
-  and `not_configured` for any other value where that was `read_failed`. No snapshot moves: no fixture holds
-  such a value. The rule's description says what was measured.
-- The Windows CI job gains the PowerShell step.
+  reads `{ qword: }`. `rongroi-host-windows`: `HKCU` is opened. No dependency or `windows` feature is
+  added.
+- `posture` emits ten fields; three rules are added; the existing rule's title and description now name
+  Windows PowerShell and say what was measured. Every report snapshot gains the three rules and, where a
+  `posture` observation exists, the three fields, each `not_configured`. All three baselines hold none of
+  the four keys, measured on the runner and consistent with the machine measured above (`PROVENANCE.md`);
+  each new rule is confronted there.
+- The consent question in the CLI and the app, `PRIVACY.md`, `docs/architecture.md`, both screenshare guides
+  and `CHANGELOG.md` say what is read. The Windows CI job keeps the PowerShell step.

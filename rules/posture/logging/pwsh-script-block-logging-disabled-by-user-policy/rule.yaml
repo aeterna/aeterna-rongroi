@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7
+title: A per-user policy turns PowerShell 7 script block logging off
+description: >-
+  A per-user policy for PowerShell 7 — pwsh.exe, which is installed separately from Windows — sets script
+  block logging to off, either in PowerShell 7's own policy or in Windows PowerShell's when PowerShell 7's
+  policy says to use that one, and no machine policy takes precedence over it. Windows ships with no such
+  policy. With it off, PowerShell 7 run by that account writes none of the script blocks it runs to its
+  event log, not even the ones it otherwise records by itself because their content looks suspicious.
+  That was measured on one test machine, not on this PC. The policy read is the one of the Windows
+  account this scan ran as: if the scan was restarted with a different administrator's password, it is
+  that administrator's policy. Whether PowerShell 7 is installed here is not read. It says nothing about
+  which scripts ran or who set the policy. On its own this describes an account's settings — it is not
+  evidence of cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  script_block_logging_pwsh_user: disabled
+retention: Current setting only. It says nothing about how the account was configured in the past.
+unmeasured_when: [not_windows]
+falsepositives:
+  - PCs managed by an employer, school or other organisation whose user policy turns script block logging off, for example to keep script contents that may hold passwords out of the event log
+  - A scan restarted with a different administrator's password, which reads that administrator's policy rather than the player's
+  - A PowerShell 7 policy that says to use the Windows PowerShell setting, for an account whose Windows PowerShell per-user policy is off; the one setting can then be shown under the Windows PowerShell per-user rule as well
+  - Security or privacy baselines, debloating guides and "PC optimiser" tools that set logging policies, or a policy left from earlier management or on a PC without PowerShell 7
+references:
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-7.5
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows?view=powershell-7.5
+author: aeterna-rongroi contributors
+date: 2026-09-14
+tags: [posture, logging]

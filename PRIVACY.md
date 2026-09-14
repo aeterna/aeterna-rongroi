@@ -66,7 +66,11 @@ the tool switches that permission on inside its own process for that one read an
 changes nothing on the PC and writes nothing to the firmware. Without administrator rights the tool does
 not get the permission and says the check could not be answered. The other is whether a Windows
 **policy** turns PowerShell's script logging on or off, or whether no such policy was set: the setting
-only, never what any script contained.
+only, never what any script contained. It is read for Windows PowerShell and for PowerShell 7, both for
+the whole PC and for the **Windows account the tool is running as** — the per-user half of the same
+policy, from that account's own part of the registry. That is your account unless the tool was restarted
+with someone else's administrator password, in which case it is theirs. Whether PowerShell 7 is installed
+is not read.
 
 It also reads one Windows setting about itself: whether Windows is writing a record when a program is
 launched (`EnablePrefetcher`). That is a machine setting and names no person. It is read so that "there

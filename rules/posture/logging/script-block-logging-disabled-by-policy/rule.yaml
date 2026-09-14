@@ -9,8 +9,8 @@ description: >-
   this rule reports. With the policy off, Windows PowerShell writes none of the script blocks it runs to
   the Windows event log, not even the ones it otherwise records by itself because their content looks
   suspicious, so a reviewer reading that log has less to read. That was measured on one test machine,
-  not on this PC. It says nothing about which scripts ran or who set the policy, and
-  PowerShell 7's own policy and a per-user policy are not read. On its own this describes the machine — it is not
+  not on this PC. It says nothing about which scripts ran or who set the policy. A per-user policy and
+  PowerShell 7's policy have rules of their own. On its own this describes the machine — it is not
   evidence of cheating.
 status: experimental
 collector: posture

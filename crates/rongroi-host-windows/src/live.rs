@@ -15,13 +15,21 @@ const CURRENT_VERSION_KEY: &str = r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVe
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LiveHost;
 
-/// The path inside `HKLM` a key is written under. Every other root is refused.
+/// The root a key is written under and the path inside it.
+///
+/// `HKLM` is the machine. `HKCU` is the account this process runs as, which after a restart with
+/// another administrator's credentials is that administrator and not the person at the keyboard; it is
+/// opened for one policy family that has a per-user half (ADR 0038). Every other root is refused.
 fn open_root(key: &str) -> Result<(&'static windows_registry::Key, &str), SourceError> {
-    key.strip_prefix(r"HKLM\")
-        .map(|path| (windows_registry::LOCAL_MACHINE, path))
-        .ok_or_else(|| {
-            SourceError::Unsupported(format!("only HKLM keys are supported, got `{key}`"))
-        })
+    if let Some(path) = key.strip_prefix(r"HKLM\") {
+        Ok((windows_registry::LOCAL_MACHINE, path))
+    } else if let Some(path) = key.strip_prefix(r"HKCU\") {
+        Ok((windows_registry::CURRENT_USER, path))
+    } else {
+        Err(SourceError::Unsupported(format!(
+            "only HKLM and HKCU keys are supported, got `{key}`"
+        )))
+    }
 }
 
 /// Opens `key` for reading, or `Ok(None)` when it is not there.

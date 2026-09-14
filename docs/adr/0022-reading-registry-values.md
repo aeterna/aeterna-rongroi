@@ -192,3 +192,10 @@ records the same gap.
   last-write time, its security descriptor, its class, the number of values as a datum of its own, or
   any hive other than `HKLM` — `LiveHost` still refuses every other root. Everything is opened for
   reading; nothing on the scanned machine is written (AGENTS.md hard rule 2).
+
+> **Amended by ADR 0038, 2026-09-14.** `LiveHost` now also opens `HKCU` — the account the program runs as —
+> for the per-user half of the script block logging policy, and `RegistrySource` gains `read_value`, which
+> hands back a value's type with its data, because Windows PowerShell 5.1 and PowerShell 7 were measured to
+> read the same value differently by type. Every other root is still refused, and every key is still opened
+> for reading only. The reasons, and what `HKCU` means after a restart with another administrator's
+> password, are in ADR 0038's amendment.

@@ -25,6 +25,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
   DMA Protection was considered and is **not** read: Microsoft documents no programmatic interface for
   its state, and the ADR declines to ship a guessed structure. The Windows CI job checks that the firmware
   read leaves the privilege as it found it and agrees with `Get-SecureBootUEFI`.
+- **Script block logging policy, per engine and per hive** (ADR 0038, amended 2026-09-14). `posture` now
+  also reports `script_block_logging_user` (Windows PowerShell's per-user policy), `script_block_logging_pwsh`
+  and `script_block_logging_pwsh_user` (PowerShell 7's, following its `UseWindowsPowerShellPolicySetting`),
+  and three `experimental` rules match each set to off. A per-user field is `machine_takes_precedence` when
+  that PowerShell takes its policy from the machine hive and never reads the user's. The per-user reads are of
+  the Windows account the scan runs as — after a restart with another administrator's password, that
+  administrator's — so a live host now opens `HKCU` besides `HKLM`, and nothing else; the consent question,
+  `PRIVACY.md` and the screenshare guide say so. Every mapping follows what Windows PowerShell 5.1 and
+  PowerShell 7.6 were measured to do on the Windows CI runner, where a new step writes each case, runs both
+  engines and counts event 4104, and the CLI's reading is printed beside it.
 - The report header says when Windows last started counting, so the times on other rows can be read
   against it (ADR 0039): `boot_time`, the scan's clock minus `GetTickCount64`, or `unmeasured` with a
   reason — never a guessed time. It is context, not evidence, and no rule can read it. It is shown in both

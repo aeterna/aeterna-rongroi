@@ -1,0 +1,6 @@
+{
+  "description": "A machine policy for PowerShell 7 decides, so the per-user one is never read",
+  "observations": [
+    { "collector": "posture", "fields": { "script_block_logging_pwsh": "enabled", "script_block_logging_pwsh_user": "machine_takes_precedence" } }
+  ]
+}

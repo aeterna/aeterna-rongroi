@@ -3,15 +3,15 @@
 For server staff checking a player's PC over a screenshare, and for the player. It covers
 aeterna-rongroi **0.2.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
-> ⚠️ **Pre-alpha.** Six rules ship in 0.2.0, and five of them are `experimental`; on `dev` there are eighteen,
-> seventeen of them `experimental`. Do not ban anyone
+> ⚠️ **Pre-alpha.** Six rules ship in 0.2.0, and five of them are `experimental`; on `dev` there are twenty-one,
+> twenty of them `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
 
 ## 1. What it can and cannot show
 
 | It can show | It cannot show |
 |---|---|
-| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. After 0.2.0 also whether the firmware agrees with Windows about Secure Boot, and whether a machine policy turns PowerShell script block logging off | Cheats running on a **second PC** (DMA). They leave nothing on the checked PC |
+| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. After 0.2.0 also whether the firmware agrees with Windows about Secure Boot, and whether a machine or per-user policy turns script block logging off for Windows PowerShell or PowerShell 7 | Cheats running on a **second PC** (DMA). They leave nothing on the checked PC |
 | That the Security log or an event log file recorded being cleared | Overlays hidden from screen capture |
 | For each check, whether it was answered and, if not, why | Anything, if Windows on that PC was modified to lie to the programs that run on it |
 | | That a PC is clean. **No result means that** |
@@ -174,7 +174,10 @@ These are counts of what SS mode does not list. §7 says why.
 | FiveM.exe has no embedded signature that verifies here — *after 0.2.0* | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
 | FiveM.exe is validly signed, but not with the certificate this rule knows — *after 0.2.0* | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
 | The firmware reports Secure Boot off while Windows reports it on — *after 0.2.0* | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
-| A machine policy turns PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
+| A machine policy turns Windows PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
+| A per-user policy turns Windows PowerShell script block logging off — *after 0.2.0* | posture | `experimental` | the same, and a scan restarted with a different administrator's password, which reads that administrator's policy |
+| A machine policy turns PowerShell 7 script block logging off — *after 0.2.0* | posture | `experimental` | the same as the Windows PowerShell row, a PowerShell 7 policy set to use the Windows PowerShell one, and a policy left on a PC without PowerShell 7 |
+| A per-user policy turns PowerShell 7 script block logging off — *after 0.2.0* | posture | `experimental` | the same, and a scan restarted with a different administrator's password |
 | A Prefetch file is marked read-only — *after 0.2.0* | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
 | An event log file is marked read-only — *after 0.2.0* | tamper | `experimental` | the same two |
 | An event log file is not the file Windows writes its channel to — *after 0.2.0* | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
@@ -205,9 +208,10 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-The rows marked *after 0.2.0* are not in the 0.2.0 release. Neither of the two posture rows among them means "a policy nobody wrote" or
-"Secure Boot is off" on its own: the firmware row needs the two readings to disagree, the PowerShell row needs a policy
-written to off. The firmware rule does not detect DMA hardware (§1) and says nothing about a second PC.
+The rows marked *after 0.2.0* are not in the 0.2.0 release. None of the five posture rows among them means "a policy nobody wrote" or
+"Secure Boot is off" on its own: the firmware row needs the two readings to disagree, each PowerShell row needs a policy
+written to off. The two per-user rows read the Windows account the scan ran as, which is the player's only when the
+scan was not restarted with somebody else's administrator password. The firmware rule does not detect DMA hardware (§1) and says nothing about a second PC.
 
 The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
 what a record in it says. None of them says who changed it or when, and on the one Windows 11 machine

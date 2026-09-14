@@ -1,0 +1,6 @@
+{
+  "description": "Windows as it ships: no per-user script block logging policy",
+  "observations": [
+    { "collector": "posture", "fields": { "script_block_logging": "not_configured", "script_block_logging_user": "not_configured" } }
+  ]
+}

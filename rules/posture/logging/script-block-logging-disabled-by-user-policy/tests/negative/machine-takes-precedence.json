@@ -1,0 +1,6 @@
+{
+  "description": "A machine policy key is there, so Windows PowerShell never reads the per-user policy",
+  "observations": [
+    { "collector": "posture", "fields": { "script_block_logging": "not_configured", "script_block_logging_user": "machine_takes_precedence" } }
+  ]
+}

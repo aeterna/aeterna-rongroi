@@ -76,9 +76,10 @@ impl SourceError {
 /// One registry value as its type and data, for a caller whose answer depends on the type as well as on
 /// what the value holds (ADR 0038).
 ///
-/// Measured on one runner, Windows PowerShell 5.1 honours a `REG_SZ` `"0"` as it honours a `REG_DWORD` 0.
-/// [`RegistrySource::read_u32`] refuses a string, and a live host's reader accepts a `REG_QWORD` there too,
-/// so it cannot say which of these a value is.
+/// Windows PowerShell 5.1 and PowerShell 7 read the same policy value differently: measured on one
+/// runner, 5.1 honours a `REG_SZ` `"0"` and a `REG_QWORD` 0 as it honours a `REG_DWORD` 0, and PowerShell 7
+/// honours only the `REG_DWORD`. [`RegistrySource::read_u32`] cannot tell those apart, because a live
+/// host's reader accepts a `REG_QWORD` there too.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegistryData {
     /// `REG_DWORD`.
@@ -92,7 +93,8 @@ pub enum RegistryData {
     OtherType,
 }
 
-/// Read-only access to the registry. Keys are written as `HKLM\...`.
+/// Read-only access to the registry. Keys are written as `HKLM\...` or, for the account this program
+/// runs as, `HKCU\...` (ADR 0038). A live host refuses every other root.
 pub trait RegistrySource {
     /// Reads a `REG_DWORD`. `Ok(None)` when the key or value does not exist.
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError>;

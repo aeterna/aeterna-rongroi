@@ -88,6 +88,15 @@ its account's `HKCU`, and what Microsoft's own enabling snippet assumes: it crea
 says it is not there ([about_Logging](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1)).
 One machine is one machine: none of these values is a statement about how other firmware answers.
 
+No baseline writes PowerShell 7's `PowerShellCore\ScriptBlockLogging` key or either policy key under `HKCU`
+either, so `script_block_logging_user`, `script_block_logging_pwsh` and `script_block_logging_pwsh_user` are
+`not_configured` on all three (ADR 0038, amended 2026-09-14). What that rests on: the machine above held no
+PowerShell 7 key under `HKLM` (its `HKCU` PowerShell 7 key was not looked at); the GitHub `windows-latest` runner
+on 2026-09-14 (build 26100, Windows PowerShell 5.1 and PowerShell 7.6.5) held none of the four keys before the CI
+step wrote any; and Microsoft's PowerShell 7 enabling snippet also creates its key when `Test-Path` says it is not
+there ([about_Logging_Windows](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows?view=powershell-7.5)).
+A runner is an imaged virtual machine, not a player's PC.
+
 A host named `baseline-*` is read by `cargo xtask check-baseline` and means more than the others: it
 asserts that a machine like this is unremarkable, so the whole rule set must stay quiet on it (ADR 0017).
 Each one is a written profile; a setting in it is never changed to silence a rule.

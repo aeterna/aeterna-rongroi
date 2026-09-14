@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 2 |
-| Rules | 18 |
-| SHA-256 | `6f54522be06a00fa1e8c9fa96e96106a589b50c7cf8884a1fbadf7572422e3ea` |
+| Rules | 21 |
+| SHA-256 | `e0838b0ae433890050f500cec4f8a0a03b7f5cb26bf9af510f8f7eb8f9c9baa4` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -58,7 +58,10 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [Windows test signing is turned on](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
+  - [A machine policy turns PowerShell 7 script block logging off](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
+  - [A per-user policy turns PowerShell 7 script block logging off](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
   - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
+  - [A per-user policy turns Windows PowerShell script block logging off](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [Memory integrity (HVCI) is configured off](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
@@ -709,6 +712,86 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 ### `posture` / `logging`
 
+<a id="rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc"></a>
+
+#### A machine policy turns PowerShell 7 script block logging off
+
+- Id: `98ee9213-39f3-4219-b2ac-f2bb3d21d6cc`
+- File: [`rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `logging`
+- Written: 2026-09-14
+
+**About this check**
+
+A machine policy for PowerShell 7 — pwsh.exe, which is installed separately from Windows — sets script block logging to off, either in PowerShell 7's own policy or in Windows PowerShell's when PowerShell 7's policy says to use that one. Windows ships with no such policy. With it off, PowerShell 7 writes none of the script blocks it runs to its event log, not even the ones it otherwise records by itself because their content looks suspicious. That was measured on one test machine, not on this PC. Whether PowerShell 7 is installed here is not read, and neither is PowerShell 7's own configuration file. It says nothing about which scripts ran or who set the policy. On its own this describes the machine — it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `script_block_logging_pwsh`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- PCs managed by an employer, school or other organisation whose policy turns script block logging off, for example to keep script contents that may hold passwords out of the event log
+- A PowerShell 7 policy that says to use the Windows PowerShell setting, on a PC whose Windows PowerShell policy is off; the one setting is then shown under both rules
+- Security or privacy baselines, debloating guides and "PC optimiser" tools that set logging policies
+- A policy left on a PC where PowerShell 7 is not installed, or from earlier management
+
+**References**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-7.5>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows?view=powershell-7.5>
+
+<a id="rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7"></a>
+
+#### A per-user policy turns PowerShell 7 script block logging off
+
+- Id: `e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7`
+- File: [`rules/posture/logging/pwsh-script-block-logging-disabled-by-user-policy/rule.yaml`](../rules/posture/logging/pwsh-script-block-logging-disabled-by-user-policy/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `logging`
+- Written: 2026-09-14
+
+**About this check**
+
+A per-user policy for PowerShell 7 — pwsh.exe, which is installed separately from Windows — sets script block logging to off, either in PowerShell 7's own policy or in Windows PowerShell's when PowerShell 7's policy says to use that one, and no machine policy takes precedence over it. Windows ships with no such policy. With it off, PowerShell 7 run by that account writes none of the script blocks it runs to its event log, not even the ones it otherwise records by itself because their content looks suspicious. That was measured on one test machine, not on this PC. The policy read is the one of the Windows account this scan ran as: if the scan was restarted with a different administrator's password, it is that administrator's policy. Whether PowerShell 7 is installed here is not read. It says nothing about which scripts ran or who set the policy. On its own this describes an account's settings — it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `script_block_logging_pwsh_user`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the account was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- PCs managed by an employer, school or other organisation whose user policy turns script block logging off, for example to keep script contents that may hold passwords out of the event log
+- A scan restarted with a different administrator's password, which reads that administrator's policy rather than the player's
+- A PowerShell 7 policy that says to use the Windows PowerShell setting, for an account whose Windows PowerShell per-user policy is off; the one setting can then be shown under the Windows PowerShell per-user rule as well
+- Security or privacy baselines, debloating guides and "PC optimiser" tools that set logging policies, or a policy left from earlier management or on a PC without PowerShell 7
+
+**References**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-7.5>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows?view=powershell-7.5>
+
 <a id="rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d"></a>
 
 #### A machine policy turns Windows PowerShell script block logging off
@@ -723,7 +806,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 **About this check**
 
-A machine policy for Windows PowerShell — the powershell.exe that comes with Windows — sets script block logging to off. Windows ships with no such policy, and a PC where nobody set one is not what this rule reports. With the policy off, Windows PowerShell writes none of the script blocks it runs to the Windows event log, not even the ones it otherwise records by itself because their content looks suspicious, so a reviewer reading that log has less to read. That was measured on one test machine, not on this PC. It says nothing about which scripts ran or who set the policy, and PowerShell 7's own policy and a per-user policy are not read. On its own this describes the machine — it is not evidence of cheating.
+A machine policy for Windows PowerShell — the powershell.exe that comes with Windows — sets script block logging to off. Windows ships with no such policy, and a PC where nobody set one is not what this rule reports. With the policy off, Windows PowerShell writes none of the script blocks it runs to the Windows event log, not even the ones it otherwise records by itself because their content looks suspicious, so a reviewer reading that log has less to read. That was measured on one test machine, not on this PC. It says nothing about which scripts ran or who set the policy. A per-user policy and PowerShell 7's policy have rules of their own. On its own this describes the machine — it is not evidence of cheating.
 
 **Matches when all of these hold for one observation**
 
@@ -749,6 +832,46 @@ Current setting only. It says nothing about how the PC was configured in the pas
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1>
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
 - <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell>
+
+<a id="rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4"></a>
+
+#### A per-user policy turns Windows PowerShell script block logging off
+
+- Id: `869c34b6-7b32-4f56-a281-9f5ac00e43c4`
+- File: [`rules/posture/logging/script-block-logging-disabled-by-user-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-user-policy/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `logging`
+- Written: 2026-09-14
+
+**About this check**
+
+A per-user policy for Windows PowerShell sets script block logging to off, and no machine policy key takes precedence over it. Windows ships with no such policy. With it off, Windows PowerShell run by that account writes none of the script blocks it runs to the Windows event log, not even the ones it otherwise records by itself because their content looks suspicious. That was measured on one test machine, not on this PC. The policy read is the one of the Windows account this scan ran as: if the scan was restarted with a different administrator's password, it is that administrator's policy, and the player's own was not read. It says nothing about which scripts ran or who set the policy. On its own this describes an account's settings — it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `script_block_logging_user`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the account was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- PCs managed by an employer, school or other organisation whose user policy turns script block logging off, for example to keep script contents that may hold passwords out of the event log
+- A scan restarted with a different administrator's password, which reads that administrator's policy rather than the player's
+- Security or privacy baselines, debloating guides and "PC optimiser" tools that set per-user logging policies
+- A PC or account that was once managed by an organisation and still carries its policies
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
 
 ### `posture` / `memory-integrity`
 

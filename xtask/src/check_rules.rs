@@ -699,7 +699,7 @@ date: 2026-09-11
         );
         assert!(
             outcome.problems[0]
-                .contains("it emits hvci, script_block_logging, secure_boot, secure_boot_firmware, test_signing, tpm, tpm_spec_version"),
+                .contains("it emits hvci, script_block_logging, script_block_logging_pwsh, script_block_logging_pwsh_user, script_block_logging_user, secure_boot, secure_boot_firmware, test_signing, tpm, tpm_spec_version"),
             "{:?}",
             outcome.problems
         );

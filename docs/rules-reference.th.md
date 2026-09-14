@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 2 |
-| จำนวน rule | 18 |
-| SHA-256 | `6f54522be06a00fa1e8c9fa96e96106a589b50c7cf8884a1fbadf7572422e3ea` |
+| จำนวน rule | 21 |
+| SHA-256 | `e0838b0ae433890050f500cec4f8a0a03b7f5cb26bf9af510f8f7eb8f9c9baa4` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -54,7 +54,10 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [เปิดโหมด test signing ของ Windows อยู่](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
+  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
+  - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ PowerShell 7](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
   - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
+  - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ Windows PowerShell](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
@@ -719,6 +722,88 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 
 ### `posture` / `logging`
 
+<a id="rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc"></a>
+
+#### นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7
+
+- ชื่อภาษาอังกฤษ: A machine policy turns PowerShell 7 script block logging off
+- id: `98ee9213-39f3-4219-b2ac-f2bb3d21d6cc`
+- ไฟล์: [`rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `logging`
+- เขียนเมื่อ: 2026-09-14
+
+**เกี่ยวกับการตรวจนี้**
+
+นโยบายระดับเครื่องของ PowerShell 7 ซึ่งคือ pwsh.exe ที่ติดตั้งแยกจาก Windows ตั้งให้ปิดการบันทึก script block จะตั้งไว้ในนโยบายของ PowerShell 7 เอง หรือในนโยบายของ Windows PowerShell เมื่อนโยบายของ PowerShell 7 บอกให้ใช้ของนั้นก็ได้ Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก เมื่อตั้งเป็นปิด PowerShell 7 จะไม่เขียน script block ที่รันลง event log ของตัวเองเลย แม้แต่ส่วนที่ปกติจะบันทึกเองเพราะเนื้อหาดูน่าสงสัย สิ่งนี้วัดบนเครื่องทดสอบเครื่องเดียว ไม่ได้วัดบนเครื่องนี้ ข้อนี้ไม่ได้อ่านว่าเครื่องนี้ติดตั้ง PowerShell 7 ไว้หรือไม่ และไม่ได้อ่านไฟล์ตั้งค่าของ PowerShell 7 ข้อนี้ไม่ได้บอกว่าสคริปต์ไหนเคยรันหรือใครเป็นคนตั้งนโยบาย ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `script_block_logging_pwsh`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เครื่องที่บริษัท โรงเรียน หรือองค์กรอื่นดูแล และนโยบายขององค์กรปิดการบันทึกนี้ เช่น เพื่อไม่ให้เนื้อหาสคริปต์ ที่อาจมีรหัสผ่านไปอยู่ใน event log
+- นโยบายของ PowerShell 7 ที่บอกให้ใช้ค่าของ Windows PowerShell บนเครื่องที่นโยบายของ Windows PowerShell ปิดไว้ ค่าเดียวกันนั้นจึงแสดงในทั้งสองข้อ
+- ชุดค่าความปลอดภัยหรือความเป็นส่วนตัว คู่มือ debloat และโปรแกรม "เร่งความเร็วเครื่อง" ที่ตั้งนโยบายการบันทึก
+- นโยบายที่ค้างอยู่บนเครื่องที่ไม่ได้ติดตั้ง PowerShell 7 หรือค้างจากการดูแลขององค์กรในอดีต
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-7.5>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows?view=powershell-7.5>
+
+<a id="rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7"></a>
+
+#### นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ PowerShell 7
+
+- ชื่อภาษาอังกฤษ: A per-user policy turns PowerShell 7 script block logging off
+- id: `e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7`
+- ไฟล์: [`rules/posture/logging/pwsh-script-block-logging-disabled-by-user-policy/rule.yaml`](../rules/posture/logging/pwsh-script-block-logging-disabled-by-user-policy/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `logging`
+- เขียนเมื่อ: 2026-09-14
+
+**เกี่ยวกับการตรวจนี้**
+
+นโยบายระดับผู้ใช้ของ PowerShell 7 ซึ่งคือ pwsh.exe ที่ติดตั้งแยกจาก Windows ตั้งให้ปิดการบันทึก script block จะตั้งไว้ในนโยบายของ PowerShell 7 เอง หรือในนโยบายของ Windows PowerShell เมื่อนโยบายของ PowerShell 7 บอกให้ใช้ของนั้นก็ได้ และไม่มีนโยบายระดับเครื่องที่มาก่อน Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก เมื่อตั้งเป็นปิด PowerShell 7 ที่บัญชีนั้นรัน จะไม่เขียน script block ที่รันลง event log ของตัวเองเลย แม้แต่ส่วนที่ปกติจะบันทึกเองเพราะเนื้อหาดูน่าสงสัย สิ่งนี้วัดบนเครื่องทดสอบเครื่องเดียว ไม่ได้วัดบนเครื่องนี้ นโยบายที่อ่านคือของบัญชี Windows ที่ใช้รันการสแกนนี้ ถ้าการสแกนถูกเริ่มใหม่ด้วยรหัสผ่านของผู้ดูแลระบบคนอื่น จะเป็นนโยบายของผู้ดูแลคนนั้น ข้อนี้ไม่ได้อ่านว่าเครื่องนี้ติดตั้ง PowerShell 7 ไว้หรือไม่ และไม่ได้บอกว่าสคริปต์ไหนเคยรันหรือใครเป็นคนตั้งนโยบาย ข้อนี้อย่างเดียวจึงบอกการตั้งค่าของบัญชี ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `script_block_logging_pwsh_user`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตบัญชีนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เครื่องที่บริษัท โรงเรียน หรือองค์กรอื่นดูแล และนโยบายระดับผู้ใช้ขององค์กรปิดการบันทึกนี้ เช่น เพื่อไม่ให้เนื้อหาสคริปต์ที่อาจมีรหัสผ่านไปอยู่ใน event log
+- การสแกนที่เริ่มใหม่ด้วยรหัสผ่านของผู้ดูแลระบบคนอื่น ซึ่งอ่านนโยบายของผู้ดูแลคนนั้นแทนของผู้เล่น
+- นโยบายของ PowerShell 7 ที่บอกให้ใช้ค่าของ Windows PowerShell สำหรับบัญชีที่นโยบายระดับผู้ใช้ของ Windows PowerShell ปิดไว้ ค่าเดียวกันนั้นจึงอาจแสดงในข้อระดับผู้ใช้ของ Windows PowerShell ด้วย
+- ชุดค่าความปลอดภัยหรือความเป็นส่วนตัว คู่มือ debloat และโปรแกรม "เร่งความเร็วเครื่อง" ที่ตั้งนโยบายการบันทึก หรือนโยบายที่ค้างจากการดูแลในอดีต หรือค้างอยู่บนเครื่องที่ไม่ได้ติดตั้ง PowerShell 7
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-7.5>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows?view=powershell-7.5>
+
 <a id="rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d"></a>
 
 #### นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell
@@ -734,7 +819,7 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 
 **เกี่ยวกับการตรวจนี้**
 
-นโยบายระดับเครื่องของ Windows PowerShell ซึ่งคือ powershell.exe ที่มากับ Windows ตั้งให้ปิดการบันทึก script block Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก และเครื่องที่ไม่มีใครตั้งนโยบายนี้ไว้ไม่ใช่สิ่งที่ข้อนี้รายงาน เมื่อนโยบายตั้งเป็นปิด Windows PowerShell จะไม่เขียน script block ที่รันลง event log ของ Windows เลย แม้แต่ส่วนที่ปกติจะบันทึกเองเพราะเนื้อหาดูน่าสงสัย ผู้ตรวจที่อ่าน log นั้นจึงมีข้อมูลให้อ่านน้อยลง สิ่งนี้วัดบนเครื่องทดสอบเครื่องเดียว ไม่ได้วัดบนเครื่องนี้ ข้อนี้ไม่ได้บอกว่าสคริปต์ไหนเคยรันหรือใครเป็นคนตั้งนโยบาย และไม่ได้อ่านนโยบายของ PowerShell 7 หรือนโยบายระดับผู้ใช้ ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
+นโยบายระดับเครื่องของ Windows PowerShell ซึ่งคือ powershell.exe ที่มากับ Windows ตั้งให้ปิดการบันทึก script block Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก และเครื่องที่ไม่มีใครตั้งนโยบายนี้ไว้ไม่ใช่สิ่งที่ข้อนี้รายงาน เมื่อนโยบายตั้งเป็นปิด Windows PowerShell จะไม่เขียน script block ที่รันลง event log ของ Windows เลย แม้แต่ส่วนที่ปกติจะบันทึกเองเพราะเนื้อหาดูน่าสงสัย ผู้ตรวจที่อ่าน log นั้นจึงมีข้อมูลให้อ่านน้อยลง สิ่งนี้วัดบนเครื่องทดสอบเครื่องเดียว ไม่ได้วัดบนเครื่องนี้ ข้อนี้ไม่ได้บอกว่าสคริปต์ไหนเคยรันหรือใครเป็นคนตั้งนโยบาย นโยบายระดับผู้ใช้และนโยบายของ PowerShell 7 มีข้อของตัวเองแยกไว้ ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
 
 **ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
 
@@ -760,6 +845,47 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1>
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
 - <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell>
+
+<a id="rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4"></a>
+
+#### นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ Windows PowerShell
+
+- ชื่อภาษาอังกฤษ: A per-user policy turns Windows PowerShell script block logging off
+- id: `869c34b6-7b32-4f56-a281-9f5ac00e43c4`
+- ไฟล์: [`rules/posture/logging/script-block-logging-disabled-by-user-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-user-policy/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `logging`
+- เขียนเมื่อ: 2026-09-14
+
+**เกี่ยวกับการตรวจนี้**
+
+นโยบายระดับผู้ใช้ของ Windows PowerShell ตั้งให้ปิดการบันทึก script block และไม่มี key นโยบายระดับเครื่องที่มาก่อน Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก เมื่อตั้งเป็นปิด Windows PowerShell ที่บัญชีนั้นรันจะไม่เขียน script block ที่รันลง event log ของ Windows เลย แม้แต่ส่วนที่ปกติจะบันทึกเองเพราะเนื้อหาดูน่าสงสัย สิ่งนี้วัดบนเครื่องทดสอบเครื่องเดียว ไม่ได้วัดบนเครื่องนี้ นโยบายที่อ่านคือของบัญชี Windows ที่ใช้รันการสแกนนี้ ถ้าการสแกนถูกเริ่มใหม่ด้วยรหัสผ่านของผู้ดูแลระบบคนอื่น จะเป็นนโยบายของผู้ดูแลคนนั้น และไม่ได้อ่านของผู้เล่นเอง ข้อนี้ไม่ได้บอกว่าสคริปต์ไหนเคยรันหรือใครเป็นคนตั้งนโยบาย ข้อนี้อย่างเดียวจึงบอกการตั้งค่าของบัญชี ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `script_block_logging_user`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตบัญชีนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เครื่องที่บริษัท โรงเรียน หรือองค์กรอื่นดูแล และนโยบายระดับผู้ใช้ขององค์กรปิดการบันทึกนี้ เช่น เพื่อไม่ให้เนื้อหาสคริปต์ที่อาจมีรหัสผ่านไปอยู่ใน event log
+- การสแกนที่เริ่มใหม่ด้วยรหัสผ่านของผู้ดูแลระบบคนอื่น ซึ่งอ่านนโยบายของผู้ดูแลคนนั้นแทนของผู้เล่น
+- ชุดค่าความปลอดภัยหรือความเป็นส่วนตัว คู่มือ debloat และโปรแกรม "เร่งความเร็วเครื่อง" ที่ตั้งนโยบายการบันทึกระดับผู้ใช้
+- เครื่องหรือบัญชีที่เคยอยู่ภายใต้การดูแลขององค์กรและยังมีนโยบายเดิมค้างอยู่
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell>
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
 
 ### `posture` / `memory-integrity`
 

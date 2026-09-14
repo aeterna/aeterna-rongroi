@@ -3,8 +3,8 @@
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
 //! Machine settings that make cheating easier: Secure Boot — as Windows reports it and as the
-//! firmware reports it — test signing, memory integrity (HVCI), the TPM, and whether a machine policy
-//! turns PowerShell script block logging off.
+//! firmware reports it — test signing, memory integrity (HVCI), the TPM, and whether a policy turns
+//! script block logging off for Windows PowerShell or PowerShell 7.
 //!
 //! One run produces one observation holding every setting that could be read, so a rule can match on
 //! more than one at a time. A setting that could not be read is a `gaps` entry instead, never a
@@ -32,18 +32,27 @@ pub const HVCI_KEY: &str =
 /// DWORD value: 1 = configured on, 0 = configured off.
 pub const HVCI_VALUE: &str = "Enabled";
 
-/// Registry key holding the Windows PowerShell script block logging policy (ADR 0038).
-///
-/// Only a machine policy is read. The same policy under `HKCU` is a per-user one, and a machine policy
-/// takes precedence over it, so the value read here is decisive when it is set. When it is not set,
-/// a per-user policy this program does not read may still apply, which is why an absent value is
-/// reported as `not_configured` and never as "on" or "off". PowerShell 7 keeps its own policy under
-/// `…\Policies\Microsoft\PowerShellCore`, which is not read either.
+/// Registry key holding Windows PowerShell's script block logging policy for the machine (ADR 0038).
 pub const SCRIPT_BLOCK_LOGGING_KEY: &str =
     r"HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging";
-/// 1 = policy on, 0 = policy off, absent = policy not configured — as text, whatever the value's type,
-/// which is how Windows PowerShell 5.1 was measured to read it (ADR 0038, amended 2026-09-14).
+/// The same policy for the account this program runs as. After a restart with another administrator's
+/// credentials that is the administrator, not the person at the keyboard (ADR 0038).
+pub const SCRIPT_BLOCK_LOGGING_USER_KEY: &str =
+    r"HKCU\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging";
+/// Registry key holding PowerShell 7's script block logging policy for the machine (ADR 0038).
+pub const PWSH_SCRIPT_BLOCK_LOGGING_KEY: &str =
+    r"HKLM\SOFTWARE\Policies\Microsoft\PowerShellCore\ScriptBlockLogging";
+/// PowerShell 7's policy for the account this program runs as.
+pub const PWSH_SCRIPT_BLOCK_LOGGING_USER_KEY: &str =
+    r"HKCU\SOFTWARE\Policies\Microsoft\PowerShellCore\ScriptBlockLogging";
+/// The value that turns script block logging on (1) or off (0), in all four keys.
 pub const SCRIPT_BLOCK_LOGGING_VALUE: &str = "EnableScriptBlockLogging";
+/// The other value PowerShell 7 reads from its policy key. Not reported: whether it is set decides
+/// whether PowerShell 7 goes on to the per-user key (ADR 0038).
+pub const SCRIPT_BLOCK_INVOCATION_LOGGING_VALUE: &str = "EnableScriptBlockInvocationLogging";
+/// In PowerShell 7's policy key, a non-zero `REG_DWORD` sends PowerShell 7 to Windows PowerShell's key
+/// under the same root instead (ADR 0038).
+pub const USE_WINDOWS_POWERSHELL_POLICY_VALUE: &str = "UseWindowsPowerShellPolicySetting";
 
 const ID: &str = "posture";
 
@@ -69,11 +78,15 @@ const REASONS: [UnmeasuredReason; 5] = [
 /// that is never a gap — an absent TPM has no version, and that is not a failure to measure.
 ///
 /// `secure_boot` and `secure_boot_firmware` are two readings of one setting from two places, kept as
-/// two fields so a rule can compare them (ADR 0038). `script_block_logging` has three values, because
-/// a policy nobody wrote and a policy written to off are different statements about a machine.
-const FIELDS: [Field; 7] = [
+/// two fields so a rule can compare them (ADR 0038). The four `script_block_logging` fields are one
+/// policy as each PowerShell applies it, per engine and per hive; a policy nobody wrote and a policy
+/// written to off are different statements about a machine, so none of them is a gap when absent.
+const FIELDS: [Field; 10] = [
     Field::text("hvci"),
     Field::text("script_block_logging"),
+    Field::text("script_block_logging_pwsh"),
+    Field::text("script_block_logging_pwsh_user"),
+    Field::text("script_block_logging_user"),
     Field::text("secure_boot"),
     Field::text("secure_boot_firmware"),
     Field::text("test_signing"),
@@ -117,11 +130,31 @@ impl Collector for Posture {
             "secure_boot_firmware",
             secure_boot_firmware(host),
         );
+        let windows_powershell = windows_powershell_script_block_logging(host);
         record(
             &mut fields,
             &mut gaps,
             "script_block_logging",
-            script_block_logging(host),
+            windows_powershell.machine,
+        );
+        record(
+            &mut fields,
+            &mut gaps,
+            "script_block_logging_user",
+            windows_powershell.user,
+        );
+        let pwsh = pwsh_script_block_logging(host);
+        record(
+            &mut fields,
+            &mut gaps,
+            "script_block_logging_pwsh",
+            pwsh.machine,
+        );
+        record(
+            &mut fields,
+            &mut gaps,
+            "script_block_logging_pwsh_user",
+            pwsh.user,
         );
 
         match host.tpm_info() {
@@ -227,20 +260,46 @@ fn secure_boot_firmware(host: &dyn Host) -> Result<&'static str, UnmeasuredReaso
     }
 }
 
-/// Whether a machine policy turns Windows PowerShell script block logging on or off (ADR 0038).
+/// What one PowerShell takes from the machine hive and from the account's own, as two field values.
+struct ScriptBlockLoggingPolicy {
+    machine: Result<&'static str, UnmeasuredReason>,
+    user: Result<&'static str, UnmeasuredReason>,
+}
+
+/// The value a per-user field takes when PowerShell never reads the per-user key, because what it found
+/// under `HKLM` settles where the policy comes from (ADR 0038).
+const MACHINE_TAKES_PRECEDENCE: &str = "machine_takes_precedence";
+
+/// Names an on/off answer.
+fn switch(on: bool) -> &'static str {
+    if on { "enabled" } else { "disabled" }
+}
+
+/// Windows PowerShell 5.1's script block logging policy, as measured on one CI runner (ADR 0038).
 ///
-/// Unlike the other registry settings here, an absent value is an answer: Windows ships with no such
-/// policy, and "nobody configured this" is what most machines say. It is `not_configured`, which is
-/// neither `enabled` nor `disabled`.
+/// - The value counts when its data reads as the text `1` or `0`: a `REG_DWORD`, a `REG_QWORD` and a
+///   `REG_SZ` holding 1 each turned logging on, and each holding 0 turned it off — the automatic record
+///   of suspicious script blocks included. A `REG_DWORD` 2, and the key with no value, did neither.
+/// - The machine key decides once it **exists**, whatever it holds: with it present and holding no
+///   value, or 2, a per-user 0 was not applied. Only with no machine key did a per-user 1 or 0 apply.
 ///
-/// The value counts as Windows PowerShell 5.1 was measured to count it on one CI runner (ADR 0038,
-/// amended 2026-09-14): when its data reads as the text `1` or `0`. A `REG_DWORD`, a `REG_QWORD`, a
-/// `REG_SZ` and a `REG_EXPAND_SZ` holding 1 each turned logging on and holding 0 turned it off — the
-/// automatic record of suspicious script blocks included. A `REG_DWORD` 2, a `REG_SZ` `01`, a
-/// `REG_MULTI_SZ` and the key with no value did neither, so they are `not_configured` too.
-fn script_block_logging(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
+/// Anything that does neither is `not_configured`: no policy this PowerShell applies from that hive.
+fn windows_powershell_script_block_logging(host: &dyn Host) -> ScriptBlockLoggingPolicy {
+    let machine = windows_powershell_switch(host, SCRIPT_BLOCK_LOGGING_KEY);
+    let user = match host.value_names(SCRIPT_BLOCK_LOGGING_KEY) {
+        Ok(Some(_)) => Ok(MACHINE_TAKES_PRECEDENCE),
+        Ok(None) => windows_powershell_switch(host, SCRIPT_BLOCK_LOGGING_USER_KEY),
+        // Whether the machine key is there decides whether the user's applies, so not knowing it is
+        // not knowing the answer.
+        Err(error) => Err(reason_for(&error)),
+    };
+    ScriptBlockLoggingPolicy { machine, user }
+}
+
+/// One Windows PowerShell policy key's `EnableScriptBlockLogging`, read the way 5.1 was measured to.
+fn windows_powershell_switch(host: &dyn Host, key: &str) -> Result<&'static str, UnmeasuredReason> {
     let data = host
-        .read_value(SCRIPT_BLOCK_LOGGING_KEY, SCRIPT_BLOCK_LOGGING_VALUE)
+        .read_value(key, SCRIPT_BLOCK_LOGGING_VALUE)
         .map_err(|error| reason_for(&error))?;
     Ok(match windows_powershell_text(data) {
         Some("1") => "enabled",
@@ -259,6 +318,102 @@ fn windows_powershell_text(data: Option<RegistryData>) -> Option<&'static str> {
         Some(RegistryData::Text(text)) if text == "0" => Some("0"),
         _ => None,
     }
+}
+
+/// PowerShell 7's script block logging policy (ADR 0038).
+///
+/// Read from PowerShell 7's source (`Utils.GetPolicySettingFromGPOImpl`) and measured on one CI runner:
+///
+/// - Only a `REG_DWORD` 1 or 0 counts. A `REG_SZ` 0 and a `REG_QWORD` 0 were ignored.
+/// - A non-zero `REG_DWORD` `UseWindowsPowerShellPolicySetting` in PowerShell 7's key sends it to
+///   Windows PowerShell's key under the same root, and PowerShell 7's own `EnableScriptBlockLogging` is
+///   then not read — but Windows PowerShell's value still counts only as a `REG_DWORD`.
+/// - The machine hive decides when the key it leads to sets `EnableScriptBlockLogging` or
+///   `EnableScriptBlockInvocationLogging` to a `REG_DWORD` 1 or 0. Otherwise PowerShell 7 goes on to the
+///   account's key, and after that to its configuration file, which this program does not read.
+fn pwsh_script_block_logging(host: &dyn Host) -> ScriptBlockLoggingPolicy {
+    match pwsh_scope(
+        host,
+        PWSH_SCRIPT_BLOCK_LOGGING_KEY,
+        SCRIPT_BLOCK_LOGGING_KEY,
+    ) {
+        Ok(PwshScope::Decides(logging)) => ScriptBlockLoggingPolicy {
+            machine: Ok(logging.map_or("not_configured", switch)),
+            user: Ok(MACHINE_TAKES_PRECEDENCE),
+        },
+        Ok(PwshScope::MovesOn) => ScriptBlockLoggingPolicy {
+            machine: Ok("not_configured"),
+            user: pwsh_scope(
+                host,
+                PWSH_SCRIPT_BLOCK_LOGGING_USER_KEY,
+                SCRIPT_BLOCK_LOGGING_USER_KEY,
+            )
+            .map(|scope| match scope {
+                PwshScope::Decides(logging) => logging.map_or("not_configured", switch),
+                PwshScope::MovesOn => "not_configured",
+            }),
+        },
+        Err(reason) => ScriptBlockLoggingPolicy {
+            machine: Err(reason),
+            user: Err(reason),
+        },
+    }
+}
+
+/// What PowerShell 7 takes from one root.
+enum PwshScope {
+    /// Nothing it reads is set here, so it goes on to the next root.
+    MovesOn,
+    /// This root decides: it sets `EnableScriptBlockLogging` to on or off, or sets only
+    /// `EnableScriptBlockInvocationLogging` and leaves script block logging as it is by default.
+    Decides(Option<bool>),
+}
+
+/// What PowerShell 7 takes from one root.
+fn pwsh_scope(
+    host: &dyn Host,
+    pwsh_key: &str,
+    windows_powershell_key: &str,
+) -> Result<PwshScope, UnmeasuredReason> {
+    let read = |key: &str, value: &str| {
+        host.read_value(key, value)
+            .map_err(|error| reason_for(&error))
+    };
+    if host
+        .value_names(pwsh_key)
+        .map_err(|error| reason_for(&error))?
+        .is_none()
+    {
+        return Ok(PwshScope::MovesOn);
+    }
+    let key = match read(pwsh_key, USE_WINDOWS_POWERSHELL_POLICY_VALUE)? {
+        None | Some(RegistryData::Dword(0)) => pwsh_key,
+        Some(RegistryData::Dword(_)) => {
+            if host
+                .value_names(windows_powershell_key)
+                .map_err(|error| reason_for(&error))?
+                .is_none()
+            {
+                return Ok(PwshScope::MovesOn);
+            }
+            windows_powershell_key
+        }
+        // PowerShell 7 casts this value to an integer, and what it does with one of another type was
+        // not measured. It is there and names nothing this program can name.
+        Some(_) => return Err(UnmeasuredReason::ReadFailed),
+    };
+    let dword = |data: Option<RegistryData>| match data {
+        Some(RegistryData::Dword(1)) => Some(true),
+        Some(RegistryData::Dword(0)) => Some(false),
+        _ => None,
+    };
+    let logging = dword(read(key, SCRIPT_BLOCK_LOGGING_VALUE)?);
+    let invocation = dword(read(key, SCRIPT_BLOCK_INVOCATION_LOGGING_VALUE)?);
+    Ok(if logging.is_some() || invocation.is_some() {
+        PwshScope::Decides(logging)
+    } else {
+        PwshScope::MovesOn
+    })
 }
 
 /// Whether memory integrity (HVCI) is configured on. See [`HVCI_KEY`] for what that does not say.
@@ -451,6 +606,9 @@ tpm:
             [
                 "hvci",
                 "script_block_logging",
+                "script_block_logging_pwsh",
+                "script_block_logging_pwsh_user",
+                "script_block_logging_user",
                 "secure_boot",
                 "secure_boot_firmware",
                 "test_signing",
@@ -542,67 +700,199 @@ tpm:
         );
     }
 
-    fn with_script_block_logging(value: &str) -> FixtureHost {
-        inline(&ORDINARY.replace(
-            "registry:\n",
-            &format!(
-                "registry:\n  'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging':\n    EnableScriptBlockLogging: {value}\n"
-            ),
-        ))
+    const NOT_CONFIGURED: &str = "not_configured";
+    const ENABLED: &str = "enabled";
+    const DISABLED: &str = "disabled";
+    const MACHINE: &str = MACHINE_TAKES_PRECEDENCE;
+
+    const WIN: &str = SCRIPT_BLOCK_LOGGING_KEY;
+    const WIN_USER: &str = SCRIPT_BLOCK_LOGGING_USER_KEY;
+    const PWSH: &str = PWSH_SCRIPT_BLOCK_LOGGING_KEY;
+    const PWSH_USER: &str = PWSH_SCRIPT_BLOCK_LOGGING_USER_KEY;
+    const ON: &str = "EnableScriptBlockLogging: 1";
+    const OFF: &str = "EnableScriptBlockLogging: 0";
+    const FALLBACK: &str = "UseWindowsPowerShellPolicySetting: 1";
+
+    /// A name, the registry keys it writes with the YAML of their values, and the four fields expected.
+    type Case = (
+        &'static str,
+        &'static [(&'static str, &'static str)],
+        [&'static str; 4],
+    );
+
+    /// Every case the Windows CI runner measured (ADR 0038), in its order, with what Windows PowerShell
+    /// 5.1 and PowerShell 7 did there, written as the four fields: Windows PowerShell's machine and
+    /// per-user policy, then PowerShell 7's. A field that says `enabled` or `disabled` is one whose
+    /// engine logged, or stopped logging, the marker blocks in that case. The last six were added from
+    /// PowerShell 7's source and the first run's results, and measured in the second run.
+    #[rustfmt::skip]
+    const MEASURED: &[Case] = &[
+        ("no policy", &[], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine DWORD 1", &[(WIN, ON)], [ENABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine DWORD 0", &[(WIN, OFF)], [DISABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine DWORD 2", &[(WIN, "EnableScriptBlockLogging: 2")], [NOT_CONFIGURED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine REG_SZ 1", &[(WIN, "EnableScriptBlockLogging: '1'")], [ENABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine REG_SZ 0", &[(WIN, "EnableScriptBlockLogging: '0'")], [DISABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine REG_QWORD 1", &[(WIN, "EnableScriptBlockLogging: { qword: 1 }")], [ENABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine REG_QWORD 0", &[(WIN, "EnableScriptBlockLogging: { qword: 0 }")], [DISABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine key with no value", &[(WIN, "")], [NOT_CONFIGURED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("user DWORD 1", &[(WIN_USER, ON)], [NOT_CONFIGURED, ENABLED, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("user DWORD 0", &[(WIN_USER, OFF)], [NOT_CONFIGURED, DISABLED, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("user REG_SZ 0", &[(WIN_USER, "EnableScriptBlockLogging: '0'")], [NOT_CONFIGURED, DISABLED, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine DWORD 1, user DWORD 0", &[(WIN, ON), (WIN_USER, OFF)], [ENABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine DWORD 0, user DWORD 1", &[(WIN, OFF), (WIN_USER, ON)], [DISABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine key with no value, user DWORD 0", &[(WIN, ""), (WIN_USER, OFF)], [NOT_CONFIGURED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("machine DWORD 2, user DWORD 0", &[(WIN, "EnableScriptBlockLogging: 2"), (WIN_USER, OFF)], [NOT_CONFIGURED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("pwsh machine DWORD 1", &[(PWSH, ON)], [NOT_CONFIGURED, NOT_CONFIGURED, ENABLED, MACHINE]),
+        ("pwsh machine DWORD 0", &[(PWSH, OFF)], [NOT_CONFIGURED, NOT_CONFIGURED, DISABLED, MACHINE]),
+        ("pwsh machine REG_SZ 0", &[(PWSH, "EnableScriptBlockLogging: '0'")], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("pwsh machine REG_QWORD 0", &[(PWSH, "EnableScriptBlockLogging: { qword: 0 }")], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("pwsh machine fallback 1, machine DWORD 0", &[(PWSH, FALLBACK), (WIN, OFF)], [DISABLED, MACHINE, DISABLED, MACHINE]),
+        ("pwsh machine fallback 1, machine DWORD 1", &[(PWSH, FALLBACK), (WIN, ON)], [ENABLED, MACHINE, ENABLED, MACHINE]),
+        ("pwsh machine fallback 1, no machine policy", &[(PWSH, FALLBACK)], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("pwsh machine fallback 1 and DWORD 0, machine DWORD 1", &[(PWSH, "UseWindowsPowerShellPolicySetting: 1; EnableScriptBlockLogging: 0"), (WIN, ON)], [ENABLED, MACHINE, ENABLED, MACHINE]),
+        ("pwsh user DWORD 0", &[(PWSH_USER, OFF)], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, DISABLED]),
+        ("pwsh machine DWORD 1, pwsh user DWORD 0", &[(PWSH, ON), (PWSH_USER, OFF)], [NOT_CONFIGURED, NOT_CONFIGURED, ENABLED, MACHINE]),
+        ("pwsh user fallback 1, user DWORD 0", &[(PWSH_USER, FALLBACK), (WIN_USER, OFF)], [NOT_CONFIGURED, DISABLED, NOT_CONFIGURED, DISABLED]),
+        ("machine REG_SZ 01", &[(WIN, "EnableScriptBlockLogging: '01'")], [NOT_CONFIGURED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+        ("pwsh machine REG_SZ 0, pwsh user DWORD 0", &[(PWSH, "EnableScriptBlockLogging: '0'"), (PWSH_USER, OFF)], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, DISABLED]),
+        ("pwsh machine DWORD 2, pwsh user DWORD 0", &[(PWSH, "EnableScriptBlockLogging: 2"), (PWSH_USER, OFF)], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, DISABLED]),
+        ("pwsh machine invocation logging 1 only, pwsh user DWORD 0", &[(PWSH, "EnableScriptBlockInvocationLogging: 1"), (PWSH_USER, OFF)], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, MACHINE]),
+        ("pwsh machine fallback 1 with no machine key, pwsh user DWORD 0", &[(PWSH, FALLBACK), (PWSH_USER, OFF)], [NOT_CONFIGURED, NOT_CONFIGURED, NOT_CONFIGURED, DISABLED]),
+        ("pwsh machine fallback 1, machine REG_SZ 0", &[(PWSH, FALLBACK), (WIN, "EnableScriptBlockLogging: '0'")], [DISABLED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED]),
+    ];
+
+    /// `ORDINARY` with registry keys added. Each entry is a key and the YAML of its values, `;` between
+    /// two: `0` is a `REG_DWORD`, `'0'` a `REG_SZ`, `{ qword: 0 }` a `REG_QWORD`, and nothing a key with
+    /// no value.
+    fn with_policy(entries: &[(&str, &str)]) -> FixtureHost {
+        use std::fmt::Write as _;
+        let mut registry = String::from("registry:\n");
+        for (key, values) in entries {
+            if values.is_empty() {
+                let _ = writeln!(registry, "  '{key}': {{}}");
+            } else {
+                let _ = writeln!(registry, "  '{key}':");
+                for line in values.split(';') {
+                    let _ = writeln!(registry, "    {}", line.trim());
+                }
+            }
+        }
+        inline(&ORDINARY.replace("registry:\n", &registry))
     }
 
-    /// Windows ships with no such policy. That is an answer about the machine, not a gap, and it is a
-    /// different answer from a policy written to off.
-    #[test]
-    fn script_block_logging_not_configured_is_its_own_value() {
-        let run = Posture.collect(&inline(ORDINARY));
-        assert_eq!(field(&run, "script_block_logging"), Some("not_configured"));
-        assert_eq!(gap_for(&run, "script_block_logging"), None);
+    fn script_block_logging_fields(run: &CollectorRun) -> [Option<&str>; 4] {
+        [
+            field(run, "script_block_logging"),
+            field(run, "script_block_logging_user"),
+            field(run, "script_block_logging_pwsh"),
+            field(run, "script_block_logging_pwsh_user"),
+        ]
     }
 
     #[test]
-    fn script_block_logging_policy_on_and_off_are_reported() {
-        let run = Posture.collect(&with_script_block_logging("1"));
-        assert_eq!(field(&run, "script_block_logging"), Some("enabled"));
-        let run = Posture.collect(&with_script_block_logging("0"));
-        assert_eq!(field(&run, "script_block_logging"), Some("disabled"));
-    }
-
-    /// The values Windows PowerShell 5.1 was measured to read on one CI runner (ADR 0038, amended
-    /// 2026-09-14): 1 or 0 as text counts whatever the type, and anything else is no policy.
-    #[test]
-    fn script_block_logging_follows_what_windows_powershell_was_measured_to_do() {
-        for (value, expected) in [
-            ("1", "enabled"),
-            ("0", "disabled"),
-            ("2", "not_configured"),
-            ("'1'", "enabled"),
-            ("'0'", "disabled"),
-            ("'01'", "not_configured"),
-            ("{ qword: 1 }", "enabled"),
-            ("{ qword: 0 }", "disabled"),
-            ("{ content: '0' }", "not_configured"),
-        ] {
-            let run = Posture.collect(&with_script_block_logging(value));
+    fn script_block_logging_follows_what_each_powershell_was_measured_to_do() {
+        for (case, entries, expected) in MEASURED {
+            let run = Posture.collect(&with_policy(entries));
             assert_eq!(
-                field(&run, "script_block_logging"),
-                Some(expected),
-                "{value}"
+                script_block_logging_fields(&run),
+                expected.map(Some),
+                "{case}"
             );
-            assert_eq!(gap_for(&run, "script_block_logging"), None, "{value}");
+        }
+    }
+
+    /// Of a value of a type that is not a number or a string, neither PowerShell reads a 1 or a 0.
+    #[test]
+    fn a_policy_value_of_another_type_turns_nothing_on_or_off() {
+        let run = Posture.collect(&with_policy(&[
+            (
+                SCRIPT_BLOCK_LOGGING_KEY,
+                "EnableScriptBlockLogging: { content: '0' }",
+            ),
+            (
+                PWSH_SCRIPT_BLOCK_LOGGING_KEY,
+                "EnableScriptBlockLogging: { content: '0' }",
+            ),
+        ]));
+        assert_eq!(
+            script_block_logging_fields(&run),
+            [NOT_CONFIGURED, MACHINE, NOT_CONFIGURED, NOT_CONFIGURED].map(Some)
+        );
+    }
+
+    /// PowerShell 7 casts `UseWindowsPowerShellPolicySetting` to an integer; what it does with a string
+    /// there was not established, so both of its fields are a gap rather than a guess.
+    #[test]
+    fn a_pwsh_fallback_switch_that_is_not_a_dword_is_a_gap() {
+        let run = Posture.collect(&with_policy(&[(
+            PWSH_SCRIPT_BLOCK_LOGGING_KEY,
+            "UseWindowsPowerShellPolicySetting: '1'",
+        )]));
+        for name in [
+            "script_block_logging_pwsh",
+            "script_block_logging_pwsh_user",
+        ] {
+            assert_eq!(field(&run, name), None, "{name}");
+            assert_eq!(
+                gap_for(&run, name),
+                Some(UnmeasuredReason::ReadFailed),
+                "{name}"
+            );
+        }
+        assert_eq!(field(&run, "script_block_logging"), Some(NOT_CONFIGURED));
+    }
+
+    /// A machine key that cannot be opened leaves its own field and the per-user field unanswered:
+    /// whether the machine key is there is what decides whether the per-user policy applies.
+    #[test]
+    fn a_denied_machine_key_leaves_the_per_user_policy_unanswered_too() {
+        for (denied, names) in [
+            (
+                SCRIPT_BLOCK_LOGGING_KEY,
+                ["script_block_logging", "script_block_logging_user"],
+            ),
+            (
+                PWSH_SCRIPT_BLOCK_LOGGING_KEY,
+                [
+                    "script_block_logging_pwsh",
+                    "script_block_logging_pwsh_user",
+                ],
+            ),
+        ] {
+            let run = Posture.collect(&inline(&format!(
+                "{ORDINARY}access_denied:\n  - '{denied}'\n"
+            )));
+            for name in names {
+                assert_eq!(
+                    gap_for(&run, name),
+                    Some(UnmeasuredReason::AccessDenied),
+                    "{name}"
+                );
+            }
         }
     }
 
     #[test]
-    fn a_script_block_logging_policy_that_cannot_be_read_is_access_denied() {
-        let yaml = format!(
-            "{ORDINARY}access_denied:\n  - 'HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging'\n"
-        );
-        let run = Posture.collect(&inline(&yaml));
+    fn a_denied_per_user_key_leaves_only_the_per_user_field_unanswered() {
+        let run = Posture.collect(&inline(&format!(
+            "{ORDINARY}access_denied:\n  - '{SCRIPT_BLOCK_LOGGING_USER_KEY}'\n  - '{PWSH_SCRIPT_BLOCK_LOGGING_USER_KEY}'\n"
+        )));
+        assert_eq!(field(&run, "script_block_logging"), Some(NOT_CONFIGURED));
         assert_eq!(
-            gap_for(&run, "script_block_logging"),
-            Some(UnmeasuredReason::AccessDenied)
+            field(&run, "script_block_logging_pwsh"),
+            Some(NOT_CONFIGURED)
         );
+        for name in [
+            "script_block_logging_user",
+            "script_block_logging_pwsh_user",
+        ] {
+            assert_eq!(
+                gap_for(&run, name),
+                Some(UnmeasuredReason::AccessDenied),
+                "{name}"
+            );
+        }
     }
 
     #[test]
