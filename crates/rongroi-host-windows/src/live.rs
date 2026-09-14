@@ -4,7 +4,7 @@
 
 //! Reads the real machine. Registry keys are opened read-only; nothing is written.
 
-use rongroi_host::{Host, Platform, RegistrySource, SourceError};
+use rongroi_host::{Host, Platform, RegistryData, RegistrySource, SourceError};
 
 const HRESULT_FILE_NOT_FOUND: i32 = 0x8007_0002_u32.cast_signed();
 const HRESULT_PATH_NOT_FOUND: i32 = 0x8007_0003_u32.cast_signed();
@@ -15,10 +15,20 @@ const CURRENT_VERSION_KEY: &str = r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVe
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LiveHost;
 
-fn hklm_subkey(key: &str) -> Result<&str, SourceError> {
-    key.strip_prefix(r"HKLM\").ok_or_else(|| {
-        SourceError::Unsupported(format!("only HKLM keys are supported, got `{key}`"))
-    })
+/// The path inside `HKLM` a key is written under. Every other root is refused.
+fn open_root(key: &str) -> Result<(&'static windows_registry::Key, &str), SourceError> {
+    key.strip_prefix(r"HKLM\")
+        .map(|path| (windows_registry::LOCAL_MACHINE, path))
+        .ok_or_else(|| {
+            SourceError::Unsupported(format!("only HKLM keys are supported, got `{key}`"))
+        })
+}
+
+/// Opens `key` for reading, or `Ok(None)` when it is not there.
+fn open(key: &str) -> Result<Option<windows_registry::Key>, SourceError> {
+    let (root, path) = open_root(key)?;
+    // `open` requests read access only.
+    classify(root.open(path))
 }
 
 fn classify<T>(result: windows_registry::Result<T>) -> Result<Option<T>, SourceError> {
@@ -34,25 +44,21 @@ fn classify<T>(result: windows_registry::Result<T>) -> Result<Option<T>, SourceE
 
 impl RegistrySource for LiveHost {
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError> {
-        // `open` requests read access only.
-        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
-        else {
+        let Some(opened) = open(key)? else {
             return Ok(None);
         };
         classify(opened.get_u32(value))
     }
 
     fn read_string(&self, key: &str, value: &str) -> Result<Option<String>, SourceError> {
-        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
-        else {
+        let Some(opened) = open(key)? else {
             return Ok(None);
         };
         classify(opened.get_string(value))
     }
 
     fn subkeys(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
-        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
-        else {
+        let Some(opened) = open(key)? else {
             return Ok(None);
         };
         let Some(names) = classify(opened.keys())? else {
@@ -64,8 +70,7 @@ impl RegistrySource for LiveHost {
     /// The names only. `Key::values` also hands back each value's data, which is dropped here so
     /// that every byte a collector reads goes through `read_bytes` and its limit.
     fn value_names(&self, key: &str) -> Result<Option<Vec<String>>, SourceError> {
-        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
-        else {
+        let Some(opened) = open(key)? else {
             return Ok(None);
         };
         let Some(values) = classify(opened.values())? else {
@@ -75,8 +80,7 @@ impl RegistrySource for LiveHost {
     }
 
     fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError> {
-        let Some(opened) = classify(windows_registry::LOCAL_MACHINE.open(hklm_subkey(key)?))?
-        else {
+        let Some(opened) = open(key)? else {
             return Ok(None);
         };
         // `get_bytes` refuses a value that is not `REG_BINARY`, which arrives here as a failure
@@ -86,6 +90,33 @@ impl RegistrySource for LiveHost {
         };
         // The limit lives in `rongroi-host`, so this host refuses exactly what the fixture host does.
         rongroi_host::bound_registry_value(bytes, rongroi_host::MAX_REGISTRY_VALUE_BYTES).map(Some)
+    }
+
+    fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError> {
+        let Some(opened) = open(key)? else {
+            return Ok(None);
+        };
+        let Some(kind) = classify(opened.get_type(value))? else {
+            return Ok(None);
+        };
+        // The type and the data are two calls. A value rewritten between them is read as it is at the
+        // second call, through the reader for the type the first call named.
+        let data = match kind {
+            windows_registry::Type::U32 => {
+                classify(opened.get_u32(value))?.map(RegistryData::Dword)
+            }
+            windows_registry::Type::U64 => {
+                classify(opened.get_u64(value))?.map(RegistryData::Qword)
+            }
+            windows_registry::Type::String | windows_registry::Type::ExpandString => {
+                classify(opened.get_string(value))?.map(RegistryData::Text)
+            }
+            _ => Some(RegistryData::OtherType),
+        };
+        data.map(|data| {
+            rongroi_host::bound_registry_data(data, rongroi_host::MAX_REGISTRY_VALUE_BYTES)
+        })
+        .transpose()
     }
 }
 

@@ -45,7 +45,8 @@ So the field has three values and none of them is a gap:
 | `not_configured` | key or value absent | no machine policy. A per-user policy this program does not read may apply |
 
 A value of another number, or of another type, is a `read_failed` gap: it is there and names nothing this
-program can name. That is not hypothetical — Microsoft's own snippet writes the value with
+program can name. *(Superseded 2026-09-14: Windows PowerShell 5.1 was measured, and the mapping now follows
+it — see "Amendment of 2026-09-14" below.)* That is not hypothetical — Microsoft's own snippet writes the value with
 `Set-ItemProperty … -Value "1"`, which is a string. How Windows PowerShell 5.1 treats a string is not
 established here; PowerShell 7, whose source is public, only honours an integer 0 or 1 for this setting
 and reads the machine key before the user key
@@ -241,9 +242,9 @@ answer, or how often the rule would fire on a population.
 
 ## What is unverified
 
-- **Windows PowerShell 5.1's handling of the policy** — whether an explicit 0 also suppresses the logging
-  of suspicious script blocks, and how it treats a `REG_SZ` value. PowerShell 7's source is the evidence
-  cited; 5.1 is closed.
+- ~~**Windows PowerShell 5.1's handling of the policy** — whether an explicit 0 also suppresses the logging
+  of suspicious script blocks, and how it treats a `REG_SZ` value.~~ Measured on 2026-09-14 on one CI
+  runner; see the amendment below.
 - **When Windows writes `UEFISecureBootEnabled`**, and therefore how long a registry value can outlive a
   firmware change. This is the condition the third `falsepositives` entry depends on.
 - **How other hypervisors' virtual firmware and other vendors' firmware report the variable.** CI adds one
@@ -290,3 +291,151 @@ the person running the scan asks for it is the fallback to weigh.
 - The consent text in the CLI and the desktop app names the firmware reading and the PowerShell logging
   policy; `PRIVACY.md`, `docs/architecture.md` and the screenshare guide say what is read.
 - The Windows CI job runs the privilege test and compares the firmware reading with `Get-SecureBootUEFI`.
+
+## Amendment of 2026-09-14 — what Windows PowerShell 5.1 does with the policy
+
+The first "not established" item above — how Windows PowerShell 5.1 treats the policy value — is answered
+here by a measurement on the GitHub `windows-latest` runner rather than by PowerShell 7's source. A runner is
+an imaged virtual machine (Windows build 26100, `powershell.exe` 10.0.26100.33158, PowerShell 7.6.5), not a
+player's PC, and **one runner is one machine**. Nothing below was measured on a player's PC or on the
+owner's.
+
+### How it was measured
+
+A CI step (`What PowerShell does with a script block logging policy`, `.github/workflows/windows.yml`)
+writes one case at a time to the policy keys, clears `Microsoft-Windows-PowerShell/Operational` and
+`PowerShellCore/Operational`, and starts each engine twice in a fresh process with one line to run:
+
+- an **inert** line, which only a policy that turns logging on should record; and
+- an inert line holding one word from PowerShell's public list of suspicious content, which PowerShell
+  records on its own when no policy says otherwise.
+
+Each line carries a nonce, and the step counts event 4104 carrying it, with its level. It then runs the CLI
+and prints every `script_block_logging*` field and the policy rules' states, so the collector's reading sits
+beside what the engines did in the same case. Every key is exported first and put back afterwards, and the
+step fails if a key that was absent is present at the end. Both engines' logs recorded the inert line when
+their machine policy was 1, so their zeros are measurements and not a log that records nothing.
+
+The automatic record is documented by Microsoft outside Learn. The PowerShell team's 2015 post says
+PowerShell "automatically logs script blocks when they have content often used by malicious scripts", and
+that setting `EnableScriptBlockLogging` to 0 disables it
+([PowerShell ♥ the Blue Team](https://devblogs.microsoft.com/powershell/powershell-the-blue-team/)). None of
+the Learn pages this ADR cites — `about_Logging` (5.1), `about_Logging_Windows` (7.5), *PowerShell security
+features*, the WindowsPowerShell Policy CSP — mentions it; they were searched on 2026-09-14.
+
+Run 34804676954 measured the first 27 cases; run 34806733664 repeated them and added nine chosen from
+PowerShell 7's source and from the first run's 5.1 results. The engines' counts in the two runs agree on all 27
+cases they share; the first run's CLI columns are the collector before this change.
+
+### What was measured
+
+"Inert" and "listed" are the two lines; a count is events 4104 carrying the nonce, `L5` verbose and `L3`
+warning. "5.1" is Windows PowerShell's result and "7" PowerShell 7's; the last column is what the CLI reported in
+the same case. PowerShell 7's column and the per-user and PowerShell 7 rows are measured in the same step and
+are there for the record; this change reads only Windows PowerShell's machine value.
+
+| Case (keys written) | 5.1 inert / listed | 7 inert / listed | `script_block_logging` |
+|---|---|---|---|
+| no policy | 0 / 1 L3 | 0 / 1 L3 | `not_configured` |
+| machine `REG_DWORD` 1 | 1 L5 / 1 L3 | 0 / 1 | `enabled` |
+| machine `REG_DWORD` 0 | **0 / 0** | 0 / 1 | `disabled` |
+| machine `REG_DWORD` 2 | 0 / 1 | 0 / 1 | `not_configured` |
+| machine `REG_SZ` "1" | 1 / 1 | 0 / 1 | `enabled` |
+| machine `REG_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` |
+| machine `REG_SZ` "01" | 0 / 1 | 0 / 1 | `not_configured` |
+| machine `REG_EXPAND_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` |
+| machine `REG_MULTI_SZ` "0" | 0 / 1 | 0 / 1 | `not_configured` |
+| machine `REG_QWORD` 1 | 1 / 1 | 0 / 1 | `enabled` |
+| machine `REG_QWORD` 0 | **0 / 0** | 0 / 1 | `disabled` |
+| machine key with no value | 0 / 1 | 0 / 1 | `not_configured` |
+| user `REG_DWORD` 1 | 1 / 1 | 0 / 1 | `not_configured` |
+| user `REG_DWORD` 0 | **0 / 0** | 0 / 1 | `not_configured` |
+| user `REG_SZ` "0" | **0 / 0** | 0 / 1 | `not_configured` |
+| machine 1, user 0 | 1 / 1 | 0 / 1 | `enabled` |
+| machine 0, user 1 | **0 / 0** | 0 / 1 | `disabled` |
+| machine key with no value, user 0 | 0 / 1 | 0 / 1 | `not_configured` |
+| machine 2, user 0 | 0 / 1 | 0 / 1 | `not_configured` |
+| PowerShell 7 machine `REG_DWORD` 1 | 0 / 1 | 1 L5 / 1 L3 | `not_configured` |
+| PowerShell 7 machine `REG_DWORD` 0 | 0 / 1 | **0 / 0** | `not_configured` |
+| PowerShell 7 machine `REG_SZ` "0" | 0 / 1 | 0 / 1 | `not_configured` |
+| PowerShell 7 machine `REG_QWORD` 0 | 0 / 1 | 0 / 1 | `not_configured` |
+| PowerShell 7 machine `UseWindowsPowerShellPolicySetting` 1, machine 0 | **0 / 0** | **0 / 0** | `disabled` |
+| PowerShell 7 machine fallback 1, machine 1 | 1 / 1 | 1 / 1 | `enabled` |
+| PowerShell 7 machine fallback 1, no Windows PowerShell key | 0 / 1 | 0 / 1 | `not_configured` |
+| PowerShell 7 machine fallback 1 and its own 0, machine 1 | 1 / 1 | 1 / 1 | `enabled` |
+| PowerShell 7 machine fallback 1, machine `REG_SZ` "0" | **0 / 0** | 0 / 1 | `disabled` |
+| PowerShell 7 machine fallback `REG_SZ` "1", machine 0 | **0 / 0** | 0 / 0 — **`pwsh` exited `0xE0434352`** | `disabled` |
+| PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
+| PowerShell 7 machine 1, PowerShell 7 user 0 | 0 / 1 | 1 / 1 | `not_configured` |
+| PowerShell 7 machine `REG_SZ` "0", PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
+| PowerShell 7 machine 2, PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
+| PowerShell 7 machine `EnableScriptBlockInvocationLogging` 1 only, PowerShell 7 user 0 | 0 / 1 | 0 / 1 | `not_configured` |
+| PowerShell 7 machine fallback 1 (no Windows PowerShell machine key), PowerShell 7 user 0 | 0 / 1 | **0 / 0** | `not_configured` |
+| PowerShell 7 user fallback 1, user 0 | **0 / 0** | **0 / 0** | `not_configured` |
+
+The machine rows' last column is the collector's unit test
+`script_block_logging_follows_what_windows_powershell_was_measured_to_do`.
+
+### What the measurement settles
+
+- **With the policy explicitly off, Windows PowerShell 5.1 also stops its automatic record** — the listed
+  line was logged as a warning with no policy, and not at all with 0. That was the first "not established"
+  item above. The same holds for PowerShell 7, as its source said.
+- **5.1 compares the value as text.** A `REG_DWORD`, `REG_QWORD`, `REG_SZ` or `REG_EXPAND_SZ` holding 1 or
+  0 all counted; `"01"`, a `REG_MULTI_SZ` and `REG_DWORD` 2 did nothing. That matches the comparison in
+  the oldest published ancestor of that code, PowerShell 6.0.0-alpha.9 (`String.Equals("0",
+  logScriptBlockExecution.ToString(), …)` in `CompiledScriptBlock.cs`), which is supporting evidence only:
+  5.1 is closed. Microsoft's own enabling snippet writes a `REG_SZ`, so this is the ordinary shape, and it
+  was a `read_failed` gap before this amendment.
+- **In 5.1, the machine key decides as soon as it exists.** A key with no value, or with 2, left logging at
+  its default and a per-user 0 was not applied. Only without a machine key did a per-user value count. Microsoft
+  documents only that "The Computer Configuration policy setting takes precedence over the User
+  Configuration policy setting"
+  ([WindowsPowerShell Policy CSP](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell)),
+  which does not say what an empty key or an unrecognised value does.
+- **PowerShell 7 counts only a `REG_DWORD`**, as its source reads (`rawRegistryValue is int` in
+  `Utils.TrySetPolicySettingsFromRegistryKey`, PowerShell `master` at `5e35e5a`). It does not read Windows
+  PowerShell's key unless its own key holds `UseWindowsPowerShellPolicySetting` — and then only that key,
+  and still only a `REG_DWORD`. Its machine hive decides only when the key it ends up reading sets
+  `EnableScriptBlockLogging` or `EnableScriptBlockInvocationLogging` to a `REG_DWORD` 1 or 0; otherwise it
+  reads the account's key. Microsoft documents the field as "enables using the value from a similar Windows
+  PowerShell Group Policy setting"
+  ([about_Group_Policy_Settings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-7.5)),
+  which does not say what happens when that setting is absent; the source and the runner agree that
+  PowerShell 7 then goes on to the next hive.
+- **A `REG_SZ` `UseWindowsPowerShellPolicySetting` stops PowerShell 7 from starting.** Both `pwsh`
+  processes exited with `0xE0434352`, the code of an unhandled .NET exception, and ran nothing. The source
+  casts the value with `(int)`.
+
+### The mapping, and a registry read that keeps the type
+
+`script_block_logging` keeps its meaning — Windows PowerShell's machine policy — and now follows the 5.1
+rows: 1 or 0 as text is `enabled` or `disabled`, and any other value, type, or no value is
+`not_configured`.
+
+`RegistrySource::read_u32` cannot carry this: a live host's `windows-registry` reader accepts a `REG_QWORD`
+there as well (`Key::get_u32` calls `get_u64`, which "Accepts `REG_DWORD` … and `REG_QWORD`", 0.100.0), and a
+string is an error. `RegistrySource` gains `read_value`, which hands back `RegistryData::{Dword, Qword, Text,
+OtherType}` — `REG_SZ` and `REG_EXPAND_SZ` are `Text`, unexpanded, and any other type's data is not read — with
+a string bounded by the same 64 KiB as a binary value (ADR 0022). A fixture writes a `REG_QWORD` as
+`{ qword: 0 }`.
+
+`REG_EXPAND_SZ` is read unexpanded, and 5.1 is .NET, which expands it on read; a value whose `%variable%`
+expands to 0 or 1 would be `not_configured` here and honoured by 5.1. That case was not measured.
+
+### Still not established
+
+- How a player's Windows 11, rather than a runner, answers any row above; the rows are one build of each
+  engine.
+- `REG_EXPAND_SZ` whose `%variable%` expands to 0 or 1.
+- Whether Windows PowerShell on other Windows builds treats the value the same way.
+- The per-user policy and PowerShell 7's are still not read by this program.
+
+### Consequences of the amendment
+
+- `rongroi-host`: `RegistryData`, `RegistrySource::read_value`, `bound_registry_data`; the fixture host
+  reads `{ qword: }`. No dependency or `windows` feature is added.
+- `script_block_logging` is `enabled` or `disabled` for a `REG_SZ` 1 or 0 where it was a `read_failed` gap,
+  and `not_configured` for any other value where that was `read_failed`. No snapshot moves: no fixture holds
+  such a value. The rule's description says what was measured.
+- The Windows CI job gains the PowerShell step.

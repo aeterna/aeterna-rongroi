@@ -17,7 +17,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 |---|---|
 | รูปแบบ rule | 2 |
 | จำนวน rule | 18 |
-| SHA-256 | `12d7f965e0d8f11efde98d869ed5be9fa6b7a6cd69b33557cb88ab2a502139e0` |
+| SHA-256 | `6f54522be06a00fa1e8c9fa96e96106a589b50c7cf8884a1fbadf7572422e3ea` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -54,7 +54,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [เปิดโหมด test signing ของ Windows อยู่](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
-  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
+  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
@@ -721,20 +721,20 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 
 <a id="rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d"></a>
 
-#### นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell
+#### นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell
 
-- ชื่อภาษาอังกฤษ: A machine policy turns PowerShell script block logging off
+- ชื่อภาษาอังกฤษ: A machine policy turns Windows PowerShell script block logging off
 - id: `88eb2aca-a33e-414d-bd0f-cfb87af95a2d`
 - ไฟล์: [`rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml)
 - collector: `posture`
 - strength: `posture` — สถานะเครื่อง
 - status: `experimental` — อยู่ระหว่างพัฒนา
 - tag: `posture`, `logging`
-- เขียนเมื่อ: 2026-09-13
+- เขียนเมื่อ: 2026-09-13 · แก้ไขล่าสุด: 2026-09-14
 
 **เกี่ยวกับการตรวจนี้**
 
-นโยบายระดับเครื่องของ Windows PowerShell ตั้งให้ปิดการบันทึก script block Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก และเครื่องที่ไม่มีใครตั้งนโยบายนี้ไว้ไม่ใช่สิ่งที่ข้อนี้รายงาน เมื่อนโยบายตั้งเป็นปิด PowerShell จะเขียนบันทึกของสคริปต์ที่รัน ลง event log ของ Windows น้อยลง ผู้ตรวจที่อ่าน log นั้นจึงมีข้อมูลให้อ่านน้อยลง ข้อนี้ไม่ได้บอกว่าสคริปต์ไหนเคยรัน หรือใครเป็นคนตั้งนโยบาย และไม่ได้อ่านนโยบายของ PowerShell 7 หรือนโยบายระดับผู้ใช้ ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
+นโยบายระดับเครื่องของ Windows PowerShell ซึ่งคือ powershell.exe ที่มากับ Windows ตั้งให้ปิดการบันทึก script block Windows ไม่ได้มีนโยบายนี้มาตั้งแต่แรก และเครื่องที่ไม่มีใครตั้งนโยบายนี้ไว้ไม่ใช่สิ่งที่ข้อนี้รายงาน เมื่อนโยบายตั้งเป็นปิด Windows PowerShell จะไม่เขียน script block ที่รันลง event log ของ Windows เลย แม้แต่ส่วนที่ปกติจะบันทึกเองเพราะเนื้อหาดูน่าสงสัย ผู้ตรวจที่อ่าน log นั้นจึงมีข้อมูลให้อ่านน้อยลง สิ่งนี้วัดบนเครื่องทดสอบเครื่องเดียว ไม่ได้วัดบนเครื่องนี้ ข้อนี้ไม่ได้บอกว่าสคริปต์ไหนเคยรันหรือใครเป็นคนตั้งนโยบาย และไม่ได้อ่านนโยบายของ PowerShell 7 หรือนโยบายระดับผู้ใช้ ข้อนี้อย่างเดียวจึงบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง
 
 **ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
 
@@ -759,6 +759,7 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1>
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
+- <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell>
 
 ### `posture` / `memory-integrity`
 

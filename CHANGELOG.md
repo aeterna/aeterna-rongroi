@@ -122,6 +122,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   (ADR 0038, now accepted). `AGENTS.md` hard rule 2 names the token as the one thing a collector may change.
 
 ### Changed
+- `script_block_logging` follows what Windows PowerShell 5.1 was measured to do with the value rather than
+  its type alone (ADR 0038, amended 2026-09-14): a `REG_SZ` holding 1 or 0 is `enabled` or `disabled`, as a
+  `REG_DWORD` or `REG_QWORD` is, where it was a `read_failed` gap before; a value holding any other number or
+  string, or of another type, is `not_configured`, where it was `read_failed`. The rule's text now says what
+  was measured: with the policy off, 5.1 also stops recording the script blocks it otherwise logs by itself.
 - No rule declares `access_denied` any more (ADR 0032, amended). Eleven rules did, in lines never checked
   against their collectors. Each was: on `evtx` and `prefetch` the reason means a refusal **with**
   administrator rights, which two elevated scans never met; the `posture` registry keys grant every

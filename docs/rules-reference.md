@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 2 |
 | Rules | 18 |
-| SHA-256 | `12d7f965e0d8f11efde98d869ed5be9fa6b7a6cd69b33557cb88ab2a502139e0` |
+| SHA-256 | `6f54522be06a00fa1e8c9fa96e96106a589b50c7cf8884a1fbadf7572422e3ea` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -58,7 +58,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [Windows test signing is turned on](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
-  - [A machine policy turns PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
+  - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [Memory integrity (HVCI) is configured off](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
@@ -711,7 +711,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 <a id="rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d"></a>
 
-#### A machine policy turns PowerShell script block logging off
+#### A machine policy turns Windows PowerShell script block logging off
 
 - Id: `88eb2aca-a33e-414d-bd0f-cfb87af95a2d`
 - File: [`rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml)
@@ -719,11 +719,11 @@ Current setting only. It says nothing about how the PC was configured in the pas
 - Strength: `posture`
 - Status: `experimental` — being developed
 - Tags: `posture`, `logging`
-- Written: 2026-09-13
+- Written: 2026-09-13 · changed: 2026-09-14
 
 **About this check**
 
-A machine policy for Windows PowerShell sets script block logging to off. Windows ships with no such policy, and a PC where nobody set one is not what this rule reports. With the policy set to off, PowerShell writes fewer records of the scripts it runs to the Windows event log, so a reviewer reading that log has less to read. It says nothing about which scripts ran or who set the policy, and PowerShell 7's own policy and a per-user policy are not read. On its own this describes the machine — it is not evidence of cheating.
+A machine policy for Windows PowerShell — the powershell.exe that comes with Windows — sets script block logging to off. Windows ships with no such policy, and a PC where nobody set one is not what this rule reports. With the policy off, Windows PowerShell writes none of the script blocks it runs to the Windows event log, not even the ones it otherwise records by itself because their content looks suspicious, so a reviewer reading that log has less to read. That was measured on one test machine, not on this PC. It says nothing about which scripts ran or who set the policy, and PowerShell 7's own policy and a per-user policy are not read. On its own this describes the machine — it is not evidence of cheating.
 
 **Matches when all of these hold for one observation**
 
@@ -748,6 +748,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1>
 - <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1>
+- <https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell>
 
 ### `posture` / `memory-integrity`
 

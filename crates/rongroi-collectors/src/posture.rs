@@ -13,7 +13,7 @@
 use std::collections::BTreeMap;
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{FirmwareSecureBoot, Host, Platform, SourceError};
+use rongroi_host::{FirmwareSecureBoot, Host, Platform, RegistryData, SourceError};
 
 use crate::{Collector, Field};
 
@@ -41,7 +41,8 @@ pub const HVCI_VALUE: &str = "Enabled";
 /// `…\Policies\Microsoft\PowerShellCore`, which is not read either.
 pub const SCRIPT_BLOCK_LOGGING_KEY: &str =
     r"HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging";
-/// DWORD value: 1 = policy on, 0 = policy off, absent = policy not configured.
+/// 1 = policy on, 0 = policy off, absent = policy not configured — as text, whatever the value's type,
+/// which is how Windows PowerShell 5.1 was measured to read it (ADR 0038, amended 2026-09-14).
 pub const SCRIPT_BLOCK_LOGGING_VALUE: &str = "EnableScriptBlockLogging";
 
 const ID: &str = "posture";
@@ -230,15 +231,33 @@ fn secure_boot_firmware(host: &dyn Host) -> Result<&'static str, UnmeasuredReaso
 ///
 /// Unlike the other registry settings here, an absent value is an answer: Windows ships with no such
 /// policy, and "nobody configured this" is what most machines say. It is `not_configured`, which is
-/// neither `enabled` nor `disabled`. A value of another type or another number is there and means
-/// nothing this program can name, so it is a gap rather than a guess.
+/// neither `enabled` nor `disabled`.
+///
+/// The value counts as Windows PowerShell 5.1 was measured to count it on one CI runner (ADR 0038,
+/// amended 2026-09-14): when its data reads as the text `1` or `0`. A `REG_DWORD`, a `REG_QWORD`, a
+/// `REG_SZ` and a `REG_EXPAND_SZ` holding 1 each turned logging on and holding 0 turned it off — the
+/// automatic record of suspicious script blocks included. A `REG_DWORD` 2, a `REG_SZ` `01`, a
+/// `REG_MULTI_SZ` and the key with no value did neither, so they are `not_configured` too.
 fn script_block_logging(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
-    match host.read_u32(SCRIPT_BLOCK_LOGGING_KEY, SCRIPT_BLOCK_LOGGING_VALUE) {
-        Ok(Some(1)) => Ok("enabled"),
-        Ok(Some(0)) => Ok("disabled"),
-        Ok(None) => Ok("not_configured"),
-        Ok(Some(_)) => Err(UnmeasuredReason::ReadFailed),
-        Err(error) => Err(reason_for(&error)),
+    let data = host
+        .read_value(SCRIPT_BLOCK_LOGGING_KEY, SCRIPT_BLOCK_LOGGING_VALUE)
+        .map_err(|error| reason_for(&error))?;
+    Ok(match windows_powershell_text(data) {
+        Some("1") => "enabled",
+        Some("0") => "disabled",
+        _ => "not_configured",
+    })
+}
+
+/// A value as the text 5.1's comparison would see: a number in decimal, a string as it is stored, and
+/// nothing for a type whose data is not a number or a string.
+fn windows_powershell_text(data: Option<RegistryData>) -> Option<&'static str> {
+    match data {
+        Some(RegistryData::Dword(1) | RegistryData::Qword(1)) => Some("1"),
+        Some(RegistryData::Dword(0) | RegistryData::Qword(0)) => Some("0"),
+        Some(RegistryData::Text(text)) if text == "1" => Some("1"),
+        Some(RegistryData::Text(text)) if text == "0" => Some("0"),
+        _ => None,
     }
 }
 
@@ -549,18 +568,28 @@ tpm:
         assert_eq!(field(&run, "script_block_logging"), Some("disabled"));
     }
 
-    /// A number other than 0 or 1, or a value of another type, is there and names nothing this program
-    /// can name — never "off", and never "not configured".
+    /// The values Windows PowerShell 5.1 was measured to read on one CI runner (ADR 0038, amended
+    /// 2026-09-14): 1 or 0 as text counts whatever the type, and anything else is no policy.
     #[test]
-    fn a_script_block_logging_value_that_means_nothing_known_is_a_gap() {
-        for value in ["2", "'0'"] {
+    fn script_block_logging_follows_what_windows_powershell_was_measured_to_do() {
+        for (value, expected) in [
+            ("1", "enabled"),
+            ("0", "disabled"),
+            ("2", "not_configured"),
+            ("'1'", "enabled"),
+            ("'0'", "disabled"),
+            ("'01'", "not_configured"),
+            ("{ qword: 1 }", "enabled"),
+            ("{ qword: 0 }", "disabled"),
+            ("{ content: '0' }", "not_configured"),
+        ] {
             let run = Posture.collect(&with_script_block_logging(value));
-            assert_eq!(field(&run, "script_block_logging"), None, "{value}");
             assert_eq!(
-                gap_for(&run, "script_block_logging"),
-                Some(UnmeasuredReason::ReadFailed),
+                field(&run, "script_block_logging"),
+                Some(expected),
                 "{value}"
             );
+            assert_eq!(gap_for(&run, "script_block_logging"), None, "{value}");
         }
     }
 

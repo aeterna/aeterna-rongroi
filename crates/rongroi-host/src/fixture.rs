@@ -12,8 +12,8 @@ use serde::Deserialize;
 use crate::{
     BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DirEntryInfo,
     EnvironmentSource, EventLogConfigSource, FilesystemSource, FirmwareSecureBoot, FirmwareSource,
-    Host, Platform, ProcessRecord, ProcessSource, RegistrySource, SignatureCheck, SignatureSource,
-    SourceError, SystemIntegritySource, TpmInfo, TpmSource,
+    Host, Platform, ProcessRecord, ProcessSource, RegistryData, RegistrySource, SignatureCheck,
+    SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -199,16 +199,25 @@ struct FixtureProcess {
     path: Option<String>,
 }
 
-/// One registry value as the YAML writes it. A number is a `REG_DWORD`, a string is a `REG_SZ`, and
-/// a map is a `REG_BINARY` whose bytes are written the two ways a file's bytes are (ADR 0019):
-/// `content:` inline, or `from:` a file under `fixtures/`. The three cannot be confused for one
-/// another, which is what makes the untagged enum safe to extend.
+/// One registry value as the YAML writes it. A number is a `REG_DWORD`, a string is a `REG_SZ`, a map
+/// with the one key `qword:` is a `REG_QWORD` (ADR 0038), and any other map is a `REG_BINARY` whose
+/// bytes are written the two ways a file's bytes are (ADR 0019): `content:` inline, or `from:` a file
+/// under `fixtures/`. None can be confused for another — both maps refuse each other's keys — which
+/// is what makes the untagged enum safe to extend.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum RegistryValue {
     Dword(u32),
     Text(String),
+    Qword(FixtureQword),
     Binary(FixtureBinary),
+}
+
+/// A `REG_QWORD`, written `{ qword: 0 }`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureQword {
+    qword: u64,
 }
 
 /// The bytes of one `REG_BINARY` value. Neither `content:` nor `from:` describes a value that is
@@ -234,6 +243,7 @@ struct StoredValue {
 #[derive(Debug, Clone)]
 enum StoredData {
     Dword(u32),
+    Qword(u64),
     Text(String),
     /// `None` describes a value that is there and cannot be read.
     Binary(Option<Vec<u8>>),
@@ -451,6 +461,7 @@ fn resolve_value(
     let data = match described {
         RegistryValue::Dword(number) => StoredData::Dword(number),
         RegistryValue::Text(text) => StoredData::Text(text),
+        RegistryValue::Qword(qword) => StoredData::Qword(qword.qword),
         RegistryValue::Binary(binary) => StoredData::Binary(resolve_content(
             binary.content,
             binary.from,
@@ -639,6 +650,10 @@ impl RegistrySource for FixtureHost {
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError> {
         match self.lookup(key, value)?.map(|stored| &stored.data) {
             Some(StoredData::Dword(number)) => Ok(Some(*number)),
+            // A live host's reader accepts a `REG_QWORD` that fits, so this one does too.
+            Some(StoredData::Qword(number)) => u32::try_from(*number)
+                .map(Some)
+                .map_err(|_| SourceError::Failed("a QWORD too large for a DWORD".to_owned())),
             Some(StoredData::Text(_)) => Err(SourceError::Failed(
                 "expected a DWORD, found a string".to_owned(),
             )),
@@ -652,8 +667,8 @@ impl RegistrySource for FixtureHost {
     fn read_string(&self, key: &str, value: &str) -> Result<Option<String>, SourceError> {
         match self.lookup(key, value)?.map(|stored| &stored.data) {
             Some(StoredData::Text(text)) => Ok(Some(text.clone())),
-            Some(StoredData::Dword(_)) => Err(SourceError::Failed(
-                "expected a string, found a DWORD".to_owned(),
+            Some(StoredData::Dword(_) | StoredData::Qword(_)) => Err(SourceError::Failed(
+                "expected a string, found a number".to_owned(),
             )),
             Some(StoredData::Binary(_)) => Err(SourceError::Failed(
                 "expected a string, found a binary value".to_owned(),
@@ -723,11 +738,26 @@ impl RegistrySource for FixtureHost {
             Some(StoredData::Binary(None)) => Err(SourceError::Failed(format!(
                 "no bytes recorded for {key}\\{value}"
             ))),
-            Some(StoredData::Dword(_) | StoredData::Text(_)) => Err(SourceError::Failed(
-                "expected a binary value, found a DWORD or a string".to_owned(),
-            )),
+            Some(StoredData::Dword(_) | StoredData::Qword(_) | StoredData::Text(_)) => {
+                Err(SourceError::Failed(
+                    "expected a binary value, found a number or a string".to_owned(),
+                ))
+            }
             None => Ok(None),
         }
+    }
+
+    /// The type and data the fixture wrote, through the same limit a live host applies to a string.
+    /// A binary value is a type whose data this method does not read.
+    fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError> {
+        let data = match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Dword(number)) => RegistryData::Dword(*number),
+            Some(StoredData::Qword(number)) => RegistryData::Qword(*number),
+            Some(StoredData::Text(text)) => RegistryData::Text(text.clone()),
+            Some(StoredData::Binary(_)) => RegistryData::OtherType,
+            None => return Ok(None),
+        };
+        crate::bound_registry_data(data, crate::MAX_REGISTRY_VALUE_BYTES).map(Some)
     }
 }
 
@@ -1077,6 +1107,62 @@ processes:
 "#;
 
     const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+    /// `read_value` hands back each type the fixture can write, and a `{ qword: }` map is neither a
+    /// binary value nor a number `read_u32` refuses: a live host's reader accepts a QWORD that fits.
+    #[test]
+    fn read_value_names_the_type_the_fixture_wrote() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nregistry:\n  'HKCU\\Software\\Example':\n    Dword: 0\n    Text: '0'\n    Qword: { qword: 1 }\n    Large: { qword: 4294967296 }\n    Blob: { content: 'x' }\n",
+            "inline",
+        )
+        .unwrap();
+        let key = r"HKCU\Software\Example";
+        assert_eq!(
+            host.read_value(key, "Dword"),
+            Ok(Some(RegistryData::Dword(0)))
+        );
+        assert_eq!(
+            host.read_value(key, "Text"),
+            Ok(Some(RegistryData::Text("0".to_owned())))
+        );
+        assert_eq!(
+            host.read_value(key, "Qword"),
+            Ok(Some(RegistryData::Qword(1)))
+        );
+        assert_eq!(
+            host.read_value(key, "Blob"),
+            Ok(Some(RegistryData::OtherType))
+        );
+        assert_eq!(host.read_value(key, "Absent"), Ok(None));
+        assert_eq!(host.read_value(r"HKCU\Software\Absent", "Dword"), Ok(None));
+        assert_eq!(host.read_u32(key, "Qword"), Ok(Some(1)));
+        assert!(matches!(
+            host.read_u32(key, "Large"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_bytes(key, "Qword"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_string(key, "Qword"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_denied_key_denies_read_value_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['HKCU\\Software\\Locked']\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.read_value(r"HKCU\Software\Locked", "Anything"),
+            Err(SourceError::AccessDenied)
+        );
+    }
 
     #[test]
     fn reads_values_case_insensitively() {

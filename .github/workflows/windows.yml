@@ -421,6 +421,192 @@ jobs:
           } else {
             Write-Output 'bam registry: no UserSettings key'
           }
+      # ADR 0038: what Windows PowerShell 5.1 and PowerShell 7 do with a script block logging policy, measured
+      # rather than read from one engine's source. For each case the policy values are written, both engines'
+      # Operational logs are cleared, and each engine runs two one-line blocks in fresh processes: an inert one,
+      # which only a policy that turns logging on should record, and an inert one holding one word from
+      # PowerShell's public list of suspicious content, which PowerShell records by itself unless a policy turns
+      # logging off. Each block carries a nonce, and event 4104 carrying it is counted. The CLI scans after
+      # every case and prints what it reports, so the collector's reading can be compared with what the engines
+      # did. The runner is thrown away, which is the only reason writing policy keys is acceptable here, and
+      # every key is put back as it was found. It runs before the Event Log service is suspended below.
+      - name: What PowerShell does with a script block logging policy
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build --locked --quiet -p rongroi-cli
+          $exe = Join-Path $PWD 'target\debug\aeterna-rongroi-cli.exe'
+          if (-not (Test-Path $exe)) { throw "the CLI was not built at $exe" }
+          $windowsPowerShell = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe"
+          $powerShell7 = (Get-Command pwsh -ErrorAction Stop).Source
+          Write-Output "powershell.exe $((Get-Item $windowsPowerShell).VersionInfo.ProductVersion) · pwsh $($PSVersionTable.PSVersion) at $powerShell7"
+          $winLog = 'Microsoft-Windows-PowerShell/Operational'
+          $coreLog = 'PowerShellCore/Operational'
+
+          # PowerShell 7 writes to its own channel only once its event provider is registered
+          # (about_Logging_Windows). Registered here if the image did not, and unregistered afterwards.
+          $registeredHere = $false
+          if (-not (Get-WinEvent -ListLog $coreLog -ErrorAction SilentlyContinue)) {
+            & (Join-Path $PSHOME 'RegisterManifest.ps1')
+            $registeredHere = $true
+          }
+          Write-Output "PowerShellCore/Operational registered by this step: $registeredHere"
+          $config = Join-Path $PSHOME 'powershell.config.json'
+          if (Test-Path $config) { Write-Output "powershell.config.json: $((Get-Content $config -Raw) -replace '\s+', ' ')" }
+
+          $keys = [ordered]@{
+            WinLM  = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging'
+            WinCU  = 'HKCU\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging'
+            WinLMParent = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell'
+            WinCUParent = 'HKCU\SOFTWARE\Policies\Microsoft\Windows\PowerShell'
+            CoreLM = 'HKLM\SOFTWARE\Policies\Microsoft\PowerShellCore'
+            CoreCU = 'HKCU\SOFTWARE\Policies\Microsoft\PowerShellCore'
+          }
+          $saved = @{}
+          $backup = Join-Path $env:RUNNER_TEMP 'rongroi-sbl'
+          New-Item -ItemType Directory -Force $backup | Out-Null
+          foreach ($name in $keys.Keys) {
+            $file = Join-Path $backup "$name.reg"
+            reg query $keys[$name] 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { reg export $keys[$name] $file /y | Out-Null; $saved[$name] = $file }
+            Write-Output "before: $name $(if ($saved[$name]) { 'present' } else { 'absent' })"
+          }
+          # Who may write a per-user policy. Account and machine names are replaced, never printed.
+          $policies = 'HKCU:\Software\Policies'
+          if (Test-Path $policies) {
+            (Get-Acl $policies).Access | ForEach-Object {
+              $who = "$($_.IdentityReference)".Replace($env:COMPUTERNAME, '<machine>').Replace($env:USERNAME, '<account>')
+              Write-Output "HKCU\Software\Policies ACE: $who $($_.AccessControlType) $($_.RegistryRights) inherited=$($_.IsInherited)"
+            }
+          }
+
+          function ClearPolicy {
+            foreach ($name in 'WinLM', 'WinCU', 'CoreLM', 'CoreCU') { reg delete $keys[$name] /f 2>&1 | Out-Null }
+          }
+          function SetValue([string] $key, [string] $name, [string] $type, [string] $data) {
+            if ($type -eq 'KEY') { reg add $key /f | Out-Null } else { reg add $key /v $name /t $type /d $data /f | Out-Null }
+            if ($LASTEXITCODE -ne 0) { throw "reg add $key $name failed" }
+          }
+          $winSbl = $keys.WinLM
+          $winSblUser = $keys.WinCU
+          $coreSbl = "$($keys.CoreLM)\ScriptBlockLogging"
+          $coreSblUser = "$($keys.CoreCU)\ScriptBlockLogging"
+          $enable = 'EnableScriptBlockLogging'
+          $fallback = 'UseWindowsPowerShellPolicySetting'
+          $cases = [ordered]@{
+            'no policy'                                  = @()
+            'machine DWORD 1'                            = @(, @($winSbl, $enable, 'REG_DWORD', '1'))
+            'machine DWORD 0'                            = @(, @($winSbl, $enable, 'REG_DWORD', '0'))
+            'machine DWORD 2'                            = @(, @($winSbl, $enable, 'REG_DWORD', '2'))
+            'machine REG_SZ 1'                           = @(, @($winSbl, $enable, 'REG_SZ', '1'))
+            'machine REG_SZ 0'                           = @(, @($winSbl, $enable, 'REG_SZ', '0'))
+            'machine REG_QWORD 1'                        = @(, @($winSbl, $enable, 'REG_QWORD', '1'))
+            'machine REG_QWORD 0'                        = @(, @($winSbl, $enable, 'REG_QWORD', '0'))
+            'machine key with no value'                  = @(, @($winSbl, '', 'KEY', ''))
+            'user DWORD 1'                               = @(, @($winSblUser, $enable, 'REG_DWORD', '1'))
+            'user DWORD 0'                               = @(, @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'user REG_SZ 0'                              = @(, @($winSblUser, $enable, 'REG_SZ', '0'))
+            'machine DWORD 1, user DWORD 0'              = @(@($winSbl, $enable, 'REG_DWORD', '1'), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'machine DWORD 0, user DWORD 1'              = @(@($winSbl, $enable, 'REG_DWORD', '0'), @($winSblUser, $enable, 'REG_DWORD', '1'))
+            'machine key with no value, user DWORD 0'    = @(@($winSbl, '', 'KEY', ''), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'machine DWORD 2, user DWORD 0'              = @(@($winSbl, $enable, 'REG_DWORD', '2'), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine DWORD 1'                       = @(, @($coreSbl, $enable, 'REG_DWORD', '1'))
+            'pwsh machine DWORD 0'                       = @(, @($coreSbl, $enable, 'REG_DWORD', '0'))
+            'pwsh machine REG_SZ 0'                      = @(, @($coreSbl, $enable, 'REG_SZ', '0'))
+            'pwsh machine REG_QWORD 0'                   = @(, @($coreSbl, $enable, 'REG_QWORD', '0'))
+            'pwsh machine fallback 1, machine DWORD 0'   = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($winSbl, $enable, 'REG_DWORD', '0'))
+            'pwsh machine fallback 1, machine DWORD 1'   = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($winSbl, $enable, 'REG_DWORD', '1'))
+            'pwsh machine fallback 1, no machine policy' = @(, @($coreSbl, $fallback, 'REG_DWORD', '1'))
+            'pwsh machine fallback 1 and DWORD 0, machine DWORD 1' = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($coreSbl, $enable, 'REG_DWORD', '0'), @($winSbl, $enable, 'REG_DWORD', '1'))
+            'pwsh user DWORD 0'                          = @(, @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine DWORD 1, pwsh user DWORD 0'    = @(@($coreSbl, $enable, 'REG_DWORD', '1'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh user fallback 1, user DWORD 0'         = @(@($coreSblUser, $fallback, 'REG_DWORD', '1'), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            # Added after the first run, from PowerShell 7's source and from the 5.1 comparison seen there.
+            'machine REG_SZ 01'                          = @(, @($winSbl, $enable, 'REG_SZ', '01'))
+            'machine REG_EXPAND_SZ 0'                    = @(, @($winSbl, $enable, 'REG_EXPAND_SZ', '0'))
+            'machine REG_MULTI_SZ 0'                     = @(, @($winSbl, $enable, 'REG_MULTI_SZ', '0'))
+            'pwsh machine REG_SZ 0, pwsh user DWORD 0'   = @(@($coreSbl, $enable, 'REG_SZ', '0'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine DWORD 2, pwsh user DWORD 0'    = @(@($coreSbl, $enable, 'REG_DWORD', '2'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine invocation logging 1 only, pwsh user DWORD 0' = @(@($coreSbl, 'EnableScriptBlockInvocationLogging', 'REG_DWORD', '1'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine fallback 1 with no machine key, pwsh user DWORD 0' = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine fallback 1, machine REG_SZ 0'  = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($winSbl, $enable, 'REG_SZ', '0'))
+            'pwsh machine fallback REG_SZ 1, machine DWORD 0' = @(@($coreSbl, $fallback, 'REG_SZ', '1'), @($winSbl, $enable, 'REG_DWORD', '0'))
+          }
+
+          # An engine that fails is recorded, not thrown: what PowerShell does with a malformed policy is
+          # part of what is measured. Its first line of output is kept for the log.
+          function Run([string] $engine, [string] $block) {
+            $out = & $engine -NoLogo -NoProfile -NonInteractive -Command $block 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { return "exit $LASTEXITCODE`: $(($out -split "`n")[0].Trim())" }
+            ''
+          }
+          function Count([string] $log, [string] $nonce) {
+            $found = @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue | Where-Object { $_.Id -eq 4104 -and $_.ToXml().Contains($nonce) })
+            $levels = ($found | Group-Object Level | ForEach-Object { "L$($_.Name)x$($_.Count)" }) -join '+'
+            if ($found.Count -eq 0) { '0' } else { "$($found.Count)($levels)" }
+          }
+
+          $rows = @()
+          try {
+            foreach ($case in $cases.Keys) {
+              ClearPolicy
+              foreach ($write in $cases[$case]) { SetValue @write }
+              wevtutil cl $winLog
+              wevtutil cl $coreLog
+              $nonce = [guid]::NewGuid().ToString('N')
+              $inert = "Write-Output rongroi-sbl-inert-$nonce"
+              $listed = '$null = [IntPtr]::Size; Write-Output rongroi-sbl-listed-' + $nonce
+              $failures = @(
+                Run $windowsPowerShell $inert
+                Run $windowsPowerShell ($listed.Replace('-listed-', '-listed-win-'))
+                Run $powerShell7 ($inert.Replace('-inert-', '-inert-core-'))
+                Run $powerShell7 ($listed.Replace('-listed-', '-listed-core-'))
+              ) | Where-Object { $_ }
+              Start-Sleep -Seconds 3
+              $json = & $exe scan --json | Out-String
+              if ($LASTEXITCODE -ne 0) { throw "the scan exited $LASTEXITCODE in case '$case'" }
+              $scan = $json | ConvertFrom-Json
+              $observations = @($scan.evidence | ForEach-Object { $_.observations }) + @($scan.unmatched | ForEach-Object { $_.observations }) | Where-Object { $_ -and $_.collector -eq 'posture' }
+              $fields = $observations | Select-Object -First 1 | ForEach-Object { $_.fields }
+              $read = ($fields.PSObject.Properties | Where-Object Name -like 'script_block_logging*' | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' '
+              $postureGaps = @($scan.evidence | Where-Object { $_.collector -eq 'posture' -and $_.state -eq 'unmeasured' } | ForEach-Object { "$($_.rule_id.Substring(0,8))/$($_.reason)" }) -join ' '
+              # script-block-logging-disabled-by-policy, …-by-user-policy, pwsh-…-by-policy, pwsh-…-by-user-policy.
+              $ruleIds = @('88eb2aca-a33e-414d-bd0f-cfb87af95a2d', '869c34b6-7b32-4f56-a281-9f5ac00e43c4', '98ee9213-39f3-4219-b2ac-f2bb3d21d6cc', 'e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7')
+              $rules = @($ruleIds | ForEach-Object { $id = $_; $scan.evidence | Where-Object { $_.rule_id -eq $id } } | ForEach-Object { "$($_.rule_id.Substring(0,8))=$($_.state)" }) -join ' '
+              $row = [pscustomobject]@{
+                case = $case
+                win_inert = Count $winLog "rongroi-sbl-inert-$nonce"
+                win_listed = Count $winLog "rongroi-sbl-listed-win-$nonce"
+                core_inert = Count $coreLog "rongroi-sbl-inert-core-$nonce"
+                core_listed = Count $coreLog "rongroi-sbl-listed-core-$nonce"
+                collector = $read
+                rules = $rules
+                posture_unmeasured = $postureGaps
+                engine_failures = $failures -join ' | '
+              }
+              $rows += $row
+              Write-Output ("case '{0}': powershell.exe inert {1} listed {2} · pwsh inert {3} listed {4} · CLI {5} · {6} {7} {8}" -f $row.case, $row.win_inert, $row.win_listed, $row.core_inert, $row.core_listed, $row.collector, $row.rules, $row.posture_unmeasured, $row.engine_failures)
+            }
+          } finally {
+            ClearPolicy
+            foreach ($name in 'WinLMParent', 'WinCUParent') { if (-not $saved[$name]) { reg delete $keys[$name] /f 2>&1 | Out-Null } }
+            foreach ($name in $saved.Keys) { reg import $saved[$name] 2>&1 | Out-Null }
+            foreach ($name in $keys.Keys) {
+              reg query $keys[$name] 2>&1 | Out-Null
+              $now = $LASTEXITCODE -eq 0
+              if ($now -ne [bool]$saved[$name]) { throw "$name was $(if ($saved[$name]) { 'present' } else { 'absent' }) before and is not now" }
+            }
+            if ($registeredHere) { & (Join-Path $PSHOME 'RegisterManifest.ps1') -Unregister }
+          }
+          $rows | Format-Table -AutoSize | Out-String -Width 400 | Write-Output
+          # A log that records nothing would make every zero above look like a measurement.
+          $on = $rows | Where-Object case -eq 'machine DWORD 1'
+          if ($on.win_inert -eq '0') { throw 'powershell.exe recorded nothing with the machine policy on, so its zeros say nothing' }
+          $coreOn = $rows | Where-Object case -eq 'pwsh machine DWORD 1'
+          if ($coreOn.core_inert -eq '0') { throw 'pwsh recorded nothing with its machine policy on, so its zeros say nothing' }
+          # `reg query` on a key that is absent leaves exit code 1 behind, which the runner would report.
+          exit 0
       # ADR 0042 §5, amended 2026-09-14: the channel-configuration reads go to the Event Log service, and a
       # service that never answers must cost its own bound (CONFIG_BUDGET, 5 s) and the three configuration
       # fields — not the scan, and not the evtx rules that read only the logs' bytes. The unit test proves
