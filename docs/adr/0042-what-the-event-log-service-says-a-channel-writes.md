@@ -327,10 +327,11 @@ PowerShell 7, read-only:
 |---|---|---|---|---|---|---|
 | one Windows 11 machine, build 26220, elevated, 2026-09-14, first pass | 1 243 | 0 | 237 ms | 0.13 ms | 1.29 ms | 4.89 ms |
 | the same machine, second pass | 1 243 | 0 | 223 ms | 0.12 ms | 0.28 ms | 1.32 ms |
+| GitHub `windows-latest`, build 26100, elevated, 2026-09-14 (run 34804602575, this amendment's CI step) | 1 262 | 0 | 316 ms | 0.24 ms | 0.34 ms | 15.19 ms |
 
-A collection asks only about the channels a log's records name, once each — 148 on that machine
-(section "What was measured, and where") — so a scan asks for a fraction of that sweep. The Windows CI
-job now prints the same sweep for the runner before it suspends the service.
+A collection asks only about the channels a log's records name, once each — the first machine compared
+148 logs (section "What was measured, and where") and the runner 126 in the live smoke of the same run —
+so a scan asks for a fraction of that sweep.
 
 ### Decision
 
@@ -385,7 +386,11 @@ the row, that is a field of its own and a snapshot change on every `evtx` host; 
   zero still refuses the logs `budget_exhausted` / `not_attempted` and gaps every field `budget_spent`.
 - The Windows CI step now also requires every `evtx` rule other than the configured-path rule not to be
   `budget_spent`, the folder account's `budget_exhausted` to be false, and the scan to finish in less
-  than 90 s, with the service suspended; it prints each rule's state.
+  than 90 s, with the service suspended; it prints each rule's state. On this amendment's first commit
+  (`30b3a4b`, run 34804602575) the scan finished in **20.9 s**; `event-log-file-cleared` and
+  `security-audit-log-cleared` were `found`, `event-log-file-read-only` `not_found`, the configured-path
+  rule `unmeasured / budget_spent`; 220 logs, 220 examined, 0 refused, `budget_exhausted` false. The
+  same three rules, with the service running, were `found`, `found` and `not_found` in the step before.
 
 ### What is unverified
 
