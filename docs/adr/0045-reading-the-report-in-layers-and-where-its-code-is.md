@@ -164,5 +164,7 @@ A state is never shown by colour alone: `found` is a filled square, `not_found` 
 - Two pull requests: the core and CLI part with this ADR, then the desktop UI on top of it.
 - A future rule whose collector has no file of its own name fails the rule-files test and must extend
   `RuleFiles` rather than link to a guess.
+- Every rule needs a `tests/` folder, `experimental` ones included, because the report links to it;
+  `cargo xtask check-rules` refuses a rule without one.
 - The M3 collectors (vulnerable drivers, USN journal) land in this layout: their hashes, signers and
   journal fields go in layer 3, not in the row.

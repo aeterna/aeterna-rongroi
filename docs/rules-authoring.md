@@ -191,7 +191,8 @@ They are synthetic observations — never real player data, never cheat binaries
 ```
 
 Optional: `gaps` (field → reason) and `expect_matches`. `status: test` and `stable` require at least one of
-each kind.
+each kind. Every rule, `experimental` included, needs a `tests/` folder holding at least one fixture file,
+because the report links to it and `check-rules` refuses a rule without one (ADR 0045).
 
 ## Translations
 
