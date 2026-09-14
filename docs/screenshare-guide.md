@@ -95,7 +95,7 @@ change the results. The consent screen decides what is shown.
 Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
 
 - **Do not use `--yes` to skip a question the player has not answered.** The flag exists for a
-  player who has already agreed (§9).
+  player who has already agreed.
 - If the player refuses, the program prints `Scan cancelled. Nothing was read.` and reads nothing.
   What your server does after a refusal is your server's rule. The tool does not measure it.
 
@@ -174,7 +174,7 @@ These are counts of what SS mode does not list. §7 says why.
 | A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here | presence | `experimental` | the same as for Legacy's plugins folder; whether Enhanced loads this folder at all is not known |
 | A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature | presence | `experimental` | the same as for Legacy's plugins folder |
 | A FiveM file's signature could not be checked | context | `experimental` | antivirus or an updater holding the file open, a path too long, a Windows answer this program does not classify, security software blocking the read |
-| FiveM.exe has no embedded signature that verifies here | presence | `experimental` | a PC that has not yet fetched the certificate authority's root (not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
+| FiveM.exe has no embedded signature that verifies here | presence | `experimental` | a PC whose certificate store does not yet hold the root the signature chains to (measured with other publishers' files: that reads as could not be verified offline, not as invalid; FiveM.exe's own chain was not measured), an interrupted update or a disk problem, a client built from Cfx.re's source, beta builds (not measured) |
 | FiveM.exe is validly signed, but not with the certificate this rule knows | presence | `experimental` | **the publisher renewed its certificate**, a FiveM.exe not updated since before 2026-07-21, beta builds (not measured) |
 | The firmware reports Secure Boot off while Windows reports it on | posture | `experimental` | virtual machines, firmware that reports Secure Boot inconsistently after an update or a key reset, a disk moved to other hardware or a firmware setting changed before Windows recorded it. Needs administrator rights |
 | A machine policy turns Windows PowerShell script block logging off | posture | `experimental` | PCs managed by an employer or school, security or privacy baselines, debloat guides and optimiser tools, policies left over from earlier management |
