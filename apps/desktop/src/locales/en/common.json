@@ -47,5 +47,30 @@
     "copy_copied": "Copied",
     "copy_failed": "Could not copy — select the text instead",
     "qr_alt": "QR code for {{url}}"
+  },
+  "nav": {
+    "about": "About & code"
+  },
+  "about": {
+    "title": "About this program and its code",
+    "intro": "aeterna-rongroi is open source: anyone can read what it reads on a PC and what each check decides from.",
+    "repository": "All of the code",
+    "this_build_code": "The code of this build",
+    "code_unknown": "The code this build was made from is not known: it was not built by the release workflow.",
+    "this_file": "This program",
+    "build": "Build",
+    "official": "official build",
+    "version": "Version",
+    "commit": "Commit",
+    "exe_sha256": "SHA-256",
+    "rules": "Rules",
+    "license": "Licence",
+    "unknown": "not known",
+    "verify_title": "Check that this file was built from this code",
+    "verify_hash": "Open this version's release page on GitHub and compare the SHA-256 above with the line for this file in SHA256SUMS.",
+    "verify_attestation": "With the GitHub CLI:",
+    "verify_unofficial": "If this window shows UNOFFICIAL BUILD or the hash differs, do not rely on its results.",
+    "no_web_title": "Why no button opens a web page",
+    "no_web_body": "This program has no network code, so it cannot open a web page. Copy a link into a browser, or scan its QR code with a phone."
   }
 }

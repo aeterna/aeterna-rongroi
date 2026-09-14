@@ -7,11 +7,12 @@ import { useTranslation } from "react-i18next";
 import { type ElevateOutcome, relaunchElevated, reportHeader } from "./api";
 import { languageNames, supportedLanguages } from "./i18n";
 import type { Mode, ReportHeader } from "./types";
+import { About } from "./views/About";
 import { Consent } from "./views/Consent";
 import { Report } from "./views/Report";
 import { UnofficialBanner } from "./views/UnofficialBanner";
 
-type Screen = "start" | "consent" | "declined" | { report: Mode };
+type Screen = "start" | "consent" | "declined" | "about" | { report: Mode };
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -30,16 +31,24 @@ export function App() {
           <h1>{t("app.name")}</h1>
           <p className="muted">{t("app.tagline")}</p>
         </div>
-        <label className="language">
-          {t("language.label")}{" "}
-          <select value={i18n.language} onChange={(e) => void i18n.changeLanguage(e.target.value)}>
-            {supportedLanguages.map((lang) => (
-              <option key={lang} value={lang}>
-                {languageNames[lang]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="top-actions">
+          <button type="button" className="nav" onClick={() => setScreen("about")}>
+            {t("nav.about")}
+          </button>
+          <label className="language">
+            {t("language.label")}{" "}
+            <select
+              value={i18n.language}
+              onChange={(e) => void i18n.changeLanguage(e.target.value)}
+            >
+              {supportedLanguages.map((lang) => (
+                <option key={lang} value={lang}>
+                  {languageNames[lang]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </header>
 
       {header && !header.provenance.official && <UnofficialBanner />}
@@ -47,14 +56,16 @@ export function App() {
       {screen === "start" && (
         <section className="start">
           <h2>{t("start.title")}</h2>
-          <button type="button" onClick={() => setScreen({ report: "self" })}>
-            {t("start.self_button")}
-          </button>
-          <p className="muted">{t("start.self_hint")}</p>
-          <button type="button" onClick={() => setScreen("consent")}>
-            {t("start.ss_button")}
-          </button>
-          <p className="muted">{t("start.ss_hint")}</p>
+          <div className="choices">
+            <button type="button" className="choice" onClick={() => setScreen({ report: "self" })}>
+              <span className="choice-title">{t("start.self_button")}</span>
+              <span className="muted">{t("start.self_hint")}</span>
+            </button>
+            <button type="button" className="choice" onClick={() => setScreen("consent")}>
+              <span className="choice-title">{t("start.ss_button")}</span>
+              <span className="muted">{t("start.ss_hint")}</span>
+            </button>
+          </div>
           {/* Only worth offering while this scan ran without the rights some checks need. */}
           {header?.elevated === false && (
             <>
@@ -84,6 +95,8 @@ export function App() {
           <p>{t("declined.body")}</p>
         </section>
       )}
+
+      {screen === "about" && <About onBack={() => setScreen("start")} />}
 
       {typeof screen === "object" && (
         <Report mode={screen.report} onBack={() => setScreen("start")} />

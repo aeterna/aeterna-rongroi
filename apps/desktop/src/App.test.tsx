@@ -569,4 +569,54 @@ describe("App", () => {
     expect(rulePath.parentElement?.querySelector("button")).toBeNull();
     expect(screen.getAllByText(/This build is not official/).length).toBeGreaterThan(0);
   });
+
+  it("opens About & code from the start screen, with the repository and its QR code", async () => {
+    stubClipboard("ok");
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    expect(await screen.findByText("About this program and its code")).toBeTruthy();
+    expect(screen.getByText(REPOSITORY)).toBeTruthy();
+    const qr = await screen.findByAltText(`QR code for ${REPOSITORY}`);
+    expect(qr.getAttribute("src")).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
+    // The snapshot's build is unofficial: its code is not known, and the page says so.
+    expect(screen.getByText(/The code this build was made from is not known/)).toBeTruthy();
+    // ADR 0003's wording, verbatim.
+    expect(screen.getByText("aeterna-rongroi's own code sends nothing anywhere.")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getAllByText("Copy link")[0] as HTMLElement);
+    });
+    expect(clipboardWrites).toEqual([REPOSITORY]);
+  });
+
+  it("links the commit of an official build and the attestation command for its file", async () => {
+    headerOverride = {
+      ...selfView.header,
+      provenance: { ...selfView.header.provenance, official: true, commit: COMMIT },
+    };
+    linksOverride = {
+      repository: REPOSITORY,
+      code: `${REPOSITORY}/tree/${COMMIT}`,
+      commit: COMMIT,
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    expect(await screen.findByText(`${REPOSITORY}/tree/${COMMIT}`)).toBeTruthy();
+    expect(
+      screen.getByText(
+        `gh attestation verify aeterna-rongroi-${selfView.header.provenance.version}-windows-x64.exe -R aeterna/aeterna-rongroi`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/The code this build was made from is not known/)).toBeNull();
+  });
+
+  it("says a refused copy and leaves the text to select", async () => {
+    stubClipboard("refused");
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    await screen.findByText(REPOSITORY);
+    await act(async () => {
+      fireEvent.click(screen.getAllByText("Copy link")[0] as HTMLElement);
+    });
+    expect(screen.getByText("Could not copy — select the text instead")).toBeTruthy();
+  });
 });
