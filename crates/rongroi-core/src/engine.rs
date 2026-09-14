@@ -6,8 +6,8 @@
 
 use crate::bundle::Bundle;
 use crate::model::{
-    CollectorRun, Evidence, EvidenceState, Observation, OwnTraceEntry, Report, ReportHeader,
-    UnmatchedGroup, UnmeasuredReason,
+    CollectorRun, DiscriminatorGaps, Evidence, EvidenceState, Observation, OwnTraceEntry, Report,
+    ReportHeader, UnmatchedGroup, UnmeasuredReason,
 };
 use crate::rules::{MatchKey, Operator, Rule, Status};
 
@@ -94,6 +94,7 @@ fn unmatched_observations(runs: &[CollectorRun], active: &[&Rule]) -> Vec<Unmatc
             let CollectorRun::Measured {
                 collector,
                 observations,
+                discriminator_gaps,
                 ..
             } = run
             else {
@@ -101,7 +102,11 @@ fn unmatched_observations(runs: &[CollectorRun], active: &[&Rule]) -> Vec<Unmatc
             };
             let observations: Vec<Observation> = observations
                 .iter()
-                .filter(|observation| !active.iter().any(|rule| matches(rule, observation)))
+                .filter(|observation| {
+                    !active
+                        .iter()
+                        .any(|rule| matches_in_run(rule, observation, discriminator_gaps))
+                })
                 .cloned()
                 .collect();
             (!observations.is_empty()).then(|| UnmatchedGroup {
@@ -129,6 +134,7 @@ fn partition_own_traces(
             collector,
             observations,
             gaps,
+            discriminator_gaps,
         } = run
         else {
             kept.push(run.clone());
@@ -149,6 +155,7 @@ fn partition_own_traces(
             collector: collector.clone(),
             observations: remaining,
             gaps: gaps.clone(),
+            discriminator_gaps: discriminator_gaps.clone(),
         });
     }
     (kept, own_traces)
@@ -166,7 +173,10 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
         None => unmeasured(UnmeasuredReason::CollectorUnavailable),
         Some(CollectorRun::Unmeasured { reason, .. }) => unmeasured(*reason),
         Some(CollectorRun::Measured {
-            observations, gaps, ..
+            observations,
+            gaps,
+            discriminator_gaps,
+            ..
         }) => {
             // Checked before anything is matched, and this ordering is the whole of ADR 0029's
             // `exists: false` answer. That operator is satisfied by a field that is not there, and a
@@ -177,9 +187,14 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
             if let Some(reason) = absence_fields(rule).find_map(|field| gaps.get(field)) {
                 return evidence(rule, unmeasured(*reason));
             }
+            // A gap confined to one discriminator value cannot take that early return: an
+            // observation from a place that *was* read lacks a field because it is not there, and
+            // that is a measured answer. What it does instead is keep an observation from the
+            // unreadable place from satisfying the absence — `matches_in_run` — so the same
+            // guarantee holds for exactly the observations the gap is about (ADR 0044).
             let matched: Vec<Observation> = observations
                 .iter()
-                .filter(|observation| matches(rule, observation))
+                .filter(|observation| matches_in_run(rule, observation, discriminator_gaps))
                 .cloned()
                 .collect();
             if !matched.is_empty() {
@@ -188,6 +203,14 @@ pub fn evaluate_rule(rule: &Rule, runs: &[CollectorRun]) -> Evidence {
                 }
             } else if let Some(reason) = rule.match_fields().find_map(|field| gaps.get(field)) {
                 // Nothing matched, but a field the rule needs was never read: "not found" would lie.
+                unmeasured(*reason)
+            } else if let Some(reason) = discriminator_gaps
+                .iter()
+                .filter(|place| could_match_there(rule, place))
+                .find_map(|place| rule.match_fields().find_map(|field| place.gaps.get(field)))
+            {
+                // The same lie, confined to one place: a place this rule could have matched in was
+                // not read. A place the rule's own `match` rules out is not consulted (ADR 0044).
                 unmeasured(*reason)
             } else {
                 EvidenceState::NotFound {
@@ -236,6 +259,45 @@ fn absence_fields(rule: &Rule) -> impl Iterator<Item = &str> {
 /// out of the gap lookup (ADR 0025's objection to a suffix, answered in ADR 0029).
 fn matches(rule: &Rule, observation: &Observation) -> bool {
     unmet_conditions(rule, observation) == Some(0) && !is_allowed(rule, observation)
+}
+
+/// [`matches`], within a run whose discriminator gaps are `places`.
+///
+/// An observation about a place that could not be read does not satisfy `<field>|exists: false` for a
+/// field listed in that place's gaps: the field may be missing because it was never read. This is
+/// ADR 0029's reason for checking run-wide gaps before an absence condition, applied to the one place
+/// the gap is about rather than to the whole run (ADR 0044). Every other condition needs the field
+/// to be present, so a gap cannot make it true and needs no such exclusion.
+fn matches_in_run(rule: &Rule, observation: &Observation, places: &[DiscriminatorGaps]) -> bool {
+    matches(rule, observation)
+        && !places.iter().any(|place| {
+            place.describes(observation)
+                && absence_fields(rule).any(|field| place.gaps.contains_key(field))
+        })
+}
+
+/// Whether `rule` could match an observation about the place `gaps` describes — whether every one of
+/// the rule's conditions on the discriminator holds for the discriminator's value there.
+///
+/// A rule with no condition on the discriminator could match anywhere, so every place's gaps reach
+/// it. A rule whose `location: plugins` cannot be satisfied by `location: enhanced_exe` could never
+/// match an observation from there, so whatever was not read there is not a question this rule
+/// asked. The comparison is the one `match` itself makes — the ASCII fold, `cased`, value lists and
+/// operators included — so the two cannot disagree about which places a rule reaches.
+fn could_match_there(rule: &Rule, gaps: &DiscriminatorGaps) -> bool {
+    rule.conditions()
+        .filter(|(key, _)| key.field() == gaps.discriminator)
+        .all(|(key, expected)| match key {
+            MatchKey::Known { field, operator } => condition_matches(
+                operator,
+                expected,
+                Some(&gaps.value),
+                rule.cased.contains(field),
+            ),
+            // `rules::validate` refuses such a key. If one arrived, reaching the place is the answer
+            // that leaves the rule `unmeasured` rather than `not_found`.
+            MatchKey::UnknownOperator { .. } => true,
+        })
 }
 
 /// How many of `rule`'s `match` conditions `observation` fails to satisfy, or `None` when the
@@ -621,6 +683,7 @@ date: 2026-09-12
             collector: "process".to_owned(),
             observations,
             gaps: BTreeMap::new(),
+            discriminator_gaps: Vec::new(),
         }
     }
 
@@ -879,6 +942,7 @@ date: 2026-09-12
             collector: "posture".to_owned(),
             observations,
             gaps: BTreeMap::new(),
+            discriminator_gaps: Vec::new(),
         }
     }
 
@@ -975,6 +1039,7 @@ date: 2026-09-12
             collector: "posture".to_owned(),
             observations: vec![],
             gaps: BTreeMap::from([("secure_boot".to_owned(), UnmeasuredReason::AccessDenied)]),
+            discriminator_gaps: Vec::new(),
         };
         let evidence = evaluate_rule(&rule(""), &[run]);
         assert_eq!(
@@ -1040,6 +1105,7 @@ date: 2026-09-12
             collector: "posture".to_owned(),
             observations: vec![],
             gaps: BTreeMap::from([("secure_boot".to_owned(), UnmeasuredReason::AccessDenied)]),
+            discriminator_gaps: Vec::new(),
         };
         assert_eq!(
             evaluate_rule(&rule, &[gap]).state,
@@ -1307,6 +1373,7 @@ date: 2026-09-12
             collector: "evtx".to_owned(),
             observations,
             gaps: BTreeMap::new(),
+            discriminator_gaps: Vec::new(),
         }
     }
 
@@ -1316,6 +1383,7 @@ date: 2026-09-12
             collector: "evtx".to_owned(),
             observations: vec![],
             gaps: BTreeMap::from([(field.to_owned(), UnmeasuredReason::ReadFailed)]),
+            discriminator_gaps: Vec::new(),
         }
     }
 
@@ -1548,6 +1616,7 @@ date: 2026-09-12
                 "oldest_record_time".to_owned(),
                 UnmeasuredReason::AccessDenied,
             )]),
+            discriminator_gaps: Vec::new(),
         };
         assert_eq!(
             evaluate_rule(&rule, &[run]).state,
@@ -1567,6 +1636,7 @@ date: 2026-09-12
             collector: "evtx".to_owned(),
             observations: vec![evtx_observation(serde_json::json!({ "log": "Security" }))],
             gaps: BTreeMap::from([("provider".to_owned(), UnmeasuredReason::ReadFailed)]),
+            discriminator_gaps: Vec::new(),
         };
         assert!(found(&evaluate_rule(&rule, &[run])));
     }
@@ -1615,5 +1685,252 @@ date: 2026-09-12
         let rule = evtx_rule("  entries|atleast: 2\n");
         let run = evtx_run(vec![evtx_observation(serde_json::json!({ "entries": 5 }))]);
         assert!(not_found(&evaluate_rule(&rule, &[run])));
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // ADR 0044: a gap confined to one value of a collector's discriminator. The shapes are
+    // `fivem_dir`'s — `location` names the place — because that is the collector that emits them.
+    // ------------------------------------------------------------------------------------------
+
+    /// A `fivem_dir` rule carrying the `match` block given.
+    fn fivem_rule(match_block: &str) -> Rule {
+        let yaml = format!(
+            "id: 6e1d2c3b-4a59-4687-9b0c-1d2e3f405162\ntitle: t\ndescription: d\nstatus: experimental\ncollector: fivem_dir\nstrength: presence\nmatch:\n{match_block}retention: The files in the folder when the scan ran.\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-14\n"
+        );
+        serde_saphyr::from_str(&yaml).expect("the test rule parses")
+    }
+
+    fn fivem_observation(fields: serde_json::Value) -> Observation {
+        Observation {
+            collector: "fivem_dir".to_owned(),
+            fields: serde_json::from_value(fields).expect("the test fields are an object"),
+        }
+    }
+
+    /// Every field of the collector a gap, with `reason`, for the observations at `location` only.
+    fn unreadable(location: &str, reason: UnmeasuredReason) -> DiscriminatorGaps {
+        DiscriminatorGaps {
+            discriminator: "location".to_owned(),
+            value: serde_json::Value::from(location),
+            gaps: ["files", "folder", "location", "path", "sha256", "signature"]
+                .into_iter()
+                .map(|field| (field.to_owned(), reason))
+                .collect(),
+        }
+    }
+
+    fn fivem_run(observations: Vec<Observation>, places: Vec<DiscriminatorGaps>) -> CollectorRun {
+        CollectorRun::Measured {
+            collector: "fivem_dir".to_owned(),
+            observations,
+            gaps: BTreeMap::new(),
+            discriminator_gaps: places,
+        }
+    }
+
+    /// The plugins folder was listed and holds one file with the signature answer given; Enhanced's
+    /// program folder, where its `FiveM.exe` would be, could not be listed.
+    fn plugins_read_enhanced_exe_denied(signature: &str) -> CollectorRun {
+        fivem_run(
+            vec![
+                fivem_observation(
+                    serde_json::json!({ "location": "plugins", "folder": "listed", "files": 1 }),
+                ),
+                fivem_observation(serde_json::json!({
+                    "location": "plugins",
+                    "path": r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins\x.dll",
+                    "signature": signature,
+                })),
+            ],
+            vec![unreadable("enhanced_exe", UnmeasuredReason::AccessDenied)],
+        )
+    }
+
+    const PLUGINS_NOT_VERIFIED: &str = "  location: plugins\n  signature: [no_embedded_signature, invalid, unverifiable_offline]\n";
+
+    /// The defect ADR 0036 recorded. A place this rule's `match` rules out could not be read, and the
+    /// place it asks about was: the answer is what that place holds, found or not found.
+    #[test]
+    fn a_rule_for_a_place_that_was_read_keeps_its_answer_when_another_place_was_not() {
+        let rule = fivem_rule(PLUGINS_NOT_VERIFIED);
+        let fired = evaluate_rule(&rule, &[plugins_read_enhanced_exe_denied("invalid")]);
+        assert!(found(&fired), "{fired:?}");
+        let quiet = evaluate_rule(&rule, &[plugins_read_enhanced_exe_denied("valid")]);
+        assert!(not_found(&quiet), "{quiet:?}");
+    }
+
+    /// The other half: a rule for the place nobody could read is `unmeasured` with that place's
+    /// reason, never `not_found`. A value list reaches the place when any of its values is it, and the
+    /// ASCII fold `match` applies reaches the discriminator too.
+    #[test]
+    fn a_rule_for_the_place_that_was_not_read_is_unmeasured() {
+        for block in [
+            "  location: enhanced_exe\n  signature: valid\n",
+            "  location: [legacy_exe, enhanced_exe]\n  signature: [no_embedded_signature, invalid, unverifiable_offline]\n",
+            "  location: ENHANCED_EXE\n  signature: valid\n",
+        ] {
+            let evidence = evaluate_rule(
+                &fivem_rule(block),
+                &[plugins_read_enhanced_exe_denied("valid")],
+            );
+            assert_eq!(
+                evidence.state,
+                EvidenceState::Unmeasured {
+                    reason: UnmeasuredReason::AccessDenied,
+                    expected: false
+                },
+                "{block}"
+            );
+        }
+    }
+
+    /// `cased` on the discriminator is honoured when deciding which places a rule reaches, exactly as
+    /// it is when matching: a byte comparison that no observation there could satisfy rules it out.
+    #[test]
+    fn a_cased_discriminator_condition_reaches_only_the_spelling_it_names() {
+        let rule = fivem_rule("  location: ENHANCED_EXE\n  signature: valid\ncased: [location]\n");
+        let evidence = evaluate_rule(&rule, &[plugins_read_enhanced_exe_denied("valid")]);
+        assert!(not_found(&evidence), "{evidence:?}");
+    }
+
+    /// A rule that names no place could match in any of them, so the unread one reaches it — and what
+    /// it matched where the collector could read is still `found`.
+    #[test]
+    fn a_rule_without_a_condition_on_the_discriminator_is_reached_by_every_place() {
+        let rule = fivem_rule("  signature: invalid\n");
+        let evidence = evaluate_rule(&rule, &[plugins_read_enhanced_exe_denied("valid")]);
+        assert!(unmeasured(&evidence), "{evidence:?}");
+        let evidence = evaluate_rule(&rule, &[plugins_read_enhanced_exe_denied("invalid")]);
+        assert!(found(&evidence), "{evidence:?}");
+    }
+
+    /// Two places unreadable and one read. Each rule is reached by the unread places its `match`
+    /// allows, and the first of those in the run's order gives the reason — the order is the
+    /// collector's ranking. A rule for the place that was read is still answered.
+    #[test]
+    fn both_places_a_rule_names_unreadable_is_unmeasured() {
+        let run = || {
+            fivem_run(
+                vec![fivem_observation(
+                    serde_json::json!({ "location": "plugins", "folder": "listed", "files": 0 }),
+                )],
+                vec![
+                    unreadable("enhanced_exe", UnmeasuredReason::AccessDenied),
+                    unreadable("legacy_exe", UnmeasuredReason::ReadFailed),
+                ],
+            )
+        };
+        let client = fivem_rule(
+            "  location: [legacy_exe, enhanced_exe]\n  signature: [no_embedded_signature, invalid, unverifiable_offline]\n",
+        );
+        assert_eq!(
+            evaluate_rule(&client, &[run()]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: false
+            }
+        );
+        let legacy = fivem_rule("  location: legacy_exe\n  signature: valid\n");
+        assert_eq!(
+            evaluate_rule(&legacy, &[run()]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::ReadFailed,
+                expected: false
+            }
+        );
+        assert!(not_found(&evaluate_rule(
+            &fivem_rule(PLUGINS_NOT_VERIFIED),
+            &[run()]
+        )));
+    }
+
+    /// ADR 0029's guarantee, confined to a place. The rule asks for a file whose signature is absent.
+    ///
+    /// - Nothing matched anywhere and a place was not read: `unmeasured`, not `not_found`.
+    /// - An observation **from the unreadable place** that lacks `signature` is not a match: its
+    ///   signature may be missing because nobody read it. Without that it would be `found`.
+    /// - A file from a place that was read and genuinely carries no signature is `found`, which a
+    ///   run-wide gap would have hidden.
+    #[test]
+    fn exists_false_is_never_satisfied_by_an_observation_from_a_place_that_was_not_read() {
+        let rule = fivem_rule("  path|exists: true\n  signature|exists: false\n");
+
+        let nothing = evaluate_rule(&rule, &[plugins_read_enhanced_exe_denied("valid")]);
+        assert!(unmeasured(&nothing), "{nothing:?}");
+
+        let from_the_unread_place = fivem_run(
+            vec![fivem_observation(serde_json::json!({
+                "location": "enhanced_exe",
+                "path": r"C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe",
+            }))],
+            vec![unreadable("enhanced_exe", UnmeasuredReason::AccessDenied)],
+        );
+        assert_eq!(
+            evaluate_rule(&rule, &[from_the_unread_place]).state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: false
+            }
+        );
+
+        let from_a_read_place = fivem_run(
+            vec![fivem_observation(serde_json::json!({
+                "location": "plugins",
+                "path": r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins\locked.dll",
+            }))],
+            vec![unreadable("enhanced_exe", UnmeasuredReason::AccessDenied)],
+        );
+        let evidence = evaluate_rule(&rule, &[from_a_read_place]);
+        assert!(found(&evidence), "{evidence:?}");
+    }
+
+    /// A place's gaps reach only the fields they list: a rule whose fields that place did read is not
+    /// made `unmeasured` by it.
+    #[test]
+    fn a_place_whose_gaps_do_not_name_the_rules_fields_leaves_it_alone() {
+        let place = DiscriminatorGaps {
+            discriminator: "location".to_owned(),
+            value: serde_json::Value::from("enhanced_exe"),
+            gaps: BTreeMap::from([("sha256".to_owned(), UnmeasuredReason::ReadFailed)]),
+        };
+        let evidence = evaluate_rule(
+            &fivem_rule("  signature: invalid\n"),
+            &[fivem_run(vec![], vec![place])],
+        );
+        assert!(not_found(&evidence), "{evidence:?}");
+    }
+
+    /// An observation a place's gaps kept from matching by absence is not dropped between the rule and
+    /// the report: no rule matched it, so it is an unmatched observation (ADR 0014).
+    #[test]
+    fn an_observation_kept_from_matching_by_a_place_gap_is_unmatched() {
+        let yaml = "id: 6e1d2c3b-4a59-4687-9b0c-1d2e3f405162\ntitle: t\ndescription: d\nstatus: experimental\ncollector: fivem_dir\nstrength: context\nmatch:\n  path|exists: true\n  signature|exists: false\nretention: r\nfalsepositives: [x]\nauthor: a\ndate: 2026-09-14\n";
+        let json = serde_json::json!({
+            "rules": [{ "path": "fivem_dir/signatures/rule-0/rule.yaml", "yaml": yaml }],
+            "i18n": []
+        })
+        .to_string();
+        let bundle = Bundle::from_bundle_json(&json).unwrap();
+        let seen = fivem_observation(serde_json::json!({
+            "location": "enhanced_exe",
+            "path": r"C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe",
+        }));
+        let report = evaluate(
+            &bundle,
+            &[fivem_run(
+                vec![seen.clone()],
+                vec![unreadable("enhanced_exe", UnmeasuredReason::AccessDenied)],
+            )],
+            header(),
+            &SelfIdentity::default(),
+        );
+        assert!(unmeasured(&report.evidence[0]), "{:?}", report.evidence);
+        assert_eq!(
+            report.unmatched,
+            vec![UnmatchedGroup {
+                collector: "fivem_dir".to_owned(),
+                observations: vec![seen],
+            }]
+        );
     }
 }

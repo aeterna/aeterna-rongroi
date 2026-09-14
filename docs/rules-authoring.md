@@ -43,6 +43,11 @@ Unknown fields are errors. Use `#` comments for notes.
 - If nothing matched but a field in `match` is listed in the run's `gaps`, the rule is `unmeasured` — never
   `not_found`. That is true of **every** operator; the table below says so one by one, and `exists: false`
   is checked against `gaps` before anything is matched at all (ADR 0029).
+- A collector that reads several places may report a gap for **one place** only, keyed by its
+  discriminator (`fivem_dir`: `location`). Such a gap makes the rule `unmeasured` only if the rule could
+  match an observation from that place — every condition the rule puts on `location` holds for that
+  place's value, which is true of a rule that puts none. An observation from that place never satisfies
+  `exists: false` for a field the place could not read (ADR 0044).
 - Otherwise the rule is `not_found`, and the report shows its `retention`.
 
 ### The operators
@@ -138,7 +143,7 @@ cased: [some_field]
 
 Some collectors report a failure on **one** item by leaving a field out of that item's observation,
 not by a gap: `fivem_dir` omits `signature` for a file whose check failed, and `sha256` for one it could
-not hash (ADR 0009). `gaps` covers the whole run, so a gap there would silence every rule on that
+not hash (ADR 0009). A gap covers the whole run, or since ADR 0044 one whole place, so a gap there would silence every rule on that
 collector because of one file. The consequence for a rule author is that such an item satisfies **no**
 equality on the omitted field, and a rule that lists every value the field can take still falls to
 `not_found` for it. Nothing in the engine can tell you this happened.

@@ -153,6 +153,7 @@ impl Collector for Posture {
             collector: ID.to_owned(),
             observations,
             gaps,
+            discriminator_gaps: Vec::new(),
         }
     }
 }

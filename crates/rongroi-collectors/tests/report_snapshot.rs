@@ -124,34 +124,83 @@ fn fivem_dir_client_exe_ss_view_redacts_both_programs_and_shows_nothing_else() {
     assert!(other.contains("Example Signer"), "{other}");
 }
 
-/// A plugin folder nobody could list is a gap in every field, so **every** `fivem_dir` rule is
-/// `unmeasured` — the one asking for an absent `signature` included, whose `exists: false` would
-/// otherwise be satisfied by a folder with nothing read in it. None of them declares `access_denied`,
-/// so SS mode lists each (ADR 0027, ADR 0029, ADR 0036). The same holds when the program folder that
-/// holds `FiveM.exe` is the one denied.
+/// A folder nobody could list is a gap in every field **for the rules that could match there**
+/// (ADR 0044). Those rules are `unmeasured` — the one asking for an absent `signature` included, whose
+/// `exists: false` would otherwise be satisfied by a folder with nothing read in it — and none of them
+/// declares `access_denied`, so SS mode lists each (ADR 0027, ADR 0029, ADR 0036). A rule whose
+/// `location` rules that folder out keeps the answer the folders that were read give it: until
+/// ADR 0044 an unreadable program folder made the plugin rules `unmeasured` too.
 #[test]
-fn a_fivem_folder_that_could_not_be_listed_leaves_every_fivem_dir_rule_unmeasured() {
-    for host in ["fivem-dir-access-denied", "fivem-dir-client-folder-denied"] {
+fn a_fivem_folder_that_could_not_be_listed_leaves_the_rules_that_could_match_there_unmeasured() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason};
+
+    const PLUGINS_NOT_VERIFIED: &str = "061797d3-161d-4783-89e6-caf658973436";
+    const PLUGINS_VALID: &str = "d5531c55-1a65-4698-9f39-7cf79bbbb7ba";
+    const ASI_NOT_VERIFIED: &str = "0999422f-8709-4d85-80e3-39410a85ed6b";
+    const ASI_VALID: &str = "53528a11-5af7-4e75-94bf-fca07eec6fcc";
+    const CLIENT_NOT_VERIFIED: &str = "148cbcdd-8d18-4af6-a541-71cc7f21b2eb";
+    const CLIENT_OTHER_CERTIFICATE: &str = "2dc11b64-72a2-48f5-a273-985e906d5a9e";
+    const NOT_CHECKED: &str = "282115fe-863d-4e2e-9cf5-4eaf8e7545e4";
+
+    // `true`: unmeasured / access_denied. `false`: not_found.
+    let expectations: [(&str, &[(&str, bool)]); 2] = [
+        // Legacy's plugins folder denied; Enhanced not installed, no program folder.
+        (
+            "fivem-dir-access-denied",
+            &[
+                (PLUGINS_NOT_VERIFIED, true),
+                (PLUGINS_VALID, true),
+                (ASI_NOT_VERIFIED, false),
+                (ASI_VALID, false),
+                (CLIENT_NOT_VERIFIED, false),
+                (CLIENT_OTHER_CERTIFICATE, false),
+                (NOT_CHECKED, true),
+            ],
+        ),
+        // Legacy's program folder denied; its plugins folder listed and empty.
+        (
+            "fivem-dir-client-folder-denied",
+            &[
+                (PLUGINS_NOT_VERIFIED, false),
+                (PLUGINS_VALID, false),
+                (ASI_NOT_VERIFIED, false),
+                (ASI_VALID, false),
+                (CLIENT_NOT_VERIFIED, true),
+                (CLIENT_OTHER_CERTIFICATE, true),
+                (NOT_CHECKED, true),
+            ],
+        ),
+    ];
+    for (host, rules) in expectations {
         let report = report_for(host);
-        let fivem: Vec<_> = report
+        let fivem = report
             .evidence
             .iter()
             .filter(|evidence| evidence.collector == "fivem_dir")
-            .collect();
-        assert_eq!(fivem.len(), 7, "{host}: {fivem:?}");
-        for evidence in fivem {
-            assert!(
+            .count();
+        assert_eq!(
+            fivem,
+            rules.len(),
+            "{host}: a fivem_dir rule is not accounted for"
+        );
+        for (rule, unmeasured) in rules {
+            let evidence = report
+                .evidence
+                .iter()
+                .find(|evidence| evidence.rule_id == *rule)
+                .unwrap();
+            let ok = if *unmeasured {
                 matches!(
                     evidence.state,
-                    rongroi_core::model::EvidenceState::Unmeasured {
-                        reason: rongroi_core::model::UnmeasuredReason::AccessDenied,
+                    EvidenceState::Unmeasured {
+                        reason: UnmeasuredReason::AccessDenied,
                         expected: false,
                     }
-                ),
-                "{host}: {} is {:?}",
-                evidence.rule_id,
-                evidence.state
-            );
+                )
+            } else {
+                matches!(evidence.state, EvidenceState::NotFound { .. })
+            };
+            assert!(ok, "{host}: {rule} is {:?}", evidence.state);
         }
     }
 }

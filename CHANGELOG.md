@@ -149,6 +149,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   refused and shown. Measured on every account key of one Windows 11 machine (build 26220), and the same
   two refusals per account were in a 0.2.0 report from another (build 26200) (ADR 0023, amended). No
   rule reads BAM, so no evidence changed.
+- One FiveM folder that could not be listed made **every** `fivem_dir` rule `unmeasured`, including the
+  rules about folders that were read (ADR 0036 recorded it). A gap can now be confined to one place a
+  collector reads, keyed by the field that says which place — `fivem_dir`'s `location` (ADR 0044). The
+  rules that could match in the unreadable place stay `unmeasured`, the rule for a file whose signature
+  could not be checked among them; the others answer from the places that were read. On the fixture
+  where Legacy's program folder is denied, four of the seven rules that SS mode used to list as "could not
+  check" are now `not_found` about folders that were checked. When no place at all could be read, every
+  rule is `unmeasured` as before. No other collector declares such a field, and no report snapshot
+  changed.
 - The SS-mode consent question named the wrong scan. In the CLI and in the window app it said the
   check reads "machine security settings"; since 0.2.0 it also reads the programs running, FiveM's
   plugins folder, what Prefetch, BAM and the Program Compatibility Assistant recorded about programs

@@ -169,6 +169,13 @@ related rule's `description` says the failed file is shown there and not in its 
 Enhanced program folder makes the Legacy plugins rules `unmeasured` too, though that folder was read.
 Per-location gaps would need a change to `CollectorRun`, which is not this ADR's.
 
+> **Amended 2026-09-14 by ADR 0044.** Fixed there. `location` is `fivem_dir`'s declared discriminator,
+> and a place that could not be read is a gap for the observations about that place only: a rule whose
+> `location` rules the place out keeps the answer the places that were read give it, and a rule that
+> could match there — the could-not-be-checked rule, which names no location, included — is still
+> `unmeasured`. When no place at all could be read, the gap is run-wide as before. The first row of the
+> table above therefore now reads "the rules that could match in that place `unmeasured`".
+
 ### 4. The pin
 
 `allow: signer_cert_sha256: 65866007…c4208f` is the one `allow` entry in this ADR, measured as above

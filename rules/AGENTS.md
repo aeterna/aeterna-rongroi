@@ -61,6 +61,11 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   false` included — there the gap is checked before anything is matched, because a field nobody could read
   is also a field that is not there, and the rule would otherwise be `found` and the report would say "we
   looked and it is not there" about it (ADR 0002, ADR 0029).
+- **A gap may be confined to one place.** `fivem_dir` reads four places, told apart by `location`, its
+  discriminator. When one could not be listed, only the rules that could match an observation from there
+  are `unmeasured`; a rule whose `location` rules that place out keeps the answer the other places give.
+  So write `location` in a rule that is about one place — a rule without it is reached by every place
+  that could not be read (ADR 0044).
 - **A field a collector leaves out for one item is not a gap**, and no equality or value list matches
   it. `fivem_dir` omits `signature` for a file whose check failed. Partition the field's values across
   rules so each one lands somewhere, and give the omitted field its own rule with `<field>|exists: false`

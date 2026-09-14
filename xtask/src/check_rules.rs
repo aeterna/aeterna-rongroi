@@ -381,6 +381,7 @@ fn check_fixture(rule: &Rule, file: &Path, expect_found: bool) -> Result<(), Str
         collector: rule.collector.clone(),
         observations: fixture.observations,
         gaps: fixture.gaps,
+        discriminator_gaps: Vec::new(),
     };
     let evidence = engine::evaluate_rule(rule, &[run]);
     match (&evidence.state, expect_found) {

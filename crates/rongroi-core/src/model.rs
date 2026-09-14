@@ -146,9 +146,14 @@ pub enum CollectorRun {
         collector: String,
         /// What the collector saw.
         observations: Vec<Observation>,
-        /// Fields the collector could not read, with the reason.
+        /// Fields the collector could not read, with the reason, for every observation of the run.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         gaps: BTreeMap<String, UnmeasuredReason>,
+        /// Fields the collector could not read for **one value of its discriminator** only — one of
+        /// the several places it reads — while the others were read (ADR 0044). Empty for a
+        /// collector that declares no discriminator.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        discriminator_gaps: Vec<DiscriminatorGaps>,
     },
     /// The collector could not look at all.
     Unmeasured {
@@ -157,6 +162,39 @@ pub enum CollectorRun {
         /// Why it could not look.
         reason: UnmeasuredReason,
     },
+}
+
+/// Gaps confined to the observations whose **discriminator** carries one value (ADR 0044).
+///
+/// A discriminator is the field a collector uses to say which of the things it reads an observation is
+/// about: `fivem_dir`'s `location`. When one of those things could not be read and the others were,
+/// a run-wide gap would make every rule on the collector `unmeasured`, including rules that can only
+/// ever match an observation from a place that was read. These gaps reach a rule only when the rule's
+/// `match` could be satisfied by an observation carrying `value`, and they stop an observation carrying
+/// `value` from satisfying `<field>|exists: false` for a field listed here.
+///
+/// The collector promises that **every** observation it emits about that place carries
+/// `discriminator: value`. The engine cannot check that promise; `rongroi-collectors` binds it with a
+/// test over every fixture host.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiscriminatorGaps {
+    /// The observation field that says which place an observation is about.
+    pub discriminator: String,
+    /// The value that field carries on every observation about the place that could not be read.
+    pub value: serde_json::Value,
+    /// Fields that could not be read there, with the reason.
+    pub gaps: BTreeMap<String, UnmeasuredReason>,
+}
+
+impl DiscriminatorGaps {
+    /// Whether `observation` is about the place these gaps describe.
+    ///
+    /// Compared exactly, not with a rule's ASCII fold: both sides are written by the same collector,
+    /// and a value it spells two ways is a defect in the collector rather than something to hide.
+    pub fn describes(&self, observation: &Observation) -> bool {
+        observation.fields.get(&self.discriminator) == Some(&self.value)
+    }
 }
 
 impl CollectorRun {

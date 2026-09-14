@@ -180,6 +180,7 @@ impl Collector for Bam {
                     collector: ID.to_owned(),
                     observations: vec![status(None, read_failure(&error))],
                     gaps: gaps(reason_for(host, &error)),
+                    discriminator_gaps: Vec::new(),
                 };
             }
         };
@@ -264,6 +265,7 @@ impl Collector for Bam {
             collector: ID.to_owned(),
             observations,
             gaps,
+            discriminator_gaps: Vec::new(),
         }
     }
 }

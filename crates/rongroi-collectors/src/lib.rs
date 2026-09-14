@@ -123,6 +123,19 @@ pub trait Collector {
     /// `every_reason_a_collector_reports_is_declared` test in this file rather than derived from it,
     /// and with the same limit: a reason no fixture host provokes cannot be proved reachable.
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason];
+    /// The **discriminator**: the field whose value says which of several places this collector reads
+    /// an observation is about, when it reads more than one, or `None` (ADR 0044).
+    ///
+    /// A place that could not be read is then reported as `DiscriminatorGaps` for that value rather
+    /// than as a gap for the whole run, so a rule whose `match` rules that place out keeps the answer
+    /// the other places give it.
+    ///
+    /// The collector promises that every observation it emits carries the field. That promise is bound
+    /// by `every_observation_carries_its_collectors_discriminator` in this file, and
+    /// `discriminator_gaps_name_the_declared_discriminator` binds the gaps to the declaration.
+    fn discriminator(&self) -> Option<&'static str> {
+        None
+    }
     /// Looks at the host.
     fn collect(&self, host: &dyn Host) -> CollectorRun;
 }
@@ -259,10 +272,20 @@ mod tests {
             for collector in all() {
                 let declared: BTreeSet<&str> =
                     collector.fields().iter().map(|field| field.name).collect();
-                let CollectorRun::Measured { gaps, .. } = collector.collect(&host) else {
+                let CollectorRun::Measured {
+                    gaps,
+                    discriminator_gaps,
+                    ..
+                } = collector.collect(&host)
+                else {
                     continue;
                 };
-                for field in gaps.keys() {
+                let every_gap = gaps.keys().chain(
+                    discriminator_gaps
+                        .iter()
+                        .flat_map(|place| place.gaps.keys()),
+                );
+                for field in every_gap {
                     assert!(
                         declared.contains(field.as_str()),
                         "fixtures/hosts/{name}: collector `{}` gapped `{field}`, which `Collector::fields` does not declare",
@@ -292,7 +315,19 @@ mod tests {
                     .collect();
                 let reported: Vec<UnmeasuredReason> = match collector.collect(&host) {
                     CollectorRun::Unmeasured { reason, .. } => vec![reason],
-                    CollectorRun::Measured { gaps, .. } => gaps.values().copied().collect(),
+                    CollectorRun::Measured {
+                        gaps,
+                        discriminator_gaps,
+                        ..
+                    } => gaps
+                        .values()
+                        .chain(
+                            discriminator_gaps
+                                .iter()
+                                .flat_map(|place| place.gaps.values()),
+                        )
+                        .copied()
+                        .collect(),
                 };
                 for reason in reported {
                     assert!(
@@ -304,6 +339,79 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// `DiscriminatorGaps` reach a rule through the value of one field, and stop an observation from
+    /// satisfying `exists: false` only when it carries that value. An observation about an unreadable
+    /// place that did **not** carry the field would slip past both, and a rule asking for an absent
+    /// field would be `found` about a place nobody read — the collapse ADR 0029 exists to prevent. So
+    /// every observation of a collector that declares a discriminator carries it (ADR 0044).
+    #[test]
+    fn every_observation_carries_its_collectors_discriminator() {
+        let mut seen = 0;
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                let Some(discriminator) = collector.discriminator() else {
+                    continue;
+                };
+                let CollectorRun::Measured { observations, .. } = collector.collect(&host) else {
+                    continue;
+                };
+                for observation in &observations {
+                    seen += 1;
+                    assert!(
+                        observation
+                            .fields
+                            .get(discriminator)
+                            .is_some_and(serde_json::Value::is_string),
+                        "fixtures/hosts/{name}: collector `{}` emitted an observation without its discriminator `{discriminator}`: {observation:?}",
+                        collector.id()
+                    );
+                }
+            }
+        }
+        assert!(seen > 0, "no fixture host produced an observation to check");
+    }
+
+    /// A place's gaps name the field the collector declared as its discriminator, that field is one it
+    /// declares it can emit, and a collector without one reports none: otherwise the engine would be
+    /// scoping gaps by a field no rule author was told about (ADR 0044). At least one fixture host has
+    /// to produce such gaps, or this test proves nothing.
+    #[test]
+    fn discriminator_gaps_name_the_declared_discriminator() {
+        let mut seen = 0;
+        for (name, dir) in fixture_hosts() {
+            let host = FixtureHost::load(&dir).expect("a fixture host loads");
+            for collector in all() {
+                if let Some(discriminator) = collector.discriminator() {
+                    assert!(
+                        collector
+                            .fields()
+                            .iter()
+                            .any(|field| field.name == discriminator),
+                        "collector `{}` declares `{discriminator}` as its discriminator and not as a field",
+                        collector.id()
+                    );
+                }
+                let CollectorRun::Measured {
+                    discriminator_gaps, ..
+                } = collector.collect(&host)
+                else {
+                    continue;
+                };
+                for place in &discriminator_gaps {
+                    seen += 1;
+                    assert_eq!(
+                        Some(place.discriminator.as_str()),
+                        collector.discriminator(),
+                        "fixtures/hosts/{name}: collector `{}`",
+                        collector.id()
+                    );
+                }
+            }
+        }
+        assert!(seen > 0, "no fixture host produced discriminator gaps");
     }
 
     /// The lists are read by a person writing a rule and by `check-rules` when it names what a
