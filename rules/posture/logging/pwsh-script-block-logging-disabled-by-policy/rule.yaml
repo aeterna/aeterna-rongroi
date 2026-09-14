@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 98ee9213-39f3-4219-b2ac-f2bb3d21d6cc
+title: A machine policy turns PowerShell 7 script block logging off
+description: >-
+  A machine policy for PowerShell 7 — pwsh.exe, which is installed separately from Windows — sets script
+  block logging to off, either in PowerShell 7's own policy or in Windows PowerShell's when PowerShell 7's
+  policy says to use that one. Windows ships with no such policy. With it off, PowerShell 7 writes none of
+  the script blocks it runs to its event log, not even the ones it otherwise records by itself because
+  their content looks suspicious. That was measured on one test machine, not on this PC. Whether
+  PowerShell 7 is installed here is not read, and neither is PowerShell 7's own configuration file. It
+  says nothing about which scripts ran or who set the policy. On its own this describes the machine — it
+  is not evidence of cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  script_block_logging_pwsh: disabled
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+unmeasured_when: [not_windows]
+falsepositives:
+  - PCs managed by an employer, school or other organisation whose policy turns script block logging off, for example to keep script contents that may hold passwords out of the event log
+  - A PowerShell 7 policy that says to use the Windows PowerShell setting, on a PC whose Windows PowerShell policy is off; the one setting is then shown under both rules
+  - Security or privacy baselines, debloating guides and "PC optimiser" tools that set logging policies
+  - A policy left on a PC where PowerShell 7 is not installed, or from earlier management
+references:
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-7.5
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows?view=powershell-7.5
+author: aeterna-rongroi contributors
+date: 2026-09-14
+tags: [posture, logging]

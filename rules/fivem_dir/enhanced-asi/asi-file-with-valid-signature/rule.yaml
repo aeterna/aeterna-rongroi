@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 53528a11-5af7-4e75-94bf-fca07eec6fcc
+title: A file in FiveM for GTA V Enhanced's asi folder carries a valid embedded signature
+description: >-
+  FiveM for GTA V Enhanced's folder %APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi holds a file with
+  an embedded signature that Windows verified, and the row names the signer and the signing
+  certificate's SHA-256. Whether the Enhanced client loads anything from this folder is not
+  established. A valid signature says who signed the file and that it has not changed since — not
+  what it does: certificates have been stolen from real companies and used to sign malware under
+  their names, and revocation is not checked. The signer's name is for the reader to look up.
+status: experimental
+collector: fivem_dir
+strength: presence
+# No `allow` yet, for the reason written in the Legacy plugins rule of the same kind.
+match:
+  location: enhanced_asi
+  signature: valid
+retention: >-
+  Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and
+  this check cannot say what the folder held earlier.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Overlays, capture and performance tools from established publishers that put a signed file here
+  - Signed builds of graphics mods, placed here by a player
+  - Software signed by an individual developer, whose certificate carries that person's own name
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [fivem_dir, enhanced_asi, signature]
+related:
+  - id: 0999422f-8709-4d85-80e3-39410a85ed6b
+    type: similar

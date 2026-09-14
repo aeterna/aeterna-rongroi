@@ -1,0 +1,7 @@
+{
+  "description": "A machine policy sets PowerShell 7 script block logging to off",
+  "observations": [
+    { "collector": "posture", "fields": { "script_block_logging_pwsh": "disabled", "script_block_logging_pwsh_user": "machine_takes_precedence" } }
+  ],
+  "expect_matches": 1
+}

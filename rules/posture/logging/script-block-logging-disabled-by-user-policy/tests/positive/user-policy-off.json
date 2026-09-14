@@ -1,0 +1,7 @@
+{
+  "description": "A per-user policy sets Windows PowerShell script block logging to off, and no machine key takes precedence",
+  "observations": [
+    { "collector": "posture", "fields": { "script_block_logging": "not_configured", "script_block_logging_user": "disabled" } }
+  ],
+  "expect_matches": 1
+}

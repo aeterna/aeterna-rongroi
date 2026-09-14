@@ -20,6 +20,11 @@ three things `RegistrySource` does not have:
 - a value's raw bytes, because `rongroi_parsers::bam::parse_value` takes `&[u8]` and `RegistrySource`
   offers only `read_u32` and `read_string`.
 
+**Amended by ADR 0023 (2026-09-14).** "The name of every value is an executable's path" is not what a
+real account key holds: every one measured on Windows 11 also holds `Version` and `SequenceNumber`, two
+`REG_DWORD` values Microsoft does not document. `read_bytes` refusing them is this ADR working as written;
+it is the `bam` collector that now sets them aside instead of counting them as refused records.
+
 ADR 0019 says as much in one line: "The fourth, BAM, needs registry enumeration and a binary registry
 value, which is a separate decision." This is that decision, and it is deliberately the same shape as
 ADR 0019's, because the two capabilities are answering the same question one source apart.
@@ -187,3 +192,10 @@ records the same gap.
   last-write time, its security descriptor, its class, the number of values as a datum of its own, or
   any hive other than `HKLM` — `LiveHost` still refuses every other root. Everything is opened for
   reading; nothing on the scanned machine is written (AGENTS.md hard rule 2).
+
+> **Amended by ADR 0038, 2026-09-14.** `LiveHost` now also opens `HKCU` — the account the program runs as —
+> for the per-user half of the script block logging policy, and `RegistrySource` gains `read_value`, which
+> hands back a value's type with its data, because Windows PowerShell 5.1 and PowerShell 7 were measured to
+> read the same value differently by type. Every other root is still refused, and every key is still opened
+> for reading only. The reasons, and what `HKCU` means after a restart with another administrator's
+> password, are in ADR 0038's amendment.

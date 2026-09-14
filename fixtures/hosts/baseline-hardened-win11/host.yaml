@@ -16,6 +16,7 @@ os_build: "26100"
 elevated: false
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
 registry:
   'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
     UEFISecureBootEnabled: 1
@@ -27,6 +28,11 @@ code_integrity:
 tpm:
   present: true
   spec_version: "2.0"
+# Firmware (ADR 0038): a scan without administrator rights cannot read the firmware's Secure Boot
+# variable, so this is what it gets — measured on a real Windows 11 machine under a limited token, not
+# chosen. No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
+firmware:
+  secure_boot: access_denied
 processes:
   - pid: 4
     name: System

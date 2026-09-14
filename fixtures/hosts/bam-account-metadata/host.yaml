@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# The shape of the account keys measured on Windows 11 (ADR 0023, amendment of 2026-09-14): every one
+# holds two `REG_DWORD` values, `Version` and `SequenceNumber`, beside its records, and some hold
+# nothing else. The collector counts those two as `metadata_values` and never as a record it could not
+# read. The numbers are measured values; the SIDs and the account name are invented.
+platform: windows
+os_build: "26220"
+elevated: true
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    Version: 1
+    SequenceNumber: 115
+    'C:\Users\fixtureuser\Downloads\example.exe':
+      from: '../../parsers/bam/documented-24-byte-value.bin'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1002':
+    Version: 1
+    SequenceNumber: 59

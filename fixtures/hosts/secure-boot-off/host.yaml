@@ -15,3 +15,9 @@ code_integrity:
 tpm:
   present: true
   spec_version: "2.0"
+# What `GetTickCount64` would answer: 3 days, 2 hours, 3 minutes and 4 seconds. Invented, so that the
+# report snapshots carry the measured shape of the header's boot time (ADR 0039).
+milliseconds_since_boot: 266584000
+firmware:
+  # A process without administrator rights cannot read a firmware variable (ADR 0038).
+  secure_boot: access_denied

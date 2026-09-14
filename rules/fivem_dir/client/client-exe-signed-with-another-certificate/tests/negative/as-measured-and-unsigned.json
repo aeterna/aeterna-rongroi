@@ -1,0 +1,47 @@
+{
+  "description": "Both editions' FiveM.exe signed with the measured certificate — excluded by `allow`, in upper case as some tools print it — a FiveM.exe with no embedded signature, which is the other client rule's, and a validly signed plugin, which is not FiveM.exe.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "valid",
+        "signer": "Rockstar Games, Inc.",
+        "signer_cert_sha256": "65866007102FF66498C1EF739CF23DFF71AE3D08DA0D9D759B89D1A409C4208F"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM for GTAV Enhanced\\FiveM.exe",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "valid",
+        "signer": "Rockstar Games, Inc.",
+        "signer_cert_sha256": "65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM for GTAV Enhanced\\FiveM.exe",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\signed.dll",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "valid",
+        "signer": "Example Signer",
+        "signer_cert_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ]
+}

@@ -73,7 +73,28 @@ impl SourceError {
     }
 }
 
-/// Read-only access to the registry. Keys are written as `HKLM\...`.
+/// One registry value as its type and data, for a caller whose answer depends on the type as well as on
+/// what the value holds (ADR 0038).
+///
+/// Windows PowerShell 5.1 and PowerShell 7 read the same policy value differently: measured on one
+/// runner, 5.1 honours a `REG_SZ` `"0"` and a `REG_QWORD` 0 as it honours a `REG_DWORD` 0, and PowerShell 7
+/// honours only the `REG_DWORD`. [`RegistrySource::read_u32`] cannot tell those apart, because a live
+/// host's reader accepts a `REG_QWORD` there too.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryData {
+    /// `REG_DWORD`.
+    Dword(u32),
+    /// `REG_QWORD`.
+    Qword(u64),
+    /// `REG_SZ` or `REG_EXPAND_SZ`, as stored: environment variables in an expandable string are not
+    /// expanded.
+    Text(String),
+    /// Any other type. Its data is not read.
+    OtherType,
+}
+
+/// Read-only access to the registry. Keys are written as `HKLM\...` or, for the account this program
+/// runs as, `HKCU\...` (ADR 0038). A live host refuses every other root.
 pub trait RegistrySource {
     /// Reads a `REG_DWORD`. `Ok(None)` when the key or value does not exist.
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError>;
@@ -107,6 +128,13 @@ pub trait RegistrySource {
     /// A value larger than the limit is [`SourceError::TooLarge`]; nothing is truncated, because a
     /// truncated artifact parses as a damaged one.
     fn read_bytes(&self, key: &str, value: &str) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// One value's type, and its data when it is a number or a string (ADR 0038).
+    ///
+    /// `Ok(None)` when the key or the value does not exist, like [`RegistrySource::read_u32`]. A string
+    /// longer than [`MAX_REGISTRY_VALUE_BYTES`] bytes is [`SourceError::TooLarge`], as a binary value
+    /// is; what that bounds is the same as for [`RegistrySource::read_bytes`].
+    fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError>;
 }
 
 /// One entry directly inside a directory. Only what collectors need: nothing about times, size or ACLs
@@ -144,6 +172,98 @@ pub trait FilesystemSource {
     /// The path must name a regular file; `list_dir` already says which entries are files. Anything
     /// else is an error rather than an answer.
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// Whether the file at `path` carries the read-only attribute (ADR 0037).
+    ///
+    /// One bit of a file's attributes and nothing else: no timestamps, no size, no owner, no other
+    /// attribute. `Ok(None)` means the file does not exist, the same fact [`FilesystemSource::read_file`]
+    /// reports for a file that is gone. The file's contents are not opened, and nothing about the file
+    /// is changed by asking.
+    fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError>;
+}
+
+/// What Windows says about the Authenticode signature **embedded in** one file, checked without the
+/// network (ADR 0035).
+///
+/// Four answers, because "not valid" is three different statements and a reviewer has to be able to
+/// tell them apart. None of them is a finding on its own: most files in a plugin folder are unsigned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SignatureCheck {
+    /// The signature is intact and chains to a root this machine trusts.
+    Valid {
+        /// Simple display name of the signing certificate's subject, for a person to read. Never
+        /// compared by `allow`: a stolen certificate carries the same name as the real one.
+        signer: String,
+        /// SHA-256 of the signing certificate's encoded bytes, as lowercase hex — the identity `allow`
+        /// compares.
+        signer_cert_sha256: String,
+    },
+    /// The file carries no embedded signature, or is not a kind of file one can be embedded in.
+    ///
+    /// Not "unsigned": a file can be signed through a Windows catalog instead, and this check does not
+    /// look there.
+    NoEmbeddedSignature,
+    /// A signature is there and Windows does not trust it: the file changed after signing, a
+    /// certificate's own signature does not verify, it expired without a timestamp, it is not for code
+    /// signing, or it is explicitly distrusted.
+    Invalid,
+    /// The answer needed something this machine does not hold locally — an intermediate certificate, a
+    /// root it holds as trusted, or revocation data — and this program does not fetch it. A fact about
+    /// the check, not the file. A chain that ends at a root this machine does not trust is here too,
+    /// because offline that cannot be told apart from a root it has not fetched yet: a self-signed
+    /// signature reads this way as well as a genuine one on such a PC (ADR 0035, amendment of
+    /// 2026-09-14).
+    UnverifiableOffline,
+}
+
+/// Read-only access to the Authenticode signature embedded in a file (ADR 0035).
+pub trait SignatureSource {
+    /// Checks the signature embedded in the file at `path`, without the network.
+    ///
+    /// The error is about that one file, like [`FilesystemSource::file_sha256`]: a collector that
+    /// cannot check one file still reports the file.
+    fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError>;
+}
+
+/// What the Windows Event Log service states about one channel's log file (ADR 0042).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelConfig {
+    /// The path of the file the service writes this channel to, as the service spells it — normally
+    /// beginning `%SystemRoot%`, which is not expanded here.
+    pub log_file_path: String,
+    /// The largest the service lets this channel's file grow, in bytes.
+    pub max_size_bytes: u64,
+}
+
+/// Read-only access to the Event Log service's configuration of a channel (ADR 0042).
+///
+/// A source of its own rather than a registry read: the service's answer is the one it acts on, and
+/// on the Windows 11 machine ADR 0042 measured, the registry's `MaxSize` differed from it for 18 of
+/// the 94 keys that carry one.
+///
+/// It hands out a [`ChannelConfigReader`] rather than answering itself, because asking the service is
+/// a call into another process that this program cannot interrupt. A reader can be moved to a thread
+/// of its own, so that a collector can stop waiting for a service that does not answer and report
+/// that it stopped, instead of never returning (ADR 0042).
+pub trait EventLogConfigSource {
+    /// A reader for channel configurations, which may be moved to another thread.
+    ///
+    /// An error means the service cannot be asked at all on this host — not that one channel failed.
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError>;
+}
+
+/// Asks the Event Log service about channels, from whichever thread holds it (ADR 0042).
+pub trait ChannelConfigReader: Send {
+    /// The log file and maximum size the service states for `channel`, e.g. `Security` or
+    /// `Microsoft-Windows-Kernel-Boot/Operational`.
+    ///
+    /// `Ok(None)` when the service has no channel of that name — which is an answer: a log file can
+    /// outlive the software that registered its channel. Nothing is changed by asking.
+    ///
+    /// **This call may not return.** It waits on the Event Log service, and a service that accepts a
+    /// request and never answers it leaves this call blocked; a caller that must return bounds its wait
+    /// from another thread.
+    fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError>;
 }
 
 /// Read-only access to the process environment. Names are case-insensitive, like Windows.
@@ -185,6 +305,34 @@ pub trait TpmSource {
     fn tpm_info(&self) -> Result<TpmInfo, SourceError>;
 }
 
+/// What the platform firmware itself says about UEFI Secure Boot (ADR 0038).
+///
+/// A second reading, independent of the `UEFISecureBootEnabled` registry value: this one is the UEFI
+/// `SecureBoot` variable in the EFI global-variable namespace, read from the firmware through
+/// Windows. Four answers, because "not enabled" is three different statements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FirmwareSecureBoot {
+    /// The `SecureBoot` variable holds 1.
+    Enabled,
+    /// The `SecureBoot` variable holds 0.
+    Disabled,
+    /// The firmware is UEFI and holds no `SecureBoot` variable.
+    VariableAbsent,
+    /// Windows was started through legacy BIOS, or through a UEFI compatibility module, so there are
+    /// no firmware variables to read at all.
+    NotUefi,
+}
+
+/// Read-only access to the platform firmware's own variables (ADR 0038). Nothing is ever written to
+/// the firmware.
+pub trait FirmwareSource {
+    /// What the firmware's `SecureBoot` variable says.
+    ///
+    /// Reading a firmware variable needs a privilege that a process without administrator rights does
+    /// not hold. That is [`SourceError::AccessDenied`], never a guessed value.
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError>;
+}
+
 /// One process that was running when the process list was read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessRecord {
@@ -204,6 +352,21 @@ pub trait ProcessSource {
     /// between the list being taken and the query — is still returned, with `path` as `None`.
     /// Dropping it would understate what is running.
     fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError>;
+}
+
+/// Read-only access to how long the running Windows kernel has been counting since it started
+/// (ADR 0039).
+///
+/// Context for the report header, never evidence: a person reads the times other rows carry against
+/// it. What "started" means is Windows' own, and it is not what a person means by "I turned the PC
+/// on": a "Shut down" with Fast Startup — the default — hibernates the kernel instead of ending it,
+/// and sleep and hibernation do not reset the count either. Only a restart, or a shutdown with Fast
+/// Startup off, starts it again.
+pub trait BootTimeSource {
+    /// Time elapsed since the system started, sleep and hibernation included.
+    ///
+    /// Nothing about who is logged on is read: it is one number about the machine.
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError>;
 }
 
 /// Size of one read when a file is streamed through SHA-256.
@@ -309,14 +472,27 @@ pub fn bound_registry_value(bytes: Vec<u8>, limit: usize) -> Result<Vec<u8>, Sou
     Ok(bytes)
 }
 
+/// Refuses a string value longer than `limit` bytes, as [`bound_registry_value`] refuses a binary one.
+/// The other kinds of [`RegistryData`] are a number or no data at all and pass unchanged.
+pub fn bound_registry_data(data: RegistryData, limit: usize) -> Result<RegistryData, SourceError> {
+    match data {
+        RegistryData::Text(text) if text.len() > limit => Err(SourceError::TooLarge { limit }),
+        other => Ok(other),
+    }
+}
+
 /// A machine that collectors can read. More source traits are added as collectors need them.
 pub trait Host:
     RegistrySource
     + FilesystemSource
+    + SignatureSource
+    + EventLogConfigSource
     + EnvironmentSource
     + SystemIntegritySource
     + TpmSource
+    + FirmwareSource
     + ProcessSource
+    + BootTimeSource
 {
     /// Operating system family.
     fn platform(&self) -> Platform;
@@ -361,6 +537,12 @@ impl RegistrySource for NonWindowsHost {
             "no registry on this platform".to_owned(),
         ))
     }
+
+    fn read_value(&self, _key: &str, _value: &str) -> Result<Option<RegistryData>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no registry on this platform".to_owned(),
+        ))
+    }
 }
 
 impl FilesystemSource for NonWindowsHost {
@@ -379,6 +561,28 @@ impl FilesystemSource for NonWindowsHost {
     fn read_file(&self, _path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn is_read_only(&self, _path: &str) -> Result<Option<bool>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+}
+
+impl EventLogConfigSource for NonWindowsHost {
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows Event Log on this platform".to_owned(),
+        ))
+    }
+}
+
+impl SignatureSource for NonWindowsHost {
+    fn file_signature(&self, _path: &str) -> Result<SignatureCheck, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Authenticode verification on this platform".to_owned(),
         ))
     }
 }
@@ -405,10 +609,26 @@ impl TpmSource for NonWindowsHost {
     }
 }
 
+impl FirmwareSource for NonWindowsHost {
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows firmware interface on this platform".to_owned(),
+        ))
+    }
+}
+
 impl ProcessSource for NonWindowsHost {
     fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows process list on this platform".to_owned(),
+        ))
+    }
+}
+
+impl BootTimeSource for NonWindowsHost {
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows boot time on this platform".to_owned(),
         ))
     }
 }
@@ -445,6 +665,18 @@ mod tests {
             NonWindowsHost.read_file(r"C:\Users\a\x.dll"),
             Err(SourceError::Unsupported(_))
         ));
+        assert!(matches!(
+            NonWindowsHost.file_signature(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.is_read_only(r"C:\Users\a\x.dll"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
         assert_eq!(NonWindowsHost.env_var("LOCALAPPDATA"), None);
     }
 
@@ -467,16 +699,50 @@ mod tests {
             NonWindowsHost.read_bytes(key, r"C:\x.exe"),
             Err(SourceError::Unsupported(_))
         ));
+        assert!(matches!(
+            NonWindowsHost.read_value(key, "Anything"),
+            Err(SourceError::Unsupported(_))
+        ));
     }
 
     #[test]
-    fn non_windows_host_reports_no_code_integrity_and_no_tpm() {
+    fn registry_text_is_bounded_like_registry_bytes() {
+        let limit = 4;
+        assert_eq!(
+            bound_registry_data(RegistryData::Text("1234".to_owned()), limit),
+            Ok(RegistryData::Text("1234".to_owned()))
+        );
+        assert_eq!(
+            bound_registry_data(RegistryData::Text("12345".to_owned()), limit),
+            Err(SourceError::TooLarge { limit })
+        );
+        // Numbers and a type whose data is not read have nothing to bound.
+        assert_eq!(
+            bound_registry_data(RegistryData::Qword(u64::MAX), limit),
+            Ok(RegistryData::Qword(u64::MAX))
+        );
+    }
+
+    #[test]
+    fn non_windows_host_reports_no_boot_time_rather_than_zero() {
+        assert!(matches!(
+            NonWindowsHost.since_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn non_windows_host_reports_no_code_integrity_no_tpm_and_no_firmware() {
         assert!(matches!(
             NonWindowsHost.code_integrity_options(),
             Err(SourceError::Unsupported(_))
         ));
         assert!(matches!(
             NonWindowsHost.tpm_info(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            NonWindowsHost.firmware_secure_boot(),
             Err(SourceError::Unsupported(_))
         ));
     }

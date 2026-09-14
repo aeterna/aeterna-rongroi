@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 88eb2aca-a33e-414d-bd0f-cfb87af95a2d
+title: A machine policy turns Windows PowerShell script block logging off
+description: >-
+  A machine policy for Windows PowerShell — the powershell.exe that comes with Windows — sets script
+  block logging to off. Windows ships with no such policy, and a PC where nobody set one is not what
+  this rule reports. With the policy off, Windows PowerShell writes none of the script blocks it runs to
+  the Windows event log, not even the ones it otherwise records by itself because their content looks
+  suspicious, so a reviewer reading that log has less to read. That was measured on one test machine,
+  not on this PC. It says nothing about which scripts ran or who set the policy. A per-user policy and
+  PowerShell 7's policy have rules of their own. On its own this describes the machine — it is not
+  evidence of cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  script_block_logging: disabled
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+unmeasured_when: [not_windows]
+falsepositives:
+  - PCs managed by an employer, school or other organisation whose policy turns script block logging off, for example to keep script contents that may hold passwords out of the event log
+  - Security or privacy baselines, debloating guides and "PC optimiser" tools that set Windows logging policies
+  - A PC that was once managed by an organisation and still carries its policies
+  - Administrators who turned it off to reduce the size of the event log
+references:
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging?view=powershell-5.1
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_group_policy_settings?view=powershell-5.1
+  - https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-windowspowershell
+author: aeterna-rongroi contributors
+date: 2026-09-13
+modified: 2026-09-14
+tags: [posture, logging]

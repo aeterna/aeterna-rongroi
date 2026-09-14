@@ -5,6 +5,239 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-14
+
+### Added
+- Two negative fixtures for the log-clearing rules, each the shape an ordinary log holds from the Event Log
+  service without anyone clearing it: `1100` and `1101` on Security, and `30` plus the classic `EventLog`
+  provider's start and stop records on System, both measured on ordinary Windows 11 machines. Widening either
+  rule to one of those event ids now fails `cargo xtask check-rules`. The owner decided not to build a machine
+  to capture a publishable log for a baseline; `rules/unconfronted.csv` records that.
+- The pinned `FiveM.exe` signing certificate can no longer go stale silently (ADR 0036, amendment of
+  2026-09-14). `rules/certificate-pins.csv` records each certificate an `allow` names with its subject,
+  validity and measurement date; `cargo xtask check-rules` requires a row for every such entry and none
+  for a certificate no rule allows, without reading a clock. A new monthly workflow, `certificate pins`,
+  runs `cargo xtask check-pin-expiry`, which fails 90 days before a rule's newest pinned certificate
+  expires — for the certificate pinned today, from 2027-06-07. It is not a required check and does not
+  run on pull requests. It watches the last date the certificate can sign, not the day the publisher
+  actually switches, which nothing here can see.
+- Two `posture` readings and two rules (ADR 0038). `secure_boot_firmware` is Secure Boot as the firmware's
+  own UEFI `SecureBoot` variable reports it, beside the registry's `secure_boot`; reading it enables
+  `SeSystemEnvironmentPrivilege` in this program's own token for the read and puts it back, and without
+  administrator rights it is `unmeasured / not_admin` — measured on one Windows 11 machine, elevated and
+  under a limited token. The rule `secure-boot-firmware-disagrees` (`experimental`) is the registry saying
+  on while the firmware says off. `script_block_logging` is the Windows PowerShell machine policy as
+  `enabled`, `disabled` or `not_configured`, which are three different statements; the rule
+  `script-block-logging-disabled-by-policy` (`experimental`) matches only a policy written to off. Kernel
+  DMA Protection was considered and is **not** read: Microsoft documents no programmatic interface for
+  its state, and the ADR declines to ship a guessed structure. The Windows CI job checks that the firmware
+  read leaves the privilege as it found it and agrees with `Get-SecureBootUEFI`.
+- **Script block logging policy, per engine and per hive** (ADR 0038, amended 2026-09-14). `posture` now
+  also reports `script_block_logging_user` (Windows PowerShell's per-user policy), `script_block_logging_pwsh`
+  and `script_block_logging_pwsh_user` (PowerShell 7's, following its `UseWindowsPowerShellPolicySetting`),
+  and three `experimental` rules match each set to off. A per-user field is `machine_takes_precedence` when
+  that PowerShell takes its policy from the machine hive and never reads the user's. The per-user reads are of
+  the Windows account the scan runs as — after a restart with another administrator's password, that
+  administrator's — so a live host now opens `HKCU` besides `HKLM`, and nothing else; the consent question,
+  `PRIVACY.md` and the screenshare guide say so. Every mapping follows what Windows PowerShell 5.1 and
+  PowerShell 7.6 were measured to do on the Windows CI runner, where a new step writes each case, runs both
+  engines and counts event 4104, and the CLI's reading is printed beside it.
+- The Windows CI job records Microsoft Defender's state and what its Operational log recorded while this
+  program enabled `SeSystemEnvironmentPrivilege` for the firmware read (ADR 0038). With real-time protection,
+  behaviour monitoring and download scanning switched on, 38 such processes in 15 minutes left no detection
+  and no event naming them. One Defender configuration on one runner; nothing about other security products.
+- The report header says when Windows last started counting, so the times on other rows can be read
+  against it (ADR 0039): `boot_time`, the scan's clock minus `GetTickCount64`, or `unmeasured` with a
+  reason — never a guessed time. It is context, not evidence, and no rule can read it. It is shown in both
+  modes and named in the consent question. The CLI and the app print it as one line with its caveat on
+  the same line: a "Shut down" with Fast Startup (the Windows default), sleep and hibernation do not
+  reset it, so a start days before the scan is ordinary. On a real Windows 11 machine it agreed to the
+  second with `Win32_OperatingSystem.LastBootUpTime`, with and without administrator rights, while the
+  System log's own start record was 7 hours away because the clock had been changed since; the
+  screenshare guide now says both.
+- **The first rules on `fivem_dir`** (ADR 0036), all `experimental`. For Legacy's plugins folder and,
+  separately, Enhanced's `asi` folder: a file with no embedded signature that verifies here, and a file
+  with a valid one, each naming what Windows said. A file whose signature could not be checked at all is
+  its own row, so a failed check is shown rather than falling to "not found" under the others. Every rule
+  says in `falsepositives` that these folders ordinarily hold ReShade, ENB, overlays and their text files;
+  the Enhanced rules say that the folder is not known to be loaded. No `allow` entry for any plugin: none
+  was measured from a published file. In SS mode the files in these folders are now shown, redacted,
+  where they were only counted.
+- **`fivem_dir` reads `FiveM.exe`** in each edition's program folder under `%LOCALAPPDATA%`, with the same
+  hash and signature check, and two rules pin it: `FiveM.exe` with no embedded signature that verifies,
+  and `FiveM.exe` validly signed with a certificate other than the one both editions carried when
+  measured on 2026-09-13 ("Rockstar Games, Inc.", valid 2026-07-21 to 2027-09-05). That certificate will
+  be renewed, and the rule's text tells a reviewer what the row then means and what to do. Measured on
+  one real Windows 11 machine, elevated and under a limited token, and every rule was made to fire there
+  on copies of real files in a scratch folder. The consumer and elevated baselines describe `FiveM.exe`
+  as measured; the two unsigned-plugin rules are recorded in `rules/unconfronted.csv`.
+- Signature checking, without the network (ADR 0035). `fivem_dir` reports, for each file in FiveM's plugin
+  folders, what Windows says about the Authenticode signature embedded in it: `valid` with the signer's
+  name and the SHA-256 of the signing certificate, `no_embedded_signature`, `invalid`, or
+  `unverifiable_offline`. `WinVerifyTrust` runs with no revocation checking and URL retrieval from the
+  local cache only. Checking a signature is the one read in this program that Windows could take to the
+  network by itself, where `cargo deny` and every lint are blind, so the Windows CI job switches the
+  CAPI2 log on and fails if the offline tests leave a network retrieval (event 53) behind — beside a
+  positive twin that must leave one. On a real Windows 11 machine the check agreed with PowerShell on
+  the signing certificate of an embedded-signed executable, called a copy with one changed byte
+  `invalid`, and found nothing embedded in a catalog-only Windows file. It also showed that PowerShell's
+  `Catalog` does not mean "nothing embedded": `explorer.exe` has both.
+- `fivem_dir` reads FiveM for GTA V **Enhanced**, which installs separately and keeps its user data under
+  `%APPDATA%` rather than `%LOCALAPPDATA%`. On a machine with only Enhanced, the collector used to report
+  that Legacy's plugin folder was absent and nothing about the one it never looked in. It now reads
+  Enhanced's `gta5enhanced\asi` folder under `location: enhanced_asi`, and reports each folder of both
+  editions — listed, absent or unreadable — by name. That the Enhanced client loads from that folder is
+  **not established**; the ADR says what was and was not found. `gta5enhanced\mods` is not read.
+- A screenshare guide, in English and Thai (`docs/screenshare-guide.md`, `docs/screenshare-guide.th.md`),
+  for staff checking a PC over a screenshare and for the player being checked. It covers getting and
+  verifying the real file, administrator rights, running SS mode, reading each row, what each of the six
+  rules' ordinary causes are, what SS mode withholds and why, and what a report does not mean. It is the
+  M3 item README listed as planned, and the one `CONVENTIONS.md` §8 once said existed when it did not.
+  Two things the guide found are written into it rather than papered over: the CLI writes its SS-mode
+  consent question to the same output as `--json`, so `--json > report.json` hides the question from
+  the player; and `--elevate` scans in a new console window this project has not checked stays open.
+- A rule reference, in English and Thai (`docs/rules-reference.md`, `docs/rules-reference.th.md`), so
+  that a reviewer or a player can read what every rule looks at without opening its YAML: title, id,
+  collector, strength, status, each `match` condition in words with its operator and whether case
+  matters, `retention`, `unmeasured_when`, `falsepositives`, `allow` and references, grouped by
+  collector and category. The pages are generated by `cargo xtask rules-reference` from the bundle the
+  program embeds, loaded by the same code, with the Thai text from `rules/i18n/th.yaml` and the words for
+  a strength or a reason from the desktop app's `report.json`. The `rust (ubuntu)` job runs
+  `cargo xtask rules-reference --check`, so a pull request that changes a rule without regenerating the
+  pages fails, with an error naming the command to run.
+- ADR 0040: reports are not signed. A key inside an executable anyone can build is readable by the
+  person whose report it signs, a verifier that is the same executable checks itself, and a Windows
+  modified to lie would have a real key sign the lie. The official-build marker (ADR 0007) and the
+  release attestation (ADR 0008) say where a binary came from, not whether a report reflects the
+  machine; watching the scan run is the control. Both screenshare guides gain §11, "What a report does
+  not prove about itself", PRIVACY.md says a report file is not signed, and the ADR lists what would make
+  the question worth asking again without promising it.
+- Three rules about the state of a Prefetch or event log **file** rather than a record in it, all
+  `experimental` and `tamper` (ADR 0037, ADR 0042): a `.pf` file marked read-only, an `.evtx` file marked
+  read-only, and a log file whose records belong to a channel that the Windows Event Log service writes
+  to a different file. Reading them needed two new reads, both disclosed in the consent question:
+  **one attribute bit** of each `.pf` and `.evtx` file, amending ADR 0009's "no attributes", and **what
+  the Event Log service states about a channel** — its file and its maximum size — through
+  `EvtOpenChannelConfig`, a new host source. That question is asked on a thread of its own and charged
+  to the `evtx` 30-second budget, so an Event Log service that never answers ends the collection with
+  the configuration `unmeasured / budget_spent` instead of stalling the scan. The registry was measured first and rejected: on one Windows
+  11 machine no `WINEVT\Channels` key named a file, and the registry's `MaxSize` disagreed with the size
+  Windows uses on 18 of the 94 keys carrying one. On that machine, elevated, all three rules were
+  `not_found`: 243 `.pf` and 413 `.evtx` files none read-only, and 148 of 148 logs with records at the
+  path their channel is written to. `max_size_bytes` is reported and **no rule reads it**: Windows'
+  documented minimum, 1 MiB, is the size 1 166 of that machine's 1 243 channels had, so there is no
+  "unusually small" to write down.
+- `prefetch` reports its own configuration as an observation — whether the folder is `listed`, `absent`
+  or `unreadable`, and the `EnablePrefetcher` value, left out when the registry holds none (ADR 0037).
+  Both used to reach the report only as the reason a rule could not be answered. No rule reads either:
+  a Windows 11 PC had the value at 3 and GitHub's Windows CI image has no value at all.
+
+- The Windows CI job suspends the Event Log service and runs a scan, which must finish and report the
+  configured-path rule as `unmeasured / budget_spent` (ADR 0042 §5). The bound on the channel-configuration
+  reads had been shown only against a fixture reader that never answers.
+- Amcache is decided against for now (ADR 0041, accepted): no collector and no hash rules until a hive
+  reader meets this repository's parser bar, and then only hashes already published elsewhere, each
+  with its source.
+- `clippy.toml` bans the four calls that write UEFI firmware variables. Reading the Secure Boot variable
+  enables `SeSystemEnvironmentPrivilege` in this program's own token, and that privilege permits writes too
+  (ADR 0038, now accepted). `AGENTS.md` hard rule 2 names the token as the one thing a collector may change.
+
+### Changed
+- `script_block_logging` follows what Windows PowerShell 5.1 was measured to do with the value rather than
+  its type alone (ADR 0038, amended 2026-09-14): a `REG_SZ` holding 1 or 0 is `enabled` or `disabled`, as a
+  `REG_DWORD` or `REG_QWORD` is, where it was a `read_failed` gap before; a value holding any other number or
+  string, or of another type, is `not_configured`, where it was `read_failed`. The rule's text now says what
+  was measured: with the policy off, 5.1 also stops recording the script blocks it otherwise logs by itself.
+- No rule declares `access_denied` any more (ADR 0032, amended). Eleven rules did, in lines never checked
+  against their collectors. Each was: on `evtx` and `prefetch` the reason means a refusal **with**
+  administrator rights, which two elevated scans never met; the `posture` registry keys grant every
+  account read access and a limited-token scan read them; and the test-signing and TPM queries never
+  report a refusal at all. A refusal on any of these rules is now a row SS mode lists instead of a number
+  it counts. A scan without administrator rights still reads as `not_admin`, which stays declared where it
+  was. No rule's matching or text changed.
+- `cargo xtask check-baseline` no longer counts a rule as confronted by an observation that differs from it
+  only in the collector's discriminator, `fivem_dir`'s `location` (ADR 0033, amended; ADR 0044). The two
+  valid-signature plugin rules were "confronted" only by the baselines' `FiveM.exe`, which is about
+  another place: with `location: plugni` written into the Legacy rule and its fixtures every gate still
+  passed. Both rules now carry an honest `rules/unconfronted.csv` row, which ends when a baseline holds a
+  plugin file measured from a published release. **The gate measures two fewer rules than it said it
+  did**; no fixture was invented to change that.
+- **A signature whose chain ends at a root this PC does not trust is `unverifiable_offline`, no longer
+  `invalid`** (ADR 0035, amendment of 2026-09-14). Measured on the Windows CI runner with a root deleted
+  from every certificate store it was in: a genuine signature that does not carry its root answers
+  `CERT_E_CHAINING`, and one that carries it answers `CERT_E_UNTRUSTEDROOT` — the same code a self-signed
+  signature gives — with no network retrieval in either case. Offline the two cannot be told apart, so a
+  genuine `FiveM.exe` on a PC that has not fetched its publisher's root no longer reads as a signature
+  that does not verify. No rule outcome changes: every rule that reads `signature` matches both values;
+  a self-signed signature is now shown as `unverifiable_offline`. The CI step and its live test assert the
+  measured codes; the three "no embedded signature that verifies" rules say what that value covers.
+- **Rule format 2.** `allow.signer`, a certificate subject's name, is replaced by
+  `allow.signer_cert_sha256`, the SHA-256 of the signing certificate (ADR 0035). Code-signing certificates
+  stolen from NVIDIA in 2022 signed malware under NVIDIA's own name, so a name-based exclusion would have
+  exempted it. No rule used the old field; one that did would no longer parse, which is why
+  `RULES_SCHEMA_VERSION` is now 2.
+- M2 is complete as scoped, and no Prefetch, BAM or PCA rule is planned (ADR 0034). The three
+  collector ADRs each deferred that rule as "a separate decision" and nobody made it. What those
+  collectors emit names a program only by file name or path, `allow` compares only `sha256` and
+  `signer`, so such a rule cannot exclude a legitimate program of the same name and a rename defeats
+  it. **No gate refuses it**: a throwaway `prefetch` rule naming one executable passed both
+  `check-rules` and `check-baseline`, while a `pca` rule on `\Downloads\` failed `check-baseline` as
+  the baseline intends. `CONVENTIONS.md` §6 records the rule as enforced by review. README's milestone
+  table now lists M1 and M2 as released in 0.2.0 instead of "merged, not released" and "0.1.0 is the
+  only release so far".
+- A PC with no Prefetch folder is now a `prefetch` run that was **measured**, with every field about a
+  record gapped by the reason it used to be `Unmeasured` for (`source_absent`, or `service_disabled`),
+  instead of an `Unmeasured` run with nothing in it (ADR 0037). A rule on a Prefetch record comes out
+  exactly as before; the difference is the new configuration observation, listed in Self mode.
+
+### Fixed
+- Every ordinary PC reported BAM `intact: false`, with two `read: failed` rows per account in Self mode.
+  Each account key under `bam\State\UserSettings` holds, beside its program records, two `REG_DWORD`
+  values named `Version` and `SequenceNumber` that Microsoft does not document, and `bam` counted them as
+  records it could not read. They are now counted in a new account field, `metadata_values`, and no
+  longer in `values` or `rejected`; a value with one of those names that is not a number is still
+  refused and shown. Measured on every account key of one Windows 11 machine (build 26220), and the same
+  two refusals per account were in a 0.2.0 report from another (build 26200) (ADR 0023, amended). No
+  rule reads BAM, so no evidence changed.
+- One FiveM folder that could not be listed made **every** `fivem_dir` rule `unmeasured`, including the
+  rules about folders that were read (ADR 0036 recorded it). A gap can now be confined to one place a
+  collector reads, keyed by the field that says which place — `fivem_dir`'s `location` (ADR 0044). The
+  rules that could match in the unreadable place stay `unmeasured`, the rule for a file whose signature
+  could not be checked among them; the others answer from the places that were read. On the fixture
+  where Legacy's program folder is denied, four of the seven rules that SS mode used to list as "could not
+  check" are now `not_found` about folders that were checked. When no place at all could be read, every
+  rule is `unmeasured` as before. No other collector declares such a field, and no report snapshot
+  changed.
+- The SS-mode consent question named the wrong scan. In the CLI and in the window app it said the
+  check reads "machine security settings"; since 0.2.0 it also reads the programs running, FiveM's
+  plugins folder, what Prefetch, BAM and the Program Compatibility Assistant recorded about programs
+  that ran, and how many events of each kind the event logs hold. A player agreed to a narrower check
+  than the one that ran. Both now list every kind of source, in the words `PRIVACY.md` uses. The window
+  app's version says the reading already happened, which is true: it scans before its window opens. A
+  test keyed by collector id fails when a collector is added without the question saying so.
+- The CLI asked its SS-mode consent question on standard output, the stream `--json` writes the report
+  to. `scan --mode ss --json > report.json` put the question into the file and left the program waiting
+  for an answer to a question the player could not see. The question, the refusal line and the
+  `--elevate` status lines now go to standard error, and a test runs the binary and parses standard
+  output as JSON.
+- `scan --elevate` in the CLI lost its report. The copy it starts runs in a console window of its own,
+  and on a real Windows 11 machine that window closed less than a second after the scan finished. The
+  copy now waits for Enter before it exits, and prints an error before waiting rather than after. The
+  same measurement showed the window open with the report in it 5 seconds after the prompt appeared,
+  and closed after Enter (ADR 0012, amended). The path through the UAC prompt itself was not run,
+  because a program cannot answer the prompt.
+- `PRIVACY.md` told the reader that nothing is stored "unless you click **Export**". No export or save
+  button exists in the window version; the only file is one a person redirects CLI output into.
+- An Event Log service that did not answer took the other `evtx` rules down with it. With the service
+  suspended on the Windows CI runner, the question about a channel's configuration waited out the whole
+  30-second `evtx` budget, and `event-log-file-cleared` and `event-log-file-read-only` — which read only
+  the logs — came out `unmeasured / budget_spent` beside the configured-path rule. The questions now have a
+  5-second bound of their own that is not taken from the 30 seconds; once it is spent the service is not
+  asked again, only `configured_path`, `at_configured_path` and `max_size_bytes` are gapped
+  `budget_spent`, and every log is still read (ADR 0042, amended). The bound was set against a
+  measurement: on one Windows 11 machine the same two properties of all 1 243 channels took 237 ms in
+  total. The CI step now also requires the other `evtx` rules not to be `budget_spent`.
+
 ## [0.2.0] - 2026-09-13
 
 ### Changed

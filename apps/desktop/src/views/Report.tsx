@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { reportView, ruleTexts } from "../api";
-import type { Evidence, Mode, Observation, ReportView, RuleText } from "../types";
+import type { BootTime, Evidence, Mode, Observation, ReportView, RuleText } from "../types";
 
 interface Props {
   mode: Mode;
@@ -47,6 +47,12 @@ export function Report({ mode, onBack }: Props) {
         <dd>{[header.platform, header.os_build].filter(Boolean).join(" ")}</dd>
         <dt>{t("header.rights")}</dt>
         <dd>{rights}</dd>
+        {/* One line of context for reading every time below it, with the sentence that stops a start
+            days ago being read as something the player did (ADR 0039). */}
+        <dt>{t("header.boot_time")}</dt>
+        <dd>
+          <BootTimeValue bootTime={header.boot_time} />
+        </dd>
         <dt>{t("header.rules")}</dt>
         <dd>
           {header.rules_bundle.rule_count} · <code>{header.rules_bundle.sha256.slice(0, 12)}</code>
@@ -128,6 +134,27 @@ export function Report({ mode, onBack }: Props) {
         {t("common:actions.back")}
       </button>
     </section>
+  );
+}
+
+function BootTimeValue({ bootTime }: { bootTime: BootTime }) {
+  const { t } = useTranslation("report");
+  if (bootTime.state === "unmeasured") {
+    return <>{t("header.boot_time_unmeasured", { reason: t(`reason.${bootTime.reason}`) })}</>;
+  }
+  const seconds = bootTime.seconds_since_boot;
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3_600);
+  const minutes = Math.floor((seconds % 3_600) / 60);
+  const since =
+    days > 0
+      ? t("header.elapsed_days", { days, hours, minutes })
+      : t("header.elapsed", { hours, minutes });
+  return (
+    <>
+      {t("header.boot_time_value", { at: bootTime.booted_at, since })}{" "}
+      <span className="muted">{t("header.boot_time_note")}</span>
+    </>
   );
 }
 

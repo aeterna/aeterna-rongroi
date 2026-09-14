@@ -1,0 +1,24 @@
+{
+  "description": "Legacy's FiveM.exe with nothing embedded and Enhanced's with a signature that does not verify. The hashes are invented.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "enhanced_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM for GTAV Enhanced\\FiveM.exe",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "invalid"
+      }
+    }
+  ],
+  "expect_matches": 2
+}

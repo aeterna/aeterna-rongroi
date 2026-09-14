@@ -60,13 +60,15 @@ system could fake what is displayed. Treat results as evidence for a person to j
 | Milestone | Scope | State |
 |---|---|---|
 | M0 | Repository, rule format, engine, Secure Boot posture check, CLI and GUI shell, release pipeline | released in 0.1.0 |
-| M1 | FiveM folder checks, running processes, more posture checks, admin re-launch | merged, not released yet |
-| M2 | Prefetch, BAM, PCA, event-log tamper signals | collectors merged and reading — a scan shows what all four hold. Two event-log rules ship, both `experimental`; no rule reads Prefetch, BAM or PCA yet, so those three appear only as observations nothing matched |
-| M3 | Vulnerable-driver list, USN journal, Amcache, screenshare guide | planned |
+| M1 | FiveM folder checks, running processes, more posture checks, admin re-launch | released in 0.2.0. Released in 0.3.0: Authenticode signature checking without the network (a chain ending at a root this PC does not trust reads as unverifiable offline, not invalid), FiveM for GTA V Enhanced, the first rules on FiveM's plugin folders and on the signer of `FiveM.exe` ([ADR 0035](docs/adr/0035-signature-checking-offline-and-fivem-enhanced.md), [ADR 0036](docs/adr/0036-the-first-fivem-dir-rules-and-fivem-exes-signer.md)) with a monthly check on when that pinned certificate expires, a FiveM folder that cannot be read no longer leaving every FiveM rule unmeasured ([ADR 0044](docs/adr/0044-a-gap-confined-to-one-place-a-collector-reads.md)), Secure Boot as the firmware reports it and the script block logging policy of Windows PowerShell and PowerShell 7, per machine and per user ([ADR 0038](docs/adr/0038-firmware-secure-boot-and-script-block-logging-policy.md)), and when Windows last started, in the report header ([ADR 0039](docs/adr/0039-a-time-anchor-for-the-report.md)) |
+| M2 | Prefetch, BAM, PCA, event-log tamper signals | released in 0.2.0: the four collectors and two event-log rules, both `experimental`. No rule on what Prefetch, BAM or PCA record is planned. What those three record names a program only by its file name or path, so a rule on them cannot exclude legitimate software and renaming the file defeats it ([ADR 0034](docs/adr/0034-prefetch-bam-and-pca-carry-no-identity.md)). Self mode lists what they saw, and SS mode counts it. Released in 0.3.0: three rules on the state of a Prefetch or event log file — read-only, or not the file its channel writes to ([ADR 0037](docs/adr/0037-prefetch-configuration-and-the-read-only-attribute.md), [ADR 0042](docs/adr/0042-what-the-event-log-service-says-a-channel-writes.md)) — and BAM no longer reporting two unreadable values per account on every PC |
+| M3 | Vulnerable-driver list, USN journal, Amcache, screenshare guide | the [screenshare guide](docs/screenshare-guide.md) is released in 0.3.0. Amcache is decided against for now: no collector and no hash rules until the conditions in [ADR 0041](docs/adr/0041-amcache-feasibility.md) are met. The vulnerable-driver list and the USN journal are planned |
 
-"Merged" means the work is on the `dev` branch and is not in a release. 0.1.0 is the only release so far,
-and the release pipeline itself shipped with it ([ADR 0008](docs/adr/0008-release-pipeline.md)), which is
-why it is listed under M0.
+The releases so far are 0.1.0, 0.2.0 and 0.3.0. The release pipeline shipped with 0.1.0
+([ADR 0008](docs/adr/0008-release-pipeline.md)), which is why it is listed under M0.
+
+Checking someone's PC over a screenshare? Read the [screenshare guide](docs/screenshare-guide.md) first.
+What each rule looks for, and what else produces it: the [rule reference](docs/rules-reference.md).
 
 ## Contributing
 

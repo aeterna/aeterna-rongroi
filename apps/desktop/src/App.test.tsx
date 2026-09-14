@@ -107,6 +107,11 @@ describe("App", () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
     expect(screen.getByText("You may refuse.")).toBeTruthy();
+    // The scan ran before this screen, so consent has to say what it read, not only settings.
+    expect(screen.getByText(/Prefetch, BAM, Program Compatibility Assistant/)).toBeTruthy();
+    // The boot time is not a collector, and staff see it at the top of the report (ADR 0039).
+    expect(screen.getByText(/when Windows last started, which staff will see/)).toBeTruthy();
+    expect(screen.getByText(/marked read-only/)).toBeTruthy();
     fireEvent.click(screen.getByText("I refuse"));
     expect(screen.getByText("Nothing was shown")).toBeTruthy();
     expect(calls).not.toContain("report_view");
@@ -120,9 +125,11 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
+    // One not-measured rule is hidden too: the firmware reading needs administrator rights, which this
+    // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038).
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 0 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
+        "Hidden in SS mode: 1 not found · 1 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -133,6 +140,46 @@ describe("App", () => {
     fireEvent.click(await screen.findByText("Check my own PC"));
     expect(await screen.findByText("Version")).toBeTruthy();
     expect(screen.getByText(selfView.header.provenance.version)).toBeTruthy();
+  });
+
+  // One line of context in the header, in both modes, with the caveat beside it that stops a start
+  // days before the scan being read as something the player did (ADR 0039).
+  it.each([
+    ["Check my own PC", null],
+    ["Screenshare check (SS mode)", "I agree — show the SS view"],
+  ])("shows when Windows started, with its caveat, after %s", async (open, agree) => {
+    render(<App />);
+    fireEvent.click(await screen.findByText(open));
+    if (agree) {
+      fireEvent.click(screen.getByText(agree));
+    }
+    expect(await screen.findByText("Windows start")).toBeTruthy();
+    expect(screen.getByText(/^2025-12-28T21:56:56Z, 3d 2h 3m before this scan\./)).toBeTruthy();
+    expect(screen.getByText(/Not reset by "Shut down" with Fast Startup/)).toBeTruthy();
+  });
+
+  it("shows when Windows started in Thai", async () => {
+    render(<App />);
+    await act(async () => {
+      await i18n.changeLanguage("th");
+    });
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(await screen.findByText("Windows เริ่มทำงาน")).toBeTruthy();
+    expect(
+      screen.getByText(/^2025-12-28T21:56:56Z \(3 วัน 2 ชม\. 3 นาที ก่อนการสแกนนี้\)/),
+    ).toBeTruthy();
+  });
+
+  // No time where none was measured, and the reason in the words every unmeasured row uses.
+  it("shows an unmeasured boot time as a reason and no time", async () => {
+    viewOverride = {
+      ...selfView,
+      header: { ...selfView.header, boot_time: { state: "unmeasured", reason: "not_windows" } },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("not measured — not running on Windows")).toBeTruthy();
+    expect(screen.queryByText(/before this scan/)).toBeNull();
   });
 
   it("offers the administrator restart when the scan ran without administrator rights", async () => {
@@ -354,6 +401,9 @@ describe("App", () => {
   });
 
   it("states nothing about administrator rights when every check was answerable", async () => {
+    // The snapshot's own scan could not read the firmware without those rights (ADR 0038), so the
+    // answerable case is written here: the same view with no rule stopped by them.
+    viewOverride = { ...selfView, scope: { not_admin: 0, not_attempted: 0 } };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
     // The evidence proves the view arrived, so the statement is absent by choice and not by timing.

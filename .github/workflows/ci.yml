@@ -50,6 +50,11 @@ jobs:
         run: cargo insta test --unreferenced reject --test-runner nextest
       - name: Rules and fixtures
         run: cargo xtask check-rules
+      # docs/rules-reference.md and .th.md are written from the rules bundle. A rule, a rule translation
+      # or a report label changed without rerunning `cargo xtask rules-reference` fails here, and the
+      # error names that command.
+      - name: Rule reference pages match the rules
+        run: cargo xtask rules-reference --check
       - name: Clean baseline (the rule set stays quiet on an ordinary machine)
         run: cargo xtask check-baseline
       - name: Locales

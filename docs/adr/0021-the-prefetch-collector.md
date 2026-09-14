@@ -39,6 +39,9 @@ software only by `sha256` or by `signer` (CONVENTIONS.md §6, `rules/AGENTS.md`)
 artifact that proves execution most strongly. Writing that rule is a separate decision with a separate
 false-positive argument, and this pull request does not make it.
 
+**Decided in ADR 0034.** The separate decision this section defers was made: no rule on `prefetch`, `bam`
+or `pca` identifies a program by `name` or `path`.
+
 The observations land in the unmatched bucket: listed in Self mode, counted and never listed in SS
 mode (ADR 0014). That settles the privacy question for *this* pull request by construction — nothing
 this collector emits reaches an SS viewer at all today — but it is not what the withholding below

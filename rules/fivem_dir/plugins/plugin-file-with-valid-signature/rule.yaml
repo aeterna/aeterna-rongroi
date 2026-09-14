@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: d5531c55-1a65-4698-9f39-7cf79bbbb7ba
+title: A file in FiveM's plugins folder carries a valid embedded signature
+description: >-
+  FiveM for GTA V Legacy's plugins folder (%LOCALAPPDATA%\FiveM\FiveM.app\plugins) holds a file with an
+  embedded signature that Windows verified, and the row names the signer and the signing certificate's
+  SHA-256. A valid signature says who signed the file and that it has not changed since — not what it
+  does, and not that it belongs here: certificates have been stolen from real companies and used to
+  sign cheats and malware under their names, and revocation is not checked. The signer's name is for
+  the reader to look up. It is a separate row from files with no signature that verifies, because what
+  a reviewer can do next is different. It does not say whether the file was ever loaded.
+status: experimental
+collector: fivem_dir
+strength: presence
+# No `allow` yet. An entry identifies software by its signing certificate's SHA-256, and ADR 0036 adds
+# one only when it was measured from a file its publisher released — never from memory.
+match:
+  location: plugins
+  signature: valid
+retention: >-
+  Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and
+  this check cannot say what the folder held earlier.
+# Left out deliberately: `access_denied`, for the reason given in the rule beside this one.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Overlays, capture and performance tools from established publishers that install a signed plugin
+    here
+  - Signed builds of graphics mods, installed here as the Cfx.re forum guides describe
+  - Software signed by an individual developer, whose certificate carries that person's own name
+references:
+  - https://forum.cfx.re/t/how-to-install-reshade/5352795
+  - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [fivem_dir, plugins, signature]
+related:
+  - id: 061797d3-161d-4783-89e6-caf658973436
+    type: similar

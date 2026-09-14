@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# FiveM for GTA V Enhanced installed and Legacy not: the Enhanced user folder under %APPDATA% holds one
+# file in its `asi` folder, and a `mods` folder beside it that this collector does not read (ADR 0035).
+# The hash is the SHA-256 of an empty file.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Roaming\FiveM for GTAV Enhanced\gta5enhanced\asi':
+    - name: example.asi
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Roaming\FiveM for GTAV Enhanced\gta5enhanced\mods':
+    - name: not-read.rpf
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855

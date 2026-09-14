@@ -1,0 +1,17 @@
+{
+  "description": "FiveM.exe validly signed under the same signer name with a certificate this rule does not know — the shape a renewed certificate and a stolen one both have. The certificate hash is invented.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "valid",
+        "signer": "Rockstar Games, Inc.",
+        "signer_cert_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

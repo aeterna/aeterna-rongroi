@@ -10,7 +10,7 @@
 # Profile: the ordinary Windows 11 PC of somebody who plays FiveM, scanned after they accepted the
 # restart-as-administrator offer (ADR 0012). Posture is `baseline-hardened-win11`'s — Secure Boot on,
 # memory integrity configured on, test signing off, TPM 2.0 — and FiveM is installed with an empty
-# plugin folder, as on `baseline-consumer-win11`. What this profile adds, and the reason it exists, is
+# plugin folder and a `FiveM.exe` signed as measured, as on `baseline-consumer-win11`. What this profile adds, and the reason it exists, is
 # the **artifact surface**: `%WinDir%` and `%SystemRoot%` are set, as they are on every Windows
 # installation, and PCA, Prefetch, the Event Log folder and the BAM state key are all present and
 # readable. The other two baselines describe none of them, so on those two every rule for those four
@@ -32,6 +32,7 @@ os_build: "26100"
 elevated: true
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
   SystemRoot: 'C:\Windows'
   WinDir: 'C:\Windows'
 registry:
@@ -39,10 +40,19 @@ registry:
     UEFISecureBootEnabled: 1
   'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
     Enabled: 1
+  # Windows' Prefetch switch at 3, application launch and boot both recorded: the value measured on a
+  # Windows 11 machine (build 26220) on 2026-09-13, where it was readable without elevation (ADR 0037).
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters':
+    EnablePrefetcher: 3
   # One account with BAM records, in the two path shapes BAM writes: the device path it normally uses
   # (ADR 0023), which no SS-mode redaction can reach and which is therefore withheld, and a
-  # drive-rooted one. The SID is invented and the collector emits no part of it.
+  # drive-rooted one. The SID is invented and the collector emits no part of it. Beside them, the two
+  # `REG_DWORD` values every account key held on the Windows 11 machines measured, with measured
+  # numbers (../PROVENANCE.md): an ordinary machine's key holds them, so a baseline without them would
+  # not be an ordinary machine's.
   'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    Version: 1
+    SequenceNumber: 115
     '\Device\HarddiskVolume3\Windows\System32\notepad.exe':
       from: '../../parsers/bam/documented-24-byte-value.bin'
     'C:\Program Files\FiveM\FiveM.exe':
@@ -61,10 +71,13 @@ filesystem:
       from: '../../parsers/pca-general/normal.txt'
   # One Prefetch record — the vendored Windows 10 corpus file, for `cmd.exe` — beside the two things a
   # real Prefetch folder also holds and this collector does not read. One `.pf` file is far fewer than
-  # a real folder's; see ../PROVENANCE.md for what that costs this baseline.
+  # a real folder's; see ../PROVENANCE.md for what that costs this baseline. Neither this `.pf` file nor
+  # the log below carries the read-only attribute: of 239 `.pf` files and 413 `.evtx` files on one
+  # measured Windows 11 machine, none did (ADR 0037).
   'C:\Windows\Prefetch':
     - name: CMD.EXE-D269B812.pf
       from: '../../prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf'
+      read_only: false
     - name: AgAppLaunch.db
       content: "not a prefetch file\n"
     - name: ReadyBoot
@@ -76,13 +89,39 @@ filesystem:
   'C:\Windows\System32\winevt\Logs':
     - name: 'Microsoft-Windows-LanguagePackSetup%4Operational.evtx'
       from: '../../evtx/languagepacksetup-operational.evtx'
+      read_only: false
   'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+  # FiveM.exe as a Legacy install has it, measured 2026-09-13 on one Windows 11 machine (build 26220):
+  # its SHA-256, and a valid embedded signature from "Rockstar Games, Inc." with the certificate SHA-256
+  # below. See ../PROVENANCE.md and ADR 0036. The folder's other entries are not reported and not listed.
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.app
+      directory: true
+    - name: FiveM.exe
+      sha256: 891e48128dc9c287aaa204757acac61d469eef9de82714cec4404d254a73c844
+      signature:
+        state: valid
+        signer: Rockstar Games, Inc.
+        signer_cert_sha256: 65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f
 code_integrity:
   enabled: true
   test_signing: false
 tpm:
   present: true
   spec_version: "2.0"
+# Firmware (ADR 0038): with administrator rights the firmware's own Secure Boot variable is read, and
+# on an ordinary machine it agrees with the registry — measured on a real Windows 11 machine, elevated.
+# No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
+firmware:
+  secure_boot: enabled
+# What the Event Log service states about the one channel this baseline's log holds, as it stated it on
+# a Windows 11 machine (build 26220) on 2026-09-13: the default file name, which is the channel's name
+# with `/` written `%4`, and the 1 052 672-byte cap that 1 166 of that machine's 1 243 channels had
+# (ADR 0042).
+event_log_channels:
+  Microsoft-Windows-LanguagePackSetup/Operational:
+    log_file_path: '%SystemRoot%\System32\Winevt\Logs\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'
+    max_size_bytes: 1052672
 processes:
   - pid: 4
     name: System

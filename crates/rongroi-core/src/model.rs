@@ -146,9 +146,14 @@ pub enum CollectorRun {
         collector: String,
         /// What the collector saw.
         observations: Vec<Observation>,
-        /// Fields the collector could not read, with the reason.
+        /// Fields the collector could not read, with the reason, for every observation of the run.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         gaps: BTreeMap<String, UnmeasuredReason>,
+        /// Fields the collector could not read for **one value of its discriminator** only — one of
+        /// the several places it reads — while the others were read (ADR 0044). Empty for a
+        /// collector that declares no discriminator.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        discriminator_gaps: Vec<DiscriminatorGaps>,
     },
     /// The collector could not look at all.
     Unmeasured {
@@ -157,6 +162,39 @@ pub enum CollectorRun {
         /// Why it could not look.
         reason: UnmeasuredReason,
     },
+}
+
+/// Gaps confined to the observations whose **discriminator** carries one value (ADR 0044).
+///
+/// A discriminator is the field a collector uses to say which of the things it reads an observation is
+/// about: `fivem_dir`'s `location`. When one of those things could not be read and the others were,
+/// a run-wide gap would make every rule on the collector `unmeasured`, including rules that can only
+/// ever match an observation from a place that was read. These gaps reach a rule only when the rule's
+/// `match` could be satisfied by an observation carrying `value`, and they stop an observation carrying
+/// `value` from satisfying `<field>|exists: false` for a field listed here.
+///
+/// The collector promises that **every** observation it emits about that place carries
+/// `discriminator: value`. The engine cannot check that promise; `rongroi-collectors` binds it with a
+/// test over every fixture host.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiscriminatorGaps {
+    /// The observation field that says which place an observation is about.
+    pub discriminator: String,
+    /// The value that field carries on every observation about the place that could not be read.
+    pub value: serde_json::Value,
+    /// Fields that could not be read there, with the reason.
+    pub gaps: BTreeMap<String, UnmeasuredReason>,
+}
+
+impl DiscriminatorGaps {
+    /// Whether `observation` is about the place these gaps describe.
+    ///
+    /// Compared exactly, not with a rule's ASCII fold: both sides are written by the same collector,
+    /// and a value it spells two ways is a defect in the collector rather than something to hide.
+    pub fn describes(&self, observation: &Observation) -> bool {
+        observation.fields.get(&self.discriminator) == Some(&self.value)
+    }
 }
 
 impl CollectorRun {
@@ -255,6 +293,76 @@ pub struct Evidence {
     pub state: EvidenceState,
 }
 
+/// When the running Windows kernel started counting, for reading the times in a report against it
+/// (ADR 0039).
+///
+/// Context, never evidence: no rule reads it and nothing is concluded from it. It is not when a person
+/// last turned the PC on — a "Shut down" with Fast Startup, which is Windows' default, hibernates the
+/// kernel rather than ending it, and sleep and hibernation do not start the count again — so a start
+/// days before the scan is the ordinary state of a PC that is shut down every night.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum BootTime {
+    /// Windows answered.
+    Measured {
+        /// The scan's own clock minus the time since the start, UTC, RFC 3339, to the second.
+        ///
+        /// Expressed on the clock the scan read, so a clock that was changed after the start moves
+        /// this value and not [`BootTime::Measured::seconds_since_boot`]; a record written before such
+        /// a change carries a time on the old clock.
+        booted_at: String,
+        /// Whole seconds Windows counted between its start and the scan, sleep and hibernation
+        /// included. What was measured; `booted_at` is derived from it.
+        seconds_since_boot: u64,
+    },
+    /// Windows was not asked or did not answer. Never a guessed time.
+    Unmeasured {
+        /// Why there is no value.
+        reason: UnmeasuredReason,
+    },
+}
+
+impl Default for BootTime {
+    /// What a report written before this field existed reads back as: nothing was tried, which is
+    /// what that report did (ADR 0030, ADR 0039).
+    fn default() -> Self {
+        Self::Unmeasured {
+            reason: UnmeasuredReason::NotAttempted,
+        }
+    }
+}
+
+impl BootTime {
+    /// The start `since_boot` before `generated_at`, the scan's own RFC 3339 time.
+    ///
+    /// A `generated_at` that does not parse, or a count that reaches back before the clock can go, is
+    /// `read_failed` rather than a time this program made up.
+    pub fn from_elapsed(generated_at: &str, since_boot: std::time::Duration) -> Self {
+        let read_failed = Self::Unmeasured {
+            reason: UnmeasuredReason::ReadFailed,
+        };
+        let Ok(now) = generated_at.parse::<jiff::Timestamp>() else {
+            return read_failed;
+        };
+        let seconds = since_boot.as_secs();
+        let Ok(signed) = i64::try_from(seconds) else {
+            return read_failed;
+        };
+        // Truncated to the second on both sides: `GetTickCount64` moves in steps of 10 to 16 ms, and
+        // a fraction of a second here would claim a precision the reading does not have.
+        let Ok(now) = jiff::Timestamp::from_second(now.as_second()) else {
+            return read_failed;
+        };
+        let Ok(booted_at) = now.checked_sub(jiff::SignedDuration::from_secs(signed)) else {
+            return read_failed;
+        };
+        Self::Measured {
+            booted_at: booted_at.to_string(),
+            seconds_since_boot: seconds,
+        }
+    }
+}
+
 /// Facts about the scan itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReportHeader {
@@ -272,6 +380,11 @@ pub struct ReportHeader {
     pub elevated: Option<bool>,
     /// When the scan ran, UTC, RFC 3339.
     pub generated_at: String,
+    /// When the running Windows kernel started counting (ADR 0039). Additive, and
+    /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed reads back
+    /// `unmeasured` / `not_attempted`.
+    #[serde(default)]
+    pub boot_time: BootTime,
 }
 
 /// One observation that describes aeterna-rongroi itself rather than the machine it scanned.
@@ -318,4 +431,94 @@ pub struct Report {
     /// reads back with none, which is what it meant (ADR 0014).
     #[serde(default)]
     pub unmatched: Vec<UnmatchedGroup>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    /// One day, two hours, three minutes and four seconds before the scan, and the fraction of a
+    /// second on each side dropped rather than rounded into a precision the counter does not have.
+    #[test]
+    fn the_boot_time_is_the_scan_time_minus_the_count() {
+        assert_eq!(
+            BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::from_millis(93_784_999)),
+            BootTime::Measured {
+                booted_at: "2025-12-30T21:56:56Z".to_owned(),
+                seconds_since_boot: 93_784,
+            }
+        );
+        assert_eq!(
+            BootTime::from_elapsed("2026-09-13T10:27:03.3128928Z", Duration::from_secs(32_571)),
+            BootTime::Measured {
+                booted_at: "2026-09-13T01:24:12Z".to_owned(),
+                seconds_since_boot: 32_571,
+            }
+        );
+    }
+
+    /// A machine that has only just started is an answer, not a missing value.
+    #[test]
+    fn zero_seconds_since_boot_is_the_scan_time_itself() {
+        assert_eq!(
+            BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::ZERO),
+            BootTime::Measured {
+                booted_at: "2026-01-01T00:00:00Z".to_owned(),
+                seconds_since_boot: 0,
+            }
+        );
+    }
+
+    /// Neither case can come from a real scan; both would otherwise need a time to be invented.
+    #[test]
+    fn a_time_that_cannot_be_computed_is_read_failed_not_a_guess() {
+        let read_failed = BootTime::Unmeasured {
+            reason: UnmeasuredReason::ReadFailed,
+        };
+        assert_eq!(
+            BootTime::from_elapsed("not a time", Duration::from_secs(1)),
+            read_failed
+        );
+        assert_eq!(
+            BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::from_secs(u64::MAX)),
+            read_failed
+        );
+        assert_eq!(
+            BootTime::from_elapsed(
+                "2026-01-01T00:00:00Z",
+                Duration::from_hours(1_000_000 * 365 * 24)
+            ),
+            read_failed
+        );
+    }
+
+    /// The header shape both front ends read, and the shape a report from before ADR 0039 reads
+    /// back as.
+    #[test]
+    fn the_boot_time_serialises_as_a_tagged_state() {
+        let measured = BootTime::from_elapsed("2026-01-01T00:00:00Z", Duration::from_secs(60));
+        assert_eq!(
+            serde_json::to_value(&measured).unwrap(),
+            serde_json::json!({
+                "state": "measured",
+                "booted_at": "2025-12-31T23:59:00Z",
+                "seconds_since_boot": 60
+            })
+        );
+        let unmeasured = BootTime::Unmeasured {
+            reason: UnmeasuredReason::NotWindows,
+        };
+        assert_eq!(
+            serde_json::to_value(&unmeasured).unwrap(),
+            serde_json::json!({ "state": "unmeasured", "reason": "not_windows" })
+        );
+        assert_eq!(
+            BootTime::default(),
+            BootTime::Unmeasured {
+                reason: UnmeasuredReason::NotAttempted
+            }
+        );
+    }
 }

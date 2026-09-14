@@ -71,6 +71,10 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
 
     let vocabulary = Vocabulary::of_this_build();
     let mut problems = Vec::new();
+    // No clock: the dates are validated here and compared with today only by the scheduled
+    // `check-pin-expiry`, so a pull request is never red because of the calendar.
+    let pins = crate::certificate_pins::read(root, &mut problems)?;
+    crate::certificate_pins::check_against_bundle(&pins, &bundle, &mut problems);
     let mut fixture_count = 0;
     for sourced in bundle.rules() {
         vocabulary.check(&sourced.path, &sourced.rule, &mut problems);
@@ -381,6 +385,7 @@ fn check_fixture(rule: &Rule, file: &Path, expect_found: bool) -> Result<(), Str
         collector: rule.collector.clone(),
         observations: fixture.observations,
         gaps: fixture.gaps,
+        discriminator_gaps: Vec::new(),
     };
     let evidence = engine::evaluate_rule(rule, &[run]);
     match (&evidence.state, expect_found) {
@@ -502,6 +507,57 @@ date: 2026-09-11
         assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
         assert_eq!(outcome.rule_count, 1);
         assert_eq!(outcome.fixture_count, 2);
+    }
+
+    /// An `allow` entry naming a certificate needs a row in `rules/certificate-pins.csv`, and the row
+    /// needs the entry: otherwise the certificate's expiry is watched by nothing, or a date warns
+    /// about a certificate no rule allows (ADR 0036).
+    #[test]
+    fn a_certificate_allow_entry_and_its_pin_row_go_together() {
+        let cert = "b".repeat(64);
+        let tmp = TempRoot::new("pins");
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(
+            &dir.join("rule.yaml"),
+            &format!("{VALID_RULE}allow:\n  - signer_cert_sha256: {cert}\n"),
+        );
+        write(&dir.join("tests/positive/on.json"), POSITIVE_FIXTURE);
+        write(&dir.join("tests/negative/off.json"), NEGATIVE_FIXTURE);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains("has no row in `rules/certificate-pins.csv`"),
+            "{:?}",
+            outcome.problems
+        );
+
+        let header = "rule_id,signer_cert_sha256,subject,not_before,not_after,measured_on";
+        let row = |id: &str| {
+            format!("{id},{cert},CN=Example,2026-07-21T00:00:00Z,2027-09-05T23:59:59Z,2026-09-13\n")
+        };
+        write(
+            &tmp.path().join("rules/certificate-pins.csv"),
+            &format!("{header}\n{}", row("7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7")),
+        );
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+        assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
+
+        write(
+            &tmp.path().join("rules/certificate-pins.csv"),
+            &format!(
+                "{header}\n{}{}",
+                row("7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7"),
+                row("00000000-0000-4000-8000-000000000000")
+            ),
+        );
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains("watches nothing"),
+            "{:?}",
+            outcome.problems
+        );
     }
 
     /// Gate (1): two rules sharing the same `id` must be rejected.
@@ -643,7 +699,7 @@ date: 2026-09-11
         );
         assert!(
             outcome.problems[0]
-                .contains("it emits hvci, secure_boot, test_signing, tpm, tpm_spec_version"),
+                .contains("it emits hvci, script_block_logging, script_block_logging_pwsh, script_block_logging_pwsh_user, script_block_logging_user, secure_boot, secure_boot_firmware, test_signing, tpm, tpm_spec_version"),
             "{:?}",
             outcome.problems
         );
@@ -701,14 +757,15 @@ date: 2026-09-11
         // The message names what it can report, so the fix does not need a grep.
         assert!(
             outcome.problems[0]
-                .contains("it reports access_denied, collector_unavailable, not_windows, read_failed, source_absent"),
+                .contains("it reports access_denied, collector_unavailable, not_admin, not_windows, read_failed, source_absent"),
             "{:?}",
             outcome.problems
         );
     }
 
-    /// A reason another collector produces is still wrong here: `posture` reads what any account may
-    /// read and never splits a denial by elevation, so it cannot report `not_admin`.
+    /// A reason another collector produces is still wrong here: `posture` reads settings, not a
+    /// place records are kept, so it cannot report `source_empty` — which `bam` and `pca` do. Until
+    /// ADR 0038 this test used `not_admin`, which `posture` now reports for the firmware reading.
     #[test]
     fn an_unmeasured_when_reason_another_collector_produces_is_rejected() {
         let tmp = TempRoot::new("wrong-collector-reason");
@@ -716,7 +773,7 @@ date: 2026-09-11
             .replace("status: test", "status: experimental")
             .replace(
                 "retention: Current setting only.",
-                "retention: Current setting only.\nunmeasured_when: [not_admin]",
+                "retention: Current setting only.\nunmeasured_when: [source_empty]",
             );
         write(
             &tmp.path()
@@ -728,7 +785,7 @@ date: 2026-09-11
 
         assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
         assert!(
-            outcome.problems[0].contains("`unmeasured_when` names `not_admin`"),
+            outcome.problems[0].contains("`unmeasured_when` names `source_empty`"),
             "{:?}",
             outcome.problems
         );
@@ -898,7 +955,7 @@ date: 2026-09-11
         assert_eq!(distance("", "abc"), 3);
     }
 
-    /// Gate (3): an `allow` entry that is not `sha256` or `signer` (e.g. `file_name`) must be
+    /// Gate (3): an `allow` entry that is not `sha256` or `signer_cert_sha256` (e.g. `file_name`) must be
     /// rejected while parsing the rule, with a message naming the offending field.
     #[test]
     fn allow_entry_with_unknown_field_is_rejected() {
@@ -914,7 +971,8 @@ date: 2026-09-11
 
         let message = error.to_string();
         assert!(
-            message.contains("unknown field `file_name`, expected one of sha256, signer"),
+            message
+                .contains("unknown field `file_name`, expected one of sha256, signer_cert_sha256"),
             "{message}"
         );
     }

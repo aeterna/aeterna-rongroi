@@ -13,14 +13,18 @@ expression: view
       "exe_sha256": null
     },
     "rules_bundle": {
-      "schema_version": 1,
+      "schema_version": 2,
       "sha256": "[bundle sha256]",
-      "rule_count": 6
+      "rule_count": 21
     },
     "platform": "windows",
     "os_build": "26100",
     "elevated": false,
-    "generated_at": "2026-01-01T00:00:00Z"
+    "generated_at": "2026-01-01T00:00:00Z",
+    "boot_time": {
+      "state": "unmeasured",
+      "reason": "read_failed"
+    }
   },
   "evidence": [
     {
@@ -40,6 +44,78 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "9b318bfa-805d-4edd-81f1-602b57639a69",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "53528a11-5af7-4e75-94bf-fca07eec6fcc",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "0999422f-8709-4d85-80e3-39410a85ed6b",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "d5531c55-1a65-4698-9f39-7cf79bbbb7ba",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "061797d3-161d-4783-89e6-caf658973436",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "282115fe-863d-4e2e-9cf5-4eaf8e7545e4",
+      "collector": "fivem_dir",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
       "collector": "posture",
       "strength": "posture",
@@ -48,9 +124,45 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "98ee9213-39f3-4219-b2ac-f2bb3d21d6cc",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
+      "rule_id": "88eb2aca-a33e-414d-bd0f-cfb87af95a2d",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "869c34b6-7b32-4f56-a281-9f5ac00e43c4",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
       "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
       "collector": "posture",
       "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
+      "collector": "prefetch",
+      "strength": "tamper",
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
@@ -75,8 +187,8 @@ expression: view
   },
   "hidden": {
     "not_found": 0,
-    "unmeasured_expected": 2,
+    "unmeasured_expected": 3,
     "unmeasured_unexpected": 0,
-    "unmatched": 2
+    "unmatched": 3
   }
 }

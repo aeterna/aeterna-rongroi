@@ -71,7 +71,7 @@ same way SS mode accepts a refusal to share.
 
 | | Asks for it | Declines the prompt | Windows refuses |
 |---|---|---|---|
-| CLI | `aeterna-rongroi-cli scan --elevate` | one line: the prompt was declined, exit 0 | the error, non-zero exit |
+| CLI | `aeterna-rongroi-cli scan --elevate` — the scan runs in a new window, which waits for Enter (amendment below) | one line: the prompt was declined, exit 0 | the error, non-zero exit |
 | Desktop | a button on the start screen, shown only while the report header says `elevated: false` | a plain sentence on the start screen | a short failure notice on the start screen |
 
 On anything other than Windows the CLI says that elevation is Windows-only and exits cleanly, rather than
@@ -91,3 +91,66 @@ accepting the flag and silently doing nothing.
   from the first. The program never shows both at once.
 - The prompt itself can only be exercised on Windows: it cannot be produced on a build machine, and the
   Windows CI runner already runs as administrator with UAC off, so a real prompt is checked by hand.
+
+## Amendment (2026-09-13) — the elevated CLI copy's window closes on its report
+
+### What was measured
+
+The table above says what the CLI prints when the relaunch is **requested**. It said nothing about
+what happens to the copy's output, and nobody had looked. `ShellExecuteExW` is called without
+`SEE_MASK_NO_CONSOLE`, which is the flag that lets a new process inherit the caller's console, so the
+copy gets a console window of its own. Whether that window stays open once the copy exits was the
+open question. It was measured on one real Windows 11 machine (build 26220; no `DelegationConsole`
+set and Windows Terminal not installed, so the console host is conhost):
+
+| Run | What was seen |
+|---|---|
+| `scan` started the way `relaunch_elevated` starts the copy: verb `runas`, `SW_SHOWNORMAL`, `SEE_MASK_NOASYNC \| SEE_MASK_FLAG_NO_UI` | one new `ConsoleWindowClass` window while the scan ran (6.3 s, exit 0); **none left open 1 s after it exited**, and none after 6 s |
+| the same, with `scan --pause-at-exit` (this amendment) | the prompt reached the window after 6.0 s; 5 s later the process was still running, its window open and the report's footer on screen; after Enter was written to its console input, it exited with 0 within 10 s and the window closed |
+
+So before this amendment, `aeterna-rongroi-cli scan --elevate` printed "The new window does the scan"
+and the new window closed as soon as the scan finished. The report was on screen for as long as the
+scan took to print.
+
+**What the measurement did not cover.** The launching process was already elevated, because a
+scheduled task can start one on the desktop without a person, and a UAC prompt cannot be answered by
+a program. From an elevated caller, `runas` shows no prompt. The product's real path is a
+**non-elevated** caller, a prompt, and a copy started by the consent service. Both give the copy a new
+console for the same reason: the flag that would share one is not set. The prompt path itself was
+not run here. It needs a person to click, as the last Consequence above already says.
+
+### Decision
+
+- **The copy waits for Enter before it exits.** `--elevate` forwards a hidden `--pause-at-exit`, which
+  prints "Press Enter to close this window." to standard error and reads one line. End of input
+  counts as Enter, so a copy with no keyboard behind it exits instead of hanging. The flag is added
+  once, however many times it is forwarded.
+- **An error is printed before the pause, not after.** Returning the error from `main` prints it
+  after everything else, which is into a window that has already closed. `main` prints it, pauses,
+  and returns a failing exit code.
+- **The relaunching process writes its messages to standard error.** "Starting again…" and "the
+  prompt was declined" are not a report, for the reason the SS consent question moved to standard
+  error at the same time: with `--json`, standard output is a file someone redirected.
+
+### What was rejected
+
+**Pausing whenever this process is the only one attached to its console** (`GetConsoleProcessList`
+returning 1). That would also catch a double-click from Explorer. It is a guess about how the program
+was started, where the flag states it, and it would change what an ordinary run does in cases no one
+measured.
+
+**Setting `SEE_MASK_NO_CONSOLE`** so the copy writes into the window it was started from. Not
+measured. Whether an elevated process can share a console created by a non-elevated one was not
+tested, and a change to how the process is created is a larger question than keeping a window open.
+
+### What this does not fix
+
+- **`--elevate` does not carry redirection.** `SHELLEXECUTEINFOW` has no standard-handle fields, so
+  `scan --elevate --json > report.json` leaves the file empty and prints the copy's JSON into the
+  copy's own window. To save an elevated report, run the scan from an administrator PowerShell.
+- **A long report can outgrow the window's scrollback.** A Self-mode scan on the same machine printed
+  more than the probe read back (it read the last 400 rows), and conhost keeps a limited number of
+  rows. SS mode lists far less.
+- **Windows Terminal as the default console host was not measured.** It has its own setting for
+  closing a tab when a process exits. The pause keeps the process alive either way, so the tab has
+  no exit to react to.

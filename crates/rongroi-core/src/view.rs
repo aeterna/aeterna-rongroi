@@ -293,6 +293,7 @@ mod tests {
             os_build: None,
             elevated: Some(false),
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
+            boot_time: crate::model::BootTime::default(),
         }
     }
 
@@ -407,7 +408,7 @@ mod tests {
                     ]),
                 },
             }],
-            // What `fivem_dir` saw: it ships with no rule, so nothing about this file matched one.
+            // What `fivem_dir` saw that no rule matched, written by hand: this report has no bundle.
             unmatched: vec![UnmatchedGroup {
                 collector: "fivem_dir".to_owned(),
                 observations: vec![Observation {

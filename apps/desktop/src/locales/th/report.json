@@ -8,6 +8,12 @@
     "elevated_yes": "ผู้ดูแลระบบ",
     "elevated_no": "ผู้ใช้ทั่วไป",
     "elevated_unknown": "ไม่ทราบ",
+    "boot_time": "Windows เริ่มทำงาน",
+    "boot_time_value": "{{at}} ({{since}} ก่อนการสแกนนี้)",
+    "boot_time_note": "การกด \"Shut down\" ขณะเปิด Fast Startup (ค่าเริ่มต้นของ Windows) การ sleep และการ hibernate ไม่ทำให้ค่านี้เริ่มใหม่ การ restart ทำให้เริ่มใหม่",
+    "boot_time_unmeasured": "ยังไม่ได้วัด — {{reason}}",
+    "elapsed": "{{hours}} ชม. {{minutes}} นาที",
+    "elapsed_days": "{{days}} วัน {{hours}} ชม. {{minutes}} นาที",
     "rules": "Rule",
     "exe_sha256": "SHA-256 ของโปรแกรม"
   },

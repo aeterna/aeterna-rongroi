@@ -1,0 +1,9 @@
+{
+  "description": "Both readings agree that Secure Boot is off. `secure-boot-disabled` describes that; this rule is about a disagreement",
+  "observations": [
+    {
+      "collector": "posture",
+      "fields": { "secure_boot": "disabled", "secure_boot_firmware": "disabled" }
+    }
+  ]
+}

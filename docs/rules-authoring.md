@@ -25,7 +25,7 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `strength` | yes | `execution` · `presence` · `tamper` · `posture` · `context` |
 | `match` | yes | map of `field` — or `field\|operator` — → value; **all** of them must hold to match. Strings compare without regard to ASCII case (ADR 0025). Every field name must be one the collector declares it can emit, and every operator one its kind can take — `check-rules` rejects the rest and names the one it meant (ADR 0026, ADR 0029). The whole vocabulary is in [How matching works](#how-matching-works) |
 | `cased` | no | **field** names compared byte for byte instead; everything left out folds case. One entry covers every comparison the rule makes against that field |
-| `allow` | no | legitimate software excluded by `sha256` or `signer` — never by file name |
+| `allow` | no | legitimate software excluded by `sha256` (the file) or `signer_cert_sha256` (the certificate that signed it) — exactly one per entry, never a file's or a signer's name: certificates stolen from a real publisher carry its name (ADR 0035). Revocation is not checked, so an allowed certificate that is later stolen and revoked stays allowed until the entry is removed. `prefetch`, `bam` and `pca` emit neither, so a rule on them has nothing to allow by, and no rule on them names a program by `name` or `path` (ADR 0034). No gate refuses that rule; review does |
 | `retention` | yes | how far back the source can see, in words for the user |
 | `unmeasured_when` | no | reason codes you expect on some machines. A reason named here is **counted** in SS mode; one that is not is **listed**, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest and names what it does report. `partial`, `budget_spent` and `read_failed` may not be named at all: a view lists them whatever you declare, so `check-rules` refuses the line (ADR 0030, ADR 0032) |
 | `falsepositives` | yes | what legitimately produces this evidence; never empty. Shown to the reader beside every `found` row (ADR 0027), so write it for them |
@@ -43,6 +43,11 @@ Unknown fields are errors. Use `#` comments for notes.
 - If nothing matched but a field in `match` is listed in the run's `gaps`, the rule is `unmeasured` — never
   `not_found`. That is true of **every** operator; the table below says so one by one, and `exists: false`
   is checked against `gaps` before anything is matched at all (ADR 0029).
+- A collector that reads several places may report a gap for **one place** only, keyed by its
+  discriminator (`fivem_dir`: `location`). Such a gap makes the rule `unmeasured` only if the rule could
+  match an observation from that place — every condition the rule puts on `location` holds for that
+  place's value, which is true of a rule that puts none. An observation from that place never satisfies
+  `exists: false` for a field the place could not read (ADR 0044).
 - Otherwise the rule is `not_found`, and the report shows its `retention`.
 
 ### The operators
@@ -123,7 +128,8 @@ ordinary condition that produces each and how common it is. The two that most of
 `source_absent` ("this PC has no such record to read") and `source_empty` ("the place this is kept is
 there and holds nothing"). They mean opposite things — write the one you mean.
 
-No rule ships with `cased` today, and none uses an operator. `cased` looks like this, and needs a `#`
+No rule ships with `cased` today. The `fivem_dir` rules are the first to use a value list and an
+operator, `exists` (ADR 0036). `cased` looks like this, and needs a `#`
 comment saying why the field's own vocabulary distinguishes case:
 
 ```yaml
@@ -132,6 +138,42 @@ match:
   some_field: Exact Value
 cased: [some_field]
 ```
+
+## When a collector omits a field for one item
+
+Some collectors report a failure on **one** item by leaving a field out of that item's observation,
+not by a gap: `fivem_dir` omits `signature` for a file whose check failed, and `sha256` for one it could
+not hash (ADR 0009). A gap covers the whole run, or since ADR 0044 one whole place, so a gap there would silence every rule on that
+collector because of one file. The consequence for a rule author is that such an item satisfies **no**
+equality on the omitted field, and a rule that lists every value the field can take still falls to
+`not_found` for it. Nothing in the engine can tell you this happened.
+
+The pattern ADR 0036 uses:
+
+- **Partition the values.** Write one rule per group of values a reader should tell apart, and put
+  every value the field can take in some rule. `match` has no negation, so "anything but `valid`" is the
+  list of the other values.
+- **Give the missing field its own rule**, with `<field>|exists: false` beside a condition only the
+  items can meet (for `fivem_dir`, `path|exists: true`, which a folder observation does not carry). The
+  engine checks gaps before an absence condition, so a run that could not read at all makes that rule
+  `unmeasured`, not `found` (ADR 0029).
+- **Say so in `description`** of every rule in the group: an item whose field is missing is shown under
+  the other rule, and this row's `not_found` speaks only for the items that carried the field.
+
+## An `allow` entry is a measurement
+
+An `allow` entry names a file or a certificate by digest, and it is only as good as where the digest came
+from. Add one only when it was measured from a file its publisher released, and say in a `#` comment when
+and how — never from memory, a forum post or another tool's list. A certificate entry goes stale when the
+publisher renews: the rule's `falsepositives` has to say what a reviewer sees then and what they should
+do, and the entry for the new certificate is added **beside** the old one, which still signs the files
+people have not updated (ADR 0036).
+
+A certificate entry also takes a row in `rules/certificate-pins.csv`, measured with it: the rule's id, the
+certificate's SHA-256, its subject, `not_before`, `not_after` and the date you read them. `check-rules`
+fails on an entry without a row and on a row without an entry, and reads no clock. The monthly
+`certificate-pins` workflow runs `cargo xtask check-pin-expiry`, which fails once a rule's newest pinned
+certificate is within 90 days of `not_after`; `--today YYYY-MM-DD` shows what it will say on another day.
 
 ## Fixtures
 
@@ -174,7 +216,10 @@ machines this project asserts are unremarkable. It asks:
 2. **Was your rule ever asked anything?** A rule is *confronted* when some baseline observation carries
    every field your `match` names and comes within **one** unsatisfied condition of firing it — the
    baseline was put the rule's question and answered no. A rule nothing confronts is quiet for a reason
-   that says nothing about it, and would stay quiet however it was written (ADR 0033).
+   that says nothing about it, and would stay quiet however it was written (ADR 0033). **The one
+   condition may not be the collector's discriminator** (`fivem_dir`: `location`): an observation that
+   differs from your rule only in the place it is about was asked about another place, and a misspelt
+   `location:` would stay "confronted" by it (ADR 0033 as amended, ADR 0044).
 
 The second is the one that will surprise you. If your rule reads values no baseline holds — a channel,
 a folder, a registry key that no fixture describes — the gate fails and the fix is a baseline that holds
@@ -188,11 +233,32 @@ worse position than a rule that fails. Say so in the pull request.
 Fixtures are bound by their own rules — read `fixtures/hosts/PROVENANCE.md` before adding one, and
 `fixtures/evtx/PROVENANCE.md` before adding any Event Log sample.
 
+## The reference page
+
+[`docs/rules-reference.md`](rules-reference.md) and [`docs/rules-reference.th.md`](rules-reference.th.md)
+describe every rule in the bundle for a reader who will not open YAML: its title, what `match` asks in
+words (operators and case included), its `retention`, `unmeasured_when`, `falsepositives`, `allow` and
+references, grouped by collector and category. They are **generated** from the same bundle the program
+embeds, the Thai one from `rules/i18n/th.yaml`, and the words for a strength or a reason from the desktop
+app's `report.json`.
+
+After changing a rule, a rule translation or one of those words, run:
+
+```bash
+cargo xtask rules-reference          # rewrites both pages; commit them with the rule
+```
+
+CI runs `cargo xtask rules-reference --check`, which fails on a page that does not match and names that
+command. Two pull requests that both change rules each regenerate the pages; whichever merges second
+reruns the command after rebasing instead of resolving the conflict by hand. Never edit the pages
+themselves: the page renders rule text, so what it says is fixed in the rule.
+
 ## Check
 
 ```bash
 cargo xtask check-rules
 cargo xtask check-baseline          # quiet on an ordinary machine, and confronted by one
+cargo xtask rules-reference --check # the reference pages match the rules
 cargo nextest run -p rongroi-core   # the embedded bundle must parse
 ```
 

@@ -10,9 +10,10 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    CodeIntegrityOptions, DirEntryInfo, EnvironmentSource, FilesystemSource, Host, Platform,
-    ProcessRecord, ProcessSource, RegistrySource, SourceError, SystemIntegritySource, TpmInfo,
-    TpmSource,
+    BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DirEntryInfo,
+    EnvironmentSource, EventLogConfigSource, FilesystemSource, FirmwareSecureBoot, FirmwareSource,
+    Host, Platform, ProcessRecord, ProcessSource, RegistryData, RegistrySource, SignatureCheck,
+    SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
 };
 
 /// Why a fixture host could not be loaded.
@@ -58,7 +59,94 @@ struct HostFile {
     #[serde(default)]
     tpm: Option<FixtureTpm>,
     #[serde(default)]
+    firmware: Option<FixtureFirmware>,
+    #[serde(default)]
     processes: Option<Vec<FixtureProcess>>,
+    /// What `GetTickCount64` would answer. Absent means the fixture never modelled it, which the
+    /// accessor reports as `Unsupported` rather than inventing a value (ADR 0039).
+    #[serde(default)]
+    milliseconds_since_boot: Option<u64>,
+    #[serde(default)]
+    event_log_channels: Option<BTreeMap<String, FixtureChannel>>,
+}
+
+/// What a fixture says the Event Log service states about one channel (ADR 0042). A fixture with no
+/// `event_log_channels:` block never modelled the service, which the accessor reports as
+/// `Unsupported`; a block that does not name a channel describes a service with no such channel.
+///
+/// `never_answers: true`, and nothing else, describes a service that accepts the question about this
+/// channel and never replies — the case a collector has to survive, and one no real machine can be
+/// made to produce on demand. A reader asked about it blocks for as long as the process lives.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureChannel {
+    #[serde(default)]
+    log_file_path: Option<String>,
+    #[serde(default)]
+    max_size_bytes: Option<u64>,
+    #[serde(default)]
+    never_answers: bool,
+}
+
+/// One channel as the fixture's reader answers it.
+#[derive(Debug, Clone)]
+enum StoredChannel {
+    Answers(ChannelConfig),
+    NeverAnswers,
+}
+
+/// Turns what a fixture wrote for one channel into what its reader answers, refusing a channel that
+/// both answers and does not.
+fn resolve_channel(
+    name: &str,
+    described: FixtureChannel,
+    origin: &str,
+) -> Result<StoredChannel, FixtureError> {
+    match (
+        described.never_answers,
+        described.log_file_path,
+        described.max_size_bytes,
+    ) {
+        (true, None, None) => Ok(StoredChannel::NeverAnswers),
+        (false, Some(log_file_path), Some(max_size_bytes)) => {
+            Ok(StoredChannel::Answers(ChannelConfig {
+                log_file_path,
+                max_size_bytes,
+            }))
+        }
+        _ => Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "channel `{name}`: write `log_file_path` and `max_size_bytes`, or `never_answers: true` alone"
+            ),
+        }),
+    }
+}
+
+/// The reader a fixture host hands out: its channels and its denials, owned, so it can move to
+/// another thread.
+#[derive(Debug, Clone)]
+struct FixtureChannelReader {
+    channels: BTreeMap<String, StoredChannel>,
+    access_denied: Vec<String>,
+}
+
+impl ChannelConfigReader for FixtureChannelReader {
+    fn channel_config(&self, channel: &str) -> Result<Option<ChannelConfig>, SourceError> {
+        let key = channel.to_ascii_lowercase();
+        if self.access_denied.contains(&key) {
+            return Err(SourceError::AccessDenied);
+        }
+        match self.channels.get(&key) {
+            None => Ok(None),
+            Some(StoredChannel::Answers(config)) => Ok(Some(config.clone())),
+            // Blocks without spinning. `park` may return spuriously, so it is asked again; nothing
+            // ever unparks this thread on purpose.
+            Some(StoredChannel::NeverAnswers) => loop {
+                std::thread::park();
+            },
+        }
+    }
 }
 
 /// Code-integrity settings a fixture describes. Absent means the fixture never modelled them, which
@@ -79,6 +167,27 @@ struct FixtureTpm {
     spec_version: Option<String>,
 }
 
+/// The firmware a fixture describes (ADR 0038). Absent means the fixture never modelled it, which the
+/// accessor reports as `Unsupported` rather than inventing a Secure Boot state.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureFirmware {
+    secure_boot: FixtureFirmwareSecureBoot,
+}
+
+/// Every answer a live host gives about the firmware's `SecureBoot` variable, including the two that
+/// are not answers: a process without the privilege to read it, and a read that failed.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureFirmwareSecureBoot {
+    Enabled,
+    Disabled,
+    VariableAbsent,
+    NotUefi,
+    AccessDenied,
+    ReadFailed,
+}
+
 /// One process a fixture describes. An absent `path` describes a process whose image path cannot be
 /// resolved, which a collector reports by omitting that one field — never by dropping the process.
 #[derive(Debug, Clone, Deserialize)]
@@ -90,16 +199,25 @@ struct FixtureProcess {
     path: Option<String>,
 }
 
-/// One registry value as the YAML writes it. A number is a `REG_DWORD`, a string is a `REG_SZ`, and
-/// a map is a `REG_BINARY` whose bytes are written the two ways a file's bytes are (ADR 0019):
-/// `content:` inline, or `from:` a file under `fixtures/`. The three cannot be confused for one
-/// another, which is what makes the untagged enum safe to extend.
+/// One registry value as the YAML writes it. A number is a `REG_DWORD`, a string is a `REG_SZ`, a map
+/// with the one key `qword:` is a `REG_QWORD` (ADR 0038), and any other map is a `REG_BINARY` whose
+/// bytes are written the two ways a file's bytes are (ADR 0019): `content:` inline, or `from:` a file
+/// under `fixtures/`. None can be confused for another — both maps refuse each other's keys — which
+/// is what makes the untagged enum safe to extend.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum RegistryValue {
     Dword(u32),
     Text(String),
+    Qword(FixtureQword),
     Binary(FixtureBinary),
+}
+
+/// A `REG_QWORD`, written `{ qword: 0 }`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureQword {
+    qword: u64,
 }
 
 /// The bytes of one `REG_BINARY` value. Neither `content:` nor `from:` describes a value that is
@@ -125,6 +243,7 @@ struct StoredValue {
 #[derive(Debug, Clone)]
 enum StoredData {
     Dword(u32),
+    Qword(u64),
     Text(String),
     /// `None` describes a value that is there and cannot be read.
     Binary(Option<Vec<u8>>),
@@ -152,11 +271,89 @@ struct FixtureFile {
     #[serde(default)]
     sha256: Option<String>,
     #[serde(default)]
+    signature: Option<FixtureSignature>,
+    #[serde(default)]
     directory: bool,
     #[serde(default)]
     content: Option<String>,
     #[serde(default)]
     from: Option<String>,
+    #[serde(default)]
+    read_only: Option<bool>,
+}
+
+/// What a fixture says Windows would report about a file's embedded signature (ADR 0035). An absent
+/// `signature:` describes a file whose signature cannot be checked, which a collector reports by
+/// omitting the fields — the same shape an absent `sha256` has.
+///
+/// `signer` and `signer_cert_sha256` belong to `state: valid` and to nothing else, and a fixture that
+/// writes them anywhere else fails to load: a live host never reports a signer it did not trust.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureSignature {
+    state: FixtureSignatureState,
+    #[serde(default)]
+    signer: Option<String>,
+    #[serde(default)]
+    signer_cert_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureSignatureState {
+    Valid,
+    NoEmbeddedSignature,
+    Invalid,
+    UnverifiableOffline,
+}
+
+/// Turns what a fixture wrote into what a host reports, refusing a combination no host produces.
+fn resolve_signature(
+    described: FixtureSignature,
+    file: &str,
+    origin: &str,
+) -> Result<SignatureCheck, FixtureError> {
+    let invalid = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message: format!("file `{file}`: {message}"),
+    };
+    let names_signer = described.signer.is_some() || described.signer_cert_sha256.is_some();
+    let quiet = |check: SignatureCheck| {
+        if names_signer {
+            Err(invalid(
+                "only a valid signature names a `signer` or a `signer_cert_sha256`".to_owned(),
+            ))
+        } else {
+            Ok(check)
+        }
+    };
+    match described.state {
+        FixtureSignatureState::NoEmbeddedSignature => quiet(SignatureCheck::NoEmbeddedSignature),
+        FixtureSignatureState::Invalid => quiet(SignatureCheck::Invalid),
+        FixtureSignatureState::UnverifiableOffline => quiet(SignatureCheck::UnverifiableOffline),
+        FixtureSignatureState::Valid => {
+            let (Some(signer), Some(cert)) = (described.signer, described.signer_cert_sha256)
+            else {
+                return Err(invalid(
+                    "a valid signature needs both `signer` and `signer_cert_sha256`".to_owned(),
+                ));
+            };
+            if signer.trim().is_empty() {
+                return Err(invalid(
+                    "a valid signature needs a non-empty `signer`".to_owned(),
+                ));
+            }
+            if cert.len() != 64 || !cert.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(invalid(format!(
+                    "`signer_cert_sha256` `{cert}` must be 64 hex characters"
+                )));
+            }
+            Ok(SignatureCheck::Valid {
+                signer,
+                signer_cert_sha256: cert.to_ascii_lowercase(),
+            })
+        }
+    }
 }
 
 /// One entry in a fixture directory with its `from:` already read from disk, so that a fixture with a
@@ -165,9 +362,14 @@ struct FixtureFile {
 struct FixtureEntry {
     name: String,
     sha256: Option<String>,
+    /// `None` describes a file whose signature cannot be checked.
+    signature: Option<SignatureCheck>,
     directory: bool,
     /// The file's bytes. `None` describes a file that exists and cannot be read.
     content: Option<Vec<u8>>,
+    /// Whether the file carries the read-only attribute. `None` describes a fixture that never said,
+    /// which is not the same as saying it does not (ADR 0037).
+    read_only: Option<bool>,
 }
 
 /// Paths and registry keys are compared case-insensitively and without a trailing separator, like Windows.
@@ -234,11 +436,17 @@ fn resolve_file(
         origin,
         base,
     )?;
+    let signature = described
+        .signature
+        .map(|signature| resolve_signature(signature, &described.name, origin))
+        .transpose()?;
     Ok(FixtureEntry {
         name: described.name,
         sha256: described.sha256,
+        signature,
         directory: described.directory,
         content,
+        read_only: described.read_only,
     })
 }
 
@@ -253,6 +461,7 @@ fn resolve_value(
     let data = match described {
         RegistryValue::Dword(number) => StoredData::Dword(number),
         RegistryValue::Text(text) => StoredData::Text(text),
+        RegistryValue::Qword(qword) => StoredData::Qword(qword.qword),
         RegistryValue::Binary(binary) => StoredData::Binary(resolve_content(
             binary.content,
             binary.from,
@@ -277,7 +486,11 @@ pub struct FixtureHost {
     access_denied: Vec<String>,
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
+    firmware: Option<FixtureFirmware>,
     processes: Option<Vec<FixtureProcess>>,
+    milliseconds_since_boot: Option<u64>,
+    /// Keyed by the lower-cased channel name, like every other name this host compares.
+    event_log_channels: Option<BTreeMap<String, StoredChannel>>,
 }
 
 impl FixtureHost {
@@ -347,8 +560,40 @@ impl FixtureHost {
                 .collect(),
             code_integrity: file.code_integrity,
             tpm: file.tpm,
+            firmware: file.firmware,
             processes: file.processes,
+            milliseconds_since_boot: file.milliseconds_since_boot,
+            event_log_channels: file
+                .event_log_channels
+                .map(|channels| {
+                    channels
+                        .into_iter()
+                        .map(|(name, channel)| {
+                            let stored = resolve_channel(&name, channel, origin)?;
+                            Ok((name.to_ascii_lowercase(), stored))
+                        })
+                        .collect::<Result<BTreeMap<_, _>, FixtureError>>()
+                })
+                .transpose()?,
         })
+    }
+
+    /// The entry the fixture wrote for one file, after the access checks every per-file read makes.
+    /// A file it never listed is a failure here, which is what hashing or checking one means.
+    fn described_file(&self, path: &str) -> Result<&FixtureEntry, SourceError> {
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        self.filesystem
+            .get(dir)
+            .and_then(|files| {
+                files
+                    .iter()
+                    .find(|file| file.name.eq_ignore_ascii_case(name))
+            })
+            .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))
     }
 
     /// The file system is only described for Windows fixtures.
@@ -405,6 +650,10 @@ impl RegistrySource for FixtureHost {
     fn read_u32(&self, key: &str, value: &str) -> Result<Option<u32>, SourceError> {
         match self.lookup(key, value)?.map(|stored| &stored.data) {
             Some(StoredData::Dword(number)) => Ok(Some(*number)),
+            // A live host's reader accepts a `REG_QWORD` that fits, so this one does too.
+            Some(StoredData::Qword(number)) => u32::try_from(*number)
+                .map(Some)
+                .map_err(|_| SourceError::Failed("a QWORD too large for a DWORD".to_owned())),
             Some(StoredData::Text(_)) => Err(SourceError::Failed(
                 "expected a DWORD, found a string".to_owned(),
             )),
@@ -418,8 +667,8 @@ impl RegistrySource for FixtureHost {
     fn read_string(&self, key: &str, value: &str) -> Result<Option<String>, SourceError> {
         match self.lookup(key, value)?.map(|stored| &stored.data) {
             Some(StoredData::Text(text)) => Ok(Some(text.clone())),
-            Some(StoredData::Dword(_)) => Err(SourceError::Failed(
-                "expected a string, found a DWORD".to_owned(),
+            Some(StoredData::Dword(_) | StoredData::Qword(_)) => Err(SourceError::Failed(
+                "expected a string, found a number".to_owned(),
             )),
             Some(StoredData::Binary(_)) => Err(SourceError::Failed(
                 "expected a string, found a binary value".to_owned(),
@@ -489,11 +738,26 @@ impl RegistrySource for FixtureHost {
             Some(StoredData::Binary(None)) => Err(SourceError::Failed(format!(
                 "no bytes recorded for {key}\\{value}"
             ))),
-            Some(StoredData::Dword(_) | StoredData::Text(_)) => Err(SourceError::Failed(
-                "expected a binary value, found a DWORD or a string".to_owned(),
-            )),
+            Some(StoredData::Dword(_) | StoredData::Qword(_) | StoredData::Text(_)) => {
+                Err(SourceError::Failed(
+                    "expected a binary value, found a number or a string".to_owned(),
+                ))
+            }
             None => Ok(None),
         }
+    }
+
+    /// The type and data the fixture wrote, through the same limit a live host applies to a string.
+    /// A binary value is a type whose data this method does not read.
+    fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError> {
+        let data = match self.lookup(key, value)?.map(|stored| &stored.data) {
+            Some(StoredData::Dword(number)) => RegistryData::Dword(*number),
+            Some(StoredData::Qword(number)) => RegistryData::Qword(*number),
+            Some(StoredData::Text(text)) => RegistryData::Text(text.clone()),
+            Some(StoredData::Binary(_)) => RegistryData::OtherType,
+            None => return Ok(None),
+        };
+        crate::bound_registry_data(data, crate::MAX_REGISTRY_VALUE_BYTES).map(Some)
     }
 }
 
@@ -517,20 +781,7 @@ impl FilesystemSource for FixtureHost {
 
     fn file_sha256(&self, path: &str) -> Result<String, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
-        let (dir, name) = split_parent(&normalised);
-        if self.is_denied(&normalised) || self.is_denied(dir) {
-            return Err(SourceError::AccessDenied);
-        }
-        let file = self
-            .filesystem
-            .get(dir)
-            .and_then(|files| {
-                files
-                    .iter()
-                    .find(|file| file.name.eq_ignore_ascii_case(name))
-            })
-            .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))?;
+        let file = self.described_file(path)?;
         file.sha256
             .clone()
             .ok_or_else(|| SourceError::Failed(format!("no sha256 recorded for {path}")))
@@ -565,6 +816,57 @@ impl FilesystemSource for FixtureHost {
             .ok_or_else(|| SourceError::Failed(format!("no content recorded for {path}")))?;
         crate::read_bounded(content.as_slice(), crate::MAX_FILE_BYTES).map(Some)
     }
+
+    /// What the fixture wrote under `read_only:` for that file, behind the same access checks
+    /// `read_file` makes.
+    ///
+    /// A file the fixture never listed does not exist, which is `Ok(None)`. A file it listed without
+    /// `read_only:` is `Unsupported`: silence in a fixture is "never modelled", and answering `false`
+    /// for it would put a value in the report nobody wrote (ADR 0037).
+    fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(file) = self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+        }) else {
+            return Ok(None);
+        };
+        file.read_only.map(Some).ok_or_else(|| {
+            SourceError::Unsupported(format!(
+                "this fixture host does not describe the attributes of {path}"
+            ))
+        })
+    }
+}
+
+impl EventLogConfigSource for FixtureHost {
+    /// A reader over what the fixture wrote under `event_log_channels:`.
+    ///
+    /// No block at all is `Unsupported`, never a reader that knows no channel: a fixture written
+    /// before this source existed must not claim that the service knows none. A channel named in
+    /// `access_denied` is refused, as a key or a folder named there is.
+    fn channel_config_reader(&self) -> Result<Box<dyn ChannelConfigReader>, SourceError> {
+        if self.platform != Platform::Windows {
+            return Err(SourceError::Unsupported(
+                "no Windows Event Log on this platform".to_owned(),
+            ));
+        }
+        let channels = self.event_log_channels.clone().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe the Event Log service".to_owned(),
+            )
+        })?;
+        Ok(Box::new(FixtureChannelReader {
+            channels,
+            access_denied: self.access_denied.clone(),
+        }))
+    }
 }
 
 impl EnvironmentSource for FixtureHost {
@@ -596,6 +898,48 @@ impl TpmSource for FixtureHost {
             present: described.present,
             spec_version: described.spec_version.clone(),
         })
+    }
+}
+
+impl BootTimeSource for FixtureHost {
+    fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
+        self.milliseconds_since_boot
+            .map(std::time::Duration::from_millis)
+            .ok_or_else(|| {
+                SourceError::Unsupported(
+                    "this fixture host does not describe a boot time".to_owned(),
+                )
+            })
+    }
+}
+
+impl FirmwareSource for FixtureHost {
+    fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError> {
+        let described = self.firmware.ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe its firmware".to_owned())
+        })?;
+        match described.secure_boot {
+            FixtureFirmwareSecureBoot::Enabled => Ok(FirmwareSecureBoot::Enabled),
+            FixtureFirmwareSecureBoot::Disabled => Ok(FirmwareSecureBoot::Disabled),
+            FixtureFirmwareSecureBoot::VariableAbsent => Ok(FirmwareSecureBoot::VariableAbsent),
+            FixtureFirmwareSecureBoot::NotUefi => Ok(FirmwareSecureBoot::NotUefi),
+            FixtureFirmwareSecureBoot::AccessDenied => Err(SourceError::AccessDenied),
+            FixtureFirmwareSecureBoot::ReadFailed => Err(SourceError::Failed(
+                "this fixture host describes a firmware read that failed".to_owned(),
+            )),
+        }
+    }
+}
+
+impl SignatureSource for FixtureHost {
+    /// What the fixture wrote under `signature:` for that file, behind the same access checks
+    /// `file_sha256` makes.
+    fn file_signature(&self, path: &str) -> Result<SignatureCheck, SourceError> {
+        self.windows_filesystem()?;
+        let file = self.described_file(path)?;
+        file.signature
+            .clone()
+            .ok_or_else(|| SourceError::Failed(format!("no signature recorded for {path}")))
     }
 }
 
@@ -640,6 +984,86 @@ impl Host for FixtureHost {
 mod tests {
     use super::*;
 
+    const CERT: &str = "ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789";
+
+    fn signed(signature: &str) -> Result<FixtureHost, FixtureError> {
+        FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.dll\n      signature: {signature}\n    - name: b.dll\n"
+            ),
+            "inline",
+        )
+    }
+
+    #[test]
+    fn a_valid_signature_reports_its_signer_and_a_lowercased_certificate_hash() {
+        let host = signed(&format!(
+            "{{ state: valid, signer: Example Corp, signer_cert_sha256: {CERT} }}"
+        ))
+        .unwrap();
+        assert_eq!(
+            host.file_signature(r"C:\P\A.DLL"),
+            Ok(SignatureCheck::Valid {
+                signer: "Example Corp".to_owned(),
+                signer_cert_sha256: CERT.to_ascii_lowercase(),
+            })
+        );
+    }
+
+    #[test]
+    fn the_three_other_states_carry_no_signer() {
+        for (written, expected) in [
+            ("no_embedded_signature", SignatureCheck::NoEmbeddedSignature),
+            ("invalid", SignatureCheck::Invalid),
+            ("unverifiable_offline", SignatureCheck::UnverifiableOffline),
+        ] {
+            let host = signed(&format!("{{ state: {written} }}")).unwrap();
+            assert_eq!(host.file_signature(r"C:\p\a.dll"), Ok(expected));
+        }
+    }
+
+    /// A live host never reports a signer it did not trust, so a fixture cannot describe one.
+    #[test]
+    fn a_fixture_cannot_describe_a_signature_no_host_would_report() {
+        for signature in [
+            "{ state: valid, signer: Example Corp }".to_owned(),
+            format!("{{ state: valid, signer_cert_sha256: {CERT} }}"),
+            format!("{{ state: valid, signer: '  ', signer_cert_sha256: {CERT} }}"),
+            "{ state: valid, signer: Example Corp, signer_cert_sha256: abc }".to_owned(),
+            "{ state: invalid, signer: Example Corp }".to_owned(),
+            format!("{{ state: unverifiable_offline, signer_cert_sha256: {CERT} }}"),
+            "{ state: unsigned }".to_owned(),
+        ] {
+            assert!(signed(&signature).is_err(), "{signature} loaded");
+        }
+    }
+
+    #[test]
+    fn a_file_with_no_signature_written_could_not_be_checked() {
+        let host = signed("{ state: invalid }").unwrap();
+        assert!(matches!(
+            host.file_signature(r"C:\p\b.dll"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.file_signature(r"C:\p\absent.dll"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_denied_folder_denies_its_signatures_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['C:\\p']\nfilesystem:\n  'C:\\p':\n    - name: a.dll\n      signature: { state: invalid }\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.file_signature(r"C:\p\a.dll"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
     const HOST: &str = r#"
 platform: windows
 os_build: "26100"
@@ -683,6 +1107,62 @@ processes:
 "#;
 
     const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+    /// `read_value` hands back each type the fixture can write, and a `{ qword: }` map is neither a
+    /// binary value nor a number `read_u32` refuses: a live host's reader accepts a QWORD that fits.
+    #[test]
+    fn read_value_names_the_type_the_fixture_wrote() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nregistry:\n  'HKCU\\Software\\Example':\n    Dword: 0\n    Text: '0'\n    Qword: { qword: 1 }\n    Large: { qword: 4294967296 }\n    Blob: { content: 'x' }\n",
+            "inline",
+        )
+        .unwrap();
+        let key = r"HKCU\Software\Example";
+        assert_eq!(
+            host.read_value(key, "Dword"),
+            Ok(Some(RegistryData::Dword(0)))
+        );
+        assert_eq!(
+            host.read_value(key, "Text"),
+            Ok(Some(RegistryData::Text("0".to_owned())))
+        );
+        assert_eq!(
+            host.read_value(key, "Qword"),
+            Ok(Some(RegistryData::Qword(1)))
+        );
+        assert_eq!(
+            host.read_value(key, "Blob"),
+            Ok(Some(RegistryData::OtherType))
+        );
+        assert_eq!(host.read_value(key, "Absent"), Ok(None));
+        assert_eq!(host.read_value(r"HKCU\Software\Absent", "Dword"), Ok(None));
+        assert_eq!(host.read_u32(key, "Qword"), Ok(Some(1)));
+        assert!(matches!(
+            host.read_u32(key, "Large"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_bytes(key, "Qword"),
+            Err(SourceError::Failed(_))
+        ));
+        assert!(matches!(
+            host.read_string(key, "Qword"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    #[test]
+    fn a_denied_key_denies_read_value_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['HKCU\\Software\\Locked']\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.read_value(r"HKCU\Software\Locked", "Anything"),
+            Err(SourceError::AccessDenied)
+        );
+    }
 
     #[test]
     fn reads_values_case_insensitively() {
@@ -1087,9 +1567,125 @@ processes:
         ));
         assert!(matches!(host.tpm_info(), Err(SourceError::Unsupported(_))));
         assert!(matches!(
+            host.firmware_secure_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
             host.running_processes(),
             Err(SourceError::Unsupported(_))
         ));
+        assert!(matches!(
+            host.since_boot(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// A fixture writes what `GetTickCount64` would answer, in its unit, and the host hands it back
+    /// unchanged. Zero is an answer — a machine that has only just started — not a missing value.
+    #[test]
+    fn the_time_since_boot_is_read_from_the_fixture() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nmilliseconds_since_boot: 93784005\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.since_boot(),
+            Ok(std::time::Duration::from_millis(93_784_005))
+        );
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nmilliseconds_since_boot: 0\n", "inline")
+                .unwrap();
+        assert_eq!(host.since_boot(), Ok(std::time::Duration::ZERO));
+    }
+
+    /// Three answers, and they are three statements: the attribute is set, it is not, and the
+    /// fixture never said. The third must not read as the second (ADR 0037).
+    #[test]
+    fn the_read_only_attribute_is_what_the_fixture_wrote_and_silence_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: set.pf\n      read_only: true\n    - name: clear.pf\n      read_only: false\n    - name: silent.pf\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(host.is_read_only(r"C:\P\SET.PF"), Ok(Some(true)));
+        assert_eq!(host.is_read_only(r"C:\p\clear.pf"), Ok(Some(false)));
+        assert!(matches!(
+            host.is_read_only(r"C:\p\silent.pf"),
+            Err(SourceError::Unsupported(_))
+        ));
+        assert_eq!(host.is_read_only(r"C:\p\absent.pf"), Ok(None));
+    }
+
+    #[test]
+    fn a_denied_folder_denies_the_read_only_attribute_too() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['C:\\p']\nfilesystem:\n  'C:\\p':\n    - name: a.pf\n      read_only: false\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.is_read_only(r"C:\p\a.pf"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    /// A block that does not name a channel describes a service that has none of that name; no
+    /// block at all describes nothing, and must not be read as "no such channel" (ADR 0042).
+    #[test]
+    fn a_channel_is_what_the_fixture_wrote_and_no_block_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied: ['Locked/Operational']\nevent_log_channels:\n  Security:\n    log_file_path: '%SystemRoot%\\System32\\Winevt\\Logs\\Security.evtx'\n    max_size_bytes: 20971520\n",
+            "inline",
+        )
+        .unwrap();
+        let reader = host.channel_config_reader().unwrap();
+        assert_eq!(
+            reader.channel_config("security"),
+            Ok(Some(ChannelConfig {
+                log_file_path: r"%SystemRoot%\System32\Winevt\Logs\Security.evtx".to_owned(),
+                max_size_bytes: 20_971_520,
+            }))
+        );
+        assert_eq!(reader.channel_config("No-Such/Channel"), Ok(None));
+        assert_eq!(
+            reader.channel_config("locked/operational"),
+            Err(SourceError::AccessDenied)
+        );
+
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            silent.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
+        let other = FixtureHost::from_yaml_str("platform: other\n", "inline").unwrap();
+        assert!(matches!(
+            other.channel_config_reader(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// A channel either answers or never does, and a fixture that says both, or neither, fails to load.
+    #[test]
+    fn a_channel_that_never_answers_is_written_alone() {
+        let with = |channel: &str| {
+            FixtureHost::from_yaml_str(
+                &format!("platform: windows\nevent_log_channels:\n  A/B:\n    {channel}\n"),
+                "inline",
+            )
+        };
+        assert!(with("never_answers: true").is_ok());
+        for refused in [
+            "{ never_answers: true, max_size_bytes: 1 }",
+            "{ never_answers: false }",
+            "{ log_file_path: 'C:\\x.evtx' }",
+        ] {
+            let yaml = format!("platform: windows\nevent_log_channels:\n  A/B: {refused}\n");
+            assert!(
+                FixtureHost::from_yaml_str(&yaml, "inline").is_err(),
+                "{refused} loaded"
+            );
+        }
     }
 
     #[test]
@@ -1157,6 +1753,43 @@ processes:
             )
             .is_err()
         );
+    }
+
+    /// Every state a fixture can write reaches the collector as the host reports it: four answers,
+    /// and the two ways of not getting one.
+    #[test]
+    fn firmware_secure_boot_is_read_from_the_fixture() {
+        let read = |state: &str| {
+            FixtureHost::from_yaml_str(
+                &format!("platform: windows\nfirmware:\n  secure_boot: {state}\n"),
+                "inline",
+            )
+            .unwrap()
+            .firmware_secure_boot()
+        };
+        assert_eq!(read("enabled"), Ok(FirmwareSecureBoot::Enabled));
+        assert_eq!(read("disabled"), Ok(FirmwareSecureBoot::Disabled));
+        assert_eq!(
+            read("variable_absent"),
+            Ok(FirmwareSecureBoot::VariableAbsent)
+        );
+        assert_eq!(read("not_uefi"), Ok(FirmwareSecureBoot::NotUefi));
+        assert_eq!(read("access_denied"), Err(SourceError::AccessDenied));
+        assert!(matches!(read("read_failed"), Err(SourceError::Failed(_))));
+    }
+
+    #[test]
+    fn unknown_fields_and_states_in_the_firmware_block_are_rejected() {
+        for yaml in [
+            "platform: windows\nfirmware:\n  secure_boot: enabled\n  bogus: 1\n",
+            "platform: windows\nfirmware:\n  secure_boot: on\n",
+            "platform: windows\nfirmware: {}\n",
+        ] {
+            assert!(
+                FixtureHost::from_yaml_str(yaml, "inline").is_err(),
+                "{yaml}"
+            );
+        }
     }
 
     #[test]

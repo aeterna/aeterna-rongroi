@@ -10,23 +10,42 @@
 # Profile: an ordinary consumer Windows 11 PC. Secure Boot on, test signing off, a TPM 2.0 present —
 # and no memory-integrity policy key at all, which is what a machine that was never told either way
 # looks like and is very common. FiveM is installed with an empty plugin folder, so `fivem_dir` looked
-# at a real folder and there was nothing in it.
+# at a real folder and there was nothing in it, and with `FiveM.exe` signed as it was measured on a real
+# install (ADR 0036).
 platform: windows
 os_build: "26100"
 elevated: false
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
 registry:
   'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
     UEFISecureBootEnabled: 1
 filesystem:
   'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+  # FiveM.exe as a Legacy install has it, measured 2026-09-13 on one Windows 11 machine (build 26220):
+  # its SHA-256, and a valid embedded signature from "Rockstar Games, Inc." with the certificate SHA-256
+  # below. See ../PROVENANCE.md and ADR 0036. The folder's other entries are not reported and not listed.
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.app
+      directory: true
+    - name: FiveM.exe
+      sha256: 891e48128dc9c287aaa204757acac61d469eef9de82714cec4404d254a73c844
+      signature:
+        state: valid
+        signer: Rockstar Games, Inc.
+        signer_cert_sha256: 65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f
 code_integrity:
   enabled: true
   test_signing: false
 tpm:
   present: true
   spec_version: "2.0"
+# Firmware (ADR 0038): a scan without administrator rights cannot read the firmware's Secure Boot
+# variable, so this is what it gets — measured on a real Windows 11 machine under a limited token, not
+# chosen. No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
+firmware:
+  secure_boot: access_denied
 processes:
   - pid: 4
     name: System

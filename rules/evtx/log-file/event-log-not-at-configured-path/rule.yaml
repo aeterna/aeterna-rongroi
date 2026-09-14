@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 87a53c8f-b0e4-477d-91e7-93b904ba965f
+title: An event log file is not the file Windows writes its channel to
+description: >-
+  The records in this log file belong to a channel that the Windows Event Log service writes to a
+  different file, named beside this row. Windows is therefore not adding to this file: it is a copy,
+  an archive, or a log whose channel was pointed somewhere else after these records were written.
+  Only what the service states about the channel is compared with the file that was read, and only
+  for a log whose records all belong to one channel. This row does not say who put the file there,
+  when, or why, and it is not evidence that anything was hidden.
+status: experimental
+collector: evtx
+strength: tamper
+match:
+  at_configured_path: false
+retention: >-
+  Only log files still in the Windows Event Log folder, compared with how Windows is set up at the
+  moment of the scan. It says nothing about how a log was set up before, or about files that were
+  removed.
+# As the log-clearing rules (ADR 0031). A service that could not be asked at all — for one, because it
+# is not running — reaches the report as `read_failed`, which no rule may declare (ADR 0032).
+# `access_denied` removed (ADR 0032, amended 2026-09-14): `evtx` gives it only to a refusal with administrator rights, and elevated scans read every log and the service described every channel asked, so it is not a kind of machine to count away.
+unmeasured_when: [not_windows, not_admin]
+falsepositives:
+  - An archive Windows keeps itself when a log is set to be backed up automatically when full — it
+    closes the full file and renames it
+  - A log saved or exported into this folder with Event Viewer or wevtutil, for example to send it to
+    someone
+  - An administrator, Group Policy or management software moving where a log is kept; the file from
+    before the move stays behind with the records written until then
+  - A log copied here from another PC, or from a backup, to be looked at
+references:
+  - https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-eventlog
+  - https://learn.microsoft.com/en-us/windows/win32/api/winevt/ne-winevt-evt_channel_config_property_id
+  - https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [evtx, log-file]
+related:
+  - id: 9b318bfa-805d-4edd-81f1-602b57639a69
+    type: similar

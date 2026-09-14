@@ -3,12 +3,16 @@
 # Synthetic fixture host — see ../PROVENANCE.md.
 # Windows 11 whose BAM state holds one account with two executables in it. The value bytes are the
 # synthetic parser corpus in fixtures/parsers/bam/, referenced rather than copied (ADR 0019), and the
-# SID and the account name are invented — the collector emits neither (ADR 0023).
+# SID and the account name are invented — the collector emits neither (ADR 0023). `Version` and
+# `SequenceNumber` are the two `REG_DWORD` values every measured account key holds beside its records;
+# their numbers are measured values (../PROVENANCE.md).
 platform: windows
 os_build: "26100"
 elevated: true
 registry:
   'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    Version: 1
+    SequenceNumber: 115
     'C:\Users\fixtureuser\Downloads\example.exe':
       from: '../../parsers/bam/documented-24-byte-value.bin'
     'C:\Windows\System32\notepad.exe':

@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 7d493537-7ecf-4f97-90a0-119e079d30d2
+title: A Prefetch file is marked read-only
+description: >-
+  A file in the Windows Prefetch folder carries the read-only attribute. Windows writes and rewrites
+  these files itself, and on the one Windows 11 machine this project measured, none of them carried
+  the attribute. This row names the file and what it records. It does not say who set the attribute,
+  when, or why, and it is not evidence that anything was hidden or that the program it names was used
+  to cheat.
+status: experimental
+collector: prefetch
+strength: tamper
+# No program is named (ADR 0034): the rule asks about the file's attribute, whichever program the file
+# is about.
+match:
+  read_only: true
+retention: >-
+  The attribute as it is at the moment of the scan, on the Prefetch files still in the folder. It says
+  nothing about when it was set, or about files that were removed.
+# `source_absent` and `service_disabled`: a PC with no Prefetch folder, or with Prefetch switched off
+# and no folder, has no file to ask about, and both are ordinary. `source_empty` is not listed because
+# it does not gap this field: an empty folder holds no read-only file, and saying so is true.
+# `access_denied` removed (ADR 0032, amended 2026-09-14): `prefetch` gives it only to a refusal with administrator rights, which Administrators' full control of the folder and two elevated scans do not show on an ordinary machine.
+unmeasured_when: [not_windows, not_admin, source_absent, service_disabled]
+falsepositives:
+  - Read-only chosen in the Properties of the Prefetch folder or of a folder above it, which Windows
+    applies to the files inside
+  - Files copied or restored into the folder by backup, imaging or copy software that keeps file
+    attributes, as Windows' own robocopy does unless told otherwise
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
+  - https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [prefetch, file-attributes]
+related:
+  - id: 9b318bfa-805d-4edd-81f1-602b57639a69
+    type: similar

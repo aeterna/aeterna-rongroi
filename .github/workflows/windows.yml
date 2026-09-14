@@ -54,6 +54,390 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Tests
         run: cargo nextest run --workspace --locked --profile ci
+      # ADR 0035. Checking a signature is the one read that could reach the network inside Windows,
+      # where cargo-deny and every lint are blind, so this proves it does not on a real machine: the
+      # CAPI2 log records a network retrieval as event 53 with the process that asked for it. The
+      # offline tests run with the log on and no event 53 may name their process. The online test is
+      # the positive twin — settings the product never uses, a cleared URL cache, and event 53 must
+      # appear — because a log that records nothing would otherwise pass for one that saw nothing.
+      # The runner is thrown away afterwards, so switching its CAPI2 log on changes no one's machine.
+      - name: Signature checks stay off the network (CAPI2 log)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function SecurityDirectorySize([string] $path) {
+            try { $bytes = [IO.File]::ReadAllBytes($path) } catch { return -1 }
+            if ($bytes.Length -lt 0x200) { return -1 }
+            $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            $magic = [BitConverter]::ToUInt16($bytes, $pe + 24)
+            $directories = if ($magic -eq 0x20b) { $pe + 24 + 112 } else { $pe + 24 + 96 }
+            [BitConverter]::ToUInt32($bytes, $directories + 4 * 8 + 4)
+          }
+          function CertSha256($signature) {
+            ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($signature.SignerCertificate.RawData))).Replace('-', '').ToLower()
+          }
+          # Chosen before the log is switched on: Get-AuthenticodeSignature does its own chain work.
+          $embedded = @("$PSHOME\pwsh.exe", "$env:ProgramFiles\Git\cmd\git.exe") |
+            Where-Object { (Test-Path $_) -and (Get-AuthenticodeSignature $_).Status -eq 'Valid' -and (SecurityDirectorySize $_) -gt 0 } |
+            Select-Object -First 1
+          if (-not $embedded) { throw 'no file with a valid embedded signature was found on this runner' }
+          # notepad.exe was catalog-only on the Windows 11 machine ADR 0035 measured; explorer.exe was not.
+          $catalog = @(Get-Item "$env:windir\System32\notepad.exe") + @(Get-ChildItem "$env:windir\System32\*.exe") |
+            Where-Object { (SecurityDirectorySize $_.FullName) -eq 0 -and (Get-AuthenticodeSignature $_.FullName).Status -eq 'Valid' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $catalog) { throw 'no catalog-only signed file was found on this runner' }
+          $env:RONGROI_SIGNED_FILE = $embedded
+          $env:RONGROI_SIGNED_FILE_CERT_SHA256 = CertSha256 (Get-AuthenticodeSignature $embedded)
+          $env:RONGROI_CATALOG_SIGNED_FILE = $catalog
+          Write-Output "embedded: $embedded · catalog only: $catalog"
+          cargo nextest list -p rongroi-host-windows --locked --run-ignored only | Out-Null
+
+          $log = 'Microsoft-Windows-CAPI2/Operational'
+          function OurEvents {
+            @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue |
+              Where-Object { $_.ToXml() -match 'rongroi_host_windows' })
+          }
+          # At the log's default maximum a burst of events from another process overwrites the test's
+          # (measured; see the next step), so it is raised here and put back at the end.
+          $originalMaxSize = (Get-WinEvent -ListLog $log).MaximumSizeInBytes
+          wevtutil sl $log /ms:104857600
+          if ($LASTEXITCODE -ne 0) { throw 'could not raise the CAPI2 log size' }
+          wevtutil sl $log /e:true
+          wevtutil cl $log
+
+          cargo nextest run -p rongroi-host-windows --locked --profile ci --run-ignored only -E 'test(/live_offline_/)'
+          if ($LASTEXITCODE -ne 0) { throw 'the offline signature tests failed' }
+          $offline = OurEvents
+          Write-Output ("offline: {0} CAPI2 events from the test process, ids: {1}" -f $offline.Count, (($offline | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))
+          if ($offline.Count -eq 0) { throw 'CAPI2 recorded nothing from the offline tests, so their silence proves nothing' }
+          $fetched = @($offline | Where-Object Id -eq 53)
+          if ($fetched.Count -gt 0) {
+            $fetched | Select-Object -First 3 | ForEach-Object { Write-Output $_.ToXml() }
+            throw "the offline signature check retrieved objects from the network ($($fetched.Count) event 53)"
+          }
+
+          certutil -urlcache * delete | Out-Null
+          wevtutil cl $log
+          cargo nextest run -p rongroi-host-windows --locked --profile ci --run-ignored only -E 'test(/live_online_/)'
+          if ($LASTEXITCODE -ne 0) { throw 'the online positive-twin test failed' }
+          $online = @(OurEvents | Where-Object Id -eq 53)
+          Write-Output "online: $($online.Count) event 53 from the test process"
+          if ($online.Count -eq 0) { throw 'the positive twin fetched nothing the log recorded, so the offline result above is not evidence' }
+          wevtutil sl $log /e:false
+          wevtutil cl $log
+          wevtutil sl $log /ms:$originalMaxSize
+      # ADR 0035, amendment of 2026-09-14. What the product's offline settings answer for a genuine
+      # signature whose chain this machine's certificate stores do not complete — a PC that never held
+      # the root, or the intermediate — and for a copy signed with a self-signed certificate, the case an
+      # untrusted root is also the answer for. Each certificate is exported from every registry store it
+      # is in and deleted, the ignored `live_chain_offline_` test prints what `WinVerifyTrust` said, and
+      # the export is imported back. The URL cache is cleared first, and CAPI2 must record no network
+      # retrieval from the test process, so nothing could have come back from the network either. The
+      # test asserts the codes this step measured, per case; the ADR has the table. The runner is thrown
+      # away afterwards; the stores are still restored, whatever happens, because the steps after this
+      # one build and run on the same machine.
+      - name: What an incomplete certificate chain answers offline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $work = Join-Path $env:RUNNER_TEMP 'rongroi-chain'
+          New-Item -ItemType Directory -Force $work | Out-Null
+          cargo nextest list -p rongroi-host-windows --locked --run-ignored only | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'the tests did not build' }
+          # Shared with the child processes below, which read the chain with a certificate chain engine
+          # that has cached nothing from before a store changed.
+          Set-Content -Path "$work\lib.ps1" -Value @'
+          Add-Type -AssemblyName System.Security.Cryptography.Pkcs
+          $storeRoots = @(
+            'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\SystemCertificates',
+            'HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\SystemCertificates',
+            'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\EnterpriseCertificates',
+            'HKEY_CURRENT_USER\Software\Microsoft\SystemCertificates',
+            'HKEY_CURRENT_USER\Software\Policies\Microsoft\SystemCertificates')
+          function SecurityDirectory([string] $path) {
+            $bytes = [IO.File]::ReadAllBytes($path)
+            $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            $magic = [BitConverter]::ToUInt16($bytes, $pe + 24)
+            $directories = if ($magic -eq 0x20b) { $pe + 24 + 112 } else { $pe + 24 + 96 }
+            [pscustomobject]@{
+              Bytes = $bytes
+              Offset = [BitConverter]::ToUInt32($bytes, $directories + 4 * 8)
+              Size = [BitConverter]::ToUInt32($bytes, $directories + 4 * 8 + 4)
+            }
+          }
+          # The PKCS #7 blob after the 8-byte WIN_CERTIFICATE header, cut to its DER length (the entry is
+          # padded).
+          function EmbeddedSignature([string] $path) {
+            $directory = SecurityDirectory $path
+            if ($directory.Size -eq 0) { return $null }
+            $bytes = $directory.Bytes
+            $start = [int] $directory.Offset + 8
+            $first = [int] $bytes[$start + 1]
+            if ($first -lt 0x80) { $header = 2; $length = $first } else {
+              $count = $first -band 0x7F; $header = 2 + $count; $length = 0
+              for ($i = 0; $i -lt $count; $i++) { $length = $length * 256 + [int] $bytes[$start + 2 + $i] }
+            }
+            $der = [byte[]]::new($header + $length)
+            [Array]::Copy($bytes, $start, $der, 0, $der.Length)
+            $cms = [Security.Cryptography.Pkcs.SignedCms]::new()
+            $cms.Decode($der)
+            $cms
+          }
+          function StoreKeys([string] $thumbprint) {
+            foreach ($root in $storeRoots) {
+              if (-not (Test-Path "Registry::$root")) { continue }
+              foreach ($store in @(Get-ChildItem "Registry::$root" -ErrorAction SilentlyContinue)) {
+                $key = "$($store.Name)\Certificates\$thumbprint"
+                if (Test-Path "Registry::$key") { $key }
+              }
+            }
+          }
+          function StoreNames([string] $thumbprint) {
+            (@(StoreKeys $thumbprint) | ForEach-Object { $_ -replace '\\Certificates\\[0-9A-Fa-f]+$', '' }) -join '; '
+          }
+          function ChainOf([string] $path) {
+            $cms = EmbeddedSignature $path
+            $chain = [Security.Cryptography.X509Certificates.X509Chain]::new()
+            $chain.ChainPolicy.RevocationMode = 'NoCheck'
+            $chain.ChainPolicy.DisableCertificateDownloads = $true
+            $chain.ChainPolicy.VerificationFlags = 'IgnoreNotTimeValid'
+            $chain.ChainPolicy.ExtraStore.AddRange($cms.Certificates)
+            [void] $chain.Build($cms.SignerInfos[0].Certificate)
+            [pscustomobject]@{ Cms = $cms; Chain = $chain }
+          }
+          function ShowChain([string] $path) {
+            $read = ChainOf $path
+            $embedded = @($read.Cms.Certificates | ForEach-Object Thumbprint)
+            $index = 0
+            foreach ($element in $read.Chain.ChainElements) {
+              $cert = $element.Certificate
+              Write-Output ("  [{0}] {1} | thumbprint {2} | self-signed {3} | embedded in the signature {4} | stores: {5} | status: {6}" -f
+                $index, $cert.Subject, $cert.Thumbprint, ($cert.Subject -eq $cert.Issuer), ($embedded -contains $cert.Thumbprint),
+                (StoreNames $cert.Thumbprint), (($element.ChainElementStatus | ForEach-Object Status) -join ','))
+              $index++
+            }
+            Write-Output ("  chain status: {0}" -f (($read.Chain.ChainStatus | ForEach-Object Status) -join ','))
+            Write-Output ("  embedded in the signature: {0}" -f (($read.Cms.Certificates | ForEach-Object Subject) -join ' || '))
+          }
+          '@
+          . "$work\lib.ps1"
+          function Child([string] $command) {
+            pwsh -NoProfile -NonInteractive -Command ". '$work\lib.ps1'; $command"
+            if ($LASTEXITCODE -ne 0) { throw "child failed: $command" }
+          }
+
+          $log = 'Microsoft-Windows-CAPI2/Operational'
+          # The test writes its own process id to a file. CAPI2 stamps every event with the id of the
+          # process that raised it, so the events are found by that id — a query the log answers
+          # directly, without reading every event's XML. The binary's name, which the step matched before,
+          # is still matched, so an event 53 attributed either way fails the step; on run 34813384625 the
+          # two agreed in every case.
+          function TestEvents([int] $testPid) {
+            @(Get-WinEvent -LogName $log -FilterXPath "*[System[Execution[@ProcessID=$testPid]]]" -ErrorAction SilentlyContinue)
+          }
+          function LogState {
+            $info = Get-WinEvent -ListLog $log
+            "file {0} of {1} bytes, {2} records, full {3}" -f $info.FileSize, $info.MaximumSizeInBytes, $info.RecordCount, $info.IsLogFull
+          }
+          function RunCase([string] $file, [string] $case) {
+            $env:RONGROI_CHAIN_FILE = $file
+            $env:RONGROI_CHAIN_CASE = $case
+            $pidFile = Join-Path $work 'test.pid'
+            Remove-Item $pidFile -ErrorAction SilentlyContinue
+            $env:RONGROI_CHAIN_PID_FILE = $pidFile
+            wevtutil cl $log
+            cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_chain_offline_/)'
+            $exit = $LASTEXITCODE
+            if (-not (Test-Path $pidFile)) { throw "${case}: the test did not record its process id (exit $exit)" }
+            $testPid = [int] (Get-Content $pidFile -Raw).Trim()
+            # The log is written asynchronously. Wait until the test process's events stop arriving:
+            # the same non-zero count on readings two seconds apart, for at most 60 seconds. What other
+            # processes write meanwhile does not hold the wait open, as waiting for the whole log to go
+            # quiet did.
+            $events = @(); $clock = [Diagnostics.Stopwatch]::StartNew()
+            while ($clock.Elapsed.TotalSeconds -lt 60) {
+              Start-Sleep -Seconds 2
+              $now = TestEvents $testPid
+              if ($now.Count -gt 0 -and $now.Count -eq $events.Count) { break }
+              $events = $now
+            }
+            $all = @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue)
+            $named = @($all | Where-Object { $_.ProcessId -ne $testPid -and $_.ToXml() -match 'rongroi_host_windows' })
+            Write-Output ("  ${case}: test process {0}: {1} CAPI2 events after {2:n1} s, ids: {3} · named but another process id: {4} · whole log: {5}" -f
+              $testPid, $events.Count, $clock.Elapsed.TotalSeconds, (($events | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '),
+              $named.Count, (LogState))
+            $others = @($all | Where-Object ProcessId -ne $testPid | Group-Object ProcessId | Sort-Object Count -Descending | Select-Object -First 3)
+            if ($others) {
+              Write-Output ("  ${case}: busiest other processes: {0}" -f (($others | ForEach-Object {
+                $name = (Get-Process -Id ([int] $_.Name) -ErrorAction SilentlyContinue).ProcessName
+                "pid $($_.Name) ($(if ($name) { $name } else { 'exited' })) x$($_.Count)"
+              }) -join ', '))
+            }
+            $events | Where-Object { $_.Id -in 11, 30, 81 } | ForEach-Object {
+              $found = [regex]::Matches($_.ToXml(), '<(ErrorStatus|Result)\b[^>]*>') | ForEach-Object Value
+              if ($found) { Write-Output "    event $($_.Id): $($found -join ' ')" }
+            }
+            $fetched = @(@($events) + @($named) | Where-Object Id -eq 53)
+            if ($fetched.Count -gt 0) { throw "${case}: the offline check retrieved objects from the network ($($fetched.Count) event 53)" }
+            if ($events.Count -eq 0) {
+              $info = Get-WinEvent -ListLog $log
+              if ($info.FileSize -ge $info.MaximumSizeInBytes) { throw "${case}: the CAPI2 log reached its maximum and overwrites its oldest events, so the test process's may have been lost" }
+              throw "${case}: CAPI2 recorded nothing from the test process within 60 s, so its silence proves nothing"
+            }
+            if ($exit -ne 0) { throw "${case}: the test failed" }
+          }
+          $exported = [Collections.Generic.List[object]]::new()
+          function RegExe([string] $arguments) {
+            $process = Start-Process reg.exe -ArgumentList $arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput "$work\reg.out" -RedirectStandardError "$work\reg.err"
+            if ($process.ExitCode -ne 0) { Get-Content "$work\reg.err"; throw "reg $arguments exited $($process.ExitCode)" }
+          }
+          function RemoveFromStores([string] $thumbprint) {
+            foreach ($key in @(StoreKeys $thumbprint)) {
+              $file = Join-Path $work ("{0}-{1}.reg" -f $thumbprint, $exported.Count)
+              RegExe "export `"$key`" `"$file`" /y"
+              $exported.Add([pscustomobject]@{ Key = $key; File = $file })
+              RegExe "delete `"$key`" /f"
+            }
+          }
+          function RestoreAll {
+            foreach ($entry in @($exported)) { RegExe "import `"$($entry.File)`"" }
+            $exported.Clear()
+          }
+          function RemovedCase([string] $file, [string] $thumbprint, [string] $case) {
+            $before = @(StoreKeys $thumbprint)
+            if ($before.Count -eq 0) { Write-Output "  ${case}: $thumbprint is in no registry store, so there is nothing to remove"; return }
+            certutil -urlcache * delete | Out-Null
+            try {
+              RemoveFromStores $thumbprint
+              $logical = @(Get-ChildItem Cert:\LocalMachine, Cert:\CurrentUser -Recurse -ErrorAction SilentlyContinue |
+                Where-Object { $_.Thumbprint -eq $thumbprint } | ForEach-Object { $_.PSParentPath -replace '^.*::', '' })
+              Write-Output "  ${case}: removed from $($before -join '; ') · still listed by the certificate provider in: $($logical -join '; ')"
+              if ($logical.Count -gt 0) { throw "${case}: $thumbprint is still in a store" }
+              Child "ShowChain '$file'"
+              RunCase $file $case
+              $after = @(StoreKeys $thumbprint)
+              Write-Output "  ${case}: after the check, $thumbprint is in: $($after -join '; ')"
+              if ($after.Count -gt 0) { throw "${case}: the certificate came back into a store during the check" }
+            } finally {
+              RestoreAll
+              Write-Output "  ${case}: stores restored"
+            }
+            $restored = @(StoreKeys $thumbprint)
+            if ((($before | Sort-Object) -join ';') -ne (($restored | Sort-Object) -join ';')) { throw "${case}: the stores were not restored: before $($before -join '; '), after $($restored -join '; ')" }
+            RunCase $file 'restored'
+          }
+
+          $candidates = @("$PSHOME\pwsh.exe", "$env:ProgramFiles\Git\cmd\git.exe") |
+            Where-Object { (Test-Path $_) -and (Get-AuthenticodeSignature $_).Status -eq 'Valid' -and (SecurityDirectory $_).Size -gt 0 }
+          if (-not $candidates) { throw 'no file with a valid embedded signature was found on this runner' }
+          # The log's maximum on the runner is 1,052,672 bytes, and it overwrites its oldest events when
+          # full. Measured on run 34814580314: the test's 11 events were in the log, a burst of
+          # Get-AuthenticodeSignature calls from another process then filled it (474 records, file at the
+          # maximum, IsLogFull still False), and none of the 11 were left; with a 100 MB maximum the same
+          # burst left 12,869 records and all 11. That is what attempt 1 of run 34811492106 looks like, so
+          # the maximum is raised for this step and put back afterwards.
+          $originalMaxSize = (Get-WinEvent -ListLog $log).MaximumSizeInBytes
+          Write-Output "CAPI2 log maximum size before this step: $originalMaxSize bytes"
+          wevtutil sl $log /ms:104857600
+          if ($LASTEXITCODE -ne 0) { throw 'could not raise the CAPI2 log size' }
+          wevtutil sl $log /e:true
+          try {
+            foreach ($file in $candidates) {
+              Write-Output "== $file"
+              Child "ShowChain '$file'"
+              RunCase $file 'intact'
+              $elements = @((ChainOf $file).Chain.ChainElements | ForEach-Object { $_.Certificate })
+              $root = $elements[-1]
+              if ($root.Subject -ne $root.Issuer) { throw "the chain of $file does not end in a self-signed root" }
+              # Whether the signature carries its root decides the code, so the case says which.
+              $carried = @((ChainOf $file).Cms.Certificates | ForEach-Object Thumbprint) -contains $root.Thumbprint
+              RemovedCase $file $root.Thumbprint ($(if ($carried) { 'root_removed_carried_in_signature' } else { 'root_removed_not_in_signature' }))
+              foreach ($intermediate in @($elements | Select-Object -Skip 1 -First ([Math]::Max(0, $elements.Count - 2)))) {
+                RemovedCase $file $intermediate.Thumbprint 'intermediate_removed'
+              }
+            }
+
+            # The other side of the same code: a copy of this unsigned test binary signed with a certificate
+            # made for it, trusted by nothing. Windows PowerShell makes it, because PowerShell 7 reaches the
+            # PKI module only through a compatibility session whose objects cannot sign.
+            $unsigned = Get-ChildItem target\debug\deps\rongroi_host_windows-*.exe |
+              Where-Object { (SecurityDirectory $_.FullName).Size -eq 0 } | Select-Object -First 1 -ExpandProperty FullName
+            if (-not $unsigned) { throw 'the unsigned test binary was not found' }
+            $selfSigned = Join-Path $work 'self-signed.exe'
+            Copy-Item $unsigned $selfSigned
+            Set-Content -Path "$work\sign.ps1" -Value @'
+          param([string] $Path)
+          $ErrorActionPreference = 'Stop'
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=aeterna-rongroi CI self-signed test' -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(1)
+          try {
+            $result = Set-AuthenticodeSignature -FilePath $Path -Certificate $cert -HashAlgorithm SHA256 -IncludeChain All
+            Write-Output "Set-AuthenticodeSignature: $($result.Status) $($result.StatusMessage)"
+          } finally {
+            Remove-Item "Cert:\CurrentUser\My\$($cert.Thumbprint)" -DeleteKey
+            # The first run found the certificate in the current user's intermediate store after signing too.
+            Get-ChildItem Cert:\CurrentUser\CA | Where-Object Thumbprint -eq $cert.Thumbprint | Remove-Item
+          }
+          '@
+            powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$work\sign.ps1" -Path $selfSigned
+            if ($LASTEXITCODE -ne 0) { throw 'signing the copy failed' }
+            if ((SecurityDirectory $selfSigned).Size -eq 0) { throw 'the copy carries no embedded signature' }
+            Write-Output "== self-signed copy"
+            Child "ShowChain '$selfSigned'"
+            RunCase $selfSigned 'self_signed'
+          } finally {
+            RestoreAll
+            wevtutil sl $log /e:false
+            wevtutil cl $log
+            wevtutil sl $log /ms:$originalMaxSize
+          }
+      # ADR 0038, "Accepted by the owner": whether security software flags a process that enables
+      # SeSystemEnvironmentPrivilege was left unmeasured. This records Microsoft Defender's state before the
+      # two processes that enable it — the firmware test below and the CLI in the live smoke — and opens the
+      # window the step "What Microsoft Defender recorded…" reads — and which the CLI scans in the PowerShell
+      # step also fall inside. Real-time protection, behaviour monitoring and download scanning are switched
+      # on for the window where the image has them off, because a scanner that is not scanning would record
+      # nothing and its silence would pass for a verdict; the later step puts each back. What one Defender
+      # configuration on one runner does says nothing about other security products.
+      - name: Microsoft Defender's state before the privileged reads
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function DefenderState {
+            try { $status = Get-MpComputerStatus } catch { return "Get-MpComputerStatus failed: $($_.Exception.Message)" }
+            ('AMServiceEnabled', 'AntivirusEnabled', 'RealTimeProtectionEnabled', 'BehaviorMonitorEnabled',
+              'IoavProtectionEnabled', 'OnAccessProtectionEnabled', 'IsTamperProtected', 'AMRunningMode',
+              'AMProductVersion', 'AntivirusSignatureVersion' | ForEach-Object { "$_=$($status.$_)" }) -join ' · '
+          }
+          Write-Output "Defender before: $(DefenderState)"
+          # The first run of this step found real-time protection off and, once it was switched on, behaviour
+          # monitoring and download scanning still off; behaviour monitoring is the part that watches what a
+          # running process does. Each one found off is switched on and named, so the later step can put it back.
+          $changed = @()
+          foreach ($switch in @(
+              @{ State = 'RealTimeProtectionEnabled'; Preference = 'DisableRealtimeMonitoring' },
+              @{ State = 'BehaviorMonitorEnabled'; Preference = 'DisableBehaviorMonitoring' },
+              @{ State = 'IoavProtectionEnabled'; Preference = 'DisableIOAVProtection' })) {
+            try {
+              if (-not (Get-MpComputerStatus).($switch.State)) {
+                $preference = @{ $switch.Preference = $false }
+                Set-MpPreference @preference
+                $changed += $switch.Preference
+              }
+            } catch {
+              Write-Output "$($switch.State) could not be switched on: $($_.Exception.Message)"
+            }
+          }
+          if ($changed.Count -gt 0) {
+            Start-Sleep -Seconds 5
+            Write-Output "Defender after switching on $($changed -join ', '): $(DefenderState)"
+          }
+          "RONGROI_DEFENDER_CHANGED=$($changed -join ',')" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "RONGROI_DEFENDER_WINDOW_START=$((Get-Date).ToUniversalTime().ToString('o'))" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      # ADR 0038. Reading the firmware's Secure Boot variable enables a privilege in this program's own
+      # token for the read. This proves the read leaves the token as it found it; on the elevated runner
+      # the privilege is held, so it also proves the read answers rather than reporting missing rights.
+      - name: Firmware read leaves its privilege as it found it
+        run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_firmware_/)'
       - name: Build the desktop app (unofficial build, no installer)
         run: pnpm -C apps/desktop tauri build --no-bundle
       - name: Live smoke — the CLI reads this machine
@@ -84,3 +468,370 @@ jobs:
             $reason = if ($_.reason) { $_.reason } else { '-' }
             Write-Output "evidence: $($_.rule_id) $($_.collector) $($_.state) $reason"
           }
+          # ADR 0038: the firmware reading compared with PowerShell's own reading of the same UEFI
+          # variable on this machine. A runner is not an ordinary Windows PC, so this says the two
+          # readers agree, not what an ordinary PC reports.
+          $postureFields = @(@($report.evidence | Where-Object { $_.collector -eq 'posture' } | ForEach-Object { $_.observations }) +
+            @($report.unmatched | Where-Object { $_.collector -eq 'posture' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ } | Select-Object -First 1 | ForEach-Object { $_.fields })
+          Write-Output "posture fields: $($postureFields | ConvertTo-Json -Compress)"
+          $firmware = if ($postureFields.Count -gt 0) { $postureFields[0].secure_boot_firmware } else { $null }
+          try {
+            $bytes = @((Get-SecureBootUEFI -Name SecureBoot -ErrorAction Stop).Bytes)
+            $expected = if ($bytes.Count -eq 1 -and $bytes[0] -eq 1) { 'enabled' } elseif ($bytes.Count -eq 1 -and $bytes[0] -eq 0) { 'disabled' } else { "unexpected bytes: $($bytes -join ' ')" }
+          } catch {
+            $expected = $null
+            Write-Output "Get-SecureBootUEFI SecureBoot: $($_.Exception.Message)"
+          }
+          Write-Output "secure_boot_firmware: '$firmware' · Get-SecureBootUEFI: '$expected'"
+          if ($firmware -ne $expected) { throw "the firmware reading '$firmware' disagrees with Get-SecureBootUEFI '$expected'" }
+          # What a second, different Windows says about the file-level facts ADR 0037 and ADR 0042 read:
+          # Prefetch's configuration, how many log files are read-only, and how many logs were compared
+          # with the file the Event Log service writes their channel to. Counts only — the channel names
+          # are a list of what is installed, and nothing here needs them.
+          $observations = @($report.evidence | ForEach-Object { $_.observations }) + @($report.unmatched | ForEach-Object { $_.observations }) | Where-Object { $_ }
+          $observations | Where-Object { $_.collector -eq 'prefetch' -and $_.fields.PSObject.Properties.Name -contains 'folder' } | ForEach-Object {
+            $switch = if ($_.fields.PSObject.Properties.Name -contains 'enable_prefetcher') { $_.fields.enable_prefetcher } else { 'absent' }
+            Write-Output "prefetch configuration: folder $($_.fields.folder) · EnablePrefetcher $switch"
+          }
+          foreach ($collector in 'prefetch', 'evtx') {
+            $bits = @($observations | Where-Object { $_.collector -eq $collector -and $_.fields.PSObject.Properties.Name -contains 'read_only' })
+            Write-Output "$collector read_only: $(@($bits | Where-Object { $_.fields.read_only }).Count) of $($bits.Count)"
+          }
+          $compared = @($observations | Where-Object { $_.collector -eq 'evtx' -and $_.fields.PSObject.Properties.Name -contains 'at_configured_path' })
+          Write-Output "evtx at_configured_path: $(@($compared | Where-Object { $_.fields.at_configured_path }).Count) of $($compared.Count)"
+          # ADR 0023, amendment of 2026-09-14: the BAM account observation beside what the registry
+          # itself says the account keys hold, by value type. Counts only — no SID, no value name.
+          $observations | Where-Object { $_.collector -eq 'bam' -and $_.fields.PSObject.Properties.Name -contains 'users' } | ForEach-Object {
+            $f = $_.fields
+            Write-Output "bam account: users $($f.users) · values $($f.values) · metadata_values $($f.metadata_values) · entries $($f.entries) · rejected $($f.rejected) · intact $($f.intact)"
+          }
+          Write-Output "bam read rows: $(@($observations | Where-Object { $_.collector -eq 'bam' -and $_.fields.PSObject.Properties.Name -contains 'read' }).Count)"
+          $bamKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings'
+          if (Test-Path $bamKey) {
+            $kinds = @(Get-ChildItem $bamKey | ForEach-Object { $key = $_; $key.GetValueNames() | ForEach-Object { $key.GetValueKind($_).ToString() } })
+            $byKind = ($kinds | Group-Object | ForEach-Object { "$($_.Name) $($_.Count)" }) -join ' · '
+            Write-Output "bam registry: $(@(Get-ChildItem $bamKey).Count) account keys · $byKind"
+          } else {
+            Write-Output 'bam registry: no UserSettings key'
+          }
+      # ADR 0038: what Windows PowerShell 5.1 and PowerShell 7 do with a script block logging policy, measured
+      # rather than read from one engine's source. For each case the policy values are written, both engines'
+      # Operational logs are cleared, and each engine runs two one-line blocks in fresh processes: an inert one,
+      # which only a policy that turns logging on should record, and an inert one holding one word from
+      # PowerShell's public list of suspicious content, which PowerShell records by itself unless a policy turns
+      # logging off. Each block carries a nonce, and event 4104 carrying it is counted. The CLI scans after
+      # every case and prints what it reports, so the collector's reading can be compared with what the engines
+      # did. The runner is thrown away, which is the only reason writing policy keys is acceptable here, and
+      # every key is put back as it was found. It runs before the Event Log service is suspended below.
+      - name: What PowerShell does with a script block logging policy
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build --locked --quiet -p rongroi-cli
+          $exe = Join-Path $PWD 'target\debug\aeterna-rongroi-cli.exe'
+          if (-not (Test-Path $exe)) { throw "the CLI was not built at $exe" }
+          $windowsPowerShell = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe"
+          $powerShell7 = (Get-Command pwsh -ErrorAction Stop).Source
+          Write-Output "powershell.exe $((Get-Item $windowsPowerShell).VersionInfo.ProductVersion) · pwsh $($PSVersionTable.PSVersion) at $powerShell7"
+          $winLog = 'Microsoft-Windows-PowerShell/Operational'
+          $coreLog = 'PowerShellCore/Operational'
+
+          # PowerShell 7 writes to its own channel only once its event provider is registered
+          # (about_Logging_Windows). Registered here if the image did not, and unregistered afterwards.
+          $registeredHere = $false
+          if (-not (Get-WinEvent -ListLog $coreLog -ErrorAction SilentlyContinue)) {
+            & (Join-Path $PSHOME 'RegisterManifest.ps1')
+            $registeredHere = $true
+          }
+          Write-Output "PowerShellCore/Operational registered by this step: $registeredHere"
+          $config = Join-Path $PSHOME 'powershell.config.json'
+          if (Test-Path $config) { Write-Output "powershell.config.json: $((Get-Content $config -Raw) -replace '\s+', ' ')" }
+
+          $keys = [ordered]@{
+            WinLM  = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging'
+            WinCU  = 'HKCU\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging'
+            WinLMParent = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell'
+            WinCUParent = 'HKCU\SOFTWARE\Policies\Microsoft\Windows\PowerShell'
+            CoreLM = 'HKLM\SOFTWARE\Policies\Microsoft\PowerShellCore'
+            CoreCU = 'HKCU\SOFTWARE\Policies\Microsoft\PowerShellCore'
+          }
+          $saved = @{}
+          $backup = Join-Path $env:RUNNER_TEMP 'rongroi-sbl'
+          New-Item -ItemType Directory -Force $backup | Out-Null
+          foreach ($name in $keys.Keys) {
+            $file = Join-Path $backup "$name.reg"
+            reg query $keys[$name] 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { reg export $keys[$name] $file /y | Out-Null; $saved[$name] = $file }
+            Write-Output "before: $name $(if ($saved[$name]) { 'present' } else { 'absent' })"
+          }
+          # Who may write a per-user policy. Account and machine names are replaced, never printed.
+          $policies = 'HKCU:\Software\Policies'
+          if (Test-Path $policies) {
+            (Get-Acl $policies).Access | ForEach-Object {
+              $who = "$($_.IdentityReference)".Replace($env:COMPUTERNAME, '<machine>').Replace($env:USERNAME, '<account>')
+              Write-Output "HKCU\Software\Policies ACE: $who $($_.AccessControlType) $($_.RegistryRights) inherited=$($_.IsInherited)"
+            }
+          }
+
+          function ClearPolicy {
+            foreach ($name in 'WinLM', 'WinCU', 'CoreLM', 'CoreCU') { reg delete $keys[$name] /f 2>&1 | Out-Null }
+          }
+          function SetValue([string] $key, [string] $name, [string] $type, [string] $data) {
+            if ($type -eq 'KEY') { reg add $key /f | Out-Null } else { reg add $key /v $name /t $type /d $data /f | Out-Null }
+            if ($LASTEXITCODE -ne 0) { throw "reg add $key $name failed" }
+          }
+          $winSbl = $keys.WinLM
+          $winSblUser = $keys.WinCU
+          $coreSbl = "$($keys.CoreLM)\ScriptBlockLogging"
+          $coreSblUser = "$($keys.CoreCU)\ScriptBlockLogging"
+          $enable = 'EnableScriptBlockLogging'
+          $fallback = 'UseWindowsPowerShellPolicySetting'
+          $cases = [ordered]@{
+            'no policy'                                  = @()
+            'machine DWORD 1'                            = @(, @($winSbl, $enable, 'REG_DWORD', '1'))
+            'machine DWORD 0'                            = @(, @($winSbl, $enable, 'REG_DWORD', '0'))
+            'machine DWORD 2'                            = @(, @($winSbl, $enable, 'REG_DWORD', '2'))
+            'machine REG_SZ 1'                           = @(, @($winSbl, $enable, 'REG_SZ', '1'))
+            'machine REG_SZ 0'                           = @(, @($winSbl, $enable, 'REG_SZ', '0'))
+            'machine REG_QWORD 1'                        = @(, @($winSbl, $enable, 'REG_QWORD', '1'))
+            'machine REG_QWORD 0'                        = @(, @($winSbl, $enable, 'REG_QWORD', '0'))
+            'machine key with no value'                  = @(, @($winSbl, '', 'KEY', ''))
+            'user DWORD 1'                               = @(, @($winSblUser, $enable, 'REG_DWORD', '1'))
+            'user DWORD 0'                               = @(, @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'user REG_SZ 0'                              = @(, @($winSblUser, $enable, 'REG_SZ', '0'))
+            'machine DWORD 1, user DWORD 0'              = @(@($winSbl, $enable, 'REG_DWORD', '1'), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'machine DWORD 0, user DWORD 1'              = @(@($winSbl, $enable, 'REG_DWORD', '0'), @($winSblUser, $enable, 'REG_DWORD', '1'))
+            'machine key with no value, user DWORD 0'    = @(@($winSbl, '', 'KEY', ''), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'machine DWORD 2, user DWORD 0'              = @(@($winSbl, $enable, 'REG_DWORD', '2'), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine DWORD 1'                       = @(, @($coreSbl, $enable, 'REG_DWORD', '1'))
+            'pwsh machine DWORD 0'                       = @(, @($coreSbl, $enable, 'REG_DWORD', '0'))
+            'pwsh machine REG_SZ 0'                      = @(, @($coreSbl, $enable, 'REG_SZ', '0'))
+            'pwsh machine REG_QWORD 0'                   = @(, @($coreSbl, $enable, 'REG_QWORD', '0'))
+            'pwsh machine fallback 1, machine DWORD 0'   = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($winSbl, $enable, 'REG_DWORD', '0'))
+            'pwsh machine fallback 1, machine DWORD 1'   = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($winSbl, $enable, 'REG_DWORD', '1'))
+            'pwsh machine fallback 1, no machine policy' = @(, @($coreSbl, $fallback, 'REG_DWORD', '1'))
+            'pwsh machine fallback 1 and DWORD 0, machine DWORD 1' = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($coreSbl, $enable, 'REG_DWORD', '0'), @($winSbl, $enable, 'REG_DWORD', '1'))
+            'pwsh user DWORD 0'                          = @(, @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine DWORD 1, pwsh user DWORD 0'    = @(@($coreSbl, $enable, 'REG_DWORD', '1'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh user fallback 1, user DWORD 0'         = @(@($coreSblUser, $fallback, 'REG_DWORD', '1'), @($winSblUser, $enable, 'REG_DWORD', '0'))
+            # Added after the first run, from PowerShell 7's source and from the 5.1 comparison seen there.
+            'machine REG_SZ 01'                          = @(, @($winSbl, $enable, 'REG_SZ', '01'))
+            'machine REG_EXPAND_SZ 0'                    = @(, @($winSbl, $enable, 'REG_EXPAND_SZ', '0'))
+            'machine REG_MULTI_SZ 0'                     = @(, @($winSbl, $enable, 'REG_MULTI_SZ', '0'))
+            'pwsh machine REG_SZ 0, pwsh user DWORD 0'   = @(@($coreSbl, $enable, 'REG_SZ', '0'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine DWORD 2, pwsh user DWORD 0'    = @(@($coreSbl, $enable, 'REG_DWORD', '2'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine invocation logging 1 only, pwsh user DWORD 0' = @(@($coreSbl, 'EnableScriptBlockInvocationLogging', 'REG_DWORD', '1'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine fallback 1 with no machine key, pwsh user DWORD 0' = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($coreSblUser, $enable, 'REG_DWORD', '0'))
+            'pwsh machine fallback 1, machine REG_SZ 0'  = @(@($coreSbl, $fallback, 'REG_DWORD', '1'), @($winSbl, $enable, 'REG_SZ', '0'))
+            'pwsh machine fallback REG_SZ 1, machine DWORD 0' = @(@($coreSbl, $fallback, 'REG_SZ', '1'), @($winSbl, $enable, 'REG_DWORD', '0'))
+          }
+
+          # An engine that fails is recorded, not thrown: what PowerShell does with a malformed policy is
+          # part of what is measured. Its first line of output is kept for the log.
+          function Run([string] $engine, [string] $block) {
+            $out = & $engine -NoLogo -NoProfile -NonInteractive -Command $block 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { return "exit $LASTEXITCODE`: $(($out -split "`n")[0].Trim())" }
+            ''
+          }
+          function Count([string] $log, [string] $nonce) {
+            $found = @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue | Where-Object { $_.Id -eq 4104 -and $_.ToXml().Contains($nonce) })
+            $levels = ($found | Group-Object Level | ForEach-Object { "L$($_.Name)x$($_.Count)" }) -join '+'
+            if ($found.Count -eq 0) { '0' } else { "$($found.Count)($levels)" }
+          }
+
+          $rows = @()
+          try {
+            foreach ($case in $cases.Keys) {
+              ClearPolicy
+              foreach ($write in $cases[$case]) { SetValue @write }
+              wevtutil cl $winLog
+              wevtutil cl $coreLog
+              $nonce = [guid]::NewGuid().ToString('N')
+              $inert = "Write-Output rongroi-sbl-inert-$nonce"
+              $listed = '$null = [IntPtr]::Size; Write-Output rongroi-sbl-listed-' + $nonce
+              $failures = @(
+                Run $windowsPowerShell $inert
+                Run $windowsPowerShell ($listed.Replace('-listed-', '-listed-win-'))
+                Run $powerShell7 ($inert.Replace('-inert-', '-inert-core-'))
+                Run $powerShell7 ($listed.Replace('-listed-', '-listed-core-'))
+              ) | Where-Object { $_ }
+              Start-Sleep -Seconds 3
+              $json = & $exe scan --json | Out-String
+              if ($LASTEXITCODE -ne 0) { throw "the scan exited $LASTEXITCODE in case '$case'" }
+              $scan = $json | ConvertFrom-Json
+              $observations = @($scan.evidence | ForEach-Object { $_.observations }) + @($scan.unmatched | ForEach-Object { $_.observations }) | Where-Object { $_ -and $_.collector -eq 'posture' }
+              $fields = $observations | Select-Object -First 1 | ForEach-Object { $_.fields }
+              $read = ($fields.PSObject.Properties | Where-Object Name -like 'script_block_logging*' | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' '
+              $postureGaps = @($scan.evidence | Where-Object { $_.collector -eq 'posture' -and $_.state -eq 'unmeasured' } | ForEach-Object { "$($_.rule_id.Substring(0,8))/$($_.reason)" }) -join ' '
+              # script-block-logging-disabled-by-policy, …-by-user-policy, pwsh-…-by-policy, pwsh-…-by-user-policy.
+              $ruleIds = @('88eb2aca-a33e-414d-bd0f-cfb87af95a2d', '869c34b6-7b32-4f56-a281-9f5ac00e43c4', '98ee9213-39f3-4219-b2ac-f2bb3d21d6cc', 'e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7')
+              $rules = @($ruleIds | ForEach-Object { $id = $_; $scan.evidence | Where-Object { $_.rule_id -eq $id } } | ForEach-Object { "$($_.rule_id.Substring(0,8))=$($_.state)" }) -join ' '
+              $row = [pscustomobject]@{
+                case = $case
+                win_inert = Count $winLog "rongroi-sbl-inert-$nonce"
+                win_listed = Count $winLog "rongroi-sbl-listed-win-$nonce"
+                core_inert = Count $coreLog "rongroi-sbl-inert-core-$nonce"
+                core_listed = Count $coreLog "rongroi-sbl-listed-core-$nonce"
+                collector = $read
+                rules = $rules
+                posture_unmeasured = $postureGaps
+                engine_failures = $failures -join ' | '
+              }
+              $rows += $row
+              Write-Output ("case '{0}': powershell.exe inert {1} listed {2} · pwsh inert {3} listed {4} · CLI {5} · {6} {7} {8}" -f $row.case, $row.win_inert, $row.win_listed, $row.core_inert, $row.core_listed, $row.collector, $row.rules, $row.posture_unmeasured, $row.engine_failures)
+            }
+          } finally {
+            ClearPolicy
+            foreach ($name in 'WinLMParent', 'WinCUParent') { if (-not $saved[$name]) { reg delete $keys[$name] /f 2>&1 | Out-Null } }
+            foreach ($name in $saved.Keys) { reg import $saved[$name] 2>&1 | Out-Null }
+            foreach ($name in $keys.Keys) {
+              reg query $keys[$name] 2>&1 | Out-Null
+              $now = $LASTEXITCODE -eq 0
+              if ($now -ne [bool]$saved[$name]) { throw "$name was $(if ($saved[$name]) { 'present' } else { 'absent' }) before and is not now" }
+            }
+            if ($registeredHere) { & (Join-Path $PSHOME 'RegisterManifest.ps1') -Unregister }
+          }
+          $rows | Format-Table -AutoSize | Out-String -Width 400 | Write-Output
+          # A log that records nothing would make every zero above look like a measurement.
+          $on = $rows | Where-Object case -eq 'machine DWORD 1'
+          if ($on.win_inert -eq '0') { throw 'powershell.exe recorded nothing with the machine policy on, so its zeros say nothing' }
+          $coreOn = $rows | Where-Object case -eq 'pwsh machine DWORD 1'
+          if ($coreOn.core_inert -eq '0') { throw 'pwsh recorded nothing with its machine policy on, so its zeros say nothing' }
+          # `reg query` on a key that is absent leaves exit code 1 behind, which the runner would report.
+          exit 0
+      - name: What Microsoft Defender recorded while the privilege was enabled
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $start = [datetime]::Parse($env:RONGROI_DEFENDER_WINDOW_START, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind)
+          $end = (Get-Date).ToUniversalTime()
+          Write-Output "window: $($start.ToString('o')) to $($end.ToString('o')) ($([math]::Round(($end - $start).TotalMinutes, 1)) min)"
+          $status = Get-MpComputerStatus
+          Write-Output "Defender now: RealTimeProtectionEnabled=$($status.RealTimeProtectionEnabled) BehaviorMonitorEnabled=$($status.BehaviorMonitorEnabled) IoavProtectionEnabled=$($status.IoavProtectionEnabled) AMRunningMode=$($status.AMRunningMode) IsTamperProtected=$($status.IsTamperProtected)"
+          $log = 'Microsoft-Windows-Windows Defender/Operational'
+          $events = @(Get-WinEvent -FilterHashtable @{ LogName = $log; StartTime = $start.ToLocalTime() } -ErrorAction SilentlyContinue)
+          Write-Output "Defender events in the window: $($events.Count) · ids: $((($events | Group-Object Id | Sort-Object { [int]$_.Name } | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))"
+          $detections = @($events | Where-Object { $_.Id -in 1006, 1007, 1008, 1015, 1116, 1117, 1118, 1119 })
+          $events | ForEach-Object { Write-Output "event $($_.Id) $($_.TimeCreated.ToUniversalTime().ToString('o')): $((($_.Message -split "`n")[0]).Trim())" }
+          Write-Output "detection events (1006-1008, 1015, 1116-1119): $($detections.Count)"
+          $naming = @($events | Where-Object { $_.ToXml() -match 'rongroi_host_windows|aeterna-rongroi-cli' })
+          Write-Output "events naming the firmware test binary or the CLI: $($naming.Count)"
+          $naming + $detections | Select-Object -First 5 | ForEach-Object { Write-Output $_.ToXml() }
+          $threats = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -ge $start.ToLocalTime() })
+          Write-Output "Get-MpThreatDetection since the window opened: $($threats.Count)"
+          foreach ($preference in @($env:RONGROI_DEFENDER_CHANGED -split ',' | Where-Object { $_ })) {
+            $restore = @{ $preference = $true }
+            Set-MpPreference @restore
+            Write-Output "$preference put back to true, as the image had it"
+          }
+      # ADR 0042 §5, amended 2026-09-14: the channel-configuration reads go to the Event Log service, and a
+      # service that never answers must cost its own bound (CONFIG_BUDGET, 5 s) and the three configuration
+      # fields — not the scan, and not the evtx rules that read only the logs' bytes. The unit test proves
+      # that against a fixture reader that blocks; this is the positive twin on a real Windows, where the
+      # service process itself is suspended so that `EvtOpenChannelConfig` has nobody to answer it. The
+      # runner is throwaway, which is the only reason suspending a system service is acceptable here, and
+      # the service is resumed whatever happens. It runs last because nothing after it should depend on the
+      # Event Log. Before suspending, it times the same two properties for every channel while the service
+      # answers, so the bound can be read against this machine too (counts and times only, no names).
+      - name: A suspended Event Log service costs the configuration fields, not the other evtx rules
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          cargo build --locked --quiet -p rongroi-cli
+          $exe = Join-Path $PWD 'target\debug\aeterna-rongroi-cli.exe'
+          if (-not (Test-Path $exe)) { throw "the CLI was not built at $exe" }
+          # EventLogConfiguration opens the channel with EvtOpenChannelConfig and reads each property with
+          # EvtGetChannelConfigProperty (dotnet/runtime, System.Diagnostics.EventLog).
+          $channels = [System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.GetLogNames()
+          $times = [System.Collections.Generic.List[double]]::new()
+          $unanswered = 0
+          $sweep = [System.Diagnostics.Stopwatch]::StartNew()
+          foreach ($channel in $channels) {
+            $one = [System.Diagnostics.Stopwatch]::StartNew()
+            try {
+              $config = [System.Diagnostics.Eventing.Reader.EventLogConfiguration]::new($channel)
+              $null = $config.LogFilePath
+              $null = $config.MaximumSizeInBytes
+              $config.Dispose()
+            } catch { $unanswered++ }
+            $one.Stop()
+            $times.Add($one.Elapsed.TotalMilliseconds)
+          }
+          $sweep.Stop()
+          $sorted = @($times | Sort-Object)
+          if ($sorted.Count -gt 0) {
+            $at = { param($share) $sorted[[math]::Min($sorted.Count - 1, [int][math]::Floor($share * $sorted.Count))] }
+            Write-Output ('service answer times: {0} channels, {1} not described, total {2:N1} ms, median {3:N3} ms, p99 {4:N3} ms, max {5:N3} ms' -f $sorted.Count, $unanswered, $sweep.Elapsed.TotalMilliseconds, (& $at 0.5), (& $at 0.99), $sorted[-1])
+          }
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class RongroiSuspend {
+            [DllImport("kernel32.dll", SetLastError = true)] public static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+            [DllImport("kernel32.dll", SetLastError = true)] public static extern bool CloseHandle(IntPtr handle);
+            [DllImport("ntdll.dll")] public static extern int NtSuspendProcess(IntPtr handle);
+            [DllImport("ntdll.dll")] public static extern int NtResumeProcess(IntPtr handle);
+          }
+          '@
+          $servicePid = (Get-CimInstance Win32_Service -Filter "Name='EventLog'").ProcessId
+          $sharing = @(Get-CimInstance Win32_Service | Where-Object { $_.ProcessId -eq $servicePid } | ForEach-Object { $_.Name })
+          Write-Output "EventLog runs in pid $servicePid with: $($sharing -join ', ')"
+          [System.Diagnostics.Process]::EnterDebugMode()
+          $PROCESS_SUSPEND_RESUME = 0x0800
+          $handle = [RongroiSuspend]::OpenProcess($PROCESS_SUSPEND_RESUME, $false, $servicePid)
+          if ($handle -eq [IntPtr]::Zero) { throw "OpenProcess on the EventLog service failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
+          $suspended = $false
+          try {
+            $status = [RongroiSuspend]::NtSuspendProcess($handle)
+            if ($status -ne 0) { throw ('NtSuspendProcess failed: 0x{0:X8}' -f $status) }
+            $suspended = $true
+            $clock = [System.Diagnostics.Stopwatch]::StartNew()
+            $scan = Start-Process -FilePath $exe -ArgumentList 'scan', '--json' -RedirectStandardOutput hung-service.json -RedirectStandardError hung-service.err -NoNewWindow -PassThru
+            $null = $scan.Handle  # held now, or ExitCode can come back empty after the process exits
+            $finished = $scan.WaitForExit(180000)
+            $clock.Stop()
+            if (-not $finished) {
+              $scan.Kill($true)
+              throw "the scan did not finish within 180 s with the Event Log service suspended"
+            }
+          } finally {
+            if ($suspended) {
+              $status = [RongroiSuspend]::NtResumeProcess($handle)
+              Write-Output ('NtResumeProcess: 0x{0:X8}' -f $status)
+            }
+            [void][RongroiSuspend]::CloseHandle($handle)
+          }
+          Write-Output "scan exit $($scan.ExitCode) after $([math]::Round($clock.Elapsed.TotalSeconds, 1)) s"
+          if ($scan.ExitCode -ne 0) { Get-Content hung-service.err; throw "the scan exited with $($scan.ExitCode)" }
+          $report = Get-Content hung-service.json -Raw | ConvertFrom-Json
+          $report.evidence | Where-Object { $_.collector -eq 'evtx' } | ForEach-Object {
+            $reason = if ($_.reason) { $_.reason } else { '-' }
+            Write-Output "evidence: $($_.rule_id) $($_.state) $reason"
+          }
+          # The most evtx can now take is the 30 s parse budget plus the 5 s service bound; before the amendment
+          # this scan took 30.3 s. 90 s leaves room for the other, unbounded collectors on a debug build and is
+          # half of the 180 s kill above.
+          if ($clock.Elapsed.TotalSeconds -ge 90) { throw "the scan took $([math]::Round($clock.Elapsed.TotalSeconds, 1)) s with the service suspended; expected well under 90 s" }
+          # The rule that compares a log with the file its channel writes to reads only what the service said.
+          $configuredPathRule = '87a53c8f-b0e4-477d-91e7-93b904ba965f'
+          $rule = @($report.evidence | Where-Object { $_.rule_id -eq $configuredPathRule })
+          if ($rule.Count -ne 1) { throw "expected one row for event-log-not-at-configured-path, got $($rule.Count)" }
+          if ($rule[0].state -ne 'unmeasured' -or $rule[0].reason -ne 'budget_spent') {
+            throw "with the service suspended, event-log-not-at-configured-path must be unmeasured / budget_spent, got '$($rule[0].state)' / '$($rule[0].reason)'"
+          }
+          # Every other evtx rule reads only the logs' own bytes and attributes. Whether each is found or not
+          # depends on this runner; what the suspended service must not do is take their measurement away.
+          $others = @($report.evidence | Where-Object { $_.collector -eq 'evtx' -and $_.rule_id -ne $configuredPathRule })
+          if ($others.Count -lt 3) { throw "expected at least three evtx rules that do not read the service, got $($others.Count)" }
+          foreach ($other in $others) {
+            if ($other.reason -eq 'budget_spent') {
+              throw "evtx rule $($other.rule_id) is unmeasured / budget_spent: the suspended service cost a rule that does not read it"
+            }
+          }
+          $folder = @(@($report.evidence | ForEach-Object { $_.observations }) + @($report.unmatched | ForEach-Object { $_.observations }) |
+            Where-Object { $_ -and $_.collector -eq 'evtx' -and $_.fields.PSObject.Properties.Name -contains 'budget_exhausted' })
+          if ($folder.Count -ne 1) { throw "expected one evtx folder account, got $($folder.Count)" }
+          Write-Output "evtx folder: logs $($folder[0].fields.logs) · examined $($folder[0].fields.examined) · refused $($folder[0].fields.refused) · budget_exhausted $($folder[0].fields.budget_exhausted)"
+          if ($folder[0].fields.budget_exhausted) { throw 'the parse budget was exhausted with the service suspended: the wait was charged to the logs' }

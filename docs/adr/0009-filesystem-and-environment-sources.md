@@ -31,6 +31,11 @@ cannot be read says nothing about the other files, so that observation is emitte
 `location` and without `sha256`. The file is never dropped and a hash is never invented. A folder that
 could not be listed at all is the opposite case: every field is then a gap.
 
+**Amended by ADR 0044.** When the collector reads several places and only some could not be listed,
+the gap is confined to the observations about those places — `DiscriminatorGaps`, keyed by the
+collector's declared discriminator, `location` — rather than the whole run. A run where nothing could be
+listed is still a gap in every field.
+
 **Hashes are streamed and well-formed.** `sha256_file` reads a file in blocks rather than into memory, so
 a large plugin costs a buffer rather than its own size. It lives in `rongroi-host` next to the trait, not
 in `rongroi-host-windows`, so that every implementation produces the same digest in the same form and so
@@ -49,11 +54,22 @@ file a collector names, bounded at 64 MiB, because three of the four parsers nee
 `Host` supplied them. The rest of the paragraph above stands: still no recursion, no timestamps, no size,
 no owner or ACL, no attributes, and nothing read that a collector did not name.
 
+**Amended by ADR 0037.** One attribute is now read: `FilesystemSource::is_read_only` returns whether a
+file a collector names carries the read-only attribute, and nothing else about its attributes. `prefetch`
+and `evtx` ask it of the files they read; `fivem_dir` does not.
+
 **No rule reads this collector yet.** A rule that says "there is a file in FiveM's plugin folder" matches
 ordinary overlay software on a great many legitimate machines, and neither an allow-list of known-good
 hashes nor Authenticode signer checking exists yet — and `allow` may only identify software by `sha256` or
 `signer`, never by file name. Shipping the rule now would produce evidence that a reviewer could not act
 on. The rule follows once signer checking or a starter allow-list exists.
+
+**Signer checking exists since ADR 0035**, which also changes what `allow` compares — the signing
+certificate's SHA-256, never the signer's name — and extends this collector to FiveM for GTA V Enhanced's
+`asi` folder under `%APPDATA%`. The rule itself is still to be written.
+
+**The first rules are ADR 0036**, which also extends this collector to `FiveM.exe` in each edition's
+program folder.
 
 This ADR originally continued: *"The observations are still visible in Self mode, where a person reads
 them."* That was false when it was written. A `Report` held one `Evidence` per rule, and an

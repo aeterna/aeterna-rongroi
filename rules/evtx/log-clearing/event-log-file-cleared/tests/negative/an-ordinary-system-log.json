@@ -1,0 +1,21 @@
+{
+  "description": "What an ordinary System log holds from the Event Log service without anyone clearing a log. The service's modern provider writes other events here too — an ordinary Windows 11 machine measured on 2026-09-14 held an event 30 from Microsoft-Windows-Eventlog on System — and the classic provider named EventLog records every start and stop of the service (6005, 6006, 6008, 6009, 6013), which is a different provider name, not a spelling of this one. The times and counts below are illustrative, not copied from either machine. Neither must match: the rule is the provider, the channel and event 104 together.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "channel": "System", "provider": "Microsoft-Windows-Eventlog",
+      "event_id": 30, "level": 2, "count": 1,
+      "first_seen": "2026-05-10T12:00:00.000Z", "last_seen": "2026-05-10T12:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "channel": "System", "provider": "EventLog",
+      "event_id": 6005, "level": 4, "count": 30,
+      "first_seen": "2026-04-01T08:00:00.000Z", "last_seen": "2026-08-28T08:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "channel": "System", "provider": "EventLog",
+      "event_id": 6006, "level": 4, "count": 28,
+      "first_seen": "2026-04-01T07:59:00.000Z", "last_seen": "2026-08-27T18:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "System.evtx", "channel": "System", "provider": "EventLog",
+      "event_id": 6008, "level": 2, "count": 2,
+      "first_seen": "2026-06-12T10:00:00.000Z", "last_seen": "2026-06-12T10:00:00.000Z" } }
+  ]
+}

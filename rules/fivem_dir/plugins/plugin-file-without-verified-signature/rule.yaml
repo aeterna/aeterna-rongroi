@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 061797d3-161d-4783-89e6-caf658973436
+title: A file in FiveM's plugins folder has no embedded signature that verifies here
+description: >-
+  FiveM for GTA V Legacy's plugins folder (%LOCALAPPDATA%\FiveM\FiveM.app\plugins) holds a file, and
+  Windows found no signature embedded in it, one that does not verify, or one it could not verify
+  without the internet; each file shown says which. "Could not verify without the internet" includes a
+  certificate chain that ends at a root certificate this PC does not hold as trusted, which offline
+  cannot be told apart from a root nobody trusts: a self-signed signature reads that way too. This folder is where the Cfx.re forum's own guides
+  tell players to put graphics mods such as ReShade, so a file here is as often one of those, its
+  settings or its log as anything else. The check does not say what a file is or does, whether it was
+  ever loaded, or who put it there. A file with a valid signature is shown under "A file in FiveM's
+  plugins folder carries a valid embedded signature", and one whose signature could not be checked at
+  all under "A FiveM file's signature could not be checked" — not here, so "not found" on this row
+  speaks only for the files whose signature was checked.
+status: experimental
+collector: fivem_dir
+strength: presence
+# A list is `or`: the three answers that are not `valid`. `unverifiable_offline` is here rather than
+# alone because it is the check's limit, not the file's, and a row of its own would read as a finding
+# about the file. The value shown on each observation keeps the three apart for the reader (ADR 0036).
+match:
+  location: plugins
+  signature: [no_embedded_signature, invalid, unverifiable_offline]
+retention: >-
+  Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and
+  this check cannot say what the folder held earlier.
+# Left out deliberately: `access_denied`. The folder is inside the player's own profile, and a plugins
+# folder its owner cannot list is not the state of an ordinary install, so SS mode lists it.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Graphics mods — ReShade's dxgi.dll or d3d11.dll, ENB — installed here as the Cfx.re forum guides
+    describe. Many are not signed by their authors at all
+  - The settings, preset and log files those mods keep beside themselves (ReShade.ini, a preset .ini,
+    ReShade.log). They are text, not programs, and text files never carry an embedded signature
+  - Overlays, FPS counters and performance or recording tools that install a plugin here
+  - A signature that does not verify because the file was damaged in download or by a disk problem,
+    or because its signing certificate expired without a timestamp
+  - A signature this PC could not verify offline — its certificate chain needs something Windows has
+    not already stored, such as its root certificate, and this check never goes to the internet to
+    fetch it
+references:
+  - https://forum.cfx.re/t/how-to-install-reshade/5352795
+  - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
+author: aeterna-rongroi contributors
+date: 2026-09-13
+tags: [fivem_dir, plugins, signature]
+related:
+  - id: d5531c55-1a65-4698-9f39-7cf79bbbb7ba
+    type: similar
+  - id: 282115fe-863d-4e2e-9cf5-4eaf8e7545e4
+    type: similar

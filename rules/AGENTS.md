@@ -26,7 +26,12 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   must not declare the other. `source_empty` in particular is **never** evidence that anything was
   removed: Windows' own scavenger empties BAM of entries older than seven days at every boot, and a
   Prefetch folder is routinely emptied by an optimiser the player ran.
-- `allow` identifies legitimate software by `sha256` or `signer` only — never by file name.
+- `allow` identifies legitimate software by `sha256` or `signer_cert_sha256` only — never by a file's or a
+  signer's name, which a stolen certificate carries too (ADR 0035).
+- **No rule on `prefetch`, `bam` or `pca` names a program** by `name` or `path` (ADR 0034). Nothing those
+  collectors emit identifies software, so such a rule cannot `allow` the legitimate program with that name
+  and a rename defeats it. No gate refuses it — `check-rules` and `check-baseline` both accept a rule for
+  one named executable — so it is on the reviewer.
 - **`match` compares strings without regard to ASCII case.** `path: "C:\\Windows\\Temp\\x.exe"` matches
   `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in and a rule that
   missed one would report `not_found` — a thing looked for and not there. Non-ASCII letters are **not**
@@ -56,6 +61,21 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   false` included — there the gap is checked before anything is matched, because a field nobody could read
   is also a field that is not there, and the rule would otherwise be `found` and the report would say "we
   looked and it is not there" about it (ADR 0002, ADR 0029).
+- **A gap may be confined to one place.** `fivem_dir` reads four places, told apart by `location`, its
+  discriminator. When one could not be listed, only the rules that could match an observation from there
+  are `unmeasured`; a rule whose `location` rules that place out keeps the answer the other places give.
+  So write `location` in a rule that is about one place — a rule without it is reached by every place
+  that could not be read (ADR 0044).
+- **A field a collector leaves out for one item is not a gap**, and no equality or value list matches
+  it. `fivem_dir` omits `signature` for a file whose check failed. Partition the field's values across
+  rules so each one lands somewhere, and give the omitted field its own rule with `<field>|exists: false`
+  — the pattern and its reasons are in `docs/rules-authoring.md` (ADR 0036).
+- **An `allow` entry is a measurement**: from a file its publisher released, with a `#` comment saying
+  when and how, never from memory. A certificate entry goes stale on renewal, and the rule's
+  `falsepositives` must tell a reviewer what that looks like (ADR 0036). Every `signer_cert_sha256`
+  entry also needs a row in `rules/certificate-pins.csv` — subject, `not_before`, `not_after`,
+  `measured_on`, all measured — which `check-rules` requires and a monthly workflow reads to warn 90 days
+  before `not_after` (ADR 0036, amendment of 2026-09-14).
 - To compare one field byte for byte, list its name in `cased`. It is per field, so the rest of `match`
   keeps folding, every field left out of it folds, and one entry covers every comparison the rule makes
   against that field, `startswith` and `contains` included. A rule with no `cased` line is
@@ -99,13 +119,19 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   `known-fps.csv` row with a reason (`cargo xtask check-baseline`, ADR 0017). **Quiet is not the same as
   measured**, and since ADR 0033 the gate tells you which you have: it requires each rule to be
   *confronted* — some baseline observation must carry the fields your `match` names and come within one
-  condition of firing it. A rule nothing confronts fails until `rules/unconfronted.csv` carries a row
+  condition of firing it — and that one condition may not be the collector's discriminator
+  (`fivem_dir`: `location`), because an observation differing only there is about another place. A rule
+  nothing confronts fails until `rules/unconfronted.csv` carries a row
   with a reason and a `resolved_when`, and the row fails once a baseline does confront it. The only
   Event Log sample in this repository is a LanguagePackSetup log, so both rules naming the `Security`
   or `System` channel have such a row today. Do not close that by inventing a log: a baseline asserts
   that a machine like it is unremarkable (`fixtures/hosts/PROVENANCE.md`). A row is not a pass — it
   records that this gate is measuring nothing about your rule — so say so in the pull request
   (ADR 0031, ADR 0033).
+- **Run `cargo xtask rules-reference` after changing a rule** or `rules/i18n/`, and commit
+  `docs/rules-reference.md` and `docs/rules-reference.th.md` with it. The pages are generated from the
+  bundle and CI's `cargo xtask rules-reference --check` fails when they disagree. After a rebase onto a
+  `dev` that changed rules, run the command again rather than merging the pages by hand; never edit them.
 - Fixtures are synthetic observations. Never commit cheat binaries, loaders or real player data.
 - **Out of scope:** rules, comments or fixtures that explain how to avoid a rule, and weakening a rule
   without a documented false-positive reason. Bypasses are reported privately via

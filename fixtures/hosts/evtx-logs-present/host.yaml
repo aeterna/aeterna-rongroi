@@ -14,6 +14,11 @@
 # came from *and* the channel its records declare, precisely because a log whose records name
 # another channel is a file that was put there.
 #
+# Since ADR 0042 the host also says what the Event Log service states about that channel — the path
+# and maximum size measured for it on a Windows 11 machine — so both logs here are, by construction,
+# files that are not where their channel is written, and the rule that reads that shape is `found` on
+# this host. Neither file carries the read-only attribute (ADR 0037).
+#
 # The sample's own chunk string table holds the host name of the machine that wrote it,
 # `DESKTOP-1N4R894` (fixtures/evtx/PROVENANCE.md). That is why this host exists: the collector's
 # tests assert that it reaches no observation.
@@ -26,7 +31,13 @@ filesystem:
   'C:\Windows\System32\winevt\Logs':
     - name: Application.evtx
       from: '../../evtx/languagepacksetup-operational.evtx'
+      read_only: false
     - name: Security.evtx
       from: '../../evtx/languagepacksetup-operational.evtx'
+      read_only: false
     - name: not-a-log.txt
       content: "not an event log\n"
+event_log_channels:
+  Microsoft-Windows-LanguagePackSetup/Operational:
+    log_file_path: '%SystemRoot%\System32\Winevt\Logs\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'
+    max_size_bytes: 1052672

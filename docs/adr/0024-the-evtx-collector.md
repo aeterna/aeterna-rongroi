@@ -179,6 +179,17 @@ The shape, specifically:
   hang the budget exists to bound. A worker that is still spinning when the collection gives up costs
   one core until the process exits; that is stated here rather than hidden, and it is the price of
   bounding an uncancellable parse.
+- **Amended by ADR 0042**, which asks the Event Log service about a log's channel. That question runs on
+  a second worker thread under this same budget, for the same reason as the parse: a call that does not
+  return must cost the budget, not the scan. The paragraphs above are left as written. The worst case
+  becomes one spinning parse thread or one blocked service thread — never both, since whichever
+  overruns first ends the collection.
+- **Amended again by ADR 0042's amendment of 2026-09-14.** The service's question no longer shares this
+  budget: it has a 5-second bound of its own, `CONFIG_BUDGET`, and the time spent waiting for the service
+  is added back to the parse deadline, so the 30 seconds are spent on reading and parsing logs alone and
+  the collection's worst case is 35 seconds. A service that does not answer gaps only the three
+  configuration fields and ends nothing, which makes the "never both" above false: the process can hold
+  a blocked service thread and, later, a spinning parse thread.
 - **The bytes are read on the collector's thread and only the parse is handed to the worker.** A
   `&dyn Host` is not `'static` and cannot be moved into a detachable thread, and the reads are
   already bounded — 64 MiB per file (ADR 0019) — while the parse is the part with no bound. Read time

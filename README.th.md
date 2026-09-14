@@ -54,12 +54,15 @@ Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
 | เฟส | ขอบเขต | สถานะ |
 |---|---|---|
 | M0 | repo, รูปแบบ rule, engine, ตรวจ Secure Boot, CLI และโครง GUI, ระบบ release | ออกใน 0.1.0 แล้ว |
-| M1 | ตรวจโฟลเดอร์ FiveM, process ที่รันอยู่, สถานะเครื่องเพิ่มเติม, เปิดใหม่ด้วยสิทธิ์ admin | merge แล้ว แต่ยังไม่ได้ออกเป็นรุ่น |
-| M2 | Prefetch, BAM, PCA, สัญญาณล้าง event log | collector merge แล้วและอ่านจริง การสแกนแสดงสิ่งที่ทั้งสี่ตัวเก็บได้ · มีกฎ event log สองตัว ทั้งคู่ยัง `experimental` · ยังไม่มีกฎตัวไหนอ่าน Prefetch, BAM หรือ PCA สามตัวนี้จึงขึ้นเป็นสิ่งที่เห็นแต่ไม่มีกฎตรงเท่านั้น |
-| M3 | รายชื่อ driver มีช่องโหว่, USN journal, Amcache, คู่มือ SS | วางแผนแล้ว |
+| M1 | ตรวจโฟลเดอร์ FiveM, process ที่รันอยู่, สถานะเครื่องเพิ่มเติม, เปิดใหม่ด้วยสิทธิ์ admin | ออกใน 0.2.0 แล้ว · ออกใน 0.3.0: ตรวจลายเซ็น Authenticode แบบไม่ต่อเน็ต (ลายเซ็นที่ต่อไปจบที่ใบรับรองต้นทางซึ่งเครื่องนี้ไม่ได้เชื่อถือ ขึ้นว่าตรวจแบบออฟไลน์ไม่ได้ ไม่ใช่ลายเซ็นไม่ถูกต้อง), FiveM for GTA V Enhanced, กฎชุดแรกของโฟลเดอร์ plugin ของ FiveM และของผู้เซ็น `FiveM.exe` ([ADR 0035](docs/adr/0035-signature-checking-offline-and-fivem-enhanced.md), [ADR 0036](docs/adr/0036-the-first-fivem-dir-rules-and-fivem-exes-signer.md)) พร้อมการเช็ครายเดือนว่าใบรับรองที่ปักไว้ใกล้หมดอายุหรือยัง, โฟลเดอร์ FiveM ที่อ่านไม่ได้ไม่ทำให้กฎ FiveM ทุกตัวเป็น "ยังไม่ได้วัด" อีกต่อไป ([ADR 0044](docs/adr/0044-a-gap-confined-to-one-place-a-collector-reads.md)), Secure Boot ตามที่เฟิร์มแวร์รายงาน และนโยบายบันทึก script block ของ Windows PowerShell และ PowerShell 7 ทั้งระดับเครื่องและระดับผู้ใช้ ([ADR 0038](docs/adr/0038-firmware-secure-boot-and-script-block-logging-policy.md)), และเวลาที่ Windows เริ่มทำงานครั้งล่าสุดในหัวรายงาน ([ADR 0039](docs/adr/0039-a-time-anchor-for-the-report.md)) |
+| M2 | Prefetch, BAM, PCA, สัญญาณล้าง event log | ออกใน 0.2.0 แล้ว: collector ทั้งสี่ตัว และกฎ event log สองตัว ทั้งคู่ยัง `experimental` · ไม่มีแผนเขียนกฎจากสิ่งที่ Prefetch, BAM หรือ PCA บันทึกไว้ เพราะสามตัวนี้ระบุโปรแกรมได้แค่ด้วยชื่อไฟล์หรือ path กฎจึงยกเว้นซอฟต์แวร์ที่ถูกต้องไม่ได้ และเปลี่ยนชื่อไฟล์ก็หลบได้ ([ADR 0034](docs/adr/0034-prefetch-bam-and-pca-carry-no-identity.md)) · โหมดตรวจเครื่องตัวเองแสดงสิ่งที่สามตัวนี้เห็นเป็นรายการ ส่วนโหมด SS แสดงแค่จำนวน · ออกใน 0.3.0: กฎสามตัวเรื่องสถานะของไฟล์ Prefetch หรือไฟล์ event log คือถูกตั้งเป็นอ่านอย่างเดียว หรือไม่ใช่ไฟล์ที่ channel ของมันเขียนลงไป ([ADR 0037](docs/adr/0037-prefetch-configuration-and-the-read-only-attribute.md), [ADR 0042](docs/adr/0042-what-the-event-log-service-says-a-channel-writes.md)) และ BAM ไม่รายงานค่าที่อ่านไม่ได้สองค่าต่อบัญชีบนทุกเครื่องอีกต่อไป |
+| M3 | รายชื่อ driver มีช่องโหว่, USN journal, Amcache, คู่มือ SS | [คู่มือ SS](docs/screenshare-guide.th.md) ออกใน 0.3.0 แล้ว · Amcache ตัดสินใจว่ายังไม่ทำ: ไม่มี collector และไม่มีกฎ hash จนกว่าจะครบเงื่อนไขใน [ADR 0041](docs/adr/0041-amcache-feasibility.md) · รายชื่อ driver มีช่องโหว่ และ USN journal วางแผนแล้ว |
 
-"merge แล้ว" หมายถึงงานอยู่บน branch `dev` แต่ยังไม่ได้ออกเป็นรุ่น ตอนนี้มีรุ่นเดียวคือ 0.1.0 และระบบ release
-ออกมาพร้อมรุ่นนั้น ([ADR 0008](docs/adr/0008-release-pipeline.md)) จึงอยู่ในแถว M0
+ตอนนี้ออกมาแล้วสามรุ่นคือ 0.1.0, 0.2.0 และ 0.3.0
+ระบบ release ออกมาพร้อม 0.1.0 ([ADR 0008](docs/adr/0008-release-pipeline.md)) จึงอยู่ในแถว M0
+
+จะตรวจเครื่องคนอื่นผ่านการแชร์หน้าจอ? อ่าน[คู่มือ SS](docs/screenshare-guide.th.md) ก่อน
+แต่ละ rule มองหาอะไร และมีเรื่องปกติอะไรที่ทำให้เกิดผลแบบเดียวกัน: [คู่มืออ้างอิง rule](docs/rules-reference.th.md)
 
 ## ร่วมพัฒนา
 

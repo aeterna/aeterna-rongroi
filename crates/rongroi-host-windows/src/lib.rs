@@ -14,9 +14,17 @@ pub use live::LiveHost;
 #[cfg(windows)]
 pub mod filesystem;
 
+pub mod boot_time;
+
 pub mod elevate;
 
+pub mod event_log;
+
+pub mod firmware;
+
 pub mod process;
+
+pub mod signature;
 
 pub mod system_integrity;
 
