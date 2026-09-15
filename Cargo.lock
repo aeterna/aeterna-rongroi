@@ -5323,6 +5323,7 @@ dependencies = [
  "rongroi-core",
  "rongroi-host",
  "serde",
+ "serde-saphyr",
  "serde_json",
  "uuid",
 ]

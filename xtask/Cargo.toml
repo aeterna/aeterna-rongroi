@@ -21,6 +21,7 @@ rongroi-core = { workspace = true, features = ["source-tree"] }
 # `check-baseline` runs the shipped pipeline against fixture hosts, so it needs the fixture host.
 rongroi-host = { workspace = true, features = ["fixture"] }
 serde.workspace = true
+serde-saphyr.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true, features = ["v4"] }
 
