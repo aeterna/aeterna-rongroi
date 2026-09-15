@@ -22,3 +22,6 @@ extend-exclude = [
 hve = "hve"
 # `notatin` is the name of a Rust registry-hive crate evaluated in ADR 0041.
 notatin = "notatin"
+# Windows driver and service names in baseline-elevated-win11's driver services (ADR 0048), read from a GitHub-hosted runner: data, not prose.
+nd = "nd"
+ser = "ser"
