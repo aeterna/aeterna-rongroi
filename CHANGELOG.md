@@ -40,6 +40,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   handle opened without write access, returned only version 3 records, and matched folders by their 128-bit
   identifier; without Administrators the volume could not be opened.
 
+### Fixed
+- A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
+  vendored `evtx` crate: a panic in a test or fuzz build, and in a release build a silently wrapped value.
+  It is now refused like every other value above 999, the record is rejected and the rest of the chunk is
+  read. Found by `fuzz_evtx` in CI; the fourth patch in `third_party/evtx` (PROVENANCE.md).
+
 ## [0.3.0] - 2026-09-14
 
 ### Added

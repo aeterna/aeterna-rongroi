@@ -381,6 +381,45 @@ mod tests {
         bytes
     }
 
+    /// Rewrites the first record's `Provider` `Guid` substitution into a `SYSTEMTIME` whose
+    /// milliseconds are `milliseconds`, leaving every other byte of the file alone.
+    ///
+    /// The first record's template instance carries 18 substitution descriptors, 1236 bytes into the
+    /// record, which is 512 bytes into the chunk. The sixteenth is a 16-byte `GuidType` (`0x0f`), and
+    /// a `SysTimeType` (`0x12`) is also 16 bytes, so changing the type byte and the value's bytes keeps
+    /// every size and offset in the record what it was. The value is 2018-07-09T20:49:14, the time of
+    /// the record itself, so the one field that varies is the milliseconds.
+    fn with_systime_milliseconds(source: &[u8], milliseconds: u16) -> Vec<u8> {
+        /// The sixteenth descriptor's type byte.
+        const DESCRIPTOR_TYPE: usize = FILE_HEADER_LEN + 512 + 1236 + 4 + 15 * 4 + 2;
+        /// The sixteenth substitution's value. Located by the provider GUID the record renders,
+        /// `7237FFF9-A08A-4804-9C79-4A8704B70B87`, whose first field is stored little-endian.
+        const VALUE: usize = FILE_HEADER_LEN + 512 + 1236 + 4 + 18 * 4 + 139;
+
+        let mut bytes = source.to_vec();
+        assert_eq!(
+            (
+                u16::from_le_bytes([bytes[DESCRIPTOR_TYPE - 2], bytes[DESCRIPTOR_TYPE - 1]]),
+                bytes[DESCRIPTOR_TYPE]
+            ),
+            (16, 0x0f),
+            "the fixture drifted: offset {DESCRIPTOR_TYPE} no longer holds the 16-byte GUID substitution \
+             this helper rewrites, so the test below would prove nothing"
+        );
+        assert_eq!(
+            bytes[VALUE..VALUE + 4],
+            [0xf9, 0xff, 0x37, 0x72],
+            "the fixture drifted: offset {VALUE} no longer holds the provider GUID this helper rewrites"
+        );
+
+        bytes[DESCRIPTOR_TYPE] = 0x12;
+        let systime: [u16; 8] = [2018, 7, 1, 9, 20, 49, 14, milliseconds];
+        for (i, field) in systime.iter().enumerate() {
+            bytes[VALUE + 2 * i..VALUE + 2 * i + 2].copy_from_slice(&field.to_le_bytes());
+        }
+        bytes
+    }
+
     /// Closes two of the chunk's string-table entries into a cycle. The table is a set of linked
     /// chains: each entry starts with the `u32` chunk offset of the next entry in its chain, then a
     /// `u16` hash, then the name. `ThreadID` sits 1523 bytes into the chunk and links to `Task` at
@@ -562,6 +601,52 @@ mod tests {
             file.rejected[0].reason,
             ParseError::Malformed { field: "chunk", .. }
         ));
+    }
+
+    /// A `SYSTEMTIME`'s milliseconds are a `u16` read from the file, and upstream multiplied them by
+    /// a million in `u32`, so any value above 4294 overflowed. Where overflow checks are on — a test
+    /// build, a fuzz build — that is a panic. In a release build it wraps silently, and the wrapped
+    /// nanoseconds reach `DateTime::new`. Microsoft documents the field as "0 through 999"
+    /// (`SYSTEMTIME`, minwinbase.h). The vendored crate widens before multiplying
+    /// (`third_party/evtx/PROVENANCE.md`, patch 4), so every value above 999 is refused the same way
+    /// 1000 to 4294 already were: the record is rejected and the rest of the chunk is read.
+    ///
+    /// Found by `fuzz_evtx` on `dev` (run 34869485443), not on the pull request whose content it
+    /// ran against: the fuzzer takes a random seed, so one green run is not evidence about the next.
+    /// This test is deterministic.
+    #[test]
+    fn a_systime_whose_milliseconds_overflow_is_refused_rather_than_wrapped() {
+        for milliseconds in [4295, u16::MAX] {
+            let file = parsed(&with_systime_milliseconds(LANGUAGE_PACK, milliseconds));
+
+            assert_eq!(file.records.len(), 16, "milliseconds {milliseconds}");
+            assert_eq!(file.rejected.len(), 1, "milliseconds {milliseconds}");
+            assert_eq!(file.rejected[0].record_id, Some(1));
+            assert!(matches!(
+                file.rejected[0].reason,
+                ParseError::Malformed {
+                    field: "record",
+                    ..
+                }
+            ));
+        }
+    }
+
+    /// The other side of the test above: the rewritten record is a well-formed one while the
+    /// milliseconds are in the documented range, so the rejection above is about the value and not
+    /// about the rewrite. 1000 is the first value outside it, and was refused before the patch too.
+    #[test]
+    fn a_systime_is_read_up_to_999_milliseconds_and_refused_from_1000() {
+        for milliseconds in [0, 999] {
+            let file = parsed(&with_systime_milliseconds(LANGUAGE_PACK, milliseconds));
+            assert!(file.rejected.is_empty(), "milliseconds {milliseconds}");
+            assert_eq!(file.records.len(), 17, "milliseconds {milliseconds}");
+        }
+
+        let file = parsed(&with_systime_milliseconds(LANGUAGE_PACK, 1000));
+        assert_eq!(file.records.len(), 16);
+        assert_eq!(file.rejected.len(), 1);
+        assert_eq!(file.rejected[0].record_id, Some(1));
     }
 
     /// A chunk's string table is walked chain by chain, and upstream guarded only against an entry
