@@ -210,8 +210,9 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
     };
     let resolved = if text.is_empty() {
         // The default path is built from the service key's own name, so a name that is itself a
-        // separator or a `.`/`..` segment is an unknown form too (F1) — nothing else here checks it.
-        if is_unusable_segment(service) || service.contains(['\\', '/']) {
+        // separator, a `.`/`..` segment, or a data-stream name (R1: `a:b`) is an unknown form too —
+        // nothing else here checks it.
+        if is_unusable_segment(service) || service.contains(['\\', '/', ':']) {
             return None;
         }
         format!(r"{root}\System32\drivers\{service}.sys")
@@ -239,11 +240,29 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
         format!(r"{root}\{text}")
     };
     // F1: every `/` an installer wrote is read as `\`, so the resolved path is always the one shape
-    // `rongroi_core::view::redact_user_paths` reaches; and a `.` or `..` segment, in any form above,
-    // is an unknown form rather than a path that walks out of the folder it appears to name.
+    // `rongroi_core::view::redact_user_paths` reaches.
     let resolved = resolved.replace('/', "\\");
-    if resolved.split('\\').any(is_unusable_segment) {
-        return None;
+    // R1: a `.` or `..` segment (F1), a repeated or trailing separator (an empty segment), a segment
+    // ending in `.` or a space, or one that names an alternate data stream with a `:` past the drive,
+    // are all unknown forms rather than paths that resolve to the file they appear to name. The
+    // segment right after the drive is also refused when it is the legacy profile folder
+    // `Documents and Settings` (a junction to `Users` on current Windows), which
+    // `rongroi_core::view::redact_user_paths` does not recognise. Together these keep every reported
+    // path under a user profile in the one `X:\Users\<name>` shape that function reaches — no such
+    // form was measured on either machine.
+    let mut segments = resolved.split('\\');
+    segments.next(); // the drive segment, e.g. `C:` — not checked here
+    for (index, segment) in segments.enumerate() {
+        if is_unusable_segment(segment)
+            || segment.is_empty()
+            || segment.ends_with(['.', ' '])
+            || segment.contains(':')
+        {
+            return None;
+        }
+        if index == 0 && segment.eq_ignore_ascii_case("Documents and Settings") {
+            return None;
+        }
     }
     Some(resolved)
 }
@@ -429,6 +448,21 @@ mod tests {
                 text(r"System32/drivers/a.sys"),
                 Some(r"C:\Windows\System32\drivers\a.sys"),
             ),
+            // R1: a repeated or trailing separator is an empty path segment once every `/` is read
+            // as `\` — an unknown form, not the folder or file the non-empty segments name.
+            (text(r"C:\\Users\bob\x.sys"), None),
+            (text(r"\??\C:\\Users\bob\x.sys"), None),
+            (text(r"C://Users/bob/x.sys"), None),
+            (text(r"C:\Users\\bob\x.sys"), None),
+            // R1: a segment ending in `.` or a space, or naming an alternate data stream with `:`
+            // past the drive, is an unknown form — Windows treats each as a different file or folder
+            // than the plain name it looks like.
+            (text(r"C:\Users.\bob\x.sys"), None),
+            (text(r"C:\Users \bob\x.sys"), None),
+            (text(r"C:\Users::$INDEX_ALLOCATION\bob\x.sys"), None),
+            // R1: `Documents and Settings` is a junction to `Users` on current Windows, and
+            // `redact_user_paths` does not know that shape.
+            (text(r"C:\Documents and Settings\bob\x.sys"), None),
         ] {
             assert_eq!(
                 resolve(&image_path, "svc", root).as_deref(),
@@ -444,7 +478,9 @@ mod tests {
     #[test]
     fn an_absent_image_path_with_an_unusable_service_name_is_an_unknown_form() {
         let root = r"C:\Windows\";
-        for service in ["a/..", r"a\b", ".", "..", "/", r"\"] {
+        // R1: a colon in the service name reaches an alternate data stream (`a:b`), the same shape
+        // refused inside `ImagePath` itself.
+        for service in ["a/..", r"a\b", ".", "..", "/", r"\", "a:b"] {
             assert_eq!(
                 resolve(&ImagePath::Absent, service, root),
                 None,
@@ -484,6 +520,26 @@ mod tests {
         let redacted = rongroi_core::view::redact_user_paths(path);
         assert_eq!(redacted, r"%USERPROFILE%\AppData\vendor.sys");
         assert!(!redacted.contains("bob"), "{redacted}");
+
+        // R1: `redact_user_paths` folds ASCII case, and `resolve` must not have introduced a
+        // separator or segment shape it does not reach — an upper-case `USERS`, and a lower-case
+        // drive letter arriving through `\??\`.
+        let root = r"C:\Windows";
+        for (image_path, expected_redacted) in [
+            (
+                ImagePath::Text(r"C:\USERS\bob\x.sys".to_owned()),
+                r"%USERPROFILE%\x.sys",
+            ),
+            (
+                ImagePath::Text(r"\??\c:\users\bob\x.sys".to_owned()),
+                r"%USERPROFILE%\x.sys",
+            ),
+        ] {
+            let resolved = resolve(&image_path, "svc", root).unwrap();
+            let redacted = rongroi_core::view::redact_user_paths(&resolved);
+            assert_eq!(redacted, expected_redacted, "{image_path:?}");
+            assert!(!redacted.contains("bob"), "{redacted}");
+        }
     }
 
     #[test]
