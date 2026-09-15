@@ -164,7 +164,7 @@ SS mode replaces the folder that holds your profile and the name after it, where
   setting (`ProfilesDirectory`) so that SS mode can use it. A Self-mode report carries it; an SS-mode
   report does not, and neither does the part of the app that is shown before you choose a mode.
 
-It reads a path the way Windows does — `\` and `/` alike, `.` and `..` applied — and it still finds the name
+It reads `\` and `/` alike and applies `.` and `..` in a path, and it still finds the name
 when a second path follows the first with nothing between them.
 
 What it does **not** cover, so a path in one of these is shown as it is, with your account name in it if

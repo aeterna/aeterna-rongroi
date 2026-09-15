@@ -39,8 +39,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ### Changed
 - SS-mode redaction knows more profile folders (ADR 0049). Besides `X:\Users\<name>`, it replaces
   `Documents and Settings\<name>` and its 8.3 short name, the same folders reached through a drive's
-  administrative share, and the machine's own `ProfilesDirectory` when it has been moved. It reads a path's
-  folders the way Windows does (`\` and `/` in any mix and run, `.` and `..` applied) and finds a second path
+  administrative share, and the machine's own `ProfilesDirectory` when it has been moved. It reads `\` and
+  `/` in any mix and run, applies `.` and `..`, and finds a second path
   written straight after a name. The scan reads `ProfilesDirectory` into the report header
   (`profiles_directory`, additive, schema stays at 1); an SS view and the header the app reads outside a view
   drop it. `redact_user_paths` is now `redact_profile_paths`. What is still not reached — a profile moved for

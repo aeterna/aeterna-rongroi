@@ -64,8 +64,9 @@ before it back to the drive letter. It takes the place of `redact_user_paths`.
   redactor that knew only the plain spelling would depend on every collector refusing the others. The
   collectors that refuse such spellings keep refusing them (ADR 0048).
 - **Where a path ends**: at the end of the string, at a byte no Windows file name holds (`"`, `<`, `>`, `|`,
-  `*`, `?`, a control byte), or at an ASCII letter followed by `:` and a separator, which starts the next
-  path. So a second path written straight after a name is read as its own path.
+  `*`, `?`, a control byte), at an ASCII letter followed by `:` and a separator, or after a folder that is
+  one ASCII letter and `$` — each of which starts the next path. So a second path written straight after a
+  name is read as its own path, and reading a string costs work in proportion to its length.
 - **A name** is a folder whose folders before it are exactly one profile root:
   - on any drive, `Users`, `Documents and Settings`, or `DOCUME~` followed by one or more digits;
   - the machine's own root, when the report carries one (section 2), on its own drive letter only. It is

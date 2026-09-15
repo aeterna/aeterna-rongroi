@@ -386,15 +386,27 @@ fn names_end(bytes: &[u8], i: usize, machine_root: Option<&MachineRoot>) -> Opti
 
 /// The byte ranges of a path's segments, from the separator at `at` to where the path ends.
 ///
-/// The path ends at the end of `bytes`, at a byte no Windows file name holds, or at an ASCII letter
-/// followed by `:` and a separator, which starts the next drive-rooted path. Any other `:` stays in its
-/// segment: past the drive it can only name a stream.
+/// The path ends at the end of `bytes`, at a byte no Windows file name holds, at an ASCII letter
+/// followed by `:` and a separator, which starts the next drive-rooted path, or after a segment that is
+/// one ASCII letter and `$`, which starts the next share path. Any other `:` stays in its segment: past
+/// the drive it can only name a stream. Ending at every place another path starts keeps the work
+/// linear in the length of `bytes`: each path is read only up to the next one.
 fn segments(bytes: &[u8], at: usize) -> Vec<(usize, usize)> {
     let mut segments = Vec::new();
     let mut start = at;
     let mut j = at;
     while j < bytes.len() {
         let byte = bytes[j];
+        let share = j == start
+            && byte.is_ascii_alphabetic()
+            && bytes.get(j + 1) == Some(&b'$')
+            && bytes.get(j + 2).is_some_and(|&after| is_separator(after));
+        if share {
+            // Kept as this path's last folder, so that a profile folder named like a share marker
+            // is still a name here.
+            segments.push((j, j + 2));
+            return segments;
+        }
         let next_path = byte.is_ascii_alphabetic()
             && bytes.get(j + 1) == Some(&b':')
             && bytes.get(j + 2).is_some_and(|&after| is_separator(after));
@@ -569,7 +581,7 @@ mod tests {
         }
     }
 
-    /// The machine's root is tried before a fixed root it could share a first folder with, so the
+    /// Every root is checked at every folder, so the name after the longer root is replaced as well as
     /// name after the longer root is the one replaced.
     #[test]
     fn a_machine_root_under_users_replaces_the_name_after_it() {
@@ -791,6 +803,22 @@ mod tests {
         let header = shown_header(&report);
         assert_eq!(header.profiles_directory, None);
         assert_eq!(header.generated_at, report.header.generated_at);
+    }
+
+    /// Every place another path starts ends the one before it, so a string of many share markers
+    /// costs work in proportion to its length; a profile folder named like a share marker is still a
+    /// name.
+    #[test]
+    fn a_string_of_many_share_markers_is_read_once() {
+        assert_eq!(redact(r"C:\Users\c$\x"), r"%USERPROFILE%\x");
+        assert_eq!(
+            redact(r"C:\Temp\\host\d$\Users\bob\x"),
+            r"C:\Temp\\host\%USERPROFILE%\x"
+        );
+        let markers = r"\c$".repeat(200_000);
+        let started = std::time::Instant::now();
+        assert_eq!(redact(&markers), markers);
+        assert!(started.elapsed() < std::time::Duration::from_secs(10));
     }
 
     fn header() -> ReportHeader {
