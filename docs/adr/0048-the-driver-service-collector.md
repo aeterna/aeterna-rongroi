@@ -97,8 +97,9 @@ The engine reads a gap on `sha256` as "not every driver was hashed": a rule that
 
 | Event | Observation | Gap on `sha256` |
 |---|---|---|
-| The `Services` key cannot be read | none | the whole run is `Unmeasured`: `access_denied` or `read_failed` |
-| `Type` unreadable in one key | none for that key | `read_failed` |
+| The `Services` key is refused, absent or cannot be read, or `%SystemRoot%` is unset | none | the whole run is `Unmeasured`: `access_denied` if refused, otherwise `read_failed` |
+| `Type`, `ImagePath` or `Start` refused in one key | none for that key | `access_denied` |
+| `Type`, `ImagePath` or `Start` unreadable in one key for another reason | none for that key | `read_failed` |
 | Unknown `ImagePath` form | without `path`, `sha256` | `read_failed` |
 | Resolved file does not exist | without `sha256` | none |
 | File refused | without `sha256` | `access_denied` |
@@ -106,7 +107,10 @@ The engine reads a gap on `sha256` as "not every driver was hashed": a rule that
 | Budget spent before this file | without `sha256` | `budget_spent` |
 
 A missing file is not a gap. A driver service whose file is gone is a key an uninstaller left behind, and
-there is no file there to be vulnerable. The cost: a resolver mistake that points at a path with no file
+there is no file there to be vulnerable. `FilesystemSource::file_sha256` answers a missing file and an
+unreadable one with the same error, so after a failure the collector lists the file's folder with
+`FilesystemSource::list_dir`: a file the folder does not hold is missing, and any other answer keeps the
+failure. No host method is added. The cost: a resolver mistake that points at a path with no file
 reads as that ordinary case. The PC and the runner had none.
 
 When several gaps occur, the one reported is the first in this order: `budget_spent`, `access_denied`,
@@ -125,7 +129,8 @@ driver service is still emitted without `sha256`, so the reader sees every one t
 
 ### The data file
 
-`rules/driver_service/vulnerable-driver/loldrivers-vulnerable-drivers.csv`, beside the rule:
+`rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv`, beside the rule
+(a rule lives at `<collector>/<category>/<slug>/rule.yaml`):
 
 ```
 sha256,loldrivers_id,file_name
@@ -142,8 +147,8 @@ sha256,loldrivers_id,file_name
   `fixtures/evtx/*.evtx`. The rule text beside it stays CC-BY-SA-4.0.
 - A `PROVENANCE.md` beside it names the upstream repository, the commit, the date taken, the filter above,
   the licence, and the script that reproduces the file from a sparse checkout of `yaml/` at that commit.
-  The script is kept in the repository so the next update runs the same filter; it reads only `yaml/`
-  and never fetches anything itself.
+  The script is `cargo xtask loldrivers`, so the next update runs the same filter; it reads only `yaml/`
+  of a checkout someone already made, and never fetches anything itself.
 - It is updated by a pull request that changes the commit, the file and `PROVENANCE.md` together. The
   program never fetches it (ADR 0003).
 
@@ -163,10 +168,11 @@ match_lists:
 - `Bundle::from_bundle_json` expands it before validation: the file's first column becomes a list under
   `match.sha256`, and every other rule rule applies to the result as if it had been written there
   (ADR 0029: a list means any of them). The engine and `Evidence` are unchanged.
-- A field may be in `match` or `match_lists`, not both. The file must exist beside the rule, have exactly
-  the header above, at least one row, and a lowercase 64-hex-digit value in every first column with no
-  duplicate. `rules::validate` refuses anything else, so `cargo xtask check-rules` and the embedded
-  bundle refuse the same files.
+- A field may be in `match` or `match_lists`, not both. The file must exist beside the rule, start with a
+  header line whose first column is the field's name, and have at least one row after it, with no empty
+  and no duplicate first column; for `sha256`, every first column is a lowercase 64-hex-digit value. Only
+  the first column is read, as the text before the first comma. `rules::validate` refuses anything else,
+  so `cargo xtask check-rules` and the embedded bundle refuse the same files.
 - `cargo xtask rules-reference` renders the condition as the file's name and its row count, never the
   hashes.
 - `Rule` is `deny_unknown_fields`, so a rule using `match_lists` does not parse in a build that predates
@@ -185,7 +191,7 @@ for a line the reader can find with one search.
 
 ### The rule
 
-`rules/driver_service/vulnerable-driver/rule.yaml`:
+`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`:
 
 - `strength: posture`, `status: test`, `match_lists: { sha256: … }`, nothing in `match`.
 - `retention`: the driver services registered when the scan ran. A driver that was registered, loaded and
@@ -193,8 +199,9 @@ for a line the reader can find with one search.
 - `falsepositives`: hardware utilities ship such drivers: overclocking, fan and RGB control, hardware
   monitoring. LOLDrivers' own RTCore64.sys entry is the MSI Afterburner driver (ADR 0046, Question 3). A
   `found` row says a driver with a known weakness is registered, not that anything used it.
-- `unmeasured_when`: nothing. Every reason this collector reports is either always listed (`read_failed`,
-  `budget_spent`) or one an ordinary PC does not produce (`access_denied`, measured on both machines).
+- `unmeasured_when: [not_windows]`, as the other `posture` rules declare it. Every other reason this
+  collector reports is either always listed (`read_failed`, `budget_spent`) or one an ordinary PC does not
+  produce (`access_denied`, measured on both machines).
 - A positive fixture: a host with one driver service whose fixture `sha256` is a hash in the data file. The
   fixture carries the hash as text; no driver binary is committed (`rules/AGENTS.md`). A negative fixture:
   the same service with a hash that is not in the file.
