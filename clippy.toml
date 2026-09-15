@@ -18,11 +18,14 @@ disallowed-types = [
 # so the write calls are banned outright (AGENTS.md hard rule 2).
 # ADR 0047: `DeviceIoControl` sends `FSCTL_DELETE_USN_JOURNAL` as readily as `FSCTL_READ_USN_JOURNAL`, and a
 # wrong constant is invisible in review. It is called in one function, `usn_journal::live::control`, which
-# accepts only the two read codes and carries the one `#[allow]`.
+# accepts only the two read codes and carries the one `#[allow]`. `CreateFileW` opens for writing and creates files
+# as readily as it opens for reading; it is called in one function, `usn_journal::live::open`, which accepts only
+# `GENERIC_READ` or `FILE_READ_ATTRIBUTES` on an existing path and carries the one `#[allow]`.
 disallowed-methods = [
   { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableA", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
   { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableW", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
   { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableExA", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
   { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableExW", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
   { path = "windows::Win32::System::IO::DeviceIoControl", reason = "collectors are read-only; ADR 0047 allows only the two change-journal read codes, through usn_journal::live::control" },
+  { path = "windows::Win32::Storage::FileSystem::CreateFileW", reason = "collectors are read-only; ADR 0047 opens a volume or folder only with GENERIC_READ or FILE_READ_ATTRIBUTES, through usn_journal::live::open" },
 ]

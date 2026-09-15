@@ -35,6 +35,42 @@ env:
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
   SystemRoot: 'C:\Windows'
   WinDir: 'C:\Windows'
+# The change journal (ADR 0047): counts and first and last times taken from the `usn` collector's own
+# reading of a GitHub-hosted Windows Server 2025 runner (windows.yml run 34930942657), rebuilt as record
+# groups that give the same observations. A runner image, not a gaming PC: it asserts the collector's
+# shape on a machine that is not anyone's, and says nothing about how many records an ordinary PC holds.
+# Its FiveM plugin folder holds no record, because the runner has no FiveM.
+usn_journal:
+  maximum_size: 33554432
+  trimmed: true
+  folders:
+    'C:\Windows\Prefetch': 1
+    'C:\Windows\System32\winevt\Logs': 2
+    'C:\Windows\appcompat\pca': 3
+    'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': 4
+  records:
+    # winevt_logs: 733 records, 13 created, 729 data_changed, fewest groups that give those counts —
+    # a record counts under both `created` and `data_changed` when it carries both reasons.
+    - parent: 'C:\Windows\System32\winevt\Logs'
+      reasons: [file_create, data_extend]
+      count: 9
+      first: '2026-09-08T01:12:16.383425Z'
+      last: '2026-09-08T01:12:16.383425Z'
+    - parent: 'C:\Windows\System32\winevt\Logs'
+      reasons: [file_create]
+      count: 4
+      first: '2026-09-09T00:00:00Z'
+      last: '2026-09-09T00:00:03Z'
+    - parent: 'C:\Windows\System32\winevt\Logs'
+      reasons: [data_extend]
+      count: 720
+      first: '2026-09-08T01:15:00Z'
+      last: '2026-09-15T05:05:28.2865607Z'
+    # The rest of the journal's 381 333 records, held by nobody this collector watches.
+    - reasons: [close]
+      count: 380600
+      first: '2026-09-08T01:12:08.3678392Z'
+      last: '2026-09-15T05:07:08.7795416Z'
 registry:
   'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
     UEFISecureBootEnabled: 1

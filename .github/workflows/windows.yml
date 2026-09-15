@@ -496,6 +496,13 @@ jobs:
             $reason = if ($_.reason) { $_.reason } else { '-' }
             Write-Output "evidence: $($_.rule_id) $($_.collector) $($_.state) $reason"
           }
+          # ADR 0047. The collector's own reading of this runner: the counts and times a baseline takes,
+          # and nothing the journal names. The runner is elevated, so the journal must be read.
+          $usn = @($report.unmatched | Where-Object { $_.collector -eq 'usn' } | ForEach-Object { $_.observations })
+          if ($usn.Count -eq 0) { throw 'the usn collector produced no observation on an elevated runner' }
+          $journal = $usn | Where-Object { $_.fields.location -eq 'journal' }
+          if (-not $journal -or $journal.fields.records -le 0) { throw 'the usn collector read no record from the system volume journal' }
+          $usn | ForEach-Object { Write-Output "usn: $($_.fields | ConvertTo-Json -Compress)" }
           # ADR 0038: the firmware reading compared with PowerShell's own reading of the same UEFI
           # variable on this machine. A runner is not an ordinary Windows PC, so this says the two
           # readers agree, not what an ordinary PC reports.

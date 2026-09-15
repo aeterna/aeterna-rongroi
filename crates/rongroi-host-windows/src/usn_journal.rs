@@ -10,7 +10,8 @@
 //! cannot write is the collector's promise kept by the operating system as well as by this code.
 //! `DeviceIoControl` carries the codes that create and delete a journal as well as the two that read
 //! one, so `clippy.toml` bans it everywhere and this module calls it in one function that accepts only
-//! the two read codes.
+//! the two read codes. `CreateFileW` is banned the same way and called in one function that accepts
+//! only `GENERIC_READ` or `FILE_READ_ATTRIBUTES`.
 
 use rongroi_host::UsnJournalState;
 
@@ -185,10 +186,31 @@ mod live {
         Ok(usize::try_from(returned).unwrap_or(0))
     }
 
-    #[allow(unsafe_code)]
+    /// The only access this program asks `CreateFileW` for. Neither can write (ADR 0047).
+    #[derive(Debug, Clone, Copy)]
+    enum ReadOnlyAccess {
+        /// `GENERIC_READ`, for the volume handle the two control codes are sent to.
+        VolumeRead,
+        /// `FILE_READ_ATTRIBUTES`, for a folder whose identifiers are read.
+        AttributesOnly,
+    }
+
+    impl ReadOnlyAccess {
+        fn mask(self) -> u32 {
+            match self {
+                Self::VolumeRead => GENERIC_READ.0,
+                Self::AttributesOnly => FILE_READ_ATTRIBUTES.0,
+            }
+        }
+    }
+
+    /// Every `CreateFileW` call in this program. `clippy.toml` bans the function everywhere else,
+    /// because the same function opens for writing and creates files; this one opens an existing path
+    /// with one of the two masks [`ReadOnlyAccess`] names (ADR 0047).
+    #[allow(unsafe_code, clippy::disallowed_methods)]
     fn open(
         path: &str,
-        access: u32,
+        access: ReadOnlyAccess,
         share: FILE_SHARE_MODE,
         flags: FILE_FLAGS_AND_ATTRIBUTES,
     ) -> windows::core::Result<OwnedHandle> {
@@ -199,7 +221,7 @@ mod live {
         let handle = unsafe {
             CreateFileW(
                 PCWSTR(wide.as_ptr()),
-                access,
+                access.mask(),
                 share,
                 None,
                 OPEN_EXISTING,
@@ -234,7 +256,7 @@ mod live {
             }
             let handle = open(
                 &format!(r"\\.\{volume}:"),
-                GENERIC_READ.0,
+                ReadOnlyAccess::VolumeRead,
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
                 FILE_FLAGS_AND_ATTRIBUTES(0),
             )
@@ -325,7 +347,7 @@ mod live {
         fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError> {
             let handle = match open(
                 path,
-                FILE_READ_ATTRIBUTES.0,
+                ReadOnlyAccess::AttributesOnly,
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                 FILE_FLAG_BACKUP_SEMANTICS,
             ) {
@@ -353,6 +375,7 @@ mod live {
             Ok(Some(FileId {
                 id_128: id.FileId.Identifier,
                 index_64: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+                volume_serial: id.VolumeSerialNumber,
             }))
         }
     }
@@ -379,24 +402,36 @@ mod tests {
 
     #[test]
     fn a_query_result_is_read_at_the_documented_offsets() {
+        // Every field a distinct non-zero value, so a read one offset off answers with a neighbour's.
+        const JOURNAL_ID: u64 = 0xDEAD;
+        const FIRST_USN: i64 = 4096;
+        const NEXT_USN: i64 = 9000;
+        const LOWEST_VALID_USN: i64 = 1024;
+        const MAX_USN: i64 = 0x7FFF_FFFF_FFFF_0000;
+        const MAXIMUM_SIZE: u64 = 33_554_432;
+        const ALLOCATION_DELTA: u64 = 8_388_608;
         let mut bytes = [0u8; 80];
-        bytes[0..8].copy_from_slice(&0xDEAD_u64.to_le_bytes());
-        bytes[8..16].copy_from_slice(&4096i64.to_le_bytes());
-        bytes[16..24].copy_from_slice(&9000i64.to_le_bytes());
-        bytes[24..32].copy_from_slice(&0i64.to_le_bytes());
-        bytes[40..48].copy_from_slice(&33_554_432u64.to_le_bytes());
-        assert_eq!(
-            journal_state(&bytes),
-            Some((
-                0xDEAD,
-                UsnJournalState {
-                    first_usn: 4096,
-                    next_usn: 9000,
-                    lowest_valid_usn: 0,
-                    maximum_size: 33_554_432
-                }
-            ))
+        bytes[0..8].copy_from_slice(&JOURNAL_ID.to_le_bytes());
+        bytes[8..16].copy_from_slice(&FIRST_USN.to_le_bytes());
+        bytes[16..24].copy_from_slice(&NEXT_USN.to_le_bytes());
+        bytes[24..32].copy_from_slice(&LOWEST_VALID_USN.to_le_bytes());
+        bytes[32..40].copy_from_slice(&MAX_USN.to_le_bytes());
+        bytes[40..48].copy_from_slice(&MAXIMUM_SIZE.to_le_bytes());
+        bytes[48..56].copy_from_slice(&ALLOCATION_DELTA.to_le_bytes());
+
+        let (journal_id, state) = journal_state(&bytes).unwrap();
+        assert_eq!(journal_id, JOURNAL_ID);
+        assert_eq!(state.first_usn, FIRST_USN);
+        assert_eq!(state.next_usn, NEXT_USN);
+        assert_eq!(state.lowest_valid_usn, LOWEST_VALID_USN);
+        assert_eq!(state.maximum_size, MAXIMUM_SIZE);
+        // `MaxUsn` at 32 is not kept: no field may answer with it.
+        assert!(
+            [state.first_usn, state.next_usn, state.lowest_valid_usn]
+                .iter()
+                .all(|usn| *usn != MAX_USN)
         );
+        assert_ne!(state.maximum_size, MAX_USN.cast_unsigned());
         assert_eq!(journal_state(&bytes[..55]), None);
     }
 
@@ -426,6 +461,10 @@ mod tests {
             .file_id(&format!(r"{system_root}\System32\winevt\Logs"))
             .unwrap()
             .unwrap();
+        // The drive root answers with the same volume the Logs folder is on: both are read from the
+        // system volume, so a caller comparing `FileId`s never mistakes one volume for another.
+        let root = host.file_id(&format!(r"{volume}:\")).unwrap().unwrap();
+        assert_eq!(root.volume_serial, logs.volume_serial);
 
         let mut buffers = 0usize;
         let mut matched = 0usize;

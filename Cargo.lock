@@ -3094,6 +3094,7 @@ name = "rongroi-collectors"
 version = "0.3.0"
 dependencies = [
  "insta",
+ "jiff",
  "rongroi-core",
  "rongroi-host",
  "rongroi-parsers",

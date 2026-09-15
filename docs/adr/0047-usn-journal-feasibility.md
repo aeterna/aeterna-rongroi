@@ -1,6 +1,6 @@
 # ADR 0047 — The USN change journal: what can be read, and what it may say
 
-- Status: accepted — the recommendation below; no code until measurement 1 under "Before any code" passes
+- Status: accepted — the recommendation below; measurement 1 under "Before any code" passed, and the `usn` collector is implemented (see Consequences)
 - Date: 2026-09-14
 - Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner"): measurement 1 passed
 
@@ -402,11 +402,20 @@ Prefetch folder itself could not be opened (5); the Event Log and PCA folders co
 - How long an ordinary journal retains on a PC, and how many records a scan of one reads.
 - Records in a Prefetch folder on a machine where Prefetch is on.
 - The contract of `FSCTL_READ_UNPRIVILEGED_USN_JOURNAL`.
+- Which reason a watched folder on another volume (a junction to a game drive) should carry. The first rule
+  that reads a per-folder count must settle it. Today it is `read_failed`, which SS mode always lists and no
+  rule can declare; `not_attempted` was rejected because it says the scan stopped early. It probably needs a
+  new reason, which would amend ADR 0030.
+- Attribution relies on the NTFS `VolumeSerialNumber`. Whether a cloned volume attached to the same PC keeps
+  the serial is not verified.
 
 ## Consequences
 
-- No code, no rule, no fixture, no dependency. `Cargo.lock`, `deny.toml`, `clippy.toml` and the report are
-  unchanged.
+- Implemented as the `usn` collector (`crates/rongroi-collectors/src/usn.rs`), with `rongroi_parsers::usn`,
+  `UsnJournalSource` and a `fuzz_usn` target. No rule. The implementation plan's rulings — per-folder times
+  rather than per-reason, version 2 matched by the 64-bit index, a 30-second budget, absent folders as
+  `source_absent` gaps and folders on another volume (checked by volume serial) as `read_failed` gaps, and
+  the program's own Prefetch record counted — are in `docs/architecture.md`'s `usn` row.
 - Accepted by the owner on 2026-09-14, with the five points of the recommendation as written.
-- README's M3 row, in both languages, links here: the USN journal is designed, and waits on the
-  measurements under "Before any code".
+- README's M3 row, in both languages, links here: the collector reads the change journal without write
+  access and counts records per watched folder with no file names, and no rule reads it yet.

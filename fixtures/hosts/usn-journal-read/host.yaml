@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# An elevated Windows 11 scan whose system volume journal holds records under three watched folders and
+# one nobody watches. FiveM is installed for Legacy only; Enhanced's folder is not there.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  WinDir: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+usn_journal:
+  maximum_size: 33554432
+  trimmed: true
+  folders:
+    'C:\Windows\Prefetch': 1
+    'C:\Windows\System32\winevt\Logs': 2
+    'C:\Windows\appcompat\pca': 3
+    'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': 4
+  records:
+    - parent: 'C:\Windows\Prefetch'
+      reasons: [file_create, data_extend, close]
+      count: 2
+      first: '2026-09-10T08:00:00Z'
+      last: '2026-09-12T08:00:00Z'
+    - parent: 'C:\Windows\Prefetch'
+      reasons: [file_delete, close]
+      first: '2026-09-13T09:30:00Z'
+    - parent: 'C:\Windows\System32\winevt\Logs'
+      reasons: [data_extend]
+      count: 700
+      first: '2026-09-08T01:11:56Z'
+      last: '2026-09-14T16:22:50Z'
+    - parent: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins'
+      reasons: [rename_old_name]
+      first: '2026-09-14T10:00:00Z'
+    - parent: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins'
+      reasons: [rename_new_name, close]
+      first: '2026-09-14T10:00:01Z'
+    - reasons: [data_overwrite, close]
+      count: 5
+      first: '2026-09-11T12:00:00Z'

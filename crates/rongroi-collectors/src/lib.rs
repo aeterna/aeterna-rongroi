@@ -15,6 +15,7 @@ pub mod posture;
 pub mod prefetch;
 pub mod process;
 pub mod scan;
+pub mod usn;
 
 use rongroi_core::model::{CollectorRun, UnmeasuredReason};
 use rongroi_host::Host;
@@ -153,6 +154,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(posture::Posture),
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
+        Box::new(usn::Usn::default()),
     ]
 }
 

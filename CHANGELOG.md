@@ -22,6 +22,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   repository. A new About & code screen shows the repository and this build's commit as copyable text and
   QR codes drawn in Rust, how to check a downloaded file, and why no button opens a web page. No plugin,
   no JavaScript dependency and no network code were added.
+- The `usn` collector: the Windows drive's NTFS change journal, read on a volume handle that cannot write
+  and through the two read control codes only, counted per folder other collectors read — records, and
+  how many created, deleted, renamed or changed a file, with the first and last time. No file name,
+  journal identifier or file number reaches the report. No rule reads it yet. `DeviceIoControl` and
+  `CreateFileW` are each banned in `clippy.toml` outside one read-only wrapper, and `fuzz_usn` joins the
+  fuzz smoke run (ADR 0047).
 
 ### Changed
 - The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the
@@ -31,9 +37,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   No collector code until its rights, `ImagePath` forms and cost are measured. Loaded modules, the
   Authenticode hash and Microsoft's blocklist switch are not read.
 - The USN change journal is designed (ADR 0047, accepted): counts of records per folder other collectors
-  already read, with file names dropped in the parser and no journal identifier in the report. No code
-  until it is measured whether the journal can be read on a volume handle opened without write access;
-  if it cannot, the M3 item closes as decided against.
+  already read, with file names dropped in the parser and no journal identifier in the report. The
+  measurement on a GitHub-hosted runner found the journal readable on a handle without write access, and
+  the collector is under Added.
 - ADR 0046 and ADR 0047 carry measurements from a GitHub-hosted Windows Server 2025 runner under an
   elevated token, a restricted token and a standard account. Driver services and their files were readable
   without Administrators there, and hashing them took 15.5 seconds cold. The USN journal read on a volume

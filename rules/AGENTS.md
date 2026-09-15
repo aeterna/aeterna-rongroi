@@ -13,8 +13,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   measurement (ADR 0027). Every entry must be a reason that collector can report — `check-rules`
   rejects the rest and names what the collector does report. Since ADR 0030 every one of the twelve
   reasons has a producer, so the check is entirely about *which* collector: `not_on_this_os` is `pca`
-  alone, `service_disabled` is `prefetch` alone, `budget_spent` and `not_attempted` are `evtx` alone.
-  Declaring a reason you have not thought about hides a result a reviewer should have seen.
+  alone, `service_disabled` is `prefetch` alone, `not_attempted` is `evtx` alone, and `budget_spent` is
+  `evtx` and `usn` (ADR 0047). Declaring a reason you have not thought about hides a result a reviewer
+  should have seen.
 - **`partial`, `budget_spent` and `read_failed` cannot be declared away**, and since ADR 0032 naming
   any of them is a `check-rules` failure rather than a line that changes nothing. All three say the
   artifact was reachable and the read of it did not finish — a fact about the scan, not one about a

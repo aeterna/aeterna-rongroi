@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# A Windows 11 scan without administrator rights, whose system volume handle is refused: the shape
+# that makes the restart-as-administrator offer worth taking.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+  WinDir: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+usn_journal:
+  state: access_denied

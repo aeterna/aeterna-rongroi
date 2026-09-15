@@ -4,7 +4,7 @@
 
 //! A fake machine described in `fixtures/hosts/<name>/host.yaml`. See `fixtures/hosts/PROVENANCE.md`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use serde::Deserialize;
@@ -500,6 +500,11 @@ struct FixtureUsnJournal {
     /// Folder path → a small number the host turns into both identifiers.
     #[serde(default)]
     folders: BTreeMap<String, u64>,
+    /// Paths under `folders:` whose identifier carries a different volume serial than the journal's —
+    /// the shape a folder reached through a junction to another volume has, so attributing a record to
+    /// it by identifier alone would be wrong (ADR 0047 amendment: junctions).
+    #[serde(default)]
+    other_volume_folders: Vec<String>,
     #[serde(default)]
     records: Vec<FixtureUsnRecords>,
 }
@@ -608,13 +613,21 @@ const USN_RECORDS_PER_BUFFER: usize = 500;
 const UNWATCHED_PARENT: u64 = u64::MAX;
 /// FILETIME of 1970-01-01T00:00:00Z.
 const UNIX_EPOCH_AS_FILETIME: i128 = 116_444_736_000_000_000;
+/// NTFS's root directory record number, for the `FileId` a fixture answers a drive root with.
+const NTFS_ROOT_DIRECTORY_RECORD: u64 = 5;
+/// `volume_serial` of the journal's own volume — every folder under `folders:` gets this, unless it is
+/// also listed in `other_volume_folders`.
+const JOURNAL_VOLUME_SERIAL: u64 = 0xAAAA_AAAA;
+/// `volume_serial` of a folder reached through a junction to a different volume than the journal's.
+const OTHER_VOLUME_SERIAL: u64 = 0xBBBB_BBBB;
 
-fn file_id_for(number: u64) -> FileId {
+fn file_id_for(number: u64, volume_serial: u64) -> FileId {
     let mut id_128 = [0u8; 16];
     id_128[..8].copy_from_slice(&number.to_le_bytes());
     FileId {
         id_128,
         index_64: number,
+        volume_serial,
     }
 }
 
@@ -659,19 +672,57 @@ fn encode_record(major: u16, parent: FileId, written: u64, reason: u32) -> Vec<u
     }
 }
 
+/// Turns `folders:` and `other_volume_folders:` into identifiers, rejecting an
+/// `other_volume_folders` entry that names no `folders:` entry: a fixture that claims a junction over
+/// a folder nobody said existed (ADR 0047 amendment: junctions).
+fn resolve_usn_folders(
+    described: &FixtureUsnJournal,
+    origin: &str,
+) -> Result<BTreeMap<String, FileId>, FixtureError> {
+    let folder_keys: BTreeSet<String> = described
+        .folders
+        .keys()
+        .map(|path| normalise_path(path))
+        .collect();
+    for path in &described.other_volume_folders {
+        if !folder_keys.contains(&normalise_path(path)) {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "usn_journal other_volume_folders `{path}` is not under `folders:`"
+                ),
+            });
+        }
+    }
+    let other_volume: BTreeSet<String> = described
+        .other_volume_folders
+        .iter()
+        .map(|path| normalise_path(path))
+        .collect();
+    Ok(described
+        .folders
+        .iter()
+        .map(|(path, number)| {
+            let key = normalise_path(path);
+            let serial = if other_volume.contains(&key) {
+                OTHER_VOLUME_SERIAL
+            } else {
+                JOURNAL_VOLUME_SERIAL
+            };
+            (key, file_id_for(*number, serial))
+        })
+        .collect())
+}
+
 fn resolve_usn_journal(
     described: FixtureUsnJournal,
     origin: &str,
 ) -> Result<StoredUsnJournal, FixtureError> {
-    let folders: BTreeMap<String, FileId> = described
-        .folders
-        .iter()
-        .map(|(path, number)| (normalise_path(path), file_id_for(*number)))
-        .collect();
+    let folders = resolve_usn_folders(&described, origin)?;
     let mut records = Vec::new();
     for group in described.records {
         let parent = match &group.parent {
-            None => file_id_for(UNWATCHED_PARENT),
+            None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
             Some(path) => {
                 *folders
                     .get(&normalise_path(path))
@@ -1239,8 +1290,10 @@ impl UsnJournalSource for FixtureHost {
         }))
     }
 
-    /// The identifier of a folder under `usn_journal: folders:`. A path named in `access_denied` is
-    /// refused, as a key or folder named there is.
+    /// The identifier of a folder under `usn_journal: folders:`, or of the journal volume's own root
+    /// (`X:\`), answered with the journal's own `volume_serial` and NTFS's root directory record
+    /// number (ADR 0047 amendment: junctions). A path named in `access_denied` is refused, as a key or
+    /// folder named there is.
     fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError> {
         let journal = self.usn_journal.as_ref().ok_or_else(|| {
             SourceError::Unsupported(
@@ -1250,6 +1303,13 @@ impl UsnJournalSource for FixtureHost {
         let key = normalise_path(path);
         if self.access_denied.contains(&key) {
             return Err(SourceError::AccessDenied);
+        }
+        let root = format!("{}:", journal.volume.to_ascii_lowercase());
+        if key == root {
+            return Ok(Some(file_id_for(
+                NTFS_ROOT_DIRECTORY_RECORD,
+                JOURNAL_VOLUME_SERIAL,
+            )));
         }
         Ok(journal.folders.get(&key).copied())
     }
@@ -2213,7 +2273,8 @@ usn_journal:
             host.file_id(r"c:\windows\prefetch").unwrap(),
             Some(FileId {
                 id_128: prefetch,
-                index_64: 7
+                index_64: 7,
+                volume_serial: JOURNAL_VOLUME_SERIAL,
             })
         );
         assert_eq!(
@@ -2310,5 +2371,51 @@ usn_journal:
         .unwrap_err();
         assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
         assert!(error.to_string().contains("last"), "{error}");
+    }
+
+    /// A caller compares a folder's identifier against the journal volume's own, so the drive root has
+    /// to answer with the journal's `volume_serial` too — this is what lets `usn` tell a folder reached
+    /// through a junction to another volume apart from one really on the system volume.
+    #[test]
+    fn a_drive_root_answers_with_the_journal_volume_serial() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nusn_journal: {}\n", "inline").unwrap();
+        let root = host.file_id(r"C:\").unwrap().unwrap();
+        assert_eq!(root.volume_serial, JOURNAL_VOLUME_SERIAL);
+        assert_eq!(root.index_64, NTFS_ROOT_DIRECTORY_RECORD);
+        // Spelled without the trailing backslash, or in another case: the same answer.
+        assert_eq!(host.file_id("c:").unwrap().unwrap(), root);
+    }
+
+    /// `other_volume_folders` is how a fixture describes a folder reached through a junction: same
+    /// drive letter, different volume underneath.
+    #[test]
+    fn a_folder_in_other_volume_folders_carries_the_other_volume_serial() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n    'C:\\Plugins': 4\n  other_volume_folders:\n    - 'C:\\Plugins'\n",
+            "inline",
+        )
+        .unwrap();
+        let prefetch = host.file_id(r"C:\Windows\Prefetch").unwrap().unwrap();
+        let plugins = host.file_id(r"C:\Plugins").unwrap().unwrap();
+        assert_eq!(prefetch.volume_serial, JOURNAL_VOLUME_SERIAL);
+        assert_eq!(plugins.volume_serial, OTHER_VOLUME_SERIAL);
+        assert_ne!(prefetch.volume_serial, plugins.volume_serial);
+    }
+
+    /// A path in `other_volume_folders` that no `folders:` entry describes is a fixture that claims a
+    /// junction over a folder nobody said existed, so it is rejected rather than silently ignored.
+    #[test]
+    fn an_other_volume_folders_entry_missing_from_folders_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n  other_volume_folders:\n    - 'C:\\Elsewhere'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(
+            error.to_string().contains("other_volume_folders"),
+            "{error}"
+        );
     }
 }

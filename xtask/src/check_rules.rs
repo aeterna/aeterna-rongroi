@@ -245,7 +245,7 @@ impl Vocabulary {
     /// or in a fixture shows it. Since ADR 0030 every one of the twelve reasons has a producer in
     /// some collector, so that half of the check is now entirely about which collector:
     /// `not_on_this_os` is `pca` and nothing else, `service_disabled` is `prefetch` and nothing
-    /// else, and `budget_spent` is `evtx` and nothing else.
+    /// else, and `budget_spent` is `evtx` and `usn` and nothing else (ADR 0047).
     ///
     /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
     /// true for is one a view lists whatever the rule said, so declaring it is a suppression that
@@ -889,9 +889,9 @@ date: 2026-09-11
 
     /// Every reason a view always lists is refused, not `read_failed` alone — so a later addition to
     /// `is_always_listed` is covered here without this test being edited. `budget_spent` is `evtx`'s
-    /// and `partial` is reported by more than one collector, so each is checked on a collector that
-    /// can produce it: without that, the message would be the collector one and this test would pass
-    /// while proving nothing.
+    /// and `usn`'s (ADR 0047) and `partial` is reported by more than one collector, so each is checked
+    /// on a collector that can produce it: without that, the message would be the collector one and
+    /// this test would pass while proving nothing.
     #[test]
     fn every_always_listed_reason_is_refused() {
         for reason in [
@@ -927,11 +927,13 @@ date: 2026-09-11
     }
 
     /// ADR 0027 recorded `not_on_this_os` and `service_disabled` as having no producer anywhere in
-    /// this build, so no rule could declare either. ADR 0030 gave each one exactly one, and this is
-    /// what that means for the gate: the reason is now usable, and only on the collector that can
-    /// actually report it. Asserted against the vocabulary the shipped executable builds, so a
-    /// collector that later stops producing one fails here rather than silently accepting a
-    /// suppression that never fires.
+    /// this build, so no rule could declare either. ADR 0030 gave each one exactly one owner, and
+    /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
+    /// both spending the same 30-second-budget idea on two different sources). This is what that
+    /// means for the gate: each reason is usable only on the collector(s) that can actually report
+    /// it. Asserted against the vocabulary the shipped executable builds, so a collector that later
+    /// starts or stops producing one fails here rather than silently accepting a suppression that
+    /// never fires, or missing one that now can.
     #[test]
     fn the_revived_reasons_belong_to_one_collector_each() {
         let vocabulary = Vocabulary::of_this_build();
@@ -942,20 +944,23 @@ date: 2026-09-11
                 .is_some_and(|reasons| reasons.contains(reason))
         };
 
-        for (reason, owner) in [
-            ("not_on_this_os", "pca"),
-            ("service_disabled", "prefetch"),
-            ("budget_spent", "evtx"),
-            ("not_attempted", "evtx"),
+        for (reason, owners) in [
+            ("not_on_this_os", &["pca"] as &[&str]),
+            ("service_disabled", &["prefetch"]),
+            ("budget_spent", &["evtx", "usn"]),
+            ("not_attempted", &["evtx"]),
         ] {
-            assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
+            for owner in owners {
+                assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
+            }
             for other in rongroi_collectors::all() {
-                if other.id() == owner {
+                if owners.contains(&other.id()) {
                     continue;
                 }
                 assert!(
                     !reports(other.id(), reason),
-                    "`{}` also reports `{reason}`; the ADR 0030 table says only `{owner}` does",
+                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
+                     names only {owners:?} as owners",
                     other.id()
                 );
             }

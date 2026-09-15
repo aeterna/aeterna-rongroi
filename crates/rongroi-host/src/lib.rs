@@ -416,6 +416,11 @@ pub struct FileId {
     /// `nFileIndexHigh` and `nFileIndexLow` from `GetFileInformationByHandle`, which a version 2 record
     /// carries.
     pub index_64: u64,
+    /// `FileIdInfo`'s `VolumeSerialNumber`: the volume `id_128` and `index_64` belong to. Both
+    /// identifiers are only ever unique within one volume, so a caller comparing two [`FileId`]s must
+    /// compare this field first — a folder reached through a junction to another volume can otherwise
+    /// share a number with an unrelated file on the volume the journal belongs to.
+    pub volume_serial: u64,
 }
 
 /// Read-only access to the NTFS change journal of a volume (ADR 0047).
@@ -432,7 +437,9 @@ pub trait UsnJournalSource {
         visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
     ) -> Result<Option<UsnJournalRead>, SourceError>;
 
-    /// The identifiers of the file or folder at `path`. `Ok(None)` when nothing is there.
+    /// The identifiers of the file or folder at `path`. `Ok(None)` when nothing is there. `path` may
+    /// also be a drive root such as `C:\`, so a caller can read a volume's own identifier to compare
+    /// against.
     fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError>;
 }
 
