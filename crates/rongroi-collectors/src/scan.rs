@@ -11,7 +11,7 @@ use rongroi_core::model::{
     BootTime, CollectorRun, REPORT_SCHEMA_VERSION, Report, ReportHeader, UnmeasuredReason,
 };
 use rongroi_core::provenance::Provenance;
-use rongroi_host::{Host, Platform};
+use rongroi_host::{Host, Platform, RegistryData};
 
 /// Inputs that come from outside the scan: build provenance, the clock, and what this program is.
 #[derive(Debug, Clone)]
@@ -32,6 +32,7 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
     // the caller took just before this call: the `evtx` collector alone may run for 30 seconds, and
     // reading the count after it would move the start that much earlier (ADR 0039).
     let boot_time = boot_time(host, &context.generated_at);
+    let profiles_directory = profiles_directory(host);
     let runs: Vec<CollectorRun> = crate::all()
         .iter()
         .map(|collector| collector.collect(host))
@@ -45,6 +46,7 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
         elevated: host.is_elevated(),
         generated_at: context.generated_at,
         boot_time,
+        profiles_directory,
     };
     engine::evaluate(bundle, &runs, header, &context.self_identity)
 }
@@ -66,6 +68,42 @@ fn boot_time(host: &dyn Host, generated_at: &str) -> BootTime {
             reason: UnmeasuredReason::ReadFailed,
         },
     }
+}
+
+/// Where Windows keeps `ProfilesDirectory`, the folder new profiles are created in.
+const PROFILE_LIST: &str = r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList";
+
+/// The machine's profile root, for SS-mode redaction and nothing else (ADR 0049).
+///
+/// Every reason there is no value — not Windows, absent, unreadable, another type, not expandable —
+/// is `None`: the view then redacts with the roots every machine has, and a reason would be a field
+/// nothing reads.
+fn profiles_directory(host: &dyn Host) -> Option<String> {
+    if host.platform() != Platform::Windows {
+        return None;
+    }
+    let Ok(Some(RegistryData::Text(stored))) = host.read_value(PROFILE_LIST, "ProfilesDirectory")
+    else {
+        return None;
+    };
+    expand_profiles_directory(&stored, host.env_var("SystemDrive").as_deref())
+}
+
+/// `stored` with a leading `%SystemDrive%` replaced by `system_drive`, kept only when the result is
+/// drive-rooted and holds no other variable.
+fn expand_profiles_directory(stored: &str, system_drive: Option<&str>) -> Option<String> {
+    const VARIABLE: &str = "%SystemDrive%";
+    let expanded = match stored.get(..VARIABLE.len()) {
+        Some(head) if head.eq_ignore_ascii_case(VARIABLE) => {
+            let drive = system_drive.filter(|drive| {
+                let bytes = drive.as_bytes();
+                bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+            })?;
+            format!("{drive}{}", &stored[VARIABLE.len()..])
+        }
+        _ => stored.to_owned(),
+    };
+    (crate::paths::is_drive_rooted(&expanded) && !expanded.contains('%')).then_some(expanded)
 }
 
 #[cfg(test)]
@@ -119,6 +157,66 @@ mod tests {
             BootTime::Unmeasured {
                 reason: UnmeasuredReason::ReadFailed
             }
+        );
+    }
+
+    #[test]
+    fn the_stored_profiles_directory_is_expanded_with_the_system_drive() {
+        assert_eq!(
+            profiles_directory(&host(
+                "platform: windows\nenv:\n  SystemDrive: 'D:'\nregistry:\n  'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList':\n    ProfilesDirectory: '%SystemDrive%\\Profiles'\n"
+            ))
+            .as_deref(),
+            Some(r"D:\Profiles")
+        );
+        assert_eq!(
+            expand_profiles_directory(r"%systemdrive%\Users", Some("C:")).as_deref(),
+            Some(r"C:\Users")
+        );
+        assert_eq!(
+            expand_profiles_directory(r"E:\Profiles", None).as_deref(),
+            Some(r"E:\Profiles")
+        );
+    }
+
+    /// Each is a value that names no folder this program can match, so redaction keeps to the roots
+    /// every machine has.
+    #[test]
+    fn a_profiles_directory_that_is_not_a_drive_rooted_folder_is_none() {
+        for (stored, system_drive) in [
+            (r"%SystemDrive%\Users", None),
+            (r"%SystemDrive%\Users", Some("")),
+            (r"%SystemDrive%\Users", Some(r"C:\")),
+            (r"%SystemRoot%\Profiles", Some("C:")),
+            (r"C:\Users\%USERNAME%", Some("C:")),
+            (r"\\server\profiles", Some("C:")),
+            ("Users", Some("C:")),
+            ("", Some("C:")),
+        ] {
+            assert_eq!(
+                expand_profiles_directory(stored, system_drive),
+                None,
+                "{stored:?} with {system_drive:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn no_profiles_directory_without_windows_or_without_the_value() {
+        let key =
+            "registry:\n  'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList':\n";
+        assert_eq!(
+            profiles_directory(&host(&format!(
+                "platform: other\n{key}    ProfilesDirectory: 'C:\\Users'\n"
+            ))),
+            None
+        );
+        assert_eq!(profiles_directory(&host("platform: windows\n")), None);
+        assert_eq!(
+            profiles_directory(&host(&format!(
+                "platform: windows\n{key}    ProfilesDirectory: 1\n"
+            ))),
+            None
         );
     }
 }

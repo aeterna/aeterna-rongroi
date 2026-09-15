@@ -64,6 +64,8 @@ export interface ReportHeader {
   elevated: boolean | null;
   generated_at: string;
   boot_time: BootTime;
+  /** The machine's profile root, for SS-mode redaction only; absent from an SS view (ADR 0049). */
+  profiles_directory?: string;
 }
 
 /**

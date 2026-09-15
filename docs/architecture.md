@@ -122,7 +122,8 @@ Both are mandatory in every rule and translated with the rest of its text (ADR 0
 | Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
 | Boot time (header) | shown | shown — context for the times on the rows SS mode lists, and named in the consent question (ADR 0039) |
 | Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |
-| Paths | as read | `X:\Users\<name>` → `%USERPROFILE%`, in evidence and own traces alike |
+| Paths | as read | `<profile root>\<name>` → `%USERPROFILE%`, in evidence and own traces alike. A profile root is `Users`, `Documents and Settings` or its short name on any drive, or the machine's `ProfilesDirectory` on its own drive, after `X:` or an administrative share `X$` (ADR 0049) |
+| `profiles_directory` (header) | carried | **dropped** — read by the scan only so that SS mode can redact under it (ADR 0049) |
 
 The `scope` numbers are not hidden counts: in SS mode those rules are counted in `hidden.unmeasured_*`
 as well, so the hidden counts keep accounting for everything the view leaves out.

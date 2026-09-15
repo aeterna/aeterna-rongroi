@@ -581,6 +581,7 @@ mod tests {
                 booted_at: "2025-12-28T21:56:56Z".to_owned(),
                 seconds_since_boot: 266_584,
             },
+            profiles_directory: None,
         };
         let evidence = Evidence {
             rule_id: rule.id.clone(),
