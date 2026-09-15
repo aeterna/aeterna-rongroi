@@ -24,7 +24,7 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `collector` | yes | must equal the first folder name, and must be a collector in this build |
 | `strength` | yes | `execution` · `presence` · `tamper` · `posture` · `context` |
 | `match` | yes | map of `field` — or `field\|operator` — → value; **all** of them must hold to match. Strings compare without regard to ASCII case (ADR 0025). Every field name must be one the collector declares it can emit, and every operator one its kind can take — `check-rules` rejects the rest and names the one it meant (ADR 0026, ADR 0029). The whole vocabulary is in [How matching works](#how-matching-works) |
-| `match_lists` | no | map of `field` → a CSV file **beside `rule.yaml`**; the file's first column becomes a list under `match` for that field when the bundle loads, so it matches when the field equals any of them (ADR 0048). The header line's first column must be the field's name; every later line's first column must be non-empty and unique, and for `sha256` 64 lowercase hex characters. A field is in `match` or `match_lists`, never both. For data kept under another licence, such as a vendored hash list — see [A list kept in a data file](#a-list-kept-in-a-data-file) |
+| `match_lists` | no | map of `field` → a CSV file **beside `rule.yaml`**; the file's first column becomes a list under `match` for that field when the bundle loads, so it matches when the field equals any of them (ADR 0048). The file is plain: its first line is the header naming the field, with no `#` comment lines, no blank lines, no quoting and no byte-order mark. Every later line's first column is compared **exactly as written** — so a value with surrounding whitespace or still wrapped in a quote is refused, not silently unmatchable — and must be non-empty and unique, and for `sha256` 64 lowercase hex characters; the file must have at least one row after the header. A field is in `match` or `match_lists`, never both. Every `match_lists` file needs a `REUSE.toml` annotation whatever its licence, because it cannot carry a `#` SPDX comment. For data kept under another licence, such as a vendored hash list — see [A list kept in a data file](#a-list-kept-in-a-data-file) |
 | `cased` | no | **field** names compared byte for byte instead; everything left out folds case. One entry covers every comparison the rule makes against that field |
 | `allow` | no | legitimate software excluded by `sha256` (the file) or `signer_cert_sha256` (the certificate that signed it) — exactly one per entry, never a file's or a signer's name: certificates stolen from a real publisher carry its name (ADR 0035). Revocation is not checked, so an allowed certificate that is later stolen and revoked stays allowed until the entry is removed. `prefetch`, `bam` and `pca` emit neither, so a rule on them has nothing to allow by, and no rule on them names a program by `name` or `path` (ADR 0034). No gate refuses that rule; review does |
 | `retention` | yes | how far back the source can see, in words for the user |
@@ -120,10 +120,16 @@ match_lists:
 ```
 
 - Only the first column is read, as the text before the first comma. Other columns are for the reader.
+- The file is plain: its first line is the header naming the field, with no `#` comment lines, no blank
+  lines, no quoting and no byte-order mark. Every value is compared exactly as written, so a value with
+  surrounding whitespace or still wrapped in the quotes a spreadsheet export adds is refused rather than
+  accepted and left unable to ever match. The file must have at least one row after the header.
+- Every `match_lists` file needs a `REUSE.toml` annotation, whatever its licence: it is data, not rule
+  text, so it cannot carry the `#` SPDX comment every other source file does.
+- A file under another licence also needs a `PROVENANCE.md` beside it saying where it came from, the
+  commit or version, the date taken, the filter applied and the command that rebuilds it.
 - The file travels in the rules bundle, so the bundle SHA-256 in every report covers it.
 - `cargo xtask rules-reference` names the file and how many values it holds instead of printing them.
-- A file under another licence needs a `REUSE.toml` annotation and a `PROVENANCE.md` beside it saying
-  where it came from and how to rebuild it.
 - The rule format is version 3 from this key on (ADR 0048).
 
 ## What the reader sees
