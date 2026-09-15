@@ -149,7 +149,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   source, the commit or version, the date taken, the filter applied and the command that rebuilds it.
   Never commit the thing the list describes — a list of vulnerable drivers is hashes, not drivers.
 - **A change to a `loldrivers-*.csv` or its `PROVENANCE.md` is reviewed by running it, not by reading
-  it.** No CI job rebuilds the LOLDrivers-derived data file, so a reviewer of such a change checks out
-  `magicsword-io/LOLDrivers` at the commit `PROVENANCE.md` names and runs
+  it.** The `rust (ubuntu)` job's step "LOLDrivers data file matches its source commit" fetches
+  `magicsword-io/LOLDrivers` at the commit `PROVENANCE.md` names (`yaml/` only) and runs
   `cargo xtask loldrivers --checkout <dir> --check` against it; the task itself refuses a checkout that is
-  not at that commit.
+  not at that commit. On a pull request the step fetches only when the diff touches that folder,
+  `xtask/`, `Cargo.lock` or `ci.yml`, and otherwise logs that it did not — so a reviewer of a data change
+  reads that step's log for the pull request's head and confirms it ran the check, not the skip line.

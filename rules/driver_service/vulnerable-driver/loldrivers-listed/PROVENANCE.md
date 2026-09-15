@@ -42,4 +42,6 @@ named above — update the `Commit` line first when moving to a new one. Both al
 page states: rows, `.yaml` files read, hashes dropped as unverified, verified samples without a usable
 SHA256 (and how many of those carry an Authentihash), and the same pair across all vulnerable-driver
 entries. An update is one pull request that changes the commit and date above, this file, and every one of
-those printed figures together. The program never fetches the list.
+those printed figures together. CI runs the `--check` form in the `rust (ubuntu)` job on every push to
+`dev` and `main`, and on a pull request that changes this folder, `xtask/`, `Cargo.lock` or `ci.yml`. The
+program never fetches the list.
