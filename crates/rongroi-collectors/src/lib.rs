@@ -6,6 +6,7 @@
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
 pub mod bam;
+pub mod driver_service;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
@@ -148,6 +149,7 @@ pub trait Collector {
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
         Box::new(bam::Bam),
+        Box::new(driver_service::DriverService::default()),
         Box::new(evtx::Evtx::default()),
         Box::new(fivem_dir::FivemDir),
         Box::new(pca::Pca),

@@ -70,6 +70,8 @@ none contains a real person's user name, host name, SID or files.
 | `usn-folders-unreadable` | An elevated Windows 11 scan where the Prefetch folder is unlistable, `%APPDATA%` is not set so Enhanced's plugin folder cannot be located, and Legacy's plugin folder is on a second volume the journal was not read from | `usn` collector tests |
 | `usn-not-described` | An elevated Windows 11 scan written before this fixture source existed: it never modelled the change journal at all, which the accessors report as `Unsupported` | `usn` collector tests |
 | `usn-folder-on-other-volume` | An elevated Windows 11 scan whose FiveM Legacy plugin folder shares Prefetch's drive letter but is reached through a junction to another volume (e.g. `mklink /J`): its identifier carries a different volume serial than the system volume's own, so its records are not credited to it | `usn` collector tests |
+| `driver-service-forms` | A Windows 11 scan whose driver services cover every `ImagePath` form the resolver knows and one it does not, and each file outcome the collector distinguishes: absent, `\SystemRoot\`, relative under `System32` and `SysWOW64`, `\??\X:\`, a bare drive letter, a quoted path an unknown form, a refused file, an unrecorded hash and a missing file, beside a `Type: 32` service that is not a driver | `driver_service` collector tests |
+| `driver-service-refused` | The key that lists driver services (`HKLM\SYSTEM\CurrentControlSet\Services`) refused to this program. Measured on no machine: both machines ADR 0046 measured let a token without Administrators read it | `driver_service` collector tests |
 
 **`FiveM.exe` in `baseline-consumer-win11` and `baseline-elevated-win11` is measured, not written.**
 Measured 2026-09-13 on one Windows 11 machine, build 26220, read-only, with `Get-FileHash`,
@@ -100,6 +102,15 @@ installed, so its two plugin folders came back `folder: absent`; `baseline-eleva
 describes an installed, empty Legacy plugin folder (above), so its `usn_journal: folders:` lists that
 path instead, giving `plugins` zero records there rather than repeating the runner's absence. Enhanced's
 plugin folder is not described by this baseline and stays absent, as it already was.
+
+**The driver services in the baselines are a runner's, not a PC's.** `baseline-elevated-win11`'s driver
+service keys and files are rebuilt from the `driver_service` collector's observations of a GitHub-hosted
+Windows Server 2025 runner (`windows.yml` run 34955915842, 2026-09-15): 424 services, 424 hashed. Each
+`ImagePath` is written as the path the collector resolved rather than the form the runner's registry held,
+and `Type` is 1 for every service; the collector's own tests cover the other forms. A runner image has
+Microsoft's drivers only, so this says nothing about a gaming PC's. No driver list from anyone's own PC is
+used (ADR 0046). Neither non-elevated baseline sets `%SystemRoot%`, so `driver_service` is `read_failed`
+on both.
 
 **Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
 posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,

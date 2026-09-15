@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# Driver services in every `ImagePath` form the resolver knows and one it does not, and each file outcome
+# the collector distinguishes (ADR 0048). Synthetic: names, paths and hashes are invented.
+platform: windows
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+access_denied:
+  - 'C:\Windows\System32\drivers\refused.sys'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\absentpath':
+    Type: 1
+    Start: 0
+  'HKLM\SYSTEM\CurrentControlSet\Services\systemroot':
+    Type: 1
+    Start: 1
+    ImagePath: '\SystemRoot\System32\drivers\systemroot.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\relative':
+    Type: 2
+    Start: 3
+    ImagePath: 'System32\drivers\relative.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wow':
+    Type: 1
+    Start: 3
+    ImagePath: 'SysWOW64\drivers\wow.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\devicepath':
+    Type: 1
+    Start: 3
+    ImagePath: '\??\C:\Program Files\Vendor\devicepath.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\driveletter':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Program Files\Vendor\driveletter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\gone':
+    Type: 1
+    Start: 3
+    ImagePath: 'System32\drivers\gone.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\refused':
+    Type: 1
+    Start: 3
+  'HKLM\SYSTEM\CurrentControlSet\Services\unreadable':
+    Type: 1
+    ImagePath: 'System32\drivers\unreadable.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\quoted':
+    Type: 1
+    Start: 3
+    ImagePath: '"C:\Program Files\Vendor\quoted.sys"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AudioSrv':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k LocalServiceNetworkRestricted'
+filesystem:
+  'C:\Windows\System32\drivers':
+    - name: absentpath.sys
+      sha256: 1111111111111111111111111111111111111111111111111111111111111111
+    - name: systemroot.sys
+      sha256: 2222222222222222222222222222222222222222222222222222222222222222
+    - name: relative.sys
+      sha256: 3333333333333333333333333333333333333333333333333333333333333333
+    - name: refused.sys
+      sha256: 4444444444444444444444444444444444444444444444444444444444444444
+    - name: unreadable.sys
+  'C:\Windows\SysWOW64\drivers':
+    - name: wow.sys
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+  'C:\Program Files\Vendor':
+    - name: devicepath.sys
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+    - name: driveletter.sys
+      sha256: 7777777777777777777777777777777777777777777777777777777777777777

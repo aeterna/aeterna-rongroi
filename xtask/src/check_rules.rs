@@ -929,11 +929,12 @@ date: 2026-09-11
     /// ADR 0027 recorded `not_on_this_os` and `service_disabled` as having no producer anywhere in
     /// this build, so no rule could declare either. ADR 0030 gave each one exactly one owner, and
     /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
-    /// both spending the same 30-second-budget idea on two different sources). This is what that
-    /// means for the gate: each reason is usable only on the collector(s) that can actually report
-    /// it. Asserted against the vocabulary the shipped executable builds, so a collector that later
-    /// starts or stops producing one fails here rather than silently accepting a suppression that
-    /// never fires, or missing one that now can.
+    /// both spending the same 30-second-budget idea on two different sources), and ADR 0048 a third
+    /// (`driver_service`, spending it on hashing driver files). This is what that means for the
+    /// gate: each reason is usable only on the collector(s) that can actually report it. Asserted
+    /// against the vocabulary the shipped executable builds, so a collector that later starts or
+    /// stops producing one fails here rather than silently accepting a suppression that never fires,
+    /// or missing one that now can.
     #[test]
     fn the_revived_reasons_belong_to_one_collector_each() {
         let vocabulary = Vocabulary::of_this_build();
@@ -947,7 +948,7 @@ date: 2026-09-11
         for (reason, owners) in [
             ("not_on_this_os", &["pca"] as &[&str]),
             ("service_disabled", &["prefetch"]),
-            ("budget_spent", &["evtx", "usn"]),
+            ("budget_spent", &["driver_service", "evtx", "usn"]),
             ("not_attempted", &["evtx"]),
         ] {
             for owner in owners {
@@ -959,8 +960,8 @@ date: 2026-09-11
                 }
                 assert!(
                     !reports(other.id(), reason),
-                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
-                     names only {owners:?} as owners",
+                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047 and \
+                     ADR 0048, names only {owners:?} as owners",
                     other.id()
                 );
             }

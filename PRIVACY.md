@@ -3,7 +3,8 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, the list of running processes, what the Program Compatibility Assistant, Windows
+FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, the list of running processes, the drivers
+registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, and counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read, with no file name.
@@ -28,6 +29,11 @@ consent question names them before anything is read.
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
 is on disk. It does not read what a program is doing, what is in its memory, or what you typed into it.
+
+Of a driver registered with Windows it reads the name of its driver service, when Windows is set to start
+it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
+graphics card vendor, a VPN, a virtualisation product — because their drivers are registered. It does not
+read which drivers are loaded or what they do.
 
 Of a Prefetch file it reads the program's name, how many times Windows recorded it running and when it
 last ran. **A Prefetch file also lists every file that program loaded — normally hundreds of paths,
@@ -166,8 +172,8 @@ tool did, not more. Paths in it are redacted in SS mode like any other.
 
 ### What a collector saw that no rule matched
 
-Some collectors read things no rule asks about — the list of programs you are running, what Windows
-recorded about programs that ran, whether each FiveM plugin folder was there, and how many records the
+Some collectors read things no rule asks about — the list of programs you are running, the drivers
+registered with Windows, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, and how many records the
 Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
 can read what the tool saw and judge it yourself.
 
