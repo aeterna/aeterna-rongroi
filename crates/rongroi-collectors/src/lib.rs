@@ -15,6 +15,7 @@ pub mod posture;
 pub mod prefetch;
 pub mod process;
 pub mod scan;
+pub mod usn;
 
 use rongroi_core::model::{CollectorRun, UnmeasuredReason};
 use rongroi_host::Host;

@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# The same denial as `usn-journal-access-denied` with administrator rights already held, where
+# restarting as administrator would not help.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  WinDir: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+usn_journal:
+  state: access_denied

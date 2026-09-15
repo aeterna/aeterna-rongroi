@@ -61,6 +61,14 @@ none contains a real person's user name, host name, SID or files.
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below) | `cargo xtask check-baseline` |
 | `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below), and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable. Its `EnablePrefetcher`, its files' read-only attribute and the Event Log service's answer for its one channel are measured values (below) | `cargo xtask check-baseline` |
+| `usn-journal-read` | An elevated Windows 11 scan whose system volume journal holds records under three watched folders — Prefetch, the Event Log folder and FiveM Legacy's plugin folder — and one group nobody watches, with the journal trimmed since it was made. Enhanced's folder is not there | `usn` collector tests |
+| `usn-journal-not-active` | An elevated Windows 11 scan whose system volume has no active change journal at all (`ERROR_JOURNAL_NOT_ACTIVE`) | `usn` collector tests |
+| `usn-journal-access-denied` | A Windows 11 scan without administrator rights whose system volume handle is refused | `usn` collector tests |
+| `usn-journal-access-denied-elevated` | The same denial with administrator rights already held, where restarting as administrator would not help | `usn` collector tests |
+| `usn-journal-changed` | An elevated Windows 11 scan whose system volume journal was trimmed or replaced while the read was in progress, so the read ends `journal_changed` with one Prefetch record already read | `usn` collector tests |
+| `usn-version-2-records` | An elevated Windows 11 scan whose system volume journal holds version 2 records under the Prefetch folder, attributed by the folder's 64-bit index rather than its 128-bit identifier | `usn` collector tests |
+| `usn-folders-unreadable` | An elevated Windows 11 scan where the Prefetch folder is unlistable, `%APPDATA%` is not set so Enhanced's plugin folder cannot be located, and Legacy's plugin folder is on a second volume the journal was not read from | `usn` collector tests |
+| `usn-not-described` | An elevated Windows 11 scan written before this fixture source existed: it never modelled the change journal at all, which the accessors report as `Unsupported` | `usn` collector tests |
 
 **`FiveM.exe` in `baseline-consumer-win11` and `baseline-elevated-win11` is measured, not written.**
 Measured 2026-09-13 on one Windows 11 machine, build 26220, read-only, with `Get-FileHash`,
