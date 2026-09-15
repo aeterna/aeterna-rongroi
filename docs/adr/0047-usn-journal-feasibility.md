@@ -402,6 +402,12 @@ Prefetch folder itself could not be opened (5); the Event Log and PCA folders co
 - How long an ordinary journal retains on a PC, and how many records a scan of one reads.
 - Records in a Prefetch folder on a machine where Prefetch is on.
 - The contract of `FSCTL_READ_UNPRIVILEGED_USN_JOURNAL`.
+- Which reason a watched folder on another volume (a junction to a game drive) should carry. The first rule
+  that reads a per-folder count must settle it. Today it is `read_failed`, which SS mode always lists and no
+  rule can declare; `not_attempted` was rejected because it says the scan stopped early. It probably needs a
+  new reason, which would amend ADR 0030.
+- Attribution relies on the NTFS `VolumeSerialNumber`. Whether a cloned volume attached to the same PC keeps
+  the serial is not verified.
 
 ## Consequences
 

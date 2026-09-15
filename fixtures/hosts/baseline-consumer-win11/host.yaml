@@ -18,11 +18,6 @@ elevated: false
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
-# The change journal (ADR 0047): not elevated, so the system volume handle is refused — measured on a
-# GitHub-hosted Windows Server 2025 runner (windows.yml run 34930942657): a standard account and a
-# restricted token were both refused with error 5.
-usn_journal:
-  state: access_denied
 registry:
   'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
     UEFISecureBootEnabled: 1

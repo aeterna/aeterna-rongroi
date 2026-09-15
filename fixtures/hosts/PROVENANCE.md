@@ -90,8 +90,12 @@ or that the certificate stays the same after 2027-09-05, when it expires.
 2025 runner (`windows.yml` run 34930942657, 2026-09-15): the same counts per folder, the same first and
 last record times, and one group for the journal's other records, whose count reproduces the runner's
 journal total of 381 333 records. Which reasons shared a record is not in an observation, so the groups
-are the fewest that give those counts. A non-elevated baseline describes the volume as refused, as a
-standard account and a restricted token were on the runner (ADR 0047). The runner had no FiveM
+are the fewest that give those counts. Neither non-elevated baseline (`baseline-consumer-win11`,
+`baseline-hardened-win11`) sets `%SystemRoot%`, so `usn` is `read_failed` on both before it reaches a
+journal — as `prefetch` and `evtx` are, which need `%SystemRoot%` too, and `pca`, whose `%WinDir%` is unset
+there as well — and neither describes a change journal. A refused volume is not a baseline's measurement:
+a standard account and a restricted token were both refused it with error 5 in `windows.yml` run
+34868203532 (ADR 0047, "Measured on a runner"), which the `usn-journal-access-denied` hosts describe. The runner had no FiveM
 installed, so its two plugin folders came back `folder: absent`; `baseline-elevated-win11` already
 describes an installed, empty Legacy plugin folder (above), so its `usn_journal: folders:` lists that
 path instead, giving `plugins` zero records there rather than repeating the runner's absence. Enhanced's
@@ -124,8 +128,8 @@ Each one is a written profile; a setting in it is never changed to silence a rul
 
 **What a baseline leaves out is a claim too.** A source a baseline does not describe is not read, the
 collector is `Unmeasured`, and a rule for it passes the gate whatever it says — which is what
-`baseline-consumer-win11` and `baseline-hardened-win11` do to `pca`, `prefetch`, `bam` and `evtx`: neither
-sets `WinDir` or `SystemRoot` and neither carries a BAM key. `baseline-elevated-win11` was added for that
+`baseline-consumer-win11` and `baseline-hardened-win11` do to `pca`, `prefetch`, `bam`, `evtx` and `usn`:
+neither sets `WinDir` or `SystemRoot` and neither carries a BAM key. `baseline-elevated-win11` was added for that
 (ADR 0026) and is the host on which every collector in the build is `Measured` with no gaps. Its artifacts
 hold the shapes a careless rule fires on — a game executable run from a Downloads folder, `cmd.exe` with a
 Prefetch record, a BAM entry whose path is a device path — because leaving those out would make the claim
