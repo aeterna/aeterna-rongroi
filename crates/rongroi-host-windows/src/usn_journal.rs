@@ -303,10 +303,15 @@ mod live {
                         end: UsnReadEnd::Stopped,
                     }));
                 }
-                // A read that does not move the start forward has nothing more to give; stopping here
-                // is what keeps this loop finite whatever the call returns.
+                // A read that does not move the start forward is a failure, not `Complete`: `Complete`
+                // means every buffer up to `next_usn` was handed to the visitor, and a call that makes
+                // no progress leaves the rest of that promise unread. Returning here, rather than
+                // looping again on the same `start`, is also what keeps this loop finite.
                 if next <= start {
-                    break;
+                    return Err(SourceError::Failed(
+                        "FSCTL_READ_USN_JOURNAL did not move past the USN it was asked to start from"
+                            .to_owned(),
+                    ));
                 }
                 start = next;
             }
