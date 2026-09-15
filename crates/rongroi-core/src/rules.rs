@@ -333,7 +333,19 @@ impl Rule {
 pub fn expand_match_lists(rule: &mut Rule, data: &BTreeMap<String, String>) -> Vec<String> {
     let mut problems = Vec::new();
     let lists = rule.match_lists.clone();
-    for (field, file) in &lists {
+    for (key, file) in &lists {
+        let field = match parse_match_key(key) {
+            MatchKey::Known {
+                field,
+                operator: Operator::Equals,
+            } if field == key => field,
+            _ => {
+                problems.push(format!(
+                    "`match_lists` key `{key}` must be a field name: a listed field compares by equality"
+                ));
+                continue;
+            }
+        };
         if rule.match_fields().any(|named| named == field) {
             problems.push(format!(
                 "`{field}` is in both `match` and `match_lists`; write it in one of them"
@@ -349,7 +361,7 @@ pub fn expand_match_lists(rule: &mut Rule, data: &BTreeMap<String, String>) -> V
         match first_column(field, content) {
             Ok(values) => {
                 rule.matcher.insert(
-                    field.clone(),
+                    field.to_owned(),
                     serde_json::Value::Array(
                         values.into_iter().map(serde_json::Value::from).collect(),
                     ),
@@ -375,6 +387,11 @@ fn first_column(field: &str, content: &str) -> Result<Vec<String>, String> {
         let value = line.split(',').next().unwrap_or_default();
         if value.is_empty() {
             return Err(format!("line {number} has an empty first column"));
+        }
+        if value != value.trim() || value.contains('"') {
+            return Err(format!(
+                "line {number}: `{value}` has surrounding whitespace or a quote; values are compared exactly as written"
+            ));
         }
         let is_lowercase_sha256 =
             is_sha256(value) && !value.bytes().any(|b| b.is_ascii_uppercase());
@@ -1285,6 +1302,69 @@ date: 2026-09-15
             "{problems:?}"
         );
         assert_eq!(rule.matcher.get("sha256"), Some(&serde_json::json!(HASH_A)));
+    }
+
+    /// A `match_lists` key is a field name, never a `match` key: an operator suffix would let a
+    /// listed field silently replace, or sit beside, a differently-typed written condition on the
+    /// same field.
+    #[test]
+    fn a_match_lists_key_with_an_operator_suffix_is_refused() {
+        let yaml = LISTED.replace("sha256: hashes.csv", "hvci|startswith: f.csv");
+        let mut rule: Rule = serde_saphyr::from_str(&yaml).unwrap();
+        let problems = expand_match_lists(&mut rule, &BTreeMap::new());
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains(
+                "`match_lists` key `hvci|startswith` must be a field name: a listed field compares by equality"
+            ),
+            "{problems:?}"
+        );
+        assert!(!rule.matcher.contains_key("hvci"));
+    }
+
+    #[test]
+    fn a_suffixed_match_lists_key_leaves_a_same_field_match_condition_untouched() {
+        let yaml = LISTED.replace(
+            "match_lists:\n  sha256: hashes.csv",
+            "match:\n  hvci|contains: keep\nmatch_lists:\n  hvci|contains: f.csv",
+        );
+        let mut rule: Rule = serde_saphyr::from_str(&yaml).unwrap();
+        let data = BTreeMap::from([("f.csv".to_owned(), "hvci\nother\n".to_owned())]);
+        let problems = expand_match_lists(&mut rule, &data);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains(
+                "`match_lists` key `hvci|contains` must be a field name: a listed field compares by equality"
+            ),
+            "{problems:?}"
+        );
+        assert_eq!(
+            rule.matcher.get("hvci|contains"),
+            Some(&serde_json::json!("keep"))
+        );
+    }
+
+    /// For a field other than `sha256`, `first_column` had no shape check at all, so a value that can
+    /// never match anything — one with surrounding whitespace, or one still wrapped in the quotes a
+    /// spreadsheet export adds — was accepted silently.
+    #[test]
+    fn a_listed_value_with_surrounding_whitespace_or_a_quote_is_refused() {
+        let yaml = LISTED.replace("sha256: hashes.csv", "loldrivers_id: hashes.csv");
+        for csv in [
+            "loldrivers_id\nid-a \n".to_owned(),
+            "loldrivers_id\n\"id-a\"\n".to_owned(),
+        ] {
+            let mut rule: Rule = serde_saphyr::from_str(&yaml).unwrap();
+            let data = BTreeMap::from([("hashes.csv".to_owned(), csv.clone())]);
+            let problems = expand_match_lists(&mut rule, &data);
+            assert_eq!(problems.len(), 1, "{csv:?}: {problems:?}");
+            assert!(
+                problems[0].contains(
+                    "has surrounding whitespace or a quote; values are compared exactly as written"
+                ),
+                "{csv:?}: {problems:?}"
+            );
+        }
     }
 
     /// A rule without `match_lists` serialises exactly as before, so nothing that writes a rule out
