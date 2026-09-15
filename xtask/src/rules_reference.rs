@@ -223,6 +223,8 @@ struct Words {
     instant: [Phrase; 4],
     present: &'static str,
     absent: &'static str,
+    /// A `match_lists` condition's values: how many, and the file (ADR 0048).
+    listed_in: fn(usize, &str) -> String,
     statuses: [&'static str; 4],
     related_kinds: [&'static str; 5],
 }
@@ -293,6 +295,7 @@ const EN: Words = Words {
     ],
     present: "the field is present",
     absent: "the field is absent",
+    listed_in: listed_in_en,
     statuses: [
         "being developed",
         "believed correct; has a positive and a negative fixture",
@@ -374,6 +377,7 @@ const TH: Words = Words {
     ],
     present: "มีฟิลด์นี้",
     absent: "ไม่มีฟิลด์นี้",
+    listed_in: listed_in_th,
     statuses: [
         "อยู่ระหว่างพัฒนา",
         "เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ",
@@ -382,6 +386,14 @@ const TH: Words = Words {
     ],
     related_kinds: ["เปลี่ยนชื่อมาจาก", "ใช้แทน", "ดัดแปลงมาจาก", "รวมมาจาก", "คล้ายกับ"],
 };
+
+fn listed_in_en(count: usize, file: &str) -> String {
+    format!("the {count} values in the first column of `{file}`, a file beside the rule")
+}
+
+fn listed_in_th(count: usize, file: &str) -> String {
+    format!("{count} ค่าในคอลัมน์แรกของ `{file}` ซึ่งเป็นไฟล์ที่อยู่ข้าง rule")
+}
 
 fn generated_comment() -> String {
     format!(
@@ -751,6 +763,23 @@ fn condition(rule: &Rule, key: &str, value: &serde_json::Value, words: &Words) -
         }
         Operator::Exists => None,
     };
+    let case = if operator.compares_text() && holds_text {
+        if rule.cased.contains(field) {
+            format!(" ({})", words.text_cased)
+        } else {
+            format!(" ({})", words.text_folded)
+        }
+    } else {
+        String::new()
+    };
+    if let Some(file) = rule.match_lists.get(field) {
+        return format!(
+            "{}: {} {}{case}",
+            code(key),
+            words.equals.any,
+            (words.listed_in)(values.len(), file)
+        );
+    }
     let reading = match phrase {
         Some(phrase) => {
             let shown: Vec<String> = values.iter().map(|value| value_code(value)).collect();
@@ -766,15 +795,6 @@ fn condition(rule: &Rule, key: &str, value: &serde_json::Value, words: &Words) -
             Some(false) => words.absent.to_owned(),
             None => value_code(value),
         },
-    };
-    let case = if operator.compares_text() && holds_text {
-        if rule.cased.contains(field) {
-            format!(" ({})", words.text_cased)
-        } else {
-            format!(" ({})", words.text_folded)
-        }
-    } else {
-        String::new()
     };
     format!("{}: {reading}{case}", code(key))
 }
@@ -1243,5 +1263,58 @@ related:
         let text = fs::read_to_string(&path).unwrap().replace('\n', "\r\n");
         fs::write(&path, text).unwrap();
         run(&tmp.0, &Args { check: true }).unwrap();
+    }
+
+    /// ADR 0048: a CSV directly beside a `rule.yaml` travels with that rule, and a CSV at the top of
+    /// `rules/` — `known-fps.csv`, `unconfronted.csv` — beside no rule does not.
+    #[test]
+    fn the_bundle_carries_the_csv_files_beside_a_rule_and_no_other() {
+        let tmp = TempRoot::new("bundle-data");
+        tmp.write("posture/memory-integrity/listed/rule.yaml", "id: x\n");
+        tmp.write(
+            "posture/memory-integrity/listed/states.csv",
+            "hvci\r\ndisabled\r\n",
+        );
+        tmp.write("posture/memory-integrity/listed/notes.txt", "not data\n");
+        tmp.write("known-fps.csv", "rule_id\n");
+
+        let json: serde_json::Value =
+            serde_json::from_str(&collect_bundle_json(&tmp.0).unwrap()).unwrap();
+
+        let rules = json["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 1);
+        assert_eq!(
+            rules[0]["data"],
+            serde_json::json!({ "states.csv": "hvci\ndisabled\n" })
+        );
+    }
+
+    /// ADR 0048: a listed condition is read aloud as the file and how many values it holds, never as
+    /// the values — 1,847 hashes on the reference page would be a data dump, not rule text.
+    #[test]
+    fn a_listed_condition_names_its_file_and_row_count() {
+        let hash_a = "a".repeat(64);
+        let hash_b = "b".repeat(64);
+        let json = serde_json::json!({
+            "rules": [{
+                "path": "driver_service/vulnerable-driver/listed/rule.yaml",
+                "yaml": "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7\ntitle: T\ndescription: D.\nstatus: test\ncollector: driver_service\nstrength: posture\nmatch_lists:\n  sha256: hashes.csv\nretention: Now.\nfalsepositives: [F]\nauthor: tests\ndate: 2026-09-15\n",
+                "data": { "hashes.csv": format!("sha256\n{hash_a}\n{hash_b}\n") },
+            }],
+            "i18n": [],
+        })
+        .to_string();
+        let bundle = rongroi_core::bundle::Bundle::from_bundle_json(&json).unwrap();
+        let rule = &bundle.rules()[0].rule;
+        let value = rule.matcher["sha256"].clone();
+
+        let en = condition(rule, "sha256", &value, &EN);
+        assert!(
+            en.contains("the 2 values in the first column of `hashes.csv`"),
+            "{en}"
+        );
+        assert!(!en.contains(&hash_a), "{en}");
+        let th = condition(rule, "sha256", &value, &TH);
+        assert!(th.contains("2 ค่าในคอลัมน์แรกของ `hashes.csv`"), "{th}");
     }
 }

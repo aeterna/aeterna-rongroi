@@ -28,6 +28,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   journal identifier or file number reaches the report. No rule reads it yet. `DeviceIoControl` and
   `CreateFileW` are each banned in `clippy.toml` outside one read-only wrapper, and `fuzz_usn` joins the
   fuzz smoke run (ADR 0047).
+- `match_lists` in the rule format: a rule can keep a long list of values for one field in a CSV file
+  beside `rule.yaml`, carried in the rules bundle and expanded into `match` when it loads. The reference
+  pages name the file and its row count. Rule format version 3 (ADR 0048).
 
 ### Changed
 - The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the

@@ -140,3 +140,11 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   without a documented false-positive reason. Bypasses are reported privately via
   [`SECURITY.md`](../SECURITY.md).
 - Rules, translations and fixtures in this folder are CC-BY-SA-4.0.
+- **Every data file named in `match_lists` needs a `REUSE.toml` annotation, whatever its licence**
+  (ADR 0048) — it is data, not rule text, so it cannot carry the `#` SPDX comment every other source file
+  does. It is plain: a header line naming the field, no `#` comment lines, no blank lines, no quoting, no
+  byte-order mark, and at least one row after the header; every value is compared exactly as written, so a
+  value with surrounding whitespace or a quote is refused rather than left unable to ever match. **One
+  under another licence** also needs `precedence = "override"` and a `PROVENANCE.md` beside it: the
+  source, the commit or version, the date taken, the filter applied and the command that rebuilds it.
+  Never commit the thing the list describes — a list of vulnerable drivers is hashes, not drivers.

@@ -48,6 +48,7 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **read_only** | Observation field: whether the file the observation is about carries the read-only attribute — the one attribute bit this program reads (ADR 0037) | `rongroi_host::FilesystemSource::is_read_only`, observation field `read_only` |
 | **configured_path** / **at_configured_path** | Observation fields of an `evtx` log account: the file the Windows Event Log service states it writes that log's channel to, as the service spells it, and whether that is the file that was read (ADR 0042) | `rongroi_host::EventLogConfigSource`, observation fields `configured_path`, `at_configured_path` |
 | **signer** / **signer_cert_sha256** | Observation fields of a `valid` signature: the signing certificate's display name, for the reader, and the SHA-256 of the certificate, the other thing `allow` may compare. A name is never compared: stolen certificates carry the real publisher's (ADR 0035) | observation fields `signer`, `signer_cert_sha256` |
+| **match_lists** | A rule key naming, per `match` field, a CSV file beside `rule.yaml` whose first column is that field's list of values; expanded into `match` when the bundle loads (ADR 0048) | `Rule::match_lists`, `rules::expand_match_lists` |
 
 Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as "detection result",
 "hit", "finding" for Evidence.
