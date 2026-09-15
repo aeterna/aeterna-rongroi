@@ -154,11 +154,30 @@ A state is never shown by colour alone: `found` is a filled square, `not_found` 
 
 ## What is unverified
 
-- Whether WebView2 inside the Tauri window grants `navigator.clipboard.writeText` without a permission
-  prompt. To be checked by hand on Windows before release; the selectable text is the fallback either
-  way.
 - The QR crate, its licence under `cargo deny`, and the size it adds to the desktop binary.
-- Whether a phone camera reads the QR code off a screenshare at ordinary stream resolutions.
+- Whether a phone camera reads the QR code off the screen, and off a screenshare at ordinary stream
+  resolutions.
+- The code-link QR code of an official build. An unofficial build knows no commit, so About & code shows
+  only the repository's QR code, and that is the only one the check below saw.
+
+## Checked on a PC
+
+On 2026-09-15, on Windows 11 build 26220, with an unofficial build of the desktop app from `dev` at
+`28efbee` running without administrator rights, in Thai. UI Automation drove the window; where a click
+matters, the click was a mouse click sent through `mouse_event`, and the layout was read off screenshots
+of the window.
+
+- **Clipboard: granted without a prompt.** A mouse click on Copy on About & code turned the button to its
+  copied label and put `https://github.com/aeterna/aeterna-rongroi` on the clipboard. The selectable text
+  stays the fallback.
+- **Two-line cut: holds.** The descriptions of closed rows end in an ellipsis after two lines and do not
+  run into the next row, with the window 820 and 1,500 pixels wide.
+- **Technical switch: opens every row.** With it on, all 22 rows and all 22 technical sections were open
+  and their buttons disabled, no not-found group was left folded, and a mouse click on a row head changed
+  nothing.
+- **Back from About & code: returns to the report, in the same mode.** The report opens again at its top
+  with the switch off and its not-found groups folded — the mode is kept, what was open on the screen is
+  not.
 
 ## Consequences
 
