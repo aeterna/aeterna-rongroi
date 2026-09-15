@@ -45,6 +45,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   without Administrators there, and hashing them took 15.5 seconds cold. The USN journal read on a volume
   handle opened without write access, returned only version 3 records, and matched folders by their 128-bit
   identifier; without Administrators the volume could not be opened.
+- ADR 0046 carries measurements from a Windows 11 PC and the LOLDrivers count. Under the limited token all
+  464 driver services were read and all 463 driver files hashed, including those in `DriverStore` and
+  `Program Files`, and a relative `SysWOW64\` `ImagePath` the runner did not have was found. LOLDrivers at
+  commit `1c60ea1` holds 1,865 distinct SHA-256 values for vulnerable drivers; 97 samples carry no file
+  SHA-256.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the

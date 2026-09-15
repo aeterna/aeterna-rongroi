@@ -1,8 +1,11 @@
 # ADR 0046 — Vulnerable drivers: what can be read, and what a list would cost
 
-- Status: accepted — the recommendation below, and no collector code until the measurements under "Before any code" exist
+- Status: accepted — the recommendation below. The measurements under "Before any code" exist, except the
+  baseline, which is made from a run of the collector itself
 - Date: 2026-09-14
 - Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner")
+- Amended: 2026-09-15, with measurements on a Windows 11 PC ("Measured on a PC") and the LOLDrivers count
+  ("The data file, counted")
 
 ## Context
 
@@ -353,12 +356,111 @@ using that path when the value is absent. It is one image's evidence, not a docu
    baseline fixture is made from a run of the collector itself, so that its observations have the
    collector's shape, not from this probe's counts.
 
+## Measured on a PC
+
+**Where and how.** One Windows 11 PC, version 25H2, build 26220, on 2026-09-15, at its owner's request. A
+PowerShell script read the registry through .NET and hashed each file on a stream opened for reading with
+every share mode, the access `std::fs::File::open` asks for. It printed counts, forms and error codes and
+nothing else: no service name and no path. It ran twice:
+
+- **elevated:** an administrator's token;
+- **limited:** the same account's filtered token, through a scheduled task created with the limited run
+  level for this run and deleted afterwards. A standard account that is not an administrator was not run
+  on this PC; the runner's standard account covers that case on its image.
+
+The script and the task were deleted from the PC afterwards. Nothing else on it was changed.
+
+| | Elevated | Limited |
+|---|---|---|
+| Keys directly under `HKLM\SYSTEM\CurrentControlSet\Services` | 870 | 870 |
+| Of those, opened for reading | 870 | 870 |
+| Driver services: `Type` 1 / `Type` 2 | 425 / 39 | 425 / 39 |
+| Driver files resolved | 463 | 463 |
+| Distinct files among them (services sharing one file) | 456 | 456 |
+| Driver files opened and hashed with SHA-256 | 463 | 463 |
+| Errors opening a key or a file | 0 | 0 |
+| Bytes hashed | 299 977 544 | 299 977 544 |
+| Time for all of the above | 8.72 s, the first pass | 1.38 s |
+
+Whether the files were already in the system's cache on the first pass was not controlled: the PC was in
+use, and a loaded driver's file may be. The time bounds nothing.
+
+**Where the files are**, of the 463:
+
+| Folder | Files | Hashed without Administrators |
+|---|---|---|
+| `%SystemRoot%\System32\drivers` | 419 | 419 |
+| `%SystemRoot%\System32\DriverStore` | 36 | 36 |
+| elsewhere under `%SystemRoot%` | 4 | 4 |
+| `Program Files`, outside `%SystemRoot%` | 4 | 4 |
+
+**`ImagePath` forms**, of the 464 driver services:
+
+| Form | Services |
+|---|---|
+| `\SystemRoot\…` | 233 |
+| `System32\…`, relative | 206 |
+| `\??\` and a drive letter | 12 |
+| absent | 12 |
+| `SysWOW64\drivers\…`, relative | 1 |
+| a bare drive letter, `%…%`, quoted, `\??\` without a drive letter, or anything else | 0 |
+
+Every `ImagePath` present was `REG_EXPAND_SZ` (452). For all 12 absent, `%SystemRoot%\System32\drivers\<service
+name>.sys` existed. The `SysWOW64\` service resolved under `%SystemRoot%` to a file that existed. It did not
+occur on the runner, and the script only found it because it counted what matched no known form.
+
+### What the PC settles, and what it does not
+
+1. **Rights (measurement 1):** on this PC, the limited token lists every driver service, reads `Type` and
+   `ImagePath`, and hashes every driver file, including the 40 in `DriverStore` and `Program Files`. It is
+   one PC. A driver installed with an ACL that refuses its users was not met, and the collector reads a
+   refused file as a gap, as it does any other.
+2. **Resolver cases:** five forms now, from two machines. Two are relative paths, under `System32\` and
+   `SysWOW64\`, and both resolved under `%SystemRoot%`. No primary source read here says Windows resolves
+   every relative `ImagePath` against `%SystemRoot%`. The collector's own ADR chooses between naming the two
+   folders measured and treating any relative path that way, and says which evidence it rests on.
+3. **Cost:** twice the runner's bytes on a PC with third-party drivers. Hashing stays where the time goes,
+   and the budget of its own that the runner's numbers called for stands.
+
+## The data file, counted
+
+Counted on 2026-09-15 at LOLDrivers commit
+[`1c60ea1`](https://github.com/magicsword-io/LOLDrivers/tree/1c60ea1c8909396fe294c76aaafae4923b6dbea1),
+from `yaml/` only, downloaded with a sparse checkout that fetched no file under `drivers/`. Every one of
+the 687 files parsed as YAML.
+
+| | `vulnerable driver` | `malicious` |
+|---|---|---|
+| Entries | 565 | 122 |
+| Entries with `Verified` true | 493 | 118 |
+| Samples under `KnownVulnerableSamples` | 2 045 | 345 |
+| Samples with a 64-hex-digit `SHA256` | 1 948 | 337 |
+| Distinct `SHA256` values | 1 865 | 316 |
+| Distinct `SHA256` values from verified entries only | 1 847 | — |
+| Samples with no file `SHA256` | 97 | 8 |
+| Of those, samples with an `Authentihash` `SHA256` | 78 | — |
+
+No `SHA256` appears in both categories. The README badge's "Drivers 2390", quoted under Question 1, is
+still 2,390 at this commit. It equals the number of samples across both categories (2,045 + 345), not the
+687 entries.
+
+What that means for the recommendation:
+
+- **Size:** 1,865 distinct hashes. A `match` list of that length is data the bundle build expands, as
+  Question 3 recommends, not text a reviewer reads.
+- **What a file hash misses in the list itself:** 97 samples have no file `SHA256`; an Authenticode hash
+  would reach 78 of them. That is a count for the Authenticode hash's own ADR, not a change to this one.
+- **Verified:** taking only verified entries drops 18 hashes. The collector's own ADR decides whether an
+  unverified entry is in the file.
+- **Also recorded, not a decision:** each sample carries `LoadsDespiteHVCI`. Among the vulnerable drivers'
+  distinct hashes, 324 say `TRUE`, 1,315 say `FALSE` and 226 carry no value. The report already shows
+  memory integrity (`posture`); whether a match should be read beside it is for the rule's own text.
+
 ## What is not established
 
-- Rights on a Windows 11 PC, and for driver files outside `%SystemRoot%`.
-- `ImagePath` forms on a PC with third-party drivers, and a primary source for the default when it is
-  absent.
-- How many hashes LOLDrivers holds per category, and how many samples lack a `SHA256`.
+- Rights for a standard account that is not an administrator on a PC, and for a driver file whose ACL
+  refuses its users.
+- A primary source for how Windows resolves a relative `ImagePath`, and for the default when it is absent.
 - Whether any Microsoft document names the blocklist switch. The pages read here do not.
 - The download terms of Microsoft's blocklist.
 - Which other hardware-utility drivers LOLDrivers lists. Only RTCore64.sys was opened.
@@ -369,3 +471,6 @@ using that path when the value is absent. It is one image's evidence, not a docu
 - Accepted by the owner on 2026-09-14, with all seven points of the recommendation as written.
 - README's M3 row links here: the vulnerable-driver list is designed, and waits on the measurements under
   "Before any code".
+- Amended on 2026-09-15: the rights, forms, cost and data-file measurements exist. The collector's own ADR
+  comes next, with the resolver's cases, the budget, whether unverified entries are in the data file, and
+  how the matched LOLDrivers entry reaches the row. Still no code, rule, fixture or dependency here.
