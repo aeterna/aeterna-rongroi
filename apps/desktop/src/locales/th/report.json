@@ -79,7 +79,8 @@
     "evtx": "Event log ของ Windows",
     "prefetch": "Prefetch ของ Windows",
     "bam": "Background Activity Moderator (BAM)",
-    "pca": "Program Compatibility Assistant"
+    "pca": "Program Compatibility Assistant",
+    "usn": "บันทึกการเปลี่ยนแปลงไฟล์ของ NTFS (USN journal)"
   },
   "group_count": {
     "found": "เจอ {{count}}",

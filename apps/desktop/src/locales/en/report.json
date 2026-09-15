@@ -79,7 +79,8 @@
     "evtx": "Windows event logs",
     "prefetch": "Windows Prefetch",
     "bam": "Background Activity Moderator (BAM)",
-    "pca": "Program Compatibility Assistant"
+    "pca": "Program Compatibility Assistant",
+    "usn": "NTFS change journal"
   },
   "group_count": {
     "found": "{{count}} found",

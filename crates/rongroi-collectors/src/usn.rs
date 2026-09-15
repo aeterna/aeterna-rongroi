@@ -97,10 +97,9 @@ const COUNTED: [&str; 10] = [
     "renamed",
 ];
 
-static REASONS: [UnmeasuredReason; 8] = [
+static REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
-    UnmeasuredReason::NotAttempted,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::SourceAbsent,
     UnmeasuredReason::Partial,
@@ -499,7 +498,13 @@ impl Tally {
                     "folder".to_owned(),
                     serde_json::Value::from(FOLDER_OTHER_VOLUME),
                 );
-                Some(UnmeasuredReason::NotAttempted)
+                // Not `not_attempted`: that reason's fixed wording ("this was not read — the scan
+                // stopped before reaching it") and its scope-statement handling in `rongroi-core::view`
+                // both say this program stopped short of something it otherwise would have reached.
+                // A folder on another volume was never reachable from the one journal this collector
+                // reads at all — `folder: other_volume` already says why — so this is a read this
+                // collector could not do, `read_failed`, not one it deferred.
+                Some(UnmeasuredReason::ReadFailed)
             }
         };
         (
@@ -706,7 +711,7 @@ mod tests {
         );
         assert_eq!(
             reason(fivem_dir::PLUGINS_LOCATION),
-            Some(UnmeasuredReason::NotAttempted)
+            Some(UnmeasuredReason::ReadFailed)
         );
         assert_eq!(
             reason(fivem_dir::ENHANCED_ASI_LOCATION),
@@ -731,7 +736,7 @@ mod tests {
             .iter()
             .find(|gap| gap.value == fivem_dir::PLUGINS_LOCATION)
             .map(|gap| gap.gaps["records"]);
-        assert_eq!(reason, Some(UnmeasuredReason::NotAttempted));
+        assert_eq!(reason, Some(UnmeasuredReason::ReadFailed));
 
         let prefetch = at(observations, PREFETCH_LOCATION);
         assert_eq!(prefetch.fields["folder"], FOLDER_IDENTIFIED);

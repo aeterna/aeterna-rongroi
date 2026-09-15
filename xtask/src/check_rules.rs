@@ -927,11 +927,13 @@ date: 2026-09-11
     }
 
     /// ADR 0027 recorded `not_on_this_os` and `service_disabled` as having no producer anywhere in
-    /// this build, so no rule could declare either. ADR 0030 gave each one exactly one, and this is
-    /// what that means for the gate: the reason is now usable, and only on the collector that can
-    /// actually report it. Asserted against the vocabulary the shipped executable builds, so a
-    /// collector that later stops producing one fails here rather than silently accepting a
-    /// suppression that never fires.
+    /// this build, so no rule could declare either. ADR 0030 gave each one exactly one owner, and
+    /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
+    /// both spending the same 30-second-budget idea on two different sources). This is what that
+    /// means for the gate: each reason is usable only on the collector(s) that can actually report
+    /// it. Asserted against the vocabulary the shipped executable builds, so a collector that later
+    /// starts or stops producing one fails here rather than silently accepting a suppression that
+    /// never fires, or missing one that now can.
     #[test]
     fn the_revived_reasons_belong_to_one_collector_each() {
         let vocabulary = Vocabulary::of_this_build();
@@ -942,20 +944,23 @@ date: 2026-09-11
                 .is_some_and(|reasons| reasons.contains(reason))
         };
 
-        for (reason, owner) in [
-            ("not_on_this_os", "pca"),
-            ("service_disabled", "prefetch"),
-            ("budget_spent", "evtx"),
-            ("not_attempted", "evtx"),
+        for (reason, owners) in [
+            ("not_on_this_os", &["pca"] as &[&str]),
+            ("service_disabled", &["prefetch"]),
+            ("budget_spent", &["evtx", "usn"]),
+            ("not_attempted", &["evtx"]),
         ] {
-            assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
+            for owner in owners {
+                assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
+            }
             for other in rongroi_collectors::all() {
-                if other.id() == owner {
+                if owners.contains(&other.id()) {
                     continue;
                 }
                 assert!(
                     !reports(other.id(), reason),
-                    "`{}` also reports `{reason}`; the ADR 0030 table says only `{owner}` does",
+                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
+                     names only {owners:?} as owners",
                     other.id()
                 );
             }

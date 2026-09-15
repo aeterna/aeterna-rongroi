@@ -217,6 +217,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
             \x20 - whether a Prefetch or event log file is marked read-only\n\
+            \x20 - how many times the change journal of the Windows drive recorded a file created, deleted, renamed or changed in the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, never a file name\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
             It shows only what matches a rule. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
             You may refuse.\n\
@@ -229,6 +230,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
+            \x20 - จำนวนครั้งที่ change journal ของไดรฟ์ Windows บันทึกว่ามีไฟล์ถูกสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไข ในโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM โดยไม่เก็บชื่อไฟล์\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
             แสดงเฉพาะสิ่งที่ตรง rule โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
             คุณปฏิเสธได้\n\
@@ -715,6 +717,7 @@ mod tests {
             ),
             ("prefetch", &["Prefetch"]),
             ("process", &[]),
+            ("usn", &["change journal"]),
         ];
         let mut ids: Vec<&str> = rongroi_collectors::all().iter().map(|c| c.id()).collect();
         ids.sort_unstable();

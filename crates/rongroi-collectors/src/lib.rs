@@ -154,6 +154,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(posture::Posture),
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
+        Box::new(usn::Usn::default()),
     ]
 }
 

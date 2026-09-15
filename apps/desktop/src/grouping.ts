@@ -16,6 +16,7 @@ export const COLLECTOR_ORDER = [
   "prefetch",
   "bam",
   "pca",
+  "usn",
 ] as const;
 
 export type StateFilter = Evidence["state"];
