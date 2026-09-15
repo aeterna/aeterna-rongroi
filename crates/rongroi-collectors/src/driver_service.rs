@@ -222,7 +222,14 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
     if paths::is_drive_rooted(text) {
         return Some(text.to_owned());
     }
-    if text.starts_with(['\\', '/', '%', '"']) || text.as_bytes().get(1) == Some(&b':') {
+    // A relative `ImagePath` is only the shape ADR 0048 measured: no leading `\` or `/`, no drive
+    // letter, and no `%` or `"` anywhere — not only leading, so `System32\%X%\a.sys` and
+    // `System32\drivers\a".sys` are unknown forms rather than a folder named `%X%` or a file named
+    // `a".sys`.
+    if text.starts_with(['\\', '/'])
+        || text.as_bytes().get(1) == Some(&b':')
+        || text.contains(['%', '"'])
+    {
         return None;
     }
     Some(format!(r"{root}\{text}"))
@@ -246,8 +253,25 @@ fn hash(host: &dyn Host, path: &str) -> Hash {
     }
 }
 
+/// Splits `path` into its parent directory and file name, keeping the separator when the parent is a
+/// bare drive.
+///
+/// `std::fs::read_dir("C:")` lists the process's *current directory on drive C:*, not `C:\` — std joins
+/// a relative piece onto a bare `X:` prefix without a separator, which Windows treats as drive-relative.
+/// A path with no separator at all, such as a plain file name, has no parent to list.
+fn parent_and_name(path: &str) -> Option<(&str, &str)> {
+    let index = path.rfind(['\\', '/'])?;
+    let (dir, name) = (&path[..index], &path[index + 1..]);
+    if dir.len() == 2 && dir.as_bytes()[1] == b':' {
+        // Keep the separator so the drive's root is listed, not the current directory on that drive.
+        Some((&path[..=index], name))
+    } else {
+        Some((dir, name))
+    }
+}
+
 fn is_missing(host: &dyn Host, path: &str) -> bool {
-    let Some((dir, name)) = path.rsplit_once(['\\', '/']) else {
+    let Some((dir, name)) = parent_and_name(path) else {
         return false;
     };
     match host.list_dir(dir) {
@@ -322,6 +346,17 @@ mod tests {
     }
 
     #[test]
+    fn a_bare_drive_keeps_its_separator_and_a_path_with_no_separator_has_no_parent() {
+        assert_eq!(parent_and_name(r"C:\drv.sys"), Some((r"C:\", "drv.sys")));
+        assert_eq!(
+            parent_and_name(r"C:\Windows\System32\drivers\a.sys"),
+            Some((r"C:\Windows\System32\drivers", "a.sys"))
+        );
+        assert_eq!(parent_and_name("C:/x.sys"), Some(("C:/", "x.sys")));
+        assert_eq!(parent_and_name("drv.sys"), None);
+    }
+
+    #[test]
     fn every_known_form_resolves_under_system_root_or_as_written() {
         let root = r"C:\Windows\";
         let text = |value: &str| ImagePath::Text(value.to_owned());
@@ -355,6 +390,8 @@ mod tests {
             (text(r"\\server\share\i.sys"), None),
             (text(r"\Device\HarddiskVolume3\j.sys"), None),
             (text("C:relative.sys"), None),
+            (text(r"System32\%X%\a.sys"), None),
+            (text(r#"System32\drivers\a".sys"#), None),
             (ImagePath::OtherType, None),
         ] {
             assert_eq!(
