@@ -154,7 +154,9 @@ such rule existed.
   nothing embedded.
 - **The Windows CI job** switches the CAPI2 operational log on (on a runner that is thrown away),
   runs the offline live tests, and fails if the log recorded nothing from the test process, or if any
-  event 53 ("Retrieve Object from Network") names it. It then clears the URL cache and runs
+  event 53 ("Retrieve Object from Network") names it. The log is written asynchronously, so the events
+  are read once they stop arriving, within 60 seconds (measured 2026-09-15: one read straight after the
+  tests usually missed some of them, and once all of them). It then clears the URL cache and runs
   `live_online_*`, which uses settings the product never uses, and fails unless event 53 appears. That
   second half is what makes an empty result evidence rather than silence.
 
