@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, RegistryData, SourceError};
+use rongroi_host::{DirEntryInfo, Host, Platform, RegistryData, SourceError};
 
 use crate::{Collector, Field, paths, prefetch};
 
@@ -316,7 +316,19 @@ fn is_missing(host: &dyn Host, path: &str) -> bool {
     let Some((dir, name)) = parent_and_name(path) else {
         return false;
     };
-    match host.list_dir(dir) {
+    missing_from(host.list_dir(dir), name)
+}
+
+/// Whether a folder listing says `name` is not in that folder — pulled out of `is_missing` (R2) so the
+/// decision can be unit-tested directly against every shape `FilesystemSource::list_dir` answers with,
+/// rather than only through a fixture host whose `access_denied` folder also makes `file_sha256` return
+/// before `is_missing` is ever called.
+///
+/// `Ok(None)` (the folder itself does not exist) and `Ok(Some(entries))` without a case-insensitive
+/// match both say the file is missing. A listing this program could not get — refused or failed for any
+/// other reason — says nothing about whether the file is there, so it is never read as "missing".
+fn missing_from(listing: Result<Option<Vec<DirEntryInfo>>, SourceError>, name: &str) -> bool {
+    match listing {
         Ok(None) => true,
         Ok(Some(entries)) => !entries
             .iter()
@@ -396,6 +408,26 @@ mod tests {
         );
         assert_eq!(parent_and_name("C:/x.sys"), Some(("C:/", "x.sys")));
         assert_eq!(parent_and_name("drv.sys"), None);
+    }
+
+    /// R2: `missing_from` in isolation, so the `Err` arm — "a listing this program could not get says
+    /// nothing about whether the file is there" — is tested directly rather than only through a
+    /// fixture host whose `access_denied` folder also makes `file_sha256` return before `is_missing`
+    /// is ever called. A `Err(_) => true` mutant fails the `AccessDenied` and `Failed` assertions here.
+    #[test]
+    fn missing_from_says_missing_only_for_a_folder_that_was_actually_read() {
+        let entry = |name: &str| DirEntryInfo {
+            name: name.to_owned(),
+            is_file: true,
+        };
+        assert!(missing_from(Ok(None), "drv.sys"));
+        assert!(missing_from(Ok(Some(vec![entry("other.sys")])), "drv.sys"));
+        assert!(!missing_from(Ok(Some(vec![entry("DRV.SYS")])), "drv.sys"));
+        assert!(!missing_from(Err(SourceError::AccessDenied), "drv.sys"));
+        assert!(!missing_from(
+            Err(SourceError::Failed("no such file".to_owned())),
+            "drv.sys"
+        ));
     }
 
     #[test]
@@ -650,12 +682,14 @@ mod tests {
         );
     }
 
-    /// F2: a folder listing that is itself refused must not be read as "the file is not there" —
-    /// `is_missing`'s `Err(_)` branch keeps the original failure instead of turning it into
-    /// `Hash::Missing`. Denying the folder makes both the hash read and the folder listing fail here
-    /// (`crates/rongroi-host/src/fixture.rs` `described_file` checks the same `access_denied` list
-    /// `list_dir` does), which still exercises the branch: without it, the mutation `Err(_) => true`
-    /// would turn this refusal into "not a gap".
+    /// R2 correction: this does **not** exercise `is_missing`'s (now `missing_from`'s) `Err(_)`
+    /// branch — `crates/rongroi-host/src/fixture.rs`'s `described_file` refuses on the same
+    /// `access_denied` folder entry `list_dir` does, so `file_sha256` itself returns `AccessDenied`
+    /// and `hash`'s F4 arm (`Err(SourceError::AccessDenied) => Hash::Failed(AccessDenied)`) returns
+    /// before `is_missing` is ever called. What this covers is F4 through a second construction — the
+    /// whole folder denied, not only the one file — and it still shows the gap survives rather than
+    /// being read as "missing". `missing_from_says_missing_only_for_a_folder_that_was_actually_read`
+    /// is what tests `missing_from`'s `Err` arm directly.
     #[test]
     fn a_refused_folder_listing_keeps_the_hash_failure_as_a_gap_instead_of_calling_it_missing() {
         let host = FixtureHost::from_yaml_str(
