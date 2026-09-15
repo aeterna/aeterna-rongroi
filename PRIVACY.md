@@ -148,8 +148,25 @@ or allow remote access.
 | Consent screen | no | yes — you may refuse |
 | Evidence shown | everything | rule matches, plus counts of what was not found or could not be answered for a reason the rule itself said is ordinary. A check this program stopped short of is shown, because that is its own limit and not a fact about your PC |
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
-| Paths | full | your user-profile folder is replaced with `%USERPROFILE%` |
+| Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
 | When Windows last started | shown | shown, as one time at the top of the report |
+
+### Which folders count as your user-profile folder
+
+SS mode replaces the folder that holds your profile and the name after it, wherever a path names it:
+
+- `Users\<your name>` on any drive, in any upper or lower case;
+- `Documents and Settings\<your name>`, the older name Windows still answers to, and its short 8.3 form;
+- the same folders reached through a drive's administrative share, such as `\\<pc>\C$\Users\<your name>`;
+- the folder your PC creates new profiles in, when it has been moved away from `Users`. The scan reads that
+  setting (`ProfilesDirectory`) so that SS mode can use it. A Self-mode report carries it; an SS-mode
+  report does not.
+
+What it does **not** cover: a profile moved for one account on its own, to a folder that is neither of
+the above. Windows allows that, and a path inside such a profile is shown as it is, with your account name
+in it if the folder carries one. Reading every account's profile location to redact it would put the list
+of accounts on your PC into the report, which is more than this check needs (ADR 0049). If your profile
+lives somewhere like that, look at the report in Self mode first.
 
 ### Program names are not redacted, and that can matter
 

@@ -385,6 +385,11 @@ pub struct ReportHeader {
     /// `unmeasured` / `not_attempted`.
     #[serde(default)]
     pub boot_time: BootTime,
+    /// The machine's `ProfilesDirectory`, expanded, when the scan could read it (ADR 0049). It is
+    /// what SS-mode redaction treats as a profile root besides the fixed ones, and nothing else reads
+    /// it; the SS view drops it. Additive, and [`REPORT_SCHEMA_VERSION`] stays at 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profiles_directory: Option<String>,
 }
 
 /// One observation that describes aeterna-rongroi itself rather than the machine it scanned.

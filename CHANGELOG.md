@@ -37,6 +37,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   after 30 seconds. No administrator rights are needed. No rule reads it yet (ADR 0048).
 
 ### Changed
+- SS-mode redaction knows more profile folders (ADR 0049). Besides `X:\Users\<name>`, it replaces
+  `Documents and Settings\<name>` and its 8.3 short name, the same folders reached through a drive's
+  administrative share, and the machine's own `ProfilesDirectory` when it has been moved. Any mix of `\`
+  and `/` and repeated separators is read as one. The scan reads `ProfilesDirectory` into the report header
+  (`profiles_directory`, additive, schema stays at 1); an SS view drops it. A profile moved for one
+  account on its own is still not reached, and `PRIVACY.md` says so.
 - The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the
   commit, the rules bundle SHA-256 and how to check a downloaded file (ADR 0045).
 - The vulnerable-driver list is designed (ADR 0046, accepted): LOLDrivers' vulnerable drivers by SHA-256,

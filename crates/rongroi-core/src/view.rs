@@ -154,8 +154,9 @@ fn ss_lists(item: &Evidence) -> bool {
 ///
 /// - Self: everything, unchanged.
 /// - SS: what [`ss_lists`] admits, with user names in paths replaced by
-///   [`USERPROFILE_PLACEHOLDER`]; every other piece of evidence is counted in [`HiddenCounts`];
-///   unmatched observations are counted and none are listed (ADR 0014).
+///   [`USERPROFILE_PLACEHOLDER`] ([`redact_profile_paths`], with the header's `profiles_directory`);
+///   every other piece of evidence is counted in [`HiddenCounts`]; unmatched observations are counted
+///   and none are listed (ADR 0014). The header it carries has no `profiles_directory` (ADR 0049).
 ///
 /// Both modes carry the same [`ScopeNotes`]: they are facts about the scan, and SS mode's filter is
 /// about evidence.
@@ -172,11 +173,12 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
             hidden: HiddenCounts::default(),
         },
         Mode::Ss => {
+            let profiles_directory = report.header.profiles_directory.as_deref();
             let mut hidden = HiddenCounts::default();
             let mut evidence = Vec::new();
             for item in &report.evidence {
                 if ss_lists(item) {
-                    evidence.push(redacted(item));
+                    evidence.push(redacted(item, profiles_directory));
                     continue;
                 }
                 match &item.state {
@@ -198,11 +200,21 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
                 .map(|group| group.observations.len())
                 .sum();
             let listed = listed_counts(&evidence);
+            // Needed to redact and not to review, and a setting whoever set up the machine chose can
+            // itself carry a name (ADR 0049).
+            let header = ReportHeader {
+                profiles_directory: None,
+                ..report.header.clone()
+            };
             ReportView {
                 mode,
-                header: report.header.clone(),
+                header,
                 evidence,
-                own_traces: report.own_traces.iter().map(redacted_own_trace).collect(),
+                own_traces: report
+                    .own_traces
+                    .iter()
+                    .map(|entry| redacted_own_trace(entry, profiles_directory))
+                    .collect(),
                 unmatched: Vec::new(),
                 scope: scope_notes(report),
                 listed,
@@ -212,11 +224,13 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
     }
 }
 
-fn redacted(item: &Evidence) -> Evidence {
+fn redacted(item: &Evidence, profiles_directory: Option<&str>) -> Evidence {
     let mut item = item.clone();
     if let EvidenceState::Found { observations } = &mut item.state {
         for observation in observations {
-            observation.fields.values_mut().for_each(redact_value);
+            for value in observation.fields.values_mut() {
+                redact_value(value, profiles_directory);
+            }
         }
     }
     item
@@ -225,54 +239,182 @@ fn redacted(item: &Evidence) -> Evidence {
 /// An own trace as SS mode shows it. It is always listed — the mode's "matches and posture only"
 /// filter is about evidence, and this is not evidence — but its paths are of the same shape as any
 /// other and carry the same user name, so they go through the same redaction (ADR 0010).
-fn redacted_own_trace(entry: &OwnTraceEntry) -> OwnTraceEntry {
+fn redacted_own_trace(entry: &OwnTraceEntry, profiles_directory: Option<&str>) -> OwnTraceEntry {
     let mut entry = entry.clone();
-    entry.observation.fields.values_mut().for_each(redact_value);
+    for value in entry.observation.fields.values_mut() {
+        redact_value(value, profiles_directory);
+    }
     entry
 }
 
-fn redact_value(value: &mut serde_json::Value) {
+fn redact_value(value: &mut serde_json::Value, profiles_directory: Option<&str>) {
     match value {
-        serde_json::Value::String(text) => *text = redact_user_paths(text),
-        serde_json::Value::Array(items) => items.iter_mut().for_each(redact_value),
-        serde_json::Value::Object(map) => map.values_mut().for_each(redact_value),
+        serde_json::Value::String(text) => *text = redact_profile_paths(text, profiles_directory),
+        serde_json::Value::Array(items) => {
+            for item in items {
+                redact_value(item, profiles_directory);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            for item in map.values_mut() {
+                redact_value(item, profiles_directory);
+            }
+        }
         _ => {}
     }
 }
 
-/// Replaces `X:\Users\<name>` (either slash, any case) with [`USERPROFILE_PLACEHOLDER`].
+/// Replaces the user-profile part of a path with [`USERPROFILE_PLACEHOLDER`], knowing only the root
+/// folders every Windows machine has. See [`redact_profile_paths`].
 pub fn redact_user_paths(input: &str) -> String {
-    const SEGMENT: &[u8] = b"users";
+    redact_profile_paths(input, None)
+}
+
+/// Replaces `<drive>\<root>\<name>` with [`USERPROFILE_PLACEHOLDER`], wherever it occurs in `input`
+/// (ADR 0049).
+///
+/// `<drive>` is an ASCII letter and `:`, or an ASCII letter and `$` straight after a separator (the
+/// administrative share `\\host\X$\`). `<root>` is, on any drive, `Users`, `Documents and Settings` or
+/// `DOCUME~` and digits, in any ASCII case; and `profiles_directory`, the machine's own root, on its
+/// own drive only. Every boundary is one or more separators, `\` or `/` in any mix, and a root folder
+/// may end in dots or spaces: Windows reads each of those spellings as the same folder. A root with no
+/// name after it is left as it is.
+pub fn redact_profile_paths(input: &str, profiles_directory: Option<&str>) -> String {
+    let machine_root = profiles_directory.and_then(MachineRoot::parse);
     let lower = input.to_ascii_lowercase();
     let bytes = lower.as_bytes();
     let mut out = String::with_capacity(input.len());
     let mut copied_to = 0;
-    let mut i = 1;
-    // `X:\users\` is 9 bytes starting at the drive letter; `i` points at the colon.
-    while i + 2 + SEGMENT.len() < bytes.len() {
-        let separator = bytes[i + 1];
-        let is_profile_root = bytes[i] == b':'
-            && bytes[i - 1].is_ascii_alphabetic()
-            && (separator == b'\\' || separator == b'/')
-            && &bytes[i + 2..i + 2 + SEGMENT.len()] == SEGMENT
-            && bytes[i + 2 + SEGMENT.len()] == separator;
-        if is_profile_root {
-            let name_start = i + 3 + SEGMENT.len();
-            let name_end = input[name_start..]
-                .find(['\\', '/'])
-                .map_or(input.len(), |offset| name_start + offset);
-            if name_end > name_start {
-                out.push_str(&input[copied_to..i - 1]);
-                out.push_str(USERPROFILE_PLACEHOLDER);
-                copied_to = name_end;
-                i = name_end + 1;
-                continue;
-            }
+    let mut i = 0;
+    while i < bytes.len() {
+        if let Some(name_end) = profile_name_end(bytes, i, machine_root.as_ref()) {
+            // `i` is an ASCII letter and `name_end` a separator or the end, so both are char boundaries.
+            out.push_str(&input[copied_to..i]);
+            out.push_str(USERPROFILE_PLACEHOLDER);
+            copied_to = name_end;
+            i = name_end;
+            continue;
         }
         i += 1;
     }
     out.push_str(&input[copied_to..]);
     out
+}
+
+fn is_separator(byte: u8) -> bool {
+    byte == b'\\' || byte == b'/'
+}
+
+/// The machine's `ProfilesDirectory` as [`redact_profile_paths`] matches it: its drive letter and the
+/// folders after it, lower-cased in ASCII.
+struct MachineRoot {
+    drive: u8,
+    folders: Vec<Vec<u8>>,
+}
+
+impl MachineRoot {
+    /// `None` unless `dir` is a drive letter, `:` and a separator. A `%` left in it is a variable the
+    /// scan did not expand, so it names no folder and is not matched.
+    fn parse(dir: &str) -> Option<Self> {
+        let bytes = dir.as_bytes();
+        let drive_rooted = bytes.len() >= 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && is_separator(bytes[2]);
+        if !drive_rooted || dir.contains('%') {
+            return None;
+        }
+        let folders = dir[3..]
+            .to_ascii_lowercase()
+            .split(['\\', '/'])
+            .filter(|folder| !folder.is_empty())
+            .map(|folder| folder.as_bytes().to_vec())
+            .collect();
+        Some(Self {
+            drive: bytes[0].to_ascii_lowercase(),
+            folders,
+        })
+    }
+}
+
+/// When a profile root starts at `i` of `bytes` (lower-cased) and a name follows it, where the name
+/// ends: at the next separator, or at the end.
+fn profile_name_end(bytes: &[u8], i: usize, machine_root: Option<&MachineRoot>) -> Option<usize> {
+    let drive = *bytes.get(i)?;
+    let marker = *bytes.get(i + 1)?;
+    let is_drive = drive.is_ascii_alphabetic()
+        && (marker == b':' || (marker == b'$' && i > 0 && is_separator(bytes[i - 1])));
+    if !is_drive {
+        return None;
+    }
+    let after_drive = separators_end(bytes, i + 2)?;
+    // The machine's root first: it can name more folders than a fixed root that shares its first one.
+    let name_start = machine_root
+        .filter(|root| root.drive == drive)
+        .and_then(|root| folders_end(bytes, after_drive, &root.folders))
+        .or_else(|| {
+            [&b"users"[..], b"documents and settings"]
+                .into_iter()
+                .find_map(|folder| folder_end(bytes, after_drive, folder))
+        })
+        .or_else(|| short_documents_end(bytes, after_drive))?;
+    let name_end = bytes[name_start..]
+        .iter()
+        .position(|&byte| is_separator(byte))
+        .map_or(bytes.len(), |offset| name_start + offset);
+    (name_end > name_start).then_some(name_end)
+}
+
+/// Where the byte after a run of one or more separators starting at `at` is.
+fn separators_end(bytes: &[u8], at: usize) -> Option<usize> {
+    let run = bytes
+        .get(at..)?
+        .iter()
+        .take_while(|&&byte| is_separator(byte))
+        .count();
+    (run > 0).then_some(at + run)
+}
+
+/// Where the byte after `folder`, any dots or spaces ending it, and its separators is, when `bytes`
+/// holds them at `at`.
+fn folder_end(bytes: &[u8], at: usize, folder: &[u8]) -> Option<usize> {
+    let end = at + folder.len();
+    if bytes.get(at..end)? != folder {
+        return None;
+    }
+    let trailing = bytes[end..]
+        .iter()
+        .take_while(|&&byte| byte == b'.' || byte == b' ')
+        .count();
+    separators_end(bytes, end + trailing)
+}
+
+fn folders_end(bytes: &[u8], at: usize, folders: &[Vec<u8>]) -> Option<usize> {
+    folders
+        .iter()
+        .try_fold(at, |at, folder| folder_end(bytes, at, folder))
+}
+
+/// `docume~` and one or more digits: the 8.3 short name of `Documents and Settings`.
+fn short_documents_end(bytes: &[u8], at: usize) -> Option<usize> {
+    const STEM: &[u8] = b"docume~";
+    let digits_start = at + STEM.len();
+    if bytes.get(at..digits_start)? != STEM {
+        return None;
+    }
+    let digits = bytes[digits_start..]
+        .iter()
+        .take_while(|byte| byte.is_ascii_digit())
+        .count();
+    if digits == 0 {
+        return None;
+    }
+    // From the digits on it ends like any other root folder.
+    folder_end(
+        bytes,
+        digits_start,
+        &bytes[digits_start..digits_start + digits],
+    )
 }
 
 #[cfg(test)]
@@ -313,6 +455,172 @@ mod tests {
         assert_eq!(redact_user_paths("no paths here"), "no paths here");
     }
 
+    /// The roots every machine has, measured on current Windows (ADR 0049): the alias of `Users` kept
+    /// for old programs, its 8.3 short name, and the administrative share of a drive.
+    #[test]
+    fn redacts_the_alias_its_short_name_and_the_administrative_share() {
+        for (input, expected) in [
+            (
+                r"C:\Documents and Settings\bob\AppData\x.sys",
+                r"%USERPROFILE%\AppData\x.sys",
+            ),
+            (r"c:\DOCUMENTS AND SETTINGS\bob", "%USERPROFILE%"),
+            (r"C:\DOCUME~1\bob\x.exe", r"%USERPROFILE%\x.exe"),
+            (r"C:\docume~12\bob\x.exe", r"%USERPROFILE%\x.exe"),
+            (
+                r"\\localhost\C$\Users\bob\x.exe",
+                r"\\localhost\%USERPROFILE%\x.exe",
+            ),
+            (
+                r"\\?\UNC\127.0.0.1\c$\DOCUME~1\bob\x.exe",
+                r"\\?\UNC\127.0.0.1\%USERPROFILE%\x.exe",
+            ),
+            (r"\\?\C:\Users\bob\x.exe", r"\\?\%USERPROFILE%\x.exe"),
+            (r"C:\Users/bob\x.exe", r"%USERPROFILE%\x.exe"),
+            (
+                r"C:/Documents and Settings\bob/x.exe",
+                "%USERPROFILE%/x.exe",
+            ),
+            (r"C:\\Users\\bob\x.exe", r"%USERPROFILE%\x.exe"),
+            (r"C:\Users. \bob\x.exe", r"%USERPROFILE%\x.exe"),
+            (r"C:\DOCUME~1.\bob", "%USERPROFILE%"),
+        ] {
+            assert_eq!(redact_user_paths(input), expected, "{input}");
+        }
+    }
+
+    /// What is not a profile root stays as it is: a root with no name, a short name that is not
+    /// followed by digits, a `$` that is not a drive of a share, and a root folder that is not the
+    /// first folder on its drive.
+    #[test]
+    fn leaves_what_is_not_a_profile_root() {
+        for input in [
+            r"C:\Documents and Settings\",
+            r"C:\DOCUME~1\",
+            r"C:\DOCUME~\bob\x",
+            r"C:\DOCUME~1a\bob\x",
+            r"C:\Documents\bob\x",
+            r"price$\Users\bob",
+            r"\\host\share$\Users\bob",
+            r"D:\Games\users\z",
+            r"C:\Windows\System32\drivers\x.sys",
+        ] {
+            assert_eq!(redact_user_paths(input), input);
+        }
+    }
+
+    /// The machine's own root, on its own drive and in either separator and case; the fixed roots
+    /// still apply beside it.
+    #[test]
+    fn redacts_the_machine_profile_root_on_its_own_drive() {
+        let root = Some(r"D:\Data\Profiles");
+        for (input, expected) in [
+            (r"D:\Data\Profiles\bob\x.exe", r"%USERPROFILE%\x.exe"),
+            (r"d:/data/PROFILES/bob", "%USERPROFILE%"),
+            (r"\\host\D$\Data\Profiles\bob\x", r"\\host\%USERPROFILE%\x"),
+            (r"C:\Users\bob\x.exe", r"%USERPROFILE%\x.exe"),
+            (r"E:\Data\Profiles\bob\x.exe", r"E:\Data\Profiles\bob\x.exe"),
+            (r"D:\Data\bob\x.exe", r"D:\Data\bob\x.exe"),
+            (r"D:\Data\Profiles\", r"D:\Data\Profiles\"),
+            (r"D:\\Data.\\Profiles\bob", "%USERPROFILE%"),
+        ] {
+            assert_eq!(redact_profile_paths(input, root), expected, "{input}");
+        }
+    }
+
+    /// The machine's root is tried before a fixed root it could share a first folder with, so the
+    /// name after the longer root is the one replaced.
+    #[test]
+    fn a_machine_root_under_users_replaces_the_name_after_it() {
+        assert_eq!(
+            redact_profile_paths(r"C:\Users\Profiles\bob\x", Some(r"C:\Users\Profiles\")),
+            r"%USERPROFILE%\x"
+        );
+    }
+
+    /// A drive root as the machine's root costs the first folder of every path on that drive and on no
+    /// other (ADR 0049).
+    #[test]
+    fn a_drive_root_as_the_machine_root_redacts_the_first_folder_of_that_drive_only() {
+        assert_eq!(
+            redact_profile_paths(r"D:\bob\x.exe", Some(r"D:\")),
+            r"%USERPROFILE%\x.exe"
+        );
+        assert_eq!(
+            redact_profile_paths(r"C:\Windows\x.exe", Some(r"D:\")),
+            r"C:\Windows\x.exe"
+        );
+    }
+
+    /// A value the scan could not expand, or one that is not drive-rooted, names no folder: only the
+    /// fixed roots apply.
+    #[test]
+    fn a_machine_root_that_is_not_a_drive_rooted_folder_is_ignored() {
+        for root in [
+            r"%SystemDrive%\Profiles",
+            r"\\server\profiles",
+            "Profiles",
+            "D:",
+            "",
+        ] {
+            assert_eq!(
+                redact_profile_paths(r"D:\Profiles\bob\x", Some(root)),
+                r"D:\Profiles\bob\x",
+                "{root:?}"
+            );
+            assert_eq!(
+                redact_profile_paths(r"C:\Users\bob\x", Some(root)),
+                r"%USERPROFILE%\x",
+                "{root:?}"
+            );
+        }
+    }
+
+    /// A name that is not ASCII is copied out whole and replaced whole, at every root.
+    #[test]
+    fn a_name_that_is_not_ascii_is_replaced_whole() {
+        assert_eq!(
+            redact_profile_paths(r"D:\โปรไฟล์\สมชาย\x", Some(r"D:\โปรไฟล์")),
+            r"%USERPROFILE%\x"
+        );
+        assert_eq!(redact_user_paths(r"C:\DOCUME~1\สมชาย"), "%USERPROFILE%");
+    }
+
+    /// The SS view redacts with the root the report carries and does not pass the root on.
+    #[test]
+    fn ss_view_redacts_under_the_machine_root_and_drops_it_from_the_header() {
+        let mut report = report();
+        report.header.profiles_directory = Some(r"D:\Profiles".to_owned());
+        if let EvidenceState::Found { observations } = &mut report.evidence[0].state {
+            observations[0].fields.insert(
+                "path".to_owned(),
+                serde_json::Value::from(format!(r"D:\Profiles\{USER}\tools\x.dll")),
+            );
+        }
+
+        let ss = for_mode(&report, Mode::Ss);
+        let EvidenceState::Found { observations } = &ss.evidence[0].state else {
+            panic!("{:?}", ss.evidence[0]);
+        };
+        assert_eq!(
+            observations[0]
+                .fields
+                .get("path")
+                .and_then(serde_json::Value::as_str),
+            Some(r"%USERPROFILE%\tools\x.dll")
+        );
+        assert_eq!(ss.header.profiles_directory, None);
+        let json = serde_json::to_string(&ss).unwrap();
+        assert!(!json.contains(USER), "{json}");
+        assert!(!json.contains("profiles_directory"), "{json}");
+
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert_eq!(
+            own.header.profiles_directory.as_deref(),
+            Some(r"D:\Profiles")
+        );
+    }
+
     fn header() -> ReportHeader {
         ReportHeader {
             schema_version: 1,
@@ -327,6 +635,7 @@ mod tests {
             elevated: Some(false),
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
             boot_time: crate::model::BootTime::default(),
+            profiles_directory: None,
         }
     }
 

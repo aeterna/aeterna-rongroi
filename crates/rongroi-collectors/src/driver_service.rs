@@ -246,10 +246,9 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
     // ending in `.` or a space, or one that names an alternate data stream with a `:` past the drive,
     // are all unknown forms rather than paths that resolve to the file they appear to name. The
     // segment right after the drive is also refused when it is the legacy profile folder
-    // `Documents and Settings` (a junction to `Users` on current Windows), which
-    // `rongroi_core::view::redact_user_paths` does not recognise. Together these keep every reported
-    // path under a user profile in the one `X:\Users\<name>` shape that function reaches — no such
-    // form was measured on either machine.
+    // `Documents and Settings` (a junction to `Users` on current Windows). SS-mode redaction reaches
+    // that folder too since ADR 0049; the refusal stays because this program does not read the
+    // file a spelling appears to name — no such form was measured on either machine.
     let mut segments = resolved.split('\\');
     segments.next(); // the drive segment, e.g. `C:` — not checked here
     for (index, segment) in segments.enumerate() {
@@ -492,8 +491,8 @@ mod tests {
             (text(r"C:\Users.\bob\x.sys"), None),
             (text(r"C:\Users \bob\x.sys"), None),
             (text(r"C:\Users::$INDEX_ALLOCATION\bob\x.sys"), None),
-            // R1: `Documents and Settings` is a junction to `Users` on current Windows, and
-            // `redact_user_paths` does not know that shape.
+            // R1: `Documents and Settings` is a junction to `Users` on current Windows; an unknown
+            // form here, though SS-mode redaction reaches it (ADR 0049).
             (text(r"C:\Documents and Settings\bob\x.sys"), None),
         ] {
             assert_eq!(

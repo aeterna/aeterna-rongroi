@@ -94,13 +94,12 @@ row), rather than the file its segments appear to name, when any segment after t
 is empty, from a repeated or trailing separator; ends in `.` or a space; contains a `:` past the drive
 (reaching an alternate data stream); or, for the segment right after the drive, is `Documents and Settings`
 (a junction to `Users` on current Windows) case-insensitively. No such `ImagePath` was measured on either
-machine. Each of these forms would otherwise carry a user name past SS-mode redaction, because
-`rongroi_core::view::redact_user_paths` recognises a profile path only as a drive letter, `\` or `/`, the
-folder `Users` in any ASCII case and the name after it. Refusing them does not make that redaction complete:
-a profile folder can also be named by an 8.3 short name, by a spelling that only Windows' own case table
-folds to `Users`, or be moved elsewhere by the machine's profile settings, and `redact_user_paths` reaches
-none of those. That limit belongs to the redaction every collector that reports a path shares, not to this
-resolver, and is not closed here.
+machine. Each is a spelling this program does not read as the file it appears to name. When this ADR was
+accepted, each could also have carried a user name past SS-mode redaction, which then recognised a profile
+path only as a drive letter, one separator, the folder `Users` and the name after it. Which folders SS mode
+treats as a profile root is decided for every collector that reports a path in ADR 0049, not in this
+resolver: since then redaction reaches these spellings as well, and the refusals stay because the resolver
+still does not read them. ADR 0049 also states what redaction does not reach.
 
 ### What is a gap and what is not
 
@@ -231,8 +230,8 @@ No baseline is built from anyone's own PC.
 
 Every driver service is emitted, as `process` emits every process (ADR 0046). In Self mode the player sees
 their own driver list among unmatched observations; in SS mode only a match is listed, and every driver the
-rule did not match is counted (ADR 0014). A path under `X:\Users\<name>\` is redacted in SS mode like any
-other (ADR 0023); every form the resolver produces is drive-letter form, so none escapes it.
+rule did not match is counted (ADR 0014). A path under a profile root is redacted in SS mode like any
+other (ADR 0023, ADR 0049); every form the resolver produces is drive-letter form.
 
 `PRIVACY.md`, the CLI consent text and the desktop consent text name driver services — their names, file
 paths and file hashes — in the pull request that registers the collector.
