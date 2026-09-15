@@ -5,8 +5,8 @@
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
 FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, the list of running processes, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
-event logs hold, and how many times the change journal of the Windows drive recorded a change in the
-folders those collectors read.
+event logs hold, and counts of the Windows drive's change journal records, for the drive as a whole and
+for each folder those collectors read, with no file name.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -167,8 +167,8 @@ tool did, not more. Paths in it are redacted in SS mode like any other.
 ### What a collector saw that no rule matched
 
 Some collectors read things no rule asks about — the list of programs you are running, what Windows
-recorded about programs that ran, whether each FiveM plugin folder was there, and how many change journal
-records named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
+recorded about programs that ran, whether each FiveM plugin folder was there, and how many records the
+Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
 can read what the tool saw and judge it yourself.
 
 **SS mode does not list them.** It says how many there were and nothing more. That mode promises to show
