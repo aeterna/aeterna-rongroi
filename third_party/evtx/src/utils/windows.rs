@@ -45,7 +45,7 @@ pub(crate) fn systime_from_bytes(bytes: &[u8; 16]) -> DeserializationResult<Time
     let hour = i8::try_from(hour).map_err(|_| DeserializationError::InvalidDateTimeError)?;
     let minute = i8::try_from(minute).map_err(|_| DeserializationError::InvalidDateTimeError)?;
     let second = i8::try_from(second).map_err(|_| DeserializationError::InvalidDateTimeError)?;
-    let nanos = i32::try_from(milliseconds * 1_000_000)
+    let nanos = i32::try_from(u64::from(milliseconds) * 1_000_000)
         .map_err(|_| DeserializationError::InvalidDateTimeError)?;
 
     let dt = DateTime::new(year, month, day, hour, minute, second, nanos)

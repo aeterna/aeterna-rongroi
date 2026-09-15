@@ -1,6 +1,6 @@
 # Vendored `evtx` — provenance
 
-This directory is the `evtx` crate's own source, vendored into this repository and carrying **three
+This directory is the `evtx` crate's own source, vendored into this repository and carrying **four
 patches**. It is not a fork: the intent is to carry them only until an upstream release includes them,
 then delete this directory and go back to the registry crate.
 
@@ -23,10 +23,10 @@ annotation would be a false claim.
 
 ## The patches
 
-Three, in three files, all found by `fuzz_evtx` and each one after the last had been fixed and merged.
-The first two are the same kind of defect — a number read off the wire used in arithmetic without
-checking what the wire could actually hold. The third is not: it is a walk over a linked structure
-built from the file, with no record of where it had already been.
+Four, in four files, all found by `fuzz_evtx` and each one after the last had been fixed and merged.
+The first, second and fourth are the same kind of defect — a number read off the wire used in
+arithmetic without checking what the wire could actually hold. The third is not: it is a walk over a
+linked structure built from the file, with no record of where it had already been.
 
 ### 1. An unbounded reservation — `src/binxml/tokens.rs`
 
@@ -166,6 +166,66 @@ parser is closed" is not "this parser cannot hang". Both saved reproducers now p
 before), the third artifact CI produced on 2026-09-12 was never retrieved and so was never re-run, and
 `fuzz_evtx` remains the only thing looking for a fourth defect.
 
+### 4. A `SYSTEMTIME`'s milliseconds multiplied in `u32` — `src/utils/windows.rs`
+
+`systime_from_bytes`, line 48:
+
+```rust
+let milliseconds = u32::from(u16::from_le_bytes([bytes[14], bytes[15]]));
+// ...
+let nanos = i32::try_from(milliseconds * 1_000_000)
+//                        ^^^^^^^^^^^^^^^^^^^^^^^ u32 arithmetic, checked afterwards
+```
+
+The milliseconds are a `u16` from the file, widened to `u32` and multiplied by a million **in `u32`**, so
+any value above 4294 overflows. Where overflow checks are on it panics:
+
+```
+thread '<unnamed>' panicked at third_party/evtx/src/utils/windows.rs:48:31:
+attempt to multiply with overflow
+```
+
+In a release build it wraps silently and the wrapped value goes on to `i32::try_from` and
+`DateTime::new`. The fix widens to `u64` before multiplying, the same shape as patch 2.
+
+**Why widen rather than refuse values above 999.** Microsoft documents the field as "The millisecond.
+The valid values for this member are 0 through 999"
+([SYSTEMTIME](https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-systemtime),
+read 2026-09-15), so refusing everything above 999 is the right outcome — and after widening it is the
+outcome: 1000 to 2147 give nanoseconds `i32` holds, which `DateTime::new` refuses; 2148 and above fail
+`i32::try_from`. Both return `InvalidDateTimeError`. Measured before the patch, on the rewritten
+fixture described below: 0 and 999 parse, 1000 to 4294 were already refused with
+`InvalidDateTimeError`, and 4295 panicked. An explicit `> 999` check would give the same result as a
+second added line, and the vendored tree is kept to the smallest divergence that fixes the defect.
+
+Found on `dev` by the `fuzz smoke (ubuntu)` job of CI run
+[34869485443](https://github.com/aeterna/aeterna-rongroi/actions/runs/34869485443), on commit `2c67950`,
+which changed documentation only. The pull request run for the same content had passed: the smoke run
+mutates for a bounded time from a random seed, and did not reach this input. The crash artifact was not
+retrieved.
+
+The regression tests are deterministic and live in `crates/rongroi-parsers/src/evtx.rs`, built from
+the good fixture rather than from a saved input, as the other patches' are:
+`a_systime_whose_milliseconds_overflow_is_refused_rather_than_wrapped` rewrites the first record's
+16-byte provider `GuidType` substitution into a 16-byte `SysTimeType` with milliseconds 4295 and 65535,
+and asserts that record is rejected and the other 16 are read; it panics at line 48 without this
+patch. `a_systime_is_read_up_to_999_milliseconds_and_refused_from_1000` asserts the rewrite parses at 0
+and 999, so the rejection is about the value. No fuzz seed is added: `fixtures/evtx/` is the seed
+corpus and everything in it must parse (ADR 0021).
+
+**What else was checked, in `src/utils/windows.rs` and the code that calls it.**
+
+- `filetime_to_timestamp`: `(filetime / 10_000_000) as i64` is at most 1 844 674 407 370, far inside
+  `i64`, and subtracting 11 644 473 600 cannot overflow. `(filetime % 10_000_000) * 100` is at most
+  999 999 900 in `u64`, and `as i32` holds it. An out-of-range result is refused by `Timestamp::new`.
+- `systime_from_bytes`: the other six fields go through `i16::try_from` / `i8::try_from`, which are
+  checked; `DateTime::new` validates the combination.
+- Every caller converts through these two functions: the record header's `FILETIME`
+  (`evtx_record.rs`), `FileTimeType`, `SysTimeType` and their array forms (`binxml/value_variant.rs`),
+  and the renderer (`binxml/value_render.rs`). The renderer's own `write_datetime` casts
+  `dt.year() as u32` and divides the nanoseconds by 1000; both values come from a `Timestamp` those two
+  functions built, whose year is at least 1601 and at most jiff's 9999, so neither wraps.
+
 ## Nothing else
 
 Nothing else in the crate is modified. A scan of every `with_capacity`, `reserve` and `vec![n]` site in
@@ -217,7 +277,7 @@ When a release carries the fix, delete this directory, delete both `[patch.crate
 
 ## What was removed, and what was not
 
-Nothing was added, edited or reformatted apart from the three patches above. Three kinds of file were dropped,
+Nothing was added, edited or reformatted apart from the four patches above. Three kinds of file were dropped,
 all of them targets the library does not need:
 
 | Removed | Why it is safe |
@@ -248,8 +308,8 @@ shasum -a 256 ~/.cargo/registry/cache/*/evtx-0.12.2.crate
 
 mkdir -p /tmp/evtx-check && tar xzf ~/.cargo/registry/cache/*/evtx-0.12.2.crate -C /tmp/evtx-check
 
-# Only src/binxml/tokens.rs, src/binxml/name.rs and src/string_cache.rs may differ, and only by the
-# patches above.
+# Only src/binxml/tokens.rs, src/binxml/name.rs, src/string_cache.rs and src/utils/windows.rs may
+# differ, and only by the patches above.
 diff -r -x bin -x benches /tmp/evtx-check/evtx-0.12.2/src third_party/evtx/src
 
 # The manifest is deliberately trimmed (see the table below), so it will differ — but only by
@@ -258,5 +318,5 @@ diff -u /tmp/evtx-check/evtx-0.12.2/Cargo.toml third_party/evtx/Cargo.toml | gre
 diff -u /tmp/evtx-check/evtx-0.12.2/src/binxml/tokens.rs third_party/evtx/src/binxml/tokens.rs
 ```
 
-A `diff -r` that reports anything other than those three files means this directory has drifted
+A `diff -r` that reports anything other than those four files means this directory has drifted
 from upstream and the drift was not recorded here — treat that as a defect in this file.
