@@ -254,4 +254,6 @@ paths and file hashes — in the pull request that registers the collector.
 - `PRIVACY.md`, both consent texts, `docs/architecture.md`, ADR 0030's reason table, `rules/AGENTS.md`,
   README (both languages) and CHANGELOG change in the pull requests that ship it.
 - No network code, no new dependency, no new `windows` feature.
+- Implemented as `crates/rongroi-collectors/src/driver_service.rs`; the baseline's driver services come
+  from `windows.yml` run 34955915842. The rule and its data file follow in their own pull request.
 - Accepted by the owner on 2026-09-15, as written.

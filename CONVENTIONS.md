@@ -49,6 +49,8 @@ repository; if the idea already has a name, use it. A new term is a PR to this t
 | **configured_path** / **at_configured_path** | Observation fields of an `evtx` log account: the file the Windows Event Log service states it writes that log's channel to, as the service spells it, and whether that is the file that was read (ADR 0042) | `rongroi_host::EventLogConfigSource`, observation fields `configured_path`, `at_configured_path` |
 | **signer** / **signer_cert_sha256** | Observation fields of a `valid` signature: the signing certificate's display name, for the reader, and the SHA-256 of the certificate, the other thing `allow` may compare. A name is never compared: stolen certificates carry the real publisher's (ADR 0035) | observation fields `signer`, `signer_cert_sha256` |
 | **match_lists** | A rule key naming, per `match` field, a CSV file beside `rule.yaml` whose first column is that field's list of values; expanded into `match` when the bundle loads (ADR 0048) | `Rule::match_lists`, `rules::expand_match_lists` |
+| **service** | Observation field of `driver_service`: the name of a driver service's key under `HKLM\SYSTEM\CurrentControlSet\Services`, as the registry spells it (ADR 0048) | observation field `service` |
+| **start** | Observation field of `driver_service`: the service's `Start` value as stored — 0 boot, 1 system, 2 automatic, 3 on demand, 4 disabled (ADR 0048) | observation field `start` |
 
 Never introduce a score, a "clean" flag, a pass/fail total, or synonyms such as "detection result",
 "hit", "finding" for Evidence.

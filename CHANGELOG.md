@@ -31,6 +31,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `match_lists` in the rule format: a rule can keep a long list of values for one field in a CSV file
   beside `rule.yaml`, carried in the rules bundle and expanded into `match` when it loads. The reference
   pages name the file and its row count. Rule format version 3 (ADR 0048).
+- The `driver_service` collector: every driver service registered with Windows, with its start setting,
+  the path its `ImagePath` resolves to and the SHA-256 of that file. Every relative `ImagePath` is read
+  under `%SystemRoot%`; a refused, unreadable or unresolved file leaves the hash a gap, and hashing stops
+  after 30 seconds. No administrator rights are needed. No rule reads it yet (ADR 0048).
 
 ### Changed
 - The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the
