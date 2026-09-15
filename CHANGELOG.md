@@ -25,8 +25,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - The `usn` collector: the Windows drive's NTFS change journal, read on a volume handle that cannot write
   and through the two read control codes only, counted per folder other collectors read — records, and
   how many created, deleted, renamed or changed a file, with the first and last time. No file name,
-  journal identifier or file number reaches the report. No rule reads it yet. `DeviceIoControl` is banned
-  in `clippy.toml` outside its one read-only wrapper, and `fuzz_usn` joins the fuzz smoke run (ADR 0047).
+  journal identifier or file number reaches the report. No rule reads it yet. `DeviceIoControl` and
+  `CreateFileW` are each banned in `clippy.toml` outside one read-only wrapper, and `fuzz_usn` joins the
+  fuzz smoke run (ADR 0047).
 
 ### Changed
 - The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the

@@ -66,7 +66,7 @@ pub const FOLDER_OTHER_VOLUME: &str = "other_volume";
 /// ADR 0047 measured about one second for a 32 MiB journal; an administrator can make one larger.
 pub const BUDGET: Duration = Duration::from_secs(30);
 
-static FIELDS: [Field; 14] = [
+static FIELDS: [Field; 13] = [
     Field::number("created"),
     Field::number("data_changed"),
     Field::number("deleted"),
@@ -78,13 +78,12 @@ static FIELDS: [Field; 14] = [
     Field::number("records"),
     Field::number("records_version_2"),
     Field::number("records_version_3"),
-    Field::number("records_version_4"),
     Field::number("renamed"),
     Field::boolean("trimmed"),
 ];
 
 /// The fields a read that did not finish leaves unanswered.
-const COUNTED: [&str; 10] = [
+const COUNTED: [&str; 9] = [
     "created",
     "data_changed",
     "deleted",
@@ -93,7 +92,6 @@ const COUNTED: [&str; 10] = [
     "records",
     "records_version_2",
     "records_version_3",
-    "records_version_4",
     "renamed",
 ];
 
@@ -241,30 +239,35 @@ impl Collector for Usn {
             }
         }
 
-        let unfinished = if tally.damaged {
-            Some(UnmeasuredReason::ReadFailed)
-        } else {
-            match read.end {
-                UsnReadEnd::Complete => None,
-                UsnReadEnd::JournalChanged => Some(UnmeasuredReason::Partial),
-                UsnReadEnd::Stopped => Some(UnmeasuredReason::BudgetSpent),
-            }
-        };
-        let gaps = unfinished
-            .map(|reason| {
-                COUNTED
-                    .iter()
-                    .map(|field| ((*field).to_owned(), reason))
-                    .collect()
-            })
-            .unwrap_or_default();
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
-            gaps,
+            gaps: counted_gaps(tally.damaged, read.end),
             discriminator_gaps,
         }
     }
+}
+
+/// The run's gaps on the fields a read that did not finish leaves unanswered. A damaged buffer
+/// outranks how the read ended: records after the damage were never parsed, whatever came next.
+fn counted_gaps(damaged: bool, end: UsnReadEnd) -> BTreeMap<String, UnmeasuredReason> {
+    let unfinished = if damaged {
+        Some(UnmeasuredReason::ReadFailed)
+    } else {
+        match end {
+            UsnReadEnd::Complete => None,
+            UsnReadEnd::JournalChanged => Some(UnmeasuredReason::Partial),
+            UsnReadEnd::Stopped => Some(UnmeasuredReason::BudgetSpent),
+        }
+    };
+    unfinished
+        .map(|reason| {
+            COUNTED
+                .iter()
+                .map(|field| ((*field).to_owned(), reason))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The drive letter a path begins with, upper-cased.
@@ -362,7 +365,6 @@ struct Tally {
     all: Counts,
     version_2: usize,
     version_3: usize,
-    version_4: usize,
     damaged: bool,
 }
 
@@ -376,7 +378,6 @@ impl Tally {
             all: Counts::default(),
             version_2: 0,
             version_3: 0,
-            version_4: 0,
             damaged: false,
         }
     }
@@ -387,7 +388,6 @@ impl Tally {
             return;
         };
         self.damaged |= buffer.damage.is_some();
-        self.version_4 += buffer.skipped_version_4;
         for record in &buffer.records {
             match record.major_version {
                 2 => self.version_2 += 1,
@@ -423,10 +423,6 @@ impl Tally {
         fields.insert(
             "records_version_3".to_owned(),
             serde_json::Value::from(self.version_3),
-        );
-        fields.insert(
-            "records_version_4".to_owned(),
-            serde_json::Value::from(self.version_4),
         );
         fields.insert("trimmed".to_owned(), serde_json::Value::from(trimmed));
         fields.insert(
@@ -574,7 +570,6 @@ mod tests {
         assert_eq!(journal.fields["records"], 710);
         assert_eq!(journal.fields["records_version_3"], 710);
         assert_eq!(journal.fields["records_version_2"], 0);
-        assert_eq!(journal.fields["records_version_4"], 0);
         assert_eq!(journal.fields["trimmed"], true);
         assert_eq!(journal.fields["maximum_size"], 33_554_432);
         assert_eq!(journal.fields["first_seen"], "2026-09-08T01:11:56Z");
@@ -759,6 +754,94 @@ mod tests {
         );
     }
 
+    /// The two non-elevated baselines set no `%SystemRoot%`, so there is no system volume to read and
+    /// the collector stops before it looks at any journal, as `prefetch` and `evtx` do there.
+    #[test]
+    fn the_non_elevated_baselines_are_read_failed_for_want_of_a_system_root() {
+        for name in ["baseline-consumer-win11", "baseline-hardened-win11"] {
+            assert_eq!(
+                unmeasured(&Usn::default().collect(&fixture(name))),
+                UnmeasuredReason::ReadFailed,
+                "{name}"
+            );
+        }
+    }
+
+    /// A version 3 record of 80 bytes whose parent is `parent`, with a two-character name.
+    fn v3_record(parent: [u8; 16], reason: u32) -> Vec<u8> {
+        let mut record = vec![0u8; 80];
+        record[0..4].copy_from_slice(&80u32.to_le_bytes());
+        record[4..6].copy_from_slice(&3u16.to_le_bytes());
+        record[24..40].copy_from_slice(&parent);
+        record[48..56].copy_from_slice(&133_000_000_000_000_000u64.to_le_bytes());
+        record[56..60].copy_from_slice(&reason.to_le_bytes());
+        record[72..74].copy_from_slice(&4u16.to_le_bytes());
+        record[74..76].copy_from_slice(&76u16.to_le_bytes());
+        record[76..80].copy_from_slice(&[b'a', 0, b'b', 0]);
+        record
+    }
+
+    /// A buffer as `FSCTL_READ_USN_JOURNAL` returns it: the next USN, then the records.
+    fn usn_buffer(records: &[Vec<u8>]) -> Vec<u8> {
+        let mut bytes = 1i64.to_le_bytes().to_vec();
+        for record in records {
+            bytes.extend_from_slice(record);
+        }
+        bytes
+    }
+
+    #[test]
+    fn a_record_length_of_zero_after_a_valid_record_leaves_the_counts_read_failed_and_keeps_the_record()
+     {
+        let mut zero = v3_record([2; 16], usn::REASON_FILE_DELETE);
+        zero[0..4].copy_from_slice(&0u32.to_le_bytes());
+        let mut tally = Tally::new(&[]);
+        tally.add(&usn_buffer(&[
+            v3_record([1; 16], usn::REASON_FILE_CREATE),
+            zero,
+        ]));
+
+        assert!(tally.damaged);
+        assert_eq!(tally.journal_observation(false, 0).fields["records"], 1);
+        let gaps = counted_gaps(tally.damaged, UsnReadEnd::Complete);
+        assert_eq!(gaps.len(), COUNTED.len());
+        assert!(
+            gaps.values()
+                .all(|reason| *reason == UnmeasuredReason::ReadFailed)
+        );
+    }
+
+    #[test]
+    fn a_buffer_shorter_than_its_eight_byte_header_leaves_the_counts_read_failed() {
+        let mut tally = Tally::new(&[]);
+        tally.add(&[0; 7]);
+
+        assert!(tally.damaged);
+        assert_eq!(tally.journal_observation(false, 0).fields["records"], 0);
+        let gaps = counted_gaps(tally.damaged, UsnReadEnd::Complete);
+        assert_eq!(gaps["records"], UnmeasuredReason::ReadFailed);
+        assert_eq!(gaps["created"], UnmeasuredReason::ReadFailed);
+    }
+
+    /// Damage outranks a journal that changed during the read: the records past the damage were never
+    /// parsed, so the counts are not merely `partial`.
+    #[test]
+    fn damage_in_a_read_that_ended_journal_changed_is_read_failed_not_partial() {
+        let mut tally = Tally::new(&[]);
+        tally.add(&[0; 7]);
+
+        let gaps = counted_gaps(tally.damaged, UsnReadEnd::JournalChanged);
+        assert_eq!(gaps.len(), COUNTED.len());
+        assert!(
+            gaps.values()
+                .all(|reason| *reason == UnmeasuredReason::ReadFailed)
+        );
+        assert_eq!(
+            counted_gaps(false, UsnReadEnd::JournalChanged)["records"],
+            UnmeasuredReason::Partial
+        );
+    }
+
     /// `baseline-elevated-win11`'s `usn_journal:` block is rebuilt from the `usn` collector's own
     /// reading of a GitHub-hosted runner (`windows.yml` run 34930942657, 2026-09-15,
     /// `fixtures/hosts/PROVENANCE.md`). This asserts the rebuild reproduces every value that run
@@ -780,7 +863,6 @@ mod tests {
         assert_eq!(journal.fields["records"], 381_333);
         assert_eq!(journal.fields["records_version_2"], 0);
         assert_eq!(journal.fields["records_version_3"], 381_333);
-        assert_eq!(journal.fields["records_version_4"], 0);
         assert_eq!(journal.fields["trimmed"], true);
         assert_eq!(journal.fields["maximum_size"], 33_554_432);
         assert_eq!(journal.fields["first_seen"], "2026-09-08T01:12:08.3678392Z");
