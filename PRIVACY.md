@@ -60,10 +60,11 @@ than passed over in silence. A log the tool never opened at all, because that ti
 when its turn came, is named as one it did not look at — which is a different thing and is said in
 different words.
 
-Of the change journal it reads, for the Windows drive only, how many records Windows wrote and when the
-oldest and newest were written, and for each of the Prefetch, event log and Program Compatibility
-Assistant folders and FiveM's two plugin folders, how many records name that folder and how many of those
-created, deleted, renamed or changed a file. **It reads no file name**: the journal names every file
+Of the change journal it reads, for the Windows drive only, how many records the journal holds, when the
+oldest and newest were written, whether older records have been trimmed from it, and the journal's maximum
+size; and for each of the Prefetch, event log and Program Compatibility Assistant folders and FiveM's two
+plugin folders, how many records name that folder, how many of those created, deleted, renamed or changed
+a file, and when the oldest and newest of that folder's records were written. **It reads no file name**: the journal names every file
 changed on the drive, and the program's parser skips the name without keeping it. It reports no journal
 identifier and no file number, because each would identify your PC across two reports.
 
