@@ -69,6 +69,7 @@ none contains a real person's user name, host name, SID or files.
 | `usn-version-2-records` | An elevated Windows 11 scan whose system volume journal holds version 2 records under the Prefetch folder, attributed by the folder's 64-bit index rather than its 128-bit identifier | `usn` collector tests |
 | `usn-folders-unreadable` | An elevated Windows 11 scan where the Prefetch folder is unlistable, `%APPDATA%` is not set so Enhanced's plugin folder cannot be located, and Legacy's plugin folder is on a second volume the journal was not read from | `usn` collector tests |
 | `usn-not-described` | An elevated Windows 11 scan written before this fixture source existed: it never modelled the change journal at all, which the accessors report as `Unsupported` | `usn` collector tests |
+| `usn-folder-on-other-volume` | An elevated Windows 11 scan whose FiveM Legacy plugin folder shares Prefetch's drive letter but is reached through a junction to another volume (e.g. `mklink /J`): its identifier carries a different volume serial than the system volume's own, so its records are not credited to it | `usn` collector tests |
 
 **`FiveM.exe` in `baseline-consumer-win11` and `baseline-elevated-win11` is measured, not written.**
 Measured 2026-09-13 on one Windows 11 machine, build 26220, read-only, with `Get-FileHash`,

@@ -19,8 +19,12 @@
 //! A version 3 record is attributed to a folder by its 128-bit identifier, which ADR 0047 measured on a
 //! GitHub-hosted runner. A version 2 record is attributed by the folder's 64-bit index, which was not
 //! measured, because the runner returned no version 2 record. Either comparison can fail to attribute a
-//! record; neither can attribute one to the wrong folder, because two files on one volume never share
-//! an identifier.
+//! record; neither attributes one to the wrong folder on the **system volume**, because two files on one
+//! volume never share an identifier. Attribution only ever compares identifiers read from that one
+//! volume: this collector reads the system volume's own identifier once, from its root (`X:\`), and a
+//! watched folder whose identifier names a different volume — the shape a junction to another drive
+//! produces — is reported `other_volume` rather than counted, because its number could otherwise collide
+//! with an unrelated file's on the volume the journal belongs to.
 //!
 //! This program's own launch writes a Prefetch record where Prefetch is on, and the Prefetch counts
 //! include it: a count carries neither a path nor a SHA-256 for ADR 0010 to separate it by.
@@ -185,10 +189,18 @@ impl Collector for Usn {
             // Without `%SystemRoot%` there is no system volume to read, so nothing was looked at.
             return unmeasured(UnmeasuredReason::ReadFailed);
         };
+        // The system volume's own identifier, read once, so every watched folder's identifier can be
+        // checked against it: a folder reached through a junction to another volume answers with a
+        // different `volume_serial`, and its records must not be counted as this volume's own.
+        let root_serial = match host.file_id(&format!(r"{volume}:\")) {
+            Ok(Some(id)) => id.volume_serial,
+            Ok(None) => return unmeasured(UnmeasuredReason::ReadFailed),
+            Err(error) => return unmeasured(reason_for(host, &error)),
+        };
 
         let places: Vec<(&Place, Located)> = PLACES
             .iter()
-            .map(|place| (place, locate(host, place, volume)))
+            .map(|place| (place, locate(host, place, volume, root_serial)))
             .collect();
         let watched: Vec<(&'static str, FileId)> = places
             .iter()
@@ -271,7 +283,7 @@ enum Located {
     OtherVolume,
 }
 
-fn locate(host: &dyn Host, place: &Place, volume: char) -> Located {
+fn locate(host: &dyn Host, place: &Place, volume: char, root_serial: u64) -> Located {
     let Some(base) = host.env_var(place.base) else {
         return Located::Unreadable(UnmeasuredReason::ReadFailed);
     };
@@ -283,6 +295,10 @@ fn locate(host: &dyn Host, place: &Place, volume: char) -> Located {
         return Located::OtherVolume;
     }
     match host.file_id(&format!(r"{base}\{}", place.relative)) {
+        // A folder can share the volume's drive letter and still be on another volume, reached through
+        // a junction: its identifier is only unique within its own volume, so this is the check that
+        // keeps a record from being credited to a folder that was never read (ADR 0047 amendment).
+        Ok(Some(id)) if id.volume_serial != root_serial => Located::OtherVolume,
         Ok(Some(id)) => Located::Identified(id),
         Ok(None) => Located::Absent,
         Err(error) => Located::Unreadable(reason_for(host, &error)),
@@ -697,6 +713,33 @@ mod tests {
             Some(UnmeasuredReason::ReadFailed)
         );
         assert_eq!(reason(WINEVT_LOGS_LOCATION), None);
+    }
+
+    /// A folder reached through a junction to another volume shares a drive letter with the system
+    /// volume, so the drive-letter check alone cannot tell it apart: it is the `volume_serial` mismatch
+    /// that keeps its records from being credited to it (the review finding this test closes).
+    #[test]
+    fn a_folder_behind_a_junction_to_another_volume_is_not_credited_with_its_records() {
+        let run = Usn::default().collect(&fixture("usn-folder-on-other-volume"));
+        let (observations, gaps, discriminator_gaps) = measured(&run);
+        assert!(gaps.is_empty());
+
+        let plugins = at(observations, fivem_dir::PLUGINS_LOCATION);
+        assert_eq!(plugins.fields["folder"], FOLDER_OTHER_VOLUME);
+        assert!(!plugins.fields.contains_key("records"));
+        let reason = discriminator_gaps
+            .iter()
+            .find(|gap| gap.value == fivem_dir::PLUGINS_LOCATION)
+            .map(|gap| gap.gaps["records"]);
+        assert_eq!(reason, Some(UnmeasuredReason::NotAttempted));
+
+        let prefetch = at(observations, PREFETCH_LOCATION);
+        assert_eq!(prefetch.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(prefetch.fields["records"], 2);
+
+        // The journal itself was read in full; only attribution to `plugins` was withheld, so its
+        // three records still count toward the journal's total.
+        assert_eq!(at(observations, JOURNAL_LOCATION).fields["records"], 5);
     }
 
     #[test]

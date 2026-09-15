@@ -353,6 +353,7 @@ mod live {
             Ok(Some(FileId {
                 id_128: id.FileId.Identifier,
                 index_64: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+                volume_serial: id.VolumeSerialNumber,
             }))
         }
     }
@@ -426,6 +427,10 @@ mod tests {
             .file_id(&format!(r"{system_root}\System32\winevt\Logs"))
             .unwrap()
             .unwrap();
+        // The drive root answers with the same volume the Logs folder is on: both are read from the
+        // system volume, so a caller comparing `FileId`s never mistakes one volume for another.
+        let root = host.file_id(&format!(r"{volume}:\")).unwrap().unwrap();
+        assert_eq!(root.volume_serial, logs.volume_serial);
 
         let mut buffers = 0usize;
         let mut matched = 0usize;

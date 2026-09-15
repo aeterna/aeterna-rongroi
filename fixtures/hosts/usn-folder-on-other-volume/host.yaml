@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# An elevated Windows 11 scan whose FiveM Legacy plugin folder shares Prefetch's drive letter but is
+# reached through a junction to another volume (e.g. `mklink /J`): its identifier carries a different
+# volume serial than the system volume's own, so its records must not be credited to it.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  WinDir: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+usn_journal:
+  folders:
+    'C:\Windows\Prefetch': 1
+    'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': 4
+  other_volume_folders:
+    - 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins'
+  records:
+    - parent: 'C:\Windows\Prefetch'
+      reasons: [file_create, close]
+      count: 2
+    - parent: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins'
+      reasons: [file_create, close]
+      count: 3
