@@ -103,6 +103,15 @@ describes an installed, empty Legacy plugin folder (above), so its `usn_journal:
 path instead, giving `plugins` zero records there rather than repeating the runner's absence. Enhanced's
 plugin folder is not described by this baseline and stays absent, as it already was.
 
+**The driver services in the baselines are a runner's, not a PC's.** `baseline-elevated-win11`'s driver
+service keys and files are rebuilt from the `driver_service` collector's observations of a GitHub-hosted
+Windows Server 2025 runner (`windows.yml` run 34955915842, 2026-09-15): 424 services, 424 hashed. Each
+`ImagePath` is written as the path the collector resolved rather than the form the runner's registry held,
+and `Type` is 1 for every service; the collector's own tests cover the other forms. A runner image has
+Microsoft's drivers only, so this says nothing about a gaming PC's. No driver list from anyone's own PC is
+used (ADR 0046). Neither non-elevated baseline sets `%SystemRoot%`, so `driver_service` is `read_failed`
+on both.
+
 **Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
 posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,
 `registry-access-denied`, `baseline-hardened-win11` and `baseline-consumer-win11` — declares

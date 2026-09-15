@@ -93,6 +93,1705 @@ registry:
       from: '../../parsers/bam/documented-24-byte-value.bin'
     'C:\Program Files\FiveM\FiveM.exe':
       from: '../../parsers/bam/moderation-state-set.bin'
+  # Driver services (ADR 0048), from the `driver_service` collector's reading of a GitHub-hosted Windows
+  # Server 2025 runner (windows.yml run 34955915842). Each `ImagePath` is written as the path the collector
+  # resolved, so every observation is reproduced through the drive-letter case, and `Type` is 1 for all.
+  'HKLM\SYSTEM\CurrentControlSet\Services\1394ohci':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\1394ohci.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\3ware':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\3ware.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ACPI':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\ACPI.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AcpiAudioCompositorInbox':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\acpiaudiocompositor.inf_amd64_047f553a6f70b169\AcpiAudioCompositor.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AcpiDev':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\AcpiDev.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\acpiex':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\Drivers\acpiex.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\acpipagr':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\acpipagr.inf_amd64_d1093347a27ff89c\acpipagr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AcpiPmi':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\acpipmi.inf_amd64_3ced06eb61dcc792\acpipmi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\acpitime':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\acpitime.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Acx01000':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\Acx01000.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ADP80XX':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\ADP80XX.SYS'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AFD':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\afd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\afunix':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\afunix.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ahcache':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\DRIVERS\ahcache.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\amdgpio2':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\amdgpio2.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\amdi2c':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\amdi2c.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AmdK8':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\amdk8.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AmdPPM':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\amdppm.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\amdsata':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\amdsata.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\amdsbs':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\amdsbs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\amdwps':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\amdwps.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\amdxata':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\amdxata.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppID':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\appid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppleSSD':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\AppleSSD.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\applockerfltr':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\applockerfltr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppvStrm':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\AppvStrm.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppvVemgr':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\AppvVemgr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppvVfs':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\AppvVfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\arcsas':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\arcsas.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AsyncMac':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\asyncmac.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\atapi':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\atapi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AziHSMDevice':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\AziHsmVf.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\b06bdrv':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\bxvbda.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\bam.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BasicDisplay':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\basicdisplay.inf_amd64_2753efdbb0d9a226\BasicDisplay.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BasicRender':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\basicrender.inf_amd64_3ee4bbe654c2a277\BasicRender.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bcmfn2':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\bcmfn2.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Beep':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\Beep.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bfadfcoei':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\bfadfcoei.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bfadi':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\bfadi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bfs':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\bfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bindflt':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\bindflt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bowser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\DRIVERS\bowser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthA2dp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\BthA2dp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthEnum':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\BthEnum.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthHFEnum':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\bthhfenum.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthLEEnum':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\Microsoft.Bluetooth.Legacy.LEEnumerator.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthMini':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\BTHMINI.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BTHPORT':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\BTHport.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BTHUSB':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\BTHUSB.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bttflt':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\bttflt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\buttonconverter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\buttonconverter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bxfcoe':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\bxfcoe.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bxois':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\bxois.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CAD':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\CAD.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CDD':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\cdd.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cdfs':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\system32\DRIVERS\cdfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cdrom':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\cdrom.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cht4iscsi':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\cht4sx64.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cht4vbd':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\cht4vx64.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CimFS':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\CimFS.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CldFlt':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\cldflt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CLFS':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\CLFS.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CmBatt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\CmBatt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CNG':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\Drivers\cng.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cnghwassist':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\System32\DRIVERS\cnghwassist.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CompositeBus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\compositebus.inf_amd64_8cf6fa9d3afdfa25\CompositeBus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\condrv':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\condrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CSC':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\system32\drivers\csc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dam':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\dam.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\devmap':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\devmap.inf_amd64_1993197f4612e967\devmap.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Dfsc':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\Drivers\dfsc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\disk':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\disk.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DisplayMux':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\displaymux.inf_amd64_da65a70f0c3ce0f3\DisplayMux.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dmvsc':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\dmvsc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\drmkaud':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\drmkaud.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DTrace':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\DTrace.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DXGKrnl':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\dxgkrnl.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ebdrv':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\evbda.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ebdrv0':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\evbd0a.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EhStorClass':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\EhStorClass.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EhStorTcgDrv':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\EhStorTcgDrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\elxfcoe':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\elxfcoe.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\elxstor':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\elxstor.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ErrDev':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\errdev.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ExecutionContext':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\Drivers\ExecutionContext.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\exfat':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\exfat.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\fastfat':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\fastfat.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\fcvsc':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\fcvsc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\fdc':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\fdc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FileCrypt':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\filecrypt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FileInfo':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\fileinfo.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Filetrace':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\filetrace.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\flpydisk':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\System32\drivers\flpydisk.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FltMgr':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\fltmgr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FsDepends':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\FsDepends.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\fse':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\fse.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\fvevol':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\DRIVERS\fvevol.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\gencounter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vmgencounter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\genericusbfn':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\genericusbfn.inf_amd64_71c810ddc0116541\genericusbfn.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\GenPass':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\genpass.inf_amd64_0c82d80c9252c9bd\genpass.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\GPIOClx0101':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\Drivers\msgpioclx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HdAudAddService':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\HdAudio.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HDAudBus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\HDAudBus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HidBatt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\HidBatt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hidinterrupt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\hidinterrupt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HidSpiCx':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\HidSpiCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HidUsb':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\hidusb.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hnswfpdriver':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\hnswfpdriver.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HpSAMD':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\HpSAMD.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HTTP':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\HTTP.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hvcrash':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\System32\drivers\hvcrash.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hvservice':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\hvservice.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hvsocketcontrol':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\hvsocketcontrol.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HwNClx0101':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\Drivers\mshwnclx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hwpolicy':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\hwpolicy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hyperkbd':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\hyperkbd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HyperVideo':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\HyperVideo.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\I3CHost':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\i3chost.inf_amd64_79382b592f2ee77b\i3chost.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\i8042prt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\i8042prt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iagpio':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iagpio.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iai2c':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iai2c.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_GPIO2':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_GPIO2.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_GPIO2_BXT_P':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_GPIO2_BXT_P.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_GPIO2_CNL':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_GPIO2_CNL.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_GPIO2_GLK':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_GPIO2_GLK.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_I2C':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_I2C.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_I2C_BXT_P':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_I2C_BXT_P.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_I2C_CNL':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_I2C_CNL.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSS2i_I2C_GLK':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSS2i_I2C_GLK.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSSi_GPIO':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSSi_GPIO.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaLPSSi_I2C':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\iaLPSSi_I2C.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaStorAVC':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\iaStorAVC.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iaStorV':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\iaStorV.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ibbus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ibbus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IndirectKmd':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\IndirectKmd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\intelide':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\intelide.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\intelpep':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\intelpep.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\intelpmax':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\intelpmax.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IntelPMT':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\IntelPMT.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\intelppm':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\intelppm.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iorate':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\iorate.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IpFilterDriver':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\DRIVERS\ipfltdrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IPMIDRV':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\IPMIDrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IPNAT':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ipnat.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IPT':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ipt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\isapnp':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\isapnp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iScsiPrt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\msiscsi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ItSas35i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\ItSas35i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\kbdclass':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\kbdclass.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\kbdhid':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\kbdhid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\kdnic':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\kdnic.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\kdnic_legacy':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\kdnic_legacy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KernelFSFormatter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\KernelFSFormatter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KSecDD':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\Drivers\ksecdd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KSecPkg':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\Drivers\ksecpkg.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KslD':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\wd\KslD.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ksthunk':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\ksthunk.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KtlLogger':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Program Files\Microsoft Service Fabric\bin\Fabric\Fabric.Code\KtlLogger.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\l1vhlwf':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\System32\drivers\l1vhlwf.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\l2bridge':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\l2bridge.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LeasLayr':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Program Files\Microsoft Service Fabric\bin\Fabric\Fabric.Code\LeasLayr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lltdio':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\lltdio.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LSI_SAS':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\lsi_sas.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LSI_SAS2i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\lsi_sas2i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LSI_SAS3i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\lsi_sas3i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\luafv':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\luafv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lunparser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\lunparser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lxss':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\lxss.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Mana':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mana.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mana_bus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mana_bus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mana_ib':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mana_ib.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mausbhost':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mausbhost.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mausbip':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mausbip.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\megasas2i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\MegaSas2i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\megasas35i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\megasas35i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\megasr':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\megasr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Microsoft_Bluetooth_AvrcpTransport':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\Microsoft.Bluetooth.AvrcpTransport.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mlx4_bus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mlx4_bus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MMCSS':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\mmcss.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Modem':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\modem.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\monitor':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\monitor.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mouclass':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mouclass.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mouhid':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mouhid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mountmgr':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\mountmgr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mpi3drvi':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\mpi3drvi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mpsdrv':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mpsdrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MQAC':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\mqac.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mrxsmb':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\DRIVERS\mrxsmb.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mrxsmb20':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\DRIVERS\mrxsmb20.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsBridge':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\bridge.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Msfs':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\Msfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\msgpiowin32':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\msgpiowin32.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mshidkmdf':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mshidkmdf.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mshidumdf':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\mshidumdf.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\msisadrv':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\msisadrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSKSSRV':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\MSKSSRV.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsLbfoProvider':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\MsLbfoProvider.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsLldp':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\mslldp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSPCLOCK':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\MSPCLOCK.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSPQM':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\MSPQM.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsQuic':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\msquic.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsQuicPrev':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\msquicprev.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsRPC':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\MsRPC.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsSecCore':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\msseccore.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsSecFlt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\mssecflt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MsSecWfp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\mssecwfp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mssmbios':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\mssmbios.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSTEE':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\MSTEE.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MTConfig':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\MTConfig.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Mup':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\Drivers\mup.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mvumis':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\mvumis.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NativeWifiP':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\DRIVERS\nwifi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ndfltr':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ndfltr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NDIS':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\ndis.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NdisCap':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\ndiscap.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NdisImPlatform':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\NdisImPlatform.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NdisTapi':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\ndistapi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Ndisuio':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\ndisuio.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NdisVirtualBus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\NdisVirtualBus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NdisWan':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ndiswan.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ndiswanlegacy':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\ndiswan.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NDKPerf':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\NDKPerf.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NDKPing':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\NDKPing.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ndproxy':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\NDProxy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetAdapterCx':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\netadaptercx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetBIOS':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\netbios.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetBT':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\DRIVERS\netbt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\netvsc':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\netvsc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Npfs':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\Npfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\npsvctrig':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\npsvctrig.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nsiproxy':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\nsiproxy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Ntfs':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\Ntfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Null':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\Null.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nvdimm':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\nvdimm.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nvmedisk':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\nvmedisk.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nvraid':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\nvraid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nvstor':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\nvstor.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\P9Rdr':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\p9rdr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Parport':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\parport.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\partmgr':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\partmgr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\passthruparser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\passthruparser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pci':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\pci.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pciide':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\pciide.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pcip':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\pcip.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pcmcia':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\pcmcia.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pcw':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\pcw.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pdc':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\pdc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PEAUTH':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\peauth.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\percsas2i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\percsas2i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\percsas3i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\percsas3i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PktMon':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\PktMon.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PktMonApi':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\PktMonApi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pmem':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\pmem.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PNPMEM':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\pnpmem.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\portcfg':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\portcfg.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PptpMiniport':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\raspptp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrjFlt':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\prjflt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PRM':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\prm.inf_amd64_7c38475757a1f016\PRM.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Processor':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\processr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Psched':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\pacer.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pvhdparser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\pvhdparser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pvscsi':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\pvscsii.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\qebdrv':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\qevbda.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\qefcoe':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\qefcoe.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\qeois':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\qeois.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ql2300i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\ql2300i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ql40xx2i':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\ql40xx2i.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\qlfcoei':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\qlfcoei.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\QWAVEdrv':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\qwavedrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Ramdisk':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ramdisk.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ramparser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\ramparser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasAcd':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\rasacd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasAgileVpn':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\AgileVpn.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasGre':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\rasgre.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Rasl2tp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\rasl2tp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasPppoe':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\raspppoe.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasSstp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\rassstp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\rdbss':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\DRIVERS\rdbss.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\rdpbus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\rdpbus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RDPDR':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\rdpdr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ReFS':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ReFS.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ReFSv1':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ReFSv1.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RFCOMM':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\rfcomm.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\rhproxy':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\rhproxy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\rspndr':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\rspndr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\s3cap':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vms3cap.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sacdrv':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\DRIVERS\sacdrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sbp2port':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\sbp2port.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\scfilter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\scfilter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\scmbus':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\scmbus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sdbus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\sdbus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SdcaHidInbox':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\sdcahid.inf_amd64_9b043c5c82568ed0\SdcaHid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SdcaMfdInbox':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\sdcamfd.inf_amd64_7616b07de0d13d6f\SdcaMfd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sdstor':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\sdstor.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SerCx':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\SerCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SerCx2':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\SerCx2.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Serenum':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\serenum.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Serial':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\serial.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sermouse':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\sermouse.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sfloppy':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\sfloppy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SiSRaid2':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\SiSRaid2.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SiSRaid4':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\sisraid4.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SmartSAMD':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\SmartSAMD.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\smbdirect':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\smbdirect.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\spaceparser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\spaceparser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\spaceport':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\spaceport.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SpbCx':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\SpbCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\srv2':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\srv2.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\srvnet':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\srvnet.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\stexstor':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\stexstor.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\storahci':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\storahci.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\storflt':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\vmstorfl.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\stornvme':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\stornvme.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\stornvmeofi':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\stornvmeofi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\storqosflt':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\storqosflt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\storufs':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\storufs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\storvsc':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\storvsc.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\storvsp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\storvsp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\swenum':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\swenum.inf_amd64_8b9dd76f362e3ec6\swenum.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Tcpip':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\tcpip.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\tcpip.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tcpipreg':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\System32\drivers\tcpipreg.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tdx':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\DRIVERS\tdx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\terminpt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\terminpt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ThermalFilter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\c_thermal.inf_amd64_8f8fc5145f1a66de\ThermalFilter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TPM':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\tpm.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TsUsbFlt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\tsusbflt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TsUsbGD':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\TsUsbGD.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tsusbhub':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\tsusbhub.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tunnel':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\tunnel.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UASPStor':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\uaspstor.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UcmCx0101':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\Drivers\UcmCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UcmTcpciCx0101':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\Drivers\UcmTcpciCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UcmUcsiAcpiClient':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\UcmUcsiAcpiClient.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UcmUcsiCx0101':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\Drivers\UcmUcsiCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Ucx01000':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\ucx01000.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UdeCx':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\udecx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\udfs':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\system32\DRIVERS\udfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UEFI':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\uefi.inf_amd64_eb40b566c94c1a51\UEFI.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UevAgentDriver':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\system32\drivers\UevAgentDriver.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Ufx01000':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\ufx01000.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UfxChipidea':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\ufxchipidea.inf_amd64_6e8bb2ed82835828\UfxChipidea.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ufxsynopsys':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\ufxsynopsys.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\uiomap':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\uiomap.inf_amd64_047c718f27ecbc1f\uiomap.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\umbus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\umbus.inf_amd64_914dd46b4b013b1b\umbus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UmPass':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\umpass.inf_amd64_06e016c9ffecbf73\umpass.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UnionFS':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\UnionFS.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UrsChipidea':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\urschipidea.inf_amd64_37fb14618bce547b\urschipidea.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UrsCx01000':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\urscx01000.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UrsSynopsys':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\urssynopsys.inf_amd64_ef0be23d0f063014\urssynopsys.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usb-platformdetection':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\usb-platformdetection.inf_amd64_1c19c915a2666a29\usb-platformdetection.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Usb4DeviceRouter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\usb4devicerouter.inf_amd64_5a0fb44cb1c9505f\Usb4DeviceRouter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Usb4HostRouter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\usb4hostrouter.inf_amd64_5ec83e51e37c6824\Usb4HostRouter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbaudio':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\usbaudio.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbaudio2':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbaudio2.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbccgp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbccgp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbehci':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbehci.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbhub':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbhub.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\USBHUB3':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\UsbHub3.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbohci':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbohci.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbprint':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbprint.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\USBSTOR':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\USBSTOR.SYS'
+  'HKLM\SYSTEM\CurrentControlSet\Services\usbuhci':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\usbuhci.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\USBXHCI':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\USBXHCI.SYS'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vdrvroot':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\vdrvroot.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VerifierExt':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\VerifierExt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VfpExt':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\system32\drivers\vfpext.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vhdmp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vhdmp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vhdparser':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\vhdparser.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vhf':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vhf.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Vid':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\Vid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VirtualRender':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\vrd.inf_amd64_4dd0e6d66a75bb7e\vrd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmbus':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\vmbus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VMBusHID':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\VMBusHID.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmbusproxy':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\vmbusproxy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmbusr':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vmbusr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmgid':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vmgid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmsmp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vmswitch.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VMSNPXY':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\VmsProxyHNic.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VMSP':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\System32\drivers\vmswitch.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VmsProxy':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\VmsProxy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VMSVSF':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vmswitch.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VMSVSP':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vmswitch.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\volmgr':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\volmgr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\volmgrx':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\volmgrx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\volsnap':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\volsnap.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\volume':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\volume.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vpci':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\vpci.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vpcivsp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\vpcivsp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vsmraid':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\vsmraid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VSTXRAID':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\vstxraid.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vwifibus':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\netvwifibus.inf_amd64_ab4e111fe8221178\vwifibus.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vwififlt':
+    Type: 1
+    Start: 1
+    ImagePath: 'C:\Windows\System32\drivers\vwififlt.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WacomPen':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\wacompen.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wanarp':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\wanarp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wanarpv6':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DRIVERS\wanarp.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wcifs':
+    Type: 1
+    Start: 2
+    ImagePath: 'C:\Windows\system32\drivers\wcifs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdAiNisDrv':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\system32\drivers\wd\WdAiNisDrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdBoot':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\wd\WdBoot.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wdf01000':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\Wdf01000.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdFilter':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\wd\WdFilter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wdiwifi':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\DRIVERS\wdiwifi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdmCompanionFilter':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\WdmCompanionFilter.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdNisDrv':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\wd\WdNisDrv.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WFPLWFS':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\wfplwfs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wificx':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\WifiCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WIMMount':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\wimmount.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinAccelCx0101':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\WinAccelCx.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WindowsTrustedRT':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\system32\drivers\WindowsTrustedRT.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WindowsTrustedRTProxy':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\WindowsTrustedRTProxy.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wini3ctarget':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\DriverStore\FileRepository\wini3ctarget.inf_amd64_9bda3f893989b4a6\wini3ctarget.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinMad':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\winmad.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinNat':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\winnat.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WINUSB':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\WinUSB.SYS'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinVerbs':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\winverbs.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WmiAcpi':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\wmiacpi.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wof':
+    Type: 1
+    Start: 0
+    ImagePath: 'C:\Windows\System32\drivers\Wof.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WpdUpFltr':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\WpdUpFltr.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ws2ifsl':
+    Type: 1
+    Start: 4
+    ImagePath: 'C:\Windows\system32\drivers\ws2ifsl.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WudfPf':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\WudfPf.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WUDFRd':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\System32\drivers\WUDFRd.sys'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ZTDNS':
+    Type: 1
+    Start: 3
+    ImagePath: 'C:\Windows\system32\drivers\ztdns.sys'
 filesystem:
   # PCA's three files, their bytes taken from the synthetic parser corpora (ADR 0019) rather than
   # written here: those files are CP-1252 with CRLF line endings, which is what the real artifact is
@@ -139,6 +1838,878 @@ filesystem:
         state: valid
         signer: Rockstar Games, Inc.
         signer_cert_sha256: 65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f
+  # Driver services (ADR 0048), from the `driver_service` collector's reading of a GitHub-hosted Windows
+  # Server 2025 runner (windows.yml run 34955915842). Each `ImagePath` is written as the path the collector
+  # resolved, so every observation is reproduced through the drive-letter case, and `Type` is 1 for all.
+  'C:\Program Files\Microsoft Service Fabric\bin\Fabric\Fabric.Code':
+    - name: 'KtlLogger.sys'
+      sha256: 90ac2c53b33f8bd632001c1bc302916d54c27f57e0ee9f205ca719267323326e
+    - name: 'LeasLayr.sys'
+      sha256: fe910b2223d3d75b1a9e679bf58319d399e24bb61efcc2e7ec5a1ae088b7d4aa
+  'C:\Windows\System32':
+    - name: 'cdd.dll'
+      sha256: d360a0ff0f3b7abed8a99eccf642126ea174db6e73afb6c909965e51ac212a75
+  'C:\Windows\System32\drivers':
+    - name: '1394ohci.sys'
+      sha256: 9df5d0ebdbcaf08e3f376ae993aca8aedef266228d8f1dd41d6f79f294840b2f
+    - name: '3ware.sys'
+      sha256: 537c7bf0dcc56757ddb97d709fa65c1b3cbf9619563df9a13fa8287b71d9e8b5
+    - name: 'ACPI.sys'
+      sha256: 9069b3bfaecb2dc82d63f073d9cb2c2a91d4f26d6cc1150da2229dd667fa848c
+    - name: 'AcpiDev.sys'
+      sha256: c08eadffead930510e760d830006a34d3326540b0460a5d189694be44e83907f
+    - name: 'acpiex.sys'
+      sha256: 0ea9b48cb8e99d98aec52b1ee2f7a500dec3df60ce3f3e9bda3777d7ff1a0f98
+    - name: 'acpitime.sys'
+      sha256: 193eb944858c86c60d3ce1d834b003c0a3092beb20b27e7398199bc46c02dd5b
+    - name: 'Acx01000.sys'
+      sha256: c1f123444102b2c6d60213a1ca216931cf180ad8d887738b337bfc9f6b3c32df
+    - name: 'ADP80XX.SYS'
+      sha256: 9f3061731fc80c4e2d41bd379573ed12daf396d84bad1a5c89ed32b10febe929
+    - name: 'afd.sys'
+      sha256: df4eb910241f725366788111fc017e08829ae736c19d8783fa1c22c88f201816
+    - name: 'afunix.sys'
+      sha256: 754062f5678906c9b21807e9d1326d86c436bc2505fe73c1d1db58be00610ce5
+    - name: 'AgileVpn.sys'
+      sha256: dd3bd2b9b5793c7737b4b0df8e62d6dde52a6bfbdba451022c064fb5b7ec430e
+    - name: 'ahcache.sys'
+      sha256: 5c488557eda6b918f2d633817ae43985eb988b06f080152dc59a83ced4ec9b29
+    - name: 'amdgpio2.sys'
+      sha256: 46a53925baa34fa9d87e7c3157504a4557d81cd8b8608e7ab6caf02f482f7792
+    - name: 'amdi2c.sys'
+      sha256: 387811d57def06c9736d9f0bab0dfb0f83dbab19e5489bf9a6dcdcbd682dd8fe
+    - name: 'amdk8.sys'
+      sha256: 4eefaee83d7709bb7cbce84c5dc2504c337680d20b3e531ff9b51a67c21e804a
+    - name: 'amdppm.sys'
+      sha256: 2adee608ce07a925956ba67ef12fa5f7996fd4c7f50432f54ccec4a325caef8e
+    - name: 'amdsata.sys'
+      sha256: 25433299f63eb920a6a74b0c1d40a95c7d9bc647ff5cd71d4f1730283b660e86
+    - name: 'amdsbs.sys'
+      sha256: afa0a9eaccc36cfc88ac41dcd0149ac6f9763d12c898397e831d80f202ef4402
+    - name: 'amdwps.sys'
+      sha256: e84ccd1521e0f1db5b0a6e67a50dc53b430d79112c973cc354acd616f0824343
+    - name: 'amdxata.sys'
+      sha256: eb4c463a91fc778b335c3a9f4a74539ce0378f59974b2b46d5350c6c8afddb69
+    - name: 'appid.sys'
+      sha256: ca4d8821baa2a30fa7985ffbf6becdbd944e90d61d9792d940e88c4bf8bb7430
+    - name: 'AppleSSD.sys'
+      sha256: 8097bba0ab20b5eccbd02def237a0b36e845ee8f50c684d72148a89bdba34a7a
+    - name: 'applockerfltr.sys'
+      sha256: a7dcb80982155b4811d1aa59000363881d2b1ad8df5bdff78ab299f1fa152a27
+    - name: 'AppvStrm.sys'
+      sha256: 3a3e7226604bbb69ede8bc8a4fde61f59922b8c795442d7f05a8077c11a2fa0c
+    - name: 'AppvVemgr.sys'
+      sha256: c8bcd77030f948a6287adda728fcba6b4297dec9fe6a05cdeccef624075c8ae1
+    - name: 'AppvVfs.sys'
+      sha256: 93e1218efac0bf749890dcd70db531132c445346d80cea00a83c4ae908de9eef
+    - name: 'arcsas.sys'
+      sha256: 9987d0687f24e842f0987193826749441c693d674f423358d44a1ba2473e515f
+    - name: 'asyncmac.sys'
+      sha256: 6135cbea049e8a2654d4e1d14b7be1afe461df62e3f55190b2b3c05d777858da
+    - name: 'atapi.sys'
+      sha256: 21bab517b42f8a761c47dd24cca0668c9b4102dab00427c7f00c6f117cb73e8d
+    - name: 'AziHsmVf.sys'
+      sha256: ad42952620d070a1c7bdcbf0efdc1092775714534ffafece424a619c22661a94
+    - name: 'bam.sys'
+      sha256: 1cb04e77951423d3b751505fad2d17729f97d710e2e9a7b67b2398aab38502bf
+    - name: 'bcmfn2.sys'
+      sha256: 9ad12e18a042c5b8efb19297bc2e7bd1fef75a138fefb64c6bf0261fd3e53ab1
+    - name: 'Beep.sys'
+      sha256: 98cdbd998cf136fbbb9ecce829717b917374d0af20780bfd02767303c2756d85
+    - name: 'bfadfcoei.sys'
+      sha256: 627e8f9fac69dc0bcd300c349faaa79ff9dc23030f7c4d9a1cb0d2dac67473fe
+    - name: 'bfadi.sys'
+      sha256: 2057c645acad15ef1c5cdfd8665464c9d007c044773caff4475d2385631f40df
+    - name: 'bfs.sys'
+      sha256: 10bd3538699efd6e1a0a54b68cf576271a603028b3652a4f9d64bf55d72ea6bf
+    - name: 'bindflt.sys'
+      sha256: d877356d3259fe0d1cd7548d00b2961d161276304fd6197e815f0b572998e600
+    - name: 'bowser.sys'
+      sha256: d76e5b0e2af224f0763c1c8a00030ed94b9a9d062cae34781f581a2be5698c00
+    - name: 'bridge.sys'
+      sha256: e555381c549daa86943dfdd803466e2913ff40e1ee31bed9b1c6d4d644555b52
+    - name: 'BthA2dp.sys'
+      sha256: 79eff3b09fd7d9860caa4d56ae77e75324e846580c539dc4b4c0a7a9db5ef321
+    - name: 'BthEnum.sys'
+      sha256: 7b06b844577a48e357cabee19334a4ac2f57eeafd9594f452972fcc4db1b04fa
+    - name: 'bthhfenum.sys'
+      sha256: fa07a8635dce46b2ae2cd6beb9677af1e75d2df3e12d495f9c4e77f0d25357e7
+    - name: 'BTHMINI.sys'
+      sha256: a5eef0a53c0b4dde39061db66039dddd98020e7b583ecaab1c2db3a5633913d9
+    - name: 'BTHport.sys'
+      sha256: fc197e1480a97d0d5a377df4d483d86ead0eb44cbbe9468b79ad96831496a9e6
+    - name: 'BTHUSB.sys'
+      sha256: 1899a19420a43c9a8ea41950a1cc80b670453f84469f4d88ff80c083cd8617a4
+    - name: 'bttflt.sys'
+      sha256: 0f65089c4a1b84b51d46cb758fe06ad3651eeecc72ed4a82dad15bc419f60ad5
+    - name: 'buttonconverter.sys'
+      sha256: c34eade7ffdac60ff64ac968647b6db956afb9be47d1fb811d825afed2d63971
+    - name: 'bxfcoe.sys'
+      sha256: cc93daf704813734011da008a5769acb2f217eaea829466424959ff83582934a
+    - name: 'bxois.sys'
+      sha256: 25fdb6383d1289c7129dc0f5443c550f0d3524760577dcec552f4cc5722d4eba
+    - name: 'bxvbda.sys'
+      sha256: 8fca12e3aba77f5a64a54431969edc8b32e1a8f3f6fc06282120fe003b2be1b9
+    - name: 'CAD.sys'
+      sha256: a820143868fe7ae2ddf8709c711656a860a336e8d3788411d9aca090a27cd5d8
+    - name: 'cdfs.sys'
+      sha256: c6ee866166e1019c5d9560e2c34aa4203d0c40fcb8eac50c5a31223c08a0c334
+    - name: 'cdrom.sys'
+      sha256: 297578fe9855f4114a839fd9dee664e4eb4350d44ee171259dc529adc8e423db
+    - name: 'cht4sx64.sys'
+      sha256: ffaa9abf91808e2569206a5a5d5d3542b02860965d8f1ea5790307648cd1e4d3
+    - name: 'cht4vx64.sys'
+      sha256: 9ec811c11ebf399a5c4fddd07a9e63975f2145151306c8599f64dc35a0966eb0
+    - name: 'CimFS.sys'
+      sha256: addc5f663ce771bc7d73f0e0a483359509674fb9ab4a5e466b3eb5ea6f129ed2
+    - name: 'cldflt.sys'
+      sha256: 0cd83c8e3d0275b6b3ec1225523b77edb4a0992ee0a829e10145afab907c43cf
+    - name: 'CLFS.sys'
+      sha256: 83ddcb2a5e5c920dff4a19e1effaf15f9f6de57b7ee9946eebda2e09fba5db85
+    - name: 'CmBatt.sys'
+      sha256: 3a3f341f69ffd0ee94c8e5969e5febc03663834f8f16ffb4fdfae2e9457a6ed4
+    - name: 'cng.sys'
+      sha256: 16ec242d911768fccd6d660118cf70d35ec0f58b78a94da78407bbef5813aa78
+    - name: 'cnghwassist.sys'
+      sha256: 8d79879e02f6dc19f04743d78004e228d3ebf64a5cc3a57d0e0b624091be5765
+    - name: 'condrv.sys'
+      sha256: 3b424955065267757dd33a3b04836d7853a5345e67e8d11ceedf6ccd064095b9
+    - name: 'csc.sys'
+      sha256: 1de130ca6c1549ee8879cb515eaf3c80d757e02e0ba78262ca2ce130623fd720
+    - name: 'dam.sys'
+      sha256: 808ea321716865a455625d983a8e735693cf9d5cb549db56279441775b792986
+    - name: 'dfsc.sys'
+      sha256: bdb72de76eaef9fed00b701dc5cb2d4b1243ae79c7919bcfb7097320fd1392d1
+    - name: 'disk.sys'
+      sha256: d632448048da10f023a42e824ca380cf7bf934d1d5dbbd5b5cea29b8626afdef
+    - name: 'dmvsc.sys'
+      sha256: cde68cfcfb9930fbc2493000fbd3e4fe20d3f495f1b414e184985c5659730024
+    - name: 'drmkaud.sys'
+      sha256: 550019d014be98ad437463b68f1ea72efefff76ab9ff30f3c131cf28a456ab4d
+    - name: 'DTrace.sys'
+      sha256: 6a247cc6346787359906cf2a0c4daf1ea00458bc6cf34012d9adf8bf34f1727c
+    - name: 'dxgkrnl.sys'
+      sha256: d5da20252a05a4826a375986716dabfe076735e603d9cb7aa6c20c5bd889523e
+    - name: 'EhStorClass.sys'
+      sha256: 638da4de4764adfd27b01fb603f0a5d2115ad77cf252070e7c2408e8e419e78c
+    - name: 'EhStorTcgDrv.sys'
+      sha256: 3dde3e7c2229d7b888d6f18f121bd8e9c8527f0b7977af7d4b3ec39c66674649
+    - name: 'elxfcoe.sys'
+      sha256: 8de5ccab3b2719013f342a944850f2645f88c65201c5c8480cc0e629c3c7660e
+    - name: 'elxstor.sys'
+      sha256: b492788402cc8490212666373c2a29dc5ff5492e3d40eddaca40a8ea30e831c7
+    - name: 'errdev.sys'
+      sha256: 42e3fa480f869c3e1d6bf2e78cb7665f19d5f399a8d359fffa4b71805dafeb9a
+    - name: 'evbd0a.sys'
+      sha256: 53af6cd54eae4d4952bc1fa57225a6a376d27e61e7eefd00acaf6c1d9346be0e
+    - name: 'evbda.sys'
+      sha256: 60fe372e60f532099a242ef73c24c142ceb66ce7b1f7ca48b826a02d9dd513c9
+    - name: 'ExecutionContext.sys'
+      sha256: af05c5f77d1aa3c85a4bb856e85c79cf4158d4bcf70720da505c64a5f3a88825
+    - name: 'exfat.sys'
+      sha256: badc01b62dc467aa158edc5ba12cc2bd4ce2dde2973eed3ef55f8b53aa27b8f0
+    - name: 'fastfat.sys'
+      sha256: 2c1ccdffffb2683d2adc1b7536c3a6365fc6c11393451d8fbb04015a2abd2b88
+    - name: 'fcvsc.sys'
+      sha256: de3aaa963c530478c6d116cf1ac2748bb679b5ffe601aa32234f8659ee538c3a
+    - name: 'fdc.sys'
+      sha256: ace9195d382eed208d1c64ae2452b8fa4d55329c5e23086d7a341c0ed19b8803
+    - name: 'filecrypt.sys'
+      sha256: 48f8408987eccdcc97b3d32c14c17fcc9e4e13ffb8be5e6c481b931be7ad5b1c
+    - name: 'fileinfo.sys'
+      sha256: 56b772ac11842c2d1bb5f13bbf24f84ea51aad78dff8ccc26fb64e4b2b73f85e
+    - name: 'filetrace.sys'
+      sha256: d78da37b91c47be3b758522bd17f91f72f94b6230a9b916ff998ade74a23fc26
+    - name: 'flpydisk.sys'
+      sha256: 2b920dcedb85453f619c599083046b6de8670886ab2d13593771dfadccebbeb2
+    - name: 'fltmgr.sys'
+      sha256: 3e7aca74dfa97a65f56ca18b7393679378857aeb4dda5eb5b8ae1def80a81fda
+    - name: 'FsDepends.sys'
+      sha256: 561e096a019e7193d987f98b9ea3cb4bfec6d28de6be54a445b1ff53151d0a5a
+    - name: 'fse.sys'
+      sha256: 263fe7129d33328aa3a73fec66042959df43ac3d8fba40c64f95d5c179c21274
+    - name: 'fvevol.sys'
+      sha256: 60973ebc6d44fb6765584bcf690f14bcf1a8d213f23b40663370787792f9ecf2
+    - name: 'HDAudBus.sys'
+      sha256: 4fda5caa86829384975fd4197aff9f78b1b3d4b5d6c9ad8f3ee3079254b9c4aa
+    - name: 'HdAudio.sys'
+      sha256: 2037206e5d162b63b59800c94fc157d6f73097a01950793516e67c53224d0562
+    - name: 'HidBatt.sys'
+      sha256: 23fc4ead8368f57cf40993491f3fe7e48d2866870eefdce923f78ba387830e45
+    - name: 'hidinterrupt.sys'
+      sha256: 61c59a8cf497947a22b584762877a6ce4cf8c9a553ad404649501a5ff61995a5
+    - name: 'HidSpiCx.sys'
+      sha256: 0db56fb4ceac174f3f43d295670c01797889a7133b11802b3ffd909fac2d5750
+    - name: 'hidusb.sys'
+      sha256: e79fed90c5f09c0b646006aa9ef3f40893c1b2edcb3071634ef048ff285708d7
+    - name: 'hnswfpdriver.sys'
+      sha256: 7d8c29641e4771fb748cf80b2646c3b453fafcb47850bf2d645caaa76e7833ed
+    - name: 'HpSAMD.sys'
+      sha256: a1de9a347d9964bd050cc644f213e09720106d7457482e04a965ae7b51a22554
+    - name: 'HTTP.sys'
+      sha256: 0b1ab9051b0555c4a8a5adf7dd86a0d38897b4fcd7481d7097e570cd037e5bbf
+    - name: 'hvcrash.sys'
+      sha256: 4624f76e07b9e7f5a6427ed25be14e15e9ae78b453803e0d6f39bdfdf0de2568
+    - name: 'hvservice.sys'
+      sha256: b4b0bb5adb861311473b0ce39f1a3f2f077705830a24270d2ae74b54b3cb37cd
+    - name: 'hvsocketcontrol.sys'
+      sha256: 755ada27a06e9ea9bc690b1e66ef1fe0f1209f50520d32c4de7f7a8204bbf41f
+    - name: 'hwpolicy.sys'
+      sha256: 2c5bf5cd6c6f7830e8f5df9fbd701a89d0700b0103d74d5018458db00c9e1b84
+    - name: 'hyperkbd.sys'
+      sha256: 1a5592cfbc576fd90569d219b5a1e21b9f6a062b54cd6a5974504c393d4549db
+    - name: 'HyperVideo.sys'
+      sha256: 59513bd70e155ecf5fb02cfc40d6e747446b4fed57ca4ac3bc7c028b600df1d4
+    - name: 'i8042prt.sys'
+      sha256: 74459efe2d403bda7b60b0146ee53651f104bc9c67c1c9db2e9d1b2b76c03ccf
+    - name: 'iagpio.sys'
+      sha256: faaa46f22944e043a90ae6e9f0f86af187fc2819c563da375b2a409347bb2c35
+    - name: 'iai2c.sys'
+      sha256: 9296a14590dfd94a3c728caf3ca91ba211f27974f9cff8417cddc00d1453315c
+    - name: 'iaLPSS2i_GPIO2.sys'
+      sha256: 6ff5d13ef69e8fbcb4772c7b5c4d5770c78e0b29f9164fa1611efde91ce876be
+    - name: 'iaLPSS2i_GPIO2_BXT_P.sys'
+      sha256: 2141de558461b592d4111a0388d1aac8062fa72cd1e2a2d2d68279a9633288e9
+    - name: 'iaLPSS2i_GPIO2_CNL.sys'
+      sha256: e353d90d0b79a70f976fd5ea1cb7e25a97835e25116962ea035424715b2f43fe
+    - name: 'iaLPSS2i_GPIO2_GLK.sys'
+      sha256: 71fdc25244298d62a335769d6ed43394c33fbd8db05aa54ca924a2977f37858f
+    - name: 'iaLPSS2i_I2C.sys'
+      sha256: 3f1f9ec7571d0f82d3f5bba298965491260708f05ebaaa2cc23483521a5ff079
+    - name: 'iaLPSS2i_I2C_BXT_P.sys'
+      sha256: bf354297a55713d9e2dd4044d42810c007733ee54d5a80d58b96dd279d92c716
+    - name: 'iaLPSS2i_I2C_CNL.sys'
+      sha256: f105edd16e38f5c0044cc7139e4084a04b0ae3212171a1c7f6fe759f3f5f77fc
+    - name: 'iaLPSS2i_I2C_GLK.sys'
+      sha256: a92487129b81376471c842b9932ff3a7b3abbbb89797978e3fdeaf71a6fd5e3f
+    - name: 'iaLPSSi_GPIO.sys'
+      sha256: f77696ae55b992154a3b35f7660bd73e0ab35a6eceec1931c0d35748cfa605c0
+    - name: 'iaLPSSi_I2C.sys'
+      sha256: 8445e41bab21964c7f014742795e462bddc6c37a261990b3d6bf4e637a719547
+    - name: 'iaStorAVC.sys'
+      sha256: a46a34e6dc1573d29b87ad22b336c6a7358a657a416b1643c0d3dad671d81692
+    - name: 'iaStorV.sys'
+      sha256: 7e862c0367b382ade309dea6beb95fd2eed15cae8bdda37658d66484c00f88bb
+    - name: 'ibbus.sys'
+      sha256: d5a937f454c416662446a99cf81bf5bcc843a7bc2d8d2fe7089ecb0c7bc71db6
+    - name: 'IndirectKmd.sys'
+      sha256: 5556a5d83d16a4ffd665bc138840248319432f4c8af9e0c5e4738b6c9aa4bfe0
+    - name: 'intelide.sys'
+      sha256: ec4f443bc63bde38c588170aa3f24967c88cdf2a4b70a94fecd516d788ec2601
+    - name: 'intelpep.sys'
+      sha256: 2a12e2d74c31326c7188dd27183cd09d81e42407522946e6a5f7c2ec6a0dc516
+    - name: 'intelpmax.sys'
+      sha256: af0c3c9ae1db6f60c65c0a046f01c740bd47e10b73fbf0a3a05bb0ab8542362b
+    - name: 'IntelPMT.sys'
+      sha256: 57e1d7db2bcdb8e328170feb2727370d47332012a0292c6bc899871305426547
+    - name: 'intelppm.sys'
+      sha256: cdb6b4a26fd7551e45a86488bea3838a8a2f5738f0494052eca70ae0c35e6c89
+    - name: 'iorate.sys'
+      sha256: 254cf4d65b4f67488f606edf0bb8bee553c85cb72d3f027fff3647c4655c1d18
+    - name: 'ipfltdrv.sys'
+      sha256: 574bf617a7c696fc5feafeae5939b7339efdf7fcb05c3f4a3b4673f5205936ae
+    - name: 'IPMIDrv.sys'
+      sha256: 44fd75ae468d34efb0406008bf566ea4b74f79c8cb742c1863f6bbb896950d31
+    - name: 'ipnat.sys'
+      sha256: 5830b1d00eeb38ea76d9a27a567125fbd8d972c2699aeeff3100331c55604657
+    - name: 'ipt.sys'
+      sha256: 3a3411e1394e65f87a1bfb13c8efe0dd0dbbdd13b5e660518de4fe8140372fa0
+    - name: 'isapnp.sys'
+      sha256: f4dc0b159729d5404fefb7784c6807dde9b7c81b70cb21a2d34d31f321f17fce
+    - name: 'ItSas35i.sys'
+      sha256: 5e7abce438ff8a3e03f1c235685a95c9bc787b87854efaf2c6eb5764b8269d4e
+    - name: 'kbdclass.sys'
+      sha256: c3a037208bf21d29c09adb1c16bb3b0210e5fa9351b1298778afcbf71609e3f5
+    - name: 'kbdhid.sys'
+      sha256: c02e5fb9898c97e1b47d0fea73e29c3d7b6831f9cc78211505bbbb5e1223f5d1
+    - name: 'kdnic.sys'
+      sha256: 51632600f5af151c3784a1985f31b986090c344e1fd66a69c4698c3a350a3796
+    - name: 'kdnic_legacy.sys'
+      sha256: 76e0ecd9d0b6acab034a33c33a5f2fae93bbaa55244719fb80bcf581281e0493
+    - name: 'KernelFSFormatter.sys'
+      sha256: afde3fa88f9d6b132f6f07e17ad7e2d43512751bc97e59dbcb5f7b50c71abb84
+    - name: 'ksecdd.sys'
+      sha256: e196538829f76be3a67708899ef40bd4f272eed7fb988f12fa631fd879c9c9ce
+    - name: 'ksecpkg.sys'
+      sha256: a947dc36c417348755a8c09c0a3a6c3bfc01540c35e29cf47a5b51ce60e1abdc
+    - name: 'ksthunk.sys'
+      sha256: 437dbb2407255655732d0b84054745588433397b72264578d92e4330700cb666
+    - name: 'l1vhlwf.sys'
+      sha256: 282863127f8fca2d1be8760cb8947c9fcfa0c73c7bf9c250284aaabc5262e40e
+    - name: 'l2bridge.sys'
+      sha256: aaa4932b1e5a619be963840998b4e3b40becf55dd30fa8be01ab39a16febccb3
+    - name: 'lltdio.sys'
+      sha256: 0a7dfd382e9ae85eda03391fef6b513ec2e7e5513563bebdd7a4f3745e6697e1
+    - name: 'lsi_sas.sys'
+      sha256: 2d3860a83b5e12c355a1f6f6dd7d61a41c0ba05950510d0655457b97584e4cc4
+    - name: 'lsi_sas2i.sys'
+      sha256: b0cfed90a269fc79767f2012c64bd256451feab1948fde416daff95a85ff8a69
+    - name: 'lsi_sas3i.sys'
+      sha256: aa3f0407e20a2d7e90d412f4325fb0d7124f12eec4215cd32a7df9aa5322d135
+    - name: 'luafv.sys'
+      sha256: a10677bd5edb9d0c5a8d7786eac1de256509b0dadc9b9306f571229924ba6bba
+    - name: 'lunparser.sys'
+      sha256: 073c7248081a23e6d758ceb1ab046dc8715d984ad7e01d0a120b2ef4e89e3f62
+    - name: 'lxss.sys'
+      sha256: 6d134588769505412e64b5c523d3d76b8c84cd521e44ded68a88c72c6098e9eb
+    - name: 'mana.sys'
+      sha256: c954d248505c902a5901657bfba7fa680a83af195c90235389699e7474c85013
+    - name: 'mana_bus.sys'
+      sha256: ce02f9b4a35b2d802d1c68daa2544b1af85f13ea3afb3c1dc57a67af5d560c59
+    - name: 'mana_ib.sys'
+      sha256: 7f6c581c61205fd3eed6929149545f2e0d7afc808444fc4a8f033a0245847bc1
+    - name: 'mausbhost.sys'
+      sha256: cf8ba6f0dfe9d20de2f6885b5557c0974e2824b16f69e55390443bcf174b84dd
+    - name: 'mausbip.sys'
+      sha256: fc1c8f58b25ba92b473b4abc81a65459d63293ab75ad4758fdd0859ad51fff5d
+    - name: 'MegaSas2i.sys'
+      sha256: 03713bdcd061cf24d8dc4d8b4cd250e28a5946c384e60644cb4328dc42b8f50d
+    - name: 'megasas35i.sys'
+      sha256: ef1aa5eb345a92a1b657a4d010500bbd1ec731b8ec22a35472f5d2da96138ec6
+    - name: 'megasr.sys'
+      sha256: 6ca30a0b91dd54edd33c3ec41e6922d329ed38c4955e38c04745328961b31974
+    - name: 'Microsoft.Bluetooth.AvrcpTransport.sys'
+      sha256: 5e7a02843440c5a91a2d2ea32a12c40c0d08e3d1351e32d09236a958ccc23c4e
+    - name: 'Microsoft.Bluetooth.Legacy.LEEnumerator.sys'
+      sha256: 7806369445d671c69abc808e39eb0c4ddf9edc6ebaca2612e9d796c179aaccd1
+    - name: 'mlx4_bus.sys'
+      sha256: 2cab829ad06837d4f807deee668e7718eeee61ac8ff7937ea9e57c4979f914e9
+    - name: 'mmcss.sys'
+      sha256: 878da506eac9c9a46f44265030ab75824140d783cc86b51d5c0ec83722c66b4a
+    - name: 'modem.sys'
+      sha256: 4f8e5bfeeb552b585c33e911e97f0b70082c0968ee4d51314196694a77b9088d
+    - name: 'monitor.sys'
+      sha256: 12677bdadc889b04b324c0b2a51b9bc401ed2d9c7d065008682233f15b7dcfc6
+    - name: 'mouclass.sys'
+      sha256: 0cb695cdd5edd557ed9e544e2dad3fe9ec6684f81c1b7bbff0a841bf1c495339
+    - name: 'mouhid.sys'
+      sha256: 0675a2d2b5488af06ed72f13f687290189a61111ca048c33122657b07fd74458
+    - name: 'mountmgr.sys'
+      sha256: 46c36b1e501e02c38910678e05800bcb7ebb2145a13be55e1888d32f8ad8174c
+    - name: 'mpi3drvi.sys'
+      sha256: 9ed1f6d7de917cf5b387eb1856bf2ea6be69cdc804adb3cab00b00647c25c163
+    - name: 'mpsdrv.sys'
+      sha256: d640f00f5e152782906d443981f7577dbaa1960058e27b7683ba029182f5a220
+    - name: 'mqac.sys'
+      sha256: 160cd9e2304c5512d2b7d3e239e033b9f011e575b2438fc550d73154e1be5dfa
+    - name: 'mrxsmb.sys'
+      sha256: 2f1b390c9482191d313e9f326c1e5b250ce522a406932fe03937a2266000e2b3
+    - name: 'mrxsmb20.sys'
+      sha256: e80cf2c531870917a025b32c2048390ef3b8aaea4c318c9cf02e5909791d4aa3
+    - name: 'Msfs.sys'
+      sha256: b69290cdbbd0361803db97a62168d203c7b3d0a35e24ef60de5ca78f614b29d7
+    - name: 'msgpioclx.sys'
+      sha256: 4354286101168a7ac30c8501c914e38af54eaebaa157ff9a5bcf956280505367
+    - name: 'msgpiowin32.sys'
+      sha256: 273b2b6c9b66f907f21561086240678e115be27b6cd2b950624efbdb5b9cfda4
+    - name: 'mshidkmdf.sys'
+      sha256: 760e5e19767e01a1a37d40e7b90cfaafee6a0dc892391f199789ee5f9ef5e535
+    - name: 'mshidumdf.sys'
+      sha256: 4e310617a209a1e7a924674ae3dd2c0a6d06828c7da3d2e6d82cd7070bc0d353
+    - name: 'mshwnclx.sys'
+      sha256: 3a245262ebbd2c661395ab770a18fdc774ee34e31a1ef96cf391ea068aa2469b
+    - name: 'msisadrv.sys'
+      sha256: df2bf42c5cd3401fa0215ab3eea91efd07edce240f36e30fb14371f5c4b3ad80
+    - name: 'msiscsi.sys'
+      sha256: e8fe743f63e439ee79ca6625b26a4936b719cd61d3fcc67987e06dae7733cf17
+    - name: 'MSKSSRV.sys'
+      sha256: dc68d0105a332c93ca3595ced9a7eac2fd68227b97f4bd387ffa8399f6e1c8f6
+    - name: 'MsLbfoProvider.sys'
+      sha256: fd4f920a42dc4e78e00d836654957c62a1efa5e1503c1d74b2fcedbe566d44a1
+    - name: 'mslldp.sys'
+      sha256: 63968649770233eb93e52e9e62f20c2eefc0f7c3133c58ddd273f0d74e23e223
+    - name: 'MSPCLOCK.sys'
+      sha256: 2c2f0005498165db9c798c8f32cb2ea82be9756946207cae44c2d3dbf0560364
+    - name: 'MSPQM.sys'
+      sha256: bafbdd88fec7b8e8fa3d60ebc78100f64247232ca60dd9615d241477380a20ad
+    - name: 'msquic.sys'
+      sha256: cbc7ee23d0349ace67928e9630cf0e59ddc5e5d9a07fd411ab5b8dee19b31167
+    - name: 'msquicprev.sys'
+      sha256: 185d88e72c71be3344dae28f269e7ace0c47bb974115b3da4ede5e0d4a0d95e9
+    - name: 'MsRPC.sys'
+      sha256: 177c84fda179385f32f640b28298714d836caf7711e3e20e44b31830d9ca96bc
+    - name: 'msseccore.sys'
+      sha256: bc70f97bfe08979db7ceacc8f0f7570b0a81ecde0d86b79a20536e7bed970cae
+    - name: 'mssecflt.sys'
+      sha256: 8953103f8a5c1d1da6608aabe033bd562656082b11852f98519e28e0dc0d7416
+    - name: 'mssecwfp.sys'
+      sha256: 91b4b6a235abf4a1e0eb7192ee6686aacd4fcf29706cf0e12734f37feb3f8403
+    - name: 'mssmbios.sys'
+      sha256: b158d81780504ab412c17bb9db0c710f6ad9c7f2b75e7095c2fc2fc1847dc9a0
+    - name: 'MSTEE.sys'
+      sha256: c36ae7bb096e32376bcc04e4ea22ac306bc94b782846591944d3bbac2182f708
+    - name: 'MTConfig.sys'
+      sha256: c68818ce3acf1b50a8b39690489a2f51d73ba61a397d22f7b907bcabdbffaecb
+    - name: 'mup.sys'
+      sha256: 55df0a17f9b09b15aa7fe059570de6615f58751dc447616554ffe4adfc4f22c5
+    - name: 'mvumis.sys'
+      sha256: 55ca3903d53aeabe3297cb5a52598cab2775d28f9821b94f124fefa6302ee4b5
+    - name: 'ndfltr.sys'
+      sha256: 34b258ebcfa15bd21a2a4aa012a669103e4dd7b492ca0842a6a419cf175514fb
+    - name: 'ndis.sys'
+      sha256: 8cd4a1a392a049ca2f11289e179b64b0dee4fcb7d1ebfaa4a07e1e58be45508e
+    - name: 'ndiscap.sys'
+      sha256: bc5a261c3f9df1ef7e11a9d2e6325a2cbbad20703b0a6a1d641241428f35e9d1
+    - name: 'NdisImPlatform.sys'
+      sha256: 08b547613680e47c73d849ac053b549c3aca2c92e4e64ce89ddead2e788658f1
+    - name: 'ndistapi.sys'
+      sha256: 6eec9a6aa0b744272a5d163f9a46d7fd6c94db2c61c8a5c5e48a582ee8e682d2
+    - name: 'ndisuio.sys'
+      sha256: 066cc6d74febbb6d655a7623d9700dc42b040bff7152b6b534f03b310fb8125f
+    - name: 'NdisVirtualBus.sys'
+      sha256: 5620649d1a8f0f38f367e473bdbeb80a3a89a4a21326e2304cd0389d24c68511
+    - name: 'ndiswan.sys'
+      sha256: 9d538c164beb334a10843a73fd5249f70c847eff998813a177a5b2eb9a8079e4
+    - name: 'NDKPerf.sys'
+      sha256: 2da35b2bef34984014e76012f8c3920729fd4ea892c405d415b8829d1d95c804
+    - name: 'NDKPing.sys'
+      sha256: 23e70fd342e45a986ddae97712b5b33adfd536e49a3f5b9e245a1f7c55ef341a
+    - name: 'NDProxy.sys'
+      sha256: e687c49852f5bf451e2b7ea82484c9f2d4f978984b9ce548b34e2eb3c22f6d1b
+    - name: 'netadaptercx.sys'
+      sha256: 1328b075e73017269168e24a0ffd55825a3296bb927b932dd39f056961561c25
+    - name: 'netbios.sys'
+      sha256: 29c10b2bd9c7272c7c71462f39252a75de0159eccfc58bdf1c407d8c226f0afc
+    - name: 'netbt.sys'
+      sha256: 578551531f2ee066ea5bbd3584d53790de6a9f4118e9f0deafe5fd29e8a0351d
+    - name: 'netvsc.sys'
+      sha256: 47abcbe194c66442059a653eed933a7c87d97fc3ec02ee1308139f5aecc8f181
+    - name: 'Npfs.sys'
+      sha256: 7428025b18bd0ed4958295c4fca56ab2e61a6ac83ecb7a4d858b6def8674cae8
+    - name: 'npsvctrig.sys'
+      sha256: dde7961a0323d8450a3506af210ee5ab8eacde91d6f78f6d91d52c456fb9a3a3
+    - name: 'nsiproxy.sys'
+      sha256: 261047d1ac635bc13b7112beb9cc38415fcea93c156e32ae16dfbd1f49f65eef
+    - name: 'Ntfs.sys'
+      sha256: b78e6037b984202d05df5e13e2446519e309b6ce9b02ef7f26050257cf0c6c8f
+    - name: 'Null.sys'
+      sha256: 4fe3ba886ba5b90b50356c88f8888d408cf88600f3e214e6b9af449efb07f4de
+    - name: 'nvdimm.sys'
+      sha256: 3d1c76d34decb6347a1d464f3862a1460a3bc8342e6d30f752133c55830247cf
+    - name: 'nvmedisk.sys'
+      sha256: d26f5ca8c5b1ecbe0f3f2709237128e198e84aec0189ee308a5234a0566bbcee
+    - name: 'nvraid.sys'
+      sha256: db769bf751d7b23ffce8cc1baabb335da5da15e06a845a049eb68c3791686fed
+    - name: 'nvstor.sys'
+      sha256: 6c52424748a9f88a3c0c33a1a4d9813107066fc7550b7c27ba3dd3d606df4fca
+    - name: 'nwifi.sys'
+      sha256: 08b89b2357838cbd51a3a20cb6e80a9a9c818c69cfed3b15923c3905e8b2e2d3
+    - name: 'p9rdr.sys'
+      sha256: dd4617284685ab0c5ee192c9c7673412b8db14140f17fdf89f1f4384e6d41b09
+    - name: 'pacer.sys'
+      sha256: 364bf0fecb5fda703b35d99c3cbb58c5cdc41669522aebc864740ccc28cbcfcc
+    - name: 'parport.sys'
+      sha256: 46b916329c1e92f4d47a1ea9f5f2d92f72bdb624b0297df2badfefbeb4b8c6de
+    - name: 'partmgr.sys'
+      sha256: c0624315b4b39bf867cbe8f8811f1f8d1a97fde8592ee926a69aa82b08f6d902
+    - name: 'passthruparser.sys'
+      sha256: 57cc7e6cbbcda83ed90cc485771c2b5ae9127d17c190b4555bbce0fb764cdad7
+    - name: 'pci.sys'
+      sha256: 6fd3b217bbae49be257c6a8a645c6cac233462682658cd7fe319dc846b9befd9
+    - name: 'pciide.sys'
+      sha256: aa716b42a80629a3299d0a240ae2d82c90259649f7923964101c12c87b3175c8
+    - name: 'pcip.sys'
+      sha256: fd4bcd5c539b4c4ac9d8c273bab9a26460097d1c6df86a1681bc7d70bd93cbf0
+    - name: 'pcmcia.sys'
+      sha256: 505f1106fcb85c22fb2b68b8ebdc945a0c361ec12f8fbc4ff2c412d58bb785d9
+    - name: 'pcw.sys'
+      sha256: 577497b1e531310f54906b787b7b42f2a7532958afb6e2c02d93bb4a6cb72fb9
+    - name: 'pdc.sys'
+      sha256: 0904449ad50c2aff4f633e2d2e28ac9731fbd74afa60057ff243385a4bb773ed
+    - name: 'peauth.sys'
+      sha256: 99b56161f6ae78afd73cf1238c736243c9c12d44f75ffb3e1432745dfce9948f
+    - name: 'percsas2i.sys'
+      sha256: 7026717ebc767674c3b52e2465fd9298ce02f7560a096162e9b50d6782a8cf08
+    - name: 'percsas3i.sys'
+      sha256: 32843e02f6f814336989698031eb8ec222db8e299f8bdc4d34c1cbffa4babf48
+    - name: 'PktMon.sys'
+      sha256: 0a6942737a726e616438d7f78888f97b7a2e8eebd5921b7df00f56675bcdb729
+    - name: 'PktMonApi.sys'
+      sha256: eac51de6da243d39a44b29ae369643af2ce26db78c9427c13959eb22fe6a7194
+    - name: 'pmem.sys'
+      sha256: f1b50b7c30106764c01f1d11e402d9d49c02a1ecc2965f05a2fc5d5e5e185b47
+    - name: 'pnpmem.sys'
+      sha256: 74468ba2353cff2c555723d032d3e2129a1675e071c22b3904146548a6d6c6f0
+    - name: 'portcfg.sys'
+      sha256: b11622606790b5ca52fa344d21edd8ec303abda8f7f0d3ad82a932cabbff3efb
+    - name: 'prjflt.sys'
+      sha256: 18cd6a83d82141bbb0aed0b86414cb28268d763869f653eaa1e78585264f6863
+    - name: 'processr.sys'
+      sha256: 30fa6c3acb0d0dffe22e386414b6ba765497dcd88ee7b0d8bae4343fb8318cf3
+    - name: 'pvhdparser.sys'
+      sha256: 07c54dc7bb067672ceff5d37744d041f23cf5b2cc634c88a32017f149bf5d85c
+    - name: 'pvscsii.sys'
+      sha256: db637123a22e12c848086d65bf57c4a5ee48c5c64a323004fa05e07bb4366f62
+    - name: 'qefcoe.sys'
+      sha256: 6e81c22492a050bfcfae977f1bcfbdbada78ab4174f00e7476134c424bedd26d
+    - name: 'qeois.sys'
+      sha256: 08adcd9060e9b3d8a205a1a5fcca4fb2e362b6db7da66162517e3f685b6d079c
+    - name: 'qevbda.sys'
+      sha256: 3077a24d0f738c62506fe51f77e6317dacb3182e07e64afbd2ae52c23aefda5a
+    - name: 'ql2300i.sys'
+      sha256: 4703403b08509478957ec33251536dc7889ba1a30ab2f1b9d135bd3482e841e3
+    - name: 'ql40xx2i.sys'
+      sha256: fb524e2e2380c1f90c5007b4a9f316f97e238b8fccc4fda0241e60fa5a2028a6
+    - name: 'qlfcoei.sys'
+      sha256: c0f270631d9d338e209ada51a2c0325915da83f95ae79c2de18e89a69ebf3f66
+    - name: 'qwavedrv.sys'
+      sha256: 89626f83fe4324fb7ec91c82726b51fa177489ac8e8339cfab78fde9fbe9600c
+    - name: 'ramdisk.sys'
+      sha256: 8607efcd42c0947aea3fa44edeaac686506c56cf3c19b0173f62c6a6bdcfd83e
+    - name: 'ramparser.sys'
+      sha256: a71df8233ca2a3c878d34f2ca4f936f22c564faa6a6546fcd932c0b12e0cd5ec
+    - name: 'rasacd.sys'
+      sha256: d0f05599fdf7e7a3ad0d9b4a561f4a11df82ef24aed3176c7706f677bad444bb
+    - name: 'rasgre.sys'
+      sha256: 63f70e7822df4bac438cd562b2741ed20e476581af0f02b12565f4d45e0b5002
+    - name: 'rasl2tp.sys'
+      sha256: f6718c49a60a3b1423558e49afdf5231f138218a04a7202d920f6de7cc7e2d55
+    - name: 'raspppoe.sys'
+      sha256: 4174df6db0196626db7dfd7a66b960103a01a08dbaa5de2fc6cc7b22c2dd41d7
+    - name: 'raspptp.sys'
+      sha256: 9d52a550a98184beab3e759b60b00b8639bad24444eb0f87fc9dbf8078166275
+    - name: 'rassstp.sys'
+      sha256: 656f952b85d2e96dd44711856a52cc70b4c69754134d68d678eb9736dfeeb5da
+    - name: 'rdbss.sys'
+      sha256: 363561cede75fb1de4e6bcc35063a92ff189743b2a34b1fdf5f38bd148c04855
+    - name: 'rdpbus.sys'
+      sha256: d7fc4e2cf18c379f1ed457e660fb67edcebd2c37853f800c4ad97619ae429853
+    - name: 'rdpdr.sys'
+      sha256: 62c366514350bd22186ce311c2dea6eebc41889721bac13fe7654f815c8f086b
+    - name: 'ReFS.sys'
+      sha256: 973e55a8f31f08f8c68b4fab7f3df0748373de1600a14876e66c5e8522264a7c
+    - name: 'ReFSv1.sys'
+      sha256: 5e302e6adf9001504cfcc58a3c516370affcc7682ecceeb9157dd1ebb4e59a28
+    - name: 'rfcomm.sys'
+      sha256: 60f472da420a719af58378efe6798a763737c5fb5aa563d396f8099cb3e0dc09
+    - name: 'rhproxy.sys'
+      sha256: 816c553ec9382554d13162a9c30213ac54ce503858c5dbd84c8b1be1c9e3c5d1
+    - name: 'rspndr.sys'
+      sha256: 00ce6128eb778ebbf4b82a3a0d84235c9c679449df9d1e972f5ea9180c21e5fb
+    - name: 'sacdrv.sys'
+      sha256: 30c084f3f92959b829923ba668181b73a0d685e83ad7dc2e107c3d7068838361
+    - name: 'sbp2port.sys'
+      sha256: 7027e3fe0fb1f3bd5600927eca4a6d0c763ff3695f14b59a757b668bb9d6e55b
+    - name: 'scfilter.sys'
+      sha256: 75e222351cbcd19c64b6898ad0c1f3b2ac4048d582376551427416e7ff8be52e
+    - name: 'scmbus.sys'
+      sha256: 959f68101eafb4705529c4d508da422d9a84bf46e369c1f19889bb4c040d56eb
+    - name: 'sdbus.sys'
+      sha256: 3f8d02cb964e7c73e7253a10603e1e930cff02fab589ed26144091c4c92ebfd4
+    - name: 'sdstor.sys'
+      sha256: fba62c004613f55cba337095749554fa7999a636f2bdeaf4d236897dc853cf76
+    - name: 'SerCx.sys'
+      sha256: 60fa91dcab5ae2a092ba5c8ed5c8850c9f78d2b93bf3cf7413c1b9e5eca20dec
+    - name: 'SerCx2.sys'
+      sha256: d2f7ebfe1144fd1a2f456e4bbc3a9b90b9d57f12f86fb2b535cabfd138e27dd7
+    - name: 'serenum.sys'
+      sha256: 59d9888a42e20faeff78bc3312e0015148c5c21abcb0799e1c93fe24b70210f8
+    - name: 'serial.sys'
+      sha256: 0cce651e05c888a994c4370233e0f68ece99821e652cf075ea389a1b8f62515f
+    - name: 'sermouse.sys'
+      sha256: 15b5a47cff67ef58df5712d97bd9c32aa2575568f5c4243f760e39a51e7b0fb3
+    - name: 'sfloppy.sys'
+      sha256: 76ebaa218f832ddd14646861476cf922d22d438c6e9709dac22671a4f4180384
+    - name: 'SiSRaid2.sys'
+      sha256: b4a9423e6a418565bfca7f1c41940a5cb899e08b77ba13fe0b5394aee693002a
+    - name: 'sisraid4.sys'
+      sha256: 6ec82d50515963c7ed8a114fd3ff21a05b98fd0c7c84341dd8ac98af379a3848
+    - name: 'SmartSAMD.sys'
+      sha256: 0aacf89126c5cfa00d33fdab2b79e6cf15e6e4dcb8eea13a4ab4d062d1239f53
+    - name: 'smbdirect.sys'
+      sha256: 5bea324f23ee36fc31d783a81f1686f5e23da01121c782f3b1252e8cd043bf11
+    - name: 'spaceparser.sys'
+      sha256: c293f6a1d770cb3a564546d1d7989eed25a8baa7b6f53cd5720cea3562eed275
+    - name: 'spaceport.sys'
+      sha256: cd2953c8163cd8d34a18e6280184bea94d5129897933a76a0ab9cee2c509fbe4
+    - name: 'SpbCx.sys'
+      sha256: 88f0247887340d0ae57004b99d727ebee620adc8bd702cc96ca5bd15dc34a8f0
+    - name: 'srv2.sys'
+      sha256: f90030442d65b976158c3e6fd2c69ecd2f1080803bc8e60b16099d03094a93ff
+    - name: 'srvnet.sys'
+      sha256: 87cfe25ec7fd1dd07478789c8fe557d0a51b82f6f8f9d08f695620f28aec02bd
+    - name: 'stexstor.sys'
+      sha256: 341cd0f3bdaf580ebe35a2e3ebbdcf94e46b85901a2effcdcdba3d3897a44937
+    - name: 'storahci.sys'
+      sha256: eaa0581caaa3bf67247237aef5277d525534e71d31e3c7c283b87d2f909223c1
+    - name: 'stornvme.sys'
+      sha256: f6068ff5652b66484700c783f955465e72ad1cd390b359222b9538ad77fa1ab8
+    - name: 'stornvmeofi.sys'
+      sha256: ab8c5491833eda1c8ee38d96454e73e8e5cb9f0c4094e455866afd3fca457eda
+    - name: 'storqosflt.sys'
+      sha256: 2c19bcfb385041520d663fadcba3f1d463bde98a1323eb48e45bc9faf6d339f6
+    - name: 'storufs.sys'
+      sha256: f8102fc7ff105003c098ef92d21d554725ae9915e305b526152fc5b53c123bf0
+    - name: 'storvsc.sys'
+      sha256: 983124be31b88d7b80b740ea07fbf5b2a37da346b1a7691d820349574c101a82
+    - name: 'storvsp.sys'
+      sha256: 9177954c640f4b4e293af900c1ec4f216c41e747b145b19078ff0e9a2fa81de9
+    - name: 'tcpip.sys'
+      sha256: a021fe2abc91c8388a46d3f1e22f85c57c4b3d4fb551bc3759366eb6d27cce84
+    - name: 'tcpipreg.sys'
+      sha256: f0d49914195fc0a5e87f563c624cffd8562344edfae465f66ae90c34db1d9efe
+    - name: 'tdx.sys'
+      sha256: a38c1a4fabfe34a668084e676e811380e9d07f9247f51e383220f41d4fabdb81
+    - name: 'terminpt.sys'
+      sha256: ccf0698bb05d64ed135aa932e02d671256557a331fdbe3cf744f8a8fb5abbc86
+    - name: 'tpm.sys'
+      sha256: 180b329a16bfdf8ebed52738a15bcea22ab67c7535fcfafff39a43b9246d4f5a
+    - name: 'tsusbflt.sys'
+      sha256: c5b243d68723dfdb05c163bb02c83691a0b9bfe6f795dafc37daf751beb4f7a8
+    - name: 'TsUsbGD.sys'
+      sha256: b158cdb366347287f0acd96d52868ad84815776b6aa93dc79230859d40c7e791
+    - name: 'tsusbhub.sys'
+      sha256: 8b3deed08a03b51386d0e168ca11e1b7384ea0d7fc1ff1222eeee83eba3e8e5d
+    - name: 'tunnel.sys'
+      sha256: 824a80dabb9d4113460d67426efa585ace0c452a6e362b332e26ba626e3dc0a2
+    - name: 'uaspstor.sys'
+      sha256: ae48bfb662c49132b8ae9868b19acd252edd8a6cf3f937585daa616dfd73acfa
+    - name: 'UcmCx.sys'
+      sha256: 57c3d163067b36002c87f96581a6c46df0dd28c2600d9480bba3c2b593e9c7ec
+    - name: 'UcmTcpciCx.sys'
+      sha256: b8316b8a6670c3e64781178d06aedf2b613e90cba668bc34e052540f7520baa6
+    - name: 'UcmUcsiAcpiClient.sys'
+      sha256: 4995a2e0d12734242be4ee0cab42a372a7b3be37100c9d1949ec57a4f43b9bba
+    - name: 'UcmUcsiCx.sys'
+      sha256: b241ac97e0d8a60f82cb4f4d435bf7ba64a2eb1ce2aae200d53c470e5e1f65ce
+    - name: 'ucx01000.sys'
+      sha256: 21da023e44a3e1c763ce5f2035d2b91385fe776284853ff46b750af49d6e8b6a
+    - name: 'udecx.sys'
+      sha256: 64854d8cec0f9edbb2ef80417dd569ca703bda98e75b1d7723f04b3e72033189
+    - name: 'udfs.sys'
+      sha256: 9f7548b363d9963d4281221f129a5de1c5c38c61ae2b9a1e2a91c1cf11893fec
+    - name: 'UevAgentDriver.sys'
+      sha256: 10828b6e3bbee3e8744b28b5697ee0e12888a48bbb2c02d027bede57cf5b34b8
+    - name: 'ufx01000.sys'
+      sha256: 78ed801f832e1a3d6309665db93c06434f89a24319311a9b632158be4e16cec3
+    - name: 'ufxsynopsys.sys'
+      sha256: 4b8938777b92f4f1b3199def96f03e710cc22d8a2720297f3f1b53a696d3347f
+    - name: 'UnionFS.sys'
+      sha256: 2b8da4a000e185bd1ffd666c0e5e3cbb5cef749e9ef0778020d2cd3870d353aa
+    - name: 'urscx01000.sys'
+      sha256: f7cb01210df55cee7f29a72576a6411693b6083e70ddb8d081ff5fd2a9697c3c
+    - name: 'usbaudio.sys'
+      sha256: e1268e4f885c134c03b2b658833f6fa48ef169307c760454d99e8e8346b7f85c
+    - name: 'usbaudio2.sys'
+      sha256: 2047e10bc9ded73bb87fa5343fa82dd0bfb15ac8f05b87a5e99292f4cba9f961
+    - name: 'usbccgp.sys'
+      sha256: e94f444abcf50f4456a1583b1bdfcdbb500e6141d5e80941a2de9918c57c4b3c
+    - name: 'usbehci.sys'
+      sha256: e476eccac1dc3136b4aaf9fd793a64ffdb8b092d9ee7d8602c76c76033da63c7
+    - name: 'usbhub.sys'
+      sha256: b395f97f5614f762058f1c2225b02499418ee235192b40ed498b2c37ce03cb15
+    - name: 'UsbHub3.sys'
+      sha256: c610f2193f6d3d9d5e282fd203f131a00e5ec3457b18d67c340a86b04932cf5b
+    - name: 'usbohci.sys'
+      sha256: 0d6a9f4b75187a9213b87f1169e8dbac2dffc105c5d32a7dc1c12c1eabff6a7b
+    - name: 'usbprint.sys'
+      sha256: c81554a27402de124dbfe317efbf6009175cfd787b9c7254d57deb62c76c7975
+    - name: 'usbser.sys'
+      sha256: 703e6e754fbf75bb361b3216effbba8d7d7ab0e55865904f156802c88fb1994a
+    - name: 'USBSTOR.SYS'
+      sha256: 9a70e6cf80e4bb7c2063937fd05684bea824eda73414c67352f0c83d53051d0f
+    - name: 'usbuhci.sys'
+      sha256: f527cd6260ba3c73620300efe3612b1f4ad86ebd222249234d809babf561825f
+    - name: 'USBXHCI.SYS'
+      sha256: 541267df3e353a4599cc9f6058ac7e218464968cdc8579edd7061fced2b48da2
+    - name: 'vdrvroot.sys'
+      sha256: 0029fa9fe4f3055244d25646bf833705b937a7553430c50d055f643e993bdb6d
+    - name: 'VerifierExt.sys'
+      sha256: dc2d73353031037743168d3100a93e9a5f6e5ce4285ad65c1beda1feebf71189
+    - name: 'vfpext.sys'
+      sha256: 20c94d80cfc926ea735503bda3002095b36b77f2d6da5351b4385284eab3c10e
+    - name: 'vhdmp.sys'
+      sha256: d7c41047a2f1b47859656b51b3165bb8c4fe1f2a5ee0186015560907991fb4c7
+    - name: 'vhdparser.sys'
+      sha256: 6ad1dc3421d544ee11075b80fc8376837679f96379596383f4ce6d400ac4da3c
+    - name: 'vhf.sys'
+      sha256: 53008a0db8ebe5c9dd7c72e22e32235946f11c845f419af9879f44cd67102407
+    - name: 'Vid.sys'
+      sha256: 5d9287c54754f91a80651c1c5722e4c2009ea17327286f4c8c255980291c39ca
+    - name: 'vmbus.sys'
+      sha256: 7c0635e6e0f2f6883a12ac59936553a0da662d2e68dc3eda7d1d4ddb81fd2b84
+    - name: 'VMBusHID.sys'
+      sha256: 67380e2dc050c74b04f48238c11cf7a57e9dab2c89ca9df66117d57b69eaaf29
+    - name: 'vmbusproxy.sys'
+      sha256: 10915cbc92de7b95ccdc79cb6a9aa96b4f0190bc8b291f75fa47d78abcadbdca
+    - name: 'vmbusr.sys'
+      sha256: a2557c9f0f1b9e46c768333728f4865e557c4dbc44b2af047bea88f691b36dc5
+    - name: 'vmgencounter.sys'
+      sha256: bfd17e40b498aa842d59fd38e0ff128416cc6cf0af9cb2eb7637c5e265180258
+    - name: 'vmgid.sys'
+      sha256: 2066f124e18b277595ca72bc205ceff7f42e4cc226b5ddad29933fba20dafe7e
+    - name: 'vms3cap.sys'
+      sha256: 8f7a702e1e703ecaca3d95fd21202d5b09d43eb1aeeb9676cba58127d36395d9
+    - name: 'VmsProxy.sys'
+      sha256: cc0247b60b2e4f5db7a086be3a096e21e6af7a15027b0e5ba77aacd17790db20
+    - name: 'VmsProxyHNic.sys'
+      sha256: c83949016f6d2f6d54c6bf2c1777f933a87e770e542d2e00b4ac2d2aaad408cc
+    - name: 'vmstorfl.sys'
+      sha256: 76e08a81aeaab356bb3f1fc2215847f0f5b8df2ea3ed0e530373affd7f7bd6b3
+    - name: 'vmswitch.sys'
+      sha256: a202c6a604709844e4f704f3a59e75acb564a295ff58be1c11ad3d33541f6fc4
+    - name: 'volmgr.sys'
+      sha256: 9094e44c78697e23661366d1625bffdd5dd530b5a4158de54daa53b5c820b678
+    - name: 'volmgrx.sys'
+      sha256: 5365625179c788fef772b612e6ec921b5acb8c74757dd6ab2f9075d4909666ad
+    - name: 'volsnap.sys'
+      sha256: 528599fe80fdc79101ef8a5d0b1481717d0ad630e09019e745813afe7d3f51aa
+    - name: 'volume.sys'
+      sha256: 42e63746060e7698bddf08ffb22905e11ef9a329181c06930784238ade49506f
+    - name: 'vpci.sys'
+      sha256: 26a0801d5504ce3850e69990d0b1bf1554d220db9fb52519ae33b5e5b7780c2f
+    - name: 'vpcivsp.sys'
+      sha256: 0e7bba57ebf81e729e2659abbfcecdd792b51e8e07f0c196c6488e55be6048a9
+    - name: 'vsmraid.sys'
+      sha256: 2e0f359b2b2f2d73d8b576cd2ecfca82a2cea642fd7e0266f6175a6ec912ce0a
+    - name: 'vstxraid.sys'
+      sha256: a07ddd9d26605fde1afdf258094b08626a3ba80ec289ffcc81ca5e4885ec063b
+    - name: 'vwififlt.sys'
+      sha256: 3438f1776e907d138579146264351da5601efc08f06c36f24621a4c28d261857
+    - name: 'wacompen.sys'
+      sha256: 55c5747ecd53113af450aa0b5055a8d0962b6ab1ff8b5431630e60b27e025a36
+    - name: 'wanarp.sys'
+      sha256: 2a36e701c79b39c90c81e1a537f905e815c964f8d23dbbedd4afd123bef10424
+    - name: 'wcifs.sys'
+      sha256: 70e7cbb366b2f007ab66851e38543cf8f4546518b7dc13292ee1a02cf1cac16f
+    - name: 'Wdf01000.sys'
+      sha256: ed257f02b3197bfce9289942c49b57de8432025da054295f0b11bea0a8cd55d2
+    - name: 'wdiwifi.sys'
+      sha256: 5506489d56e7988f30fac7b16f51a42da406e6e46845cbc91069895d550c84ec
+    - name: 'WdmCompanionFilter.sys'
+      sha256: ddac459d912f325386758e67182aec0eb8d4035aacd70b007f0eb7d4be753011
+    - name: 'wfplwfs.sys'
+      sha256: 7a64c991a3c93bb1209d4a4e2e2570a1bf55a7683bd9d388b441cf7eb8e6ce23
+    - name: 'WifiCx.sys'
+      sha256: 886ac5101df88450becc482d4aafe0aedd5d0c897f310920b52ca957a89134b3
+    - name: 'wimmount.sys'
+      sha256: f732c9ed741b415cbef8b9059e78f07c26604a267516d3840229d606c55f36af
+    - name: 'WinAccelCx.sys'
+      sha256: e2c6a6dc14bbc3d23940efc6f8432d7c3cf1dd88825d2ee93ceea7ef8a91c8e0
+    - name: 'WindowsTrustedRT.sys'
+      sha256: 1d4915b61a6474f13734197f930928ae6e67e1b19ef9741f8b52b4e84e69cfd8
+    - name: 'WindowsTrustedRTProxy.sys'
+      sha256: fa8336a782b6e51d6677d7c1423d8efa4ede207c64d29bb0a360ac8615cb7492
+    - name: 'winmad.sys'
+      sha256: 65a539646471f6508e075effd54ceae58720fd757b6b3afc21c14ae80680e6b3
+    - name: 'winnat.sys'
+      sha256: 0297d28dc5a81163c0d26e05db1b6e7d5a7acb0da2ac0c6b86cd798df8b71db7
+    - name: 'WinUSB.SYS'
+      sha256: 48443acaefd3e1a6931e3b9081bde2b243a4031647098b8097861ac6b7afd64f
+    - name: 'winverbs.sys'
+      sha256: d5799efbeb35f2f0313e2fbf7c5c4bbe21868a821d3682581ba6e03f9b6a3af5
+    - name: 'wmiacpi.sys'
+      sha256: 3a8540de14ed7f876de425fa0379790f01526a1df50c409a4e8bc3fc134f7177
+    - name: 'Wof.sys'
+      sha256: 7f2d3778ae0aa5f1f5eea0e19c3e9e19ea88e6f79f4758a0127d40670ed63eea
+    - name: 'WpdUpFltr.sys'
+      sha256: 45489df939804ffe56e9a833cbed357402795d7d0cbd6dfcda29645cd3df4300
+    - name: 'ws2ifsl.sys'
+      sha256: 507af82d800a0ce2d8df6ff4b397b82d3b180df1eb3802e812a970ab302acc13
+    - name: 'WudfPf.sys'
+      sha256: 780ce0fccfe004a365539e8fb5a3c7d1dfddca1ba64bbb625dddf110596a1dbe
+    - name: 'WUDFRd.sys'
+      sha256: b88d997133152dc9d4e7ec93903fe2621b36e01fc4d6953adb867e5af6a0fdaf
+    - name: 'ztdns.sys'
+      sha256: 835c58f988203e153913718a34004cca74b1c17d1da813659a98a8762d2b4921
+  'C:\Windows\system32\drivers\wd':
+    - name: 'KslD.sys'
+      sha256: e845e428a350ea8adef1b417ac2a48347771270cb060bb6c03dbea164357ccca
+    - name: 'WdAiNisDrv.sys'
+      sha256: 8e3056b2db787ca5b13e734543f4c48d15478ab2fe3d727111217b5a047e2655
+    - name: 'WdBoot.sys'
+      sha256: 4d857b8b61e32e9da2449c7f00ef481febe1c1f5aa8e4507507679671a99c55b
+    - name: 'WdFilter.sys'
+      sha256: c5b90ac5d85fb224f6b1ba213564a6e6ab5dcc739a389c89e57f55b6b2422afc
+    - name: 'WdNisDrv.sys'
+      sha256: 09c1e9a08c61c62da861b858d94469394fb5de876586fdef36d27636928e755c
+  'C:\Windows\System32\DriverStore\FileRepository\acpiaudiocompositor.inf_amd64_047f553a6f70b169':
+    - name: 'AcpiAudioCompositor.sys'
+      sha256: d384df9f10829e07f73e8ec5b0076cdcba5495b982b6fc081d0fb2bcb0bebaf2
+  'C:\Windows\System32\DriverStore\FileRepository\acpipagr.inf_amd64_d1093347a27ff89c':
+    - name: 'acpipagr.sys'
+      sha256: 96a4a7046116b2e729020f64326744a53415c75e7a0009d409b4e012efab0be4
+  'C:\Windows\System32\DriverStore\FileRepository\acpipmi.inf_amd64_3ced06eb61dcc792':
+    - name: 'acpipmi.sys'
+      sha256: 16daf02659c08b1f53a16edeb93e751d5a2cd94e01210d15cad2f76290055573
+  'C:\Windows\System32\DriverStore\FileRepository\basicdisplay.inf_amd64_2753efdbb0d9a226':
+    - name: 'BasicDisplay.sys'
+      sha256: df42b232d1620023195558443cb764f3192816a1cd97d5c637d5b52fbd409f7c
+  'C:\Windows\System32\DriverStore\FileRepository\basicrender.inf_amd64_3ee4bbe654c2a277':
+    - name: 'BasicRender.sys'
+      sha256: 8eb19300d221f9a77b75b39877daca662da9fb59feedfb49c7075d1d6295bea2
+  'C:\Windows\System32\DriverStore\FileRepository\c_thermal.inf_amd64_8f8fc5145f1a66de':
+    - name: 'ThermalFilter.sys'
+      sha256: 2ea00c33f5718067de122cb1b944ad1e66585693ca2fab81f6c742b298ca64ce
+  'C:\Windows\System32\DriverStore\FileRepository\compositebus.inf_amd64_8cf6fa9d3afdfa25':
+    - name: 'CompositeBus.sys'
+      sha256: cd3da415d3eb770aff4a6fcffc83627394c607674611449896250d6b8e1b4839
+  'C:\Windows\System32\DriverStore\FileRepository\devmap.inf_amd64_1993197f4612e967':
+    - name: 'devmap.sys'
+      sha256: d2ca184489215a4d1f2aa121993988771527881b99c04f93219ba035b1ff4f0b
+  'C:\Windows\System32\DriverStore\FileRepository\displaymux.inf_amd64_da65a70f0c3ce0f3':
+    - name: 'DisplayMux.sys'
+      sha256: fa7dcd09a43bafe5308794e2ebba1cd826864d89f23aac253904dec2c3e18f87
+  'C:\Windows\System32\DriverStore\FileRepository\genericusbfn.inf_amd64_71c810ddc0116541':
+    - name: 'genericusbfn.sys'
+      sha256: f52273c6288fdbb012d2f00b73e075dd32e99d999596037583921cbf6e0d358a
+  'C:\Windows\System32\DriverStore\FileRepository\genpass.inf_amd64_0c82d80c9252c9bd':
+    - name: 'genpass.sys'
+      sha256: 6607b762cad45a321b287163aefdbef62d17fd7980e5ea44b8c5e83f5217d4f5
+  'C:\Windows\System32\DriverStore\FileRepository\i3chost.inf_amd64_79382b592f2ee77b':
+    - name: 'i3chost.sys'
+      sha256: b1a01612fe1ab6e3d944724e787729d9b672b5d365cf96995d258b0a9914f835
+  'C:\Windows\System32\DriverStore\FileRepository\netvwifibus.inf_amd64_ab4e111fe8221178':
+    - name: 'vwifibus.sys'
+      sha256: 5cb6e77b582990932082bce8d7b4edcbc856387b372f5576ffbe3ac68d7e5ec8
+  'C:\Windows\System32\DriverStore\FileRepository\prm.inf_amd64_7c38475757a1f016':
+    - name: 'PRM.sys'
+      sha256: cef2b58655b4c4e3947ccce2f0357059819e20ca8945134a40459d2f7ec60650
+  'C:\Windows\System32\DriverStore\FileRepository\sdcahid.inf_amd64_9b043c5c82568ed0':
+    - name: 'SdcaHid.sys'
+      sha256: e0c7ecc5651ce7c66b7cb41ed764a0beaa236c1d44881f54402491fd5a279566
+  'C:\Windows\System32\DriverStore\FileRepository\sdcamfd.inf_amd64_7616b07de0d13d6f':
+    - name: 'SdcaMfd.sys'
+      sha256: ae76e6142922e21b67709b077297fca5db8b38cfe8a77449663f5bc23a72843e
+  'C:\Windows\System32\DriverStore\FileRepository\swenum.inf_amd64_8b9dd76f362e3ec6':
+    - name: 'swenum.sys'
+      sha256: 0e6d766bbd3d9b7476cde2d2e9c317fa51090c9a608929c9e372f66ea2e2f88f
+  'C:\Windows\System32\DriverStore\FileRepository\uefi.inf_amd64_eb40b566c94c1a51':
+    - name: 'UEFI.sys'
+      sha256: ac6e3cb4127d529f0457bf14dc7215081095d0e7a34898410d04c44e21acba16
+  'C:\Windows\System32\DriverStore\FileRepository\ufxchipidea.inf_amd64_6e8bb2ed82835828':
+    - name: 'UfxChipidea.sys'
+      sha256: c4e58ae7833097f4ab1264a9888f3790d819bc5f29a2bad268f8dec8730bf070
+  'C:\Windows\System32\DriverStore\FileRepository\uiomap.inf_amd64_047c718f27ecbc1f':
+    - name: 'uiomap.sys'
+      sha256: 495cc47726ec0f26c18485d1f27354a260b57e7d7dcbea9a00a00d6ba402b92d
+  'C:\Windows\System32\DriverStore\FileRepository\umbus.inf_amd64_914dd46b4b013b1b':
+    - name: 'umbus.sys'
+      sha256: ea211d5531bc397d1ae6e8692124ff8abefcdd8d8609dc14333155f108bd81df
+  'C:\Windows\System32\DriverStore\FileRepository\umpass.inf_amd64_06e016c9ffecbf73':
+    - name: 'umpass.sys'
+      sha256: 1484366beca79e7fbe4adc8e2a765787a6aeb7330b2d0e2fc2acabacaa757c88
+  'C:\Windows\System32\DriverStore\FileRepository\urschipidea.inf_amd64_37fb14618bce547b':
+    - name: 'urschipidea.sys'
+      sha256: 12f6a60d01b9c99b73be45598f2ccca605d879ece849686b724062f3636c2100
+  'C:\Windows\System32\DriverStore\FileRepository\urssynopsys.inf_amd64_ef0be23d0f063014':
+    - name: 'urssynopsys.sys'
+      sha256: e41a3359de99e673f16809bd00cc7697bb0e41c198a94dfb96d29b287b1f78e2
+  'C:\Windows\System32\DriverStore\FileRepository\usb-platformdetection.inf_amd64_1c19c915a2666a29':
+    - name: 'usb-platformdetection.sys'
+      sha256: 2e550ea1ac7e5664e2fdaecfc80b74fc6e1004c7c98ea6a999e182d20343e79e
+  'C:\Windows\System32\DriverStore\FileRepository\usb4devicerouter.inf_amd64_5a0fb44cb1c9505f':
+    - name: 'Usb4DeviceRouter.sys'
+      sha256: 475dfb502702df0efb9b014277bc2178576f694bddfac5261e5a28b55ed8dc2b
+  'C:\Windows\System32\DriverStore\FileRepository\usb4hostrouter.inf_amd64_5ec83e51e37c6824':
+    - name: 'Usb4HostRouter.sys'
+      sha256: f60f6072e308f052fcc3f92a8a30d08a8f97ea6a6e7f6edf0286b2159f6ad2d2
+  'C:\Windows\System32\DriverStore\FileRepository\vrd.inf_amd64_4dd0e6d66a75bb7e':
+    - name: 'vrd.sys'
+      sha256: dd09ec4ebc7cab9175d4bfe30b2e96816ea3bbb89e3ff7351cac9e4c36f222ac
+  'C:\Windows\System32\DriverStore\FileRepository\wini3ctarget.inf_amd64_9bda3f893989b4a6':
+    - name: 'wini3ctarget.sys'
+      sha256: 4e8da0a95ffc8c3cc05ae86677357edb6bc68fd031c1f26a0e377d7e7301dcbf
 code_integrity:
   enabled: true
   test_signing: false

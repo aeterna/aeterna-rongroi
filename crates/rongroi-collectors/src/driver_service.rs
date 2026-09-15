@@ -589,4 +589,21 @@ mod tests {
             unmeasured(UnmeasuredReason::NotWindows)
         );
     }
+
+    /// The baseline reproduces the runner's reading (windows.yml run 34955915842): every driver service, and
+    /// every hash, with no gap.
+    #[test]
+    fn baseline_elevated_win11_reproduces_the_runners_driver_service_reading() {
+        let run = DriverService::default().collect(&fixture("baseline-elevated-win11"));
+        let (observations, gaps) = measured(&run);
+        assert_eq!(observations.len(), 424);
+        assert_eq!(
+            observations
+                .iter()
+                .filter(|observation| observation.fields.contains_key("sha256"))
+                .count(),
+            424
+        );
+        assert!(gaps.is_empty(), "{gaps:?}");
+    }
 }
