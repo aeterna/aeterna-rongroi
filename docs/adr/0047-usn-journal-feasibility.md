@@ -405,8 +405,11 @@ Prefetch folder itself could not be opened (5); the Event Log and PCA folders co
 
 ## Consequences
 
-- No code, no rule, no fixture, no dependency. `Cargo.lock`, `deny.toml`, `clippy.toml` and the report are
-  unchanged.
+- Implemented as the `usn` collector (`crates/rongroi-collectors/src/usn.rs`), with `rongroi_parsers::usn`,
+  `UsnJournalSource` and a `fuzz_usn` target. No rule. The implementation plan's rulings — per-folder times
+  rather than per-reason, version 2 matched by the 64-bit index, a 30-second budget, absent folders as
+  `source_absent` gaps and folders on another volume (checked by volume serial) as `read_failed` gaps, and
+  the program's own Prefetch record counted — are in `docs/architecture.md`'s `usn` row.
 - Accepted by the owner on 2026-09-14, with the five points of the recommendation as written.
-- README's M3 row, in both languages, links here: the USN journal is designed, and waits on the
-  measurements under "Before any code".
+- README's M3 row, in both languages, links here: the collector reads the change journal without write
+  access and counts records per watched folder with no file names, and no rule reads it yet.

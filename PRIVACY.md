@@ -5,7 +5,8 @@
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
 FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, the list of running processes, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
-event logs hold.
+event logs hold, and how many times the change journal of the Windows drive recorded a change in the
+folders those collectors read.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -58,6 +59,13 @@ or because the tool's own time limit ran out — is **named in the report as one
 than passed over in silence. A log the tool never opened at all, because that time limit was already gone
 when its turn came, is named as one it did not look at — which is a different thing and is said in
 different words.
+
+Of the change journal it reads, for the Windows drive only, how many records Windows wrote and when the
+oldest and newest were written, and for each of the Prefetch, event log and Program Compatibility
+Assistant folders and FiveM's two plugin folders, how many records name that folder and how many of those
+created, deleted, renamed or changed a file. **It reads no file name**: the journal names every file
+changed on the drive, and the program's parser skips the name without keeping it. It reports no journal
+identifier and no file number, because each would identify your PC across two reports.
 
 Of the machine's security settings it also reads two more (ADR 0038). One is what the PC's **firmware**
 itself says about Secure Boot, beside what Windows says — one on/off value, nothing that names a person.
@@ -158,8 +166,9 @@ tool did, not more. Paths in it are redacted in SS mode like any other.
 ### What a collector saw that no rule matched
 
 Some collectors read things no rule asks about — the list of programs you are running, what Windows
-recorded about programs that ran, and whether each FiveM plugin folder was there. **Self mode lists
-them**, under "unmatched observations", so that you can read what the tool saw and judge it yourself.
+recorded about programs that ran, whether each FiveM plugin folder was there, and how many change journal
+records named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
+can read what the tool saw and judge it yourself.
 
 **SS mode does not list them.** It says how many there were and nothing more. That mode promises to show
 only what matches a rule, and the names of every file and every running program on your PC are not that:
