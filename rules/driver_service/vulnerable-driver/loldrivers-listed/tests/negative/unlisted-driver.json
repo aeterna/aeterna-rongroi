@@ -1,0 +1,7 @@
+{
+  "description": "Registered driver services whose files are not in the list, and one whose file is missing",
+  "observations": [
+    { "collector": "driver_service", "fields": { "service": "kbd", "start": 1, "path": "C:\\Windows\\System32\\drivers\\kbd.sys", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" } },
+    { "collector": "driver_service", "fields": { "service": "gone", "start": 3, "path": "C:\\Windows\\System32\\drivers\\gone.sys" } }
+  ]
+}

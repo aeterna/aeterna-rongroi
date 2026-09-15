@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 98f6e2b8-6d23-4202-bc7f-06587ebdd2f3
+title: A registered driver is on LOLDrivers' list of vulnerable drivers
+description: >-
+  A driver service registered on this PC points at a file whose SHA-256 LOLDrivers lists as a verified
+  vulnerable driver: a signed driver with a known weakness, which a program running as administrator can
+  use to run code in the Windows kernel. Windows loads it because it is signed. The row shows the file's
+  SHA-256; find that hash in rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv
+  in this program's repository to see the LOLDrivers entry id and file name. This says the driver is
+  registered, not that it is loaded, that anything used it, or why it is installed, and ordinary hardware
+  utilities install such drivers.
+status: test
+collector: driver_service
+strength: posture
+match_lists:
+  sha256: loldrivers-vulnerable-drivers.csv
+retention: >-
+  The driver services registered when the scan ran. A driver that was registered and removed before the
+  scan is not seen.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Overclocking, fan and RGB control, and hardware-monitoring utilities, which install drivers of this kind; LOLDrivers' RTCore64.sys entry is the MSI Afterburner driver
+  - A driver service left registered after its program was uninstalled, whose file is still on disk
+references:
+  - https://github.com/magicsword-io/LOLDrivers
+  - https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules
+author: aeterna-rongroi contributors
+date: 2026-09-15
+tags: [posture, drivers]

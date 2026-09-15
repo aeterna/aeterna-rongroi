@@ -273,4 +273,6 @@ paths and file hashes — in the pull request that registers the collector.
 - No network code, no new dependency, no new `windows` feature.
 - Implemented as `crates/rongroi-collectors/src/driver_service.rs`; the baseline's driver services come
   from `windows.yml` run 34955915842. The rule and its data file follow in their own pull request.
+- The rule is `rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`, with 1,847 rows at
+  LOLDrivers `1c60ea1`.
 - Accepted by the owner on 2026-09-15, as written.

@@ -1,0 +1,8 @@
+{
+  "description": "A registered driver service whose file's SHA-256 is in the list, and one whose is not",
+  "observations": [
+    { "collector": "driver_service", "fields": { "service": "vendorio", "start": 3, "path": "C:\\Program Files\\Vendor\\vendorio.sys", "sha256": "000547560fea0dd4b477eb28bf781ea67bf83c748945ce8923f90fdd14eb7a4b" } },
+    { "collector": "driver_service", "fields": { "service": "kbd", "start": 1, "path": "C:\\Windows\\System32\\drivers\\kbd.sys", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" } }
+  ],
+  "expect_matches": 1
+}

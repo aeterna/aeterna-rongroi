@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 3 |
-| จำนวน rule | 21 |
-| SHA-256 | `e0838b0ae433890050f500cec4f8a0a03b7f5cb26bf9af510f8f7eb8f9c9baa4` |
+| จำนวน rule | 22 |
+| SHA-256 | `af805cc00cc83783e1e7530ee27120a62eff095985a25f75f7b541fcd488e973` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -37,6 +37,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 ## สารบัญ
 
+- `driver_service`
+  - [ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
   - [มี event log ไฟล์หนึ่งถูกล้าง](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [Security log มีบันทึกว่าตัวเองถูกล้าง](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
@@ -62,6 +64,49 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+
+## collector `driver_service`
+
+### `driver_service` / `vulnerable-driver`
+
+<a id="rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3"></a>
+
+#### ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers
+
+- ชื่อภาษาอังกฤษ: A registered driver is on LOLDrivers' list of vulnerable drivers
+- id: `98f6e2b8-6d23-4202-bc7f-06587ebdd2f3`
+- ไฟล์: [`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`](../rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml)
+- collector: `driver_service`
+- strength: `posture` — สถานะเครื่อง
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `posture`, `drivers`
+- เขียนเมื่อ: 2026-09-15
+
+**เกี่ยวกับการตรวจนี้**
+
+driver service ที่ลงทะเบียนไว้บนเครื่องนี้ชี้ไปที่ไฟล์ซึ่ง SHA-256 ตรงกับไดรเวอร์มีช่องโหว่ที่ LOLDrivers ยืนยันแล้ว คือไดรเวอร์ที่มีลายเซ็นแต่มีจุดอ่อนที่รู้กันอยู่ ซึ่งโปรแกรมที่รันด้วยสิทธิ์ผู้ดูแลระบบใช้รันโค้ดใน kernel ของ Windows ได้ Windows ยอมโหลดเพราะมีลายเซ็น แถวนี้แสดง SHA-256 ของไฟล์ ค้นหา hash นั้นใน rules/driver\_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv ใน repository ของโปรแกรมนี้เพื่อดู id ของรายการใน LOLDrivers และชื่อไฟล์ ข้อนี้บอกว่าไดรเวอร์ลงทะเบียนไว้ ไม่ได้บอกว่าถูกโหลดอยู่ ไม่ได้บอกว่ามีอะไรใช้มัน หรือทำไมถึงติดตั้งไว้ และโปรแกรมฮาร์ดแวร์ทั่วไปก็ติดตั้งไดรเวอร์แบบนี้
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `sha256`: เป็นค่าใดค่าหนึ่งใน 1847 ค่าในคอลัมน์แรกของ `loldrivers-vulnerable-drivers.csv` ซึ่งเป็นไฟล์ที่อยู่ข้าง rule (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+driver service ที่ลงทะเบียนไว้ตอนสแกน ไดรเวอร์ที่เคยลงทะเบียนแล้วถูกลบออกก่อนสแกนจะไม่เห็น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- โปรแกรมโอเวอร์คล็อก ควบคุมพัดลมและไฟ RGB และโปรแกรมดูสถานะฮาร์ดแวร์ ซึ่งติดตั้งไดรเวอร์แบบนี้ รายการ RTCore64.sys ของ LOLDrivers คือไดรเวอร์ของ MSI Afterburner
+- driver service ที่ยังลงทะเบียนค้างไว้หลังถอนโปรแกรมออกแล้ว โดยไฟล์ยังอยู่บนดิสก์
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/magicsword-io/LOLDrivers>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## collector `evtx`
 
