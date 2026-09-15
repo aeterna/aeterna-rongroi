@@ -53,8 +53,8 @@ be `unmeasured` there.
 
 ## The fuzz layer
 
-One target per public parser entry point — six of them: `fuzz_bam`, `fuzz_pca_app_launch`,
-`fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`, `fuzz_evtx`. Each asserts nothing about the value it
+One target per public parser entry point — seven of them: `fuzz_bam`, `fuzz_pca_app_launch`,
+`fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`, `fuzz_evtx`, `fuzz_usn`. Each asserts nothing about the value it
 gets back: a malformed artifact is a typed `ParseError`, which is a correct answer, so the bug a target looks
 for is a panic, an abort or a hang.
 

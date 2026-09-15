@@ -13,10 +13,10 @@
 
 use std::path::{Path, PathBuf};
 
-use rongroi_parsers::{bam, evtx, filetime, pca};
+use rongroi_parsers::{bam, evtx, filetime, pca, usn};
 
 /// The directories that are both an L0 fixture set and a fuzz seed corpus.
-const SEEDED_DIRECTORIES: [&str; 3] = ["bam", "pca-app-launch", "pca-general"];
+const SEEDED_DIRECTORIES: [&str; 4] = ["bam", "pca-app-launch", "pca-general", "usn"];
 
 /// `fuzz_prefetch`'s seed corpus, which is the one that does not live under `fixtures/parsers/`:
 /// those files are vendored from a third-party corpus under its own licence and `REUSE.toml`
@@ -190,6 +190,49 @@ fn every_bam_fixture_is_decoded_or_refused_rather_than_panicking() {
         // accepts, including the ones that are not the documented 24-byte shape.
         assert_eq!(parsed.is_ok(), name != "truncated.bin", "{name}");
     }
+}
+
+#[test]
+fn every_usn_fixture_is_decoded_or_refused_rather_than_panicking() {
+    for (name, bytes) in fixtures_in("usn") {
+        let parsed = usn::parse_buffer(&bytes);
+        if name == "truncated.bin" {
+            assert!(parsed.is_err(), "{name}");
+            continue;
+        }
+        let parsed = parsed.unwrap_or_else(|error| panic!("{name}: {error}"));
+        let damaged = matches!(
+            name.as_str(),
+            "record-length-zero.bin" | "record-length-past-end.bin" | "unknown-major-version.bin"
+        );
+        assert_eq!(parsed.damage.is_some(), damaged, "{name}");
+    }
+}
+
+#[test]
+fn the_usn_fixtures_hold_the_records_their_names_say() {
+    assert_eq!(
+        usn::parse_buffer(&fixture("usn", "three-version-3-records.bin"))
+            .unwrap()
+            .records
+            .len(),
+        3
+    );
+    assert_eq!(
+        usn::parse_buffer(&fixture("usn", "one-version-2-record.bin"))
+            .unwrap()
+            .records
+            .len(),
+        1
+    );
+    let skipped = usn::parse_buffer(&fixture("usn", "version-4-then-version-3.bin")).unwrap();
+    assert_eq!((skipped.skipped_version_4, skipped.records.len()), (1, 1));
+    assert!(
+        usn::parse_buffer(&fixture("usn", "next-usn-only.bin"))
+            .unwrap()
+            .records
+            .is_empty()
+    );
 }
 
 /// `fuzz_filetime` seeds from the BAM directory, because a BAM value's first eight bytes are exactly
