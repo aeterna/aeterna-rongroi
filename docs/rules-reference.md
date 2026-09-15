@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 3 |
-| Rules | 21 |
-| SHA-256 | `e0838b0ae433890050f500cec4f8a0a03b7f5cb26bf9af510f8f7eb8f9c9baa4` |
+| Rules | 22 |
+| SHA-256 | `6a2cab06d1db3383d699dd86f85916592a5b9b6787fdf038d701e1d19748dbee` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -41,6 +41,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 ## Contents
 
+- `driver_service`
+  - [A registered driver is on LOLDrivers' list of vulnerable drivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
   - [An event log file was cleared](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [The Security log records that it was cleared](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
@@ -66,6 +68,48 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+
+## Collector `driver_service`
+
+### `driver_service` / `vulnerable-driver`
+
+<a id="rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3"></a>
+
+#### A registered driver is on LOLDrivers' list of vulnerable drivers
+
+- Id: `98f6e2b8-6d23-4202-bc7f-06587ebdd2f3`
+- File: [`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`](../rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml)
+- Collector: `driver_service`
+- Strength: `posture`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `posture`, `drivers`
+- Written: 2026-09-15
+
+**About this check**
+
+A driver service registered on this PC points at a file whose SHA-256 LOLDrivers lists as a verified vulnerable driver: a signed driver with a known weakness that a program running as administrator can use to reach the Windows kernel; the LOLDrivers entry says what this one allows. Windows loads a signed driver unless Microsoft's vulnerable-driver blocklist names it, and this program does not read whether that blocklist is on. The row shows the file's SHA-256; find that hash in rules/driver\_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv in this program's repository to see the LOLDrivers entry id and file name. This says the driver is registered, not that it is loaded, that anything used it, or why it is installed, and ordinary hardware utilities install such drivers.
+
+**Matches when all of these hold for one observation**
+
+- `sha256`: is one of the 1847 values in the first column of `loldrivers-vulnerable-drivers.csv`, a file beside the rule (text, ASCII case ignored)
+
+**Look-back**
+
+The driver services registered when the scan ran. A driver that was registered and removed before the scan is not seen.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Overclocking, fan and RGB control, and hardware-monitoring utilities, which install drivers of this kind; LOLDrivers' RTCore64.sys entry is the MSI Afterburner driver
+- A driver service left registered after its program was uninstalled, whose file is still on disk
+
+**References**
+
+- <https://github.com/magicsword-io/LOLDrivers>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## Collector `evtx`
 

@@ -34,7 +34,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - The `driver_service` collector: every driver service registered with Windows, with its start setting,
   the path its `ImagePath` resolves to and the SHA-256 of that file. Every relative `ImagePath` is read
   under `%SystemRoot%`; a refused, unreadable or unresolved file leaves the hash a gap, and hashing stops
-  after 30 seconds. No administrator rights are needed. No rule reads it yet (ADR 0048).
+  after 30 seconds. No administrator rights are needed (ADR 0048).
+- A vulnerable-driver rule (`posture`, status `test`): a driver service registered on the PC whose file's
+  SHA-256 is one of 1,847 verified vulnerable-driver hashes from LOLDrivers at commit `1c60ea1`, vendored
+  under Apache-2.0 beside the rule with how to rebuild it (`cargo xtask loldrivers`). A `found` row shows
+  the hash; the data file gives the LOLDrivers entry. Hardware utilities install such drivers, and the rule
+  says so (ADR 0046, ADR 0048).
 
 ### Changed
 - SS-mode redaction knows more profile folders (ADR 0049). Besides `X:\Users\<name>`, it replaces

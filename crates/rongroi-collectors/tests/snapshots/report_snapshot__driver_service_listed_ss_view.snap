@@ -18,7 +18,7 @@ expression: view
       "rule_count": 22
     },
     "platform": "windows",
-    "os_build": "26100",
+    "os_build": null,
     "elevated": false,
     "generated_at": "2026-01-01T00:00:00Z",
     "boot_time": {
@@ -31,16 +31,25 @@ expression: view
       "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
       "collector": "driver_service",
       "strength": "posture",
-      "state": "unmeasured",
-      "reason": "read_failed",
-      "expected": false
+      "state": "found",
+      "observations": [
+        {
+          "collector": "driver_service",
+          "fields": {
+            "path": "C:\\Windows\\System32\\drivers\\CorsairLLAccess64.sys",
+            "service": "corsairllaccess64",
+            "sha256": "000547560fea0dd4b477eb28bf781ea67bf83c748945ce8923f90fdd14eb7a4b",
+            "start": 3
+          }
+        }
+      ]
     },
     {
       "rule_id": "f4c99b57-02c8-4e53-82d0-dba8bdc13dda",
       "collector": "evtx",
       "strength": "tamper",
       "state": "unmeasured",
-      "reason": "read_failed",
+      "reason": "source_absent",
       "expected": false
     },
     {
@@ -48,7 +57,7 @@ expression: view
       "collector": "evtx",
       "strength": "tamper",
       "state": "unmeasured",
-      "reason": "read_failed",
+      "reason": "source_absent",
       "expected": false
     },
     {
@@ -56,13 +65,53 @@ expression: view
       "collector": "evtx",
       "strength": "tamper",
       "state": "unmeasured",
-      "reason": "read_failed",
+      "reason": "source_absent",
       "expected": false
     },
     {
       "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
       "collector": "evtx",
       "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": false
+    },
+    {
+      "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "53528a11-5af7-4e75-94bf-fca07eec6fcc",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "0999422f-8709-4d85-80e3-39410a85ed6b",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "d5531c55-1a65-4698-9f39-7cf79bbbb7ba",
+      "collector": "fivem_dir",
+      "strength": "presence",
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
@@ -71,33 +120,17 @@ expression: view
       "rule_id": "061797d3-161d-4783-89e6-caf658973436",
       "collector": "fivem_dir",
       "strength": "presence",
-      "state": "found",
-      "observations": [
-        {
-          "collector": "fivem_dir",
-          "fields": {
-            "location": "plugins",
-            "path": "%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\example-plugin.dll",
-            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "signature": "no_embedded_signature"
-          }
-        }
-      ]
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
     },
     {
       "rule_id": "282115fe-863d-4e2e-9cf5-4eaf8e7545e4",
       "collector": "fivem_dir",
       "strength": "context",
-      "state": "found",
-      "observations": [
-        {
-          "collector": "fivem_dir",
-          "fields": {
-            "location": "plugins",
-            "path": "%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.app\\plugins\\unreadable-plugin.dll"
-          }
-        }
-      ]
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
     },
     {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
@@ -142,14 +175,6 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
-    },
-    {
-      "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
-      "collector": "prefetch",
-      "strength": "tamper",
-      "state": "unmeasured",
-      "reason": "read_failed",
-      "expected": false
     }
   ],
   "own_traces": [],
@@ -159,14 +184,14 @@ expression: view
     "not_attempted": 0
   },
   "listed": {
-    "found": 2,
+    "found": 1,
     "not_found": 4,
-    "unmeasured": 8
+    "unmeasured": 13
   },
   "hidden": {
-    "not_found": 5,
-    "unmeasured_expected": 3,
+    "not_found": 0,
+    "unmeasured_expected": 4,
     "unmeasured_unexpected": 0,
-    "unmatched": 3
+    "unmatched": 2
   }
 }

@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 3,
       "sha256": "[bundle sha256]",
-      "rule_count": 21
+      "rule_count": 22
     },
     "platform": "windows",
     "os_build": "19045",
@@ -27,6 +27,14 @@ expression: view
     }
   },
   "evidence": [
+    {
+      "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
+      "collector": "driver_service",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
     {
       "rule_id": "f4c99b57-02c8-4e53-82d0-dba8bdc13dda",
       "collector": "evtx",
@@ -217,7 +225,7 @@ expression: view
   "listed": {
     "found": 0,
     "not_found": 7,
-    "unmeasured": 14
+    "unmeasured": 15
   },
   "hidden": {
     "not_found": 0,

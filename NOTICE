@@ -6,7 +6,9 @@ General Public License as published by the Free Software Foundation, either vers
 or (at your option) any later version. See LICENSES/GPL-3.0-or-later.txt.
 
 Detection rules, rule translations and rule test fixtures under rules/ are licensed under the Creative
-Commons Attribution-ShareAlike 4.0 International license. See LICENSES/CC-BY-SA-4.0.txt.
+Commons Attribution-ShareAlike 4.0 International license. See LICENSES/CC-BY-SA-4.0.txt. One exception is
+vendored third-party data: rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv
+is LOLDrivers data under Apache-2.0, per its own REUSE.toml annotation and the PROVENANCE.md beside it.
 
 Per-file licensing is declared with SPDX headers and REUSE.toml (https://reuse.software).
 
