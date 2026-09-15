@@ -89,12 +89,14 @@ What it rests on:
 A form in the last row produces an observation with `service` and `start` and no `path` or `sha256`, and a
 `read_failed` gap on `sha256`: the value exists and this program did not understand it.
 
-Every `/` in the path the table above builds is read as `\`, and a resolved path with a `.` or `..` segment
-is an unknown form (last row) rather than one that walks out of the folder it appears to name — no such
-`ImagePath` was measured on either machine. Both are what keep every reported path in the one shape
-`rongroi_core::view::redact_user_paths` reaches: that function only recognises `X:\Users\<name>`, and a
-path an installer wrote with a forward slash, or a mixed one, would otherwise carry a user name straight
-past SS-mode redaction.
+Every `/` in the path the table above builds is read as `\`. A resolved path is then an unknown form (last
+row), rather than the file its segments appear to name, when any segment after the drive: is `.` or `..`;
+is empty, from a repeated or trailing separator; ends in `.` or a space; contains a `:` past the drive
+(reaching an alternate data stream); or, for the segment right after the drive, is `Documents and Settings`
+(a junction to `Users` on current Windows) case-insensitively. No such `ImagePath` was measured on either
+machine. Together these keep every reported path under a user profile in the one `X:\Users\<name>` shape
+`rongroi_core::view::redact_user_paths` reaches: that function only recognises that exact shape, and any
+of the forms above would otherwise carry a user name straight past SS-mode redaction.
 
 ### What is a gap and what is not
 
@@ -254,7 +256,7 @@ paths and file hashes — in the pull request that registers the collector.
 - The budget is checked between files, not while one is hashing: one very large file, a slow removable
   volume, or a drive letter mapped to a network share can hold the scan past 30 s on that file alone, and a
   file's size is not bounded before it is hashed. A path on a mapped network drive is read through the
-  network like any other. Genuine drivers are small — the runner's 424 took under 15.5 s cold — so this was
+  network like any other. Genuine drivers are small — the runner's 424 took 15.5 seconds cold — so this was
   not measured on either machine.
 
 ## Consequences
