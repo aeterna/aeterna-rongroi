@@ -263,10 +263,14 @@ enum Hash {
 }
 
 /// Hashes `path`. `file_sha256` answers a missing file and an unreadable one with the same kind of
-/// error, so after a failure the file's folder is listed: a file the folder does not hold is missing.
+/// error, so after a failure that is not a refusal, the file's folder is listed: a file the folder
+/// does not hold is missing. A refusal (F4) is never read as "the file is not there" — the folder is
+/// not even listed for one, because a token that cannot open the file may equally be unable to list
+/// its folder, and that would say "missing" about a file this program was refused, not absent.
 fn hash(host: &dyn Host, path: &str) -> Hash {
     match host.file_sha256(path) {
         Ok(digest) => Hash::Hashed(digest.to_ascii_lowercase()),
+        Err(SourceError::AccessDenied) => Hash::Failed(UnmeasuredReason::AccessDenied),
         Err(_) if is_missing(host, path) => Hash::Missing,
         Err(error) => Hash::Failed(reason(&error)),
     }
@@ -498,41 +502,45 @@ mod tests {
             (
                 "absentpath",
                 r"C:\Windows\System32\drivers\absentpath.sys",
-                "1111",
+                "1111111111111111111111111111111111111111111111111111111111111111",
                 0,
             ),
             (
                 "systemroot",
                 r"C:\Windows\System32\drivers\systemroot.sys",
-                "2222",
+                "2222222222222222222222222222222222222222222222222222222222222222",
                 1,
             ),
             (
                 "relative",
                 r"C:\Windows\System32\drivers\relative.sys",
-                "3333",
+                "3333333333333333333333333333333333333333333333333333333333333333",
                 3,
             ),
-            ("wow", r"C:\Windows\SysWOW64\drivers\wow.sys", "5555", 3),
+            (
+                "wow",
+                r"C:\Windows\SysWOW64\drivers\wow.sys",
+                "5555555555555555555555555555555555555555555555555555555555555555",
+                3,
+            ),
             (
                 "devicepath",
                 r"C:\Program Files\Vendor\devicepath.sys",
-                "6666",
+                "6666666666666666666666666666666666666666666666666666666666666666",
                 3,
             ),
             (
                 "driveletter",
                 r"C:\Program Files\Vendor\driveletter.sys",
-                "7777",
+                "7777777777777777777777777777777777777777777777777777777777777777",
                 4,
             ),
         ] {
             let observation = service(observations, name);
             assert_eq!(text(observation, "path"), Some(path), "{name}");
-            assert!(
-                text(observation, "sha256").unwrap().starts_with(hash),
-                "{name}"
-            );
+            // F5: the full 64-character hash, not a prefix — a truncated comparison would not catch a
+            // resolver that hashed the wrong file but happened to share a leading digit.
+            assert_eq!(text(observation, "sha256"), Some(hash), "{name}");
             assert_eq!(observation.fields["start"], start, "{name}");
             assert_eq!(observation.collector, "driver_service");
         }
@@ -540,8 +548,12 @@ mod tests {
 
     #[test]
     fn a_missing_file_is_listed_without_a_hash_and_is_not_a_gap_by_itself() {
+        // F2: the folder exists and lists another file, so a missing `gone.sys` is read through
+        // `is_missing`'s `Ok(Some(entries))` branch, not the `Ok(None)` branch a folder with no
+        // fixture `filesystem:` entry takes — the branch a real PC's non-empty `System32\drivers`
+        // takes.
         let host = FixtureHost::from_yaml_str(
-            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\gone':\n    Type: 1\n    ImagePath: 'System32\\drivers\\gone.sys'\n",
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\gone':\n    Type: 1\n    ImagePath: 'System32\\drivers\\gone.sys'\nfilesystem:\n  'C:\\Windows\\System32\\drivers':\n    - name: other.sys\n      sha256: 9999999999999999999999999999999999999999999999999999999999999999\n",
             "inline",
         )
         .unwrap();
@@ -554,6 +566,82 @@ mod tests {
         );
         assert_eq!(gone.fields.get("sha256"), None);
         assert!(gaps.is_empty(), "{gaps:?}");
+    }
+
+    /// F2: `is_missing` folds ASCII case, because the registry's `ImagePath` and the file system's
+    /// own spelling of a name need not match byte-for-byte. A file the folder lists under a different
+    /// case is present, not missing, so the hash failure it already has (no recorded `sha256`) stays
+    /// a gap.
+    #[test]
+    fn a_file_present_under_a_different_ascii_case_keeps_its_hash_failure_as_a_gap() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\caselock':\n    Type: 1\n    ImagePath: 'System32\\drivers\\CaseLock.sys'\nfilesystem:\n  'C:\\Windows\\System32\\drivers':\n    - name: caselock.sys\n",
+            "inline",
+        )
+        .unwrap();
+        let run = DriverService::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        let caselock = service(observations, "caselock");
+        assert_eq!(
+            text(caselock, "path"),
+            Some(r"C:\Windows\System32\drivers\CaseLock.sys")
+        );
+        assert_eq!(caselock.fields.get("sha256"), None);
+        assert_eq!(
+            gaps.get("sha256"),
+            Some(&UnmeasuredReason::ReadFailed),
+            "{gaps:?}"
+        );
+    }
+
+    /// F2: a folder listing that is itself refused must not be read as "the file is not there" —
+    /// `is_missing`'s `Err(_)` branch keeps the original failure instead of turning it into
+    /// `Hash::Missing`. Denying the folder makes both the hash read and the folder listing fail here
+    /// (`crates/rongroi-host/src/fixture.rs` `described_file` checks the same `access_denied` list
+    /// `list_dir` does), which still exercises the branch: without it, the mutation `Err(_) => true`
+    /// would turn this refusal into "not a gap".
+    #[test]
+    fn a_refused_folder_listing_keeps_the_hash_failure_as_a_gap_instead_of_calling_it_missing() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\naccess_denied: ['C:\\Windows\\System32\\drivers']\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\blocked':\n    Type: 1\n    ImagePath: 'System32\\drivers\\blocked.sys'\n",
+            "inline",
+        )
+        .unwrap();
+        let run = DriverService::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        let blocked = service(observations, "blocked");
+        assert_eq!(blocked.fields.get("sha256"), None);
+        assert_eq!(
+            gaps.get("sha256"),
+            Some(&UnmeasuredReason::AccessDenied),
+            "{gaps:?}"
+        );
+    }
+
+    /// F4: a refusal on the file itself never means "not there". Denying only the file (not its
+    /// folder) so the folder listing would, if consulted, say the file is absent — without the F4
+    /// fix `hash` would call `is_missing`, get `true`, and silently turn the refusal into
+    /// `Hash::Missing` with no gap.
+    #[test]
+    fn a_refused_file_is_access_denied_even_when_the_folder_listing_would_call_it_missing() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\naccess_denied: ['C:\\Windows\\System32\\drivers\\refused-alone.sys']\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\refusedalone':\n    Type: 1\n    ImagePath: 'System32\\drivers\\refused-alone.sys'\n",
+            "inline",
+        )
+        .unwrap();
+        let run = DriverService::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        let refused = service(observations, "refusedalone");
+        assert_eq!(
+            text(refused, "path"),
+            Some(r"C:\Windows\System32\drivers\refused-alone.sys")
+        );
+        assert_eq!(refused.fields.get("sha256"), None);
+        assert_eq!(
+            gaps.get("sha256"),
+            Some(&UnmeasuredReason::AccessDenied),
+            "{gaps:?}"
+        );
     }
 
     #[test]
