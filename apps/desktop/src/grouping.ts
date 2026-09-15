@@ -10,6 +10,7 @@ import type { Evidence } from "./types";
 /** The order collector groups appear in. A collector not named here follows, in first-seen order. */
 export const COLLECTOR_ORDER = [
   "posture",
+  "driver_service",
   "fivem_dir",
   "process",
   "evtx",
