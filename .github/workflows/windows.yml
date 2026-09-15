@@ -503,6 +503,16 @@ jobs:
           $journal = $usn | Where-Object { $_.fields.location -eq 'journal' }
           if (-not $journal -or $journal.fields.records -le 0) { throw 'the usn collector read no record from the system volume journal' }
           $usn | ForEach-Object { Write-Output "usn: $($_.fields | ConvertTo-Json -Compress)" }
+          # ADR 0048. The collector's own reading of this runner: every driver service, its start, path and
+          # hash, which the baseline reproduces. A runner image's drivers belong to no person.
+          $drivers = @($report.unmatched | Where-Object { $_.collector -eq 'driver_service' } | ForEach-Object { $_.observations })
+          $matched = @($report.evidence | Where-Object { $_.collector -eq 'driver_service' -and $_.state -eq 'found' } | ForEach-Object { $_.observations })
+          $all = @($drivers + $matched | Where-Object { $_ })
+          if ($all.Count -eq 0) { throw 'the driver_service collector produced no observation on the runner' }
+          $hashed = @($all | Where-Object { $_.fields.sha256 })
+          if ($hashed.Count -eq 0) { throw 'the driver_service collector hashed no driver file on the runner' }
+          Write-Output "driver_service count: $($all.Count) services, $($hashed.Count) hashed"
+          $all | ForEach-Object { Write-Output "driver_service: $($_.fields | ConvertTo-Json -Compress)" }
           # ADR 0038: the firmware reading compared with PowerShell's own reading of the same UEFI
           # variable on this machine. A runner is not an ordinary Windows PC, so this says the two
           # readers agree, not what an ordinary PC reports.
