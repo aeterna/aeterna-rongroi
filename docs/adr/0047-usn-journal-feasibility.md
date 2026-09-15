@@ -1,6 +1,6 @@
 # ADR 0047 — The USN change journal: what can be read, and what it may say
 
-- Status: accepted — the recommendation below; no code until measurement 1 under "Before any code" passes
+- Status: accepted — the recommendation below; measurement 1 under "Before any code" passed, and the `usn` collector is implemented (see Consequences)
 - Date: 2026-09-14
 - Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner"): measurement 1 passed
 

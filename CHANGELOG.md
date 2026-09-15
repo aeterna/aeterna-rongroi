@@ -36,9 +36,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   No collector code until its rights, `ImagePath` forms and cost are measured. Loaded modules, the
   Authenticode hash and Microsoft's blocklist switch are not read.
 - The USN change journal is designed (ADR 0047, accepted): counts of records per folder other collectors
-  already read, with file names dropped in the parser and no journal identifier in the report. No code
-  until it is measured whether the journal can be read on a volume handle opened without write access;
-  if it cannot, the M3 item closes as decided against.
+  already read, with file names dropped in the parser and no journal identifier in the report. The
+  measurement on a GitHub-hosted runner found the journal readable on a handle without write access, and
+  the collector is under Added.
 - ADR 0046 and ADR 0047 carry measurements from a GitHub-hosted Windows Server 2025 runner under an
   elevated token, a restricted token and a standard account. Driver services and their files were readable
   without Administrators there, and hashing them took 15.5 seconds cold. The USN journal read on a volume
