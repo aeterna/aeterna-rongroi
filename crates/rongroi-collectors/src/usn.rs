@@ -758,4 +758,61 @@ mod tests {
             UnmeasuredReason::NotWindows
         );
     }
+
+    /// `baseline-elevated-win11`'s `usn_journal:` block is rebuilt from the `usn` collector's own
+    /// reading of a GitHub-hosted runner (`windows.yml` run 34930942657, 2026-09-15,
+    /// `fixtures/hosts/PROVENANCE.md`). This asserts the rebuild reproduces every value that run
+    /// printed, so the reproduction is enforced rather than eyeballed.
+    #[test]
+    fn baseline_elevated_win11_reproduces_the_runners_usn_reading() {
+        let run = Usn::default().collect(&fixture("baseline-elevated-win11"));
+        let (observations, gaps, discriminator_gaps) = measured(&run);
+        assert!(gaps.is_empty());
+        // Enhanced is not installed on this baseline, so its plugin folder is absent, as on the
+        // runner — the one discriminator gap this reading has.
+        assert_eq!(discriminator_gaps.len(), 1);
+        assert_eq!(
+            discriminator_gaps[0].value,
+            fivem_dir::ENHANCED_ASI_LOCATION
+        );
+
+        let journal = at(observations, JOURNAL_LOCATION);
+        assert_eq!(journal.fields["records"], 381_333);
+        assert_eq!(journal.fields["records_version_2"], 0);
+        assert_eq!(journal.fields["records_version_3"], 381_333);
+        assert_eq!(journal.fields["records_version_4"], 0);
+        assert_eq!(journal.fields["trimmed"], true);
+        assert_eq!(journal.fields["maximum_size"], 33_554_432);
+        assert_eq!(journal.fields["first_seen"], "2026-09-08T01:12:08.3678392Z");
+        assert_eq!(journal.fields["last_seen"], "2026-09-15T05:07:08.7795416Z");
+
+        let prefetch = at(observations, PREFETCH_LOCATION);
+        assert_eq!(prefetch.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(prefetch.fields["records"], 0);
+        assert_eq!(prefetch.fields["created"], 0);
+        assert_eq!(prefetch.fields["deleted"], 0);
+        assert_eq!(prefetch.fields["renamed"], 0);
+        assert_eq!(prefetch.fields["data_changed"], 0);
+
+        let winevt = at(observations, WINEVT_LOGS_LOCATION);
+        assert_eq!(winevt.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(winevt.fields["records"], 733);
+        assert_eq!(winevt.fields["created"], 13);
+        assert_eq!(winevt.fields["deleted"], 0);
+        assert_eq!(winevt.fields["renamed"], 0);
+        assert_eq!(winevt.fields["data_changed"], 729);
+        assert_eq!(winevt.fields["first_seen"], "2026-09-08T01:12:16.383425Z");
+        assert_eq!(winevt.fields["last_seen"], "2026-09-15T05:05:28.2865607Z");
+
+        let pca = at(observations, APPCOMPAT_PCA_LOCATION);
+        assert_eq!(pca.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(pca.fields["records"], 0);
+
+        let plugins = at(observations, fivem_dir::PLUGINS_LOCATION);
+        assert_eq!(plugins.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(plugins.fields["records"], 0);
+
+        let enhanced = at(observations, fivem_dir::ENHANCED_ASI_LOCATION);
+        assert_eq!(enhanced.fields["folder"], FOLDER_ABSENT);
+    }
 }

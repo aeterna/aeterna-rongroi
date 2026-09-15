@@ -85,6 +85,18 @@ described — the folder's shortcut and manifest are left out, as the collector 
 this does not claim: that a player's `FiveM.exe` has this hash — it changes with every FiveM update —
 or that the certificate stays the same after 2027-09-05, when it expires.
 
+**The change journal in the baselines is a runner's, not a PC's.** `baseline-elevated-win11`'s
+`usn_journal:` block is rebuilt from the `usn` collector's observations of a GitHub-hosted Windows Server
+2025 runner (`windows.yml` run 34930942657, 2026-09-15): the same counts per folder, the same first and
+last record times, and one group for the journal's other records, whose count reproduces the runner's
+journal total of 381 333 records. Which reasons shared a record is not in an observation, so the groups
+are the fewest that give those counts. A non-elevated baseline describes the volume as refused, as a
+standard account and a restricted token were on the runner (ADR 0047). The runner had no FiveM
+installed, so its two plugin folders came back `folder: absent`; `baseline-elevated-win11` already
+describes an installed, empty Legacy plugin folder (above), so its `usn_journal: folders:` lists that
+path instead, giving `plugins` zero records there rather than repeating the runner's absence. Enhanced's
+plugin folder is not described by this baseline and stays absent, as it already was.
+
 **Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
 posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,
 `registry-access-denied`, `baseline-hardened-win11` and `baseline-consumer-win11` — declares
