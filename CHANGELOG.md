@@ -50,7 +50,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `Program Files`, and a relative `SysWOW64\` `ImagePath` the runner did not have was found. LOLDrivers at
   commit `1c60ea1` holds 1,865 distinct SHA-256 values for vulnerable drivers; 97 samples carry no file
   SHA-256.
-- The `driver_service` collector is proposed (ADR 0048): registered driver services with each file's
+- The `driver_service` collector is designed (ADR 0048, accepted): registered driver services with each file's
   SHA-256 and `Start`, a resolver that reads relative `ImagePath` values under `%SystemRoot%`, a 30-second
   budget, and a vulnerable-driver rule whose `match_lists` names a vendored file of 1,847 verified LOLDrivers
   hashes. Rule format version 3.

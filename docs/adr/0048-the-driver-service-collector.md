@@ -1,7 +1,6 @@
 # ADR 0048 — The `driver_service` collector and the vulnerable-driver rule
 
-- Status: proposed — the owner decided the resolver, verified entries only, how the matched entry reaches
-  the reader, and the observation's fields on 2026-09-15; the rest awaits acceptance
+- Status: accepted
 - Date: 2026-09-15
 
 ## Context
@@ -248,3 +247,4 @@ paths and file hashes — in the pull request that registers the collector.
 - `PRIVACY.md`, both consent texts, `docs/architecture.md`, ADR 0030's reason table, `rules/AGENTS.md`,
   README (both languages) and CHANGELOG change in the pull requests that ship it.
 - No network code, no new dependency, no new `windows` feature.
+- Accepted by the owner on 2026-09-15, as written.
