@@ -245,7 +245,7 @@ impl Vocabulary {
     /// or in a fixture shows it. Since ADR 0030 every one of the twelve reasons has a producer in
     /// some collector, so that half of the check is now entirely about which collector:
     /// `not_on_this_os` is `pca` and nothing else, `service_disabled` is `prefetch` and nothing
-    /// else, and `budget_spent` is `evtx` and nothing else.
+    /// else, and `budget_spent` is `evtx` and `usn` and nothing else (ADR 0047).
     ///
     /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
     /// true for is one a view lists whatever the rule said, so declaring it is a suppression that
@@ -889,9 +889,9 @@ date: 2026-09-11
 
     /// Every reason a view always lists is refused, not `read_failed` alone — so a later addition to
     /// `is_always_listed` is covered here without this test being edited. `budget_spent` is `evtx`'s
-    /// and `partial` is reported by more than one collector, so each is checked on a collector that
-    /// can produce it: without that, the message would be the collector one and this test would pass
-    /// while proving nothing.
+    /// and `usn`'s (ADR 0047) and `partial` is reported by more than one collector, so each is checked
+    /// on a collector that can produce it: without that, the message would be the collector one and
+    /// this test would pass while proving nothing.
     #[test]
     fn every_always_listed_reason_is_refused() {
         for reason in [
