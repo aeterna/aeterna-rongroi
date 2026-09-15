@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# One driver service whose file's SHA-256 is the vendored data file's first row (ADR 0048): LOLDrivers id
+# ff74f03e-e4ce-4242-bfe3-60601056bb34, CorsairLLAccess64.sys. The service name and path are invented; the
+# hash is copied from rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv.
+platform: windows
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\corsairllaccess64':
+    Type: 1
+    Start: 3
+    ImagePath: 'System32\drivers\CorsairLLAccess64.sys'
+filesystem:
+  'C:\Windows\System32\drivers':
+    - name: CorsairLLAccess64.sys
+      sha256: 000547560fea0dd4b477eb28bf781ea67bf83c748945ce8923f90fdd14eb7a4b

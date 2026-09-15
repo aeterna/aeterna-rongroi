@@ -5,9 +5,11 @@ id: 98f6e2b8-6d23-4202-bc7f-06587ebdd2f3
 title: A registered driver is on LOLDrivers' list of vulnerable drivers
 description: >-
   A driver service registered on this PC points at a file whose SHA-256 LOLDrivers lists as a verified
-  vulnerable driver: a signed driver with a known weakness, which a program running as administrator can
-  use to run code in the Windows kernel. Windows loads it because it is signed. The row shows the file's
-  SHA-256; find that hash in rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv
+  vulnerable driver: a signed driver with a known weakness that a program running as administrator can
+  use to reach the Windows kernel; the LOLDrivers entry says what this one allows. Windows loads a signed
+  driver unless Microsoft's vulnerable-driver blocklist names it, and this program does not read whether
+  that blocklist is on. The row shows the file's SHA-256; find that hash in
+  rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv
   in this program's repository to see the LOLDrivers entry id and file name. This says the driver is
   registered, not that it is loaded, that anything used it, or why it is installed, and ordinary hardware
   utilities install such drivers.

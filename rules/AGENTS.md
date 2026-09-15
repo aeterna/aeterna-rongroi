@@ -148,3 +148,8 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   under another licence** also needs `precedence = "override"` and a `PROVENANCE.md` beside it: the
   source, the commit or version, the date taken, the filter applied and the command that rebuilds it.
   Never commit the thing the list describes — a list of vulnerable drivers is hashes, not drivers.
+- **A change to a `loldrivers-*.csv` or its `PROVENANCE.md` is reviewed by running it, not by reading
+  it.** No CI job rebuilds the LOLDrivers-derived data file, so a reviewer of such a change checks out
+  `magicsword-io/LOLDrivers` at the commit `PROVENANCE.md` names and runs
+  `cargo xtask loldrivers --checkout <dir> --check` against it; the task itself refuses a checkout that is
+  not at that commit.

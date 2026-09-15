@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 3 |
 | Rules | 22 |
-| SHA-256 | `af805cc00cc83783e1e7530ee27120a62eff095985a25f75f7b541fcd488e973` |
+| SHA-256 | `6a2cab06d1db3383d699dd86f85916592a5b9b6787fdf038d701e1d19748dbee` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -87,7 +87,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 **About this check**
 
-A driver service registered on this PC points at a file whose SHA-256 LOLDrivers lists as a verified vulnerable driver: a signed driver with a known weakness, which a program running as administrator can use to run code in the Windows kernel. Windows loads it because it is signed. The row shows the file's SHA-256; find that hash in rules/driver\_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv in this program's repository to see the LOLDrivers entry id and file name. This says the driver is registered, not that it is loaded, that anything used it, or why it is installed, and ordinary hardware utilities install such drivers.
+A driver service registered on this PC points at a file whose SHA-256 LOLDrivers lists as a verified vulnerable driver: a signed driver with a known weakness that a program running as administrator can use to reach the Windows kernel; the LOLDrivers entry says what this one allows. Windows loads a signed driver unless Microsoft's vulnerable-driver blocklist names it, and this program does not read whether that blocklist is on. The row shows the file's SHA-256; find that hash in rules/driver\_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv in this program's repository to see the LOLDrivers entry id and file name. This says the driver is registered, not that it is loaded, that anything used it, or why it is installed, and ordinary hardware utilities install such drivers.
 
 **Matches when all of these hold for one observation**
 

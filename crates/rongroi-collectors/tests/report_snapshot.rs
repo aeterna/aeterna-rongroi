@@ -494,6 +494,89 @@ fn a_log_that_could_not_be_read_leaves_the_clearing_rules_unmeasured() {
     }
 }
 
+/// The whole `HKLM\SYSTEM\CurrentControlSet\Services` key refused makes `driver_service` itself
+/// `Unmeasured` (ADR 0048), which every rule reading that collector inherits — here the one
+/// vulnerable-driver rule. Self mode carries it as an ordinary unmeasured row (Minor 6 of the PR 3
+/// review).
+#[test]
+fn driver_service_refused_self_view() {
+    let view = view::for_mode(&report_for("driver-service-refused"), Mode::SelfCheck);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// The same refusal in SS mode: `access_denied` is not in this rule's `unmeasured_when`
+/// (`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`), so it is an unexpected
+/// reason and SS mode lists it rather than only counting it (Minor 6 of the PR 3 review).
+#[test]
+fn driver_service_refused_ss_view() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason};
+
+    const VULNERABLE_DRIVER_LISTED: &str = "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3";
+
+    let report = report_for("driver-service-refused");
+    let evidence = report
+        .evidence
+        .iter()
+        .find(|evidence| evidence.rule_id == VULNERABLE_DRIVER_LISTED)
+        .unwrap_or_else(|| panic!("{VULNERABLE_DRIVER_LISTED} did not reach the report"));
+    assert!(
+        matches!(
+            evidence.state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: false,
+            }
+        ),
+        "{:?}",
+        evidence.state
+    );
+
+    let view = view::for_mode(&report, Mode::Ss);
+    assert!(
+        view.evidence
+            .iter()
+            .any(|row| row.rule_id == VULNERABLE_DRIVER_LISTED),
+        "SS mode does not list {VULNERABLE_DRIVER_LISTED}"
+    );
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// A driver service whose file's SHA-256 is the vendored data file's first row is `Found`, with that
+/// hash on the row, and SS mode lists it — `ss_lists` admits every match whatever the rule's
+/// `strength`, and this rule is `posture` (Minor 6 of the PR 3 review).
+#[test]
+fn driver_service_listed_ss_view() {
+    use rongroi_core::model::EvidenceState;
+
+    const VULNERABLE_DRIVER_LISTED: &str = "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3";
+    const LISTED_SHA256: &str = "000547560fea0dd4b477eb28bf781ea67bf83c748945ce8923f90fdd14eb7a4b";
+
+    let report = report_for("driver-service-listed");
+    let evidence = report
+        .evidence
+        .iter()
+        .find(|evidence| evidence.rule_id == VULNERABLE_DRIVER_LISTED)
+        .unwrap_or_else(|| panic!("{VULNERABLE_DRIVER_LISTED} did not reach the report"));
+    let EvidenceState::Found { observations } = &evidence.state else {
+        panic!("expected Found, got {:?}", evidence.state);
+    };
+    assert!(
+        observations.iter().any(|observation| {
+            observation
+                .fields
+                .get("sha256")
+                .and_then(|value| value.as_str())
+                == Some(LISTED_SHA256)
+        }),
+        "{observations:?}"
+    );
+
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(json.contains(LISTED_SHA256), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
 /// The boot time is a fact about the scan's context, so both views carry it unchanged: SS mode's
 /// filter is about evidence, and staff read the times on the rows they are shown against it
 /// (ADR 0039). A report written before the field existed reads back as never having tried, not as a
