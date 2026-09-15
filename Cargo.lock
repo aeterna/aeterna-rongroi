@@ -3133,6 +3133,7 @@ dependencies = [
 name = "rongroi-host"
 version = "0.3.0"
 dependencies = [
+ "jiff",
  "serde",
  "serde-saphyr",
  "sha2 0.11.0",
@@ -3144,6 +3145,7 @@ name = "rongroi-host-windows"
 version = "0.3.0"
 dependencies = [
  "rongroi-host",
+ "rongroi-parsers",
  "thiserror 2.0.20",
  "windows 0.62.2",
  "windows-registry",

@@ -461,6 +461,11 @@ jobs:
       # the privilege is held, so it also proves the read answers rather than reporting missing rights.
       - name: Firmware read leaves its privilege as it found it
         run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_firmware_/)'
+      # ADR 0047. The runner is elevated and its system volume has a change journal: the collector's
+      # source reads it on a volume handle without write access, to the end, and a folder's identifier
+      # finds records under it. Nothing the journal holds is printed.
+      - name: Change journal reads without write access
+        run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_usn_/)'
       - name: Build the desktop app (unofficial build, no installer)
         run: pnpm -C apps/desktop tauri build --no-bundle
       - name: Live smoke — the CLI reads this machine

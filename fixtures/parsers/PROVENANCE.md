@@ -18,6 +18,7 @@ parallel set of sample bytes to keep in step.
 | `bam/` | `bam::parse_value` | `crates/rongroi-parsers/src/bam.rs`, `tests/fixtures.rs` | `fuzz_bam`, and `fuzz_filetime` — a BAM value's first eight bytes are the `FILETIME` |
 | `pca-app-launch/` | `pca::parse_app_launch_dic` | `crates/rongroi-parsers/src/pca.rs`, `tests/fixtures.rs` | `fuzz_pca_app_launch` |
 | `pca-general/` | `pca::parse_general_db` | `tests/fixtures.rs` | `fuzz_pca_general` |
+| `usn/` | `usn::parse_buffer` | `crates/rongroi-parsers/src/usn.rs`, `tests/fixtures.rs` | `fuzz_usn` |
 
 ## What each file is
 
@@ -38,6 +39,14 @@ parallel set of sample bytes to keep in step.
 | `pca-general/normal.txt` | Two ordinary `\|`-delimited records |
 | `pca-general/field-count-varies.txt` | One line with more fields than any write-up describes and one with fewer |
 | `pca-general/malformed-lines.txt` | A good line and a line with no delimiter at all |
+| `usn/three-version-3-records.bin` | A buffer as `FSCTL_READ_USN_JOURNAL` returns it: next USN 9000, then three 80-byte `USN_RECORD_V3` records named `ab`, two under one parent and one under another, with a create, a close with data extended, and a close with a delete. Written from Microsoft's documented layout (ADR 0047), not captured |
+| `usn/one-version-2-record.bin` | One 64-byte `USN_RECORD_V2` record, whose parent is a 64-bit index |
+| `usn/version-4-then-version-3.bin` | A version 4 record's header, which is skipped, then a version 3 record |
+| `usn/next-usn-only.bin` | Eight bytes: the next USN and no record, which is what a read at the end of the journal returns |
+| `usn/record-length-zero.bin` | A good record, then one whose `RecordLength` is 0 — the value Microsoft's sample loop never advances past |
+| `usn/record-length-past-end.bin` | A good record, then one claiming 4000 bytes in an 80-byte remainder |
+| `usn/unknown-major-version.bin` | A record with major version 5, which stops the buffer |
+| `usn/truncated.bin` | Seven bytes — one short of the next USN, so a `Truncated` error |
 
 Line endings matter here — CRLF is what Windows writes — so `.gitattributes` marks this folder binary
 and git does not normalise it.

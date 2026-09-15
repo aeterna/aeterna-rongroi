@@ -29,3 +29,5 @@ pub mod signature;
 pub mod system_integrity;
 
 pub mod tpm;
+
+pub mod usn_journal;
