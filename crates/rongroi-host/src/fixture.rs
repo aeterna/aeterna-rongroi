@@ -705,6 +705,16 @@ fn resolve_usn_journal(
             .map(|text| filetime_of(text, origin))
             .transpose()?
             .unwrap_or(first);
+        if last < first {
+            let first_text = group.first.as_deref().unwrap_or("<default>");
+            let last_text = group.last.as_deref().unwrap_or("<default>");
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
+                ),
+            });
+        }
         let span = last.saturating_sub(first);
         let steps = u64::from(group.count.saturating_sub(1)).max(1);
         for index in 0..group.count {
@@ -2286,5 +2296,19 @@ usn_journal:
             host.file_id(r"C:\Windows\Prefetch"),
             Err(SourceError::AccessDenied)
         );
+    }
+
+    /// A record group whose `last` is before its `first` is a transposed fixture, not a group with a
+    /// negative span: it is rejected like every other invalid `usn_journal` group, rather than
+    /// silently clamped to a span of zero with a final record that jumps backward.
+    #[test]
+    fn a_record_group_with_last_before_first_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [close]\n      first: '2026-09-14T00:00:00Z'\n      last: '2026-09-13T00:00:00Z'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(error.to_string().contains("last"), "{error}");
     }
 }
