@@ -369,6 +369,73 @@ pub trait BootTimeSource {
     fn since_boot(&self) -> Result<std::time::Duration, SourceError>;
 }
 
+/// A volume's change journal as `FSCTL_QUERY_USN_JOURNAL` states it, without its identifier
+/// (ADR 0047). The identifier stays inside the host: it is needed to read the journal and would
+/// identify one machine across two reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UsnJournalState {
+    /// `FirstUsn`: "The number of first record that can be read from the journal."
+    pub first_usn: i64,
+    /// `NextUsn` when the journal was queried: the read stops once it reaches this.
+    pub next_usn: i64,
+    /// `LowestValidUsn`: "The first record that was written into the journal for this journal
+    /// instance." Equal to `first_usn` while nothing has been trimmed since the journal was made.
+    pub lowest_valid_usn: i64,
+    /// `MaximumSize`, in bytes: the size Windows trims the journal back to.
+    pub maximum_size: u64,
+}
+
+/// How a read of a change journal ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UsnReadEnd {
+    /// Every buffer from `first_usn` up to `next_usn` was handed to the visitor.
+    Complete,
+    /// The journal was trimmed past the read, or deleted, while it was being read: some of it was
+    /// handed over and the rest cannot be.
+    JournalChanged,
+    /// The visitor asked to stop.
+    Stopped,
+}
+
+/// A read of a change journal: what the journal said about itself, and how the read ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UsnJournalRead {
+    /// The journal's state when it was queried, before the read.
+    pub state: UsnJournalState,
+    /// How the read ended.
+    pub end: UsnReadEnd,
+}
+
+/// A file or folder's identifiers, in the two forms a change journal record names a parent by
+/// (ADR 0047).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileId {
+    /// The 128-bit identifier `GetFileInformationByHandleEx` reports with `FileIdInfo`, which a version
+    /// 3 record carries.
+    pub id_128: [u8; 16],
+    /// `nFileIndexHigh` and `nFileIndexLow` from `GetFileInformationByHandle`, which a version 2 record
+    /// carries.
+    pub index_64: u64,
+}
+
+/// Read-only access to the NTFS change journal of a volume (ADR 0047).
+pub trait UsnJournalSource {
+    /// Queries the journal of `volume` (a drive letter) and reads it from its first record to the
+    /// `NextUsn` the query returned, handing each output buffer to `visit` as the control code returned
+    /// it: the next USN, eight bytes, then records. A buffer with no record is not handed over.
+    ///
+    /// `Ok(None)` when the volume has no active journal. `visit` returning `ControlFlow::Break` ends
+    /// the read with [`UsnReadEnd::Stopped`]. Nothing on the volume is changed.
+    fn read_usn_journal(
+        &self,
+        volume: char,
+        visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError>;
+
+    /// The identifiers of the file or folder at `path`. `Ok(None)` when nothing is there.
+    fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError>;
+}
+
 /// Size of one read when a file is streamed through SHA-256.
 const READ_BLOCK: usize = 64 * 1024;
 
@@ -493,6 +560,7 @@ pub trait Host:
     + FirmwareSource
     + ProcessSource
     + BootTimeSource
+    + UsnJournalSource
 {
     /// Operating system family.
     fn platform(&self) -> Platform;
@@ -629,6 +697,24 @@ impl BootTimeSource for NonWindowsHost {
     fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows boot time on this platform".to_owned(),
+        ))
+    }
+}
+
+impl UsnJournalSource for NonWindowsHost {
+    fn read_usn_journal(
+        &self,
+        _volume: char,
+        _visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no NTFS change journal on this platform".to_owned(),
+        ))
+    }
+
+    fn file_id(&self, _path: &str) -> Result<Option<FileId>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file identifiers on this platform".to_owned(),
         ))
     }
 }

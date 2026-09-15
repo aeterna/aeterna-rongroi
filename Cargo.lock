@@ -3133,6 +3133,7 @@ dependencies = [
 name = "rongroi-host"
 version = "0.3.0"
 dependencies = [
+ "jiff",
  "serde",
  "serde-saphyr",
  "sha2 0.11.0",
