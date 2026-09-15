@@ -208,31 +208,50 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
         ImagePath::Absent => "",
         ImagePath::Text(text) => text.as_str(),
     };
-    if text.is_empty() {
-        return Some(format!(r"{root}\System32\drivers\{service}.sys"));
-    }
-    if let Some(prefix) = text.get(..SYSTEM_ROOT_PREFIX.len())
+    let resolved = if text.is_empty() {
+        // The default path is built from the service key's own name, so a name that is itself a
+        // separator or a `.`/`..` segment is an unknown form too (F1) — nothing else here checks it.
+        if is_unusable_segment(service) || service.contains(['\\', '/']) {
+            return None;
+        }
+        format!(r"{root}\System32\drivers\{service}.sys")
+    } else if let Some(prefix) = text.get(..SYSTEM_ROOT_PREFIX.len())
         && prefix.eq_ignore_ascii_case(SYSTEM_ROOT_PREFIX)
     {
-        return Some(format!(r"{root}\{}", &text[SYSTEM_ROOT_PREFIX.len()..]));
-    }
-    if let Some(rest) = text.strip_prefix(r"\??\") {
-        return paths::is_drive_rooted(rest).then(|| rest.to_owned());
-    }
-    if paths::is_drive_rooted(text) {
-        return Some(text.to_owned());
-    }
-    // A relative `ImagePath` is only the shape ADR 0048 measured: no leading `\` or `/`, no drive
-    // letter, and no `%` or `"` anywhere — not only leading, so `System32\%X%\a.sys` and
-    // `System32\drivers\a".sys` are unknown forms rather than a folder named `%X%` or a file named
-    // `a".sys`.
-    if text.starts_with(['\\', '/'])
+        format!(r"{root}\{}", &text[SYSTEM_ROOT_PREFIX.len()..])
+    } else if let Some(rest) = text.strip_prefix(r"\??\") {
+        if !paths::is_drive_rooted(rest) {
+            return None;
+        }
+        rest.to_owned()
+    } else if paths::is_drive_rooted(text) {
+        text.to_owned()
+    } else if text.starts_with(['\\', '/'])
         || text.as_bytes().get(1) == Some(&b':')
         || text.contains(['%', '"'])
     {
+        // A relative `ImagePath` is only the shape ADR 0048 measured: no leading `\` or `/`, no
+        // drive letter, and no `%` or `"` anywhere — not only leading, so `System32\%X%\a.sys` and
+        // `System32\drivers\a".sys` are unknown forms rather than a folder named `%X%` or a file
+        // named `a".sys`.
+        return None;
+    } else {
+        format!(r"{root}\{text}")
+    };
+    // F1: every `/` an installer wrote is read as `\`, so the resolved path is always the one shape
+    // `rongroi_core::view::redact_user_paths` reaches; and a `.` or `..` segment, in any form above,
+    // is an unknown form rather than a path that walks out of the folder it appears to name.
+    let resolved = resolved.replace('/', "\\");
+    if resolved.split('\\').any(is_unusable_segment) {
         return None;
     }
-    Some(format!(r"{root}\{text}"))
+    Some(resolved)
+}
+
+/// Whether a path segment is `.` or `..` — never a real file or folder name, only a way to walk out
+/// of the folder the rest of the path names.
+fn is_unusable_segment(segment: &str) -> bool {
+    segment == "." || segment == ".."
 }
 
 /// What hashing one file came to.
@@ -393,6 +412,19 @@ mod tests {
             (text(r"System32\%X%\a.sys"), None),
             (text(r#"System32\drivers\a".sys"#), None),
             (ImagePath::OtherType, None),
+            // F1: a `.` or `..` segment, in any form the resolver otherwise accepts, is an unknown
+            // form rather than a path that walks out of the folder it appears to name.
+            (text(r"System32\..\..\Users\bob\x.sys"), None),
+            (text(r"\??\C:\Windows\..\Users\bob\x.sys"), None),
+            (text(r".\x.sys"), None),
+            // F1: mixed separators are normalised to `\` so the resolved path is the one shape
+            // `redact_user_paths` reaches, whichever separator the installer that wrote `ImagePath`
+            // used.
+            (text(r"C:\Users/bob\x.sys"), Some(r"C:\Users\bob\x.sys")),
+            (
+                text(r"System32/drivers/a.sys"),
+                Some(r"C:\Windows\System32\drivers\a.sys"),
+            ),
         ] {
             assert_eq!(
                 resolve(&image_path, "svc", root).as_deref(),
@@ -400,6 +432,54 @@ mod tests {
                 "{image_path:?}"
             );
         }
+    }
+
+    /// F1: the absent/empty-`ImagePath` default builds its path from the service name, so a service
+    /// name that is itself a separator or a `.`/`..` segment must be an unknown form too — otherwise
+    /// a service key named `a/..` would resolve outside `System32\drivers`.
+    #[test]
+    fn an_absent_image_path_with_an_unusable_service_name_is_an_unknown_form() {
+        let root = r"C:\Windows\";
+        for service in ["a/..", r"a\b", ".", "..", "/", r"\"] {
+            assert_eq!(
+                resolve(&ImagePath::Absent, service, root),
+                None,
+                "{service}"
+            );
+            assert_eq!(
+                resolve(&ImagePath::Text(String::new()), service, root),
+                None,
+                "{service}"
+            );
+        }
+        // An ordinary service name is unaffected.
+        assert_eq!(
+            resolve(&ImagePath::Absent, "svc", root).as_deref(),
+            Some(r"C:\Windows\System32\drivers\svc.sys")
+        );
+    }
+
+    /// F1: a resolved path under a user profile is redacted the same way any other collector's path
+    /// is. This calls `rongroi_core::view::redact_user_paths` directly on the string `resolve`
+    /// produced, rather than building a `Found` row through the rule engine, because no rule reads
+    /// `driver_service` yet in this pull request (ADR 0048) — there is no bundled rule to match it
+    /// and construct a real `Found` evidence item from.
+    #[test]
+    fn a_driver_service_path_under_a_user_profile_is_redacted_by_the_core_view_function() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\vendor':\n    Type: 1\n    ImagePath: '\\??\\C:\\Users\\bob\\AppData\\vendor.sys'\n",
+            "inline",
+        )
+        .unwrap();
+        let run = DriverService::default().collect(&host);
+        let (observations, _) = measured(&run);
+        let vendor = service(observations, "vendor");
+        let path = text(vendor, "path").unwrap();
+        assert_eq!(path, r"C:\Users\bob\AppData\vendor.sys");
+
+        let redacted = rongroi_core::view::redact_user_paths(path);
+        assert_eq!(redacted, r"%USERPROFILE%\AppData\vendor.sys");
+        assert!(!redacted.contains("bob"), "{redacted}");
     }
 
     #[test]
