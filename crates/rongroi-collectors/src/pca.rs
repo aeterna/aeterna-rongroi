@@ -19,7 +19,7 @@
 //! matchable by a rule and as little else as possible:
 //!
 //! - a full path is emitted **only when it begins with a drive letter**, which is the one shape
-//!   `rongroi_core::view::redact_user_paths` can reach. Any other shape — a UNC share, a device
+//!   `rongroi_core::view::redact_profile_paths` can reach. Any other shape — a UNC share, a device
 //!   path — is withheld, because a path carrying `\Users\<name>\` with no drive letter in front of
 //!   it would reach an SS viewer unredacted while the code around it says paths are redacted;
 //! - the general databases contribute **no record content at all**, only how many records they held
@@ -614,7 +614,7 @@ mod tests {
         let entries = launches(observations, APP_LAUNCH_DIC);
         assert_eq!(entries.len(), 3, "{entries:?}");
 
-        // A drive-rooted path is the shape `redact_user_paths` was written for, so it is emitted.
+        // A drive-rooted path is the shape `redact_profile_paths` was written for, so it is emitted.
         assert_eq!(
             text(entries[0], "path"),
             Some(r"C:\Users\fixtureuser\Downloads\drive-rooted.exe")

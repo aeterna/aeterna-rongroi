@@ -239,8 +239,8 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
     } else {
         format!(r"{root}\{text}")
     };
-    // F1: every `/` an installer wrote is read as `\`, so the resolved path is always the one shape
-    // `rongroi_core::view::redact_user_paths` reaches.
+    // F1: every `/` an installer wrote is read as `\`, so the resolved path is always written one way,
+    // whichever separator the installer used.
     let resolved = resolved.replace('/', "\\");
     // R1: a `.` or `..` segment (F1), a repeated or trailing separator (an empty segment), a segment
     // ending in `.` or a space, or one that names an alternate data stream with a `:` past the drive,
@@ -471,9 +471,8 @@ mod tests {
             (text(r"System32\..\..\Users\bob\x.sys"), None),
             (text(r"\??\C:\Windows\..\Users\bob\x.sys"), None),
             (text(r".\x.sys"), None),
-            // F1: mixed separators are normalised to `\` so the resolved path is the one shape
-            // `redact_user_paths` reaches, whichever separator the installer that wrote `ImagePath`
-            // used.
+            // F1: mixed separators are normalised to `\`, whichever separator the installer that wrote
+            // `ImagePath` used.
             (text(r"C:\Users/bob\x.sys"), Some(r"C:\Users\bob\x.sys")),
             (
                 text(r"System32/drivers/a.sys"),
@@ -531,7 +530,7 @@ mod tests {
     }
 
     /// F1: a resolved path under a user profile is redacted the same way any other collector's path
-    /// is. This calls `rongroi_core::view::redact_user_paths` directly on the string `resolve`
+    /// is. This calls `rongroi_core::view::redact_profile_paths` directly on the string `resolve`
     /// produced, rather than building a `Found` row through the rule engine, because no rule reads
     /// `driver_service` yet in this pull request (ADR 0048) — there is no bundled rule to match it
     /// and construct a real `Found` evidence item from.
@@ -548,11 +547,11 @@ mod tests {
         let path = text(vendor, "path").unwrap();
         assert_eq!(path, r"C:\Users\bob\AppData\vendor.sys");
 
-        let redacted = rongroi_core::view::redact_user_paths(path);
+        let redacted = rongroi_core::view::redact_profile_paths(path, None);
         assert_eq!(redacted, r"%USERPROFILE%\AppData\vendor.sys");
         assert!(!redacted.contains("bob"), "{redacted}");
 
-        // R1: `redact_user_paths` folds ASCII case, and `resolve` must not have introduced a
+        // R1: `redact_profile_paths` folds ASCII case, and `resolve` must not have introduced a
         // separator or segment shape it does not reach — an upper-case `USERS`, and a lower-case
         // drive letter arriving through `\??\`.
         let root = r"C:\Windows";
@@ -567,7 +566,7 @@ mod tests {
             ),
         ] {
             let resolved = resolve(&image_path, "svc", root).unwrap();
-            let redacted = rongroi_core::view::redact_user_paths(&resolved);
+            let redacted = rongroi_core::view::redact_profile_paths(&resolved, None);
             assert_eq!(redacted, expected_redacted, "{image_path:?}");
             assert!(!redacted.contains("bob"), "{redacted}");
         }

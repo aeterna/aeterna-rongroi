@@ -46,7 +46,7 @@ Of Windows' Background Activity Moderator it reads which programs ran and when. 
 **per user account**, and the account is named by a SID — an identifier of the account *and* of the
 Windows installation it belongs to. **No part of that SID is reported**, hashed or otherwise: the report
 says how many accounts had records and nothing else about them. The path of a program is reported only
-when it starts with a drive letter, because that is the only shape SS mode knows how to redact. A path
+when it starts with a drive letter, because that is a shape SS mode knows how to redact. A path
 written any other way can carry your account name with nothing to replace it, so it is withheld rather
 than shown — and the report says it was withheld, rather than leaving you to notice it is missing.
 Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
@@ -155,18 +155,32 @@ or allow remote access.
 
 SS mode replaces the folder that holds your profile and the name after it, wherever a path names it:
 
-- `Users\<your name>` on any drive, in any upper or lower case;
-- `Documents and Settings\<your name>`, the older name Windows still answers to, and its short 8.3 form;
-- the same folders reached through a drive's administrative share, such as `\\<pc>\C$\Users\<your name>`;
+- `Users\<your name>` directly under any drive, such as `D:\Users\<your name>`, in any upper or lower case;
+- `Documents and Settings\<your name>`, the older name Windows still answers to, and its usual short 8.3
+  form;
+- the same folders reached through a drive's administrative share, such as `\\<pc>\C$\Users\<your name>`.
+  The PC name before `C$` is shown as written;
 - the folder your PC creates new profiles in, when it has been moved away from `Users`. The scan reads that
   setting (`ProfilesDirectory`) so that SS mode can use it. A Self-mode report carries it; an SS-mode
-  report does not.
+  report does not, and neither does the part of the app that is shown before you choose a mode.
 
-What it does **not** cover: a profile moved for one account on its own, to a folder that is neither of
-the above. Windows allows that, and a path inside such a profile is shown as it is, with your account name
-in it if the folder carries one. Reading every account's profile location to redact it would put the list
-of accounts on your PC into the report, which is more than this check needs (ADR 0049). If your profile
-lives somewhere like that, look at the report in Self mode first.
+It reads a path the way Windows does — `\` and `/` alike, `.` and `..` applied — and it still finds the name
+when a second path follows the first with nothing between them.
+
+What it does **not** cover, so a path in one of these is shown as it is, with your account name in it if
+the folder carries one (ADR 0049):
+
+- a profile moved for one account on its own, to a folder that is neither of the above. Reading every
+  account's profile location to redact it would put the list of accounts on your PC into the report, which
+  is more than this check needs;
+- a path written without a drive letter — a device or volume path, or a network share other than a drive's
+  administrative share. Background Activity Moderator paths of that kind are withheld, as described above;
+  the path of a running program is reported as Windows gives it;
+- the short 8.3 name of a moved profile folder, and the rarer short names Windows makes when many folders
+  begin alike;
+- a moved profile folder whose name has non-ASCII letters, written in a different case.
+
+If any of these could apply to you, look at the report in Self mode first.
 
 ### Program names are not redacted, and that can matter
 

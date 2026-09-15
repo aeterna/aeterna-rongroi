@@ -17,10 +17,11 @@ use tauri::State;
 
 use crate::AppState;
 
-/// Facts about the scan without evidence, for the start screen and the unofficial-build banner.
+/// Facts about the scan without evidence, for the start screen and the unofficial-build banner. The
+/// header as the core shows it outside a view, whatever the mode (ADR 0049).
 #[tauri::command]
 pub fn report_header(state: State<'_, AppState>) -> ReportHeader {
-    state.report.header.clone()
+    view::shown_header(&state.report)
 }
 
 /// The report as `mode` may see it.

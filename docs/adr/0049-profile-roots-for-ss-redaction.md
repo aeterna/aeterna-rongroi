@@ -8,7 +8,8 @@
 SS mode replaces the user-profile part of a path with `%USERPROFILE%` (ADR 0010, AGENTS.md hard rule 5).
 Until this ADR, `rongroi_core::view::redact_user_paths` recognised one shape: a drive letter, `:`, `\` or
 `/`, the folder `Users` in any ASCII case, the same separator, and the name after it. Every collector that
-reports a path — `process`, `pca`, `bam`, `fivem_dir`, `driver_service` — relies on that one function.
+reports a path — among them `process`, `pca`, `bam`, `prefetch`, `evtx`, `fivem_dir` and `driver_service` —
+relies on that one function.
 
 ADR 0020, ADR 0021 and ADR 0023 each declined to widen it, for three reasons: it is a change to
 `rongroi-core` with its own snapshot churn; it would weaken a function whose precision is testable; and a
@@ -50,23 +51,29 @@ The owner chose, on 2026-09-15, to widen the profile roots in the core and to re
 
 ### 1. The roots the function knows
 
-A profile root is a drive marker, a separator, a root folder and a separator; the name is the segment
-after it, and it is replaced together with everything before it back to the drive letter. A separator is one
-or more of `\` and `/` in any mix, and a root folder may end in dots or spaces: Windows' path handling reads
-each of those spellings as the same folder, and a redactor that required the plain spelling would let the
-others past. The collectors that refuse such spellings keep refusing them (ADR 0048); this is so the view
-does not depend on every collector doing so.
+`rongroi_core::view::redact_profile_paths` replaces the name after a profile root, together with everything
+before it back to the drive letter. It takes the place of `redact_user_paths`.
 
-- **Drive marker**: an ASCII letter followed by `:`, as before; or an ASCII letter followed by `$` whose
-  letter comes straight after a separator — the administrative share `\\host\X$\`. The host part stays as
-  written; only the drive onwards is replaced.
-- **Root folders on any drive**, ASCII case-insensitive: `Users`; `Documents and Settings`; `DOCUME~` followed
-  by one or more digits.
-- **The machine's own root**, when the report carries one (section 2): its folders after the drive, on its
-  own drive letter only.
+- **Where a path starts**: an ASCII letter followed by `:`, as before; or an ASCII letter followed by `$`
+  whose letter comes straight after a separator — the administrative share `\\host\X$\`. Then a
+  separator. The host part stays as written; only the drive onwards is replaced.
+- **How its folders are read**: a separator is one or more of `\` and `/` in any mix; a `.` folder is
+  dropped and a `..` folder removes the one before it; a folder is compared without a `:` suffix and without
+  the dots and spaces it ends in, in ASCII case. Whether Windows opens every one of those spellings as the
+  folder it resembles was not measured here; redacting a spelling that does not open costs nothing, and a
+  redactor that knew only the plain spelling would depend on every collector refusing the others. The
+  collectors that refuse such spellings keep refusing them (ADR 0048).
+- **Where a path ends**: at the end of the string, at a byte no Windows file name holds (`"`, `<`, `>`, `|`,
+  `*`, `?`, a control byte), or at an ASCII letter followed by `:` and a separator, which starts the next
+  path. So a second path written straight after a name is read as its own path.
+- **A name** is a folder whose folders before it are exactly one profile root:
+  - on any drive, `Users`, `Documents and Settings`, or `DOCUME~` followed by one or more digits;
+  - the machine's own root, when the report carries one (section 2), on its own drive letter only. It is
+    read the way a path's folders are.
 
-Everything else is unchanged: a root with no name after it is left alone, `D:\Games\users\z` is left alone
-because `users` is not the folder right after the drive, and every occurrence in a string is replaced.
+  When both a fixed root and the machine's root name a folder in one path, each name is replaced. A root with
+  no name after it is left alone, and so is `D:\Games\users\z`, because `users` is not the first folder on
+  its drive.
 
 A drive-independent reading of the machine's own root was weighed and not taken: a `ProfilesDirectory` of
 `D:\` would then redact the first folder of every path on every drive, `C:\Windows` included, and every row
@@ -87,22 +94,30 @@ serialised when absent, and a report written before it exists reads back `None`.
   the fixed roots of section 1.
 - It is context for the view and nothing else. No rule reads it and no state depends on it (ADR 0002).
 - **The Self view carries it** in its header. Neither the text report nor the app prints it: it reads
-  `C:\Users` on nearly every machine and says nothing about the evidence. **The SS view drops it**: the
-  view needs it to redact and the reviewer does not, and a setting chosen by whoever set up the machine
-  could itself carry a name.
+  `C:\Users` on nearly every machine and says nothing about the evidence. **The SS view drops it**, and so
+  does `view::shown_header`, the header the app reads outside a view: the view needs it to redact and the
+  reviewer does not, and a setting chosen by whoever set up the machine could itself carry a name.
 
 Why `None` and not a tagged state like `boot_time`: the only consumer is redaction, and for redaction every
 reason there is no value means the same thing — use the fixed roots. A reason would be a field nothing reads.
 
 ### 3. What this does not close
 
-A profile can be moved for **one account** by editing that account's `ProfileImagePath` in `ProfileList`,
-leaving `ProfilesDirectory` alone. Such a profile is named by no root here. Reading every account's
-`ProfileImagePath` into the report was weighed and not taken: it lists the machine's accounts in the header of
-every report, which is the kind of listing SS mode exists not to show, and a header that must then itself be
-redacted.
+Each of these still shows a path as written, with a name in it if the folder carries one:
 
-This limit is stated in `PRIVACY.md`.
+- A profile moved for **one account** by editing that account's `ProfileImagePath` in `ProfileList`, leaving
+  `ProfilesDirectory` alone. Reading every account's `ProfileImagePath` into the report was weighed and not
+  taken: it lists the machine's accounts in the header of every report, which is the kind of listing SS mode
+  exists not to show, and a header that must then itself be redacted.
+- A path with no drive letter and no administrative share: a device or volume path, or a share of another
+  name. `pca` and `bam` withhold such paths already (ADR 0020, ADR 0023), and `prefetch` reports none of the
+  paths inside a Prefetch file (ADR 0021); a collector that reports a path Windows handed it, such as
+  `process`, does not check its shape.
+- The 8.3 short name of a moved profile root, and a hashed 8.3 short name of `Documents and Settings`.
+- A machine root spelt with non-ASCII letters, compared in a different case.
+- The host name before an administrative share, which is shown as written.
+
+`PRIVACY.md` states these.
 
 ## Alternatives weighed
 
@@ -119,7 +134,9 @@ This limit is stated in `PRIVACY.md`.
 - The measurement is one image. A PC with 8.3 name creation disabled on its system volume has no
   `DOCUME~1`; the root is recognised either way.
 - Whether a short name of `Documents and Settings` is ever numbered other than `~1`; the digits are read
-  whatever they are.
+  whatever they are. A short name NTFS writes in its hashed form is not recognised (section 3).
+- Which of the spellings section 1 reads — `.`, `..`, a `:` suffix, trailing dots or spaces, repeated
+  separators — Windows opens as the folder they resemble.
 - Whether a real PC stores `ProfilesDirectory` as `%SystemDrive%\Users` or already expanded; both are read.
 - A moved `ProfilesDirectory` was not measured on any machine; the reading of it is tested with fixtures.
 
