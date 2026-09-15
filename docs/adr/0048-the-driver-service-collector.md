@@ -94,9 +94,13 @@ row), rather than the file its segments appear to name, when any segment after t
 is empty, from a repeated or trailing separator; ends in `.` or a space; contains a `:` past the drive
 (reaching an alternate data stream); or, for the segment right after the drive, is `Documents and Settings`
 (a junction to `Users` on current Windows) case-insensitively. No such `ImagePath` was measured on either
-machine. Together these keep every reported path under a user profile in the one `X:\Users\<name>` shape
-`rongroi_core::view::redact_user_paths` reaches: that function only recognises that exact shape, and any
-of the forms above would otherwise carry a user name straight past SS-mode redaction.
+machine. Each of these forms would otherwise carry a user name past SS-mode redaction, because
+`rongroi_core::view::redact_user_paths` recognises a profile path only as a drive letter, `\` or `/`, the
+folder `Users` in any ASCII case and the name after it. Refusing them does not make that redaction complete:
+a profile folder can also be named by an 8.3 short name, by a spelling that only Windows' own case table
+folds to `Users`, or be moved elsewhere by the machine's profile settings, and `redact_user_paths` reaches
+none of those. That limit belongs to the redaction every collector that reports a path shares, not to this
+resolver, and is not closed here.
 
 ### What is a gap and what is not
 
