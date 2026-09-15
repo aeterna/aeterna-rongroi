@@ -74,7 +74,7 @@
   },
   "collector": {
     "posture": "Security settings of this PC",
-    "driver_service": "Registered drivers",
+    "driver_service": "Drivers registered with Windows",
     "fivem_dir": "FiveM files",
     "process": "Running programs",
     "evtx": "Windows event logs",

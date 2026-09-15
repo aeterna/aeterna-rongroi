@@ -14,7 +14,9 @@
 # the **artifact surface**: `%WinDir%` and `%SystemRoot%` are set, as they are on every Windows
 # installation, and PCA, Prefetch, the Event Log folder and the BAM state key are all present and
 # readable. The other two baselines describe none of them, so on those two every rule for those four
-# collectors comes out `Unmeasured` and says nothing about the rule (ADR 0026).
+# collectors comes out `Unmeasured` and says nothing about the rule (ADR 0026). Its driver services and
+# its change-journal counts are not a PC's: both are taken from a GitHub-hosted Windows Server 2025
+# runner, not from any of the Windows 11 machines this profile otherwise describes — see PROVENANCE.md.
 #
 # Elevation is what makes this honest rather than optimistic. This repository does not claim any of
 # these four sources is readable without an elevated token — ADR 0021 and ADR 0024 say the opposite
