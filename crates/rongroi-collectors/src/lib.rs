@@ -6,6 +6,7 @@
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
 pub mod bam;
+pub mod driver_service;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
