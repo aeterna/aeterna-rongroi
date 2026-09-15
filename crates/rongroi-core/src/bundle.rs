@@ -55,6 +55,9 @@ struct RawBundle {
 struct RawRule {
     path: String,
     yaml: String,
+    /// The CSV files beside the rule, by file name (ADR 0048). Absent for a rule that has none.
+    #[serde(default)]
+    data: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -82,12 +85,19 @@ impl Bundle {
         let raw: RawBundle = serde_json::from_str(json)?;
 
         let mut rules = Vec::with_capacity(raw.rules.len());
+        let mut problems = Vec::new();
         for file in raw.rules {
-            let rule: Rule =
+            let mut rule: Rule =
                 serde_saphyr::from_str(&file.yaml).map_err(|e| BundleError::Parse {
                     path: file.path.clone(),
                     message: e.to_string(),
                 })?;
+            for message in rules::expand_match_lists(&mut rule, &file.data) {
+                problems.push(Problem {
+                    path: file.path.clone(),
+                    message,
+                });
+            }
             rules.push(SourcedRule {
                 path: file.path,
                 rule,
@@ -107,7 +117,7 @@ impl Bundle {
             translations.insert(file.lang, texts);
         }
 
-        let problems = rules::validate(&rules, &translations);
+        problems.extend(rules::validate(&rules, &translations));
         if !problems.is_empty() {
             return Err(BundleError::Invalid(problems));
         }
@@ -266,5 +276,45 @@ mod tests {
             assert!(root.join(&files.fixtures).is_dir(), "{}", files.fixtures);
             assert!(root.join(&files.collector).is_file(), "{}", files.collector);
         }
+    }
+
+    const LISTED_RULE: &str = "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7\ntitle: Listed\ndescription: Listed description.\nstatus: test\ncollector: posture\nstrength: posture\nmatch_lists:\n  hvci: states.csv\nretention: Now.\nfalsepositives: [Legacy BIOS]\nauthor: tests\ndate: 2026-09-15\n";
+
+    /// ADR 0048: the data file travels in the bundle beside its rule, and the loaded rule's `match`
+    /// holds its first column.
+    #[test]
+    fn a_rule_data_file_is_expanded_when_the_bundle_loads() {
+        let json = serde_json::json!({
+            "rules": [{
+                "path": "posture/memory-integrity/listed/rule.yaml",
+                "yaml": LISTED_RULE,
+                "data": { "states.csv": "hvci,note\ndisabled,off\n" },
+            }],
+            "i18n": [],
+        })
+        .to_string();
+        let bundle = Bundle::from_bundle_json(&json).unwrap();
+        assert_eq!(
+            bundle.rules()[0].rule.matcher.get("hvci"),
+            Some(&serde_json::json!(["disabled"]))
+        );
+    }
+
+    #[test]
+    fn a_rule_whose_data_file_is_not_in_the_bundle_is_invalid() {
+        let json = serde_json::json!({
+            "rules": [{ "path": "posture/memory-integrity/listed/rule.yaml", "yaml": LISTED_RULE }],
+            "i18n": [],
+        })
+        .to_string();
+        let Err(BundleError::Invalid(problems)) = Bundle::from_bundle_json(&json) else {
+            panic!("expected an invalid bundle");
+        };
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.message.contains("not a file beside rule.yaml")),
+            "{problems:?}"
+        );
     }
 }

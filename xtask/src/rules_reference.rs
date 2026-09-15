@@ -1244,4 +1244,28 @@ related:
         fs::write(&path, text).unwrap();
         run(&tmp.0, &Args { check: true }).unwrap();
     }
+
+    /// ADR 0048: a CSV directly beside a `rule.yaml` travels with that rule, and a CSV at the top of
+    /// `rules/` — `known-fps.csv`, `unconfronted.csv` — beside no rule does not.
+    #[test]
+    fn the_bundle_carries_the_csv_files_beside_a_rule_and_no_other() {
+        let tmp = TempRoot::new("bundle-data");
+        tmp.write("posture/memory-integrity/listed/rule.yaml", "id: x\n");
+        tmp.write(
+            "posture/memory-integrity/listed/states.csv",
+            "hvci\r\ndisabled\r\n",
+        );
+        tmp.write("posture/memory-integrity/listed/notes.txt", "not data\n");
+        tmp.write("known-fps.csv", "rule_id\n");
+
+        let json: serde_json::Value =
+            serde_json::from_str(&collect_bundle_json(&tmp.0).unwrap()).unwrap();
+
+        let rules = json["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 1);
+        assert_eq!(
+            rules[0]["data"],
+            serde_json::json!({ "states.csv": "hvci\ndisabled\n" })
+        );
+    }
 }

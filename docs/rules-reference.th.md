@@ -15,7 +15,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 | rules bundle | |
 |---|---|
-| รูปแบบ rule | 2 |
+| รูปแบบ rule | 3 |
 | จำนวน rule | 21 |
 | SHA-256 | `e0838b0ae433890050f500cec4f8a0a03b7f5cb26bf9af510f8f7eb8f9c9baa4` |
 
