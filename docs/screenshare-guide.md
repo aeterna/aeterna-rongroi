@@ -185,6 +185,7 @@ These are counts of what SS mode does not list. §7 says why.
 | A Prefetch file is marked read-only | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
 | An event log file is marked read-only | tamper | `experimental` | the same two |
 | An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
+| A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
 
 Three things to know about the two log-clearing rules:
 
@@ -212,7 +213,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the other fifteen are new in 0.3.0. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last one, about vulnerable drivers, is new after 0.3.0 and is not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -221,6 +222,21 @@ scan was not restarted with somebody else's administrator password. The firmware
 The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
 what a record in it says. None of them says who changed it or when, and on the one Windows 11 machine
 this project measured, all three were "Not found".
+
+Three things to know about the vulnerable-driver rule:
+
+- **A hardware utility is enough to trigger it.** On the one Windows 11 PC this project scanned, it was
+  "Found" twice, both times for drivers that ASUS signed, on a PC with ASUS's graphics-card utility
+  installed ([ADR 0048](adr/0048-the-driver-service-collector.md)). The drivers on LOLDrivers' list are
+  genuine, signed drivers with a known weakness.
+- **Registered is not loaded, and not used.** The row says a driver service points at that file. It does
+  not say the driver is running, that anything used its weakness, or who installed it. The row gives the
+  service name, the file path and its SHA-256: search for the hash in the rule's list (the
+  [rule reference](rules-reference.md) names the file) to see which LOLDrivers entry it is, and ask the
+  player which program the service belongs to.
+- **Windows may still block it.** Microsoft keeps its own list of vulnerable drivers that Windows refuses
+  to load. This program does not read whether that list is on, and a driver on LOLDrivers' list is not
+  necessarily on Microsoft's.
 
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
