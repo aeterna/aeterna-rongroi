@@ -74,6 +74,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   SHA-256 and `Start`, a resolver that reads relative `ImagePath` values under `%SystemRoot%`, a 30-second
   budget, and a vulnerable-driver rule whose `match_lists` names a vendored file of 1,847 verified LOLDrivers
   hashes. Rule format version 3.
+- Proposed (ADR 0050): a directory listing would also return each entry's size and its creation and
+  last-write times, read from the listing without opening the entry and truncated to whole seconds, as a
+  basis for showing when FiveM's cache, log and crash folders changed. The last-access time stays unread,
+  and no collector emits the values until a later decision names the places.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
