@@ -135,11 +135,11 @@ the child. A copy started this way neither gains nor loses administrator rights.
 - The token a `CreateProcessW` child receives under UAC settings other than the default one measured
   below — for example `ConsentPromptBehaviorAdmin` values that prompt for credentials, or
   `FilterAdministratorToken` set for the built-in Administrator account.
-- Whether either binary could ever be started with a manifest that requires administrator rights, which
-  would make `CreateProcessW` fail with `ERROR_ELEVATION_REQUIRED`. Today neither declares a level: the
-  desktop app embeds `tauri-build` 2.6.3's default manifest, which has no `requestedExecutionLevel`, and
-  the CLI has no build script that embeds one; what its linker embeds by default was not checked. The desktop app has run without
-  administrator rights (ADR 0045's Windows check).
+- Whether either binary could ever be started with a manifest that requires administrator rights, which would
+  make `CreateProcessW` fail with `ERROR_ELEVATION_REQUIRED`. Today neither declares a level: the desktop app
+  embeds `tauri-build` 2.6.3's default manifest, which has no `requestedExecutionLevel`, and the CLI has no
+  build script that embeds one; what its linker embeds by default was not checked. The desktop app has run
+  without administrator rights (ADR 0045's Windows check).
 - Which native dialog API fits: `MessageBoxW` is enough for a yes/no over a text list; `TaskDialogIndirect`
   gives an expandable list. The `windows` crate feature names for either are not checked here and must be
   grepped, not guessed.
