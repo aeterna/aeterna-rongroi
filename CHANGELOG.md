@@ -83,6 +83,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   its listed evidence plus reviewed timeline selectors — rule files that select times without making a
   row — and ADR 0034 would be narrowed so a timeline selector, never a rule, may select Prefetch, BAM and
   PCA entries by name.
+- Proposed (ADR 0052): two scan tiers. Sources that read more about the player — FiveM's logs, server
+  cache folder names, crash-dump module lists, profile counts — would be read only in a full scan, which the
+  player chooses before it starts: a question on the CLI, and a native Windows dialog in a fresh desktop copy
+  before any WebView exists. A standard scan reports those sources as `not_consented`, once, above the
+  evidence. Server identities and account identifiers stay hidden in SS mode unless the player agrees to
+  each.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
