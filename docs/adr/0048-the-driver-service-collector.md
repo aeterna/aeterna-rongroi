@@ -251,16 +251,34 @@ paths and file hashes — in the pull request that registers the collector.
 ## What is unverified
 
 - A primary source for how Windows resolves a relative `ImagePath`, and for the default when it is absent.
-- Rights for a standard account that is not an administrator on a PC, and for a driver file whose ACL
-  refuses its users.
+- Rights for a standard account that is not an administrator on a PC (the PC below was scanned with an
+  administrator's limited token, not a standard account), and for a driver file whose ACL refuses its
+  users.
 - A cold hash time on a PC.
-- Whether the rule is quiet on an ordinary gaming PC. A baseline from a runner cannot show that, and no
-  person's driver list is published to show it.
+- How often an ordinary gaming PC reads `found`. One PC with a hardware utility did (below); a baseline
+  from a runner cannot show the rate, and no person's driver list is published to show it.
 - The budget is checked between files, not while one is hashing: one very large file, a slow removable
   volume, or a drive letter mapped to a network share can hold the scan past 30 s on that file alone, and a
   file's size is not bounded before it is hashed. A path on a mapped network drive is read through the
   network like any other. Genuine drivers are small — the runner's 424 took 15.5 seconds cold — so this was
   not measured on either machine.
+
+## The rule on a PC
+
+On 2026-09-15 the CLI built from `dev` at `28efbee` scanned a Windows 11 PC (build 26220) that has ASUS
+GPU Tweak III 1.9.5.8 installed, once elevated and once with a limited token from a scheduled task. The two
+reports agree:
+
+- 464 driver services, every one hashed, in a scan of 24 seconds.
+- The rule is `found`, with two rows: `AsIO` (`C:\WINDOWS\SysWow64\drivers\AsIO.sys`) and `Asusgio2`
+  (`C:\WINDOWS\system32\drivers\AsIO2.sys`, running). Both hashes belong to LOLDrivers entry
+  `2651f5c4-d9e1-4b06-92be-e9e7313f87c4`, and both files are signed by ASUSTeK Computer Inc.
+- `VulnerableDriverBlocklistEnable` under `HKLM\SYSTEM\CurrentControlSet\Control\CI\Config` is 1 on this
+  PC, and `Asusgio2` runs. The blocklist this program does not read did not stop this driver; what that
+  value controls has no Microsoft-documented source (ADR 0046).
+
+This is the rule's first `falsepositives` case seen on a real PC: a hardware utility's drivers. Which
+installer placed them was not established.
 
 ## Consequences
 
