@@ -78,6 +78,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   last-write times, read from the listing without opening the entry and truncated to whole seconds, as a
   basis for showing when FiveM's cache, log and crash folders changed. The last-access time stays unread,
   and no collector emits the values until a later decision names the places.
+- Proposed (ADR 0051): a timeline view in the core that orders the times a report already holds, with the
+  scan's own times as anchors and each source's covered span beside them. SS mode would show the times in
+  its listed evidence plus reviewed timeline selectors — rule files that select times without making a
+  row — and ADR 0034 would be narrowed so a timeline selector, never a rule, may select Prefetch, BAM and
+  PCA entries by name.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
