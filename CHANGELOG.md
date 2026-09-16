@@ -89,6 +89,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   before any WebView exists. A standard scan reports those sources as `not_consented`, once, above the
   evidence. Server identities and account identifiers stay hidden in SS mode unless the player agrees to
   each.
+- ADR 0052 records a Windows 11 measurement: under UAC's default settings, a process started with
+  `CreateProcessW` from an elevated copy is elevated, and from a standard copy is standard, with no consent
+  prompt in between. A desktop copy started for a full scan neither gains nor loses administrator rights.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the

@@ -63,10 +63,10 @@ starts the standard scan. The dialog belongs to Windows, not to the WebView, so 
 ADR 0012 protect — the report is measured before the WebView exists — holds.
 
 The new copy is meant to keep the token of the copy that started it, so that asking for a full scan neither
-gains nor drops administrator rights. The intended call is `CreateProcessW`, expected to give a child of an
-elevated copy the same elevated token without another UAC prompt; that expectation is unverified and is
-measured before any code (What is unverified). The elevation button forwards `--full` when the current scan
-is full.
+gains nor drops administrator rights. The call is `CreateProcessW` with no token argument: measured, it gives
+a child of an elevated copy the same elevated token without another UAC prompt, and a child of a standard copy
+the same limited token (section "Measured"). The elevation button forwards `--full` when the current scan is
+full.
 
 **The flag alone never reads anything.** A shortcut or a script that passes `--full` gets the question, not a
 full scan. The question is asked by the process that will read, every time, so no earlier answer is trusted.
@@ -113,9 +113,33 @@ messenger's storage or any store that holds a credential or a token, whatever th
 | A per-source checklist at start | More choices than a screenshare can walk through, and each source's reason lives in its ADR; one list with two sensitive switches in SS mode covers the owner's cases. |
 | `--yes-full` for scripts | A scripted full scan has no player at the keyboard to agree. |
 
+## Measured
+
+On one Windows 11 PC (build 26220), 2026-09-16, with the owner's permission. UAC as Windows ships it:
+`EnableLUA` 1, `ConsentPromptBehaviorAdmin` 5, `PromptOnSecureDesktop` 1, `FilterAdministratorToken` not
+set. A parent PowerShell process called `CreateProcessW` with `CREATE_NO_WINDOW` and no other flag, no token
+and no inherited handles; the child read its own token. Scheduled tasks gave the parents their tokens; the
+task, the script and its output were deleted afterwards.
+
+| Parent | Parent's token | Child's token |
+|---|---|---|
+| task at `HIGHEST`, on the signed-in desktop | elevated, elevation type full, high integrity, session 3 | elevated, elevation type full, high integrity, session 3 |
+| task at `LIMITED`, on the signed-in desktop | not elevated, elevation type limited, medium integrity, session 3 | not elevated, elevation type limited, medium integrity, session 3 |
+| an SSH session | elevated, elevation type default, high integrity, session 0 | elevated, elevation type default, high integrity, session 0 |
+
+The elevated case finished without anyone at the machine, so no consent prompt stood between the parent and
+the child. A copy started this way neither gains nor loses administrator rights.
+
 ## What is unverified
 
-- The token a `CreateProcessW` child receives from an elevated parent (section 3).
+- The token a `CreateProcessW` child receives under UAC settings other than the default one measured
+  below — for example `ConsentPromptBehaviorAdmin` values that prompt for credentials, or
+  `FilterAdministratorToken` set for the built-in Administrator account.
+- Whether either binary could ever be started with a manifest that requires administrator rights, which
+  would make `CreateProcessW` fail with `ERROR_ELEVATION_REQUIRED`. Today neither declares a level: the
+  desktop app embeds `tauri-build` 2.6.3's default manifest, which has no `requestedExecutionLevel`, and
+  the CLI has no build script that embeds one; what its linker embeds by default was not checked. The desktop app has run without
+  administrator rights (ADR 0045's Windows check).
 - Which native dialog API fits: `MessageBoxW` is enough for a yes/no over a text list; `TaskDialogIndirect`
   gives an expandable list. The `windows` crate feature names for either are not checked here and must be
   grepped, not guessed.
