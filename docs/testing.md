@@ -47,6 +47,13 @@ be `unmeasured` there.
 > `bam` and `prefetch` limited-token runs — it is one per collector and was not opened. The per-artifact
 > path questions in ADRs 0020, 0021, 0023 and 0024 stay open.
 >
+> **The same machine, 2026-09-15.** The `driver_service` collector hashed all 464 registered driver
+> services both elevated and under a limited token, and the vulnerable-driver rule read `found` for two
+> hardware-utility drivers ([ADR 0048](adr/0048-the-driver-service-collector.md)). The desktop app, run
+> under a limited token and driven by UI Automation, confirmed the clipboard, the two-line cut, the
+> technical switch and Back from About & code; reading its QR code with a phone is still unchecked
+> ([ADR 0045](adr/0045-reading-the-report-in-layers-and-where-its-code-is.md)).
+>
 > The CI job remains a second, different machine rather than a substitute: it has a real `winevt\Logs`
 > folder and an elevated token, so it parses real event-log bytes on every run, and it says nothing about
 > the non-elevated branch an ordinary scan takes.
