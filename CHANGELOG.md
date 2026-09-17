@@ -93,6 +93,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - ADR 0052 records a Windows 11 measurement: under UAC's default settings, a process started with
   `CreateProcessW` from an elevated copy is elevated, and from a standard copy is standard, with no consent
   prompt in between. A desktop copy started for a full scan neither gains nor loses administrator rights.
+- Proposed (ADR 0053): `fivem_dir` would report FiveM's log, crash and cache folders in both editions as
+  folder activity — how many files and subfolders, their total size, the earliest and latest file times, and
+  the folder's own times — and each Enhanced server cache folder's creation and last-change times and entry
+  count, with no file or folder name. No rule would read them.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
