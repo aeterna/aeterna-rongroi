@@ -122,6 +122,7 @@ Both are mandatory in every rule and translated with the rest of its text (ADR 0
 | Own traces | shown | shown — they are transparency about the tool, not evidence about the PC (ADR 0010) |
 | Boot time (header) | shown | shown — context for the times on the rows SS mode lists, and named in the consent question (ADR 0039) |
 | Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |
+| Timeline | every timestamp field of every observation, the anchors, the coverage bands and the unmeasured sources | the times of the evidence it lists, what timeline selectors selected, the anchors, the coverage bands and the unmeasured sources; subjects and places redacted as rows are (ADR 0051) |
 | Paths | as read | `<profile root>\<name>` → `%USERPROFILE%`, in evidence and own traces alike. A profile root is `Users`, `Documents and Settings` or its short name on any drive, or the machine's `ProfilesDirectory` on its own drive, after `X:` or an administrative share `X$` (ADR 0049) |
 | `profiles_directory` (header) | carried | **dropped** — read by the scan only so that SS mode can redact under it (ADR 0049) |
 
@@ -133,6 +134,17 @@ modes; in SS mode listed plus hidden accounts for every rule once; they are thre
 added into one number (ADR 0002, ADR 0045).
 
 Redaction is implemented and tested in `rongroi-core::view` (AGENTS.md hard rule 5).
+
+**Timeline (ADR 0051).** `view::timeline` builds each view's `timeline` from what the report declares:
+`scan::run` copies each collector's timestamp fields (`Field::timestamp`), its discriminator and its
+coverage fields (`Collector::coverage`) into `Report.timestamp_fields`, `discriminators` and
+`coverage_fields`, and lists in `unmeasured_sources` every collector or place whose timestamp fields
+could not be read. The core never takes a value for a time by its shape. The engine evaluates
+`role: timeline` files apart from rules: their matches go to `Report.timeline_selections`, they make no
+evidence, and they leave `unmatched` as it was. An observation reached by more than one route is shown
+once — as evidence, then as a selection, then as unmatched. Entries are ordered by time, then anchors
+first, then `view::COLLECTOR_ORDER`, which each view carries as `collector_order` for the desktop's
+grouping.
 
 ## Rules bundle
 

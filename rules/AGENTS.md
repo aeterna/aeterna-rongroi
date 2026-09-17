@@ -31,8 +31,14 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   signer's name, which a stolen certificate carries too (ADR 0035).
 - **No rule on `prefetch`, `bam` or `pca` names a program** by `name` or `path` (ADR 0034). Nothing those
   collectors emit identifies software, so such a rule cannot `allow` the legitimate program with that name
-  and a rename defeats it. No gate refuses it — `check-rules` and `check-baseline` both accept a rule for
-  one named executable — so it is on the reviewer.
+  and a rename defeats it. Since ADR 0051 the bundle loader, and so `check-rules`, refuses such a rule.
+- **A timeline selector** (`role: timeline`, ADR 0051) is written like a rule and makes no evidence: what
+  it matches puts its times on the timeline, in SS mode too. It is the one kind of file that may select
+  `prefetch`, `bam` or `pca` records by `name` or `path`, it is `strength: context`, and it has no
+  `unmeasured_when`. Its `falsepositives` are shown beside its times, so they must say that a name does
+  not identify a program and that a missing time is not evidence. **A new selector on those three
+  collectors widens what SS mode shows**, so the consent text in `crates/rongroi-cli/src/output.rs`, the
+  desktop's `consent.shows` and `PRIVACY.md` must name what it selects, in the same change.
 - **`match` compares strings without regard to ASCII case.** `path: "C:\\Windows\\Temp\\x.exe"` matches
   `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in and a rule that
   missed one would report `not_found` — a thing looked for and not there. Non-ASCII letters are **not**

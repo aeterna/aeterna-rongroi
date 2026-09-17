@@ -16,9 +16,9 @@ beside every Found row the program shows the ordinary things that also produce i
 
 | Rules bundle | |
 |---|---|
-| Rule format | 3 |
-| Rules | 22 |
-| SHA-256 | `6a2cab06d1db3383d699dd86f85916592a5b9b6787fdf038d701e1d19748dbee` |
+| Rule format | 4 |
+| Rules | 31 |
+| SHA-256 | `a70841c0bf2f3054186a2851b4715057c7f2afe7613e0c4a38f89862561b3106` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -68,6 +68,22 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+- Timeline selectors
+  - `bam`
+    - [When BAM recorded a program named like FiveM's game process](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
+    - [When BAM recorded a program named like FiveM or GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
+  - `evtx`
+    - [A Windows event log's oldest and newest record](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
+  - `fivem_dir`
+    - [When FiveM's log, crash and cache folders were written](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
+  - `pca`
+    - [When Program Compatibility Assistant recorded a program named like FiveM's game process](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
+    - [When Program Compatibility Assistant recorded a program named like FiveM or GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `prefetch`
+    - [When Prefetch recorded a program named like FiveM's game process](#rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db) — `context` · `experimental`
+    - [When Prefetch recorded a program named like FiveM or GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
+  - `usn`
+    - [When the change journal recorded changes in a watched folder](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
 
 ## Collector `driver_service`
 
@@ -1046,3 +1062,309 @@ The attribute as it is at the moment of the scan, on the Prefetch files still in
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+## Timeline selectors
+
+A timeline selector is written like a rule and produces no evidence: the observations it matches put their times on the report's timeline, in Self and SS mode, each with the text and the ordinary causes below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not (ADR 0034): a name says nothing about which program it was, and each one says so.
+
+### `bam` / `timeline`
+
+<a id="rule-bf213176-ed26-4c02-935e-99925abc7db7"></a>
+
+#### When BAM recorded a program named like FiveM's game process
+
+- Id: `bf213176-ed26-4c02-935e-99925abc7db7`
+- File: [`rules/bam/timeline/fivem-game-process-by-name/rule.yaml`](../rules/bam/timeline/fivem-game-process-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Background Activity Moderator (BAM) recorded for a program named FiveM\_b\<number\>\_GTAProcess.exe, the name FiveM gives the game process it starts, with the game build in place of \<number\>. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name|endswith`: ends with `_GTAProcess.exe` (text, ASCII case ignored)
+- `name|startswith`: starts with `FiveM_b` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older run leaves no entry here.
+
+**Ordinary things behind these times**
+
+- Any program whose name begins with FiveM\_b and ends with \_GTAProcess.exe — the record holds a name and nothing that identifies the program, so a program renamed to that shape is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not keeping a record — BAM entries older than seven days are removed when Windows starts
+- Windows keeping the record after the program's files were removed
+
+<a id="rule-19dc7372-391e-4874-9c94-92ee6170f2df"></a>
+
+#### When BAM recorded a program named like FiveM or GTA V
+
+- Id: `19dc7372-391e-4874-9c94-92ee6170f2df`
+- File: [`rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Background Activity Moderator (BAM) recorded for a program named FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their executables. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name`: is one of `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older run leaves no entry here.
+
+**Ordinary things behind these times**
+
+- Any program of one of these names — the record holds a name and nothing that identifies the program, so a program renamed to one of them is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not keeping a record — BAM entries older than seven days are removed when Windows starts
+- Windows keeping the record after the program's files were removed
+
+### `evtx` / `timeline`
+
+<a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
+
+#### A Windows event log's oldest and newest record
+
+- Id: `87b47713-1ed3-415e-bc07-9cd0b953d7c1`
+- File: [`rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml`](../rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `evtx`
+- Strength: `context`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `evtx`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time of the oldest and the newest record each Windows event log file still holds. The span between them is what that log can show; a time outside it is one the log says nothing about. A short span is not evidence that a log was cleared.
+
+**Matches when all of these hold for one observation**
+
+- `oldest_record_time|exists`: the field is present
+
+**Look-back**
+
+The log files as they are at the moment of the scan. Each log has a size limit and overwrites its oldest records when it is full.
+
+**Ordinary things behind these times**
+
+- A log that reached its size limit and overwrote its oldest records, which busy logs do within days
+- A new Windows installation, or a reset
+- A log cleared by an administrator, by an installer or by a maintenance tool
+
+### `fivem_dir` / `timeline`
+
+<a id="rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"></a>
+
+#### When FiveM's log, crash and cache folders were written
+
+- Id: `2ef0da16-e65e-4bb6-90c5-0898ffc93ad8`
+- File: [`rules/fivem_dir/timeline/folder-activity-times/rule.yaml`](../rules/fivem_dir/timeline/folder-activity-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `fivem_dir`
+- Strength: `context`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `fivem_dir`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the times FiveM's log, crash and cache folders report, for GTA V Legacy and Enhanced: when each folder was created and last changed, the earliest and latest file times in it, and when each Enhanced server cache folder was created and last changed. These are the times the file system reports, which the program that writes a file can set. A server cache folder is shown without its name. None of this is evidence of anything.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is one of `legacy_logs`, `legacy_crashes`, `legacy_cache`, `legacy_server_cache`, `enhanced_logs`, `enhanced_crashes`, `enhanced_launcher_crashes`, `enhanced_server_cache` (text, ASCII case ignored)
+
+**Look-back**
+
+The folders as they are at the moment of the scan. FiveM writes, rotates and removes its own logs, crash reports and cache, and a player can clear them.
+
+**Ordinary things behind these times**
+
+- FiveM writing, rotating and removing its own logs, crash reports and cache in ordinary use
+- The player clearing FiveM's cache or logs
+- Reinstalling FiveM, moving it to another PC, or restoring it from a backup
+- A backup, sync or copy tool that sets file times
+
+### `pca` / `timeline`
+
+<a id="rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5"></a>
+
+#### When Program Compatibility Assistant recorded a program named like FiveM's game process
+
+- Id: `eaf79187-e067-43ed-9afe-bffe65e6b2e5`
+- File: [`rules/pca/timeline/fivem-game-process-by-name/rule.yaml`](../rules/pca/timeline/fivem-game-process-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `pca`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pca`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Program Compatibility Assistant recorded for a program named FiveM\_b\<number\>\_GTAProcess.exe, the name FiveM gives the game process it starts, with the game build in place of \<number\>. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name|endswith`: ends with `_GTAProcess.exe` (text, ASCII case ignored)
+- `name|startswith`: starts with `FiveM_b` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what the Program Compatibility Assistant files still hold. Windows keeps these files on Windows 11 22H2 and later.
+
+**Ordinary things behind these times**
+
+- Any program whose name begins with FiveM\_b and ends with \_GTAProcess.exe — the record holds a name and nothing that identifies the program, so a program renamed to that shape is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing a record — these files exist only on Windows 11 22H2 and later
+- Windows keeping the record after the program's files were removed
+
+<a id="rule-6487719d-15cf-422c-8b8a-858647091fd1"></a>
+
+#### When Program Compatibility Assistant recorded a program named like FiveM or GTA V
+
+- Id: `6487719d-15cf-422c-8b8a-858647091fd1`
+- File: [`rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `pca`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pca`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Program Compatibility Assistant recorded for a program named FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their executables. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name`: is one of `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what the Program Compatibility Assistant files still hold. Windows keeps these files on Windows 11 22H2 and later.
+
+**Ordinary things behind these times**
+
+- Any program of one of these names — the record holds a name and nothing that identifies the program, so a program renamed to one of them is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing a record — these files exist only on Windows 11 22H2 and later
+- Windows keeping the record after the program's files were removed
+
+### `prefetch` / `timeline`
+
+<a id="rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db"></a>
+
+#### When Prefetch recorded a program named like FiveM's game process
+
+- Id: `d377e008-0a08-4d6e-adf2-f6cbc8b978db`
+- File: [`rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `prefetch`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `prefetch`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time Windows' Prefetch recorded for a program named FiveM\_b\<number\>\_GTAProcess.exe, the name FiveM gives the game process it starts, with the game build in place of \<number\>. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name|endswith`: ends with `_GTAProcess.exe` (text, ASCII case ignored)
+- `name|startswith`: starts with `FiveM_b` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the Prefetch files still in the folder, and only the most recent run each one records. Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+
+**Ordinary things behind these times**
+
+- Any program whose name begins with FiveM\_b and ends with \_GTAProcess.exe — the record holds a name and nothing that identifies the program, so a program renamed to that shape is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing or not keeping a record — Prefetch switched off, a Prefetch file Windows removed, or a folder emptied by a clean-up tool
+- Windows keeping the record after the program's files were removed
+
+<a id="rule-a81a1693-2982-4004-8f40-186c2b90a6a2"></a>
+
+#### When Prefetch recorded a program named like FiveM or GTA V
+
+- Id: `a81a1693-2982-4004-8f40-186c2b90a6a2`
+- File: [`rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `prefetch`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `prefetch`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time Windows' Prefetch recorded for a program named FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their executables. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name`: is one of `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the Prefetch files still in the folder, and only the most recent run each one records. Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+
+**Ordinary things behind these times**
+
+- Any program of one of these names — the record holds a name and nothing that identifies the program, so a program renamed to one of them is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing or not keeping a record — Prefetch switched off, a Prefetch file Windows removed, or a folder emptied by a clean-up tool
+- Windows keeping the record after the program's files were removed
+
+### `usn` / `timeline`
+
+<a id="rule-82c71896-ef70-492d-b6fc-8671c09b5e1c"></a>
+
+#### When the change journal recorded changes in a watched folder
+
+- Id: `82c71896-ef70-492d-b6fc-8671c09b5e1c`
+- File: [`rules/usn/timeline/watched-folder-record-times/rule.yaml`](../rules/usn/timeline/watched-folder-record-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `usn`
+- Strength: `context`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `usn`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the oldest and newest change the NTFS change journal still holds for each folder this program watches: Prefetch, the event log folder, the Program Compatibility Assistant folder and FiveM's plugin folders. The journal counts changes without saying which program made them, so a time here is when a file in that folder was created, changed, renamed or deleted, by anyone, including Windows and FiveM. It is not evidence that anything was removed.
+
+**Matches when all of these hold for one observation**
+
+- `folder`: is `identified` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the records the journal still holds. The journal has a fixed size and drops its oldest records as new ones arrive, so it reaches back only as far as its size allows.
+
+**Ordinary things behind these times**
+
+- Windows writing and removing Prefetch files, event logs and compatibility records in ordinary use
+- FiveM, its updater and plugins installed or removed by the player changing files in the plugin folders
+- Disk clean-up, backup, antivirus and optimisation tools
+- A folder with no change in the journal's span has no time here, which does not mean nothing changed before it

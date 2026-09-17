@@ -32,7 +32,7 @@ Every result is one of three things:
 - **The GUI uses Microsoft WebView2**, a Windows component that may send Windows diagnostic data according
   to your Windows settings. **The CLI version does not use WebView2.**
 - No screenshots, no browser history, no remote access.
-- **SS mode** (for screenshare) asks for consent first, shows only what matched a rule, and hides your
+- **SS mode** (for screenshare) asks for consent first, shows what matched a rule and a timeline of the times its consent screen lists, and hides your
   user name in paths. You may refuse.
 
 Details: [PRIVACY.md](PRIVACY.md).

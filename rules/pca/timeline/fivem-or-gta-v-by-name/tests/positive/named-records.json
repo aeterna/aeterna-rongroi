@@ -1,0 +1,24 @@
+{
+  "description": "Records whose names this selector lists",
+  "observations": [
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "FIVEM.EXE",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\FIVEM.EXE",
+        "last_run": "2026-09-15T18:02:11Z"
+      }
+    },
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "GTA5_Enhanced.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\GTA5_Enhanced.exe",
+        "last_run": "2026-09-15T18:03:40Z"
+      }
+    }
+  ],
+  "expect_matches": 2
+}

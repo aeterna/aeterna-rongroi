@@ -107,5 +107,20 @@
     "fixtures": "Fixtures",
     "collector_file": "Collector",
     "reference": "Reference"
+  },
+  "timeline": {
+    "title": "Timeline",
+    "note": "The times this report holds, oldest first. An order of recorded times is not an order of events, and a record that is absent was not necessarily removed. A time a folder listing reports is what the file system says, which the program that wrote the file can set.",
+    "coverage_note": "Nothing can be read from a source outside the span it can show.",
+    "coverage": "{{source}} can show {{from}} to {{to}}",
+    "not_measured": "{{source}}: not measured — {{reason}}",
+    "filter": "Show times from",
+    "all": "every source",
+    "count": "Times: {{count}}",
+    "scan_time": "This scan ran",
+    "boot_time": "Windows started",
+    "unmatched": "no rule matched this",
+    "selectors": "What the selected times mean",
+    "selector_causes": "Ordinary things behind these times"
   }
 }

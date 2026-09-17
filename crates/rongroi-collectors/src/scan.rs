@@ -5,10 +5,13 @@
 //! One full scan: run every collector, evaluate the bundle, freeze the report.
 //! The CLI and the desktop app both call [`run`], so they cannot disagree about a result.
 
+use std::collections::BTreeMap;
+
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::{self, SelfIdentity};
 use rongroi_core::model::{
-    BootTime, CollectorRun, REPORT_SCHEMA_VERSION, Report, ReportHeader, UnmeasuredReason,
+    BootTime, CollectorRun, CoverageFields, REPORT_SCHEMA_VERSION, Report, ReportHeader,
+    UnmeasuredReason, UnmeasuredSource,
 };
 use rongroi_core::provenance::Provenance;
 use rongroi_host::{Host, Platform, RegistryData};
@@ -33,7 +36,8 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
     // reading the count after it would move the start that much earlier (ADR 0039).
     let boot_time = boot_time(host, &context.generated_at);
     let profiles_directory = profiles_directory(host);
-    let runs: Vec<CollectorRun> = crate::all()
+    let collectors = crate::all();
+    let runs: Vec<CollectorRun> = collectors
         .iter()
         .map(|collector| collector.collect(host))
         .collect();
@@ -48,7 +52,93 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
         boot_time,
         profiles_directory,
     };
-    engine::evaluate(bundle, &runs, header, &context.self_identity)
+    let mut report = engine::evaluate(bundle, &runs, header, &context.self_identity);
+    declare_times(&mut report, &collectors, &runs);
+    report
+}
+
+/// Copies into the report what the timeline needs to know and the core cannot: which fields are
+/// times, which field names a place, which fields bound a source, and which sources of times could
+/// not be read (ADR 0051).
+fn declare_times(
+    report: &mut Report,
+    collectors: &[Box<dyn crate::Collector>],
+    runs: &[CollectorRun],
+) {
+    for collector in collectors {
+        let id = collector.id();
+        let timestamps: Vec<&'static str> = collector
+            .fields()
+            .iter()
+            .filter(|field| field.kind == crate::FieldKind::Timestamp)
+            .map(|field| field.name)
+            .collect();
+        if timestamps.is_empty() {
+            continue;
+        }
+        report.timestamp_fields.insert(
+            id.to_owned(),
+            timestamps.iter().map(|name| (*name).to_owned()).collect(),
+        );
+        if let Some(discriminator) = collector.discriminator() {
+            report
+                .discriminators
+                .insert(id.to_owned(), discriminator.to_owned());
+        }
+        if let Some(coverage) = collector.coverage() {
+            report.coverage_fields.insert(
+                id.to_owned(),
+                CoverageFields {
+                    from: coverage.from.to_owned(),
+                    to: coverage.to.to_owned(),
+                    place: coverage.place.map(str::to_owned),
+                },
+            );
+        }
+        let Some(run) = runs.iter().find(|run| run.collector() == id) else {
+            continue;
+        };
+        report
+            .unmeasured_sources
+            .extend(unmeasured_sources(id, &timestamps, run));
+    }
+}
+
+/// Where `run` could not read one of `timestamps`: the whole collector, or one of its places.
+///
+/// One entry per place, with the reason of the first timestamp field that place could not read. A
+/// place whose gaps name no timestamp field — a file that could not be hashed — is not a source of
+/// times that failed, and is left to the rows.
+fn unmeasured_sources(
+    collector: &str,
+    timestamps: &[&str],
+    run: &CollectorRun,
+) -> Vec<UnmeasuredSource> {
+    let first_gap = |gaps: &BTreeMap<String, UnmeasuredReason>| {
+        timestamps
+            .iter()
+            .find_map(|field| gaps.get(*field).copied())
+    };
+    let source = |place: Option<String>, reason| UnmeasuredSource {
+        collector: collector.to_owned(),
+        place,
+        reason,
+    };
+    match run {
+        CollectorRun::Unmeasured { reason, .. } => vec![source(None, *reason)],
+        CollectorRun::Measured {
+            gaps,
+            discriminator_gaps,
+            ..
+        } => first_gap(gaps)
+            .map(|reason| source(None, reason))
+            .into_iter()
+            .chain(discriminator_gaps.iter().filter_map(|place| {
+                let reason = first_gap(&place.gaps)?;
+                Some(source(place.value.as_str().map(str::to_owned), reason))
+            }))
+            .collect(),
+    }
 }
 
 /// When the running Windows kernel started counting, or why there is no value (ADR 0039).
@@ -114,6 +204,91 @@ mod tests {
 
     fn host(yaml: &str) -> FixtureHost {
         FixtureHost::from_yaml_str(yaml, "inline").unwrap()
+    }
+
+    /// Every collector with a timestamp field is declared, with its discriminator and span.
+    #[test]
+    fn the_report_declares_every_collectors_times() {
+        let bundle = Bundle::embedded().unwrap();
+        let report = run(
+            &host("platform: windows\n"),
+            &bundle,
+            ScanContext {
+                provenance: Provenance::from_parts(None, "0.0.0-test", None, None),
+                generated_at: "2026-01-01T00:00:00Z".to_owned(),
+                self_identity: SelfIdentity::default(),
+            },
+        );
+        for collector in crate::all() {
+            let declared = collector
+                .fields()
+                .iter()
+                .any(|field| field.kind == crate::FieldKind::Timestamp);
+            assert_eq!(
+                report.timestamp_fields.contains_key(collector.id()),
+                declared,
+                "{}",
+                collector.id()
+            );
+        }
+        assert_eq!(
+            report.timestamp_fields.get("prefetch"),
+            Some(&vec!["last_run".to_owned()])
+        );
+        assert_eq!(
+            report.discriminators.get("usn").map(String::as_str),
+            Some("location")
+        );
+        assert_eq!(
+            report
+                .coverage_fields
+                .get("usn")
+                .and_then(|c| c.place.as_deref()),
+            Some("journal")
+        );
+        assert!(!report.timestamp_fields.contains_key("posture"));
+    }
+
+    #[test]
+    fn a_source_of_times_that_could_not_be_read_is_named_with_its_place() {
+        let unmeasured = CollectorRun::Unmeasured {
+            collector: "usn".to_owned(),
+            reason: UnmeasuredReason::NotAdmin,
+        };
+        assert_eq!(
+            unmeasured_sources("usn", &["first_seen"], &unmeasured),
+            vec![UnmeasuredSource {
+                collector: "usn".to_owned(),
+                place: None,
+                reason: UnmeasuredReason::NotAdmin,
+            }]
+        );
+        let gaps = |field: &str, reason| BTreeMap::from([(field.to_owned(), reason)]);
+        let measured = CollectorRun::Measured {
+            collector: "fivem_dir".to_owned(),
+            observations: Vec::new(),
+            gaps: gaps("sha256", UnmeasuredReason::ReadFailed),
+            discriminator_gaps: vec![
+                rongroi_core::model::DiscriminatorGaps {
+                    discriminator: "location".to_owned(),
+                    value: serde_json::Value::from("legacy_logs"),
+                    gaps: gaps("created_at", UnmeasuredReason::AccessDenied),
+                },
+                rongroi_core::model::DiscriminatorGaps {
+                    discriminator: "location".to_owned(),
+                    value: serde_json::Value::from("plugins"),
+                    gaps: gaps("signature", UnmeasuredReason::AccessDenied),
+                },
+            ],
+        };
+        assert_eq!(
+            unmeasured_sources("fivem_dir", &["created_at", "modified_at"], &measured),
+            vec![UnmeasuredSource {
+                collector: "fivem_dir".to_owned(),
+                place: Some("legacy_logs".to_owned()),
+                reason: UnmeasuredReason::AccessDenied,
+            }]
+        );
     }
 
     #[test]

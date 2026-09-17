@@ -141,8 +141,28 @@ pub trait Collector {
     fn discriminator(&self) -> Option<&'static str> {
         None
     }
+    /// The two timestamp fields that bound what this collector's source could see, when it has
+    /// such a span, or `None` (ADR 0051).
+    ///
+    /// The timeline shows the span beside the times, because "nothing recorded here" can only be read
+    /// inside it. `Coverage::place` narrows it to the one observation about the whole source, for a
+    /// collector whose other observations carry the same two fields about something smaller.
+    fn coverage(&self) -> Option<Coverage> {
+        None
+    }
     /// Looks at the host.
     fn collect(&self, host: &dyn Host) -> CollectorRun;
+}
+
+/// What [`Collector::coverage`] declares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Coverage {
+    /// The timestamp field holding the oldest time the source still holds.
+    pub from: &'static str,
+    /// The timestamp field holding the newest.
+    pub to: &'static str,
+    /// The discriminator value of the observation about the whole source, when there is one.
+    pub place: Option<&'static str>,
 }
 
 /// Every collector in this build.
@@ -267,6 +287,35 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A declared span names two fields the collector declares as timestamps, and a place only for a
+    /// collector with a discriminator (ADR 0051).
+    #[test]
+    fn a_declared_coverage_names_declared_timestamps() {
+        let mut declared = 0;
+        for collector in all() {
+            let Some(coverage) = collector.coverage() else {
+                continue;
+            };
+            declared += 1;
+            for name in [coverage.from, coverage.to] {
+                assert!(
+                    collector
+                        .fields()
+                        .iter()
+                        .any(|field| field.name == name && field.kind == FieldKind::Timestamp),
+                    "collector `{}` declares coverage by `{name}`, which is not one of its timestamp fields",
+                    collector.id()
+                );
+            }
+            assert!(
+                coverage.place.is_none() || collector.discriminator().is_some(),
+                "collector `{}` scopes its coverage to a place without a discriminator",
+                collector.id()
+            );
+        }
+        assert_eq!(declared, 2, "evtx and usn declare a span");
     }
 
     /// A gap names the field it is a gap in, so a `gaps` key outside the declared list is the same

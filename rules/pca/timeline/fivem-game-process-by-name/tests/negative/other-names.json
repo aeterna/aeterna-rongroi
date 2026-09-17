@@ -1,0 +1,32 @@
+{
+  "description": "FiveM's own launcher name, GTA V's, and a name that begins like the game process and ends otherwise",
+  "observations": [
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "FiveM.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\FiveM.exe",
+        "last_run": "2026-09-15T18:02:11Z"
+      }
+    },
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "GTA5.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\GTA5.exe",
+        "last_run": "2026-09-15T18:02:20Z"
+      }
+    },
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "FiveM_b3258_Other.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\FiveM_b3258_Other.exe",
+        "last_run": "2026-09-15T18:02:25Z"
+      }
+    }
+  ]
+}

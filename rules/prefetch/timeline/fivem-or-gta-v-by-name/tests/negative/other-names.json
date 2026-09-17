@@ -1,0 +1,41 @@
+{
+  "description": "Programs whose names are not one of the four, including names that contain one of them",
+  "observations": [
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "steam.exe",
+        "path": "C:\\Windows\\Prefetch\\steam.exe-1A2B3C4D.pf",
+        "last_run": "2026-09-15T17:58:02Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    },
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "FiveM_Launcher.exe",
+        "path": "C:\\Windows\\Prefetch\\FiveM_Launcher.exe-1A2B3C4D.pf",
+        "last_run": "2026-09-15T18:01:59Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    },
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "myGTA5.exe",
+        "path": "C:\\Windows\\Prefetch\\myGTA5.exe-1A2B3C4D.pf",
+        "last_run": "2026-09-14T09:00:00Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    }
+  ]
+}

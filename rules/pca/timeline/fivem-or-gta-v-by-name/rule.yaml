@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 6487719d-15cf-422c-8b8a-858647091fd1
+title: When Program Compatibility Assistant recorded a program named like FiveM or GTA V
+description: >-
+  Puts on the timeline the time the Windows Program Compatibility Assistant recorded for a program
+  named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their
+  executables. The record holds a name, not which program it was, so this shows when a program of
+  that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of
+  anything, and a missing entry does not mean the game never ran.
+status: experimental
+# A timeline selector (ADR 0051): it makes no evidence and selects by name, which ADR 0034 forbids a rule.
+role: timeline
+collector: pca
+strength: context
+match:
+  name: [FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe]
+retention: >-
+  Only what the Program Compatibility Assistant files still hold. Windows keeps these files on
+  Windows 11 22H2 and later.
+falsepositives:
+  - Any program of one of these names — the record holds a name and nothing that identifies the
+    program, so a program renamed to one of them is recorded under it
+  - A program of another name is not selected, whatever it is, so an absent entry does not mean that
+    nothing ran
+  - Windows not writing a record — these files exist only on Windows 11 22H2 and later
+  - Windows keeping the record after the program's files were removed
+author: aeterna-rongroi contributors
+date: 2026-09-17
+tags: [pca, timeline]

@@ -15,9 +15,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 | rules bundle | |
 |---|---|
-| รูปแบบ rule | 3 |
-| จำนวน rule | 22 |
-| SHA-256 | `6a2cab06d1db3383d699dd86f85916592a5b9b6787fdf038d701e1d19748dbee` |
+| รูปแบบ rule | 4 |
+| จำนวน rule | 31 |
+| SHA-256 | `a70841c0bf2f3054186a2851b4715057c7f2afe7613e0c4a38f89862561b3106` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -64,6 +64,22 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+- timeline selector
+  - `bam`
+    - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
+    - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
+  - `evtx`
+    - [record เก่าสุดและใหม่สุดของ event log ของ Windows](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
+  - `fivem_dir`
+    - [เวลาที่โฟลเดอร์ log, crash และ cache ของ FiveM ถูกเขียน](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
+  - `pca`
+    - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
+    - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `prefetch`
+    - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db) — `context` · `experimental`
+    - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
+  - `usn`
+    - [เวลาที่ change journal บันทึกการเปลี่ยนแปลงในโฟลเดอร์ที่เฝ้าดู](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
 
 ## collector `driver_service`
 
@@ -1064,3 +1080,318 @@ Windows ถูกตั้งค่าไม่ให้บังคับใช
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+## timeline selector
+
+timeline selector เขียนแบบเดียวกับ rule แต่ไม่สร้างหลักฐาน สิ่งที่เห็นที่มันเลือกจะเอาเวลาของตัวเองไปวางบน timeline ของรายงาน ทั้งโหมด Self และ SS พร้อมข้อความและเรื่องปกติด้านล่าง มันไม่เคยเป็น เจอ ไม่เจอ หรือ ยังไม่ได้วัด และไม่ถูกนับ (ADR 0051) timeline selector เลือกบันทึกของ Prefetch, BAM และ Program Compatibility Assistant ตามชื่อได้ ซึ่ง rule ทำไม่ได้ (ADR 0034) ชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน และทุกตัวเขียนบอกไว้
+
+### `bam` / `timeline`
+
+<a id="rule-bf213176-ed26-4c02-935e-99925abc7db7"></a>
+
+#### เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM
+
+- ชื่อภาษาอังกฤษ: When BAM recorded a program named like FiveM's game process
+- id: `bf213176-ed26-4c02-935e-99925abc7db7`
+- ไฟล์: [`rules/bam/timeline/fivem-game-process-by-name/rule.yaml`](../rules/bam/timeline/fivem-game-process-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `bam`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `bam`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Background Activity Moderator (BAM) ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM\_b\<ตัวเลข\>\_GTAProcess.exe ซึ่งเป็นชื่อที่ FiveM ตั้งให้ process เกมที่มันเปิด โดยตัวเลขคือ build ของเกม บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name|endswith`: ลงท้ายด้วย `_GTAProcess.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `name|startswith`: ขึ้นต้นด้วย `FiveM_b` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ BAM ยังเก็บอยู่ Windows ลบรายการ BAM ที่เก่ากว่าเจ็ดวันทุกครั้งที่เริ่มทำงาน การรันที่เก่ากว่านั้นจึงไม่มีรายการเหลือ
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ชื่อขึ้นต้นด้วย FiveM\_b และลงท้ายด้วย \_GTAProcess.exe — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อให้เป็นรูปนี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เก็บบันทึกไว้ — รายการ BAM ที่เก่ากว่าเจ็ดวันถูกลบทุกครั้งที่ Windows เริ่มทำงาน
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+<a id="rule-19dc7372-391e-4874-9c94-92ee6170f2df"></a>
+
+#### เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V
+
+- ชื่อภาษาอังกฤษ: When BAM recorded a program named like FiveM or GTA V
+- id: `19dc7372-391e-4874-9c94-92ee6170f2df`
+- ไฟล์: [`rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `bam`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `bam`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Background Activity Moderator (BAM) ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe หรือ PlayGTAV.exe ซึ่งเป็นชื่อไฟล์โปรแกรมของ FiveM และ GTA V บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name`: เป็นค่าใดค่าหนึ่งใน `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ BAM ยังเก็บอยู่ Windows ลบรายการ BAM ที่เก่ากว่าเจ็ดวันทุกครั้งที่เริ่มทำงาน การรันที่เก่ากว่านั้นจึงไม่มีรายการเหลือ
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ใช้ชื่อเหล่านี้ — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อเป็นชื่อเหล่านี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เก็บบันทึกไว้ — รายการ BAM ที่เก่ากว่าเจ็ดวันถูกลบทุกครั้งที่ Windows เริ่มทำงาน
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `evtx` / `timeline`
+
+<a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
+
+#### record เก่าสุดและใหม่สุดของ event log ของ Windows
+
+- ชื่อภาษาอังกฤษ: A Windows event log's oldest and newest record
+- id: `87b47713-1ed3-415e-bc07-9cd0b953d7c1`
+- ไฟล์: [`rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml`](../rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `evtx`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า record เก่าสุดและใหม่สุดที่ไฟล์ event log แต่ละไฟล์ยังเก็บไว้มีเวลาเท่าไร ช่วงระหว่างสองเวลานี้คือสิ่งที่ log นั้นแสดงได้ เวลาที่อยู่นอกช่วงนี้เป็นเวลาที่ log ไม่ได้บอกอะไรเลย ช่วงที่สั้นไม่ใช่หลักฐานว่ามีการล้าง log
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `oldest_record_time|exists`: มีฟิลด์นี้
+
+**ย้อนดูได้**
+
+ไฟล์ log ตามที่เป็นอยู่ตอนสแกน log แต่ละตัวมีขนาดจำกัดและเขียนทับ record เก่าสุดเมื่อเต็ม
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- log ที่เต็มขนาดที่ตั้งไว้แล้วเขียนทับ record เก่าสุด ซึ่ง log ที่มีการเขียนบ่อยเป็นแบบนี้ได้ภายในไม่กี่วัน
+- ติดตั้ง Windows ใหม่ หรือรีเซ็ตเครื่อง
+- log ที่ถูกล้างโดยผู้ดูแลระบบ ตัวติดตั้งโปรแกรม หรือเครื่องมือบำรุงรักษา
+
+### `fivem_dir` / `timeline`
+
+<a id="rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"></a>
+
+#### เวลาที่โฟลเดอร์ log, crash และ cache ของ FiveM ถูกเขียน
+
+- ชื่อภาษาอังกฤษ: When FiveM's log, crash and cache folders were written
+- id: `2ef0da16-e65e-4bb6-90c5-0898ffc93ad8`
+- ไฟล์: [`rules/fivem_dir/timeline/folder-activity-times/rule.yaml`](../rules/fivem_dir/timeline/folder-activity-times/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `fivem_dir`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `fivem_dir`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าโฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced รายงานเวลาอะไรไว้บ้าง ได้แก่ เวลาที่แต่ละโฟลเดอร์ถูกสร้างและแก้ไขล่าสุด เวลาของไฟล์ที่เก่าสุดกับใหม่สุดในโฟลเดอร์ และเวลาที่โฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced ถูกสร้างและแก้ไขล่าสุด เวลาเหล่านี้เป็นเวลาที่ระบบไฟล์รายงาน ซึ่งโปรแกรมที่เขียนไฟล์ตั้งเองได้ โฟลเดอร์ cache ของเซิร์ฟเวอร์แสดงโดยไม่มีชื่อ ข้อนี้ไม่ใช่หลักฐานของสิ่งใด
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `location`: เป็นค่าใดค่าหนึ่งใน `legacy_logs`, `legacy_crashes`, `legacy_cache`, `legacy_server_cache`, `enhanced_logs`, `enhanced_crashes`, `enhanced_launcher_crashes`, `enhanced_server_cache` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+โฟลเดอร์ตามที่เป็นอยู่ตอนสแกน FiveM เขียน หมุนเวียน และลบ log, รายงาน crash และ cache ของตัวเอง และผู้เล่นล้างเองได้
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- FiveM เขียน หมุนเวียน และลบ log, รายงาน crash และ cache ของตัวเองตามการใช้งานปกติ
+- ผู้เล่นล้าง cache หรือ log ของ FiveM เอง
+- ติดตั้ง FiveM ใหม่ ย้ายไปเครื่องอื่น หรือกู้คืนจากข้อมูลสำรอง
+- โปรแกรมสำรองข้อมูล ซิงก์ หรือคัดลอกไฟล์ที่ตั้งเวลาของไฟล์
+
+### `pca` / `timeline`
+
+<a id="rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5"></a>
+
+#### เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM
+
+- ชื่อภาษาอังกฤษ: When Program Compatibility Assistant recorded a program named like FiveM's game process
+- id: `eaf79187-e067-43ed-9afe-bffe65e6b2e5`
+- ไฟล์: [`rules/pca/timeline/fivem-game-process-by-name/rule.yaml`](../rules/pca/timeline/fivem-game-process-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `pca`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pca`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Program Compatibility Assistant ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM\_b\<ตัวเลข\>\_GTAProcess.exe ซึ่งเป็นชื่อที่ FiveM ตั้งให้ process เกมที่มันเปิด โดยตัวเลขคือ build ของเกม บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name|endswith`: ลงท้ายด้วย `_GTAProcess.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `name|startswith`: ขึ้นต้นด้วย `FiveM_b` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ไฟล์ของ Program Compatibility Assistant ยังเก็บอยู่ Windows มีไฟล์เหล่านี้ตั้งแต่ Windows 11 22H2 ขึ้นไป
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ชื่อขึ้นต้นด้วย FiveM\_b และลงท้ายด้วย \_GTAProcess.exe — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อให้เป็นรูปนี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนบันทึก — ไฟล์เหล่านี้มีเฉพาะใน Windows 11 22H2 ขึ้นไป
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+<a id="rule-6487719d-15cf-422c-8b8a-858647091fd1"></a>
+
+#### เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V
+
+- ชื่อภาษาอังกฤษ: When Program Compatibility Assistant recorded a program named like FiveM or GTA V
+- id: `6487719d-15cf-422c-8b8a-858647091fd1`
+- ไฟล์: [`rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `pca`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pca`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Program Compatibility Assistant ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe หรือ PlayGTAV.exe ซึ่งเป็นชื่อไฟล์โปรแกรมของ FiveM และ GTA V บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name`: เป็นค่าใดค่าหนึ่งใน `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ไฟล์ของ Program Compatibility Assistant ยังเก็บอยู่ Windows มีไฟล์เหล่านี้ตั้งแต่ Windows 11 22H2 ขึ้นไป
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ใช้ชื่อเหล่านี้ — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อเป็นชื่อเหล่านี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนบันทึก — ไฟล์เหล่านี้มีเฉพาะใน Windows 11 22H2 ขึ้นไป
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `prefetch` / `timeline`
+
+<a id="rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db"></a>
+
+#### เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM
+
+- ชื่อภาษาอังกฤษ: When Prefetch recorded a program named like FiveM's game process
+- id: `d377e008-0a08-4d6e-adf2-f6cbc8b978db`
+- ไฟล์: [`rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `prefetch`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `prefetch`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Prefetch ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM\_b\<ตัวเลข\>\_GTAProcess.exe ซึ่งเป็นชื่อที่ FiveM ตั้งให้ process เกมที่มันเปิด โดยตัวเลขคือ build ของเกม บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name|endswith`: ลงท้ายด้วย `_GTAProcess.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `name|startswith`: ขึ้นต้นด้วย `FiveM_b` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะไฟล์ Prefetch ที่ยังอยู่ในโฟลเดอร์ และเฉพาะเวลารันล่าสุดที่แต่ละไฟล์บันทึกไว้ Windows ลบไฟล์ Prefetch เองได้ และเครื่องที่ปิด Prefetch จะไม่มีไฟล์เลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ชื่อขึ้นต้นด้วย FiveM\_b และลงท้ายด้วย \_GTAProcess.exe — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อให้เป็นรูปนี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนหรือไม่ได้เก็บบันทึกไว้ — ปิด Prefetch อยู่ Windows ลบไฟล์ Prefetch ไปแล้ว หรือโปรแกรมทำความสะอาดล้างโฟลเดอร์
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+<a id="rule-a81a1693-2982-4004-8f40-186c2b90a6a2"></a>
+
+#### เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V
+
+- ชื่อภาษาอังกฤษ: When Prefetch recorded a program named like FiveM or GTA V
+- id: `a81a1693-2982-4004-8f40-186c2b90a6a2`
+- ไฟล์: [`rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `prefetch`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `prefetch`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Prefetch ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe หรือ PlayGTAV.exe ซึ่งเป็นชื่อไฟล์โปรแกรมของ FiveM และ GTA V บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name`: เป็นค่าใดค่าหนึ่งใน `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะไฟล์ Prefetch ที่ยังอยู่ในโฟลเดอร์ และเฉพาะเวลารันล่าสุดที่แต่ละไฟล์บันทึกไว้ Windows ลบไฟล์ Prefetch เองได้ และเครื่องที่ปิด Prefetch จะไม่มีไฟล์เลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ใช้ชื่อเหล่านี้ — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อเป็นชื่อเหล่านี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนหรือไม่ได้เก็บบันทึกไว้ — ปิด Prefetch อยู่ Windows ลบไฟล์ Prefetch ไปแล้ว หรือโปรแกรมทำความสะอาดล้างโฟลเดอร์
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `usn` / `timeline`
+
+<a id="rule-82c71896-ef70-492d-b6fc-8671c09b5e1c"></a>
+
+#### เวลาที่ change journal บันทึกการเปลี่ยนแปลงในโฟลเดอร์ที่เฝ้าดู
+
+- ชื่อภาษาอังกฤษ: When the change journal recorded changes in a watched folder
+- id: `82c71896-ef70-492d-b6fc-8671c09b5e1c`
+- ไฟล์: [`rules/usn/timeline/watched-folder-record-times/rule.yaml`](../rules/usn/timeline/watched-folder-record-times/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `usn`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าการเปลี่ยนแปลงที่เก่าสุดและใหม่สุดที่ NTFS change journal ยังเก็บไว้ของแต่ละโฟลเดอร์ที่โปรแกรมนี้เฝ้าดู (Prefetch, โฟลเดอร์ event log, โฟลเดอร์ Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM) เกิดขึ้นเมื่อไร journal นับการเปลี่ยนแปลงโดยไม่บอกว่าโปรแกรมไหนเป็นคนทำ เวลาในข้อนี้จึงเป็นเวลาที่มีไฟล์ในโฟลเดอร์นั้นถูกสร้าง แก้ไข เปลี่ยนชื่อ หรือลบ โดยใครก็ได้ รวมถึง Windows และ FiveM ข้อนี้ไม่ใช่หลักฐานว่ามีการลบสิ่งใด
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะ record ที่ journal ยังเก็บอยู่ journal มีขนาดจำกัดและทิ้ง record เก่าสุดเมื่อมี record ใหม่ จึงย้อนหลังได้เท่าที่ขนาดของมันเก็บไหว
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- Windows เขียนและลบไฟล์ Prefetch, event log และบันทึกความเข้ากันได้ตามการใช้งานปกติ
+- FiveM ตัวอัปเดตของมัน และ plugin ที่ผู้เล่นติดตั้งหรือถอดออก เปลี่ยนไฟล์ในโฟลเดอร์ plugin
+- โปรแกรมทำความสะอาดดิสก์ สำรองข้อมูล แอนตี้ไวรัส และโปรแกรมปรับแต่งเครื่อง
+- โฟลเดอร์ที่ไม่มีการเปลี่ยนแปลงในช่วงที่ journal ครอบคลุมจะไม่มีเวลาในข้อนี้ ซึ่งไม่ได้แปลว่าก่อนหน้านั้นไม่มีอะไรเปลี่ยน

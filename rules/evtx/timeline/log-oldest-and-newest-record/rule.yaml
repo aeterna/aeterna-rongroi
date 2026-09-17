@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 87b47713-1ed3-415e-bc07-9cd0b953d7c1
+title: A Windows event log's oldest and newest record
+description: >-
+  Puts on the timeline the time of the oldest and the newest record each Windows event log file
+  still holds. The span between them is what that log can show; a time outside it is one the log
+  says nothing about. A short span is not evidence that a log was cleared.
+status: test
+# A timeline selector (ADR 0051). The same two times are also the log's coverage band.
+role: timeline
+collector: evtx
+strength: context
+match:
+  oldest_record_time|exists: true
+retention: >-
+  The log files as they are at the moment of the scan. Each log has a size limit and overwrites its
+  oldest records when it is full.
+falsepositives:
+  - A log that reached its size limit and overwrote its oldest records, which busy logs do within days
+  - A new Windows installation, or a reset
+  - A log cleared by an administrator, by an installer or by a maintenance tool
+author: aeterna-rongroi contributors
+date: 2026-09-17
+tags: [evtx, timeline]

@@ -94,6 +94,49 @@ export interface ListedCounts {
   unmeasured: number;
 }
 
+/** Where a timeline entry came from (ADR 0051). */
+export type EntrySource =
+  | { kind: "anchor" }
+  | { kind: "evidence"; rule_id: string }
+  | { kind: "selector"; selector_id: string }
+  | { kind: "observation" };
+
+/** One time value on the timeline. `collector` is null for the scan's own times. */
+export interface TimelineEntry {
+  at: string;
+  collector: string | null;
+  field: string;
+  place: string | null;
+  source: EntrySource;
+  subject: string | null;
+}
+
+/** The span one source could see. "Nothing recorded" can be read only inside it. */
+export interface CoverageBand {
+  collector: string;
+  place: string | null;
+  subject: string | null;
+  from: string;
+  to: string;
+}
+
+/** A source of times, or one place of it, that could not be read. */
+export interface UnmeasuredSource {
+  collector: string;
+  place?: string;
+  reason: UnmeasuredReason;
+}
+
+/**
+ * The times a view may show, oldest first, with the spans that bound them (ADR 0051). Nothing is
+ * computed from the entries: no gap, no count, no summary. Built in Rust for each mode.
+ */
+export interface Timeline {
+  entries: TimelineEntry[];
+  bands: CoverageBand[];
+  unmeasured: UnmeasuredSource[];
+}
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
@@ -109,6 +152,9 @@ export interface ReportView {
    */
   scope: { not_admin: number; not_attempted: number };
   listed: ListedCounts;
+  timeline: Timeline;
+  /** The order collector groups appear in, from the core (ADR 0051). */
+  collector_order: string[];
   hidden: {
     not_found: number;
     unmeasured_expected: number;

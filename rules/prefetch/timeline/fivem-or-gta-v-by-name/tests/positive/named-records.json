@@ -1,0 +1,30 @@
+{
+  "description": "Records whose names this selector lists",
+  "observations": [
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "FIVEM.EXE",
+        "path": "C:\\Windows\\Prefetch\\FIVEM.EXE-1A2B3C4D.pf",
+        "last_run": "2026-09-15T18:02:11Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    },
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "GTA5_Enhanced.exe",
+        "path": "C:\\Windows\\Prefetch\\GTA5_Enhanced.exe-1A2B3C4D.pf",
+        "last_run": "2026-09-15T18:03:40Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    }
+  ],
+  "expect_matches": 2
+}

@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use clap::ValueEnum;
 use rongroi_core::bundle::Bundle;
 use rongroi_core::model::{BootTime, EvidenceState, Mode, Observation, UnmeasuredReason};
-use rongroi_core::view::ReportView;
+use rongroi_core::view::{EntrySource, ReportView, Timeline};
 
 /// Output language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -149,6 +149,42 @@ fn text_elevate(lang: Lang, key: &str) -> &'static str {
         (Lang::En, "pause_at_exit") => "Press Enter to close this window.",
         (Lang::Th, "pause_at_exit") => "กด Enter เพื่อปิดหน้าต่างนี้",
         (Lang::Th, "elevate_not_windows") => "สิทธิ์ผู้ดูแลระบบเป็นเรื่องของ Windows --elevate ไม่มีผลบนระบบนี้",
+        _ => text_timeline(lang, key),
+    }
+}
+
+/// Text for the timeline section (ADR 0051).
+fn text_timeline(lang: Lang, key: &str) -> &'static str {
+    match (lang, key) {
+        // The same word in both languages, as the Thai text uses it.
+        (_, "timeline") => "timeline",
+        // What the section never says, said above it (ADR 0051 decision 6).
+        (Lang::En, "timeline_note") => {
+            "the times this report holds, oldest first. An order of recorded times is not an order of \
+             events, and a record that is absent was not necessarily removed. A time a folder listing \
+             reports is what the file system says, which the program that wrote the file can set."
+        }
+        (Lang::Th, "timeline_note") => {
+            "เวลาที่รายงานนี้มี เรียงจากเก่าไปใหม่ ลำดับของเวลาที่ถูกบันทึกไม่ใช่ลำดับของเหตุการณ์ \
+             และบันทึกที่ไม่มีอยู่ไม่ได้แปลว่าถูกลบ เวลาที่ได้จากการอ่านรายชื่อไฟล์ในโฟลเดอร์เป็นเวลาที่ระบบไฟล์รายงาน \
+             ซึ่งโปรแกรมที่เขียนไฟล์ตั้งเองได้"
+        }
+        (Lang::En, "coverage") => "can show",
+        (Lang::Th, "coverage") => "ครอบคลุมช่วง",
+        (Lang::En, "coverage_note") => {
+            "nothing can be read from a source outside the span it can show"
+        }
+        (Lang::Th, "coverage_note") => "นอกช่วงที่แหล่งหนึ่งครอบคลุม แหล่งนั้นไม่ได้บอกอะไรเลย",
+        (Lang::En, "not_measured") => "not measured",
+        (Lang::Th, "not_measured") => "ยังไม่ได้วัด",
+        (Lang::En, "scan_time") => "this scan ran",
+        (Lang::Th, "scan_time") => "เวลาที่สแกน",
+        (Lang::En, "boot_anchor") => "Windows started",
+        (Lang::Th, "boot_anchor") => "Windows เริ่มทำงานครั้งล่าสุด",
+        (Lang::En, "selectors") => "What the selected times mean",
+        (Lang::Th, "selectors") => "ความหมายของเวลาที่ถูกเลือกมาแสดง",
+        (Lang::En, "selector_causes") => "Ordinary things behind these times",
+        (Lang::Th, "selector_causes") => "เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้",
         _ => "",
     }
 }
@@ -221,7 +257,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows only what matches a rule. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; and the oldest and newest change the journal holds for each folder above. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
@@ -236,7 +272,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงเฉพาะสิ่งที่ตรง rule โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
@@ -338,6 +374,8 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     out.push('\n');
 
     out.push_str(&evidence_section(view, bundle, lang));
+
+    out.push_str(&timeline_section(&view.timeline, bundle, lang));
 
     // Both sections come after the evidence and clearly apart from it, in this order.
     out.push_str(&own_traces_section(view, lang));
@@ -477,6 +515,101 @@ fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     out
 }
 
+/// The timeline: its note, the spans the sources could show, what could not be read, the times, and
+/// the text of every timeline selector that put a time there (ADR 0051).
+fn timeline_section(timeline: &Timeline, bundle: &Bundle, lang: Lang) -> String {
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "\n{} — {}",
+        text(lang, "timeline"),
+        text(lang, "timeline_note")
+    );
+    if !timeline.bands.is_empty() {
+        let _ = writeln!(out, "    {}", text(lang, "coverage_note"));
+    }
+    for band in &timeline.bands {
+        let _ = writeln!(
+            out,
+            "    [{}{}] {}: {} .. {}",
+            band.collector,
+            where_(band.place.as_deref(), band.subject.as_deref()),
+            text(lang, "coverage"),
+            band.from,
+            band.to
+        );
+    }
+    for source in &timeline.unmeasured {
+        let place = source
+            .place
+            .as_deref()
+            .map(|place| format!(" {place}"))
+            .unwrap_or_default();
+        let _ = writeln!(
+            out,
+            "    [{}{place}] {}: {}",
+            source.collector,
+            text(lang, "not_measured"),
+            reason(lang, source.reason)
+        );
+    }
+    let title = |id: &str| {
+        bundle
+            .text(id, lang.code())
+            .map_or_else(|| id.to_owned(), |text| text.title)
+    };
+    let mut selectors: Vec<&str> = Vec::new();
+    for entry in &timeline.entries {
+        let what = match (&entry.source, entry.field.as_str()) {
+            (EntrySource::Anchor, "generated_at") => text(lang, "scan_time").to_owned(),
+            (EntrySource::Anchor, _) => text(lang, "boot_anchor").to_owned(),
+            (source, field) => {
+                let from = match source {
+                    EntrySource::Evidence { rule_id } => format!(" ({})", title(rule_id)),
+                    EntrySource::Selector { selector_id } => {
+                        if !selectors.contains(&selector_id.as_str()) {
+                            selectors.push(selector_id);
+                        }
+                        format!(" ({})", title(selector_id))
+                    }
+                    EntrySource::Anchor | EntrySource::Observation => String::new(),
+                };
+                format!(
+                    "[{}{}] {field}{from}",
+                    entry.collector.as_deref().unwrap_or_default(),
+                    where_(entry.place.as_deref(), entry.subject.as_deref()),
+                )
+            }
+        };
+        let _ = writeln!(out, "    {}  {what}", entry.at);
+    }
+    // Each selector's meaning and ordinary causes once, rather than beside each of its times.
+    if !selectors.is_empty() {
+        let _ = writeln!(out, "    {}:", text(lang, "selectors"));
+    }
+    for id in selectors {
+        let Some(selector) = bundle.text(id, lang.code()) else {
+            continue;
+        };
+        let _ = writeln!(out, "    - {}: {}", selector.title, selector.description);
+        let _ = writeln!(out, "      {}:", text(lang, "selector_causes"));
+        for cause in &selector.falsepositives {
+            let _ = writeln!(out, "        - {cause}");
+        }
+    }
+    out
+}
+
+/// ` place subject`, leaving out what is not there.
+fn where_(place: Option<&str>, subject: Option<&str>) -> String {
+    let mut out = String::new();
+    for part in [place, subject].into_iter().flatten() {
+        out.push(' ');
+        out.push_str(part);
+    }
+    out
+}
+
 /// One observation as `field=value, field=value`, the way both trailing sections list it.
 fn fields_of(observation: &Observation) -> String {
     observation
@@ -606,9 +739,82 @@ mod tests {
                 evidence: vec![evidence],
                 own_traces: Vec::new(),
                 unmatched: Vec::new(),
+                timeline_selections: Vec::new(),
+                timestamp_fields: std::collections::BTreeMap::new(),
+                discriminators: std::collections::BTreeMap::new(),
+                coverage_fields: std::collections::BTreeMap::new(),
+                unmeasured_sources: Vec::new(),
             },
             bundle,
         )
+    }
+
+    /// ADR 0051: the timeline says what it does not show above its times, and names the scan's own.
+    #[test]
+    fn the_timeline_is_a_section_with_its_note_and_the_scan_time() {
+        let (report, bundle) = report(true);
+        for (lang, note) in [
+            (Lang::En, "not an order of events"),
+            (Lang::Th, "ไม่ใช่ลำดับของเหตุการณ์"),
+        ] {
+            let text = render(&view::for_mode(&report, Mode::Ss), &bundle, lang);
+            assert!(text.contains(note), "{text}");
+            assert!(
+                text.contains(&format!(
+                    "    {}  {}",
+                    report.header.generated_at,
+                    text_timeline(lang, "scan_time")
+                )),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_timeline_entry_names_its_place_subject_field_and_selector() {
+        let (_, bundle) = report(true);
+        let selector = bundle
+            .rules()
+            .iter()
+            .find(|sourced| sourced.rule.is_timeline_selector())
+            .expect("the bundle ships a timeline selector");
+        let timeline = Timeline {
+            entries: vec![rongroi_core::view::TimelineEntry {
+                at: "2026-09-15T18:02:11Z".to_owned(),
+                collector: Some("prefetch".to_owned()),
+                field: "last_run".to_owned(),
+                place: None,
+                source: EntrySource::Selector {
+                    selector_id: selector.rule.id.clone(),
+                },
+                subject: Some("FIVEM.EXE".to_owned()),
+            }],
+            bands: Vec::new(),
+            unmeasured: vec![rongroi_core::model::UnmeasuredSource {
+                collector: "usn".to_owned(),
+                place: None,
+                reason: UnmeasuredReason::NotAdmin,
+            }],
+        };
+        let text = timeline_section(&timeline, &bundle, Lang::En);
+        assert!(
+            text.contains(&format!(
+                "    2026-09-15T18:02:11Z  [prefetch FIVEM.EXE] last_run ({})",
+                selector.rule.title
+            )),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "[usn] not measured: Windows would not show this without administrator rights"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("Ordinary things behind these times"),
+            "{text}"
+        );
+        assert!(text.contains(&selector.rule.falsepositives[0]), "{text}");
     }
 
     #[test]
@@ -640,7 +846,13 @@ mod tests {
                 "{text}"
             );
             assert!(lines[0].contains("Fast Startup"), "{text}");
-            assert!(!below.contains("Windows start"), "{text}");
+            // The line is not repeated. The timeline carries the same time as an anchor, in its own
+            // words, among the other times (ADR 0051).
+            assert!(!below.contains("Windows start:"), "{text}");
+            assert!(
+                below.contains("2025-12-28T21:56:56Z  Windows started"),
+                "{text}"
+            );
 
             let thai = render(&view::for_mode(&report, mode), &bundle, Lang::Th);
             assert!(
@@ -756,6 +968,19 @@ mod tests {
                 ],
             ),
         ];
+        // ADR 0051 decision 2: the consent names the programs whose times the timeline shows, not a
+        // description of them.
+        let timeline = [
+            "timeline",
+            "FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe",
+            "_GTAProcess.exe",
+        ];
+        for lang in [Lang::En, Lang::Th] {
+            let question = consent(lang);
+            for words in timeline {
+                assert!(question.contains(words), "{words} missing from {question}");
+            }
+        }
         for (lang, process_words, boot_time_words, later_reads) in running {
             let question = consent(lang);
             assert!(question.contains(process_words), "{question}");

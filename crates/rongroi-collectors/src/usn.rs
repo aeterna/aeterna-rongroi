@@ -39,7 +39,7 @@ use rongroi_host::{FileId, Host, Platform, UsnReadEnd};
 use rongroi_parsers::usn::{self, ParentReference, UsnRecord};
 
 use crate::failure::reason_for;
-use crate::{Collector, Field, evtx, fivem_dir, pca, prefetch};
+use crate::{Collector, Coverage, Field, evtx, fivem_dir, pca, prefetch};
 
 const ID: &str = "usn";
 /// The field that says which place an observation is about (ADR 0044): a watched folder, or the journal.
@@ -168,6 +168,16 @@ impl Collector for Usn {
 
     fn discriminator(&self) -> Option<&'static str> {
         Some(DISCRIMINATOR)
+    }
+
+    /// The journal's own oldest and newest record (ADR 0051). The watched folders carry the same two
+    /// fields about their own records, which is activity rather than what the journal could see.
+    fn coverage(&self) -> Option<Coverage> {
+        Some(Coverage {
+            from: "first_seen",
+            to: "last_seen",
+            place: Some(JOURNAL_LOCATION),
+        })
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {

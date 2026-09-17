@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: a81a1693-2982-4004-8f40-186c2b90a6a2
+title: When Prefetch recorded a program named like FiveM or GTA V
+description: >-
+  Puts on the timeline the time Windows' Prefetch recorded for a program named FiveM.exe, GTA5.exe,
+  GTA5_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their executables. The record
+  holds a name, not which program it was, so this shows when a program of that name ran according to
+  this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does
+  not mean the game never ran.
+status: experimental
+# A timeline selector (ADR 0051): it makes no evidence and selects by name, which ADR 0034 forbids a rule.
+role: timeline
+collector: prefetch
+strength: context
+match:
+  name: [FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe]
+retention: >-
+  Only the Prefetch files still in the folder, and only the most recent run each one records.
+  Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+falsepositives:
+  - Any program of one of these names — the record holds a name and nothing that identifies the
+    program, so a program renamed to one of them is recorded under it
+  - A program of another name is not selected, whatever it is, so an absent entry does not mean that
+    nothing ran
+  - Windows not writing or not keeping a record — Prefetch switched off, a Prefetch file Windows
+    removed, or a folder emptied by a clean-up tool
+  - Windows keeping the record after the program's files were removed
+author: aeterna-rongroi contributors
+date: 2026-09-17
+tags: [prefetch, timeline]

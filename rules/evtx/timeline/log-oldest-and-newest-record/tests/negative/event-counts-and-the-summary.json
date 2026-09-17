@@ -1,0 +1,30 @@
+{
+  "description": "An event count and the folder summary, which carry no record span",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "System.evtx",
+        "channel": "System",
+        "provider": "Microsoft-Windows-Kernel-General",
+        "event_id": 12,
+        "level": 4,
+        "count": 31,
+        "first_seen": "2026-03-02T11:04:51.109Z",
+        "last_seen": "2026-09-11T22:19:03.774Z"
+      }
+    },
+    {
+      "collector": "evtx",
+      "fields": {
+        "logs": 214,
+        "examined": 214,
+        "refused": 0,
+        "logs_without_records": 171,
+        "channels": 43,
+        "budget_exhausted": false,
+        "budget_seconds": 30
+      }
+    }
+  ]
+}

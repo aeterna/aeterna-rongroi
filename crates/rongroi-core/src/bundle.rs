@@ -22,7 +22,7 @@ pub struct BundleInfo {
     pub schema_version: u32,
     /// SHA-256 of the raw bundle.
     pub sha256: String,
-    /// Number of rules in the bundle, including deprecated ones.
+    /// Number of rule files in the bundle, deprecated ones and timeline selectors (ADR 0051) included.
     pub rule_count: usize,
 }
 

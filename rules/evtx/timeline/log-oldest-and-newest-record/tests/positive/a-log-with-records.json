@@ -1,0 +1,23 @@
+{
+  "description": "One log file's own observation",
+  "observations": [
+    {
+      "collector": "evtx",
+      "fields": {
+        "log": "System.evtx",
+        "path": "C:\\Windows\\System32\\winevt\\Logs\\System.evtx",
+        "read_only": false,
+        "entries": 4417,
+        "rejected": 0,
+        "intact": true,
+        "size_bytes": 20975616,
+        "max_size_bytes": 20971520,
+        "oldest_record_id": 1,
+        "newest_record_id": 4417,
+        "oldest_record_time": "2026-03-02T11:04:51.109Z",
+        "newest_record_time": "2026-09-11T22:19:03.774Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

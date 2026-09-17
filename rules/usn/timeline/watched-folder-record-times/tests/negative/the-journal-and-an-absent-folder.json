@@ -1,0 +1,25 @@
+{
+  "description": "The journal's own observation, which is its coverage band, and a folder that is not there",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "journal",
+        "records": 80412,
+        "records_version_2": 0,
+        "records_version_3": 80412,
+        "trimmed": true,
+        "maximum_size": 33554432,
+        "first_seen": "2026-09-09T02:11:00Z",
+        "last_seen": "2026-09-16T21:20:00Z"
+      }
+    },
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "enhanced_asi",
+        "folder": "absent"
+      }
+    }
+  ]
+}

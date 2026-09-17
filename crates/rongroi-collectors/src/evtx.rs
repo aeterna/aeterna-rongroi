@@ -81,7 +81,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{self, EvtxFile, EvtxRecord};
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Collector, Field};
+use crate::{Collector, Coverage, Field};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -256,6 +256,15 @@ impl Collector for Evtx {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    /// Each log's oldest and newest record (ADR 0051): the span that log could show.
+    fn coverage(&self) -> Option<Coverage> {
+        Some(Coverage {
+            from: "oldest_record_time",
+            to: "newest_record_time",
+            place: None,
+        })
     }
 
     /// Lists `%SystemRoot%\System32\winevt\Logs` and reads every `.evtx` file in it, within

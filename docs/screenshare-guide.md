@@ -80,8 +80,8 @@ line.
 
 ## 4. Run SS mode
 
-SS mode is the screenshare view. It asks the player for consent first. It lists only what matched a
-rule, and it replaces the player's user folder in paths with `%USERPROFILE%`.
+SS mode is the screenshare view. It asks the player for consent first. It lists what matched a rule and
+a timeline of the times its consent screen names, and it replaces the player's user folder in paths with `%USERPROFILE%`.
 
 **Window version:** **Screenshare check (SS mode)** → read the consent screen → **I agree — show the
 SS view**. The window version scans when it starts, **before** its window opens, so the window cannot
@@ -251,13 +251,22 @@ that ran (Prefetch, BAM, the Program Compatibility Assistant), and the list of r
 so they are *unmatched observations*:
 
 - **Self mode** lists them, for the player.
-- **SS mode** shows only how many there were.
+- **SS mode** shows only how many there were, except on its timeline.
 
-This is deliberate. The consent screen promises "only what matches a rule". A list of every program
+This is deliberate. The consent screen promises what matches a rule, and a timeline it names. A list of every program
 someone ran would show staff what else is on that PC. Replacing the user name in the paths would not
 change that. [ADR 0034](adr/0034-prefetch-bam-and-pca-carry-no-identity.md) explains why there is no
 rule for them: these records name a program only by its file name or path, so renaming the file
 defeats such a rule, and it cannot tell a legitimate program with the same name apart.
+
+**The timeline** (ADR 0051) is the one exception, and the consent screen names it program by program:
+for programs named `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` or
+`FiveM_b<number>_GTAProcess.exe`, SS mode shows the time Windows recorded, with the name. It is not a
+row and not evidence. A name is all Windows keeps, so a time there says a program **of that name** ran
+then, not that the game did, and a missing time does not say the game never ran. The timeline also
+shows the times of FiveM's log, crash and cache folders, the span each Windows log and the change
+journal could see, and which of those could not be read. Read a time only inside its source's span, and
+never read the space between two times as something someone removed.
 
 Self mode is the player's view, and the player's consent covers SS mode. Asking to see Self mode is
 asking for something the player did not agree to.

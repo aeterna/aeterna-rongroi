@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
-import type { ReportHeader, ReportView, UnmeasuredReason } from "./types";
+import type { ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
 
 // Vitest runs with apps/desktop as the working directory.
 const SNAPSHOTS = resolve(process.cwd(), "../../crates/rongroi-collectors/tests/snapshots");
@@ -49,6 +49,8 @@ function subject(view: ReportView) {
 }
 let calls: string[] = [];
 let viewOverride: ReportView | null = null;
+/** Rule texts added to the mocked `rule_texts` answer, for tests that need a timeline selector's. */
+let extraTexts: Record<string, RuleText> = {};
 let headerOverride: ReportHeader | null = null;
 let linksOverride: { repository: string; code: string; commit: string | null } | null = null;
 // Carried fix (b): a `code_links` call that never resolves, so `links` stays `null` — the same shape
@@ -68,6 +70,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   calls = [];
   viewOverride = null;
+  extraTexts = {};
   headerOverride = null;
   linksOverride = null;
   linksNeverResolve = false;
@@ -83,6 +86,7 @@ beforeEach(async () => {
         return viewOverride ?? (payload.mode === "ss" ? ssView : selfView);
       case "rule_texts":
         return {
+          ...extraTexts,
           [RULE_ID]: {
             title: payload.lang === "th" ? "Secure Boot ถูกปิดอยู่" : "Secure Boot is turned off",
             description: payload.lang === "th" ? THAI_DESCRIPTION : ENGLISH_DESCRIPTION,
@@ -156,12 +160,75 @@ describe("App", () => {
     );
   });
 
+  // ADR 0051: the SS view shows its timeline, with what it never says above it, and the scan's own
+  // time as an anchor.
+  it("shows the timeline in SS mode with its note and the scan time", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(await screen.findByText("Timeline")).toBeTruthy();
+    expect(screen.getByText(/An order of recorded times is not an order of events/)).toBeTruthy();
+    expect(screen.getByText("This scan ran")).toBeTruthy();
+    expect(screen.getByText(ssView.header.generated_at)).toBeTruthy();
+  });
+
+  it("names the selector behind a selected time and its ordinary causes", async () => {
+    viewOverride = {
+      ...ssView,
+      timeline: {
+        entries: [
+          {
+            at: "2026-09-15T18:02:11Z",
+            collector: "prefetch",
+            field: "last_run",
+            place: null,
+            source: { kind: "selector", selector_id: "selector-id" },
+            subject: "FIVEM.EXE",
+          },
+        ],
+        bands: [],
+        unmeasured: [{ collector: "usn", reason: "not_admin" }],
+      },
+    };
+    extraTexts = {
+      "selector-id": {
+        title: "When Prefetch recorded a program named like FiveM or GTA V",
+        description: "Puts a time on the timeline.",
+        falsepositives: ["Any program of one of these names"],
+        retention: "Only the Prefetch files still in the folder.",
+        status: "experimental",
+        files: { rule: "r", fixtures: "f", collector: "c", references: [] },
+      },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(await screen.findByText(/Windows Prefetch · FIVEM\.EXE/)).toBeTruthy();
+    expect(
+      screen.getAllByText(/When Prefetch recorded a program named like FiveM or GTA V/).length,
+    ).toBe(2);
+    expect(screen.getByText("Any program of one of these names")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "NTFS change journal: not measured — Windows would not show this without administrator rights",
+      ),
+    ).toBeTruthy();
+  });
+
   it("shows nothing from the report when SS consent is refused", async () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
     expect(screen.getByText("You may refuse.")).toBeTruthy();
     // The scan ran before this screen, so consent has to say what it read, not only settings.
-    expect(screen.getByText(/Prefetch, BAM, Program Compatibility Assistant/)).toBeTruthy();
+    expect(
+      screen.getByText(/what Windows recorded about programs that ran \(Prefetch, BAM/),
+    ).toBeTruthy();
+    // ADR 0051: what the SS timeline shows is named, program by program.
+    expect(
+      screen.getByText(
+        /a timeline of: .*GTA5_Enhanced\.exe, PlayGTAV\.exe or FiveM_b<number>_GTAProcess\.exe/,
+      ),
+    ).toBeTruthy();
     // The boot time is not a collector, and staff see it at the top of the report (ADR 0039).
     expect(screen.getByText(/when Windows last started, which staff will see/)).toBeTruthy();
     expect(screen.getByText(/marked read-only/)).toBeTruthy();
@@ -449,6 +516,8 @@ describe("App", () => {
           expected: false,
         },
       ],
+      // The row is what this test reads; the timeline states its own unmeasured sources.
+      timeline: { ...selfView.timeline, unmeasured: [] },
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
