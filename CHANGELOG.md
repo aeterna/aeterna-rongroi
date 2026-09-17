@@ -89,12 +89,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   oldest and newest record, and FiveM's folder activity. The consent question and PRIVACY.md name what the
   SS timeline shows, program by program. The desktop groups rows in an order the core now decides. A rule
   on Prefetch, BAM or PCA that matches `name` or `path` is now refused when the bundle loads (ADR 0034).
-- Proposed (ADR 0052): two scan tiers. Sources that read more about the player — FiveM's logs, server
-  cache folder names, crash-dump module lists, profile counts — would be read only in a full scan, which the
-  player chooses before it starts: a question on the CLI, and a native Windows dialog in a fresh desktop copy
-  before any WebView exists. A standard scan reports those sources as `not_consented`, once, above the
-  evidence. Server identities and account identifiers stay hidden in SS mode unless the player agrees to
-  each.
+- Accepted (ADR 0052, 2026-09-17), not yet implemented: two scan tiers. Sources that read more about the
+  player — FiveM's logs, server cache folder names, crash-dump module lists, profile counts — would be read
+  only in a full scan, which the player chooses before it starts: a question on the CLI, and a native
+  Windows dialog in a fresh desktop copy before any WebView exists. A standard scan would report those
+  sources as `not_consented`, once, above the evidence. Server identities and account identifiers stay
+  hidden in SS mode unless the player agrees to each.
 - ADR 0052 records a Windows 11 measurement: under UAC's default settings, a process started with
   `CreateProcessW` from an elevated copy is elevated, and from a standard copy is standard, with no consent
   prompt in between. A desktop copy started for a full scan neither gains nor loses administrator rights.

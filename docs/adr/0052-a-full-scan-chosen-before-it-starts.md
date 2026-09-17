@@ -1,6 +1,6 @@
 # ADR 0052 — A full scan, chosen before it starts
 
-- Status: proposed
+- Status: accepted — the owner decided the four questions below on 2026-09-17; not implemented yet
 - Date: 2026-09-16
 
 ## Context
@@ -146,12 +146,19 @@ the child. A copy started this way neither gains nor loses administrator rights.
 - Whether a native dialog shown before a Tauri window exists is brought to the front on every Windows 11
   configuration.
 
-## Owner decisions this ADR needs
+## Owner decisions (2026-09-17)
 
-1. The native pre-scan dialog in the desktop copy (section 3), rather than trusting the flag.
+1. The desktop copy asks in a native pre-scan dialog (section 3); the flag alone is never trusted.
 2. No bypass for scripts (section 3).
-3. The two sensitive kinds and their default of hidden in SS mode (section 4).
-4. The initial assignments (section 6).
+3. Server identities and account identifiers are hidden in SS mode unless the player turns each on
+   (section 4).
+4. The initial assignments of section 6 stand. The first two rows shipped as `standard` with ADR 0053.
+   The crash-dump row needs a range read of a file larger than ADR 0019's 64 MiB limit, which is an ADR of
+   its own before that collector.
+
+The tier is implemented together with its first `full` collector — an Enhanced server cache folder's name,
+or the endpoints in FiveM's logs — because until one exists it changes nothing a player sees. The two
+unverified points above about the relaunch and the dialog are measured on a real Windows PC then.
 
 ## Consequences
 
