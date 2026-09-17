@@ -3,7 +3,7 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, the list of running processes, the drivers
+FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders, the list of running processes, the drivers
 registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, and counts of the Windows drive's change journal records, for the drive as a whole and
@@ -21,6 +21,14 @@ It reads the same four things of `FiveM.exe` in the program folder of each FiveM
 report can say whether FiveM's own program carries the signature FiveM was measured with (ADR 0036). To
 find that one file it lists the names in the program folder; **no other file there is reported**, and
 nothing is read from inside it but what the hash and the signature check consume.
+
+Of FiveM's **log, crash and cache folders** in both editions it reads only what listing each folder
+gives: how many files and subfolders it holds, the files' total size, the earliest and latest creation and
+last-write times among them, and the folder's own times (ADR 0053). Of each folder FiveM for GTA V Enhanced
+keeps per server, it reads when it was created and last changed and how many entries it holds. **It reads
+no file name and no folder name there**, and opens no file: a log's or a crash dump's name can carry a date,
+and a server folder's name identifies the server. The times are what Windows recorded, which programs set as
+they copy and extract files; they are specific enough to match two reports of the same PC (ADR 0050).
 
 **Since ADR 0036 rules read these files, so SS mode shows them.** Each file in a plugin folder, and
 `FiveM.exe` when its signature is not the expected one, matches a rule and is shown to the person
@@ -204,7 +212,7 @@ tool did, not more. Paths in it are redacted in SS mode like any other.
 ### What a collector saw that no rule matched
 
 Some collectors read things no rule asks about — the list of programs you are running, the drivers
-registered with Windows, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, and how many records the
+registered with Windows, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
 Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
 can read what the tool saw and judge it yourself.
 

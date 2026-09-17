@@ -230,6 +230,55 @@ expression: view
             "folder": "absent",
             "location": "enhanced_asi"
           }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "legacy_logs"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "legacy_crashes"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "legacy_cache"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_logs"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_crashes"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_launcher_crashes"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_server_cache"
+          }
         }
       ]
     },

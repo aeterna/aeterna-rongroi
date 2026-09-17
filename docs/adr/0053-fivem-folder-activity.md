@@ -1,6 +1,6 @@
 # ADR 0053 — When FiveM's own folders last changed
 
-- Status: proposed
+- Status: accepted — the owner asked for the implementation on 2026-09-17
 - Date: 2026-09-17
 
 ## Context
@@ -152,3 +152,17 @@ file name. They also say that these times can match two reports of the same PC (
 - Consent text (CLI and desktop), `PRIVACY.md`, `docs/architecture.md`'s collector row and the glossary
   change with the code.
 - Report snapshots change: Self mode lists the new observations, SS mode's unmatched count grows.
+
+## Implementation (2026-09-17)
+
+- `fivem_dir`: the eight places, `Reads::FolderActivity` and `Reads::FolderActivityAndServers`, and the
+  eleven fields as decided. A launch-mode cache that is not there is not reported; every other new place
+  that is not there is `folder: absent`, as a plugin folder is. A server folder that cannot be listed keeps
+  its times and carries no `entries`; it is not a gap. Server folders are ordered by their times.
+- A folder's own times come from listing its parent. When that listing fails, the two fields are left out;
+  the folder itself was read, so that is not a gap either.
+- Fixture hosts `fivem-dir-folder-activity` and `fivem-dir-folder-activity-denied`; the report snapshots of
+  `fivem-dir-plugin-present` gain seven `absent` observations in Self mode, and SS mode's unmatched count
+  goes from 3 to 10.
+- The consent question (CLI and desktop, both languages), `PRIVACY.md`, `docs/architecture.md` and the
+  glossary name the new reads.
