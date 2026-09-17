@@ -14,10 +14,11 @@ publish.workspace = true
 
 [features]
 # FixtureHost: a fake machine described in YAML, for tests.
-fixture = ["dep:serde", "dep:serde-saphyr", "dep:jiff"]
+fixture = ["dep:serde", "dep:serde-saphyr"]
 
 [dependencies]
-jiff = { workspace = true, optional = true }
+# jiff: the listing's creation and last-write times are timestamps on `DirEntryInfo` (ADR 0050).
+jiff.workspace = true
 serde = { workspace = true, optional = true }
 serde-saphyr = { workspace = true, optional = true }
 sha2.workspace = true

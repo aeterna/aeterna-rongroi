@@ -137,14 +137,55 @@ pub trait RegistrySource {
     fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError>;
 }
 
-/// One entry directly inside a directory. Only what collectors need: nothing about times, size or ACLs
-/// is read (ADR 0009).
+/// One entry directly inside a directory, with what the listing itself holds about it (ADR 0009,
+/// ADR 0050): its size and its creation and last-write times. Nothing about its owner, ACL, other
+/// attributes or last-access time is read, and nothing is opened to get these values.
+///
+/// The times are what the file system recorded, which programs update as they create, copy, extract
+/// and write files, and which any program able to write a file can set. A last-write time earlier than
+/// a creation time is ordinary. No value orders two events on its own (ADR 0050).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntryInfo {
     /// Name inside the directory, without any parent path.
     pub name: String,
     /// `true` for a regular file; `false` for a directory or anything else.
     pub is_file: bool,
+    /// Size in bytes as the listing reports it. `None` for anything that is not a file, and when the
+    /// listing did not provide one.
+    pub size: Option<u64>,
+    /// Creation time, in whole seconds (see [`listed_time`]). `None` when the listing did not provide
+    /// one or it is outside the range a [`jiff::Timestamp`] represents — never a stand-in value.
+    pub created: Option<jiff::Timestamp>,
+    /// Last-write time, in whole seconds, with the same meaning of `None` as [`Self::created`].
+    pub modified: Option<jiff::Timestamp>,
+}
+
+impl DirEntryInfo {
+    /// An entry the listing said nothing more about than its name and whether it is a file.
+    pub fn named(name: impl Into<String>, is_file: bool) -> Self {
+        Self {
+            name: name.into(),
+            is_file,
+            size: None,
+            created: None,
+            modified: None,
+        }
+    }
+}
+
+/// A time a directory listing reported, as a timestamp in whole seconds (ADR 0050).
+///
+/// The sub-second part is dropped by rounding down, towards the earlier second, so an instant before
+/// 1970 is not moved later. The 100-nanosecond part of a file time adds nothing a reviewer reads, and
+/// makes two reports of the same machine easier to match. `None` means the value is outside the range
+/// [`jiff::Timestamp`] represents.
+pub fn listed_time(time: std::time::SystemTime) -> Option<jiff::Timestamp> {
+    let exact = jiff::Timestamp::try_from(time).ok()?;
+    let mut seconds = exact.as_second();
+    if exact.subsec_nanosecond() < 0 {
+        seconds -= 1;
+    }
+    jiff::Timestamp::from_second(seconds).ok()
 }
 
 /// Read-only access to the file system. Paths are absolute and Windows-style, e.g. `C:\Users\a\x.dll`.
@@ -743,6 +784,43 @@ impl Host for NonWindowsHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::time::{Duration, UNIX_EPOCH};
+
+    fn at(text: &str) -> jiff::Timestamp {
+        text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_listed_time_keeps_whole_seconds_and_drops_the_rest() {
+        let exact = UNIX_EPOCH + Duration::new(1_789_000_000, 999_999_900);
+        assert_eq!(listed_time(exact), Some(at("2026-09-10T00:26:40Z")));
+        let whole = UNIX_EPOCH + Duration::from_secs(1_789_000_000);
+        assert_eq!(listed_time(whole), Some(at("2026-09-10T00:26:40Z")));
+    }
+
+    /// Rounding towards zero would move an instant before 1970 later than it was. The file-time epoch
+    /// is 1601, and a copied file can carry a write time that far back.
+    #[test]
+    fn a_listed_time_before_1970_rounds_to_the_earlier_second() {
+        let before = UNIX_EPOCH - Duration::new(10, 100);
+        assert_eq!(listed_time(before), Some(at("1969-12-31T23:59:49Z")));
+        // 1601-01-01 to 1970-01-01: 134 774 days, 11 644 473 600 seconds.
+        let filetime_epoch = UNIX_EPOCH - Duration::from_hours(134_774 * 24);
+        assert_eq!(
+            listed_time(filetime_epoch),
+            Some(at("1601-01-01T00:00:00Z"))
+        );
+    }
+
+    #[test]
+    fn a_named_entry_carries_no_size_and_no_times() {
+        let entry = DirEntryInfo::named("a.dll", true);
+        assert_eq!(
+            (entry.size, entry.created, entry.modified),
+            (None, None, None)
+        );
+    }
 
     #[test]
     fn non_windows_host_reads_no_files_and_no_environment() {

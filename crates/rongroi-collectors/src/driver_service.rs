@@ -415,10 +415,7 @@ mod tests {
     /// is ever called. A `Err(_) => true` mutant fails the `AccessDenied` and `Failed` assertions here.
     #[test]
     fn missing_from_says_missing_only_for_a_folder_that_was_actually_read() {
-        let entry = |name: &str| DirEntryInfo {
-            name: name.to_owned(),
-            is_file: true,
-        };
+        let entry = |name: &str| DirEntryInfo::named(name, true);
         assert!(missing_from(Ok(None), "drv.sys"));
         assert!(missing_from(Ok(Some(vec![entry("other.sys")])), "drv.sys"));
         assert!(!missing_from(Ok(Some(vec![entry("DRV.SYS")])), "drv.sys"));

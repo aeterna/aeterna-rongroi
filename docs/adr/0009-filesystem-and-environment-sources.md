@@ -58,8 +58,8 @@ no owner or ACL, no attributes, and nothing read that a collector did not name.
 file a collector names carries the read-only attribute, and nothing else about its attributes. `prefetch`
 and `evtx` ask it of the files they read; `fivem_dir` does not.
 
-**Amended by ADR 0050 (proposed).** `list_dir` would also return each entry's size and its creation and
-last-write times, read from the listing itself without opening the entry, truncated to whole seconds. The
+**Amended by ADR 0050.** `list_dir` also returns each entry's size and its creation and last-write
+times, read from the listing itself without opening the entry, in whole seconds. The
 last-access time, owner, ACL and other attributes stay unread, and no collector emits the new values until
 its own decision says which places and why.
 

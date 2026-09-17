@@ -26,11 +26,31 @@ impl FilesystemSource for LiveHost {
             // One unreadable entry fails the whole listing on purpose: a partial list that looked
             // complete would be read as "nothing else was there".
             let entry = entry.map_err(|error| SourceError::from_io(&error))?;
+            // `file_type` does not follow reparse points, so a link to a directory is not a file.
+            // An entry whose type cannot be read is reported as not-a-file: the collector only
+            // observes what it could confirm is a file.
+            let is_file = entry.file_type().is_ok_and(|kind| kind.is_file());
+            // On Windows, `DirEntry::metadata` converts the `WIN32_FIND_DATAW` the listing already
+            // holds: no second system call, and the entry is not opened (ADR 0050). Unlike
+            // `std::fs::metadata`, it describes the entry itself and does not follow a link. An
+            // entry whose values cannot be read keeps its name; one entry's times are never a reason
+            // to fail the listing.
+            let metadata = entry.metadata().ok();
+            let time = |read: fn(&std::fs::Metadata) -> std::io::Result<std::time::SystemTime>| {
+                metadata
+                    .as_ref()
+                    .and_then(|metadata| read(metadata).ok())
+                    .and_then(rongroi_host::listed_time)
+            };
             listed.push(DirEntryInfo {
-                // `file_type` does not follow reparse points, so a link to a directory is not a file.
-                // An entry whose type cannot be read is reported as not-a-file: the collector only
-                // observes what it could confirm is a file.
-                is_file: entry.file_type().is_ok_and(|kind| kind.is_file()),
+                size: if is_file {
+                    metadata.as_ref().map(std::fs::Metadata::len)
+                } else {
+                    None
+                },
+                created: time(std::fs::Metadata::created),
+                modified: time(std::fs::Metadata::modified),
+                is_file,
                 // A name that is not valid Unicode is kept in lossy form. It is still shown to the
                 // reviewer; hashing it will fail and the observation then carries only the path.
                 name: entry.file_name().to_string_lossy().into_owned(),
@@ -84,6 +104,44 @@ mod tests {
     use rongroi_host::FilesystemSource;
 
     use crate::LiveHost;
+
+    /// Size and times come from the listing, on a real file system, for a file and a folder the test
+    /// created in its own temporary folder. The times are compared with two readings of the clock
+    /// taken around the writes, each rounded down to a whole second as the listing's are.
+    #[test]
+    fn a_listing_reports_size_and_times_in_whole_seconds() {
+        let dir = std::env::temp_dir().join(format!("rongroi-listed-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let before = rongroi_host::listed_time(std::time::SystemTime::now()).unwrap();
+        std::fs::write(dir.join("five.bin"), b"12345").unwrap();
+        std::fs::create_dir(dir.join("sub")).unwrap();
+        let after = rongroi_host::listed_time(std::time::SystemTime::now()).unwrap();
+
+        let mut listed = LiveHost.list_dir(dir.to_str().unwrap()).unwrap().unwrap();
+        listed.sort_by(|a, b| a.name.cmp(&b.name));
+        let [file, sub] = listed.as_slice() else {
+            panic!("expected two entries, got {listed:?}");
+        };
+        assert_eq!(
+            (file.name.as_str(), file.is_file, file.size),
+            ("five.bin", true, Some(5))
+        );
+        assert_eq!(
+            (sub.name.as_str(), sub.is_file, sub.size),
+            ("sub", false, None)
+        );
+        for entry in [file, sub] {
+            for time in [entry.created, entry.modified] {
+                let time = time.unwrap_or_else(|| panic!("no time for {entry:?}"));
+                assert!(
+                    before <= time && time <= after,
+                    "{time} outside {before}..{after}"
+                );
+                assert_eq!(time.subsec_nanosecond(), 0);
+            }
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     /// Both answers on a real file system, and a file that is not there. The test sets the attribute
     /// on a file it created in its own temporary folder, never on anything a scan reads.
