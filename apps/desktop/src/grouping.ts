@@ -3,22 +3,9 @@
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
 // How the report's rows are grouped and ordered. Presentation only: which evidence is listed is
-// decided in `rongroi-core::view` (ADR 0045).
+// decided in `rongroi-core::view` (ADR 0045), and so is the order of the collectors (ADR 0051).
 
 import type { Evidence } from "./types";
-
-/** The order collector groups appear in. A collector not named here follows, in first-seen order. */
-export const COLLECTOR_ORDER = [
-  "posture",
-  "driver_service",
-  "fivem_dir",
-  "process",
-  "evtx",
-  "prefetch",
-  "bam",
-  "pca",
-  "usn",
-] as const;
 
 export type StateFilter = Evidence["state"];
 
@@ -30,9 +17,17 @@ export interface EvidenceGroup {
 
 const RANK: Record<StateFilter, number> = { found: 0, unmeasured: 1, not_found: 2 };
 
-export function groupEvidence(evidence: Evidence[], filter: StateFilter | null): EvidenceGroup[] {
+/**
+ * Groups rows by collector in `order` — the view's `collector_order`, decided in the core (ADR 0051) —
+ * with a collector not named there following, in first-seen order.
+ */
+export function groupEvidence(
+  evidence: Evidence[],
+  filter: StateFilter | null,
+  order: readonly string[],
+): EvidenceGroup[] {
   const kept = filter ? evidence.filter((item) => item.state === filter) : evidence;
-  const collectors: string[] = [...COLLECTOR_ORDER];
+  const collectors: string[] = [...order];
   for (const item of kept) {
     if (!collectors.includes(item.collector)) {
       collectors.push(item.collector);

@@ -13,6 +13,19 @@ const row = (rule_id: string, collector: string, state: Evidence["state"]): Evid
       ? { rule_id, collector, strength: "posture", state, retention: "now" }
       : { rule_id, collector, strength: "posture", state, reason: "source_absent", expected: true };
 
+// The core's order (`rongroi_core::view::COLLECTOR_ORDER`), as a view carries it.
+const ORDER = [
+  "posture",
+  "driver_service",
+  "fivem_dir",
+  "process",
+  "evtx",
+  "prefetch",
+  "bam",
+  "pca",
+  "usn",
+];
+
 describe("groupEvidence", () => {
   const evidence = [
     row("e1", "evtx", "not_found"),
@@ -25,7 +38,7 @@ describe("groupEvidence", () => {
   ];
 
   it("groups by collector in the fixed order, unknown collectors last", () => {
-    expect(groupEvidence(evidence, null).map((g) => g.collector)).toEqual([
+    expect(groupEvidence(evidence, null, ORDER).map((g) => g.collector)).toEqual([
       "posture",
       "fivem_dir",
       "evtx",
@@ -34,12 +47,12 @@ describe("groupEvidence", () => {
   });
 
   it("puts found first, then unmeasured, then not found, keeping the view's order inside a state", () => {
-    const posture = groupEvidence(evidence, null)[0];
+    const posture = groupEvidence(evidence, null, ORDER)[0];
     expect(posture?.rows.map((r) => r.rule_id)).toEqual(["p2", "p3", "p1", "p4"]);
   });
 
   it("keeps only one state when filtered, and drops groups left empty", () => {
-    const groups = groupEvidence(evidence, "found");
+    const groups = groupEvidence(evidence, "found", ORDER);
     expect(groups.map((g) => [g.collector, g.rows.map((r) => r.rule_id)])).toEqual([
       ["posture", ["p2"]],
       ["future_collector", ["x1"]],

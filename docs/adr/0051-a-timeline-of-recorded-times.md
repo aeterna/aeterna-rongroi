@@ -1,6 +1,6 @@
 # ADR 0051 — A timeline of the times a report already holds
 
-- Status: proposed
+- Status: accepted — the owner decided the three questions below on 2026-09-17
 - Date: 2026-09-16
 
 ## Context
@@ -142,11 +142,11 @@ Decision 1 still holds for rules: no `role: evidence` file on these collectors m
   and an ordinary PC holds hundreds of them; the desktop layer needs a filter by collector and place before
   it is usable, and that is not designed here.
 
-## Owner decisions this ADR needs
+## Owner decisions (2026-09-17)
 
-1. Timeline selectors as rule files (section 4), or another form.
-2. The ADR 0034 narrowing (section 5), and the SS consent text that goes with it.
-3. The first timeline selector list.
+1. Timeline selectors are rule files (section 4).
+2. The ADR 0034 narrowing (section 5) is accepted, with the SS consent text naming the programs.
+3. The first list is all three rows of section 4, and FiveM's folder activity (ADR 0053) as a fourth.
 
 ## Consequences
 
@@ -162,3 +162,46 @@ Decision 1 still holds for rules: no `role: evidence` file on these collectors m
   first timeline selector.
 - `CONVENTIONS.md`'s glossary gains **timeline**, **timeline selector**, **anchor** and **coverage band** in
   the change that introduces the types.
+
+## Implementation (2026-09-17)
+
+- **Rule format 4.** `Rule::role` (`evidence`, the default, or `timeline`). The bundle loader refuses a
+  timeline selector that is not `strength: context` or that names `unmeasured_when` — it makes no row for
+  the declaration to count — and refuses a `role: evidence` file on `prefetch`, `bam` or `pca` whose `match`
+  names `name` or `path`. That check is in `rules::validate`, so it binds every bundle and `check-rules`
+  with it.
+- **Engine.** `evaluate` partitions active files by role. Rules make evidence and decide `unmatched` as
+  before; a timeline selector's matches go to `Report.timeline_selections`, only when its collector looked
+  and it matched something.
+- **What the report declares.** Beside `timestamp_fields` (section 2), three more additive fields, all
+  filled by `scan::run`: `discriminators` (a collector's ADR 0044 field, which the entry's `place` is read
+  from), `coverage_fields` (from a new `Collector::coverage`: `evtx` declares
+  `oldest_record_time`..`newest_record_time`, `usn` declares `first_seen`..`last_seen` on the observation
+  whose `location` is `journal`, so a watched folder's own times are entries and not a band) and
+  `unmeasured_sources` (a collector with timestamp fields whose run was unmeasured, or whose run-wide or
+  per-place gaps name one of them, with the first such reason). `REPORT_SCHEMA_VERSION` stays at 1.
+- **View.** `view::timeline` and `ReportView.timeline` in both modes, `ReportView.collector_order` from
+  `view::COLLECTOR_ORDER`, which the desktop's grouping now takes instead of its own copy. An entry's
+  `subject` is the observation's `name`, or its `path` when it has none. An observation reached twice is
+  shown once, as evidence before selection before unmatched; bands come from evidence and unmatched
+  observations in both modes. Section 6 is a sentence above the list in both front ends, with the ADR 0050
+  statement about file times folded into it, and each selector's description and ordinary causes are
+  shown once below the list rather than beside each time.
+- **The selectors.** Section 4's first row is six files, because `match` has no *or* between conditions:
+  on each of `prefetch`, `bam` and `pca`, one for the names `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`
+  and `PlayGTAV.exe`, and one for a name that begins `FiveM_b` and ends `_GTAProcess.exe`. All six are
+  `experimental`, for the unverified names above. The second and third rows are
+  `usn/timeline/watched-folder-record-times` (`folder: identified`) and
+  `evtx/timeline/log-oldest-and-newest-record` (`oldest_record_time|exists: true`); the fourth is
+  `fivem_dir/timeline/folder-activity-times`, the eight ADR 0053 places.
+- **Baseline.** `check-baseline` confronts selectors as it does rules and, since a selection is not a
+  `found`, does not ask whether they are quiet. The three pattern files have two conditions on one field,
+  and no baseline describes a PC that ran FiveM, so none is confronted; `rules/unconfronted.csv` carries a
+  row for each, ending when a measured baseline holds FiveM's game process.
+- **Front ends.** The CLI prints a timeline section after the evidence; the desktop adds a timeline layer
+  after the evidence with a filter by collector, folded when it holds more than 50 times. The consent
+  question (CLI and desktop, both languages), `PRIVACY.md`, both READMEs, both screenshare guides,
+  `docs/architecture.md`, `docs/rules-authoring.md`, `rules/AGENTS.md` and the glossary name what the SS
+  timeline shows.
+- **Not done.** The desktop filter is by collector only, not by place, and nothing measures how long an
+  ordinary PC's Self-mode timeline is.

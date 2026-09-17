@@ -1,0 +1,41 @@
+{
+  "description": "FiveM's own launcher name, GTA V's, and a name that begins like the game process and ends otherwise",
+  "observations": [
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "FiveM.exe",
+        "path": "C:\\Windows\\Prefetch\\FiveM.exe-1A2B3C4D.pf",
+        "last_run": "2026-09-15T18:02:11Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    },
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "GTA5.exe",
+        "path": "C:\\Windows\\Prefetch\\GTA5.exe-1A2B3C4D.pf",
+        "last_run": "2026-09-15T18:02:20Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    },
+    {
+      "collector": "prefetch",
+      "fields": {
+        "name": "FiveM_b3258_Other.exe",
+        "path": "C:\\Windows\\Prefetch\\FiveM_b3258_Other.exe-1A2B3C4D.pf",
+        "last_run": "2026-09-15T18:02:25Z",
+        "run_count": 3,
+        "recorded_runs": 3,
+        "scca_version": 31,
+        "read_only": false
+      }
+    }
+  ]
+}

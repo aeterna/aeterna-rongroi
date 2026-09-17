@@ -11,7 +11,7 @@
     "self_button": "Check my own PC",
     "self_hint": "See everything, only on this screen.",
     "ss_button": "Screenshare check (SS mode)",
-    "ss_hint": "For staff watching your screen. Asks for your consent first and shows only what matches a rule.",
+    "ss_hint": "For staff watching your screen. Asks for your consent first and shows what matches a rule, with a timeline of the times the consent lists.",
     "elevate_button": "Scan as administrator",
     "elevate_hint": "Some checks need administrator rights. This closes the program, starts it again with those rights and scans from the beginning. Windows will ask you to confirm.",
     "elevate_declined": "You declined the Windows prompt. Nothing changed.",
@@ -21,7 +21,7 @@
   "consent": {
     "title": "Before you share your screen",
     "reads": "When it started, this program read, on this PC: security settings such as Secure Boot — as Windows and as the firmware report it — memory integrity, and the PowerShell logging policies of this PC and of the Windows account running this program; the programs running and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode); for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, never a file or folder name; these times can match two reports of this PC; what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on; how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log; whether a Prefetch or event log file is marked read-only; how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name; the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256; and when Windows last started, which staff will see as one time at the top of the report.",
-    "shows": "Staff will see only what matches a rule. Your user name is hidden in file paths.",
+    "shows": "Staff will see what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders; the oldest and newest record of each event log; and the oldest and newest change the change journal holds for each folder it counts. Your user name is hidden in file paths.",
     "sends": "aeterna-rongroi's own code sends nothing anywhere.",
     "webview": "This window uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The CLI version does not use WebView2.",
     "refuse_ok": "You may refuse.",

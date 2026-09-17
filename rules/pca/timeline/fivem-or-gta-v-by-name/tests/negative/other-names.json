@@ -1,0 +1,32 @@
+{
+  "description": "Programs whose names are not one of the four, including names that contain one of them",
+  "observations": [
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "steam.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\steam.exe",
+        "last_run": "2026-09-15T17:58:02Z"
+      }
+    },
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "FiveM_Launcher.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\FiveM_Launcher.exe",
+        "last_run": "2026-09-15T18:01:59Z"
+      }
+    },
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "myGTA5.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\myGTA5.exe",
+        "last_run": "2026-09-14T09:00:00Z"
+      }
+    }
+  ]
+}

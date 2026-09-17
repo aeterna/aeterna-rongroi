@@ -29,6 +29,7 @@ keeps per server, it reads when it was created and last changed and how many ent
 no file name and no folder name there**, and opens no file: a log's or a crash dump's name can carry a date,
 and a server folder's name identifies the server. The times are what Windows recorded, which programs set as
 they copy and extract files; they are specific enough to match two reports of the same PC (ADR 0050).
+SS mode shows these times on its [timeline](#the-timeline) (ADR 0051).
 
 **Since ADR 0036 rules read these files, so SS mode shows them.** Each file in a plugin folder, and
 `FiveM.exe` when its signature is not the expected one, matches a rule and is shown to the person
@@ -158,6 +159,28 @@ or allow remote access.
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
 | When Windows last started | shown | shown, as one time at the top of the report |
+| Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
+
+### The timeline
+
+Both modes show the times the report holds in one list, oldest first, with the span each Windows log and
+the change journal could see, and the sources whose times could not be read (ADR 0051). The list never
+calls anything a gap or a cleaning: an order of recorded times is not an order of events.
+
+In Self mode the list holds every time the scan read. In SS mode it holds the times of the evidence SS mode
+shows, when this scan ran and when Windows last started, and these, which SS mode did not show before
+ADR 0051:
+
+- **the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named
+  `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe`, and any name that begins `FiveM_b` and ends `_GTAProcess.exe`**, with that name. Windows records only a name, so this says when a program of that
+  name ran, not which program it was. Programs of any other name are still only counted;
+- the times of FiveM's log, crash and cache folders, and of each Enhanced server cache folder, without its
+  name. These times can match two reports of this PC;
+- the oldest and newest record each Windows event log holds, with the log's path;
+- the oldest and newest change the change journal holds for each folder it counts.
+
+The same list is on the consent screen. Each entry that comes from this list is shown with the ordinary
+things that produce it.
 
 ### Which folders count as your user-profile folder
 
@@ -216,8 +239,9 @@ registered with Windows, what Windows recorded about programs that ran, whether 
 Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
 can read what the tool saw and judge it yourself.
 
-**SS mode does not list them.** It says how many there were and nothing more. That mode promises to show
-only what matches a rule, and the names of every file and every running program on your PC are not that:
+**SS mode does not list them.** It says how many there were and nothing more, except for the times its
+[timeline](#the-timeline) names, program by program, on the consent screen. That mode promises to show
+what matches a rule and that list, and the names of every file and every running program on your PC are not that:
 they would tell whoever is watching what you have open, which is none of the check's business. Replacing
 your user name in paths would not change that, so the list is withheld rather than redacted.
 

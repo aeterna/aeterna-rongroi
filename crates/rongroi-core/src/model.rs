@@ -420,6 +420,53 @@ pub struct UnmatchedGroup {
     pub observations: Vec<Observation>,
 }
 
+/// Observations of one collector that one timeline selector matched (ADR 0051).
+///
+/// Not evidence: no state, no strength, no count. The same observations stay in
+/// [`Report::unmatched`] when no rule matched them, so what an SS view counts does not change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TimelineSelection {
+    /// Id of the timeline selector (`UUIDv4`), for its text.
+    pub selector_id: String,
+    /// Id of the collector that saw them.
+    pub collector: String,
+    /// The observations, as that collector reported them.
+    pub observations: Vec<Observation>,
+}
+
+/// The two fields of a collector's observations that bound what the source could see (ADR 0051).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CoverageFields {
+    /// The field holding the oldest time the source still holds.
+    pub from: String,
+    /// The field holding the newest.
+    pub to: String,
+    /// The discriminator value of the one observation that describes the whole source, when the
+    /// collector's other observations carry the same two fields about something narrower: `usn`'s
+    /// `journal`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+}
+
+/// A collector, or one of the places it reads, whose times could not be read (ADR 0051).
+///
+/// The timeline shows the reason where a coverage band or the entries would be, so an absent entry
+/// is never read as "nothing happened". A scope reason — `not_admin` — is one of these too: it is
+/// the one place the `usn` collector's `not_admin` reaches a reviewer while no rule reads `usn`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnmeasuredSource {
+    /// Id of the collector.
+    pub collector: String,
+    /// The discriminator value of the place, when only that place could not be read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// Why.
+    pub reason: UnmeasuredReason,
+}
+
 /// A full scan result, before a view decides what to show.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Report {
@@ -436,6 +483,27 @@ pub struct Report {
     /// reads back with none, which is what it meant (ADR 0014).
     #[serde(default)]
     pub unmatched: Vec<UnmatchedGroup>,
+    /// What each timeline selector matched (ADR 0051). Additive, and [`REPORT_SCHEMA_VERSION`] stays
+    /// at 1: a report written before it existed reads back with none.
+    #[serde(default)]
+    pub timeline_selections: Vec<TimelineSelection>,
+    /// For each collector, the fields its `fields()` declares as timestamps (ADR 0051). The core
+    /// never guesses a time from a value's shape, so a report written before this field existed
+    /// reads back with none and shows no timeline entries.
+    #[serde(default)]
+    pub timestamp_fields: BTreeMap<String, Vec<String>>,
+    /// For each collector that declares one, its discriminator (ADR 0044): which field names the
+    /// place an observation is about, for the timeline to show beside a time. Additive.
+    #[serde(default)]
+    pub discriminators: BTreeMap<String, String>,
+    /// For each collector that has them, the fields that bound what its source could see
+    /// (ADR 0051). Additive.
+    #[serde(default)]
+    pub coverage_fields: BTreeMap<String, CoverageFields>,
+    /// Collectors, or places, that declare timestamp fields and could not read them (ADR 0051).
+    /// Additive.
+    #[serde(default)]
+    pub unmeasured_sources: Vec<UnmeasuredSource>,
 }
 
 #[cfg(test)]

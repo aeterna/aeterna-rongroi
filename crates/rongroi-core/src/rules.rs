@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! Rule format v3 (ADR 0048) and the validation shared by the embedded bundle and `cargo xtask check-rules`.
+//! Rule format v4 (ADR 0051) and the validation shared by the embedded bundle and `cargo xtask check-rules`.
 //! The authoring guide is `docs/rules-authoring.md`.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -17,8 +17,42 @@ use crate::model::{Strength, UnmeasuredReason};
 /// 2 since ADR 0035 replaced `allow.signer`, a name, with `allow.signer_cert_sha256`, a certificate's
 /// hash. No rule had used the old field, but a rule written for version 1 that did would no longer
 /// parse, and that is what a version number is for. 3 since ADR 0048 added `match_lists`, which a
-/// build of version 2 refuses as an unknown key.
-pub const RULES_SCHEMA_VERSION: u32 = 3;
+/// build of version 2 refuses as an unknown key. 4 since ADR 0051 added `role`, which a build of
+/// version 3 refuses the same way, and which changes what a file is: a timeline selector is not
+/// evidence.
+pub const RULES_SCHEMA_VERSION: u32 = 4;
+
+/// What a rule file produces (ADR 0051).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Role {
+    /// A rule: one `found`, `not_found` or `unmeasured` piece of evidence. What every file was before
+    /// ADR 0051, and what a file that says nothing still is.
+    #[default]
+    Evidence,
+    /// A **timeline selector**: the observations it matches put their times on the timeline, in both
+    /// modes, and it produces no evidence and no count. The observations stay unmatched for ADR 0014's
+    /// purposes.
+    Timeline,
+}
+
+impl Role {
+    /// Stable identifier used in messages and in the rules reference.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Evidence => "evidence",
+            Self::Timeline => "timeline",
+        }
+    }
+}
+
+/// The collectors whose records carry a program's name and nothing that identifies the program
+/// (ADR 0034). A `role: evidence` file on one of them may not match `name` or `path`; a timeline
+/// selector may (ADR 0051).
+pub const NAME_ONLY_COLLECTORS: [&str; 3] = ["bam", "pca", "prefetch"];
+
+/// The fields [`NAME_ONLY_COLLECTORS`] carry that name a program.
+pub const NAMING_FIELDS: [&str; 2] = ["name", "path"];
 
 /// Lifecycle of a rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -237,6 +271,9 @@ pub struct Rule {
     pub description: String,
     /// Lifecycle status.
     pub status: Status,
+    /// Whether this file is a rule or a timeline selector (ADR 0051). Left out, it is a rule.
+    #[serde(default, skip_serializing_if = "is_evidence")]
+    pub role: Role,
     /// Collector the rule reads.
     pub collector: String,
     /// What the evidence can show.
@@ -294,7 +331,18 @@ pub struct Rule {
     pub related: Vec<Related>,
 }
 
+// `skip_serializing_if` hands the field by reference.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_evidence(role: &Role) -> bool {
+    *role == Role::Evidence
+}
+
 impl Rule {
+    /// Whether this file is a timeline selector rather than a rule (ADR 0051).
+    pub fn is_timeline_selector(&self) -> bool {
+        self.role == Role::Timeline
+    }
+
     /// Whether this rule said in `unmeasured_when` that it expects to be unmeasured for `reason`.
     ///
     /// This is the whole of what `unmeasured_when` does: the engine records the answer on the
@@ -571,6 +619,7 @@ fn validate_rule(rule: &Rule, report: &mut impl FnMut(String)) {
         validate_condition(key, value, report);
     }
     validate_cased(rule, report);
+    validate_role(rule, report);
     if rule.falsepositives.is_empty() || rule.falsepositives.iter().any(|f| f.trim().is_empty()) {
         report("`falsepositives` must list what legitimately produces this evidence".to_owned());
     }
@@ -602,6 +651,46 @@ fn validate_rule(rule: &Rule, report: &mut impl FnMut(String)) {
     for related in &rule.related {
         if !is_uuid_v4(&related.id) {
             report(format!("related id `{}` is not a UUIDv4", related.id));
+        }
+    }
+}
+
+/// Checks what a file's `role` allows.
+///
+/// A timeline selector is `context`: it shows when something was recorded, and the strength words are
+/// about what a match shows, which a selector never claims. A rule on a collector whose records carry
+/// only a program's name may not match that name, because a rename defeats it and legitimate software
+/// of the same name cannot be told apart (ADR 0034, decision 1). Until ADR 0051 no gate enforced that.
+fn validate_role(rule: &Rule, report: &mut impl FnMut(String)) {
+    match rule.role {
+        Role::Timeline => {
+            // It makes no evidence, so no `unmeasured` row for the declaration to count: a line that
+            // changes nothing reads as though it did (ADR 0032). A source that could not be read is
+            // on the timeline whatever the file says.
+            if !rule.unmeasured_when.is_empty() {
+                report(
+                    "a timeline selector makes no `unmeasured` row, so `unmeasured_when` changes nothing; remove it (ADR 0051)"
+                        .to_owned(),
+                );
+            }
+            if rule.strength != Strength::Context {
+                report(format!(
+                    "a timeline selector is `strength: context`, not `{}`; it shows times and claims nothing (ADR 0051)",
+                    rule.strength.as_str()
+                ));
+            }
+        }
+        Role::Evidence => {
+            if NAME_ONLY_COLLECTORS.contains(&rule.collector.as_str()) {
+                for field in rule.match_fields() {
+                    if NAMING_FIELDS.contains(&field) {
+                        report(format!(
+                            "a rule on `{}` may not match `{field}`: these records carry a name and no identity (ADR 0034); only a `role: timeline` selector may select by it (ADR 0051)",
+                            rule.collector
+                        ));
+                    }
+                }
+            }
         }
     }
 }
@@ -1377,7 +1466,85 @@ date: 2026-09-15
     }
 
     #[test]
-    fn the_rule_format_is_version_3() {
-        assert_eq!(RULES_SCHEMA_VERSION, 3);
+    fn the_rule_format_is_version_4() {
+        assert_eq!(RULES_SCHEMA_VERSION, 4);
+    }
+
+    /// A file that says nothing is a rule, and writes out as it did before ADR 0051.
+    #[test]
+    fn a_file_without_role_is_a_rule_and_does_not_serialise_the_key() {
+        let rule: Rule = serde_saphyr::from_str(VALID).unwrap();
+        assert_eq!(rule.role, Role::Evidence);
+        assert!(!rule.is_timeline_selector());
+        let json = serde_json::to_value(&rule).unwrap();
+        assert!(json.get("role").is_none(), "{json}");
+    }
+
+    fn name_only(collector: &str, role: &str, strength: &str, block: &str) -> String {
+        VALID
+            .replace("collector: posture", &format!("collector: {collector}"))
+            .replace(
+                "strength: posture",
+                &format!("strength: {strength}\nrole: {role}"),
+            )
+            .replace(
+                "match:\n  secure_boot: disabled\n",
+                &format!("match:\n{block}"),
+            )
+    }
+
+    fn problems_at(collector: &str, yaml: &str) -> Vec<String> {
+        let rules = [sourced(
+            &format!("{collector}/timeline/example/rule.yaml"),
+            yaml,
+        )];
+        validate(&rules, &Translations::new())
+            .into_iter()
+            .map(|problem| problem.message)
+            .collect()
+    }
+
+    /// ADR 0034 decision 1, enforced since ADR 0051: a rule on a name-only collector may not ask
+    /// about the name or the path, and a timeline selector may.
+    #[test]
+    fn only_a_timeline_selector_may_select_a_name_only_record_by_name() {
+        for collector in NAME_ONLY_COLLECTORS {
+            for block in ["  name: fivem.exe\n", "  path|endswith: \\fivem.exe\n"] {
+                let rule = name_only(collector, "evidence", "execution", block);
+                let problems = problems_at(collector, &rule);
+                assert_eq!(problems.len(), 1, "{collector} {block}: {problems:?}");
+                assert!(problems[0].contains("ADR 0034"), "{problems:?}");
+
+                let selector = name_only(collector, "timeline", "context", block);
+                assert_eq!(problems_at(collector, &selector), Vec::<String>::new());
+            }
+            let other_field = name_only(collector, "evidence", "tamper", "  read_only: true\n");
+            assert_eq!(problems_at(collector, &other_field), Vec::<String>::new());
+        }
+        let elsewhere = name_only("process", "evidence", "presence", "  name: fivem.exe\n");
+        assert_eq!(problems_at("process", &elsewhere), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_timeline_selector_is_context() {
+        let selector = name_only("usn", "timeline", "tamper", "  folder: identified\n");
+        let problems = problems_at("usn", &selector);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("strength: context"), "{problems:?}");
+    }
+
+    #[test]
+    fn a_timeline_selector_declares_no_unmeasured_reason() {
+        let selector = name_only("usn", "timeline", "context", "  folder: identified\n")
+            .replace("retention:", "unmeasured_when: [not_admin]\nretention:");
+        let problems = problems_at("usn", &selector);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("unmeasured_when"), "{problems:?}");
+    }
+
+    #[test]
+    fn an_unknown_role_does_not_parse() {
+        let yaml = VALID.replace("strength: posture", "strength: posture\nrole: marker");
+        assert!(serde_saphyr::from_str::<Rule>(&yaml).is_err());
     }
 }

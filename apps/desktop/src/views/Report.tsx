@@ -17,6 +17,7 @@ import type {
 } from "../types";
 import { EvidenceRow } from "./EvidenceRow";
 import { ReportSummary } from "./ReportSummary";
+import { Timeline } from "./Timeline";
 
 interface Props {
   mode: Mode;
@@ -119,7 +120,7 @@ export function Report({ mode, onBack }: Props) {
       </div>
 
       {view.evidence.length === 0 && <p>{t("empty")}</p>}
-      {groupEvidence(view.evidence, filter).map((group) => (
+      {groupEvidence(view.evidence, filter, view.collector_order).map((group) => (
         <Group
           key={group.collector}
           group={group}
@@ -132,6 +133,9 @@ export function Report({ mode, onBack }: Props) {
           unfold={filter === "not_found"}
         />
       ))}
+
+      {/* After the evidence and apart from it: the times this view may show, in order (ADR 0051). */}
+      <Timeline timeline={view.timeline} texts={texts} />
 
       {/* Apart from the evidence, and shown in both modes: this is what the program itself left in
           what the collectors saw, not evidence about the PC (ADR 0010). */}

@@ -4,12 +4,29 @@
 
 //! What a Self or SS view may show. Privacy is decided here, not in the UI (AGENTS.md hard rule 5).
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::model::{
-    Evidence, EvidenceState, Mode, OwnTraceEntry, Report, ReportHeader, Strength, UnmatchedGroup,
-    UnmeasuredReason,
+    BootTime, Evidence, EvidenceState, Mode, Observation, OwnTraceEntry, Report, ReportHeader,
+    Strength, UnmatchedGroup, UnmeasuredReason, UnmeasuredSource,
 };
+
+/// The order collectors are shown in, by both front ends: the rows of one collector together, and
+/// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
+/// follows the named ones.
+pub const COLLECTOR_ORDER: [&str; 9] = [
+    "posture",
+    "driver_service",
+    "fivem_dir",
+    "process",
+    "evtx",
+    "prefetch",
+    "bam",
+    "pca",
+    "usn",
+];
 
 /// Replacement for the user-profile part of a path in SS mode.
 pub const USERPROFILE_PLACEHOLDER: &str = "%USERPROFILE%";
@@ -105,6 +122,80 @@ pub struct ReportView {
     pub listed: ListedCounts,
     /// What this view does not list.
     pub hidden: HiddenCounts,
+    /// The times this view may show, in order (ADR 0051). Additive; the report schema stays at 1.
+    #[serde(default)]
+    pub timeline: Timeline,
+    /// [`COLLECTOR_ORDER`], so the desktop groups rows in the order the core orders the timeline.
+    #[serde(default)]
+    pub collector_order: Vec<String>,
+}
+
+/// Where a timeline entry came from (ADR 0051).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum EntrySource {
+    /// The scan's own time: when it ran, or when Windows last started (ADR 0039).
+    Anchor,
+    /// An observation a rule matched, listed as that rule's evidence.
+    Evidence {
+        /// The rule.
+        rule_id: String,
+    },
+    /// An observation a timeline selector selected.
+    Selector {
+        /// The timeline selector, for its text and ordinary causes.
+        selector_id: String,
+    },
+    /// An unmatched observation. Self mode only.
+    Observation,
+}
+
+/// One time value on the timeline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimelineEntry {
+    /// The time, as the report holds it: RFC 3339, UTC.
+    pub at: String,
+    /// The collector that recorded it; `None` for an anchor.
+    pub collector: Option<String>,
+    /// The field that holds it, or `generated_at` / `boot_time` for an anchor.
+    pub field: String,
+    /// The value of the collector's discriminator on the observation, when it declares one.
+    pub place: Option<String>,
+    /// Where it came from.
+    pub source: EntrySource,
+    /// The observation's `name`, or its `path` when it has no name, redacted as its row is.
+    pub subject: Option<String>,
+}
+
+/// The span one source could see, from its oldest to its newest record (ADR 0051).
+///
+/// "Nothing in this span" can be read only inside a band. Outside it the source saw nothing at all.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CoverageBand {
+    /// The collector.
+    pub collector: String,
+    /// The discriminator value of the observation, when the collector declares one.
+    pub place: Option<String>,
+    /// The observation's `name` or `path`, redacted as a row is.
+    pub subject: Option<String>,
+    /// The oldest time the source holds.
+    pub from: String,
+    /// The newest.
+    pub to: String,
+}
+
+/// The times a report holds, in order, with the spans that bound them (ADR 0051).
+///
+/// Nothing here is computed from the entries: no gap, no count, no summary. An order of recorded
+/// times is not an order of events, and a record that is absent was not necessarily removed.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Timeline {
+    /// Oldest first. Entries with the same time keep anchors first, then [`COLLECTOR_ORDER`].
+    pub entries: Vec<TimelineEntry>,
+    /// One per source that reports the span it could see.
+    pub bands: Vec<CoverageBand>,
+    /// Sources, or places, whose times could not be read, with the reason, in place of a band.
+    pub unmeasured: Vec<UnmeasuredSource>,
 }
 
 /// The reasons a view states once above the evidence instead of as a row per rule (ADR 0027,
@@ -171,6 +262,8 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
             scope: scope_notes(report),
             listed: listed_counts(&report.evidence),
             hidden: HiddenCounts::default(),
+            timeline: timeline(report, mode),
+            collector_order: collector_order(),
         },
         Mode::Ss => {
             let machine_root = report
@@ -218,9 +311,226 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
                 scope: scope_notes(report),
                 listed,
                 hidden,
+                timeline: timeline(report, mode),
+                collector_order: collector_order(),
             }
         }
     }
+}
+
+fn collector_order() -> Vec<String> {
+    COLLECTOR_ORDER.iter().map(|id| (*id).to_owned()).collect()
+}
+
+/// Where `collector` sorts among collectors: its place in [`COLLECTOR_ORDER`], or after all of them.
+fn collector_rank(collector: Option<&str>) -> usize {
+    match collector {
+        // Anchors first: they are the scan's own times.
+        None => 0,
+        Some(id) => COLLECTOR_ORDER
+            .iter()
+            .position(|known| *known == id)
+            .map_or(COLLECTOR_ORDER.len() + 1, |index| index + 1),
+    }
+}
+
+/// The timeline `mode` may show (ADR 0051).
+///
+/// - Self: every timestamp field of every observation the report holds — evidence, timeline
+///   selections and unmatched — with the anchors, the bands and the unmeasured sources.
+/// - SS: the times in the evidence SS mode lists, the times timeline selectors selected, the anchors,
+///   the bands and the unmeasured sources. Nothing an SS view counts instead of listing reaches it
+///   except through a reviewed timeline selector. Subjects and places are redacted as rows are.
+///
+/// An observation reached by more than one route is shown once, as evidence before selector before
+/// unmatched. Which fields are times comes from `report.timestamp_fields` and nothing else.
+pub fn timeline(report: &Report, mode: Mode) -> Timeline {
+    let machine_root = match mode {
+        Mode::SelfCheck => None,
+        Mode::Ss => report
+            .header
+            .profiles_directory
+            .as_deref()
+            .and_then(MachineRoot::parse),
+    };
+    let redact = |text: String| match mode {
+        Mode::SelfCheck => text,
+        Mode::Ss => redact_with(&text, machine_root.as_ref()),
+    };
+
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut entries = anchors(&report.header);
+    for (observation, source) in routes(report, mode) {
+        let key = serde_json::to_string(observation).unwrap_or_default();
+        if !seen.insert(key) {
+            continue;
+        }
+        let Some(fields) = report.timestamp_fields.get(&observation.collector) else {
+            continue;
+        };
+        let place = place_of(report, observation).map(redact);
+        let subject = subject_of(observation).map(redact);
+        for field in fields {
+            let Some(at) = time_of(observation, field) else {
+                continue;
+            };
+            entries.push(TimelineEntry {
+                at: at.to_owned(),
+                collector: Some(observation.collector.clone()),
+                field: field.clone(),
+                place: place.clone(),
+                source: source.clone(),
+                subject: subject.clone(),
+            });
+        }
+    }
+    // Stable: entries with one time and one collector keep the order they were reached in.
+    entries.sort_by_cached_key(|entry| {
+        (
+            entry.at.parse::<jiff::Timestamp>().ok(),
+            collector_rank(entry.collector.as_deref()),
+        )
+    });
+
+    Timeline {
+        entries,
+        bands: bands(report, redact),
+        unmeasured: report.unmeasured_sources.clone(),
+    }
+}
+
+/// Every observation `mode` may take times from, with where it came from, in the order that decides
+/// which route an observation reached by two is shown as.
+fn routes(report: &Report, mode: Mode) -> Vec<(&Observation, EntrySource)> {
+    let mut routes = Vec::new();
+    for item in &report.evidence {
+        if mode == Mode::Ss && !ss_lists(item) {
+            continue;
+        }
+        if let EvidenceState::Found { observations } = &item.state {
+            for observation in observations {
+                let source = EntrySource::Evidence {
+                    rule_id: item.rule_id.clone(),
+                };
+                routes.push((observation, source));
+            }
+        }
+    }
+    for selection in &report.timeline_selections {
+        for observation in &selection.observations {
+            let source = EntrySource::Selector {
+                selector_id: selection.selector_id.clone(),
+            };
+            routes.push((observation, source));
+        }
+    }
+    if mode == Mode::SelfCheck {
+        for group in &report.unmatched {
+            for observation in &group.observations {
+                routes.push((observation, EntrySource::Observation));
+            }
+        }
+    }
+    routes
+}
+
+/// The span each source could see, from every observation that carries its coverage fields — in both
+/// modes, because a span is a fact about the source rather than about a program or a file.
+fn bands(report: &Report, redact: impl Fn(String) -> String) -> Vec<CoverageBand> {
+    let observations = report
+        .evidence
+        .iter()
+        .filter_map(|item| match &item.state {
+            EvidenceState::Found { observations } => Some(observations.iter()),
+            _ => None,
+        })
+        .flatten()
+        .chain(
+            report
+                .unmatched
+                .iter()
+                .flat_map(|group| &group.observations),
+        );
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut bands = Vec::new();
+    for observation in observations {
+        let Some(coverage) = report.coverage_fields.get(&observation.collector) else {
+            continue;
+        };
+        let place = place_of(report, observation);
+        if coverage.place.is_some() && coverage.place != place {
+            continue;
+        }
+        let (Some(from), Some(to)) = (
+            time_of(observation, &coverage.from),
+            time_of(observation, &coverage.to),
+        ) else {
+            continue;
+        };
+        let key = serde_json::to_string(observation).unwrap_or_default();
+        if !seen.insert(key) {
+            continue;
+        }
+        bands.push(CoverageBand {
+            collector: observation.collector.clone(),
+            place: place.map(&redact),
+            subject: subject_of(observation).map(&redact),
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+    bands.sort_by_cached_key(|band| {
+        (
+            collector_rank(Some(&band.collector)),
+            band.from.parse::<jiff::Timestamp>().ok(),
+        )
+    });
+    bands
+}
+
+/// The scan's own times: when it ran, and when Windows last started when that was measured.
+fn anchors(header: &ReportHeader) -> Vec<TimelineEntry> {
+    let anchor = |field: &str, at: &str| TimelineEntry {
+        at: at.to_owned(),
+        collector: None,
+        field: field.to_owned(),
+        place: None,
+        source: EntrySource::Anchor,
+        subject: None,
+    };
+    let mut anchors = vec![anchor("generated_at", &header.generated_at)];
+    if let BootTime::Measured { booted_at, .. } = &header.boot_time {
+        anchors.push(anchor("boot_time", booted_at));
+    }
+    anchors
+}
+
+/// A field's value when it is a time the engine can put in order, and nothing otherwise.
+fn time_of<'o>(observation: &'o Observation, field: &str) -> Option<&'o str> {
+    observation
+        .fields
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| value.parse::<jiff::Timestamp>().is_ok())
+}
+
+fn place_of(report: &Report, observation: &Observation) -> Option<String> {
+    let discriminator = report.discriminators.get(&observation.collector)?;
+    observation
+        .fields
+        .get(discriminator)
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+}
+
+fn subject_of(observation: &Observation) -> Option<String> {
+    ["name", "path"].iter().find_map(|field| {
+        observation
+            .fields
+            .get(*field)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    })
 }
 
 fn redacted(item: &Evidence, machine_root: Option<&MachineRoot>) -> Evidence {
@@ -963,6 +1273,11 @@ mod tests {
                     )]),
                 }],
             }],
+            timeline_selections: Vec::new(),
+            timestamp_fields: BTreeMap::new(),
+            discriminators: BTreeMap::new(),
+            coverage_fields: BTreeMap::new(),
+            unmeasured_sources: Vec::new(),
         }
     }
 
@@ -1233,5 +1548,253 @@ mod tests {
             + view.hidden.unmeasured_unexpected;
         assert_eq!(listed + hidden, report.evidence.len());
         assert_eq!(listed, view.evidence.len());
+    }
+
+    fn observed(collector: &str, pairs: &[(&str, &str)]) -> Observation {
+        Observation {
+            collector: collector.to_owned(),
+            fields: pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), serde_json::Value::from(*v)))
+                .collect(),
+        }
+    }
+
+    /// A report holding one time on each route: a rule's evidence, a timeline selector's selection,
+    /// an unmatched observation, a coverage band and an unmeasured place.
+    fn timed_report() -> Report {
+        let mut report = report();
+        report.header.boot_time = crate::model::BootTime::Measured {
+            booted_at: "2025-12-31T00:00:00Z".to_owned(),
+            seconds_since_boot: 86_400,
+        };
+        let found = observed(
+            "prefetch",
+            &[("name", "found.exe"), ("last_run", "2025-12-30T00:00:00Z")],
+        );
+        report.evidence = vec![Evidence {
+            rule_id: "found".to_owned(),
+            collector: "prefetch".to_owned(),
+            strength: Strength::Tamper,
+            state: EvidenceState::Found {
+                observations: vec![found],
+            },
+        }];
+        let selected = observed(
+            "prefetch",
+            &[
+                ("name", "FIVEM.EXE"),
+                ("last_run", "2025-12-29T00:00:00.5Z"),
+                ("path", &format!(r"C:\Users\{USER}\x.pf")),
+            ],
+        );
+        let unselected = observed(
+            "prefetch",
+            &[
+                ("path", &format!(r"C:\Users\{USER}\secret.pf")),
+                ("last_run", "2025-12-28T00:00:00Z"),
+            ],
+        );
+        let log = observed(
+            "evtx",
+            &[
+                ("path", r"C:\Windows\System32\winevt\Logs\System.evtx"),
+                ("oldest_record_time", "2025-11-01T00:00:00Z"),
+                ("newest_record_time", "2025-12-31T12:00:00Z"),
+            ],
+        );
+        report.timeline_selections = vec![crate::model::TimelineSelection {
+            selector_id: "selector".to_owned(),
+            collector: "prefetch".to_owned(),
+            observations: vec![selected.clone()],
+        }];
+        report.unmatched = vec![
+            UnmatchedGroup {
+                collector: "prefetch".to_owned(),
+                observations: vec![selected, unselected],
+            },
+            UnmatchedGroup {
+                collector: "evtx".to_owned(),
+                observations: vec![log],
+            },
+        ];
+        report.timestamp_fields = BTreeMap::from([
+            ("prefetch".to_owned(), vec!["last_run".to_owned()]),
+            (
+                "evtx".to_owned(),
+                vec![
+                    "newest_record_time".to_owned(),
+                    "oldest_record_time".to_owned(),
+                ],
+            ),
+        ]);
+        report.coverage_fields = BTreeMap::from([(
+            "evtx".to_owned(),
+            crate::model::CoverageFields {
+                from: "oldest_record_time".to_owned(),
+                to: "newest_record_time".to_owned(),
+                place: None,
+            },
+        )]);
+        report.unmeasured_sources = vec![UnmeasuredSource {
+            collector: "usn".to_owned(),
+            place: None,
+            reason: UnmeasuredReason::NotAdmin,
+        }];
+        report
+    }
+
+    fn at_and_source(timeline: &Timeline) -> Vec<(String, EntrySource)> {
+        timeline
+            .entries
+            .iter()
+            .map(|entry| (entry.at.clone(), entry.source.clone()))
+            .collect()
+    }
+
+    /// Self mode: every time on every route, oldest first, each observation once — the selected one
+    /// as the selector's, not also as an unmatched one.
+    #[test]
+    fn the_self_timeline_holds_every_time_in_order_and_each_observation_once() {
+        let timeline = timeline(&timed_report(), Mode::SelfCheck);
+        let selector = EntrySource::Selector {
+            selector_id: "selector".to_owned(),
+        };
+        let evidence = EntrySource::Evidence {
+            rule_id: "found".to_owned(),
+        };
+        assert_eq!(
+            at_and_source(&timeline),
+            vec![
+                ("2025-11-01T00:00:00Z".to_owned(), EntrySource::Observation),
+                ("2025-12-28T00:00:00Z".to_owned(), EntrySource::Observation),
+                ("2025-12-29T00:00:00.5Z".to_owned(), selector),
+                ("2025-12-30T00:00:00Z".to_owned(), evidence),
+                ("2025-12-31T00:00:00Z".to_owned(), EntrySource::Anchor),
+                ("2025-12-31T12:00:00Z".to_owned(), EntrySource::Observation),
+                ("2026-01-01T00:00:00Z".to_owned(), EntrySource::Anchor),
+            ]
+        );
+        assert_eq!(timeline.entries[2].subject.as_deref(), Some("FIVEM.EXE"));
+        assert_eq!(timeline.entries[4].field, "boot_time");
+        assert_eq!(
+            timeline.bands,
+            vec![CoverageBand {
+                collector: "evtx".to_owned(),
+                place: None,
+                subject: Some(r"C:\Windows\System32\winevt\Logs\System.evtx".to_owned()),
+                from: "2025-11-01T00:00:00Z".to_owned(),
+                to: "2025-12-31T12:00:00Z".to_owned(),
+            }]
+        );
+        assert_eq!(timeline.unmeasured.len(), 1);
+    }
+
+    /// SS mode: the listed evidence, the selection, the anchors, the band and the unmeasured source —
+    /// and nothing an SS view only counts. The unmatched observation nobody selected, with its path,
+    /// does not reach it.
+    #[test]
+    fn the_ss_timeline_shows_only_listed_evidence_selections_anchors_and_bands() {
+        let report = timed_report();
+        let view = for_mode(&report, Mode::Ss);
+        let timeline = &view.timeline;
+        let sources: Vec<EntrySource> = timeline
+            .entries
+            .iter()
+            .map(|entry| entry.source.clone())
+            .collect();
+        assert_eq!(
+            sources,
+            vec![
+                EntrySource::Selector {
+                    selector_id: "selector".to_owned()
+                },
+                EntrySource::Evidence {
+                    rule_id: "found".to_owned()
+                },
+                EntrySource::Anchor,
+                EntrySource::Anchor,
+            ]
+        );
+        assert_eq!(timeline.bands.len(), 1);
+        assert_eq!(timeline.unmeasured.len(), 1);
+        let json = serde_json::to_string(&view).unwrap();
+        assert!(!json.contains("secret.pf"), "{json}");
+        assert!(!json.contains("2025-12-28"), "{json}");
+        assert!(!json.contains(USER), "{json}");
+        // The count is unchanged by the selector: both prefetch observations are still unmatched.
+        assert_eq!(view.hidden.unmatched, 3);
+    }
+
+    /// The core does not guess which fields are times: a report with no declarations, as every
+    /// report before ADR 0051 was, has only the anchors.
+    #[test]
+    fn without_declared_timestamp_fields_only_the_anchors_are_on_the_timeline() {
+        let mut report = timed_report();
+        report.timestamp_fields.clear();
+        let timeline = timeline(&report, Mode::SelfCheck);
+        assert!(
+            timeline
+                .entries
+                .iter()
+                .all(|entry| entry.source == EntrySource::Anchor),
+            "{timeline:?}"
+        );
+    }
+
+    /// A band scoped to one place is read only from the observation about that place.
+    #[test]
+    fn a_band_scoped_to_a_place_comes_from_that_place_only() {
+        let mut report = timed_report();
+        let journal = observed(
+            "usn",
+            &[
+                ("location", "journal"),
+                ("first_seen", "2025-12-01T00:00:00Z"),
+                ("last_seen", "2025-12-31T00:00:00Z"),
+            ],
+        );
+        let folder = observed(
+            "usn",
+            &[
+                ("location", "prefetch"),
+                ("first_seen", "2025-12-15T00:00:00Z"),
+                ("last_seen", "2025-12-16T00:00:00Z"),
+            ],
+        );
+        report.unmatched.push(UnmatchedGroup {
+            collector: "usn".to_owned(),
+            observations: vec![journal, folder],
+        });
+        report
+            .discriminators
+            .insert("usn".to_owned(), "location".to_owned());
+        report.coverage_fields.insert(
+            "usn".to_owned(),
+            crate::model::CoverageFields {
+                from: "first_seen".to_owned(),
+                to: "last_seen".to_owned(),
+                place: Some("journal".to_owned()),
+            },
+        );
+        let timeline = timeline(&report, Mode::SelfCheck);
+        let usn: Vec<&CoverageBand> = timeline
+            .bands
+            .iter()
+            .filter(|band| band.collector == "usn")
+            .collect();
+        assert_eq!(usn.len(), 1, "{usn:?}");
+        assert_eq!(usn[0].place.as_deref(), Some("journal"));
+        assert_eq!(usn[0].from, "2025-12-01T00:00:00Z");
+    }
+
+    #[test]
+    fn both_views_carry_the_collector_order() {
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            assert_eq!(
+                for_mode(&report(), mode).collector_order,
+                COLLECTOR_ORDER.map(str::to_owned).to_vec()
+            );
+        }
     }
 }

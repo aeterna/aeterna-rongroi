@@ -1,0 +1,15 @@
+{
+  "description": "Records whose names this selector lists",
+  "observations": [
+    {
+      "collector": "pca",
+      "fields": {
+        "source": "app_launch_dic",
+        "name": "FIVEM_B3258_GTAPROCESS.EXE",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Games\\FIVEM_B3258_GTAPROCESS.EXE",
+        "last_run": "2026-09-15T18:02:30Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

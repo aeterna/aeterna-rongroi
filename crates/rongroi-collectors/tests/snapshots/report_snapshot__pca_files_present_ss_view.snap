@@ -13,9 +13,9 @@ expression: view
       "exe_sha256": null
     },
     "rules_bundle": {
-      "schema_version": 3,
+      "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 22
+      "rule_count": 31
     },
     "platform": "windows",
     "os_build": "26100",
@@ -192,5 +192,64 @@ expression: view
     "unmeasured_expected": 3,
     "unmeasured_unexpected": 0,
     "unmatched": 7
-  }
+  },
+  "timeline": {
+    "entries": [
+      {
+        "at": "2026-01-01T00:00:00Z",
+        "collector": null,
+        "field": "generated_at",
+        "place": null,
+        "source": {
+          "kind": "anchor"
+        },
+        "subject": null
+      },
+      {
+        "at": "2026-09-11T22:05:01Z",
+        "collector": "pca",
+        "field": "last_run",
+        "place": null,
+        "source": {
+          "kind": "selector",
+          "selector_id": "6487719d-15cf-422c-8b8a-858647091fd1"
+        },
+        "subject": "fivem.exe"
+      }
+    ],
+    "bands": [],
+    "unmeasured": [
+      {
+        "collector": "bam",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "prefetch",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "usn",
+        "reason": "read_failed"
+      }
+    ]
+  },
+  "collector_order": [
+    "posture",
+    "driver_service",
+    "fivem_dir",
+    "process",
+    "evtx",
+    "prefetch",
+    "bam",
+    "pca",
+    "usn"
+  ]
 }

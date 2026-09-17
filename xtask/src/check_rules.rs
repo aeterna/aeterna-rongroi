@@ -1040,6 +1040,15 @@ date: 2026-09-11
         )
     }
 
+    /// [`prefetch_rule`] as a timeline selector, the one kind of file that may name `name` or `path`
+    /// on `prefetch` (ADR 0034, ADR 0051). The field-kind gates apply to it as to a rule.
+    fn prefetch_selector(match_block: &str) -> String {
+        prefetch_rule(match_block).replace(
+            "strength: execution\n",
+            "strength: context\nrole: timeline\n",
+        )
+    }
+
     fn problems_for(label: &str, rule: &str) -> Vec<String> {
         let tmp = TempRoot::new(label);
         let dir = tmp.path().join("rules/prefetch/execution/example");
@@ -1069,7 +1078,7 @@ date: 2026-09-11
     /// to a player as a thing looked for and not there.
     #[test]
     fn an_empty_value_list_is_rejected() {
-        let problems = problems_for("empty-list", &prefetch_rule("  name: []\n"));
+        let problems = problems_for("empty-list", &prefetch_selector("  name: []\n"));
 
         assert_eq!(problems.len(), 1, "{problems:?}");
         assert!(problems[0].contains("has an empty list"), "{problems:?}");
@@ -1080,7 +1089,7 @@ date: 2026-09-11
     /// for field names, arriving through the operator instead.
     #[test]
     fn an_ordinal_comparison_against_a_text_field_is_rejected() {
-        let problems = problems_for("ordinal-on-text", &prefetch_rule("  name|gt: 2\n"));
+        let problems = problems_for("ordinal-on-text", &prefetch_selector("  name|gt: 2\n"));
 
         assert_eq!(problems.len(), 1, "{problems:?}");
         assert!(
@@ -1127,12 +1136,27 @@ date: 2026-09-11
     fn the_operators_are_accepted_where_the_field_kind_takes_them() {
         let problems = problems_for(
             "good-operators",
-            &prefetch_rule(
+            &prefetch_selector(
                 "  name: [FiveM.exe, cmd.exe]\n  path|startswith: 'C:\\\\Windows\\\\'\n  path|endswith: .pf\n  path|contains: Prefetch\n  run_count|gte: 2\n  rejected|gt: 0\n  last_run|lt: \"2026-09-13T00:00:00Z\"\n  read|exists: false\n",
             ),
         );
 
         assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    /// ADR 0034 decision 1 is a gate since ADR 0051: the same conditions in a rule are refused.
+    #[test]
+    fn a_rule_on_prefetch_that_names_a_program_is_rejected() {
+        let problems = problems_for(
+            "rule-by-name",
+            &prefetch_rule("  name: FiveM.exe\n  run_count|gte: 2\n"),
+        );
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains("a rule on `prefetch` may not match `name`"),
+            "{problems:?}"
+        );
     }
 
     /// Every field a collector declares carries a kind, so the first rule written for any of them

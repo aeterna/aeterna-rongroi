@@ -79,11 +79,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
   log and crash folders changed. The last-access time stays unread. Fixture hosts can describe the three
   values, and refuse a directory with a size or a time with a fraction of a second. No collector emits the
   values yet, so reports are unchanged (ADR 0050, accepted).
-- Proposed (ADR 0051): a timeline view in the core that orders the times a report already holds, with the
-  scan's own times as anchors and each source's covered span beside them. SS mode would show the times in
-  its listed evidence plus reviewed timeline selectors — rule files that select times without making a
-  row — and ADR 0034 would be narrowed so a timeline selector, never a rule, may select Prefetch, BAM and
-  PCA entries by name.
+- The timeline (ADR 0051, accepted): both front ends list the times a report holds, oldest first, with
+  when the scan ran and when Windows started as anchors, the span each event log and the change journal
+  could see, and the sources whose times could not be read — including the change journal's `not_admin`,
+  which reached no output before. Self mode's timeline holds every time the scan read. SS mode's holds the
+  times of the evidence it lists and what **timeline selectors** select: rule files with `role: timeline`
+  (rule format version 4) that make no evidence and no count. Nine ship: FiveM and GTA V executables by
+  name in Prefetch, BAM and PCA (`experimental`), each watched folder's journal times, each event log's
+  oldest and newest record, and FiveM's folder activity. The consent question and PRIVACY.md name what the
+  SS timeline shows, program by program. The desktop groups rows in an order the core now decides. A rule
+  on Prefetch, BAM or PCA that matches `name` or `path` is now refused when the bundle loads (ADR 0034).
 - Proposed (ADR 0052): two scan tiers. Sources that read more about the player — FiveM's logs, server
   cache folder names, crash-dump module lists, profile counts — would be read only in a full scan, which the
   player chooses before it starts: a question on the CLI, and a native Windows dialog in a fresh desktop copy
