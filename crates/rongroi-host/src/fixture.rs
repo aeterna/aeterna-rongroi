@@ -285,6 +285,15 @@ struct FixtureFile {
     from: Option<String>,
     #[serde(default)]
     read_only: Option<bool>,
+    /// What the listing reports as the entry's size (ADR 0050). A directory has none.
+    #[serde(default)]
+    size: Option<u64>,
+    /// The listing's creation time, RFC 3339 in whole seconds (ADR 0050).
+    #[serde(default)]
+    created: Option<String>,
+    /// The listing's last-write time, RFC 3339 in whole seconds (ADR 0050).
+    #[serde(default)]
+    modified: Option<String>,
 }
 
 /// What a fixture says Windows would report about a file's embedded signature (ADR 0035). An absent
@@ -375,6 +384,11 @@ struct FixtureEntry {
     /// Whether the file carries the read-only attribute. `None` describes a fixture that never said,
     /// which is not the same as saying it does not (ADR 0037).
     read_only: Option<bool>,
+    /// What a listing reports beside the name (ADR 0050). `None` is a value the fixture never wrote,
+    /// which a listing returns as "not provided", never as a zero or an epoch.
+    size: Option<u64>,
+    created: Option<jiff::Timestamp>,
+    modified: Option<jiff::Timestamp>,
 }
 
 /// Paths and registry keys are compared case-insensitively and without a trailing separator, like Windows.
@@ -445,6 +459,17 @@ fn resolve_file(
         .signature
         .map(|signature| resolve_signature(signature, &described.name, origin))
         .transpose()?;
+    if described.directory && described.size.is_some() {
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "directory `{}` has a `size:`; a listing reports a size for files only",
+                described.name
+            ),
+        });
+    }
+    let created = listed_time_of(described.created.as_deref(), &described.name, origin)?;
+    let modified = listed_time_of(described.modified.as_deref(), &described.name, origin)?;
     Ok(FixtureEntry {
         name: described.name,
         sha256: described.sha256,
@@ -452,7 +477,35 @@ fn resolve_file(
         directory: described.directory,
         content,
         read_only: described.read_only,
+        size: described.size,
+        created,
+        modified,
     })
+}
+
+/// Parses a `created:` or `modified:` value. A live listing never reports a fraction of a second
+/// (ADR 0050), so a fixture that writes one describes something no machine returns, and fails to load.
+fn listed_time_of(
+    text: Option<&str>,
+    name: &str,
+    origin: &str,
+) -> Result<Option<jiff::Timestamp>, FixtureError> {
+    let Some(text) = text else {
+        return Ok(None);
+    };
+    let fail = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message,
+    };
+    let instant: jiff::Timestamp = text
+        .parse()
+        .map_err(|error: jiff::Error| fail(format!("entry `{name}` time `{text}`: {error}")))?;
+    if instant.subsec_nanosecond() != 0 {
+        return Err(fail(format!(
+            "entry `{name}` time `{text}` has a fraction of a second; a listing reports whole seconds"
+        )));
+    }
+    Ok(Some(instant))
 }
 
 /// Turns one described registry value into a stored one, reading a `from:` file now rather than
@@ -1114,6 +1167,9 @@ impl FilesystemSource for FixtureHost {
                 .map(|file| DirEntryInfo {
                     name: file.name.clone(),
                     is_file: !file.directory,
+                    size: file.size,
+                    created: file.created,
+                    modified: file.modified,
                 })
                 .collect()
         }))
@@ -1787,18 +1843,9 @@ processes:
         assert_eq!(
             host.list_dir(r"c:\users\FIXTUREUSER\appdata\local\example"),
             Ok(Some(vec![
-                DirEntryInfo {
-                    name: "readable.dll".to_owned(),
-                    is_file: true,
-                },
-                DirEntryInfo {
-                    name: "unreadable.dll".to_owned(),
-                    is_file: true,
-                },
-                DirEntryInfo {
-                    name: "cache".to_owned(),
-                    is_file: false,
-                },
+                DirEntryInfo::named("readable.dll", true),
+                DirEntryInfo::named("unreadable.dll", true),
+                DirEntryInfo::named("cache", false),
             ]))
         );
     }
@@ -2017,6 +2064,56 @@ processes:
             Err(SourceError::Unsupported(_))
         ));
         assert_eq!(host.is_read_only(r"C:\p\absent.pf"), Ok(None));
+    }
+
+    #[test]
+    fn a_listing_reports_the_size_and_times_the_fixture_wrote_and_nothing_else() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      size: 42\n      created: 2026-09-01T10:00:00Z\n      modified: 2025-01-02T03:04:05Z\n    - name: sub\n      directory: true\n      created: 2026-09-02T00:00:00Z\n    - name: silent.log\n",
+            "inline",
+        )
+        .unwrap();
+        let at = |text: &str| Some(text.parse::<jiff::Timestamp>().unwrap());
+        assert_eq!(
+            host.list_dir(r"C:\p"),
+            Ok(Some(vec![
+                DirEntryInfo {
+                    name: "a.log".to_owned(),
+                    is_file: true,
+                    size: Some(42),
+                    created: at("2026-09-01T10:00:00Z"),
+                    modified: at("2025-01-02T03:04:05Z"),
+                },
+                DirEntryInfo {
+                    created: at("2026-09-02T00:00:00Z"),
+                    ..DirEntryInfo::named("sub", false)
+                },
+                DirEntryInfo::named("silent.log", true),
+            ]))
+        );
+    }
+
+    #[test]
+    fn a_fixture_listing_refuses_what_no_listing_reports() {
+        for (yaml, needle) in [
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: sub\n      directory: true\n      size: 1\n",
+                "files only",
+            ),
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      created: 2026-09-01T10:00:00.5Z\n",
+                "fraction of a second",
+            ),
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      modified: yesterday\n",
+                "`yesterday`",
+            ),
+        ] {
+            let error = FixtureHost::from_yaml_str(yaml, "inline")
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(needle), "{error}");
+        }
     }
 
     #[test]

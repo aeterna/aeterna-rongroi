@@ -1769,10 +1769,7 @@ mod tests {
         let entries = |names: &[&str]| {
             names
                 .iter()
-                .map(|name| rongroi_host::DirEntryInfo {
-                    name: (*name).to_owned(),
-                    is_file: true,
-                })
+                .map(|name| rongroi_host::DirEntryInfo::named(*name, true))
                 .collect()
         };
 

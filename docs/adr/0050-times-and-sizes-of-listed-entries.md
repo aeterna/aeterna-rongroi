@@ -1,6 +1,6 @@
 # ADR 0050 — Times and sizes of the entries a listing returns
 
-- Status: proposed
+- Status: accepted — the owner asked for the implementation on 2026-09-17
 - Date: 2026-09-16
 
 ## Context
@@ -66,12 +66,13 @@ DirEntryInfo { name, is_file, size: Option<u64>, created: Option<Timestamp>, mod
 ```
 
 - `size`: the entry's size in bytes as the listing reports it. `None` for a directory.
-- `created`, `modified`: the entry's creation and last-write times, converted from `FILETIME` with
-  `rongroi_parsers::filetime::to_timestamp`, and **truncated to whole seconds**. A reviewer reads a folder's
-  times against events minutes or days apart; the 100-nanosecond part adds nothing to that reading and makes
-  two reports of the same machine easier to link (section 4).
-- `None` when the listing did not provide the value, or when the value is outside the range `to_timestamp`
-  represents. `None` is never a zero, and a zero `FILETIME` converts to 1601 like any other value.
+- `created`, `modified`: the entry's creation and last-write times, taken from the standard library's
+  `Metadata::created` and `Metadata::modified` and converted by `rongroi_host::listed_time`, which keeps
+  **whole seconds**, rounding down so that an instant before 1970 is not moved later. A reviewer reads a
+  folder's times against events minutes or days apart; the 100-nanosecond part adds nothing to that reading
+  and makes two reports of the same machine easier to link (section 4).
+- `None` when the listing did not provide the value, or when the value is outside the range a
+  `jiff::Timestamp` represents. `None` is never a zero; the 1601 epoch converts like any other instant.
 - **The last-access time is not read.** NTFS delays it by up to an hour, and a listing like this one is
   itself an access to the folder.
 
@@ -85,7 +86,8 @@ DirEntryInfo { name, is_file, size: Option<u64>, created: Option<Timestamp>, mod
 
 `FixtureFile` gains `size`, `created` and `modified`, each optional, times in RFC 3339 UTC. A fixture that
 does not write one returns `None` for it, never a default: a fixture written before this ADR describes
-entries whose times were not modelled, not entries created at the epoch.
+entries whose times were not modelled, not entries created at the epoch. A fixture that gives a directory a
+`size`, or a time with a fraction of a second, fails to load, because no listing reports either.
 
 ### 3. What the values mean, written where they are shown
 
@@ -151,3 +153,16 @@ FiveM's cache, log and crash folders and the Enhanced per-server cache folders; 
 - ADR 0009's "No timestamps, no size", and its restatement in the paragraph ADR 0019 added, are amended for
   these three values.
   Owner, ACL, other attributes and the last-access time remain unread.
+
+## Implementation (2026-09-17)
+
+- `rongroi-host`: `DirEntryInfo` gains `size`, `created` and `modified`, and `DirEntryInfo::named` builds an
+  entry with none of them; `listed_time` converts a `SystemTime`. `jiff` becomes an ordinary dependency of
+  the crate rather than one of the `fixture` feature.
+- `rongroi-host-windows`: `list_dir` reads the values from `DirEntry::metadata`, and a Windows test lists a
+  file and a folder it created and checks the size and that both times fall, in whole seconds, between two
+  readings of the clock taken around the writes.
+- No collector emits the values, so no report, rule, snapshot, consent text or `PRIVACY.md` line changed.
+- The conversion is not `rongroi_parsers::filetime::to_timestamp`, as the proposal said: the standard
+  library already turns the listing's `FILETIME` into a `SystemTime`, and `rongroi-host-windows` does not
+  depend on `rongroi-parsers`.
