@@ -31,9 +31,9 @@ shapes and times only. Paths below are relative to `%LOCALAPPDATA%` (local) or `
 FiveM's public source names the Legacy cache folders: `data/server-cache` with the launch mode as a suffix
 (`code/components/rage-device-five/src/CitizenMount.Shared.cpp`), and the launcher pairs older
 `cache/priv/` and `cache/fxdk/` folders with `data/server-cache-priv/` and `data/server-cache-fxdk/`
-(`code/client/launcher/ViabilityChecks.cpp`). The
-Enhanced client is not in the public repository; what its per-server folder names are derived from is not
-known. Hashes of the endpoints and URLs its own logs named matched none of them.
+(`code/client/launcher/ViabilityChecks.cpp`). The Enhanced client is not in the public repository; what its
+per-server folder names are derived from is not known. Hashes of the endpoints and URLs its own logs named
+matched none of them.
 
 A per-server folder's creation time and its last-write time both differed from its files' times.
 
@@ -112,7 +112,7 @@ in SS mode. They carry `Timestamp` fields, so the timeline in ADR 0051, once bui
 timeline selector there can bring them into SS mode under that ADR's terms.
 
 None of them says a folder was emptied by a person. A small or recent cache is what a new installation, a
-cleared cache in FiveM's own settings, an update, disk-cleaning software or a moved profile folder also
+cache cleared by hand or by FiveM itself, an update, disk-cleaning software or a moved profile folder also
 leave. The text shown with them says so, in the words of ADR 0050 section 3.
 
 ### 5. Privacy
