@@ -108,6 +108,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   and Windows Firewall rules for FiveM — with one `experimental` hosts rule. The ADR records the owner's
   decision that no record of where traffic went is read: not SRUM, the DNS cache, the live TCP table, the
   firewall log or a packet capture.
+- ADR 0054 records a second Windows 11 measurement: the hosts file's folder (`DataBasePath`), the proxy
+  values and the firewall rules key all read the same with and without administrator rights; FiveM's four
+  firewall rules include two for GTA V Enhanced's executable inside FiveM's folder, so the collector finds
+  FiveM's rules by folder rather than by file name.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
