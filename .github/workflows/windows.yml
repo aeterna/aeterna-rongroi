@@ -513,6 +513,26 @@ jobs:
           if ($hashed.Count -eq 0) { throw 'the driver_service collector hashed no driver file on the runner' }
           Write-Output "driver_service count: $($all.Count) services, $($hashed.Count) hashed"
           $all | ForEach-Object { Write-Output "driver_service: $($_.fields | ConvertTo-Json -Compress)" }
+          # ADR 0054. The collector's own reading of this runner's network settings: the hosts file's
+          # path and line count, whether a proxy is set, and how many firewall rules there are, beside
+          # PowerShell's own count of the local store. No hosts line, address or rule name is printed.
+          $net = @(@($report.unmatched | Where-Object { $_.collector -eq 'net_config' } | ForEach-Object { $_.observations }) +
+            @($report.evidence | Where-Object { $_.collector -eq 'net_config' -and $_.state -eq 'found' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ })
+          $hostsFile = @($net | Where-Object { $_.fields.location -eq 'hosts' -and $null -ne $_.fields.present })
+          if ($hostsFile.Count -ne 1) { throw "net_config did not read the hosts file on the runner: $($net.Count) observations" }
+          $proxy = @($net | Where-Object { $_.fields.location -eq 'proxy' })
+          if ($proxy.Count -ne 1) { throw 'net_config did not read the proxy settings on the runner' }
+          $store = @($net | Where-Object { $_.fields.location -eq 'firewall' -and $null -ne $_.fields.firewall_rules })
+          if ($store.Count -ne 1 -or $store[0].fields.firewall_rules -le 0) { throw 'net_config read no firewall rule on the runner' }
+          Write-Output "net_config hosts: $($hostsFile[0].fields | ConvertTo-Json -Compress)"
+          Write-Output "net_config proxy: $($proxy[0].fields | ConvertTo-Json -Compress)"
+          Write-Output "net_config firewall: $($store[0].fields | ConvertTo-Json -Compress)"
+          try {
+            Write-Output "Get-NetFirewallRule PersistentStore: $(@(Get-NetFirewallRule -PolicyStore PersistentStore -ErrorAction Stop).Count)"
+          } catch {
+            Write-Output "Get-NetFirewallRule PersistentStore: $($_.Exception.Message)"
+          }
           # ADR 0038: the firmware reading compared with PowerShell's own reading of the same UEFI
           # variable on this machine. A runner is not an ordinary Windows PC, so this says the two
           # readers agree, not what an ordinary PC reports.

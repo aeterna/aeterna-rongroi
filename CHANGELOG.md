@@ -103,12 +103,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
   and each Enhanced server cache folder's creation and last-change times and entry count, with no file or
   folder name. No rule reads them: Self mode lists them and SS mode counts them. The consent question and
   PRIVACY.md say so (ADR 0053, accepted).
-- Accepted (ADR 0054, 2026-09-18), not yet implemented: a `net_config` collector for the settings that
-  decide where traffic goes — hosts file lines naming `cfx.re`, `fivem.net` or `rockstargames.com`, whether
-  a proxy is set (never its address), and Windows Firewall rules for programs in FiveM's folders — with one
-  `experimental` hosts rule. SS mode shows a hosts line's address only as its kind: loopback, unspecified,
-  private or public. The ADR records the owner's decision that no record of where traffic went is read:
-  not SRUM, the DNS cache, the live TCP table, the firewall log or a packet capture.
+- The `net_config` collector: the settings that decide where network traffic goes, never a record of
+  where it went (ADR 0054). Of the hosts file, found through `DataBasePath`, it counts the lines in effect
+  and reports only the lines that give a name under `cfx.re`, `fivem.net` or `rockstargames.com` an
+  address, with the address and its kind; of the current user's proxy, whether it is on and whether a
+  server or a setup script is set, never their addresses; of the Windows Firewall rules, how many there
+  are and, for each rule for a program in a FiveM folder, its action, state, direction, protocol,
+  profiles and program path, never its name or description. SS mode never shows a hosts line's address,
+  only its kind (`view::SS_WITHHELD_FIELDS`). One `posture` rule, `experimental`: the hosts file gives a
+  FiveM or Rockstar name an address. The consent question, PRIVACY.md and both screenshare guides say what
+  is read. The owner decided that no record of where traffic went is read: not SRUM, the DNS cache, the
+  live TCP table, the firewall log or a packet capture.
 - ADR 0054 records a second Windows 11 measurement: the hosts file's folder (`DataBasePath`), the proxy
   values and the firewall rules key all read the same with and without administrator rights; FiveM's four
   firewall rules include two for GTA V Enhanced's executable inside FiveM's folder, so the collector finds

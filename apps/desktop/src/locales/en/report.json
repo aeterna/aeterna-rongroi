@@ -76,6 +76,7 @@
     "posture": "Security settings of this PC",
     "driver_service": "Drivers registered with Windows",
     "fivem_dir": "FiveM files",
+    "net_config": "Network settings (hosts, proxy, firewall)",
     "process": "Running programs",
     "evtx": "Windows event logs",
     "prefetch": "Windows Prefetch",

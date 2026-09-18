@@ -186,6 +186,7 @@ These are counts of what SS mode does not list. §7 says why.
 | An event log file is marked read-only | tamper | `experimental` | the same two |
 | An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
 | A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
+| The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
 
 Three things to know about the two log-clearing rules:
 
@@ -213,7 +214,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last one, about vulnerable drivers, is new after 0.3.0 and is not in a released version yet. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last two, about vulnerable drivers and the hosts file, are new after 0.3.0 and are not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -237,6 +238,16 @@ Three things to know about the vulnerable-driver rule:
 - **Windows may still block it.** Microsoft keeps its own list of vulnerable drivers that Windows refuses
   to load. This program does not read whether that list is on, and a driver on LOLDrivers' list is not
   necessarily on Microsoft's.
+
+Two things to know about the hosts-file rule:
+
+- **The kind of address is what to read.** `loopback` or `unspecified` sends the name nowhere, which is
+  how a blocklist blocks a service; `private` or `public` sends it to another machine. SS mode shows only
+  the kind: the address itself can name the player's own server, so ask them if you need it.
+- **It reads settings, not traffic.** This program never reads where a PC connected — not the DNS cache,
+  the open connections or any log of them ([ADR 0054](adr/0054-network-settings-not-network-traffic.md)).
+  The proxy and the Windows Firewall rules for FiveM are read too, and no rule reads them: an allowed
+  FiveM program and a proxy are what ordinary PCs have. SS mode only counts them.
 
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.

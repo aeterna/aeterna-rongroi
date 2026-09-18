@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 31
+      "rule_count": 32
     },
     "platform": "windows",
     "os_build": null,
@@ -124,6 +124,13 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "65ee0ec1-bcda-47a3-a401-98632b42e75f",
+      "collector": "net_config",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "The hosts file as it was when the scan ran. A line removed before the scan is not seen."
+    },
+    {
       "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
       "collector": "posture",
       "strength": "posture",
@@ -203,6 +210,19 @@ expression: view
   "own_traces": [],
   "unmatched": [
     {
+      "collector": "net_config",
+      "observations": [
+        {
+          "collector": "net_config",
+          "fields": {
+            "location": "hosts",
+            "path": "C:\\Windows\\System32\\drivers\\etc\\hosts",
+            "present": false
+          }
+        }
+      ]
+    },
+    {
       "collector": "posture",
       "observations": [
         {
@@ -234,7 +254,7 @@ expression: view
   },
   "listed": {
     "found": 0,
-    "not_found": 4,
+    "not_found": 5,
     "unmeasured": 18
   },
   "hidden": {
@@ -288,6 +308,7 @@ expression: view
     "posture",
     "driver_service",
     "fivem_dir",
+    "net_config",
     "process",
     "evtx",
     "prefetch",

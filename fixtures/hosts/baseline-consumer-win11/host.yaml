@@ -19,6 +19,14 @@ env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
 registry:
+  # ADR 0054: the proxy off and FiveM's firewall rules, as on `baseline-elevated-win11`; both were
+  # read without administrator rights on the PC measured. No `%SystemRoot%` is set here, so the hosts
+  # file is not read on this host.
+  'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings':
+    ProxyEnable: 0
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules':
+    fixture-rule-1: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=6|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
+    fixture-rule-2: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=17|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
   'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
     UEFISecureBootEnabled: 1
 filesystem:

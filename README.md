@@ -31,7 +31,8 @@ Every result is one of three things:
   code is added.
 - **The GUI uses Microsoft WebView2**, a Windows component that may send Windows diagnostic data according
   to your Windows settings. **The CLI version does not use WebView2.**
-- No screenshots, no browser history, no remote access.
+- No screenshots, no browser history, no remote access, and no record of where your PC connected: of the
+  network it reads only the settings that decide where traffic goes (hosts file, proxy, firewall rules).
 - **SS mode** (for screenshare) asks for consent first, shows what matched a rule and a timeline of the times its consent screen lists, and hides your
   user name in paths. You may refuse.
 

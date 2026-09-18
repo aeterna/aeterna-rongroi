@@ -16,10 +16,11 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 9] = [
+pub const COLLECTOR_ORDER: [&str; 10] = [
     "posture",
     "driver_service",
     "fivem_dir",
+    "net_config",
     "process",
     "evtx",
     "prefetch",
@@ -27,6 +28,13 @@ pub const COLLECTOR_ORDER: [&str; 9] = [
     "pca",
     "usn",
 ];
+
+/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054).
+///
+/// A hosts line's address can name the player's own server; its kind, which `net_config` emits
+/// beside it as `address_kind`, is what separates a blocklist from a redirect and is what SS mode
+/// shows in its place (owner decision 2).
+pub const SS_WITHHELD_FIELDS: [(&str, &str); 1] = [("net_config", "address")];
 
 /// Replacement for the user-profile part of a path in SS mode.
 pub const USERPROFILE_PLACEHOLDER: &str = "%USERPROFILE%";
@@ -537,6 +545,11 @@ fn redacted(item: &Evidence, machine_root: Option<&MachineRoot>) -> Evidence {
     let mut item = item.clone();
     if let EvidenceState::Found { observations } = &mut item.state {
         for observation in observations {
+            for (collector, field) in SS_WITHHELD_FIELDS {
+                if observation.collector == collector {
+                    observation.fields.remove(field);
+                }
+            }
             for value in observation.fields.values_mut() {
                 redact_value(value, machine_root);
             }
@@ -1287,6 +1300,45 @@ mod tests {
         let view = for_mode(&report, Mode::SelfCheck);
         assert_eq!(view.evidence, report.evidence);
         assert_eq!(view.hidden, HiddenCounts::default());
+    }
+
+    /// A hosts line's address never reaches an SS view, even on a match; its kind does, and Self mode
+    /// keeps both (ADR 0054, owner decision 2). Only `net_config`'s field is withheld.
+    #[test]
+    fn ss_view_withholds_the_hosts_address_and_keeps_its_kind() {
+        let observation = |collector: &str| Observation {
+            collector: collector.to_owned(),
+            fields: BTreeMap::from([
+                ("location".to_owned(), serde_json::Value::from("hosts")),
+                ("host_name".to_owned(), serde_json::Value::from("fivem.net")),
+                ("address".to_owned(), serde_json::Value::from("192.0.2.10")),
+                ("address_kind".to_owned(), serde_json::Value::from("public")),
+            ]),
+        };
+        let mut report = report();
+        report.evidence = ["net_config", "other"]
+            .into_iter()
+            .map(|collector| Evidence {
+                rule_id: collector.to_owned(),
+                collector: collector.to_owned(),
+                strength: Strength::Posture,
+                state: EvidenceState::Found {
+                    observations: vec![observation(collector)],
+                },
+            })
+            .collect();
+        let fields = |view: &ReportView, index: usize| match &view.evidence[index].state {
+            EvidenceState::Found { observations } => observations[0].fields.clone(),
+            state => panic!("expected a match, got {state:?}"),
+        };
+        let ss = for_mode(&report, Mode::Ss);
+        let hosts = fields(&ss, 0);
+        assert!(!hosts.contains_key("address"), "{hosts:?}");
+        assert_eq!(hosts["address_kind"], "public");
+        assert_eq!(hosts["host_name"], "fivem.net");
+        assert!(fields(&ss, 1).contains_key("address"));
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert_eq!(fields(&own, 0)["address"], "192.0.2.10");
     }
 
     #[test]

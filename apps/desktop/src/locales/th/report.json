@@ -76,6 +76,7 @@
     "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
     "driver_service": "ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows",
     "fivem_dir": "ไฟล์ของ FiveM",
+    "net_config": "การตั้งค่าเครือข่าย (hosts, proxy, firewall)",
     "process": "โปรแกรมที่กำลังรัน",
     "evtx": "Event log ของ Windows",
     "prefetch": "Prefetch ของ Windows",

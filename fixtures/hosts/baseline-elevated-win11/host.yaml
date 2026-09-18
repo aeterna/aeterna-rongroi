@@ -74,6 +74,22 @@ usn_journal:
       first: '2026-09-08T01:12:08.3678392Z'
       last: '2026-09-15T05:07:08.7795416Z'
 registry:
+  # ADR 0054: the three places `net_config` reads, in the shapes measured on one Windows 11 PC (build
+  # 26220) on 2026-09-17, with invented values and value names — no rule, name or line from that PC is copied. The
+  # hosts folder is the value measured there; the proxy is off as it was there; the firewall holds
+  # FiveM's four rules as that PC had them (an allow-in rule for TCP and one for UDP, for FiveM.exe and
+  # for GTA V Enhanced's executable inside FiveM's own folder) beside rules for other programs.
+  'HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters':
+    DataBasePath: '%SystemRoot%\System32\drivers\etc'
+  'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings':
+    ProxyEnable: 0
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules':
+    fixture-rule-1: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=6|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
+    fixture-rule-2: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=17|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
+    fixture-rule-3: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=6|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem for gtav enhanced\gamecache\game\gta5_enhanced.exe|Name=gta5_enhanced|Desc=gta5_enhanced|Defer=User|'
+    fixture-rule-4: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=17|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem for gtav enhanced\gamecache\game\gta5_enhanced.exe|Name=gta5_enhanced|Desc=gta5_enhanced|Defer=User|'
+    fixture-rule-5: 'v2.33|Action=Allow|Active=TRUE|Dir=In|Protocol=6|Profile=Domain|Profile=Private|LPort=5000|App=C:\Program Files\Example Media\player.exe|Name=Example Media|Desc=Example Media|'
+    fixture-rule-6: 'v2.30|Action=Block|Active=FALSE|Dir=Out|App=%SystemRoot%\system32\example.exe|Svc=exampleservice|Name=@example.dll,-1|Desc=@example.dll,-2|'
   'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
     UEFISecureBootEnabled: 1
   'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity':
@@ -1795,6 +1811,12 @@ registry:
     Start: 3
     ImagePath: 'C:\Windows\system32\drivers\ztdns.sys'
 filesystem:
+  # ADR 0054: a hosts file of the shape measured — UTF-8 with a byte-order mark, six lines in effect,
+  # none naming a listed name: one loopback, two private and three other addresses. Every name is
+  # invented. The byte-order mark is written as the escape a YAML double-quoted string takes.
+  'C:\Windows\System32\drivers\etc':
+    - name: hosts
+      content: "\uFEFF# Hosts file for a fixture PC.\r\n#\r\n# Lines added by software on this PC.\r\n\r\n127.0.0.1 local.example.test\r\n192.168.1.10 nas.home.example\r\n10.0.0.2 printer.home.example\r\n203.0.113.5 ads.example.net\r\n198.51.100.7 tracker.example.org\r\n203.0.113.9 telemetry.example.com\r\n"
   # PCA's three files, their bytes taken from the synthetic parser corpora (ADR 0019) rather than
   # written here: those files are CP-1252 with CRLF line endings, which is what the real artifact is
   # and what a YAML block scalar cannot express. Their launch dictionary records FiveM, Notepad and a

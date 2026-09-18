@@ -10,6 +10,7 @@ pub mod driver_service;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
+pub mod net_config;
 pub mod paths;
 pub mod pca;
 pub mod posture;
@@ -172,6 +173,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(driver_service::DriverService::default()),
         Box::new(evtx::Evtx::default()),
         Box::new(fivem_dir::FivemDir),
+        Box::new(net_config::NetConfig),
         Box::new(pca::Pca),
         Box::new(posture::Posture),
         Box::new(prefetch::Prefetch),

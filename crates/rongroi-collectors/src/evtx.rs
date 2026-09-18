@@ -949,7 +949,7 @@ fn configured(observation: &mut Observation, config: &ChannelConfig, path: &str,
 /// written as `%4`, so `Microsoft-Windows-Kernel-Boot%4Operational.evtx` holds one. A `%` counts as the
 /// start of a variable only when a name beginning with a letter or `_`, made of letters, digits and
 /// `_`, runs up to the next `%`; every other `%` is kept as it is.
-fn expand_windows_directory(path: &str, root: &str) -> Option<String> {
+pub(crate) fn expand_windows_directory(path: &str, root: &str) -> Option<String> {
     let root = root.trim_end_matches(['\\', '/']);
     if root.is_empty() {
         return None;

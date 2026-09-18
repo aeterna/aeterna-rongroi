@@ -6,8 +6,9 @@ Only local artifacts needed by its collectors, for example machine security sett
 FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders, the list of running processes, the drivers
 registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
-event logs hold, and counts of the Windows drive's change journal records, for the drive as a whole and
-for each folder those collectors read, with no file name.
+event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
+for each folder those collectors read, with no file name, and the settings that decide where network
+traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -43,6 +44,25 @@ Of a driver registered with Windows it reads the name of its driver service, whe
 it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
 graphics card vendor, a VPN, a virtualisation product — because their drivers are registered. It does not
 read which drivers are loaded or what they do.
+
+Of the **network settings** it reads three things, and never a record of where traffic went: not which
+sites or servers you connected to, not the DNS cache, not the connections open now, not the firewall log,
+and nothing captured off the network (ADR 0054).
+
+- **The hosts file.** It counts the lines in effect. Of a line that gives a name under `cfx.re`,
+  `fivem.net` or `rockstargames.com` an address, it reads that name, the address and the line's number.
+  **Every other line is counted and never reported**: they are your own choices about the rest of the
+  internet. In SS mode the address is shown only as its kind — loopback, unspecified, private or public —
+  because an address can name your own server.
+- **The proxy.** Whether your Windows account has a proxy switched on, and whether a proxy server or a
+  setup script is set. **Never the address of either**, which can name your employer's or your own
+  server, and never the list of your VPN and dial-up connections Windows keeps beside it.
+- **The Windows Firewall rules.** How many rules there are, and of each rule for a program in a FiveM
+  folder, whether it allows or blocks, whether it is on, its direction, protocol and network profiles, and
+  the program's path. **Never a rule's name or description**, which anyone who made the rule could write
+  anything in. Rules for other programs are only counted.
+
+No rule reads the proxy or the firewall rules, so SS mode shows only how many of them there were.
 
 Of a Prefetch file it reads the program's name, how many times Windows recorded it running and when it
 last ran. **A Prefetch file also lists every file that program loaded — normally hundreds of paths,
@@ -158,6 +178,7 @@ or allow remote access.
 | Evidence shown | everything | rule matches, plus counts of what was not found or could not be answered for a reason the rule itself said is ordinary. A check this program stopped short of is shown, because that is its own limit and not a fact about your PC |
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
+| A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
 | When Windows last started | shown | shown, as one time at the top of the report |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
 

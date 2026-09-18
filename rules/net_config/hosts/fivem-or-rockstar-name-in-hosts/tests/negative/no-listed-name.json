@@ -1,0 +1,9 @@
+{
+  "description": "A hosts file with lines in effect, none for a listed name, beside a FiveM firewall rule",
+  "observations": [
+    { "collector": "net_config", "fields": { "location": "hosts", "path": "C:\\Windows\\System32\\drivers\\etc\\hosts", "present": true, "lines_in_effect": 6 } },
+    { "collector": "net_config", "fields": { "location": "firewall", "firewall_rules": 2, "unparsed_rules": 0 } },
+    { "collector": "net_config", "fields": { "location": "firewall", "path": "C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.exe", "action": "Allow", "enabled": true, "direction": "In", "protocol": 6 } }
+  ],
+  "expect_matches": 0
+}

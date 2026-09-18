@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 65ee0ec1-bcda-47a3-a401-98632b42e75f
+title: The hosts file gives a FiveM or Rockstar name an address
+description: >-
+  A line in effect in this PC's hosts file gives a name under cfx.re, fivem.net or rockstargames.com an
+  address of its own, so Windows uses that address for the name instead of asking a DNS server. The row
+  shows the name, the line and the kind of address: loopback or unspecified sends the name nowhere, which
+  is how blocklists block a service; private or public sends it to another machine. SS mode shows only
+  the kind, because the address itself can name the player's own server. This does not say what wrote
+  the line, when, or whether any program used it.
+status: experimental
+collector: net_config
+strength: posture
+match:
+  location: hosts
+  host_name|exists: true
+retention: >-
+  The hosts file as it was when the scan ran. A line removed before the scan is not seen.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Ad, tracking and telemetry blocklists, which point Rockstar names at 0.0.0.0 or 127.0.0.1
+  - Guides that block the Rockstar launcher's update or sign-in servers by editing the hosts file
+  - Software that writes its own hosts entries, such as a VPN, a security suite or a development tool
+author: aeterna-rongroi contributors
+date: 2026-09-18
+tags: [net_config, hosts]
