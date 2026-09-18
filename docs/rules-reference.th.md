@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 31 |
-| SHA-256 | `a70841c0bf2f3054186a2851b4715057c7f2afe7613e0c4a38f89862561b3106` |
+| จำนวน rule | 32 |
+| SHA-256 | `d5db1ed9998a02de3322541ecad9dd6aae7fceb2415015c23fe0ecd93fe0f42e` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -52,6 +52,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่มีลายเซ็นฝังในไฟล์ซึ่งถูกต้อง](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
   - [ตรวจลายเซ็นของไฟล์ FiveM ไม่ได้](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
+- `net_config`
+  - [ไฟล์ hosts กำหนด address ให้ชื่อของ FiveM หรือ Rockstar](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -654,6 +656,46 @@ FiveM.exe ในโฟลเดอร์โปรแกรมของ FiveM for
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+## collector `net_config`
+
+### `net_config` / `hosts`
+
+<a id="rule-65ee0ec1-bcda-47a3-a401-98632b42e75f"></a>
+
+#### ไฟล์ hosts กำหนด address ให้ชื่อของ FiveM หรือ Rockstar
+
+- ชื่อภาษาอังกฤษ: The hosts file gives a FiveM or Rockstar name an address
+- id: `65ee0ec1-bcda-47a3-a401-98632b42e75f`
+- ไฟล์: [`rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml`](../rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml)
+- collector: `net_config`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `net_config`, `hosts`
+- เขียนเมื่อ: 2026-09-18
+
+**เกี่ยวกับการตรวจนี้**
+
+บรรทัดที่มีผลในไฟล์ hosts ของเครื่องนี้กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com เอง Windows จึงใช้ address นั้นกับชื่อนั้นแทนการถาม DNS server แถวนี้แสดงชื่อ บรรทัด และชนิดของ address ถ้าเป็น loopback หรือ unspecified ชื่อนั้นจะไม่ไปไหน ซึ่งเป็นวิธีที่ blocklist ใช้บล็อกบริการ ถ้าเป็น private หรือ public ชื่อนั้นจะถูกส่งไปเครื่องอื่น โหมด SS แสดงแค่ชนิด เพราะ address เองอาจเป็นเซิร์ฟเวอร์ของผู้เล่น ข้อนี้ไม่ได้บอกว่าอะไรเขียนบรรทัดนี้ เขียนเมื่อไร หรือมีโปรแกรมใช้มันหรือไม่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `host_name|exists`: มีฟิลด์นี้
+- `location`: เป็น `hosts` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+ไฟล์ hosts ตามที่เป็นอยู่ตอนสแกน บรรทัดที่ถูกลบไปก่อนสแกนจะไม่เห็น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- blocklist ของโฆษณา การติดตาม และ telemetry ซึ่งชี้ชื่อของ Rockstar ไปที่ 0.0.0.0 หรือ 127.0.0.1
+- คู่มือที่บล็อกเซิร์ฟเวอร์อัปเดตหรือเซิร์ฟเวอร์ sign-in ของ Rockstar launcher ด้วยการแก้ไฟล์ hosts
+- ซอฟต์แวร์ที่เขียนบรรทัดของตัวเองลงไฟล์ hosts เช่น VPN ชุดโปรแกรมความปลอดภัย หรือเครื่องมือพัฒนาโปรแกรม
 
 ## collector `posture`
 

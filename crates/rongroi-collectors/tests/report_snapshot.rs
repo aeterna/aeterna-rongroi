@@ -577,6 +577,38 @@ fn driver_service_listed_ss_view() {
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
+/// A hosts line for a listed name is `Found`. SS mode lists it with the kind of address and without the
+/// address itself, which Self mode shows (ADR 0054, owner decision 2); the proxy's server and the
+/// firewall rules reach neither view as evidence, since no rule reads them.
+#[test]
+fn net_config_listed_name_ss_view() {
+    const HOSTS_RULE: &str = "65ee0ec1-bcda-47a3-a401-98632b42e75f";
+
+    let report = report_for("net-config-listed-name");
+    let evidence = report
+        .evidence
+        .iter()
+        .find(|evidence| evidence.rule_id == HOSTS_RULE)
+        .unwrap_or_else(|| panic!("{HOSTS_RULE} did not reach the report"));
+    assert!(
+        matches!(&evidence.state, rongroi_core::model::EvidenceState::Found { observations } if observations.len() == 2),
+        "{evidence:?}"
+    );
+
+    let own = serde_json::to_string(&view::for_mode(&report, Mode::SelfCheck)).unwrap();
+    assert!(own.contains("192.0.2.10"), "{own}");
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    for withheld in ["192.0.2.10", "proxy.example.test", "Example"] {
+        assert!(
+            !json.contains(withheld),
+            "{withheld} reached the SS view: {json}"
+        );
+    }
+    assert!(json.contains("\"address_kind\":\"public\""), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
 /// The boot time is a fact about the scan's context, so both views carry it unchanged: SS mode's
 /// filter is about evidence, and staff read the times on the rows they are shown against it
 /// (ADR 0039). A report written before the field existed reads back as never having tried, not as a

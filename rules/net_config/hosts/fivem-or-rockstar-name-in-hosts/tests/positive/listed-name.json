@@ -1,0 +1,10 @@
+{
+  "description": "A hosts file whose lines give a Rockstar subdomain and a FiveM name an address",
+  "observations": [
+    { "collector": "net_config", "fields": { "location": "hosts", "path": "C:\\Windows\\System32\\drivers\\etc\\hosts", "present": true, "lines_in_effect": 3 } },
+    { "collector": "net_config", "fields": { "location": "hosts", "line": 2, "host_name": "prod.example.rockstargames.com", "address": "0.0.0.0", "address_kind": "unspecified" } },
+    { "collector": "net_config", "fields": { "location": "hosts", "line": 3, "host_name": "fivem.net", "address": "192.0.2.10", "address_kind": "public" } },
+    { "collector": "net_config", "fields": { "location": "proxy", "proxy_enabled": false, "proxy_server_set": false, "auto_config_url_set": false } }
+  ],
+  "expect_matches": 2
+}

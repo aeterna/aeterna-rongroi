@@ -1,6 +1,7 @@
 # ADR 0054 — Network settings, not network traffic
 
-- Status: accepted — the owner decided the four questions below on 2026-09-18; not implemented yet
+- Status: accepted — the owner decided the four questions below on 2026-09-18 and asked for the
+  implementation the same day
 - Date: 2026-09-17
 
 ## Context
@@ -140,6 +141,41 @@ of a redirect can name the player's own server (owner decision 2).
 
 The points under "What is unverified" stay open; the change that adds the collector says which it
 measured.
+
+## Implementation (2026-09-18)
+
+- `net_config` in `rongroi-collectors`, registered in `all()` and after `fivem_dir` in `COLLECTOR_ORDER`.
+  Its fields: `location`; for `hosts`, `path`, `present`, `lines_in_effect`, and per listed name `line`,
+  `host_name`, `address`, `address_kind`; for `proxy`, `proxy_enabled`, `proxy_server_set`,
+  `auto_config_url_set`; for `firewall`, `firewall_rules`, `unparsed_rules`, and per FiveM rule `path`,
+  `action`, `enabled`, `direction`, `protocol`, `profiles`. Its reasons are `not_windows`,
+  `access_denied` and `read_failed`.
+- Choices this ADR left open, made here:
+  - A hosts file that is not there is `present: false`, not a gap: Windows reads no line from it.
+  - A hosts file starting with a UTF-16 byte-order mark is `read_failed`, because how Windows reads one
+    was not measured. Any other bytes are read as UTF-8, with a UTF-8 mark skipped.
+  - `address_kind` has a fifth value, `not_an_address`, for text in the address column that is not an
+    IPv4 or IPv6 address. The address is parsed in the collector, without `std::net` (AGENTS.md hard
+    rule 1); IPv4 link-local counts as `private`, as do IPv6 link-local and unique-local addresses.
+  - A name matches the list without ASCII case and without a trailing `.`; a name on a listed line is
+    reported as the line spells it.
+  - `proxy_enabled` is left out when `ProxyEnable` is absent or not a `REG_DWORD`: how Windows reads either
+    was not measured. A missing `Internet Settings` key, or firewall rules key, is `read_failed`.
+  - A firewall value that is not text, or larger than the registry bound, counts as unparsed; a `Profile`
+    that repeats is kept every time, other repeated keys the first time. Without `%LOCALAPPDATA%` the
+    firewall place is `read_failed`, since the FiveM folders cannot be named.
+- `rongroi-core::view`: `SS_WITHHELD_FIELDS` removes `net_config`'s `address` from every SS-mode row.
+- The rule `net_config/hosts/fivem-or-rockstar-name-in-hosts` matches `location: hosts` and
+  `host_name|exists: true`. No baseline can confront it, since every observation carrying `host_name`
+  fires it; `rules/unconfronted.csv` says so and what would end the row.
+- `baseline-elevated-win11` gains a hosts file, the proxy and firewall rules in the measured shapes with
+  invented values; `baseline-consumer-win11` gains the proxy and FiveM's two Legacy rules. A new fixture
+  host, `net-config-listed-name`, and its SS-view snapshot show a match without the address.
+- The Windows job reads the three places on its runner and prints the file's line count, the proxy flags
+  and the rule counts beside `Get-NetFirewallRule`'s, never a line or a rule's name.
+- The consent question (CLI and desktop, both languages), `PRIVACY.md`, `docs/architecture.md`, the
+  glossary, both READMEs and both screenshare guides name the new reads. The points under "What is
+  unverified" stay open.
 
 ## Consequences
 

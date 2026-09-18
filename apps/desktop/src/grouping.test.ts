@@ -18,6 +18,7 @@ const ORDER = [
   "posture",
   "driver_service",
   "fivem_dir",
+  "net_config",
   "process",
   "evtx",
   "prefetch",

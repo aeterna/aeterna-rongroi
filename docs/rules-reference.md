@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 31 |
-| SHA-256 | `a70841c0bf2f3054186a2851b4715057c7f2afe7613e0c4a38f89862561b3106` |
+| Rules | 32 |
+| SHA-256 | `d5db1ed9998a02de3322541ecad9dd6aae7fceb2415015c23fe0ecd93fe0f42e` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -56,6 +56,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A file in FiveM's plugins folder carries a valid embedded signature](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
   - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
+- `net_config`
+  - [The hosts file gives a FiveM or Rockstar name an address](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -646,6 +648,45 @@ Only the files present when the scan ran, and only the attempt made during it. A
 **References**
 
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+## Collector `net_config`
+
+### `net_config` / `hosts`
+
+<a id="rule-65ee0ec1-bcda-47a3-a401-98632b42e75f"></a>
+
+#### The hosts file gives a FiveM or Rockstar name an address
+
+- Id: `65ee0ec1-bcda-47a3-a401-98632b42e75f`
+- File: [`rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml`](../rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml)
+- Collector: `net_config`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `net_config`, `hosts`
+- Written: 2026-09-18
+
+**About this check**
+
+A line in effect in this PC's hosts file gives a name under cfx.re, fivem.net or rockstargames.com an address of its own, so Windows uses that address for the name instead of asking a DNS server. The row shows the name, the line and the kind of address: loopback or unspecified sends the name nowhere, which is how blocklists block a service; private or public sends it to another machine. SS mode shows only the kind, because the address itself can name the player's own server. This does not say what wrote the line, when, or whether any program used it.
+
+**Matches when all of these hold for one observation**
+
+- `host_name|exists`: the field is present
+- `location`: is `hosts` (text, ASCII case ignored)
+
+**Look-back**
+
+The hosts file as it was when the scan ran. A line removed before the scan is not seen.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Ad, tracking and telemetry blocklists, which point Rockstar names at 0.0.0.0 or 127.0.0.1
+- Guides that block the Rockstar launcher's update or sign-in servers by editing the hosts file
+- Software that writes its own hosts entries, such as a VPN, a security suite or a development tool
 
 ## Collector `posture`
 

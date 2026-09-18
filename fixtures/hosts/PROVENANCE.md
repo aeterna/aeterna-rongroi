@@ -74,6 +74,7 @@ none contains a real person's user name, host name, SID or files.
 | `usn-folder-on-other-volume` | An elevated Windows 11 scan whose FiveM Legacy plugin folder shares Prefetch's drive letter but is reached through a junction to another volume (e.g. `mklink /J`): its identifier carries a different volume serial than the system volume's own, so its records are not credited to it | `usn` collector tests |
 | `driver-service-forms` | A Windows 11 scan whose driver services cover every `ImagePath` form the resolver knows and one it does not, and each file outcome the collector distinguishes: absent, `\SystemRoot\`, relative under `System32` and `SysWOW64`, `\??\X:\`, a bare drive letter, a quoted path an unknown form, a refused file, an unrecorded hash and a missing file, beside a `Type: 32` service that is not a driver | `driver_service` collector tests |
 | `driver-service-refused` | The key that lists driver services (`HKLM\SYSTEM\CurrentControlSet\Services`) refused to this program. Measured on no machine: both machines ADR 0046 measured let a token without Administrators read it | `driver_service` collector tests, report snapshots |
+| `net-config-listed-name` | The three places `net_config` reads (ADR 0054) in the shapes measured on one Windows 11 PC, with invented values: a hosts file whose lines give a Rockstar subdomain an unspecified address and a FiveM name a public one beside a line for an unlisted name, a proxy on with a server set, and one firewall rule for FiveM.exe beside one for another program and one that is not a rule | `net_config` report snapshot |
 | `driver-service-listed` | A Windows 11 scan with one driver service whose file's SHA-256 is the vendored `loldrivers-vulnerable-drivers.csv`'s first row (LOLDrivers id `ff74f03e-e4ce-4242-bfe3-60601056bb34`, `CorsairLLAccess64.sys`), so the vulnerable-driver rule can be exercised through the real bundle. The service name and path are invented; only the hash is real, copied from the data file | report snapshots |
 
 **`FiveM.exe` in `baseline-consumer-win11` and `baseline-elevated-win11` is measured, not written.**
@@ -105,6 +106,18 @@ installed, so its two plugin folders came back `folder: absent`; `baseline-eleva
 describes an installed, empty Legacy plugin folder (above), so its `usn_journal: folders:` lists that
 path instead, giving `plugins` zero records there rather than repeating the runner's absence. Enhanced's
 plugin folder is not described by this baseline and stays absent, as it already was.
+
+**The network settings in the baselines are shapes, not a PC's values (ADR 0054).** On 2026-09-17 one
+Windows 11 PC (build 26220) was measured read-only with a limited and an elevated token, printing counts
+and shapes only: `DataBasePath` was `%SystemRoot%\System32\drivers\etc`; the hosts file was UTF-8 with a
+byte-order mark, 36 lines of which 6 were in effect — one loopback, two private and three other
+addresses — and none named a listed name; `ProxyEnable` was `0` with no other proxy value; and the
+firewall rules key held `REG_SZ` values of the form `v2.<n>|key=value|…|`, FiveM's being two allow-in
+rules (TCP and UDP) for `FiveM.exe` and two for GTA V Enhanced's executable in FiveM's folder.
+`baseline-elevated-win11` holds a hosts file, a proxy and firewall rules of those shapes, and
+`baseline-consumer-win11` the proxy and the two `FiveM.exe` rules. Every name, address, value name,
+profile and rule text in them is invented; nothing was copied from that PC. `baseline-consumer-win11`
+sets no `%SystemRoot%`, so its hosts file is not read there.
 
 **The driver services in the baselines are a runner's, not a PC's.** `baseline-elevated-win11`'s driver
 service keys and files are rebuilt from the `driver_service` collector's observations of a GitHub-hosted
