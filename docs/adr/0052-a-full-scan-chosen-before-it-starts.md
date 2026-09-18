@@ -1,6 +1,7 @@
 # ADR 0052 — A full scan, chosen before it starts
 
-- Status: accepted — the owner decided the four questions below on 2026-09-17; not implemented yet
+- Status: accepted — the owner decided the four questions below on 2026-09-17; implemented on 2026-09-18
+  with its first `full` collector (ADR 0055)
 - Date: 2026-09-16
 
 ## Context
@@ -159,6 +160,43 @@ the child. A copy started this way neither gains nor loses administrator rights.
 The tier is implemented together with its first `full` collector — an Enhanced server cache folder's name,
 or the endpoints in FiveM's logs — because until one exists it changes nothing a player sees. The two
 unverified points above about the relaunch and the dialog are measured on a real Windows PC then.
+
+## Implementation (2026-09-18)
+
+- `rongroi-core`: `ScanTier` (`standard`, `full`) and `SensitiveKind` (`server_identity`,
+  `account_identifier`) in the model; `UnmeasuredReason::NotConsented`, a scope statement;
+  `ReportHeader.scan_tier` and `Report.sensitive_fields`, both additive; `ScopeNotes.not_consented`.
+  `Rule::expects_unmeasured` answers true for `not_consented`: no rule may declare it, and a standard scan
+  is the ordinary one, so SS mode counts it as expected rather than listing it as a surprise.
+- `view`: `SsOptions` and `for_mode_with`. In SS mode every value of a field a collector declared
+  sensitive is replaced by `%SERVER_IDENTITY%` or `%ACCOUNT_IDENTIFIER%` before the view is built — in the
+  evidence, the timeline selections, the unmatched observations and own traces — unless the option for its
+  kind is on. `for_mode` and `timeline` keep their signatures and show nothing more.
+- `rongroi-collectors`: `Collector::tier`, `Field::sensitive`, `sensitive_kinds(tier)`;
+  `ScanContext.tier`; `scan::run` does not call a collector whose tier is above the scan's, and reports
+  its run as `not_consented`. A `not_consented` source is not listed among the timeline's unmeasured
+  sources: it was not read, and the scope statement says so once. A test holds every `standard` collector
+  to declaring no sensitive field.
+- The first `full` collector is `fivem_servers` (ADR 0055).
+- CLI: `scan --full` asks on standard error before any collector runs; only `yes` starts a full scan, and
+  anything else — end of input too — starts the standard scan and says so. `--elevate` forwards `--full`,
+  and the elevated copy asks again. In SS mode, after the consent question, which names what a full scan
+  read, each kind of sensitive value the scan's collectors declare is asked about separately, default no;
+  `--yes` answers the consent question only, so a scripted SS scan shows no sensitive value.
+- `rongroi-host-windows`: `relaunch::relaunch_same_token`, with `std::process::Command`, which calls
+  `CreateProcessW` with no token argument (read from the standard library's source for Rust 1.98.1); and
+  `dialog::ask_yes_no`, a `MessageBoxW` with Yes and No, No the default, topmost and set to the
+  foreground. The dialog API chosen is `MessageBoxW`: a yes-or-no over a short list does not need
+  `TaskDialogIndirect`.
+- Desktop: a copy started with `--full` shows the dialog, in English and Thai, before the scan and before
+  any window of its own; Yes is a full scan, No or closing it the standard one. The start screen says which
+  scan ran and, after a standard one, offers "Full scan", which starts a copy with `--full` through
+  `relaunch_same_token` and exits. The elevation button forwards `--full` only when the current scan was
+  full, so a player who answered No is not asked again. After a full scan the SS consent screen names what
+  it read and offers a switch to show server identities, off by default; `report_view` takes the options.
+- `xtask`: `check-baseline` scans at `full`; `check-rules` refuses `not_consented` in `unmeasured_when`.
+- The Windows job runs `scan --full` with `no` and with `yes` on standard input and checks the header and
+  the full collector's runs.
 
 ## Consequences
 

@@ -106,6 +106,8 @@ beforeEach(async () => {
           return new Promise(() => {});
         }
         return linksOverride ?? { repository: REPOSITORY, code: REPOSITORY, commit: null };
+      case "relaunch_full":
+        return "failed";
       case "code_link_qr":
         return `<?xml version="1.0" standalone="yes"?><svg xmlns="http://www.w3.org/2000/svg"></svg>`;
       default:
@@ -247,9 +249,10 @@ describe("App", () => {
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
     // One not-measured rule is hidden too: the firmware reading needs administrator rights, which this
     // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038).
+    // So is the full-scan rule: this was a standard scan, which every rule expects (ADR 0052).
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 1 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
+        "Hidden in SS mode: 1 not found · 2 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -499,6 +502,7 @@ describe("App", () => {
     ["source_empty", "the place this is kept is there and holds nothing"],
     ["partial", "part of this was read and part of it was not"],
     ["budget_spent", "this program stopped reading before it finished"],
+    ["not_consented", "only a full scan reads this, and this was the standard scan"],
   ])("shows %s as a sentence a non-expert reads", async (reason, sentence) => {
     const first = selfView.evidence[0];
     if (!first) {
@@ -523,6 +527,72 @@ describe("App", () => {
     fireEvent.click(await screen.findByText("Check my own PC"));
     fireEvent.click(await screen.findByText(/^Check: /));
     expect(await screen.findByText(new RegExp(sentence))).toBeTruthy();
+  });
+
+  // The third scope statement: which scan the player chose is one fact about the scan (ADR 0052).
+  it("states the checks only a full scan answers once, above the evidence", async () => {
+    viewOverride = { ...selfView, scope: { not_admin: 0, not_attempted: 0, not_consented: 1 } };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const statements = await screen.findAllByText(/read only in a full scan/);
+    expect(statements).toHaveLength(1);
+    expect(statements[0]?.textContent).toContain("1 check(s)");
+  });
+
+  // A full scan is chosen in a new copy that asks in a Windows dialog before it reads anything; this
+  // window only offers it, and says so (ADR 0052).
+  it("offers a full scan after a standard one and asks Rust to start a new copy", async () => {
+    render(<App />);
+    expect(await screen.findByText("This was a standard scan.")).toBeTruthy();
+    fireEvent.click(screen.getByText("Full scan"));
+    expect(await screen.findByText(/did not start the program again/)).toBeTruthy();
+    expect(calls).toContain("relaunch_full");
+  });
+
+  it("does not offer a full scan after one, and names what it read on the consent screen", async () => {
+    headerOverride = { ...selfView.header, scan_tier: "full" };
+    render(<App />);
+    expect(await screen.findByText(/This was a full scan/)).toBeTruthy();
+    expect(screen.queryByText("Full scan")).toBeNull();
+    fireEvent.click(screen.getByText("Screenshare check (SS mode)"));
+    expect(screen.getByText(/also read the name of each server cache folder/)).toBeTruthy();
+    // Off until the player turns it on.
+    const toggle = screen.getByRole("checkbox", { name: /Also show which servers these are/ });
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("passes the player's answer about server names to the view", async () => {
+    headerOverride = { ...selfView.header, scan_tier: "full" };
+    const seen: unknown[] = [];
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Also show which servers these are/ }));
+    mockIPC((cmd, args) => {
+      calls.push(cmd);
+      if (cmd === "report_view") {
+        seen.push((args as Record<string, unknown>).options);
+        return ssView;
+      }
+      if (cmd === "rule_texts") {
+        return {};
+      }
+      if (cmd === "code_links") {
+        return { repository: REPOSITORY, code: REPOSITORY, commit: null };
+      }
+      return selfView.header;
+    });
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    await screen.findByText("Found");
+    expect(seen).toContainEqual({ server_identity: true, account_identifier: false });
+  });
+
+  it("offers no server-name choice after a standard scan", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    expect(
+      screen.queryByRole("checkbox", { name: /Also show which servers these are/ }),
+    ).toBeNull();
+    expect(screen.queryByText(/also read the name of each server cache folder/)).toBeNull();
   });
 
   it("states nothing about administrator rights when every check was answerable", async () => {

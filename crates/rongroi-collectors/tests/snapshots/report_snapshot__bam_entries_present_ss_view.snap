@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 32
+      "rule_count": 33
     },
     "platform": "windows",
     "os_build": "26100",
@@ -24,7 +24,8 @@ expression: view
     "boot_time": {
       "state": "unmeasured",
       "reason": "read_failed"
-    }
+    },
+    "scan_tier": "standard"
   },
   "evidence": [
     {
@@ -188,7 +189,8 @@ expression: view
   "unmatched": [],
   "scope": {
     "not_admin": 0,
-    "not_attempted": 0
+    "not_attempted": 0,
+    "not_consented": 1
   },
   "listed": {
     "found": 0,
@@ -197,7 +199,7 @@ expression: view
   },
   "hidden": {
     "not_found": 0,
-    "unmeasured_expected": 3,
+    "unmeasured_expected": 4,
     "unmeasured_unexpected": 0,
     "unmatched": 4
   },
@@ -242,6 +244,7 @@ expression: view
     "posture",
     "driver_service",
     "fivem_dir",
+    "fivem_servers",
     "net_config",
     "process",
     "evtx",

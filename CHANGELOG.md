@@ -89,12 +89,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
   oldest and newest record, and FiveM's folder activity. The consent question and PRIVACY.md name what the
   SS timeline shows, program by program. The desktop groups rows in an order the core now decides. A rule
   on Prefetch, BAM or PCA that matches `name` or `path` is now refused when the bundle loads (ADR 0034).
-- Accepted (ADR 0052, 2026-09-17), not yet implemented: two scan tiers. Sources that read more about the
-  player — FiveM's logs, server cache folder names, crash-dump module lists, profile counts — would be read
-  only in a full scan, which the player chooses before it starts: a question on the CLI, and a native
-  Windows dialog in a fresh desktop copy before any WebView exists. A standard scan would report those
-  sources as `not_consented`, once, above the evidence. Server identities and account identifiers stay
-  hidden in SS mode unless the player agrees to each.
+- Two scan tiers (ADR 0052). A **full scan** reads more than the standard one, and only when the player
+  says yes before it starts, in the process that reads: `scan --full` asks on standard error and only
+  `yes` starts it; the desktop app's "Full scan" button starts a new copy with the same token, which asks
+  in a Windows dialog before any collector runs and before any WebView exists. No flag answers for the
+  player. In a standard scan a `full` collector is not called: its rules are unmeasured with the new
+  reason `not_consented`, a scope statement said once above the evidence. The header carries `scan_tier`.
+  A field a `full` collector declares sensitive is shown in SS mode as `%SERVER_IDENTITY%` or
+  `%ACCOUNT_IDENTIFIER%` unless the player agreed to show that kind, a separate question, default no.
+- The first `full` collector, `fivem_servers`: the name of each server cache folder FiveM for GTA V
+  Enhanced keeps, with its creation and last-write times, and one `context` rule that lists them
+  (ADR 0055). What the name is made from is not known.
 - ADR 0052 records a Windows 11 measurement: under UAC's default settings, a process started with
   `CreateProcessW` from an elevated copy is elevated, and from a standard copy is standard, with no consent
   prompt in between. A desktop copy started for a full scan neither gains nor loses administrator rights.

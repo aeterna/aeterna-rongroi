@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use rongroi_collectors::scan::{self, ScanContext};
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::SelfIdentity;
-use rongroi_core::model::Mode;
+use rongroi_core::model::{Mode, ScanTier};
 use rongroi_core::provenance::Provenance;
 use rongroi_core::view;
 use rongroi_host::FixtureHost;
@@ -24,6 +24,14 @@ fn report_for(host: &str) -> rongroi_core::model::Report {
 }
 
 fn report_for_self(host: &str, self_identity: SelfIdentity) -> rongroi_core::model::Report {
+    report_at(host, self_identity, ScanTier::Standard)
+}
+
+fn report_at(
+    host: &str,
+    self_identity: SelfIdentity,
+    tier: ScanTier,
+) -> rongroi_core::model::Report {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures/hosts")
         .join(host);
@@ -33,6 +41,7 @@ fn report_for_self(host: &str, self_identity: SelfIdentity) -> rongroi_core::mod
         provenance: Provenance::from_parts(None, "0.0.0-test", None, None),
         generated_at: "2026-01-01T00:00:00Z".to_owned(),
         self_identity,
+        tier,
     };
     scan::run(&host, &bundle, context)
 }

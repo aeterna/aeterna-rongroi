@@ -272,6 +272,14 @@ impl Vocabulary {
                 ));
                 continue;
             }
+            // No machine produces it: the scan does, when the player chose the standard one, and every
+            // rule counts it as expected already (ADR 0052).
+            if *reason == UnmeasuredReason::NotConsented {
+                problems.push(format!(
+                    "rules/{path}: `unmeasured_when` names `{name}`, which no rule may declare; it says which scan the player chose, not anything about the machine, and every rule already expects it"
+                ));
+                continue;
+            }
             if !known.contains(name) {
                 problems.push(format!(
                     "rules/{path}: `unmeasured_when` names `{name}`, which the `{}` collector cannot report; it reports {}",
@@ -782,6 +790,32 @@ date: 2026-09-11
     /// written "this one is ordinary on some machines" and the report lists it anyway. `posture`
     /// reads registry values and a platform API and has no service to be switched off, so
     /// `service_disabled` — which since ADR 0030 `prefetch` does produce — is still wrong here.
+    /// `not_consented` is a fact about which scan the player chose, produced by the scan and never by
+    /// a collector reading a machine, so no rule may declare it (ADR 0052).
+    #[test]
+    fn not_consented_is_rejected_in_unmeasured_when() {
+        let tmp = TempRoot::new("not-consented");
+        let rule = VALID_RULE
+            .replace("status: test", "status: experimental")
+            .replace(
+                "retention: Current setting only.",
+                "retention: Current setting only.\nunmeasured_when: [not_consented]",
+            );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0]
+                .contains("`unmeasured_when` names `not_consented`, which no rule may declare"),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
     #[test]
     fn an_unmeasured_when_reason_this_build_cannot_produce_is_rejected() {
         let tmp = TempRoot::new("dead-reason");
@@ -917,6 +951,7 @@ date: 2026-09-11
             UnmeasuredReason::SourceAbsent,
             UnmeasuredReason::SourceEmpty,
             UnmeasuredReason::CollectorUnavailable,
+            UnmeasuredReason::NotConsented,
         ] {
             assert!(
                 !reason.is_always_listed(),

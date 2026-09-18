@@ -1,0 +1,9 @@
+{
+  "description": "A server cache folder listed with two server folders",
+  "observations": [
+    { "collector": "fivem_servers", "fields": { "folder": "listed", "server_folders": 2 } },
+    { "collector": "fivem_servers", "fields": { "server_folder": "0123456789abcdef0123456789abcdef01234567", "created_at": "2026-09-09T14:32:00Z", "modified_at": "2026-09-15T09:18:00Z" } },
+    { "collector": "fivem_servers", "fields": { "server_folder": "89abcdef0123456789abcdef0123456789abcdef" } }
+  ],
+  "expect_matches": 2
+}

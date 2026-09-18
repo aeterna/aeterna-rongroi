@@ -348,8 +348,11 @@ impl Rule {
     /// This is the whole of what `unmeasured_when` does: the engine records the answer on the
     /// evidence and the view lists the surprises and counts the rest (ADR 0027). It changes nothing
     /// about whether the rule matches.
+    ///
+    /// `not_consented` is always expected: no rule may declare it, and a standard scan is the
+    /// ordinary scan every player gets unless they ask for more (ADR 0052).
     pub fn expects_unmeasured(&self, reason: UnmeasuredReason) -> bool {
-        self.unmeasured_when.contains(&reason)
+        reason == UnmeasuredReason::NotConsented || self.unmeasured_when.contains(&reason)
     }
 
     /// Every `match` key split into the field it names and the operator it asks for.

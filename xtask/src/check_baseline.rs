@@ -35,7 +35,7 @@ use anyhow::{Context, bail};
 use rongroi_collectors::scan::{self, ScanContext};
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::{SelfIdentity, confronts};
-use rongroi_core::model::{EvidenceState, Observation, Report};
+use rongroi_core::model::{EvidenceState, Observation, Report, ScanTier};
 use rongroi_core::provenance::Provenance;
 use rongroi_host::FixtureHost;
 
@@ -332,6 +332,8 @@ fn baseline_context() -> ScanContext {
         generated_at: "2026-01-01T00:00:00Z".to_owned(),
         // Nothing in a baseline describes this program, so no observation is an own trace.
         self_identity: SelfIdentity::default(),
+        // Every collector, so a `full` collector's rules are measured on a baseline too (ADR 0052).
+        tier: ScanTier::Full,
     }
 }
 

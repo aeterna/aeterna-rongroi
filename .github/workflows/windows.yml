@@ -533,6 +533,21 @@ jobs:
           } catch {
             Write-Output "Get-NetFirewallRule PersistentStore: $($_.Exception.Message)"
           }
+          # ADR 0052. `--full` asks on standard error before anything is read, and only `yes` starts a full
+          # scan: `no` gives the standard scan, whose `full` collectors are `not_consented`, and `yes` gives a
+          # full scan that calls them. The runner has no FiveM for GTA V Enhanced, so its server cache
+          # folder is `absent`; no folder name is printed.
+          $standardScan = ('no' | & cargo run --locked --quiet -p rongroi-cli -- scan --full --json | Out-String) | ConvertFrom-Json
+          if ($standardScan.header.scan_tier -ne 'standard') { throw "scan --full answered no ran a $($standardScan.header.scan_tier) scan" }
+          $notConsented = @($standardScan.evidence | Where-Object { $_.collector -eq 'fivem_servers' -and $_.reason -eq 'not_consented' })
+          if ($notConsented.Count -eq 0) { throw 'a standard scan did not report the full collector as not_consented' }
+          $fullScan = ('yes' | & cargo run --locked --quiet -p rongroi-cli -- scan --full --json | Out-String) | ConvertFrom-Json
+          if ($fullScan.header.scan_tier -ne 'full') { throw "scan --full answered yes ran a $($fullScan.header.scan_tier) scan" }
+          $servers = @(@($fullScan.unmatched | Where-Object { $_.collector -eq 'fivem_servers' } | ForEach-Object { $_.observations }) +
+            @($fullScan.evidence | Where-Object { $_.collector -eq 'fivem_servers' -and $_.state -eq 'found' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ })
+          if ($servers.Count -eq 0) { throw 'fivem_servers produced no observation in a full scan' }
+          Write-Output "full scan: fivem_servers folder=$(@($servers | Where-Object { $_.fields.folder } | ForEach-Object { $_.fields.folder }) -join ',') server_folders=$(@($servers | Where-Object { $_.fields.server_folder }).Count)"
           # ADR 0038: the firmware reading compared with PowerShell's own reading of the same UEFI
           # variable on this machine. A runner is not an ordinary Windows PC, so this says the two
           # readers agree, not what an ordinary PC reports.

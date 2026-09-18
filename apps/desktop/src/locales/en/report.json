@@ -14,7 +14,11 @@
     "boot_time_unmeasured": "not measured — {{reason}}",
     "elapsed": "{{hours}}h {{minutes}}m",
     "elapsed_days": "{{days}}d {{hours}}h {{minutes}}m",
-    "rules": "Rules"
+    "rules": "Rules",
+    "scan_tier": "Scan",
+    "tier_standard": "standard",
+    "tier_full": "full",
+    "server_identity_hidden": "Server names are shown as %SERVER_IDENTITY%: the player did not agree to show them."
   },
   "state": {
     "found": "Found",
@@ -42,14 +46,16 @@
     "partial": "part of this was read and part of it was not",
     "budget_spent": "this program stopped reading before it finished",
     "read_failed": "this could not be read",
-    "collector_unavailable": "this build does not read that"
+    "collector_unavailable": "this build does not read that",
+    "not_consented": "only a full scan reads this, and this was the standard scan"
   },
   "retention": "Look-back",
   "description": "About this check",
   "falsepositives": "Ordinary things that also produce this",
   "scope": {
     "not_admin": "Scope: {{checks}} check(s) could not be answered because this scan does not have administrator rights. Running it again as administrator answers them.",
-    "not_attempted": "Scope: {{checks}} check(s) could not be answered because this program stopped reading before it reached what they ask about. That is this program's limit, not a finding about this PC."
+    "not_attempted": "Scope: {{checks}} check(s) could not be answered because this program stopped reading before it reached what they ask about. That is this program's limit, not a finding about this PC.",
+    "not_consented": "Scope: {{checks}} check(s) were not answered because they read only in a full scan, and the standard scan was chosen. A full scan asks before it starts."
   },
   "own_traces": {
     "title": "Own traces (excluded)",
@@ -82,7 +88,8 @@
     "prefetch": "Windows Prefetch",
     "bam": "Background Activity Moderator (BAM)",
     "pca": "Program Compatibility Assistant",
-    "usn": "NTFS change journal"
+    "usn": "NTFS change journal",
+    "fivem_servers": "FiveM server cache folders (full scan)"
   },
   "group_count": {
     "found": "{{count}} found",
