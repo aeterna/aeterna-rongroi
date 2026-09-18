@@ -38,6 +38,34 @@ only:
 
 How the probe listed the firewall rules was not recorded, and the registry form of a rule was not read.
 
+**Second measurement, 2026-09-17**, same PC, same permission, run once elevated and once with a limited
+token (a scheduled task at `HIGHEST` and one at `LIMITED` on the signed-in desktop), printing counts, value
+kinds and the shape of a rule with its user name, rule name and description masked. The script and its
+output were deleted afterwards. **Both tokens read exactly the same thing**, so none of the three places
+needed administrator rights on this build.
+
+| Place | What was read |
+|---|---|
+| `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters` | a value `DataBasePath`, `REG_EXPAND_SZ`, `%SystemRoot%\System32\drivers\etc` |
+| the `hosts` file in that folder | readable; 36 lines, 6 in effect, UTF-8 with a byte-order mark, at most two names per line, no tab; addresses: 1 loopback, 2 private, 3 others; no listed name |
+| `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` | `ProxyEnable` present, `REG_DWORD`, `0`; no `ProxyServer`, `AutoConfigURL`, `ProxyOverride` or `AutoDetect` value. Its `Connections` subkey holds one binary value per connection, named after the connection — VPN products among them |
+| `HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules` | 909 values, all `REG_SZ`; `Get-NetFirewallRule` listed the same 909, all in the local store. Each value is `v2.<n>` followed by `\|`-separated `key=value` pairs and a trailing `\|`, in seven format versions (`v2.10` to `v2.33`). Keys seen include `Action`, `Active`, `Dir`, `Protocol`, `Profile`, `App`, `Name`, `Desc`, `Svc`, `LPort` and `RA4`; **a key can repeat** (`Profile` twice) |
+| the FiveM rules among them | 4, the same 4 `Get-NetFirewallApplicationFilter` found, all `v2.10`, `Action=Allow`, `Active=TRUE`, `Dir=In`, one TCP (`Protocol=6`) and one UDP (`17`) per program, each with a `Defer` key. Two name `...\appdata\local\fivem\fivem.exe`; two name GTA V Enhanced's executable **inside FiveM's own folder** (`...\appdata\local\fivem for gtav enhanced\gamecache\...\gta5_enhanced.exe`). The paths were lower-case and under the user's profile. None of their value names was a GUID |
+| firewall rules from Group Policy | `HKLM\SOFTWARE\Policies\Microsoft\WindowsFirewall\FirewallRules` absent |
+
+What this changes in the proposal:
+
+- `hosts` is found through `DataBasePath`, expanded as `ProfilesDirectory` is (ADR 0049); a value that does
+  not expand to a drive-rooted folder is `read_failed`. A byte-order mark is skipped before lines are read.
+- `firewall` reads that one key. A rule is FiveM's when its `App` is under a FiveM program folder
+  (`%LOCALAPPDATA%\FiveM` or `%LOCALAPPDATA%\FiveM for GTAV Enhanced`), compared without case, because the
+  game's executable lives there too. Only `Action`, `Active`, `Dir`, `Protocol`, every `Profile`, and `App`
+  are reported; `Name` and `Desc` are not, because a rule a person wrote can say anything. A value that does
+  not start with `v2.` is counted as unparsed. Rules from Group Policy or other policy stores are not read in
+  this change.
+- `proxy` reads the `Internet Settings` values only. `Connections` is not read: its value names name the
+  PC's VPN and dial-up connections.
+
 ## Decision (proposed)
 
 ### 1. A collector, `net_config`, in the standard tier
@@ -45,7 +73,7 @@ How the probe listed the firewall rules was not recorded, and the registry form 
 It reads three places, told apart by a discriminator `location` (ADR 0044):
 
 - **`hosts`** — the hosts file, found through the folder Windows' TCP/IP parameters name for it, which
-  defaults to `%SystemRoot%\System32\drivers\etc` [the value name is unverified]. One observation for the
+  defaults to `%SystemRoot%\System32\drivers\etc` (`DataBasePath`, measured). One observation for the
   file: how many lines are in effect (not blank, not a comment). One observation per line in effect **whose
   host name is, or ends in `.` followed by, a name on a fixed list** (section 2), with that host name and
   the address the line gives it (section 4). Other lines are counted and never reported: they are the
@@ -53,12 +81,12 @@ It reads three places, told apart by a discriminator `location` (ADR 0044):
 - **`proxy`** — the current user's `Internet Settings` key: whether `ProxyEnable` is on, and whether a
   `ProxyServer` and an `AutoConfigURL` value exist. **Never their values**: an address can name a person's
   own server or a company's.
-- **`firewall`** — Windows Firewall rules whose program path is a FiveM or FXServer executable: whether each
-  is enabled, its direction and its action, and the program path, redacted in SS mode like every path. The
-  place Windows keeps rules in the registry and the form of a rule must be measured before this is written
-  [unverified]; a form this program cannot parse makes the place `read_failed`, not empty.
+- **`firewall`** — Windows Firewall rules for a program in a FiveM folder: whether each is enabled, its
+  direction, action, protocol and profiles, and the program path, redacted in SS mode like every path. Where
+  the rules are and their form are under "Measured"; a form this program cannot parse is counted as
+  unparsed, and a key it cannot read makes the place `read_failed`, not empty.
 
-It needs no administrator rights for `hosts` and `proxy` [to measure for `firewall`]. It opens nothing for
+It needs no administrator rights for any of the three (measured). It opens nothing for
 writing, and it reads no value it does not report.
 
 ### 2. The fixed list of names
@@ -91,10 +119,12 @@ of a redirect can name the player's own server. This is an owner decision below.
 
 ## What is unverified
 
-- The registry value that names the hosts file's folder, and whether Windows reads the file from there on
-  current builds.
-- Where Windows Firewall keeps its rules in the registry, the form of one rule, and whether a standard user
-  can read them.
+- Whether Windows resolves names from the folder `DataBasePath` names when the value is changed. The value
+  was read, not changed.
+- What `Defer` means and what writes a rule with it — plausibly the Windows prompt that asks to allow a
+  program on first use, which was not observed.
+- Whether GTA V Legacy under FiveM, or FXServer, gets rules of the same shape. The PC measured had none.
+- Whether a standard user can read the firewall key on other Windows builds.
 - Whether an ordinary baseline host has any of the listed names in its hosts file, and so whether the rule is
   quiet on `check-baseline`.
 
@@ -102,7 +132,8 @@ of a redirect can name the player's own server. This is an owner decision below.
 
 1. The fixed list of names (section 2).
 2. The address of a hosts line: shown in Self mode and only as a kind in SS mode (section 4).
-3. The firewall place, with its fields, once its form is measured (section 1).
+3. The firewall place: FiveM's rules found by their program folder, with the fields listed under
+   "Measured" (section 1).
 4. The one rule, and no rule for proxy and firewall (section 3).
 
 ## Consequences
@@ -113,4 +144,5 @@ of a redirect can name the player's own server. This is an owner decision below.
 - `rules/net_config/…` with fixtures, Thai text and a baseline check.
 - The consent question (CLI and desktop), `PRIVACY.md`, `docs/architecture.md`, the glossary and the desktop's
   collector names say what is read, in the change that adds the collector.
-- A measurement on a real Windows PC, with permission, before the `firewall` place is written.
+- Fixture hosts built from the shapes measured above with invented values of the same form; no rule value
+  measured on a PC is vendored.
