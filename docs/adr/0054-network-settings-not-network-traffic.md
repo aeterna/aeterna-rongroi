@@ -1,6 +1,6 @@
 # ADR 0054 — Network settings, not network traffic
 
-- Status: proposed
+- Status: accepted — the owner decided the four questions below on 2026-09-18; not implemented yet
 - Date: 2026-09-17
 
 ## Context
@@ -66,7 +66,7 @@ What this changes in the proposal:
 - `proxy` reads the `Internet Settings` values only. `Connections` is not read: its value names name the
   PC's VPN and dial-up connections.
 
-## Decision (proposed)
+## Decision
 
 ### 1. A collector, `net_config`, in the standard tier
 
@@ -104,9 +104,9 @@ what ordinary PCs have. Self mode lists them, and SS mode counts them.
 
 ### 4. The address in a hosts line
 
-Proposed: reported as written in Self mode, and in SS mode only as its kind — `loopback`, `unspecified`
+Reported as written in Self mode, and in SS mode only as its kind — `loopback`, `unspecified`
 (`0.0.0.0`, `::`), `private` or `public`. The kind is what separates a blocklist from a redirect; the address
-of a redirect can name the player's own server. This is an owner decision below.
+of a redirect can name the player's own server (owner decision 2).
 
 ## Alternatives weighed
 
@@ -128,13 +128,18 @@ of a redirect can name the player's own server. This is an owner decision below.
 - Whether an ordinary baseline host has any of the listed names in its hosts file, and so whether the rule is
   quiet on `check-baseline`.
 
-## Owner decisions this ADR needs
+## Owner decisions (2026-09-18)
 
-1. The fixed list of names (section 2).
-2. The address of a hosts line: shown in Self mode and only as a kind in SS mode (section 4).
-3. The firewall place: FiveM's rules found by their program folder, with the fields listed under
+1. The fixed list of names is `cfx.re`, `fivem.net` and `rockstargames.com`, with their subdomains
+   (section 2).
+2. The address of a hosts line is shown as written in Self mode and only as its kind in SS mode
+   (section 4).
+3. The firewall place finds FiveM's rules by their program folder and reports only the fields listed under
    "Measured" (section 1).
-4. The one rule, and no rule for proxy and firewall (section 3).
+4. One rule ships, on the hosts place; proxy and firewall have none (section 3).
+
+The points under "What is unverified" stay open; the change that adds the collector says which it
+measured.
 
 ## Consequences
 

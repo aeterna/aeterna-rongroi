@@ -103,11 +103,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   and each Enhanced server cache folder's creation and last-change times and entry count, with no file or
   folder name. No rule reads them: Self mode lists them and SS mode counts them. The consent question and
   PRIVACY.md say so (ADR 0053, accepted).
-- Proposed (ADR 0054): a `net_config` collector for the settings that decide where traffic goes — hosts file
-  lines naming `cfx.re`, `fivem.net` or `rockstargames.com`, whether a proxy is set (never its address),
-  and Windows Firewall rules for FiveM — with one `experimental` hosts rule. The ADR records the owner's
-  decision that no record of where traffic went is read: not SRUM, the DNS cache, the live TCP table, the
-  firewall log or a packet capture.
+- Accepted (ADR 0054, 2026-09-18), not yet implemented: a `net_config` collector for the settings that
+  decide where traffic goes — hosts file lines naming `cfx.re`, `fivem.net` or `rockstargames.com`, whether
+  a proxy is set (never its address), and Windows Firewall rules for programs in FiveM's folders — with one
+  `experimental` hosts rule. SS mode shows a hosts line's address only as its kind: loopback, unspecified,
+  private or public. The ADR records the owner's decision that no record of where traffic went is read:
+  not SRUM, the DNS cache, the live TCP table, the firewall log or a packet capture.
 - ADR 0054 records a second Windows 11 measurement: the hosts file's folder (`DataBasePath`), the proxy
   values and the firewall rules key all read the same with and without administrator rights; FiveM's four
   firewall rules include two for GTA V Enhanced's executable inside FiveM's folder, so the collector finds
