@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::{self, SelfIdentity};
 use rongroi_core::model::{
-    BootTime, CollectorRun, CoverageFields, REPORT_SCHEMA_VERSION, Report, ReportHeader,
+    BootTime, CollectorRun, CoverageFields, REPORT_SCHEMA_VERSION, Report, ReportHeader, ScanTier,
     UnmeasuredReason, UnmeasuredSource,
 };
 use rongroi_core::provenance::Provenance;
@@ -27,6 +27,9 @@ pub struct ScanContext {
     /// machine (ADR 0010). Computed by the caller's `main`, never read from the running process
     /// here, so that a fixture can exercise the whole path.
     pub self_identity: SelfIdentity,
+    /// Which scan the player chose before it started (ADR 0052). A collector whose tier is above it
+    /// is not called.
+    pub tier: ScanTier,
 }
 
 /// Runs every collector against `host` and evaluates `bundle`.
@@ -37,9 +40,20 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
     let boot_time = boot_time(host, &context.generated_at);
     let profiles_directory = profiles_directory(host);
     let collectors = crate::all();
+    let tier = context.tier;
     let runs: Vec<CollectorRun> = collectors
         .iter()
-        .map(|collector| collector.collect(host))
+        .map(|collector| {
+            if collector.tier() > tier {
+                // Not called at all: no function of it touches the machine (ADR 0052).
+                CollectorRun::Unmeasured {
+                    collector: collector.id().to_owned(),
+                    reason: UnmeasuredReason::NotConsented,
+                }
+            } else {
+                collector.collect(host)
+            }
+        })
         .collect();
     let header = ReportHeader {
         schema_version: REPORT_SCHEMA_VERSION,
@@ -51,10 +65,29 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
         generated_at: context.generated_at,
         boot_time,
         profiles_directory,
+        scan_tier: tier,
     };
     let mut report = engine::evaluate(bundle, &runs, header, &context.self_identity);
     declare_times(&mut report, &collectors, &runs);
+    declare_sensitive(&mut report, &collectors);
     report
+}
+
+/// Copies into the report which fields each collector declared sensitive, for `view` to hide in SS
+/// mode (ADR 0052), whatever the tier of the scan.
+fn declare_sensitive(report: &mut Report, collectors: &[Box<dyn crate::Collector>]) {
+    for collector in collectors {
+        let fields: BTreeMap<String, rongroi_core::model::SensitiveKind> = collector
+            .fields()
+            .iter()
+            .filter_map(|field| Some((field.name.to_owned(), field.sensitive?)))
+            .collect();
+        if !fields.is_empty() {
+            report
+                .sensitive_fields
+                .insert(collector.id().to_owned(), fields);
+        }
+    }
 }
 
 /// Copies into the report what the timeline needs to know and the core cannot: which fields are
@@ -125,6 +158,11 @@ fn unmeasured_sources(
         reason,
     };
     match run {
+        // A scope fact, stated once above the evidence; the source was never read, not unreadable.
+        CollectorRun::Unmeasured {
+            reason: UnmeasuredReason::NotConsented,
+            ..
+        } => Vec::new(),
         CollectorRun::Unmeasured { reason, .. } => vec![source(None, *reason)],
         CollectorRun::Measured {
             gaps,
@@ -217,6 +255,7 @@ mod tests {
                 provenance: Provenance::from_parts(None, "0.0.0-test", None, None),
                 generated_at: "2026-01-01T00:00:00Z".to_owned(),
                 self_identity: SelfIdentity::default(),
+                tier: ScanTier::Standard,
             },
         );
         for collector in crate::all() {
@@ -247,6 +286,108 @@ mod tests {
             Some("journal")
         );
         assert!(!report.timestamp_fields.contains_key("posture"));
+    }
+
+    fn context(tier: ScanTier) -> ScanContext {
+        ScanContext {
+            provenance: Provenance::from_parts(None, "0.0.0-test", None, None),
+            generated_at: "2026-01-01T00:00:00Z".to_owned(),
+            self_identity: SelfIdentity::default(),
+            tier,
+        }
+    }
+
+    /// A standard scan never calls a `full` collector: its run is `not_consented`, its rules are
+    /// unmeasured for that reason, and the header says which scan it was. A full scan calls every
+    /// collector (ADR 0052).
+    #[test]
+    fn a_standard_scan_does_not_call_a_full_collector_and_a_full_scan_does() {
+        let bundle = Bundle::embedded().unwrap();
+        let host =
+            host("platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\n");
+        let full: Vec<&'static str> = crate::all()
+            .iter()
+            .filter(|collector| collector.tier() == ScanTier::Full)
+            .map(|collector| collector.id())
+            .collect();
+        assert!(full.contains(&"fivem_servers"), "{full:?}");
+
+        let standard = run(&host, &bundle, context(ScanTier::Standard));
+        assert_eq!(standard.header.scan_tier, ScanTier::Standard);
+        for item in standard
+            .evidence
+            .iter()
+            .filter(|item| full.contains(&item.collector.as_str()))
+        {
+            assert!(
+                matches!(
+                    item.state,
+                    rongroi_core::model::EvidenceState::Unmeasured {
+                        reason: UnmeasuredReason::NotConsented,
+                        ..
+                    }
+                ),
+                "{item:?}"
+            );
+        }
+        assert!(
+            !standard
+                .unmatched
+                .iter()
+                .any(|group| full.contains(&group.collector.as_str())),
+            "a standard scan holds observations of a full collector"
+        );
+        assert!(
+            standard
+                .unmeasured_sources
+                .iter()
+                .all(|source| source.reason != UnmeasuredReason::NotConsented)
+        );
+
+        let full_scan = run(&host, &bundle, context(ScanTier::Full));
+        assert_eq!(full_scan.header.scan_tier, ScanTier::Full);
+        assert!(
+            full_scan
+                .unmatched
+                .iter()
+                .any(|group| group.collector == "fivem_servers"),
+            "{:?}",
+            full_scan.unmatched
+        );
+        // Declared whatever the tier, so a view can hide the field in either report.
+        for report in [&standard, &full_scan] {
+            assert_eq!(
+                report.sensitive_fields["fivem_servers"]["server_folder"],
+                rongroi_core::model::SensitiveKind::ServerIdentity
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_full_scan_asks_about_sensitive_kinds() {
+        assert!(crate::sensitive_kinds(ScanTier::Standard).is_empty());
+        assert!(
+            crate::sensitive_kinds(ScanTier::Full)
+                .contains(&rongroi_core::model::SensitiveKind::ServerIdentity)
+        );
+    }
+
+    /// Only a `full` collector may mark a field sensitive: a standard scan's reads are what every
+    /// player agrees to, so nothing it reads is hidden behind a separate answer (ADR 0052).
+    #[test]
+    fn no_standard_collector_declares_a_sensitive_field() {
+        for collector in crate::all() {
+            if collector.tier() == ScanTier::Standard {
+                assert!(
+                    collector
+                        .fields()
+                        .iter()
+                        .all(|field| field.sensitive.is_none()),
+                    "{}",
+                    collector.id()
+                );
+            }
+        }
     }
 
     #[test]

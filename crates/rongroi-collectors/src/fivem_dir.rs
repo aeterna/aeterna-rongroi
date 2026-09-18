@@ -272,11 +272,11 @@ const FIELDS: [Field; 19] = [
 ];
 
 /// The `folder` value of a folder that is there and was listed.
-const FOLDER_LISTED: &str = "listed";
+pub(crate) const FOLDER_LISTED: &str = "listed";
 /// The `folder` value of a folder that is not there: that edition is not installed for this user.
-const FOLDER_ABSENT: &str = "absent";
+pub(crate) const FOLDER_ABSENT: &str = "absent";
 /// The `folder` value of a folder that could not be listed; the reason is in the run's `gaps`.
-const FOLDER_UNREADABLE: &str = "unreadable";
+pub(crate) const FOLDER_UNREADABLE: &str = "unreadable";
 
 /// The `fivem_dir` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -522,7 +522,7 @@ fn activity_observation(
     observation
 }
 
-fn insert_times(
+pub(crate) fn insert_times(
     fields: &mut BTreeMap<String, serde_json::Value>,
     created_at: Option<Timestamp>,
     modified_at: Option<Timestamp>,
@@ -554,7 +554,7 @@ fn own_times(host: &dyn Host, folder: &str) -> (Option<Timestamp>, Option<Timest
 /// Whether a folder in Enhanced's server cache has the shape `FiveM` gives a server's folder: 40
 /// hexadecimal characters. Anything else there — a folder someone renamed — is counted by the folder
 /// activity only (ADR 0053).
-fn is_server_folder(name: &str) -> bool {
+pub(crate) fn is_server_folder(name: &str) -> bool {
     name.len() == 40 && name.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 

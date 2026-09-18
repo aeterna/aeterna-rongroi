@@ -186,6 +186,7 @@ These are counts of what SS mode does not list. §7 says why.
 | An event log file is marked read-only | tamper | `experimental` | the same two |
 | An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
 | A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
+| FiveM for GTA V Enhanced keeps a cache folder for a server (full scan only) | context | `experimental` | joining any server with FiveM for GTA V Enhanced, a folder kept from a server joined long ago or by another person on the same Windows account |
 | The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
 
 Three things to know about the two log-clearing rules:
@@ -214,7 +215,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last two, about vulnerable drivers and the hosts file, are new after 0.3.0 and are not in a released version yet. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last three, about vulnerable drivers, a server cache folder and the hosts file, are new after 0.3.0 and are not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -238,6 +239,19 @@ Three things to know about the vulnerable-driver rule:
 - **Windows may still block it.** Microsoft keeps its own list of vulnerable drivers that Windows refuses
   to load. This program does not read whether that list is on, and a driver on LOLDrivers' list is not
   necessarily on Microsoft's.
+
+Three things to know about a full scan (ADR 0052, ADR 0055):
+
+- **The player chooses it before the scan starts**, in the program that reads: `scan --full` asks and only
+  `yes` starts it; in the desktop app, "Full scan" restarts the program and a Windows dialog asks before
+  anything is read. You cannot start one for them with a flag. A standard scan says once, above the
+  evidence, how many checks only a full scan answers.
+- **A server cache folder row says the game joined a server, nothing more.** Its name is shown as
+  `%SERVER_IDENTITY%` unless the player also agreed to show server names. The same name in two reports of
+  one PC is the same server; whether another PC gets the same name is not known, so do not compare it with
+  a folder on your own PC.
+- **Its absence says nothing.** A player who never used GTA V Enhanced, reinstalled it, or deleted the
+  folder has none.
 
 Two things to know about the hosts-file rule:
 

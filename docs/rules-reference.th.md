@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 32 |
-| SHA-256 | `d5db1ed9998a02de3322541ecad9dd6aae7fceb2415015c23fe0ecd93fe0f42e` |
+| จำนวน rule | 33 |
+| SHA-256 | `61fe3637182ef641faba709b0d7e020ff8010e5f4320765e18a6155e8616b88b` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -52,6 +52,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่มีลายเซ็นฝังในไฟล์ซึ่งถูกต้อง](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
   - [ตรวจลายเซ็นของไฟล์ FiveM ไม่ได้](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
+- `fivem_servers`
+  - [FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
 - `net_config`
   - [ไฟล์ hosts กำหนด address ให้ชื่อของ FiveM หรือ Rockstar](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
 - `posture`
@@ -656,6 +658,44 @@ FiveM.exe ในโฟลเดอร์โปรแกรมของ FiveM for
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+## collector `fivem_servers`
+
+### `fivem_servers` / `enhanced`
+
+<a id="rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0"></a>
+
+#### FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้
+
+- ชื่อภาษาอังกฤษ: FiveM for GTA V Enhanced keeps a cache folder for a server
+- id: `c402aedc-1ed7-49a6-998c-0762e17e9bd0`
+- ไฟล์: [`rules/fivem_servers/enhanced/server-cache-folder/rule.yaml`](../rules/fivem_servers/enhanced/server-cache-folder/rule.yaml)
+- collector: `fivem_servers`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `fivem_servers`, `full_scan`
+- เขียนเมื่อ: 2026-09-18
+
+**เกี่ยวกับการตรวจนี้**
+
+FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache หนึ่งโฟลเดอร์ต่อหนึ่งเซิร์ฟเวอร์ที่เคยเข้า แถวนี้คือหนึ่งในนั้น พร้อมชื่อโฟลเดอร์ เวลาที่สร้าง และเวลาที่แก้ไขล่าสุด ยังไม่รู้ว่าชื่อนี้คำนวณมาจากอะไร แต่ชื่อของเซิร์ฟเวอร์เดิมบนเครื่องนี้จะเหมือนเดิม ชื่อเดียวกันในรายงานสองฉบับจากเครื่องนี้จึงเป็นเซิร์ฟเวอร์เดียวกัน ยังไม่รู้ว่าเครื่องอื่นได้ชื่อเดียวกันสำหรับเซิร์ฟเวอร์นั้นหรือไม่ โหมด SS แสดงชื่อก็ต่อเมื่อผู้เล่นยินยอมให้แสดงตัวตนของเซิร์ฟเวอร์ อ่านเฉพาะการสแกนแบบ Full ข้อนี้บอกว่าเกมเคยเข้าเซิร์ฟเวอร์ ไม่ได้บอกว่าใครทำอะไรในนั้น
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `server_folder|exists`: มีฟิลด์นี้
+
+**ย้อนดูได้**
+
+โฟลเดอร์ cache ของเซิร์ฟเวอร์ที่มีอยู่ตอนสแกน โฟลเดอร์ที่ผู้เล่น โปรแกรมทำความสะอาด หรือการติดตั้งใหม่ลบไปแล้วจะไม่เห็น และยังไม่รู้ว่า FiveM ลบโฟลเดอร์เก่าเองหรือไม่
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- การเข้าเซิร์ฟเวอร์ใดก็ได้ด้วย FiveM for GTA V Enhanced ซึ่งเป็นสิ่งที่ทิ้งโฟลเดอร์เหล่านี้ไว้
+- โฟลเดอร์ที่ค้างมาจากเซิร์ฟเวอร์ที่เข้านานแล้ว หรือจากคนอื่นที่ใช้บัญชี Windows นี้
 
 ## collector `net_config`
 

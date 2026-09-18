@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 32 |
-| SHA-256 | `d5db1ed9998a02de3322541ecad9dd6aae7fceb2415015c23fe0ecd93fe0f42e` |
+| Rules | 33 |
+| SHA-256 | `61fe3637182ef641faba709b0d7e020ff8010e5f4320765e18a6155e8616b88b` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -56,6 +56,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A file in FiveM's plugins folder carries a valid embedded signature](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
   - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
+- `fivem_servers`
+  - [FiveM for GTA V Enhanced keeps a cache folder for a server](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
 - `net_config`
   - [The hosts file gives a FiveM or Rockstar name an address](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
 - `posture`
@@ -648,6 +650,43 @@ Only the files present when the scan ran, and only the attempt made during it. A
 **References**
 
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+## Collector `fivem_servers`
+
+### `fivem_servers` / `enhanced`
+
+<a id="rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0"></a>
+
+#### FiveM for GTA V Enhanced keeps a cache folder for a server
+
+- Id: `c402aedc-1ed7-49a6-998c-0762e17e9bd0`
+- File: [`rules/fivem_servers/enhanced/server-cache-folder/rule.yaml`](../rules/fivem_servers/enhanced/server-cache-folder/rule.yaml)
+- Collector: `fivem_servers`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `fivem_servers`, `full_scan`
+- Written: 2026-09-18
+
+**About this check**
+
+FiveM for GTA V Enhanced keeps one cache folder per server it joined, and this row is one of them: the folder's name, and when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so the same name in two reports of this PC is the same server. Whether another PC gets the same name for that server is not known. SS mode shows the name only if the player agreed to show server identities. Read only in a full scan. This says that the game joined a server, not what anyone did on it.
+
+**Matches when all of these hold for one observation**
+
+- `server_folder|exists`: the field is present
+
+**Look-back**
+
+The server cache folders there when the scan ran. A folder the player, a cleaner or a reinstall removed is not seen, and whether FiveM removes old ones itself is not known.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Joining any server with FiveM for GTA V Enhanced, which is what leaves these folders
+- A folder kept from a server joined long ago, or by another person using this Windows account
 
 ## Collector `net_config`
 

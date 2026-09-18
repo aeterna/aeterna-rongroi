@@ -1,0 +1,8 @@
+{
+  "description": "A server cache folder that is not there, and one listed with no server folder",
+  "observations": [
+    { "collector": "fivem_servers", "fields": { "folder": "absent" } },
+    { "collector": "fivem_servers", "fields": { "folder": "listed", "server_folders": 0 } }
+  ],
+  "expect_matches": 0
+}

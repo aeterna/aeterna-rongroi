@@ -4,15 +4,15 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type ElevateOutcome, relaunchElevated, reportHeader } from "./api";
+import { type ElevateOutcome, relaunchElevated, relaunchFull, reportHeader } from "./api";
 import { languageNames, supportedLanguages } from "./i18n";
-import type { Mode, ReportHeader } from "./types";
+import type { Mode, ReportHeader, SsOptions } from "./types";
 import { About } from "./views/About";
 import { Consent } from "./views/Consent";
 import { Report } from "./views/Report";
 import { UnofficialBanner } from "./views/UnofficialBanner";
 
-type Screen = "start" | "consent" | "declined" | "about" | { report: Mode };
+type Screen = "start" | "consent" | "declined" | "about" | { report: Mode; options?: SsOptions };
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -22,6 +22,8 @@ export function App() {
   // and an SS report does not ask for consent again.
   const [beforeAbout, setBeforeAbout] = useState<Exclude<Screen, "about">>("start");
   const [elevation, setElevation] = useState<ElevateOutcome | null>(null);
+  const [fullScan, setFullScan] = useState<ElevateOutcome | null>(null);
+  const full = header?.scan_tier === "full";
 
   useEffect(() => {
     void reportHeader().then(setHeader);
@@ -90,13 +92,28 @@ export function App() {
               {elevation === "failed" && <p className="note">{t("start.elevate_failed")}</p>}
             </>
           )}
+          {/* Which scan ran, and a way to the other one: a new copy asks in a Windows dialog before it
+              reads anything, so this window never decides what is read (ADR 0052). */}
+          {header && (
+            <p className="muted">{full ? t("start.full_done") : t("start.standard_done")}</p>
+          )}
+          {header && !full && (
+            <>
+              <button type="button" onClick={() => void relaunchFull().then(setFullScan)}>
+                {t("start.full_button")}
+              </button>
+              <p className="muted">{t("start.full_hint")}</p>
+              {fullScan === "failed" && <p className="note">{t("start.full_failed")}</p>}
+            </>
+          )}
           <p className="note">{t("start.scan_note")}</p>
         </section>
       )}
 
       {screen === "consent" && (
         <Consent
-          onAgree={() => setScreen({ report: "ss" })}
+          full={full}
+          onAgree={(options) => setScreen({ report: "ss", options })}
           onRefuse={() => setScreen("declined")}
         />
       )}
@@ -111,7 +128,7 @@ export function App() {
       {screen === "about" && <About onBack={() => setScreen(beforeAbout)} />}
 
       {typeof screen === "object" && (
-        <Report mode={screen.report} onBack={() => setScreen("start")} />
+        <Report mode={screen.report} options={screen.options} onBack={() => setScreen("start")} />
       )}
 
       <footer className="muted">{t("footer.evidence_only")}</footer>

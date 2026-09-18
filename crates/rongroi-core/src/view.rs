@@ -10,16 +10,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::model::{
     BootTime, Evidence, EvidenceState, Mode, Observation, OwnTraceEntry, Report, ReportHeader,
-    Strength, UnmatchedGroup, UnmeasuredReason, UnmeasuredSource,
+    SensitiveKind, Strength, UnmatchedGroup, UnmeasuredReason, UnmeasuredSource,
 };
 
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 10] = [
+pub const COLLECTOR_ORDER: [&str; 11] = [
     "posture",
     "driver_service",
     "fivem_dir",
+    "fivem_servers",
     "net_config",
     "process",
     "evtx",
@@ -35,6 +36,41 @@ pub const COLLECTOR_ORDER: [&str; 10] = [
 /// beside it as `address_kind`, is what separates a blocklist from a redirect and is what SS mode
 /// shows in its place (owner decision 2).
 pub const SS_WITHHELD_FIELDS: [(&str, &str); 1] = [("net_config", "address")];
+
+/// What SS mode shows in place of a server identity the player did not agree to show (ADR 0052).
+pub const SERVER_IDENTITY_PLACEHOLDER: &str = "%SERVER_IDENTITY%";
+/// What SS mode shows in place of an account identifier the player did not agree to show (ADR 0052).
+pub const ACCOUNT_IDENTIFIER_PLACEHOLDER: &str = "%ACCOUNT_IDENTIFIER%";
+
+/// The placeholder for one kind of sensitive value.
+pub fn placeholder(kind: SensitiveKind) -> &'static str {
+    match kind {
+        SensitiveKind::ServerIdentity => SERVER_IDENTITY_PLACEHOLDER,
+        SensitiveKind::AccountIdentifier => ACCOUNT_IDENTIFIER_PLACEHOLDER,
+    }
+}
+
+/// What the player agreed SS mode may show beyond its default, each answered on its own, default
+/// no (ADR 0052). Self mode ignores it: it shows everything.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SsOptions {
+    /// Show server identities: an endpoint, a server cache folder's name.
+    #[serde(default)]
+    pub server_identity: bool,
+    /// Show account identifiers.
+    #[serde(default)]
+    pub account_identifier: bool,
+}
+
+impl SsOptions {
+    /// Whether values of `kind` are shown.
+    pub fn shows(self, kind: SensitiveKind) -> bool {
+        match kind {
+            SensitiveKind::ServerIdentity => self.server_identity,
+            SensitiveKind::AccountIdentifier => self.account_identifier,
+        }
+    }
+}
 
 /// Replacement for the user-profile part of a path in SS mode.
 pub const USERPROFILE_PLACEHOLDER: &str = "%USERPROFILE%";
@@ -78,6 +114,10 @@ pub struct ScopeNotes {
     /// to the view, and [`crate::model::REPORT_SCHEMA_VERSION`] stays at 1 (ADR 0030).
     #[serde(default)]
     pub not_attempted: usize,
+    /// How many rules were unmeasured because their collector reads only in a full scan and the
+    /// player chose the standard one (ADR 0052). One fact about the scan, like the two above.
+    #[serde(default)]
+    pub not_consented: usize,
 }
 
 /// How many pieces of the evidence a view lists are in each state (ADR 0045).
@@ -219,6 +259,7 @@ fn scope_notes(report: &Report) -> ScopeNotes {
     ScopeNotes {
         not_admin: counted(UnmeasuredReason::NotAdmin),
         not_attempted: counted(UnmeasuredReason::NotAttempted),
+        not_consented: counted(UnmeasuredReason::NotConsented),
     }
 }
 
@@ -260,6 +301,57 @@ fn ss_lists(item: &Evidence) -> bool {
 /// Both modes carry the same [`ScopeNotes`]: they are facts about the scan, and SS mode's filter is
 /// about evidence.
 pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
+    for_mode_with(report, mode, SsOptions::default())
+}
+
+/// Builds the view for `mode`, with what the player agreed SS mode may show (ADR 0052).
+///
+/// In SS mode every value of a field a collector declared sensitive is replaced by its
+/// [`placeholder`] unless `options` shows its kind — in the evidence, the timeline, own traces and
+/// everything counted — before anything else is built, so no later step can reach the value.
+pub fn for_mode_with(report: &Report, mode: Mode, options: SsOptions) -> ReportView {
+    match mode {
+        Mode::SelfCheck => build(report, mode),
+        Mode::Ss => build(&masked(report, options), mode),
+    }
+}
+
+/// `report` with each sensitive value `options` does not show replaced by its placeholder.
+fn masked(report: &Report, options: SsOptions) -> Report {
+    let mut report = report.clone();
+    let sensitive = std::mem::take(&mut report.sensitive_fields);
+    let mask = |observation: &mut Observation| {
+        let Some(fields) = sensitive.get(&observation.collector) else {
+            return;
+        };
+        for (field, kind) in fields {
+            if options.shows(*kind) {
+                continue;
+            }
+            if let Some(value) = observation.fields.get_mut(field) {
+                *value = serde_json::Value::from(placeholder(*kind));
+            }
+        }
+    };
+    for item in &mut report.evidence {
+        if let EvidenceState::Found { observations } = &mut item.state {
+            observations.iter_mut().for_each(mask);
+        }
+    }
+    for selection in &mut report.timeline_selections {
+        selection.observations.iter_mut().for_each(mask);
+    }
+    for group in &mut report.unmatched {
+        group.observations.iter_mut().for_each(mask);
+    }
+    for entry in &mut report.own_traces {
+        mask(&mut entry.observation);
+    }
+    report.sensitive_fields = sensitive;
+    report
+}
+
+fn build(report: &Report, mode: Mode) -> ReportView {
     match mode {
         Mode::SelfCheck => ReportView {
             mode,
@@ -270,7 +362,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
             scope: scope_notes(report),
             listed: listed_counts(&report.evidence),
             hidden: HiddenCounts::default(),
-            timeline: timeline(report, mode),
+            timeline: timeline_of(report, mode),
             collector_order: collector_order(),
         },
         Mode::Ss => {
@@ -319,7 +411,7 @@ pub fn for_mode(report: &Report, mode: Mode) -> ReportView {
                 scope: scope_notes(report),
                 listed,
                 hidden,
-                timeline: timeline(report, mode),
+                timeline: timeline_of(report, mode),
                 collector_order: collector_order(),
             }
         }
@@ -353,6 +445,13 @@ fn collector_rank(collector: Option<&str>) -> usize {
 /// An observation reached by more than one route is shown once, as evidence before selector before
 /// unmatched. Which fields are times comes from `report.timestamp_fields` and nothing else.
 pub fn timeline(report: &Report, mode: Mode) -> Timeline {
+    match mode {
+        Mode::SelfCheck => timeline_of(report, mode),
+        Mode::Ss => timeline_of(&masked(report, SsOptions::default()), mode),
+    }
+}
+
+fn timeline_of(report: &Report, mode: Mode) -> Timeline {
     let machine_root = match mode {
         Mode::SelfCheck => None,
         Mode::Ss => report
@@ -1159,6 +1258,7 @@ mod tests {
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
             boot_time: crate::model::BootTime::default(),
             profiles_directory: None,
+            scan_tier: crate::model::ScanTier::Standard,
         }
     }
 
@@ -1291,6 +1391,7 @@ mod tests {
             discriminators: BTreeMap::new(),
             coverage_fields: BTreeMap::new(),
             unmeasured_sources: Vec::new(),
+            sensitive_fields: BTreeMap::new(),
         }
     }
 

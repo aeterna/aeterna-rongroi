@@ -33,6 +33,9 @@ Every result is one of three things:
   to your Windows settings. **The CLI version does not use WebView2.**
 - No screenshots, no browser history, no remote access, and no record of where your PC connected: of the
   network it reads only the settings that decide where traffic goes (hosts file, proxy, firewall rules).
+- **A full scan reads more, and only if you say yes before it starts**: today, the names of FiveM for GTA V
+  Enhanced's server cache folders. A flag or a script cannot say yes for you, and in SS mode a server's
+  name stays hidden unless you agree to show it separately.
 - **SS mode** (for screenshare) asks for consent first, shows what matched a rule and a timeline of the times its consent screen lists, and hides your
   user name in paths. You may refuse.
 

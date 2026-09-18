@@ -22,6 +22,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   kind of machine that an author could have anticipated (ADR 0030, ADR 0032). `access_denied` and
   `source_absent` are the other side of that line and stay declarable: they say the program never
   reached the artifact, and why, in terms of how the machine is set up.
+- **`not_consented` is not declarable either.** It is the scan's, not the machine's: a `full` collector's
+  rules get it in a standard scan, every rule already expects it, and `check-rules` refuses it in
+  `unmeasured_when` (ADR 0052).
 - **`source_absent` and `source_empty` are opposite statements.** "This PC has no such record" and
   "the record's place is there and holds nothing" were one word until ADR 0030; a rule that means one
   must not declare the other. `source_empty` in particular is **never** evidence that anything was

@@ -90,8 +90,7 @@ pub fn relaunch_elevated(args: &[String]) -> Result<(), ElevateError> {
     /// `HRESULT_FROM_WIN32(ERROR_CANCELLED)` — 1223, what Windows reports when the person dismisses the
     /// consent prompt.
     const HRESULT_ERROR_CANCELLED: i32 = 0x8007_04C7_u32.cast_signed();
-    /// `SW_SHOWNORMAL`, written out so this crate does not take the whole
-    /// `Win32_UI_WindowsAndMessaging` feature for one constant.
+    /// `SW_SHOWNORMAL`, written out rather than imported with its `SHOW_WINDOW_CMD` wrapper.
     const SW_SHOWNORMAL: i32 = 1;
 
     /// A NUL-terminated UTF-16 copy, as the `W` entry points expect.

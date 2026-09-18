@@ -5,16 +5,19 @@
 // The only way the UI talks to Rust: local Tauri IPC commands. No network (ADR 0003).
 
 import { invoke } from "@tauri-apps/api/core";
-import type { CodeLinks, Mode, ReportHeader, ReportView, RuleText } from "./types";
+import type { CodeLinks, Mode, ReportHeader, ReportView, RuleText, SsOptions } from "./types";
 
 /** Facts about the scan (provenance, platform) without any evidence. */
 export function reportHeader(): Promise<ReportHeader> {
   return invoke<ReportHeader>("report_header");
 }
 
-/** The frozen report as `mode` may see it. Filtering and redaction happen in Rust. */
-export function reportView(mode: Mode): Promise<ReportView> {
-  return invoke<ReportView>("report_view", { mode });
+/**
+ * The frozen report as `mode` may see it, with what the player agreed SS mode may show beyond its
+ * default. Filtering, redaction and the placeholders happen in Rust (ADR 0052).
+ */
+export function reportView(mode: Mode, options?: SsOptions): Promise<ReportView> {
+  return invoke<ReportView>("report_view", { mode, options: options ?? null });
 }
 
 /** What came of a request to restart with administrator rights. */
@@ -26,6 +29,14 @@ export type ElevateOutcome = "started" | "declined" | "failed";
  */
 export function relaunchElevated(): Promise<ElevateOutcome> {
   return invoke<ElevateOutcome>("relaunch_elevated");
+}
+
+/**
+ * Starts a copy of this program that asks, in a Windows dialog before it reads anything, whether to
+ * run a full scan, and closes this one (ADR 0052). There is no prompt to decline here.
+ */
+export function relaunchFull(): Promise<ElevateOutcome> {
+  return invoke<ElevateOutcome>("relaunch_full");
 }
 
 /** Rule text in `lang`, keyed by rule id, English fallback applied in Rust. */
