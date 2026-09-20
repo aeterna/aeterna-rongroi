@@ -26,6 +26,10 @@ hve = "hve"
 notatin = "notatin"
 
 [default.extend-identifiers]
+# `amd64fre` is part of Windows' own `BuildLabEx` string, measured on a real PC (ADR 0056): the build
+# lab, the architecture and a free (non-checked) build, written as Microsoft writes it.
+amd64fre = "amd64fre"
+
 # Windows driver and service names in baseline-elevated-win11's driver services (ADR 0048), read from a GitHub-hosted runner: data, not prose.
 NDProxy = "NDProxy"
 SerCx = "SerCx"
