@@ -8,7 +8,8 @@ registered with Windows and a SHA-256 of each driver's file, what the Program Co
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read, with no file name, and the settings that decide where network
-traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM.
+traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM, and what
+Windows says this installation is, with how the services Windows ships with are set to start.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -63,6 +64,14 @@ and nothing captured off the network (ADR 0054).
   anything in. Rules for other programs are only counted.
 
 No rule reads the proxy or the firewall rules, so SS mode shows only how many of them there were.
+
+Of **what Windows says this installation is** it reads the edition and build values `winver` shows, the
+registered organisation, and the manufacturer, model and support link Settings shows — the last three are
+where two published Windows-modification playbooks write their own name (ADR 0056). **It does not read
+`RegisteredOwner`**, the name of the person who set the PC up. It also reads, for each of eight services
+Windows ships with — Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy,
+Search and telemetry — whether its key is there and how it is set to start. No other service is read, and
+no service is started, stopped or changed.
 
 Of a Prefetch file it reads the program's name, how many times Windows recorded it running and when it
 last ran. **A Prefetch file also lists every file that program loaded — normally hundreds of paths,

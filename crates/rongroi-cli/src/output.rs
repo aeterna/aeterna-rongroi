@@ -306,6 +306,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
             \x20 - the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are\n\
+            \x20 - what Windows says this installation is — the edition, the build, the registered organisation and the manufacturer, model and support link Settings shows, never the registered owner's name — and how each of the services Windows ships with (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) is set to start, or that its key is not there\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
             It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; and the oldest and newest change the journal holds for each folder above. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public.\n\
             You may refuse.\n\
@@ -322,6 +323,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
             \x20 - การตั้งค่าที่กำหนดว่า traffic ของเครือข่ายไปที่ไหน โดยไม่อ่านบันทึกว่าเคยไปที่ไหน: บรรทัดในไฟล์ hosts ที่กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com พร้อม address นั้น (บรรทัดอื่นแค่นับจำนวน) proxy เปิดอยู่หรือไม่ และตั้ง proxy server หรือสคริปต์ตั้งค่า proxy ไว้หรือไม่ โดยไม่อ่าน address ของมัน และ rule ของ Windows Firewall สำหรับโปรแกรมในโฟลเดอร์ของ FiveM พร้อมจำนวน rule ทั้งหมด\n\
+            \x20 - สิ่งที่ Windows บอกว่าตัวเองเป็นอะไร — edition, build, ชื่อองค์กรที่จดทะเบียนไว้ และชื่อผู้ผลิต รุ่นเครื่อง กับลิงก์ฝ่ายสนับสนุนที่ Settings แสดง โดยไม่อ่านชื่อเจ้าของที่จดทะเบียนไว้ — และเซอร์วิสที่ Windows มีมาให้แต่ละตัว (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) ถูกตั้งให้เริ่มทำงานแบบไหน หรือไม่มีคีย์ของมันอยู่\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
             แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public\n\
             คุณปฏิเสธได้\n\
@@ -1066,6 +1068,7 @@ mod tests {
                     "loopback, unspecified, private",
                 ],
             ),
+            ("os_image", &["Defender", "Windows Update", "Event Log"]),
             ("pca", &["Program Compatibility Assistant"]),
             (
                 "posture",

@@ -1,0 +1,19 @@
+{
+  "description": "The manufacturer Atlas writes over the board vendor's",
+  "observations": [
+    {
+      "collector": "os_image",
+      "fields": {
+        "product_name": "Windows 10 Home",
+        "edition_id": "Core",
+        "registered_organization": "",
+        "oem_manufacturer": "Atlas Team",
+        "oem_model": "MS-7A36",
+        "service_windefend": "automatic",
+        "service_eventlog": "automatic",
+        "service_wuauserv": "manual"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

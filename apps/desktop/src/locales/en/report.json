@@ -83,6 +83,7 @@
     "driver_service": "Drivers registered with Windows",
     "fivem_dir": "FiveM files",
     "net_config": "Network settings (hosts, proxy, firewall)",
+    "os_image": "What Windows says this installation is",
     "process": "Running programs",
     "evtx": "Windows event logs",
     "prefetch": "Windows Prefetch",

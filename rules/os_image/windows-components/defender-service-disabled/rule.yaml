@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 77646339-caf4-4ade-93ef-133089dac30e
+title: Microsoft Defender's service is set never to start
+description: >-
+  The `WinDefend` service is registered and its start type is `disabled`, so Windows does not start
+    it. **Installing another antivirus does exactly this**, and it is the single most ordinary reason
+    for this row; a tweaking script that turns Defender off is another. Read it beside what else the
+    report says, never on its own, and read it as a description of the machine rather than as evidence
+    of cheating.
+status: experimental
+collector: os_image
+strength: posture
+match:
+  service_windefend: disabled
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - Any third-party antivirus, which disables Defender's service when it installs itself
+  - A PC managed by an employer or a school whose policy turns Defender off
+  - A tweaking script or a pre-modified Windows image the owner installed for performance
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/services/service-installation
+author: aeterna-rongroi contributors
+date: 2026-09-20
+tags: [posture, os_image]

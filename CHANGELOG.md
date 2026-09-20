@@ -6,6 +6,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The `os_image` collector and seven rules for what Windows says this installation is (ADR 0056): the
+  edition and build values `winver` shows, the registered organisation, and the manufacturer, model and
+  support link Settings shows — where the Atlas and ReviOS playbooks write their own name — and how each
+  of eight services Windows ships with is set to start, or that its key is not there at all, which is
+  what a pre-modified image that removed the component looks like. `RegisteredOwner`, a person's name, is
+  not read. Every rule is `posture` and says in its own text that a person may run whatever operating
+  system they like on their own PC.
 - Listed counts: every report view carries how many of the evidence it lists are found, not found and
   not measured, and the text report prints them on one line above the evidence. Three numbers, never
   one (ADR 0045).

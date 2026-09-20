@@ -247,12 +247,14 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
-    // One not-measured rule is hidden too: the firmware reading needs administrator rights, which this
-    // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038).
-    // So is the full-scan rule: this was a standard scan, which every rule expects (ADR 0052).
+    // Nine not-measured rules are hidden: the firmware reading needs administrator rights, which this
+    // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038);
+    // the full-scan rule, because this was a standard scan, which every rule expects (ADR 0052); and the
+    // seven `os_image` rules, because this fixture describes no `CurrentVersion` key for them to read
+    // (ADR 0056).
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 2 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
+        "Hidden in SS mode: 1 not found · 9 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
