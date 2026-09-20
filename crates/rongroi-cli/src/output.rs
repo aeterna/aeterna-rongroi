@@ -8,7 +8,9 @@ use std::fmt::Write as _;
 
 use clap::ValueEnum;
 use rongroi_core::bundle::Bundle;
-use rongroi_core::model::{BootTime, EvidenceState, Mode, Observation, UnmeasuredReason};
+use rongroi_core::model::{
+    BootTime, EvidenceState, Mode, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
+};
 use rongroi_core::view::{EntrySource, ReportView, Timeline};
 
 /// Output language.
@@ -74,6 +76,15 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::Th, "scope_not_attempted") => {
             "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะโปรแกรมหยุดอ่านก่อนจะถึงส่วนที่รายการนั้นถาม \
              เป็นข้อจำกัดของโปรแกรมนี้เอง ไม่ใช่สิ่งที่ตรวจเจอในเครื่องนี้"
+        }
+        // The same shape again: one fact about which scan the player chose (ADR 0052).
+        (Lang::En, "scope_not_consented") => {
+            "Scope: {n} check(s) were not answered because they read only in a full scan, and the \
+             standard scan was chosen. A full scan asks before it starts."
+        }
+        (Lang::Th, "scope_not_consented") => {
+            "ขอบเขตการตรวจ: มี {n} รายการที่ไม่ได้ตอบ เพราะอ่านเฉพาะการสแกนแบบ Full และครั้งนี้เลือกการสแกนแบบมาตรฐาน \
+             การสแกนแบบ Full จะถามก่อนเริ่มทุกครั้ง"
         }
         // Context for reading every time below it, never a finding: the sentence after the time is
         // what stops "started three days ago" being read as something the player did (ADR 0039).
@@ -189,6 +200,38 @@ fn text_timeline(lang: Lang, key: &str) -> &'static str {
     }
 }
 
+/// The words about which scan ran and what the player agreed to show (ADR 0052), apart from [`text`]
+/// so neither table grows past what one screen can check.
+fn scan_text(lang: Lang, key: &str) -> &'static str {
+    match (lang, key) {
+        (Lang::En, "tier_standard") => "standard scan",
+        (Lang::Th, "tier_standard") => "สแกนแบบมาตรฐาน",
+        (Lang::En, "tier_full") => "full scan",
+        (Lang::Th, "tier_full") => "สแกนแบบ Full",
+        (Lang::En, "full_declined") => {
+            "Standard scan: the sources only a full scan reads are not read."
+        }
+        (Lang::Th, "full_declined") => "สแกนแบบมาตรฐาน: ไม่อ่านแหล่งข้อมูลที่อ่านเฉพาะการสแกนแบบ Full",
+        (Lang::En, "server_identity_question") => {
+            "Show the person watching which servers these are (the names of FiveM's server cache \
+             folders)? If not, each name is shown as %SERVER_IDENTITY%. [y/N] "
+        }
+        (Lang::Th, "server_identity_question") => {
+            "ให้คนที่ดูอยู่เห็นว่าเป็นเซิร์ฟเวอร์ไหน (ชื่อโฟลเดอร์ cache ของเซิร์ฟเวอร์ใน FiveM) หรือไม่ \
+             ถ้าไม่ ชื่อแต่ละชื่อจะแสดงเป็น %SERVER_IDENTITY% [y/N] "
+        }
+        (Lang::En, "account_identifier_question") => {
+            "Show the person watching the account identifiers this scan read? If not, each is shown \
+             as %ACCOUNT_IDENTIFIER%. [y/N] "
+        }
+        (Lang::Th, "account_identifier_question") => {
+            "ให้คนที่ดูอยู่เห็นตัวระบุบัญชีที่การสแกนนี้อ่านมาหรือไม่ ถ้าไม่ แต่ละค่าจะแสดงเป็น \
+             %ACCOUNT_IDENTIFIER% [y/N] "
+        }
+        _ => "",
+    }
+}
+
 /// The one line a non-expert reads beside an unmeasured result.
 ///
 /// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
@@ -235,6 +278,12 @@ fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
         (Lang::Th, UnmeasuredReason::ReadFailed) => "อ่านข้อมูลนี้ไม่ได้",
         (Lang::En, UnmeasuredReason::CollectorUnavailable) => "this build does not read that",
         (Lang::Th, UnmeasuredReason::CollectorUnavailable) => "build นี้ยังไม่ได้อ่านส่วนนี้",
+        (Lang::En, UnmeasuredReason::NotConsented) => {
+            "only a full scan reads this, and this was the standard scan"
+        }
+        (Lang::Th, UnmeasuredReason::NotConsented) => {
+            "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน"
+        }
     }
 }
 
@@ -279,6 +328,74 @@ pub fn consent(lang: Lang) -> String {
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
     }
+}
+
+/// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055).
+fn full_reads(lang: Lang) -> &'static str {
+    match lang {
+        Lang::En => {
+            "the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server \
+             this PC joined — with when it was created and last changed. What the name is made from is \
+             not known; it stays the same for that server on this PC, so it can match two reports of \
+             this PC"
+        }
+        Lang::Th => {
+            "ชื่อโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ที่ FiveM for GTA V Enhanced เก็บไว้ \
+             หนึ่งโฟลเดอร์ต่อหนึ่งเซิร์ฟเวอร์ที่เครื่องนี้เคยเข้า พร้อมเวลาที่สร้างกับเวลาที่แก้ไขล่าสุด \
+             ยังไม่รู้ว่าชื่อนี้คำนวณมาจากอะไร แต่ชื่อของเซิร์ฟเวอร์เดิมบนเครื่องนี้จะเหมือนเดิม \
+             จึงจับคู่รายงานสองฉบับจากเครื่องนี้ได้"
+        }
+    }
+}
+
+/// The question `scan --full` asks before any collector runs (ADR 0052). Only `yes` starts a full scan.
+pub fn full_question(lang: Lang) -> String {
+    match lang {
+        Lang::En => format!(
+            "Full scan — this reads more than the standard scan:\n  - {}\nNothing is read \
+             differently and nothing is sent anywhere. In SS mode a server's name is shown only if \
+             you agree to that separately.\nType yes for the full scan; anything else starts the \
+             standard scan: ",
+            full_reads(lang)
+        ),
+        Lang::Th => format!(
+            "การสแกนแบบ Full — อ่านมากกว่าการสแกนแบบมาตรฐาน:\n  - {}\nไม่ได้อ่านสิ่งใดต่างไปจากเดิม \
+             และไม่ส่งอะไรออกไปไหน ในโหมด SS ชื่อเซิร์ฟเวอร์จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง\n\
+             พิมพ์ yes เพื่อสแกนแบบ Full พิมพ์อย่างอื่นจะเป็นการสแกนแบบมาตรฐาน: ",
+            full_reads(lang)
+        ),
+    }
+}
+
+/// Printed when the full-scan question was not answered `yes`.
+pub fn full_declined(lang: Lang) -> &'static str {
+    scan_text(lang, "full_declined")
+}
+
+/// The SS-mode question about one kind of sensitive value (ADR 0052). Default no.
+pub fn sensitive_question(lang: Lang, kind: SensitiveKind) -> &'static str {
+    match kind {
+        SensitiveKind::ServerIdentity => scan_text(lang, "server_identity_question"),
+        SensitiveKind::AccountIdentifier => scan_text(lang, "account_identifier_question"),
+    }
+}
+
+/// The SS-mode consent question for a scan at `tier`: the standard one, and for a full scan what
+/// the full scan read as well (ADR 0052).
+pub fn consent_for(lang: Lang, tier: ScanTier) -> String {
+    let question = consent(lang);
+    if tier == ScanTier::Standard {
+        return question;
+    }
+    let (marker, label) = match lang {
+        Lang::En => ("  - when Windows last started", "(full scan) "),
+        Lang::Th => ("  - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด", "(สแกนแบบ Full) "),
+    };
+    question.replacen(
+        marker,
+        &format!("  - {label}{}\n{marker}", full_reads(lang)),
+        1,
+    )
 }
 
 /// Line shown before an elevated copy waits for Enter, so its window does not close on the report.
@@ -340,9 +457,13 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         Some(build) => format!("{} {build}", header.platform),
         None => header.platform.clone(),
     };
+    let tier = match header.scan_tier {
+        ScanTier::Standard => scan_text(lang, "tier_standard"),
+        ScanTier::Full => scan_text(lang, "tier_full"),
+    };
     let _ = writeln!(
         out,
-        "mode: {mode} · {platform} · {elevated} · rules: {} ({})",
+        "mode: {mode} · {tier} · {platform} · {elevated} · rules: {} ({})",
         header.rules_bundle.rule_count,
         short(&header.rules_bundle.sha256),
     );
@@ -356,6 +477,7 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     for (count, key) in [
         (view.scope.not_admin, "scope_not_admin"),
         (view.scope.not_attempted, "scope_not_attempted"),
+        (view.scope.not_consented, "scope_not_consented"),
     ] {
         if count > 0 {
             let _ = writeln!(
@@ -719,6 +841,7 @@ mod tests {
                 seconds_since_boot: 266_584,
             },
             profiles_directory: None,
+            scan_tier: rongroi_core::model::ScanTier::Standard,
         };
         let evidence = Evidence {
             rule_id: rule.id.clone(),
@@ -746,6 +869,7 @@ mod tests {
                 discriminators: std::collections::BTreeMap::new(),
                 coverage_fields: std::collections::BTreeMap::new(),
                 unmeasured_sources: Vec::new(),
+                sensitive_fields: std::collections::BTreeMap::new(),
             },
             bundle,
         )
@@ -930,6 +1054,7 @@ mod tests {
                     "Authenticode",
                 ],
             ),
+            ("fivem_servers", &["FiveM for GTA V Enhanced"]),
             (
                 "net_config",
                 &[
@@ -995,7 +1120,10 @@ mod tests {
             }
         }
         for (lang, process_words, boot_time_words, later_reads) in running {
-            let question = consent(lang);
+            // A full scan's question names what only a full scan reads; the standard one does not
+            // (ADR 0052).
+            assert!(!consent(lang).contains("FiveM for GTA V Enhanced"));
+            let question = consent_for(lang, ScanTier::Full);
             assert!(question.contains(process_words), "{question}");
             assert!(question.contains(boot_time_words), "{question}");
             for words in later_reads {

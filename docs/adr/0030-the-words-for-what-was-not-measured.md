@@ -83,6 +83,7 @@ The English is R3's recommended wording except where noted; the Thai is beside i
 | `budget_spent` | "this program stopped reading before it finished" | "โปรแกรมนี้หยุดอ่านก่อนจะครบ" | `evtx`, `usn`, `driver_service` | The 30-second budget ran out. **Rare**, and it is this program's limit, not the machine's; for `usn`, the same budget on reading the change journal (ADR 0047); for `driver_service`, the same budget on hashing driver files (ADR 0048) |
 | `read_failed` | "this could not be read" | "อ่านข้อมูลนี้ไม่ได้" | every collector that reads a source | I/O failure, a file past the 64 MiB cap (ADR 0019), an unset `%SystemRoot%`. Uncommon |
 | `collector_unavailable` | "this build does not read that" | "build นี้ยังไม่ได้อ่านส่วนนี้" | the engine | A rule for a collector this build has none of. Never in a shipped build; it is the ADR 0026 gate |
+| `not_consented` | "only a full scan reads this, and this was the standard scan" | "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน" | the scan, for a `full` collector (ADR 0052) | The player chose the standard scan. **Very common** — it is the default — so it is a scope statement, every rule expects it, and no rule may declare it. Added by ADR 0052 as a thirteenth reason |
 
 Three wordings depart from R3:
 
@@ -180,7 +181,7 @@ ADR 0027's filter stands, with `UnmeasuredReason` answering two questions about 
 | `not_found`, `posture` strength | listed (ADR 0011) | listed |
 | `not_found`, any other strength | counted | listed |
 | `unmeasured`, `partial` or `budget_spent` | **listed, declared or not** | listed |
-| `unmeasured`, `not_admin` or `not_attempted` | **scope statement** | listed, and the scope statement |
+| `unmeasured`, `not_admin`, `not_attempted` or `not_consented` (ADR 0052) | **scope statement** | listed, and the scope statement |
 | `unmeasured`, reason in `unmeasured_when` | counted | listed |
 | `unmeasured`, reason not in `unmeasured_when` | listed | listed |
 

@@ -138,6 +138,26 @@ Windows ships, and sleep and hibernation do not start the count again, so on an 
 days old. It does say roughly when the PC was last restarted, which is a small fact about your day, and
 two reports taken before the next restart show the same time. The consent question names it (ADR 0039).
 
+### A full scan reads more, and only if you agree before it starts
+
+There are two scans (ADR 0052). Everything above is the **standard scan**, which every run makes. A
+**full scan** also reads the sources below, and only when you agree to it **before the scan starts**, in
+the program that will read them: the command-line version asks when you run `scan --full` and starts the
+full scan only if you type `yes`; the desktop app's "Full scan" button starts the program again, and a
+Windows dialog lists what a full scan reads before anything is read. Anything but yes is the standard
+scan. No flag, shortcut or script answers for you, and a standard scan never touches these sources at
+all — the report says, once, how many checks only a full scan answers.
+
+What a full scan reads today:
+
+- **The name of each server cache folder FiveM for GTA V Enhanced keeps**, one per server the game
+  joined, with when each was created and last changed (ADR 0055). What the name is made from is not
+  known. It stays the same for that server on this PC, so it can match two reports of this PC; whether
+  another PC gets the same name is not known. Nothing inside those folders is read.
+
+A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
+reads a browser's history, a messenger's storage, or anything that holds a password or a token.
+
 ### When the tool says it could not answer
 
 Every check that could not be answered says **why**, in one sentence, in your language. Several of the
@@ -179,6 +199,7 @@ or allow remote access.
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
 | A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
+| What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, a separate choice that is off until you turn it on |
 | When Windows last started | shown | shown, as one time at the top of the report |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
 

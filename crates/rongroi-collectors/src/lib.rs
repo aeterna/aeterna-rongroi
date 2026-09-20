@@ -10,6 +10,7 @@ pub mod driver_service;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
+pub mod fivem_servers;
 pub mod net_config;
 pub mod paths;
 pub mod pca;
@@ -20,6 +21,7 @@ pub mod scan;
 pub mod usn;
 
 use rongroi_core::model::{CollectorRun, UnmeasuredReason};
+pub use rongroi_core::model::{ScanTier, SensitiveKind};
 use rongroi_host::Host;
 
 /// What kind of value an observation field carries, so that `cargo xtask check-rules` can refuse an
@@ -59,6 +61,9 @@ pub struct Field {
     pub name: &'static str,
     /// What kind of value it carries.
     pub kind: FieldKind,
+    /// The kind of sensitive value it carries, which SS mode hides unless the player agreed to show
+    /// that kind, or `None` (ADR 0052).
+    pub sensitive: Option<SensitiveKind>,
 }
 
 impl Field {
@@ -67,6 +72,7 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Text,
+            sensitive: None,
         }
     }
 
@@ -75,6 +81,7 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Number,
+            sensitive: None,
         }
     }
 
@@ -83,6 +90,17 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Bool,
+            sensitive: None,
+        }
+    }
+
+    /// This field, marked as carrying a sensitive value of `kind` (ADR 0052). Only a collector whose
+    /// tier is `full` may mark one: a standard scan's reads are what every player agrees to.
+    #[must_use]
+    pub const fn sensitive(self, kind: SensitiveKind) -> Self {
+        Self {
+            sensitive: Some(kind),
+            ..self
         }
     }
 
@@ -91,6 +109,7 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Timestamp,
+            sensitive: None,
         }
     }
 }
@@ -151,6 +170,11 @@ pub trait Collector {
     fn coverage(&self) -> Option<Coverage> {
         None
     }
+    /// Which scan reads this collector (ADR 0052). A `full` collector is not called in a standard
+    /// scan: its run is `not_consented`. A collector is `full` when its own ADR says so.
+    fn tier(&self) -> ScanTier {
+        ScanTier::Standard
+    }
     /// Looks at the host.
     fn collect(&self, host: &dyn Host) -> CollectorRun;
 }
@@ -166,6 +190,21 @@ pub struct Coverage {
     pub place: Option<&'static str>,
 }
 
+/// Every kind of sensitive value the collectors a scan at `tier` would call declare, so a front end
+/// can ask about each before the scan starts (ADR 0052).
+pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKind> {
+    all()
+        .iter()
+        .filter(|collector| collector.tier() <= tier)
+        .flat_map(|collector| {
+            collector
+                .fields()
+                .iter()
+                .filter_map(|field| field.sensitive)
+        })
+        .collect()
+}
+
 /// Every collector in this build.
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
@@ -173,6 +212,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(driver_service::DriverService::default()),
         Box::new(evtx::Evtx::default()),
         Box::new(fivem_dir::FivemDir),
+        Box::new(fivem_servers::FivemServers),
         Box::new(net_config::NetConfig),
         Box::new(pca::Pca),
         Box::new(posture::Posture),

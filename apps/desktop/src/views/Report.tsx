@@ -14,6 +14,7 @@ import type {
   Observation,
   ReportView,
   RuleText,
+  SsOptions,
 } from "../types";
 import { EvidenceRow } from "./EvidenceRow";
 import { ReportSummary } from "./ReportSummary";
@@ -21,10 +22,12 @@ import { Timeline } from "./Timeline";
 
 interface Props {
   mode: Mode;
+  /** What the player agreed SS mode may show beyond its default (ADR 0052). */
+  options?: SsOptions;
   onBack: () => void;
 }
 
-export function Report({ mode, onBack }: Props) {
+export function Report({ mode, options, onBack }: Props) {
   const { t, i18n } = useTranslation("report");
   const [view, setView] = useState<ReportView | null>(null);
   const [texts, setTexts] = useState<Record<string, RuleText>>({});
@@ -33,8 +36,8 @@ export function Report({ mode, onBack }: Props) {
   const [technicalAll, setTechnicalAll] = useState(false);
 
   useEffect(() => {
-    void reportView(mode).then(setView);
-  }, [mode]);
+    void reportView(mode, options).then(setView);
+  }, [mode, options]);
 
   useEffect(() => {
     void ruleTexts(i18n.language).then(setTexts);
@@ -71,6 +74,8 @@ export function Report({ mode, onBack }: Props) {
       <dl className="facts context">
         <dt>{mode === "ss" ? t("header.mode_ss") : t("header.mode_self")}</dt>
         <dd />
+        <dt>{t("header.scan_tier")}</dt>
+        <dd>{header.scan_tier === "full" ? t("header.tier_full") : t("header.tier_standard")}</dd>
         <dt>{t("header.version")}</dt>
         <dd>{header.provenance.version}</dd>
         <dt>{t("header.platform")}</dt>
@@ -96,6 +101,14 @@ export function Report({ mode, onBack }: Props) {
       )}
       {view.scope.not_attempted > 0 && (
         <p className="scope">{t("scope.not_attempted", { checks: view.scope.not_attempted })}</p>
+      )}
+      {(view.scope.not_consented ?? 0) > 0 && (
+        <p className="scope">
+          {t("scope.not_consented", { checks: view.scope.not_consented ?? 0 })}
+        </p>
+      )}
+      {mode === "ss" && header.scan_tier === "full" && !options?.server_identity && (
+        <p className="muted">{t("header.server_identity_hidden")}</p>
       )}
 
       <div className="toolbar">

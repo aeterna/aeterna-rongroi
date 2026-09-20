@@ -19,7 +19,8 @@ export type UnmeasuredReason =
   | "partial"
   | "budget_spent"
   | "read_failed"
-  | "collector_unavailable";
+  | "collector_unavailable"
+  | "not_consented";
 
 export type Strength = "execution" | "presence" | "tamper" | "posture" | "context";
 
@@ -66,6 +67,17 @@ export interface ReportHeader {
   boot_time: BootTime;
   /** The machine's profile root, for SS-mode redaction only; absent from an SS view (ADR 0049). */
   profiles_directory?: string;
+  /** Which scan the player chose before it started; absent from an older report, which was standard (ADR 0052). */
+  scan_tier?: ScanTier;
+}
+
+/** How much a scan reads, chosen before it starts (ADR 0052). */
+export type ScanTier = "standard" | "full";
+
+/** What the player agreed SS mode may show beyond its default, each default no (ADR 0052). */
+export interface SsOptions {
+  server_identity: boolean;
+  account_identifier: boolean;
 }
 
 /**
@@ -150,7 +162,7 @@ export interface ReportView {
    * administrator rights left unanswered — one fact about the scan rather than one per rule, and the
    * one with a remedy. It is not a fourth hidden count; the same checks are in `hidden` (ADR 0027).
    */
-  scope: { not_admin: number; not_attempted: number };
+  scope: { not_admin: number; not_attempted: number; not_consented?: number };
   listed: ListedCounts;
   timeline: Timeline;
   /** The order collector groups appear in, from the core (ADR 0051). */
