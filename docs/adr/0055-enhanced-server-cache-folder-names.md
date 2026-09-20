@@ -65,6 +65,16 @@ that SS mode lists them after a full scan with the player's agreement, each name
 | Report every folder name in the cache | A renamed folder's name is whatever someone typed; only the shape FiveM writes is reported. |
 | Hash the name before reporting it | A hash of a stable identifier is a stable identifier; it hides nothing. |
 
+## Measured after it shipped (2026-09-20)
+
+The binary built from `dev` at `d6e1246` ran `scan --full` on the same Windows 11 PC, with the owner's
+permission, from two scheduled tasks on the signed-in desktop — one with an elevated token, one with a
+limited one. Both read the folder: `folder: listed`, `server_folders: 3`, and one observation per server
+folder, each name 40 hexadecimal characters, with the same creation and last-write times in both reports.
+Listing `servercache` and reading those times needs no administrator rights, so `fivem_servers` has no
+`not_admin` case to declare. The task, the script, the binary and the output were deleted afterwards, and
+no folder name was written down.
+
 ## What is unverified
 
 - What the name is computed from, and whether it is the same on another PC.
