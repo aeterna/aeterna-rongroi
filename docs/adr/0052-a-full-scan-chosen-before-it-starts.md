@@ -131,6 +131,25 @@ task, the script and its output were deleted afterwards.
 The elevated case finished without anyone at the machine, so no consent prompt stood between the parent and
 the child. A copy started this way neither gains nor loses administrator rights.
 
+### The dialog and the two tiers, on the same PC, 2026-09-20
+
+The binaries built from `dev` at `d6e1246` were run on that PC with the owner's permission, from scheduled
+tasks on the signed-in desktop; the task, the scripts, the binaries and their output were deleted
+afterwards, and nothing measured was written into this repository beyond the numbers below.
+
+- The desktop copy started with `--full` showed the dialog 266 ms after the process started, before any
+  window of its own existed. `GetForegroundWindow` returned that dialog's handle, `WS_EX_TOPMOST` was set on
+  it, and its two buttons read `&Yes` and `&No`. So a dialog shown before a Tauri window exists does come to
+  the front on this configuration.
+- Closing that dialog, which `MessageBoxW` answers as No, gave the standard scan: its window appeared 6.6 s
+  later.
+- The CLI's `scan --full` answered `yes` on standard input gave `scan_tier: full` at a task running with an
+  elevated token and at one running with a limited token. Both reports listed the same three server cache
+  folders, each named with 40 hexadecimal characters, with the same creation and last-write times, and the
+  same `folder: listed`, `server_folders: 3`. The scope statements differed only in `not_admin`, 6 under the
+  limited token and 0 under the elevated one, from other collectors. Listing that folder needs no
+  administrator rights (ADR 0055).
+
 ## What is unverified
 
 - The token a `CreateProcessW` child receives under UAC settings other than the default one measured
@@ -144,8 +163,13 @@ the child. A copy started this way neither gains nor loses administrator rights.
 - Which native dialog API fits: `MessageBoxW` is enough for a yes/no over a text list; `TaskDialogIndirect`
   gives an expandable list. The `windows` crate feature names for either are not checked here and must be
   grepped, not guessed.
-- Whether a native dialog shown before a Tauri window exists is brought to the front on every Windows 11
-  configuration.
+- Whether a native dialog shown before a Tauri window exists is brought to the front on Windows 11
+  configurations other than the one measured above — a PC with a full-screen game in front, for example.
+- Whether the desktop start screen's "Full scan" button starts the copy that asks. The button's command and
+  the arguments it forwards are covered by tests in `commands.rs` and `App.test.tsx`, and the copy it starts
+  is the one measured above, but the click itself was not driven on a real PC: from the window handle, UI
+  Automation lists only the `WebView2` control's own Refresh button, not the page's, so the page's button
+  cannot be invoked that way, and driving the mouse was not attempted on a PC in use.
 
 ## Owner decisions (2026-09-17)
 

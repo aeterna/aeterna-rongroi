@@ -123,6 +123,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   values and the firewall rules key all read the same with and without administrator rights; FiveM's four
   firewall rules include two for GTA V Enhanced's executable inside FiveM's folder, so the collector finds
   FiveM's rules by folder rather than by file name.
+- ADR 0052 and ADR 0055 record the measurement of the shipped full scan on that PC: the dialog a copy
+  started with `--full` shows appeared 266 ms after the process started, as the foreground window and
+  topmost, and closing it gave the standard scan; `scan --full` answered `yes` read the Enhanced server
+  cache folder the same with an elevated and with a limited token, so that read needs no administrator
+  rights. Driving the desktop start screen's "Full scan" button was not measured: from the window handle,
+  UI Automation lists only the `WebView2` control's own button, not the page's.
 
 ### Fixed
 - A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
