@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-21
+
 ### Added
 - The `install_marker` collector and three rules for the named places a Windows modification installs
   (ADR 0057): Atlas' module and desktop folders and its registry key, ReviOS' own tool and wallpaper
