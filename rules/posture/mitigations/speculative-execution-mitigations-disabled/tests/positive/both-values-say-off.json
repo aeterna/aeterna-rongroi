@@ -1,0 +1,16 @@
+{
+  "description": "The override and its mask both say the mitigations are off",
+  "observations": [
+    {
+      "collector": "posture",
+      "fields": {
+        "secure_boot": "enabled",
+        "test_signing": "disabled",
+        "speculative_execution_mitigations": "disabled",
+        "exception_chain_validation": "not_configured",
+        "object_namespace_protection": "enabled"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

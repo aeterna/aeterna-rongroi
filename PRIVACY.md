@@ -9,7 +9,8 @@ Prefetch and the Background Activity Moderator recorded about programs that ran,
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read, with no file name, and the settings that decide where network
 traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM, and what
-Windows says this installation is, with how the services Windows ships with are set to start.
+Windows says this installation is, with how the services Windows ships with are set to start, and
+whether six named places are on this PC.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -72,6 +73,12 @@ where two published Windows-modification playbooks write their own name (ADR 005
 Windows ships with — Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy,
 Search and telemetry — whether its key is there and how it is set to start. No other service is read, and
 no service is started, stopped or changed.
+
+Of the **six named places** it reads one thing each: whether the place is there. Five are what the Atlas
+and ReviOS Windows modifications install — folders and a registry key of theirs — and the sixth is
+Microsoft's own, the folder Windows keeps Defender's engine in, read for its absence (ADR 0057).
+**What is inside a folder is never listed, reported or hashed**, and no value is read from the registry
+key. Nothing is opened for writing.
 
 Of a Prefetch file it reads the program's name, how many times Windows recorded it running and when it
 last ran. **A Prefetch file also lists every file that program loaded — normally hundreds of paths,

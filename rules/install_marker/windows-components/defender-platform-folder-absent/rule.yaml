@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: f47de6d4-05ef-4f33-9aca-2307170fd5ab
+title: Microsoft Defender's platform folder is not on this PC
+description: >-
+  The folder Windows keeps Defender's engine in is not there. Turning Defender off in Settings, and
+    installing another antivirus, both leave the folder in place, so this is what a Windows image that
+    removed the component looks like. Read it beside whether the Defender service is still registered,
+    which says which of the two happened. It describes what is installed on the PC and is not evidence
+    of cheating.
+status: experimental
+collector: install_marker
+strength: posture
+match:
+  marker: "%ProgramData%\\Microsoft\\Windows Defender\\Platform"
+  present: false
+retention: Current state only. It says nothing about how the PC was set up in the past.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - A pre-modified Windows image installed for performance, for an old PC or for a small disk, by somebody who never touched a game
+  - A Windows edition or a managed build that ships without Defender
+  - A removal tool run by the PC's owner or by whoever set the PC up for them
+  - A PC whose Defender is installed somewhere else than the folder Windows uses by default
+references:
+  - https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/microsoft-defender-antivirus-windows
+author: aeterna-rongroi contributors
+date: 2026-09-21
+tags: [posture, install_marker]

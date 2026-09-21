@@ -84,6 +84,7 @@
     "fivem_dir": "ไฟล์ของ FiveM",
     "net_config": "การตั้งค่าเครือข่าย (hosts, proxy, firewall)",
     "os_image": "Windows ตัวนี้บอกว่าตัวเองเป็นอะไร",
+    "install_marker": "ที่ที่โปรแกรมดัดแปลง Windows ติดตั้งไว้",
     "process": "โปรแกรมที่กำลังรัน",
     "evtx": "Event log ของ Windows",
     "prefetch": "Prefetch ของ Windows",

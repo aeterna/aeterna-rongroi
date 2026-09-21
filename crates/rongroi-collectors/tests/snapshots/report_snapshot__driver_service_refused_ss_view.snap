@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 40
+      "rule_count": 46
     },
     "platform": "windows",
     "os_build": null,
@@ -125,11 +125,50 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "fd58dec6-84c1-49cb-806c-10b4614a046f",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
       "rule_id": "65ee0ec1-bcda-47a3-a401-98632b42e75f",
       "collector": "net_config",
       "strength": "posture",
       "state": "not_found",
       "retention": "The hosts file as it was when the scan ran. A line removed before the scan is not seen."
+    },
+    {
+      "rule_id": "77646339-caf4-4ade-93ef-133089dac30e",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "8f656238-36d2-4178-98db-87f55432edf7",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "cf83f06e-23b5-47fc-b7a0-b6d1b8192379",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "c9012982-5fc1-4d61-ab0c-0bc1abe93830",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
     },
     {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
@@ -168,6 +207,27 @@ expression: view
       "retention": "Current setting only. It says nothing about how the account was configured in the past."
     },
     {
+      "rule_id": "dc858978-954d-418f-a42e-29f06975f4ed",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "a4af8cdc-a009-42ee-8368-7f35e93051fe",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "d2f86e75-7692-468e-88a2-52eb1e24dc30",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
       "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
       "collector": "posture",
       "strength": "context",
@@ -185,14 +245,14 @@ expression: view
   },
   "listed": {
     "found": 0,
-    "not_found": 5,
-    "unmeasured": 14
+    "not_found": 9,
+    "unmeasured": 18
   },
   "hidden": {
     "not_found": 0,
-    "unmeasured_expected": 12,
+    "unmeasured_expected": 10,
     "unmeasured_unexpected": 0,
-    "unmatched": 3
+    "unmatched": 7
   },
   "timeline": {
     "entries": [

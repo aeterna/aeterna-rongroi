@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 40 |
-| SHA-256 | `5641a0b939c265d41d0f4f4cadf107b1a42e8ca9eaa6506b1266bd748599c916` |
+| Rules | 46 |
+| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -58,6 +58,10 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `fivem_servers`
   - [FiveM for GTA V Enhanced keeps a cache folder for a server](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
+- `install_marker`
+  - [A folder or key the Atlas playbook installs is on this PC](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
+  - [A folder the ReviOS playbook installs is on this PC](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
+  - [Microsoft Defender's platform folder is not on this PC](#rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab) — `posture` · `experimental`
 - `net_config`
   - [The hosts file gives a FiveM or Rockstar name an address](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
 - `os_image`
@@ -77,6 +81,9 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [A per-user policy turns Windows PowerShell script block logging off](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [Memory integrity (HVCI) is configured off](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
+  - [Structured exception handling overwrite protection (SEHOP) is switched off](#rule-dc858978-954d-418f-a42e-29f06975f4ed) — `posture` · `experimental`
+  - [The kernel object namespace is not protected as Windows ships it](#rule-a4af8cdc-a009-42ee-8368-7f35e93051fe) — `posture` · `experimental`
+  - [The speculative-execution mitigations are switched off](#rule-d2f86e75-7692-468e-88a2-52eb1e24dc30) — `posture` · `experimental`
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
@@ -696,6 +703,136 @@ The server cache folders there when the scan ran. A folder the player, a cleaner
 - Joining any server with FiveM for GTA V Enhanced, which is what leaves these folders
 - A folder kept from a server joined long ago, or by another person using this Windows account
 
+## Collector `install_marker`
+
+### `install_marker` / `modified-build`
+
+<a id="rule-fd58dec6-84c1-49cb-806c-10b4614a046f"></a>
+
+#### A folder or key the Atlas playbook installs is on this PC
+
+- Id: `fd58dec6-84c1-49cb-806c-10b4614a046f`
+- File: [`rules/install_marker/modified-build/atlas-files-present/rule.yaml`](../rules/install_marker/modified-build/atlas-files-present/rule.yaml)
+- Collector: `install_marker`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `install_marker`
+- Written: 2026-09-21
+
+**About this check**
+
+One of the places the Atlas playbook creates when it is applied is here: its module folder, its desktop folder of configuration scripts, or its own registry key. Atlas turns off parts of Windows, and some of those parts are what this program and a server's anti-cheat read. Which operating system to run is the owner's choice; this row says what is installed, not that anything was cheated. What is inside the folder was not read.
+
+**Matches when all of these hold for one observation**
+
+- `marker`: is one of `%SystemRoot%\AtlasModules`, `%SystemRoot%\AtlasDesktop`, `HKLM\SOFTWARE\AtlasOS` (text, ASCII case ignored)
+- `present`: is `true`
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied the playbook for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- A folder or key left behind after the playbook was removed or reverted
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-3ec29285-f365-4e60-81fe-818d27c6b47a"></a>
+
+#### A folder the ReviOS playbook installs is on this PC
+
+- Id: `3ec29285-f365-4e60-81fe-818d27c6b47a`
+- File: [`rules/install_marker/modified-build/revios-files-present/rule.yaml`](../rules/install_marker/modified-build/revios-files-present/rule.yaml)
+- Collector: `install_marker`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `install_marker`
+- Written: 2026-09-21
+
+**About this check**
+
+One of the places the ReviOS playbook creates when it is applied is here: the folder of its own tool, or the wallpaper folder it installs. ReviOS turns off parts of Windows, some of which are what this program and a server's anti-cheat read. Which operating system to run is the owner's choice; this row says what is installed, not that anything was cheated. What is inside the folder was not read.
+
+**Matches when all of these hold for one observation**
+
+- `marker`: is one of `%ProgramFiles%\Revision Tool`, `%SystemRoot%\Web\Wallpaper\MeetRevision` (text, ASCII case ignored)
+- `present`: is `true`
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied the playbook for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- A folder left behind after the playbook was removed or reverted
+
+**References**
+
+- <https://github.com/meetrevision/playbook>
+
+### `install_marker` / `windows-components`
+
+<a id="rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab"></a>
+
+#### Microsoft Defender's platform folder is not on this PC
+
+- Id: `f47de6d4-05ef-4f33-9aca-2307170fd5ab`
+- File: [`rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml`](../rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml)
+- Collector: `install_marker`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `install_marker`
+- Written: 2026-09-21
+
+**About this check**
+
+The folder Windows keeps Defender's engine in is not there. Turning Defender off in Settings, and installing another antivirus, both leave the folder in place, so this is what a Windows image that removed the component looks like. Read it beside whether the Defender service is still registered, which says which of the two happened. It describes what is installed on the PC and is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `marker`: is `%ProgramData%\Microsoft\Windows Defender\Platform` (text, ASCII case ignored)
+- `present`: is `false`
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A pre-modified Windows image installed for performance, for an old PC or for a small disk, by somebody who never touched a game
+- A Windows edition or a managed build that ships without Defender
+- A removal tool run by the PC's owner or by whoever set the PC up for them
+- A PC whose Defender is installed somewhere else than the folder Windows uses by default
+
+**References**
+
+- <https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/microsoft-defender-antivirus-windows>
+
 ## Collector `net_config`
 
 ### `net_config` / `hosts`
@@ -766,7 +903,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 
 **Ordinary things that also produce this**
@@ -806,7 +942,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 
 **Ordinary things that also produce this**
@@ -847,7 +982,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 
 **Ordinary things that also produce this**
@@ -890,7 +1024,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 
 **Ordinary things that also produce this**
@@ -930,7 +1063,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 
 **Ordinary things that also produce this**
@@ -970,7 +1102,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 
 **Ordinary things that also produce this**
@@ -1010,7 +1141,6 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **Not measured, and named by the rule as ordinary on some machines**
 
 - `not_windows` — not running on Windows
-- `access_denied` — Windows refused to open this
 - `source_absent` — this PC has no such record to read
 
 **Ordinary things that also produce this**
@@ -1349,6 +1479,125 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **References**
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/enable-virtualization-based-protection-of-code-integrity>
+
+### `posture` / `mitigations`
+
+<a id="rule-dc858978-954d-418f-a42e-29f06975f4ed"></a>
+
+#### Structured exception handling overwrite protection (SEHOP) is switched off
+
+- Id: `dc858978-954d-418f-a42e-29f06975f4ed`
+- File: [`rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml`](../rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `mitigations`
+- Written: 2026-09-21
+
+**About this check**
+
+Windows is told not to validate the exception handler chain, a protection against one way of hijacking a program's control flow. Switching it off is a step several gaming tweak scripts take, and some older software asks for it. It is a setting the owner of the machine chose and it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `exception_chain_validation`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Older software whose own instructions ask for this protection to be switched off
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+- A PC managed by an employer whose policy sets it this way
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/security/threat-protection/overview-of-threat-mitigations-in-windows-10>
+
+<a id="rule-a4af8cdc-a009-42ee-8368-7f35e93051fe"></a>
+
+#### The kernel object namespace is not protected as Windows ships it
+
+- Id: `a4af8cdc-a009-42ee-8368-7f35e93051fe`
+- File: [`rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml`](../rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `mitigations`
+- Written: 2026-09-21
+
+**About this check**
+
+Windows is told not to keep programs of different privilege levels apart in the kernel object namespace, a protection it ships switched on (measured on an ordinary PC). Switching it off makes it easier for one program to reach another's named objects. Some tweak scripts do it, and some old software asks for it. It is a setting the owner of the machine chose and it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `object_namespace_protection`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Older software whose own instructions ask for this protection to be switched off
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+- A PC managed by an employer whose policy sets it this way
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/sync/object-namespaces>
+
+<a id="rule-d2f86e75-7692-468e-88a2-52eb1e24dc30"></a>
+
+#### The speculative-execution mitigations are switched off
+
+- Id: `d2f86e75-7692-468e-88a2-52eb1e24dc30`
+- File: [`rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml`](../rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `mitigations`
+- Written: 2026-09-21
+
+**About this check**
+
+Windows is told to turn off the mitigations for Spectre variant 2 and Meltdown, by the pair of values that together mean off. The mitigations cost a few percent of performance, and turning them off is a step several gaming tweak scripts take; it also leaves the PC exposed to the processor flaws they were written for. It is a setting the owner of the machine chose and it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `speculative_execution_mitigations`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- An owner who followed performance advice for an older processor, on which these mitigations cost the most
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+- A PC set up this way by a shop or by whoever built it
+
+**References**
+
+- <https://support.microsoft.com/en-us/topic/kb4073119-windows-client-guidance-for-it-pros-to-protect-against-silicon-based-microarchitectural-and-speculative-execution-side-channel-vulnerabilities-35820a8a-ae13-1299-88cc-357f104f5b11>
 
 ### `posture` / `tpm`
 

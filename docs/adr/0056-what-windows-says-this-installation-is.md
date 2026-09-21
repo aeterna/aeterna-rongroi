@@ -60,8 +60,14 @@ Two of those measurements decide rules that were considered and **not** written:
   may treat the presence of OEM information as a modification; only the specific strings the two
   playbooks write are matched.
 
-A limited-token measurement was **not** made, so `access_denied` stays declarable for this collector
-rather than being ruled out the way ADR 0054 ruled it out for `net_config`.
+A limited-token measurement was **not** made when this ADR was written, so `access_denied` stayed
+declarable for this collector.
+
+**Amended 2026-09-21 (ADR 0057).** That measurement has now been made on the same PC: every read above
+works with the account's limited token. `access_denied` was removed from the `unmeasured_when` of this
+ADR's rules, so a machine that does refuse one of these reads is shown to a reviewer as a row rather
+than counted in the scope line. The collector still reports the reason — only the rules stopped
+declaring it.
 
 ### What the two playbooks write, read from their own source
 

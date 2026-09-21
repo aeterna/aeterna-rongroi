@@ -1,0 +1,60 @@
+{
+  "description": "The platform folder is not there",
+  "observations": [
+    {
+      "collector": "install_marker",
+      "fields": {
+        "marker": "%ProgramData%\\Microsoft\\Windows Defender\\Platform",
+        "kind": "folder",
+        "path": "%ProgramData%\\Microsoft\\Windows Defender\\Platform",
+        "present": false
+      }
+    },
+    {
+      "collector": "install_marker",
+      "fields": {
+        "marker": "%ProgramFiles%\\Revision Tool",
+        "kind": "folder",
+        "path": "%ProgramFiles%\\Revision Tool",
+        "present": false
+      }
+    },
+    {
+      "collector": "install_marker",
+      "fields": {
+        "marker": "%SystemRoot%\\AtlasDesktop",
+        "kind": "folder",
+        "path": "%SystemRoot%\\AtlasDesktop",
+        "present": false
+      }
+    },
+    {
+      "collector": "install_marker",
+      "fields": {
+        "marker": "%SystemRoot%\\AtlasModules",
+        "kind": "folder",
+        "path": "%SystemRoot%\\AtlasModules",
+        "present": false
+      }
+    },
+    {
+      "collector": "install_marker",
+      "fields": {
+        "marker": "%SystemRoot%\\Web\\Wallpaper\\MeetRevision",
+        "kind": "folder",
+        "path": "%SystemRoot%\\Web\\Wallpaper\\MeetRevision",
+        "present": false
+      }
+    },
+    {
+      "collector": "install_marker",
+      "fields": {
+        "marker": "HKLM\\SOFTWARE\\AtlasOS",
+        "kind": "registry_key",
+        "path": "HKLM\\SOFTWARE\\AtlasOS",
+        "present": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

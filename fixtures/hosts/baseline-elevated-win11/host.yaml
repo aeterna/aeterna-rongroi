@@ -37,6 +37,8 @@ env:
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
   SystemRoot: 'C:\Windows'
   WinDir: 'C:\Windows'
+  ProgramFiles: 'C:\Program Files'
+  ProgramData: 'C:\ProgramData'
 # The change journal (ADR 0047): counts and first and last times taken from the `usn` collector's own
 # reading of a GitHub-hosted Windows Server 2025 runner (windows.yml run 34930942657), rebuilt as record
 # groups that give the same observations. A runner image, not a gaming PC: it asserts the collector's
@@ -94,6 +96,10 @@ registry:
     SupportURL: "http://www.msi.com/"
   'HKLM\SYSTEM\CurrentControlSet\Services\WinDefend':
     Start: 2
+  # Measured on the same PC on 2026-09-21 (ADR 0057): object-namespace protection as Windows ships
+  # it, and no override of the speculative-execution mitigations and no SEHOP switch written at all.
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager':
+    ProtectionMode: 1
   'HKLM\SYSTEM\CurrentControlSet\Services\EventLog':
     Start: 2
   'HKLM\SYSTEM\CurrentControlSet\Services\SysMain':
@@ -1845,6 +1851,14 @@ registry:
     Start: 3
     ImagePath: 'C:\Windows\system32\drivers\ztdns.sys'
 filesystem:
+  # ADR 0057: Defender's platform folder, which the same PC has and which a limited token listed on
+  # 2026-09-21. The two version folders are the names that PC had; nothing inside them is read, and
+  # `install_marker` reports only that the folder is there.
+  'C:\ProgramData\Microsoft\Windows Defender\Platform':
+    - name: 4.18.26080.3-0
+      directory: true
+    - name: 4.18.26080.4-0
+      directory: true
   # ADR 0054: a hosts file of the shape measured — UTF-8 with a byte-order mark, six lines in effect,
   # none naming a listed name: one loopback, two private and three other addresses. Every name is
   # invented. The byte-order mark is written as the escape a YAML double-quoted string takes.

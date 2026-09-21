@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 40
+      "rule_count": 46
     },
     "platform": "windows",
     "os_build": null,
@@ -133,6 +133,29 @@ expression: view
       "expected": true
     },
     {
+      "rule_id": "fd58dec6-84c1-49cb-806c-10b4614a046f",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "3ec29285-f365-4e60-81fe-818d27c6b47a",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "f47de6d4-05ef-4f33-9aca-2307170fd5ab",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
       "rule_id": "65ee0ec1-bcda-47a3-a401-98632b42e75f",
       "collector": "net_config",
       "strength": "posture",
@@ -169,7 +192,7 @@ expression: view
       "strength": "posture",
       "state": "unmeasured",
       "reason": "access_denied",
-      "expected": true
+      "expected": false
     },
     {
       "rule_id": "8f656238-36d2-4178-98db-87f55432edf7",
@@ -177,7 +200,7 @@ expression: view
       "strength": "posture",
       "state": "unmeasured",
       "reason": "access_denied",
-      "expected": true
+      "expected": false
     },
     {
       "rule_id": "cf83f06e-23b5-47fc-b7a0-b6d1b8192379",
@@ -185,7 +208,7 @@ expression: view
       "strength": "posture",
       "state": "unmeasured",
       "reason": "access_denied",
-      "expected": true
+      "expected": false
     },
     {
       "rule_id": "c9012982-5fc1-4d61-ab0c-0bc1abe93830",
@@ -193,7 +216,7 @@ expression: view
       "strength": "posture",
       "state": "unmeasured",
       "reason": "access_denied",
-      "expected": true
+      "expected": false
     },
     {
       "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
@@ -256,6 +279,27 @@ expression: view
       "expected": true
     },
     {
+      "rule_id": "dc858978-954d-418f-a42e-29f06975f4ed",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "a4af8cdc-a009-42ee-8368-7f35e93051fe",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "d2f86e75-7692-468e-88a2-52eb1e24dc30",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
       "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
       "collector": "posture",
       "strength": "context",
@@ -275,6 +319,47 @@ expression: view
   "own_traces": [],
   "unmatched": [
     {
+      "collector": "install_marker",
+      "observations": [
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\AtlasDesktop",
+            "path": "C:\\Windows\\AtlasDesktop",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\AtlasModules",
+            "path": "C:\\Windows\\AtlasModules",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\Web\\Wallpaper\\MeetRevision",
+            "path": "C:\\Windows\\Web\\Wallpaper\\MeetRevision",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "registry_key",
+            "marker": "HKLM\\SOFTWARE\\AtlasOS",
+            "path": "HKLM\\SOFTWARE\\AtlasOS",
+            "present": false
+          }
+        }
+      ]
+    },
+    {
       "collector": "net_config",
       "observations": [
         {
@@ -293,10 +378,13 @@ expression: view
         {
           "collector": "posture",
           "fields": {
+            "exception_chain_validation": "not_configured",
+            "object_namespace_protection": "not_configured",
             "script_block_logging": "not_configured",
             "script_block_logging_pwsh": "not_configured",
             "script_block_logging_pwsh_user": "not_configured",
-            "script_block_logging_user": "not_configured"
+            "script_block_logging_user": "not_configured",
+            "speculative_execution_mitigations": "not_configured"
           }
         }
       ]
@@ -320,8 +408,8 @@ expression: view
   },
   "listed": {
     "found": 0,
-    "not_found": 5,
-    "unmeasured": 26
+    "not_found": 9,
+    "unmeasured": 28
   },
   "hidden": {
     "not_found": 0,

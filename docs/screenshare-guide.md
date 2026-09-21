@@ -188,6 +188,32 @@ These are counts of what SS mode does not list. §7 says why.
 | A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
 | FiveM for GTA V Enhanced keeps a cache folder for a server (full scan only) | context | `experimental` | joining any server with FiveM for GTA V Enhanced, a folder kept from a server joined long ago or by another person on the same Windows account |
 | The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
+| The registered organisation names a Windows-modification playbook | posture | `experimental` | anyone who applied Atlas or ReviOS for privacy, battery life or an old PC; a second-hand PC that came with it; a name typed in by hand |
+| The OEM model shown in Settings names a Windows-modification playbook | posture | `experimental` | the same three |
+| The OEM manufacturer shown in Settings is a Windows-modification project | posture | `experimental` | the same three |
+| Microsoft Defender's service is not registered on this PC | posture | `experimental` | a pre-modified Windows image installed for performance or an old PC, an edition or managed build without Defender, a removal tool the owner ran |
+| Microsoft Defender's service is set never to start | posture | `experimental` | **any third-party antivirus**, which disables it when it installs itself; an employer's or school's policy; a tweaking script or pre-modified image |
+| The Windows Event Log service does not start with Windows | posture | `experimental` | a pre-modified Windows image, a tweaking script the owner ran, a managed build whose policy sets it differently |
+| Windows Update's service cannot start on this PC | posture | `experimental` | an owner who turned updates off to stop reboots or keep a driver, a PC updated another way by an employer, a tweaking script or pre-modified image |
+| A folder or key the Atlas playbook installs is on this PC | posture | `experimental` | anyone who applied the playbook and never touched a game, a second-hand PC that came with it, a folder left behind after it was removed |
+| A folder the ReviOS playbook installs is on this PC | posture | `experimental` | the same three |
+| Microsoft Defender's platform folder is not on this PC | posture | `experimental` | a pre-modified Windows image, an edition or managed build without Defender, a removal tool the owner ran, a Defender installed somewhere other than the default folder |
+| The speculative-execution mitigations are switched off | posture | `experimental` | performance advice for an older processor, a tweaking script or pre-modified image, a PC set up this way by the shop that built it |
+| Structured exception handling overwrite protection (SEHOP) is switched off | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+| The kernel object namespace is not protected as Windows ships it | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+
+Four things to know about the thirteen rows above, which are all about **which Windows this is**:
+
+- **None of them is about cheating.** A person may install any operating system on a PC they own. What
+  they say is which parts of Windows are there and how they are set — including the parts this program
+  and a server's anti-cheat read.
+- **"Defender's service is disabled" is most often another antivirus.** That is what installing one
+  does. Read it beside the platform-folder row: a service that is registered and disabled, with the
+  folder still there, is the ordinary picture.
+- **The two playbooks name themselves; the pre-modified ISOs do not.** Atlas and ReviOS write their own
+  name where Windows shows it, so those rows say which one. KernelOS, Ghost Spectre and images built
+  with tiny11builder publish no such name, so what you see instead is which components are missing.
+- **Nothing inside the folders was read.** The folder rows answer one question — is it there.
 
 Three things to know about the two log-clearing rules:
 
@@ -215,7 +241,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last three, about vulnerable drivers, a server cache folder and the hosts file, are new after 0.3.0 and are not in a released version yet. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last sixteen — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new after 0.3.0 and are not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
