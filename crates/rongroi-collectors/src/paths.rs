@@ -27,9 +27,9 @@ pub fn file_name(path: &str) -> Option<String> {
 
 /// Whether a path starts `X:\` or `X:/`.
 ///
-/// This is the only shape `rongroi_core::view::redact_user_paths` was written for, and it is
-/// deliberately narrower than what that function can reach: a path this refuses is withheld, and
-/// erring toward withholding is the direction that cannot leak a user name.
+/// This is the shape `rongroi_core::view::redact_profile_paths` was first written for, and it is
+/// deliberately narrower than what that function reaches (ADR 0049): a path this refuses is withheld,
+/// and erring toward withholding is the direction that cannot leak a user name.
 pub fn is_drive_rooted(path: &str) -> bool {
     let bytes = path.as_bytes();
     bytes.len() >= 3
@@ -57,7 +57,7 @@ mod tests {
     }
 
     /// The device path is the shape BAM is expected to write and the shape that walks straight past
-    /// `redact_user_paths`, so it is named here rather than left to a collector's own test.
+    /// `redact_profile_paths`, so it is named here rather than left to a collector's own test.
     #[test]
     fn only_a_drive_rooted_path_is_emitted() {
         assert!(is_drive_rooted(r"C:\Users\alex\x.exe"));

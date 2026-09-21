@@ -47,14 +47,38 @@ be `unmeasured` there.
 > `bam` and `prefetch` limited-token runs — it is one per collector and was not opened. The per-artifact
 > path questions in ADRs 0020, 0021, 0023 and 0024 stay open.
 >
+> **The same machine, 2026-09-15.** The `driver_service` collector hashed all 464 registered driver
+> services both elevated and under a limited token, and the vulnerable-driver rule read `found` for two
+> hardware-utility drivers ([ADR 0048](adr/0048-the-driver-service-collector.md)). The desktop app, run
+> under a limited token and driven by UI Automation, confirmed the clipboard, the two-line cut, the
+> technical switch and Back from About & code; reading its QR code with a phone is still unchecked
+> ([ADR 0045](adr/0045-reading-the-report-in-layers-and-where-its-code-is.md)).
+>
+> **The same machine, 2026-09-21: the first run of `os_image`, `install_marker` and the three new
+> `posture` settings** ([ADR 0056](adr/0056-what-windows-says-this-installation-is.md),
+> [ADR 0057](adr/0057-named-places-and-the-mitigation-switches.md)). The CLI was cross-built and run
+> there, and every value it read matched, string for string, what the three baseline hosts in
+> `fixtures/hosts/` assert — `ProductName` `Windows 10 Home` on a genuine 25H2 build, `EditionID` and
+> `CompositionEditionID` `Core`, `BuildLabEx` `26100.6.amd64fre.ge_release_flt.260716-1700`, `UBR`
+> 9492, an empty `RegisteredOrganization`, the board vendor's `Msi` / `MS-7A36` /
+> `http://www.msi.com/`, six services `automatic` and `wuauserv` and `WerSvc` `manual`,
+> `object_namespace_protection` `enabled` and the other two settings `not_configured`.
+> `install_marker` answered all six of its places: the five a modification installs `present: false`,
+> with the paths this PC expands them to, and Defender's platform folder `present: true`.
+>
+> **All thirteen rules read `not_found`** on that machine — no false positive on an ordinary PC. They
+> stay `experimental` all the same: a *positive* match has never been seen on a real machine, because
+> nobody has run this on a PC carrying one of these builds. The binary was deleted from that machine
+> after the run.
+>
 > The CI job remains a second, different machine rather than a substitute: it has a real `winevt\Logs`
 > folder and an elevated token, so it parses real event-log bytes on every run, and it says nothing about
 > the non-elevated branch an ordinary scan takes.
 
 ## The fuzz layer
 
-One target per public parser entry point — six of them: `fuzz_bam`, `fuzz_pca_app_launch`,
-`fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`, `fuzz_evtx`. Each asserts nothing about the value it
+One target per public parser entry point — seven of them: `fuzz_bam`, `fuzz_pca_app_launch`,
+`fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`, `fuzz_evtx`, `fuzz_usn`. Each asserts nothing about the value it
 gets back: a malformed artifact is a typed `ParseError`, which is a correct answer, so the bug a target looks
 for is a panic, an abort or a hang.
 

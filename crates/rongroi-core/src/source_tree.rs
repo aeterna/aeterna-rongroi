@@ -6,11 +6,11 @@
 // embedded bundle and `cargo xtask check-rules` read the rules tree in exactly the same way.
 // It uses fully qualified paths because it is included into two different crates.
 
-/// Collects every `rule.yaml` (outside `deprecated/`) and every `i18n/<lang>.yaml` under `rules_dir`
-/// into the raw bundle JSON. Paths are sorted and line endings normalised, so the bundle and its
-/// SHA-256 are identical on every platform.
+/// Collects every `rule.yaml` (outside `deprecated/`), the `*.csv` files beside each one, and every
+/// `i18n/<lang>.yaml` under `rules_dir` into the raw bundle JSON. Paths are sorted and line endings
+/// normalised, so the bundle and its SHA-256 are identical on every platform.
 pub fn collect_bundle_json(rules_dir: &std::path::Path) -> std::io::Result<String> {
-    let mut rules: Vec<(String, String)> = Vec::new();
+    let mut rules: Vec<(String, String, std::collections::BTreeMap<String, String>)> = Vec::new();
     if rules_dir.is_dir() {
         collect_rule_files(rules_dir, rules_dir, &mut rules)?;
     }
@@ -33,7 +33,13 @@ pub fn collect_bundle_json(rules_dir: &std::path::Path) -> std::io::Result<Strin
     let json = serde_json::json!({
         "rules": rules
             .iter()
-            .map(|(path, yaml)| serde_json::json!({ "path": path, "yaml": yaml }))
+            .map(|(path, yaml, data)| {
+                if data.is_empty() {
+                    serde_json::json!({ "path": path, "yaml": yaml })
+                } else {
+                    serde_json::json!({ "path": path, "yaml": yaml, "data": data })
+                }
+            })
             .collect::<Vec<_>>(),
         "i18n": i18n
             .iter()
@@ -46,7 +52,7 @@ pub fn collect_bundle_json(rules_dir: &std::path::Path) -> std::io::Result<Strin
 fn collect_rule_files(
     root: &std::path::Path,
     dir: &std::path::Path,
-    out: &mut Vec<(String, String)>,
+    out: &mut Vec<(String, String, std::collections::BTreeMap<String, String>)>,
 ) -> std::io::Result<()> {
     let mut entries = std::fs::read_dir(dir)?.collect::<Result<Vec<_>, _>>()?;
     entries.sort_by_key(std::fs::DirEntry::path);
@@ -65,10 +71,28 @@ fn collect_rule_files(
                 .map(|component| component.as_os_str().to_string_lossy().into_owned())
                 .collect::<Vec<_>>()
                 .join("/");
-            out.push((relative, read_normalised(&path)?));
+            out.push((relative, read_normalised(&path)?, data_beside(dir)?));
         }
     }
     Ok(())
+}
+
+/// Every `*.csv` directly inside `dir`, by file name, line endings normalised (ADR 0048). A rule names
+/// the ones it reads in `match_lists`; `rules::expand_match_lists` refuses a name that is not here.
+fn data_beside(
+    dir: &std::path::Path,
+) -> std::io::Result<std::collections::BTreeMap<String, String>> {
+    let mut data = std::collections::BTreeMap::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_file()
+            && path.extension().is_some_and(|ext| ext == "csv")
+            && let Some(name) = path.file_name().and_then(|name| name.to_str())
+        {
+            data.insert(name.to_owned(), read_normalised(&path)?);
+        }
+    }
+    Ok(data)
 }
 
 fn read_normalised(path: &std::path::Path) -> std::io::Result<String> {

@@ -11,22 +11,29 @@
     "self_button": "Check my own PC",
     "self_hint": "See everything, only on this screen.",
     "ss_button": "Screenshare check (SS mode)",
-    "ss_hint": "For staff watching your screen. Asks for your consent first and shows only what matches a rule.",
+    "ss_hint": "For staff watching your screen. Asks for your consent first and shows what matches a rule, with a timeline of the times the consent lists.",
     "elevate_button": "Scan as administrator",
     "elevate_hint": "Some checks need administrator rights. This closes the program, starts it again with those rights and scans from the beginning. Windows will ask you to confirm.",
     "elevate_declined": "You declined the Windows prompt. Nothing changed.",
     "elevate_failed": "Windows did not start the program with administrator rights. Nothing changed.",
-    "scan_note": "The scan ran on this PC when the program started, before this window opened, so the window cannot change the results. Nothing is shown or saved until you choose."
+    "scan_note": "The scan ran on this PC when the program started, before this window opened, so the window cannot change the results. Nothing is shown or saved until you choose.",
+    "standard_done": "This was a standard scan.",
+    "full_done": "This was a full scan: you agreed in the Windows dialog before it read anything.",
+    "full_button": "Full scan",
+    "full_hint": "Reads more than the standard scan: the name of each server cache folder FiveM for GTA V Enhanced keeps. This closes the program and starts it again; before it reads anything, a Windows dialog lists what a full scan reads and asks you. No there gives you the standard scan.",
+    "full_failed": "Windows did not start the program again. Nothing changed."
   },
   "consent": {
     "title": "Before you share your screen",
-    "reads": "When it started, this program read, on this PC: security settings such as Secure Boot — as Windows and as the firmware report it — memory integrity, and the PowerShell logging policies of this PC and of the Windows account running this program; the programs running and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode); what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on; how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log; whether a Prefetch or event log file is marked read-only; and when Windows last started, which staff will see as one time at the top of the report.",
-    "shows": "Staff will see only what matches a rule. Your user name is hidden in file paths.",
+    "reads": "When it started, this program read, on this PC: security settings such as Secure Boot — as Windows and as the firmware report it — memory integrity, and the PowerShell logging policies of this PC and of the Windows account running this program, and whether the speculative-execution mitigations, SEHOP and the kernel object-namespace protection are switched off; the programs running and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode); for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, never a file or folder name; these times can match two reports of this PC; what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on; how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log; whether a Prefetch or event log file is marked read-only; how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name; the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256; the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are; what Windows says this installation is — the edition, the build, the registered organisation and the manufacturer, model and support link Settings shows, never the registered owner's name — and how each of the services Windows ships with (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) is set to start, or that its key is not there; whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it; and when Windows last started, which staff will see as one time at the top of the report.",
+    "shows": "Staff will see what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders; the oldest and newest record of each event log; and the oldest and newest change the change journal holds for each folder it counts. Your user name is hidden in file paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public.",
     "sends": "aeterna-rongroi's own code sends nothing anywhere.",
     "webview": "This window uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The CLI version does not use WebView2.",
     "refuse_ok": "You may refuse.",
     "agree": "I agree — show the SS view",
-    "refuse": "I refuse"
+    "refuse": "I refuse",
+    "full_reads": "A full scan also read the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server this PC joined — with when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so it can match two reports of this PC.",
+    "server_identity": "Also show which servers these are (the folder names). Off: each name is shown as %SERVER_IDENTITY%."
   },
   "declined": {
     "title": "Nothing was shown",
@@ -41,5 +48,37 @@
   },
   "actions": {
     "back": "Back"
+  },
+  "code": {
+    "copy_idle": "Copy link",
+    "copy_copied": "Copied",
+    "copy_failed": "Could not copy — select the text instead",
+    "qr_alt": "QR code for {{url}}"
+  },
+  "nav": {
+    "about": "About & code"
+  },
+  "about": {
+    "title": "About this program and its code",
+    "intro": "aeterna-rongroi is open source: anyone can read what it reads on a PC and what each check decides from.",
+    "repository": "All of the code",
+    "this_build_code": "The code of this build",
+    "code_commit_unknown": "The commit this build was made from is not known.",
+    "code_unknown": "The code this build was made from is not known: it was not built by the release workflow.",
+    "this_file": "This program",
+    "build": "Build",
+    "official": "official build",
+    "version": "Version",
+    "commit": "Commit",
+    "exe_sha256": "SHA-256",
+    "rules": "Rules",
+    "license": "Licence",
+    "unknown": "not known",
+    "verify_title": "Check that this file was built from this code",
+    "verify_hash": "Open this version's release page on GitHub and compare the SHA-256 above with the line for this file in SHA256SUMS.",
+    "verify_attestation": "With the GitHub CLI:",
+    "verify_unofficial": "If this window shows UNOFFICIAL BUILD or the hash differs, do not rely on its results.",
+    "no_web_title": "Why no button opens a web page",
+    "no_web_body": "This program has no network code, so it cannot open a web page. Copy a link into a browser, or scan its QR code with a phone."
   }
 }

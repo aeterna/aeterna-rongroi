@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 2ef0da16-e65e-4bb6-90c5-0898ffc93ad8
+title: When FiveM's log, crash and cache folders were written
+description: >-
+  Puts on the timeline the times FiveM's log, crash and cache folders report, for GTA V Legacy and
+  Enhanced: when each folder was created and last changed, the earliest and latest file times in it,
+  and when each Enhanced server cache folder was created and last changed. These are the times the
+  file system reports, which the program that writes a file can set. A server cache folder is shown
+  without its name. None of this is evidence of anything.
+status: test
+# A timeline selector (ADR 0051) over the folders ADR 0053 reads for their activity.
+role: timeline
+collector: fivem_dir
+strength: context
+match:
+  location:
+    - legacy_logs
+    - legacy_crashes
+    - legacy_cache
+    - legacy_server_cache
+    - enhanced_logs
+    - enhanced_crashes
+    - enhanced_launcher_crashes
+    - enhanced_server_cache
+retention: >-
+  The folders as they are at the moment of the scan. FiveM writes, rotates and removes its own logs,
+  crash reports and cache, and a player can clear them.
+falsepositives:
+  - FiveM writing, rotating and removing its own logs, crash reports and cache in ordinary use
+  - The player clearing FiveM's cache or logs
+  - Reinstalling FiveM, moving it to another PC, or restoring it from a backup
+  - A backup, sync or copy tool that sets file times
+author: aeterna-rongroi contributors
+date: 2026-09-17
+tags: [fivem_dir, timeline]

@@ -26,7 +26,7 @@
 //!   refused to create for a volume serial number. What is reported is how many accounts had
 //!   records, which is a count and not an identifier.
 //! - **A path is emitted only when it begins with a drive letter**, the one shape
-//!   `rongroi_core::view::redact_user_paths` can reach, exactly as `pca` decides it. BAM is expected
+//!   `rongroi_core::view::redact_profile_paths` can reach, exactly as `pca` decides it. BAM is expected
 //!   to spell paths in the `\Device\HarddiskVolumeN\…` form — unverified, see ADR 0023 — and such a
 //!   path carries `\Users\<account>\` with no drive letter in front of it, so it would reach an SS
 //!   viewer unredacted while the code around it says paths are redacted.

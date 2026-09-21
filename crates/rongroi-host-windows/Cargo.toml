@@ -40,6 +40,12 @@ windows-registry.workspace = true
 # `EvtOpenChannelConfig` and `EvtClose` are under `Win32_System_EventLog`; `EvtGetChannelConfigProperty`
 # and the `EVT_VARIANT` it fills are gated on `Win32_Security` as well, already listed (ADR 0042; read
 # from the same sources).
+# `CreateFileW` on a volume or a folder, `GetFileInformationByHandle`, `GetFileInformationByHandleEx` and
+# `FILE_ID_INFO` are under `Win32_Storage_FileSystem` (`CreateFileW` also behind `Win32_Security`, listed);
+# `DeviceIoControl` is under `Win32_System_IO`, and `FSCTL_QUERY_USN_JOURNAL` / `FSCTL_READ_USN_JOURNAL`
+# under `Win32_System_Ioctl` (ADR 0047; read from the same sources).
+# `MessageBoxW` and its `MB_*` and `IDYES` constants are under `Win32_UI_WindowsAndMessaging`, gated on
+# nothing else (ADR 0052; read from `src/Windows/Win32/UI/WindowsAndMessaging/mod.rs` in 0.62.2).
 windows = { workspace = true, features = [
   "Wdk_System_SystemInformation",
   "Win32_Foundation",
@@ -48,15 +54,22 @@ windows = { workspace = true, features = [
   "Win32_Security_Cryptography_Catalog",
   "Win32_Security_Cryptography_Sip",
   "Win32_Security_WinTrust",
+  "Win32_Storage_FileSystem",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_EventLog",
+  "Win32_System_IO",
+  "Win32_System_Ioctl",
   "Win32_System_Registry",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
   "Win32_System_TpmBaseServices",
   "Win32_System_WindowsProgramming",
   "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
 ] }
+
+[dev-dependencies]
+rongroi-parsers.workspace = true
 
 [lints]
 workspace = true

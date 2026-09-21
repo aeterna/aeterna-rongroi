@@ -6,17 +6,24 @@
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
 pub mod bam;
+pub mod driver_service;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
+pub mod fivem_servers;
+pub mod install_marker;
+pub mod net_config;
+pub mod os_image;
 pub mod paths;
 pub mod pca;
 pub mod posture;
 pub mod prefetch;
 pub mod process;
 pub mod scan;
+pub mod usn;
 
 use rongroi_core::model::{CollectorRun, UnmeasuredReason};
+pub use rongroi_core::model::{ScanTier, SensitiveKind};
 use rongroi_host::Host;
 
 /// What kind of value an observation field carries, so that `cargo xtask check-rules` can refuse an
@@ -56,6 +63,9 @@ pub struct Field {
     pub name: &'static str,
     /// What kind of value it carries.
     pub kind: FieldKind,
+    /// The kind of sensitive value it carries, which SS mode hides unless the player agreed to show
+    /// that kind, or `None` (ADR 0052).
+    pub sensitive: Option<SensitiveKind>,
 }
 
 impl Field {
@@ -64,6 +74,7 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Text,
+            sensitive: None,
         }
     }
 
@@ -72,6 +83,7 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Number,
+            sensitive: None,
         }
     }
 
@@ -80,6 +92,17 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Bool,
+            sensitive: None,
+        }
+    }
+
+    /// This field, marked as carrying a sensitive value of `kind` (ADR 0052). Only a collector whose
+    /// tier is `full` may mark one: a standard scan's reads are what every player agrees to.
+    #[must_use]
+    pub const fn sensitive(self, kind: SensitiveKind) -> Self {
+        Self {
+            sensitive: Some(kind),
+            ..self
         }
     }
 
@@ -88,6 +111,7 @@ impl Field {
         Self {
             name,
             kind: FieldKind::Timestamp,
+            sensitive: None,
         }
     }
 }
@@ -139,20 +163,66 @@ pub trait Collector {
     fn discriminator(&self) -> Option<&'static str> {
         None
     }
+    /// The two timestamp fields that bound what this collector's source could see, when it has
+    /// such a span, or `None` (ADR 0051).
+    ///
+    /// The timeline shows the span beside the times, because "nothing recorded here" can only be read
+    /// inside it. `Coverage::place` narrows it to the one observation about the whole source, for a
+    /// collector whose other observations carry the same two fields about something smaller.
+    fn coverage(&self) -> Option<Coverage> {
+        None
+    }
+    /// Which scan reads this collector (ADR 0052). A `full` collector is not called in a standard
+    /// scan: its run is `not_consented`. A collector is `full` when its own ADR says so.
+    fn tier(&self) -> ScanTier {
+        ScanTier::Standard
+    }
     /// Looks at the host.
     fn collect(&self, host: &dyn Host) -> CollectorRun;
+}
+
+/// What [`Collector::coverage`] declares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Coverage {
+    /// The timestamp field holding the oldest time the source still holds.
+    pub from: &'static str,
+    /// The timestamp field holding the newest.
+    pub to: &'static str,
+    /// The discriminator value of the observation about the whole source, when there is one.
+    pub place: Option<&'static str>,
+}
+
+/// Every kind of sensitive value the collectors a scan at `tier` would call declare, so a front end
+/// can ask about each before the scan starts (ADR 0052).
+pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKind> {
+    all()
+        .iter()
+        .filter(|collector| collector.tier() <= tier)
+        .flat_map(|collector| {
+            collector
+                .fields()
+                .iter()
+                .filter_map(|field| field.sensitive)
+        })
+        .collect()
 }
 
 /// Every collector in this build.
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
         Box::new(bam::Bam),
+        Box::new(driver_service::DriverService::default()),
         Box::new(evtx::Evtx::default()),
         Box::new(fivem_dir::FivemDir),
+        Box::new(fivem_servers::FivemServers),
+        Box::new(install_marker::InstallMarker),
+        Box::new(net_config::NetConfig),
+        Box::new(os_image::OsImage),
         Box::new(pca::Pca),
         Box::new(posture::Posture),
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
+        Box::new(usn::Usn::default()),
     ]
 }
 
@@ -263,6 +333,35 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A declared span names two fields the collector declares as timestamps, and a place only for a
+    /// collector with a discriminator (ADR 0051).
+    #[test]
+    fn a_declared_coverage_names_declared_timestamps() {
+        let mut declared = 0;
+        for collector in all() {
+            let Some(coverage) = collector.coverage() else {
+                continue;
+            };
+            declared += 1;
+            for name in [coverage.from, coverage.to] {
+                assert!(
+                    collector
+                        .fields()
+                        .iter()
+                        .any(|field| field.name == name && field.kind == FieldKind::Timestamp),
+                    "collector `{}` declares coverage by `{name}`, which is not one of its timestamp fields",
+                    collector.id()
+                );
+            }
+            assert!(
+                coverage.place.is_none() || collector.discriminator().is_some(),
+                "collector `{}` scopes its coverage to a place without a discriminator",
+                collector.id()
+            );
+        }
+        assert_eq!(declared, 2, "evtx and usn declare a span");
     }
 
     /// A gap names the field it is a gap in, so a `gaps` key outside the declared list is the same

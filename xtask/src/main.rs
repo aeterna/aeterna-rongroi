@@ -9,6 +9,7 @@ mod check_baseline;
 mod check_locales;
 mod check_rules;
 mod check_unicode;
+mod loldrivers;
 mod new_locale;
 mod new_rule;
 mod release;
@@ -42,6 +43,8 @@ enum Command {
     CheckLocales,
     /// Fail on zero-width and bidi control characters in any text file.
     CheckUnicode,
+    /// Rebuild the vulnerable-driver data file from a `LOLDrivers` checkout: `cargo xtask loldrivers --checkout <dir>`.
+    Loldrivers(loldrivers::Args),
     /// Scaffold a new rule: `cargo xtask new-rule posture boot/my-rule`.
     NewRule {
         /// Collector id, in `snake_case`.
@@ -71,6 +74,7 @@ fn main() -> anyhow::Result<()> {
         Command::RulesReference(args) => rules_reference::run(&root, &args),
         Command::CheckLocales => check_locales::run(&root),
         Command::CheckUnicode => check_unicode::run(&root),
+        Command::Loldrivers(args) => loldrivers::run(&root, &args),
         Command::NewRule { collector, path } => new_rule::run(&root, &collector, &path),
         Command::NewLocale { lang } => new_locale::run(&root, &lang),
         Command::ReleaseCheck(args) => release_check::run(&root, &args),

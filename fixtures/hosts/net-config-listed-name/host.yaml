@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# The three places `net_config` reads (ADR 0054), in the shapes measured on one Windows 11 PC, with
+# invented values: a hosts file whose lines give a Rockstar subdomain an unspecified address and a FiveM
+# name a public one beside a line for an unlisted name, a proxy that is on with a server set, and one
+# firewall rule for FiveM.exe beside one for another program and one this program cannot parse.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters':
+    DataBasePath: '%SystemRoot%\System32\drivers\etc'
+  'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings':
+    ProxyEnable: 1
+    ProxyServer: 'proxy.example.test:8080'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules':
+    fixture-rule-1: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=17|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
+    fixture-rule-2: 'v2.33|Action=Allow|Active=TRUE|Dir=In|Protocol=6|App=C:\Program Files\Example\app.exe|Name=Example|'
+    fixture-rule-3: 'not a rule this program understands'
+filesystem:
+  'C:\Windows\System32\drivers\etc':
+    - name: hosts
+      content: "# Hosts file for a fixture PC.\r\n127.0.0.1 local.example.test\r\n0.0.0.0 telemetry.example.rockstargames.com\r\n192.0.2.10 fivem.net # added by hand\r\n"

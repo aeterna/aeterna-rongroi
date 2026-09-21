@@ -8,8 +8,10 @@ use std::fmt::Write as _;
 
 use clap::ValueEnum;
 use rongroi_core::bundle::Bundle;
-use rongroi_core::model::{BootTime, EvidenceState, Mode, Observation, UnmeasuredReason};
-use rongroi_core::view::ReportView;
+use rongroi_core::model::{
+    BootTime, EvidenceState, Mode, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
+};
+use rongroi_core::view::{EntrySource, ReportView, Timeline};
 
 /// Output language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -75,6 +77,15 @@ fn text(lang: Lang, key: &str) -> &'static str {
             "ขอบเขตการตรวจ: มี {n} รายการที่ตอบไม่ได้เพราะโปรแกรมหยุดอ่านก่อนจะถึงส่วนที่รายการนั้นถาม \
              เป็นข้อจำกัดของโปรแกรมนี้เอง ไม่ใช่สิ่งที่ตรวจเจอในเครื่องนี้"
         }
+        // The same shape again: one fact about which scan the player chose (ADR 0052).
+        (Lang::En, "scope_not_consented") => {
+            "Scope: {n} check(s) were not answered because they read only in a full scan, and the \
+             standard scan was chosen. A full scan asks before it starts."
+        }
+        (Lang::Th, "scope_not_consented") => {
+            "ขอบเขตการตรวจ: มี {n} รายการที่ไม่ได้ตอบ เพราะอ่านเฉพาะการสแกนแบบ Full และครั้งนี้เลือกการสแกนแบบมาตรฐาน \
+             การสแกนแบบ Full จะถามก่อนเริ่มทุกครั้ง"
+        }
         // Context for reading every time below it, never a finding: the sentence after the time is
         // what stops "started three days ago" being read as something the player did (ADR 0039).
         (Lang::En, "boot_time") => {
@@ -103,11 +114,32 @@ fn text(lang: Lang, key: &str) -> &'static str {
         }
         (Lang::En, "footer") => "Evidence only. This report cannot prove that a PC is clean.",
         (Lang::Th, "footer") => "เป็นหลักฐานประกอบเท่านั้น รายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด",
+        // Three counts of what this view lists, never one number (ADR 0045).
+        (Lang::En, "listed") => {
+            "Listed: {found} found · {not_found} not found · {unmeasured} not measured"
+        }
+        (Lang::Th, "listed") => {
+            "รายการที่แสดง: เจอ {found} · ไม่เจอ {not_found} · ยังไม่ได้วัด {unmeasured}"
+        }
+        (Lang::En, "code") => "Code: {url}",
+        (Lang::Th, "code") => "โค้ด: {url}",
+        (Lang::En, "code_unknown") => {
+            "Code: {url} (the code this build was made from is not known)"
+        }
+        (Lang::Th, "code_unknown") => "โค้ด: {url} (ไม่รู้ว่า build นี้สร้างจากโค้ดของ commit ไหน)",
         (Lang::En, "elevated_yes") => "administrator",
         (Lang::Th, "elevated_yes") => "สิทธิ์ผู้ดูแลระบบ",
         (Lang::En, "elevated_no") => "standard user",
         (Lang::Th, "elevated_no") => "ผู้ใช้ทั่วไป",
         (_, "elevated_unknown") => "?",
+        _ => text_elevate(lang, key),
+    }
+}
+
+/// Text for the elevation and consent flow, kept apart from [`text`] so that function stays under
+/// clippy's line limit.
+fn text_elevate(lang: Lang, key: &str) -> &'static str {
+    match (lang, key) {
         (Lang::En, "declined") => "Scan cancelled. Nothing was read.",
         (Lang::Th, "declined") => "ยกเลิกการสแกนแล้ว ไม่ได้อ่านอะไรเลย",
         (Lang::En, "elevate_started") => {
@@ -128,6 +160,74 @@ fn text(lang: Lang, key: &str) -> &'static str {
         (Lang::En, "pause_at_exit") => "Press Enter to close this window.",
         (Lang::Th, "pause_at_exit") => "กด Enter เพื่อปิดหน้าต่างนี้",
         (Lang::Th, "elevate_not_windows") => "สิทธิ์ผู้ดูแลระบบเป็นเรื่องของ Windows --elevate ไม่มีผลบนระบบนี้",
+        _ => text_timeline(lang, key),
+    }
+}
+
+/// Text for the timeline section (ADR 0051).
+fn text_timeline(lang: Lang, key: &str) -> &'static str {
+    match (lang, key) {
+        // The same word in both languages, as the Thai text uses it.
+        (_, "timeline") => "timeline",
+        // What the section never says, said above it (ADR 0051 decision 6).
+        (Lang::En, "timeline_note") => {
+            "the times this report holds, oldest first. An order of recorded times is not an order of \
+             events, and a record that is absent was not necessarily removed. A time a folder listing \
+             reports is what the file system says, which the program that wrote the file can set."
+        }
+        (Lang::Th, "timeline_note") => {
+            "เวลาที่รายงานนี้มี เรียงจากเก่าไปใหม่ ลำดับของเวลาที่ถูกบันทึกไม่ใช่ลำดับของเหตุการณ์ \
+             และบันทึกที่ไม่มีอยู่ไม่ได้แปลว่าถูกลบ เวลาที่ได้จากการอ่านรายชื่อไฟล์ในโฟลเดอร์เป็นเวลาที่ระบบไฟล์รายงาน \
+             ซึ่งโปรแกรมที่เขียนไฟล์ตั้งเองได้"
+        }
+        (Lang::En, "coverage") => "can show",
+        (Lang::Th, "coverage") => "ครอบคลุมช่วง",
+        (Lang::En, "coverage_note") => {
+            "nothing can be read from a source outside the span it can show"
+        }
+        (Lang::Th, "coverage_note") => "นอกช่วงที่แหล่งหนึ่งครอบคลุม แหล่งนั้นไม่ได้บอกอะไรเลย",
+        (Lang::En, "not_measured") => "not measured",
+        (Lang::Th, "not_measured") => "ยังไม่ได้วัด",
+        (Lang::En, "scan_time") => "this scan ran",
+        (Lang::Th, "scan_time") => "เวลาที่สแกน",
+        (Lang::En, "boot_anchor") => "Windows started",
+        (Lang::Th, "boot_anchor") => "Windows เริ่มทำงานครั้งล่าสุด",
+        (Lang::En, "selectors") => "What the selected times mean",
+        (Lang::Th, "selectors") => "ความหมายของเวลาที่ถูกเลือกมาแสดง",
+        (Lang::En, "selector_causes") => "Ordinary things behind these times",
+        (Lang::Th, "selector_causes") => "เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้",
+        _ => "",
+    }
+}
+
+/// The words about which scan ran and what the player agreed to show (ADR 0052), apart from [`text`]
+/// so neither table grows past what one screen can check.
+fn scan_text(lang: Lang, key: &str) -> &'static str {
+    match (lang, key) {
+        (Lang::En, "tier_standard") => "standard scan",
+        (Lang::Th, "tier_standard") => "สแกนแบบมาตรฐาน",
+        (Lang::En, "tier_full") => "full scan",
+        (Lang::Th, "tier_full") => "สแกนแบบ Full",
+        (Lang::En, "full_declined") => {
+            "Standard scan: the sources only a full scan reads are not read."
+        }
+        (Lang::Th, "full_declined") => "สแกนแบบมาตรฐาน: ไม่อ่านแหล่งข้อมูลที่อ่านเฉพาะการสแกนแบบ Full",
+        (Lang::En, "server_identity_question") => {
+            "Show the person watching which servers these are (the names of FiveM's server cache \
+             folders)? If not, each name is shown as %SERVER_IDENTITY%. [y/N] "
+        }
+        (Lang::Th, "server_identity_question") => {
+            "ให้คนที่ดูอยู่เห็นว่าเป็นเซิร์ฟเวอร์ไหน (ชื่อโฟลเดอร์ cache ของเซิร์ฟเวอร์ใน FiveM) หรือไม่ \
+             ถ้าไม่ ชื่อแต่ละชื่อจะแสดงเป็น %SERVER_IDENTITY% [y/N] "
+        }
+        (Lang::En, "account_identifier_question") => {
+            "Show the person watching the account identifiers this scan read? If not, each is shown \
+             as %ACCOUNT_IDENTIFIER%. [y/N] "
+        }
+        (Lang::Th, "account_identifier_question") => {
+            "ให้คนที่ดูอยู่เห็นตัวระบุบัญชีที่การสแกนนี้อ่านมาหรือไม่ ถ้าไม่ แต่ละค่าจะแสดงเป็น \
+             %ACCOUNT_IDENTIFIER% [y/N] "
+        }
         _ => "",
     }
 }
@@ -178,6 +278,12 @@ fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
         (Lang::Th, UnmeasuredReason::ReadFailed) => "อ่านข้อมูลนี้ไม่ได้",
         (Lang::En, UnmeasuredReason::CollectorUnavailable) => "this build does not read that",
         (Lang::Th, UnmeasuredReason::CollectorUnavailable) => "build นี้ยังไม่ได้อ่านส่วนนี้",
+        (Lang::En, UnmeasuredReason::NotConsented) => {
+            "only a full scan reads this, and this was the standard scan"
+        }
+        (Lang::Th, UnmeasuredReason::NotConsented) => {
+            "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน"
+        }
     }
 }
 
@@ -191,29 +297,109 @@ pub fn consent(lang: Lang) -> String {
     match lang {
         Lang::En => "SS mode — screenshare check\n\
             This program will read, on this PC:\n\
-            \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity, and the PowerShell logging policies of this PC and of the Windows account running the scan\n\
+            \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity, and the PowerShell logging policies of this PC and of the Windows account running the scan, and whether the speculative-execution mitigations, SEHOP and the kernel object-namespace protection are switched off\n\
             \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
+            \x20 - for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, never a file or folder name; these times can match two reports of this PC\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
             \x20 - whether a Prefetch or event log file is marked read-only\n\
+            \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
+            \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
+            \x20 - the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are\n\
+            \x20 - what Windows says this installation is — the edition, the build, the registered organisation and the manufacturer, model and support link Settings shows, never the registered owner's name — and how each of the services Windows ships with (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) is set to start, or that its key is not there\n\
+            \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows only what matches a rule. Its own code sends nothing anywhere. Your user name is hidden in paths.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; and the oldest and newest change the journal holds for each folder above. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
         Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
             โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
-            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell ทั้งของเครื่องและของบัญชี Windows ที่ใช้รันการสแกน\n\
+            \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell ทั้งของเครื่องและของบัญชี Windows ที่ใช้รันการสแกน และการป้องกัน speculative execution, SEHOP กับ object namespace ของเคอร์เนล ถูกปิดไว้หรือไม่\n\
             \x20 - โปรแกรมที่กำลังรันอยู่ ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
+            \x20 - โฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced: จำนวนไฟล์และโฟลเดอร์ย่อย ขนาดรวม และเวลาของไฟล์ที่เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced เวลาที่สร้างกับเวลาที่แก้ไขล่าสุด และจำนวนรายการข้างใน โดยไม่เก็บชื่อไฟล์หรือชื่อโฟลเดอร์ เวลาเหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
+            \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
+            \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
+            \x20 - การตั้งค่าที่กำหนดว่า traffic ของเครือข่ายไปที่ไหน โดยไม่อ่านบันทึกว่าเคยไปที่ไหน: บรรทัดในไฟล์ hosts ที่กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com พร้อม address นั้น (บรรทัดอื่นแค่นับจำนวน) proxy เปิดอยู่หรือไม่ และตั้ง proxy server หรือสคริปต์ตั้งค่า proxy ไว้หรือไม่ โดยไม่อ่าน address ของมัน และ rule ของ Windows Firewall สำหรับโปรแกรมในโฟลเดอร์ของ FiveM พร้อมจำนวน rule ทั้งหมด\n\
+            \x20 - สิ่งที่ Windows บอกว่าตัวเองเป็นอะไร — edition, build, ชื่อองค์กรที่จดทะเบียนไว้ และชื่อผู้ผลิต รุ่นเครื่อง กับลิงก์ฝ่ายสนับสนุนที่ Settings แสดง โดยไม่อ่านชื่อเจ้าของที่จดทะเบียนไว้ — และเซอร์วิสที่ Windows มีมาให้แต่ละตัว (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) ถูกตั้งให้เริ่มทำงานแบบไหน หรือไม่มีคีย์ของมันอยู่\n\
+            \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงเฉพาะสิ่งที่ตรง rule โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
     }
+}
+
+/// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055).
+fn full_reads(lang: Lang) -> &'static str {
+    match lang {
+        Lang::En => {
+            "the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server \
+             this PC joined — with when it was created and last changed. What the name is made from is \
+             not known; it stays the same for that server on this PC, so it can match two reports of \
+             this PC"
+        }
+        Lang::Th => {
+            "ชื่อโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ที่ FiveM for GTA V Enhanced เก็บไว้ \
+             หนึ่งโฟลเดอร์ต่อหนึ่งเซิร์ฟเวอร์ที่เครื่องนี้เคยเข้า พร้อมเวลาที่สร้างกับเวลาที่แก้ไขล่าสุด \
+             ยังไม่รู้ว่าชื่อนี้คำนวณมาจากอะไร แต่ชื่อของเซิร์ฟเวอร์เดิมบนเครื่องนี้จะเหมือนเดิม \
+             จึงจับคู่รายงานสองฉบับจากเครื่องนี้ได้"
+        }
+    }
+}
+
+/// The question `scan --full` asks before any collector runs (ADR 0052). Only `yes` starts a full scan.
+pub fn full_question(lang: Lang) -> String {
+    match lang {
+        Lang::En => format!(
+            "Full scan — this reads more than the standard scan:\n  - {}\nNothing is read \
+             differently and nothing is sent anywhere. In SS mode a server's name is shown only if \
+             you agree to that separately.\nType yes for the full scan; anything else starts the \
+             standard scan: ",
+            full_reads(lang)
+        ),
+        Lang::Th => format!(
+            "การสแกนแบบ Full — อ่านมากกว่าการสแกนแบบมาตรฐาน:\n  - {}\nไม่ได้อ่านสิ่งใดต่างไปจากเดิม \
+             และไม่ส่งอะไรออกไปไหน ในโหมด SS ชื่อเซิร์ฟเวอร์จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง\n\
+             พิมพ์ yes เพื่อสแกนแบบ Full พิมพ์อย่างอื่นจะเป็นการสแกนแบบมาตรฐาน: ",
+            full_reads(lang)
+        ),
+    }
+}
+
+/// Printed when the full-scan question was not answered `yes`.
+pub fn full_declined(lang: Lang) -> &'static str {
+    scan_text(lang, "full_declined")
+}
+
+/// The SS-mode question about one kind of sensitive value (ADR 0052). Default no.
+pub fn sensitive_question(lang: Lang, kind: SensitiveKind) -> &'static str {
+    match kind {
+        SensitiveKind::ServerIdentity => scan_text(lang, "server_identity_question"),
+        SensitiveKind::AccountIdentifier => scan_text(lang, "account_identifier_question"),
+    }
+}
+
+/// The SS-mode consent question for a scan at `tier`: the standard one, and for a full scan what
+/// the full scan read as well (ADR 0052).
+pub fn consent_for(lang: Lang, tier: ScanTier) -> String {
+    let question = consent(lang);
+    if tier == ScanTier::Standard {
+        return question;
+    }
+    let (marker, label) = match lang {
+        Lang::En => ("  - when Windows last started", "(full scan) "),
+        Lang::Th => ("  - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด", "(สแกนแบบ Full) "),
+    };
+    question.replacen(
+        marker,
+        &format!("  - {label}{}\n{marker}", full_reads(lang)),
+        1,
+    )
 }
 
 /// Line shown before an elevated copy waits for Enter, so its window does not close on the report.
@@ -275,9 +461,13 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         Some(build) => format!("{} {build}", header.platform),
         None => header.platform.clone(),
     };
+    let tier = match header.scan_tier {
+        ScanTier::Standard => scan_text(lang, "tier_standard"),
+        ScanTier::Full => scan_text(lang, "tier_full"),
+    };
     let _ = writeln!(
         out,
-        "mode: {mode} · {platform} · {elevated} · rules: {} ({})",
+        "mode: {mode} · {tier} · {platform} · {elevated} · rules: {} ({})",
         header.rules_bundle.rule_count,
         short(&header.rules_bundle.sha256),
     );
@@ -291,6 +481,7 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
     for (count, key) in [
         (view.scope.not_admin, "scope_not_admin"),
         (view.scope.not_attempted, "scope_not_attempted"),
+        (view.scope.not_consented, "scope_not_consented"),
     ] {
         if count > 0 {
             let _ = writeln!(
@@ -300,9 +491,19 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
             );
         }
     }
+    let _ = writeln!(
+        out,
+        "{}",
+        text(lang, "listed")
+            .replace("{found}", &view.listed.found.to_string())
+            .replace("{not_found}", &view.listed.not_found.to_string())
+            .replace("{unmeasured}", &view.listed.unmeasured.to_string())
+    );
     out.push('\n');
 
     out.push_str(&evidence_section(view, bundle, lang));
+
+    out.push_str(&timeline_section(&view.timeline, bundle, lang));
 
     // Both sections come after the evidence and clearly apart from it, in this order.
     out.push_str(&own_traces_section(view, lang));
@@ -323,7 +524,17 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
             view.hidden.unmatched
         );
     }
-    let _ = writeln!(out, "\n{}", text(lang, "footer"));
+    let code = if provenance.code_commit().is_some() {
+        "code"
+    } else {
+        "code_unknown"
+    };
+    let _ = writeln!(
+        out,
+        "\n{}",
+        text(lang, code).replace("{url}", &provenance.code_url())
+    );
+    let _ = writeln!(out, "{}", text(lang, "footer"));
     out
 }
 
@@ -428,6 +639,101 @@ fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
                 }
             }
         }
+    }
+    out
+}
+
+/// The timeline: its note, the spans the sources could show, what could not be read, the times, and
+/// the text of every timeline selector that put a time there (ADR 0051).
+fn timeline_section(timeline: &Timeline, bundle: &Bundle, lang: Lang) -> String {
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "\n{} — {}",
+        text(lang, "timeline"),
+        text(lang, "timeline_note")
+    );
+    if !timeline.bands.is_empty() {
+        let _ = writeln!(out, "    {}", text(lang, "coverage_note"));
+    }
+    for band in &timeline.bands {
+        let _ = writeln!(
+            out,
+            "    [{}{}] {}: {} .. {}",
+            band.collector,
+            where_(band.place.as_deref(), band.subject.as_deref()),
+            text(lang, "coverage"),
+            band.from,
+            band.to
+        );
+    }
+    for source in &timeline.unmeasured {
+        let place = source
+            .place
+            .as_deref()
+            .map(|place| format!(" {place}"))
+            .unwrap_or_default();
+        let _ = writeln!(
+            out,
+            "    [{}{place}] {}: {}",
+            source.collector,
+            text(lang, "not_measured"),
+            reason(lang, source.reason)
+        );
+    }
+    let title = |id: &str| {
+        bundle
+            .text(id, lang.code())
+            .map_or_else(|| id.to_owned(), |text| text.title)
+    };
+    let mut selectors: Vec<&str> = Vec::new();
+    for entry in &timeline.entries {
+        let what = match (&entry.source, entry.field.as_str()) {
+            (EntrySource::Anchor, "generated_at") => text(lang, "scan_time").to_owned(),
+            (EntrySource::Anchor, _) => text(lang, "boot_anchor").to_owned(),
+            (source, field) => {
+                let from = match source {
+                    EntrySource::Evidence { rule_id } => format!(" ({})", title(rule_id)),
+                    EntrySource::Selector { selector_id } => {
+                        if !selectors.contains(&selector_id.as_str()) {
+                            selectors.push(selector_id);
+                        }
+                        format!(" ({})", title(selector_id))
+                    }
+                    EntrySource::Anchor | EntrySource::Observation => String::new(),
+                };
+                format!(
+                    "[{}{}] {field}{from}",
+                    entry.collector.as_deref().unwrap_or_default(),
+                    where_(entry.place.as_deref(), entry.subject.as_deref()),
+                )
+            }
+        };
+        let _ = writeln!(out, "    {}  {what}", entry.at);
+    }
+    // Each selector's meaning and ordinary causes once, rather than beside each of its times.
+    if !selectors.is_empty() {
+        let _ = writeln!(out, "    {}:", text(lang, "selectors"));
+    }
+    for id in selectors {
+        let Some(selector) = bundle.text(id, lang.code()) else {
+            continue;
+        };
+        let _ = writeln!(out, "    - {}: {}", selector.title, selector.description);
+        let _ = writeln!(out, "      {}:", text(lang, "selector_causes"));
+        for cause in &selector.falsepositives {
+            let _ = writeln!(out, "        - {cause}");
+        }
+    }
+    out
+}
+
+/// ` place subject`, leaving out what is not there.
+fn where_(place: Option<&str>, subject: Option<&str>) -> String {
+    let mut out = String::new();
+    for part in [place, subject].into_iter().flatten() {
+        out.push(' ');
+        out.push_str(part);
     }
     out
 }
@@ -538,6 +844,8 @@ mod tests {
                 booted_at: "2025-12-28T21:56:56Z".to_owned(),
                 seconds_since_boot: 266_584,
             },
+            profiles_directory: None,
+            scan_tier: rongroi_core::model::ScanTier::Standard,
         };
         let evidence = Evidence {
             rule_id: rule.id.clone(),
@@ -560,9 +868,83 @@ mod tests {
                 evidence: vec![evidence],
                 own_traces: Vec::new(),
                 unmatched: Vec::new(),
+                timeline_selections: Vec::new(),
+                timestamp_fields: std::collections::BTreeMap::new(),
+                discriminators: std::collections::BTreeMap::new(),
+                coverage_fields: std::collections::BTreeMap::new(),
+                unmeasured_sources: Vec::new(),
+                sensitive_fields: std::collections::BTreeMap::new(),
             },
             bundle,
         )
+    }
+
+    /// ADR 0051: the timeline says what it does not show above its times, and names the scan's own.
+    #[test]
+    fn the_timeline_is_a_section_with_its_note_and_the_scan_time() {
+        let (report, bundle) = report(true);
+        for (lang, note) in [
+            (Lang::En, "not an order of events"),
+            (Lang::Th, "ไม่ใช่ลำดับของเหตุการณ์"),
+        ] {
+            let text = render(&view::for_mode(&report, Mode::Ss), &bundle, lang);
+            assert!(text.contains(note), "{text}");
+            assert!(
+                text.contains(&format!(
+                    "    {}  {}",
+                    report.header.generated_at,
+                    text_timeline(lang, "scan_time")
+                )),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_timeline_entry_names_its_place_subject_field_and_selector() {
+        let (_, bundle) = report(true);
+        let selector = bundle
+            .rules()
+            .iter()
+            .find(|sourced| sourced.rule.is_timeline_selector())
+            .expect("the bundle ships a timeline selector");
+        let timeline = Timeline {
+            entries: vec![rongroi_core::view::TimelineEntry {
+                at: "2026-09-15T18:02:11Z".to_owned(),
+                collector: Some("prefetch".to_owned()),
+                field: "last_run".to_owned(),
+                place: None,
+                source: EntrySource::Selector {
+                    selector_id: selector.rule.id.clone(),
+                },
+                subject: Some("FIVEM.EXE".to_owned()),
+            }],
+            bands: Vec::new(),
+            unmeasured: vec![rongroi_core::model::UnmeasuredSource {
+                collector: "usn".to_owned(),
+                place: None,
+                reason: UnmeasuredReason::NotAdmin,
+            }],
+        };
+        let text = timeline_section(&timeline, &bundle, Lang::En);
+        assert!(
+            text.contains(&format!(
+                "    2026-09-15T18:02:11Z  [prefetch FIVEM.EXE] last_run ({})",
+                selector.rule.title
+            )),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "[usn] not measured: Windows would not show this without administrator rights"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("Ordinary things behind these times"),
+            "{text}"
+        );
+        assert!(text.contains(&selector.rule.falsepositives[0]), "{text}");
     }
 
     #[test]
@@ -594,7 +976,13 @@ mod tests {
                 "{text}"
             );
             assert!(lines[0].contains("Fast Startup"), "{text}");
-            assert!(!below.contains("Windows start"), "{text}");
+            // The line is not repeated. The timeline carries the same time as an anchor, in its own
+            // words, among the other times (ADR 0051).
+            assert!(!below.contains("Windows start:"), "{text}");
+            assert!(
+                below.contains("2025-12-28T21:56:56Z  Windows started"),
+                "{text}"
+            );
 
             let thai = render(&view::for_mode(&report, mode), &bundle, Lang::Th);
             assert!(
@@ -657,6 +1045,7 @@ mod tests {
     fn consent_names_every_kind_of_source() {
         let named: &[(&str, &[&str])] = &[
             ("bam", &["BAM"]),
+            ("driver_service", &["driver"]),
             ("evtx", &["event log"]),
             (
                 "fivem_dir",
@@ -669,6 +1058,20 @@ mod tests {
                     "Authenticode",
                 ],
             ),
+            ("fivem_servers", &["FiveM for GTA V Enhanced"]),
+            ("install_marker", &["Atlas", "ReviOS", "Defender"]),
+            (
+                "net_config",
+                &[
+                    "hosts",
+                    "cfx.re, fivem.net",
+                    "rockstargames.com",
+                    "proxy",
+                    "Windows Firewall",
+                    "loopback, unspecified, private",
+                ],
+            ),
+            ("os_image", &["Defender", "Windows Update", "Event Log"]),
             ("pca", &["Program Compatibility Assistant"]),
             (
                 "posture",
@@ -676,6 +1079,7 @@ mod tests {
             ),
             ("prefetch", &["Prefetch"]),
             ("process", &[]),
+            ("usn", &["change journal"]),
         ];
         let mut ids: Vec<&str> = rongroi_collectors::all().iter().map(|c| c.id()).collect();
         ids.sort_unstable();
@@ -708,8 +1112,24 @@ mod tests {
                 ],
             ),
         ];
-        for (lang, process_words, boot_time_words, later_reads) in running {
+        // ADR 0051 decision 2: the consent names the programs whose times the timeline shows, not a
+        // description of them.
+        let timeline = [
+            "timeline",
+            "FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe",
+            "_GTAProcess.exe",
+        ];
+        for lang in [Lang::En, Lang::Th] {
             let question = consent(lang);
+            for words in timeline {
+                assert!(question.contains(words), "{words} missing from {question}");
+            }
+        }
+        for (lang, process_words, boot_time_words, later_reads) in running {
+            // A full scan's question names what only a full scan reads; the standard one does not
+            // (ADR 0052).
+            assert!(!consent(lang).contains("FiveM for GTA V Enhanced"));
+            let question = consent_for(lang, ScanTier::Full);
             assert!(question.contains(process_words), "{question}");
             assert!(question.contains(boot_time_words), "{question}");
             for words in later_reads {
@@ -906,6 +1326,63 @@ mod tests {
         let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
         assert!(text.contains("[NOT MEASURED (expected here)]"), "{text}");
         assert!(!text.contains("(not expected)"), "{text}");
+    }
+
+    /// Three counts above the evidence, in both languages, never summed (ADR 0045).
+    #[test]
+    fn listed_counts_are_one_line_above_the_evidence() {
+        let (report, bundle) = report(true);
+        for (lang, marker, line) in [
+            (
+                Lang::En,
+                "[FOUND]",
+                "Listed: 1 found · 0 not found · 0 not measured",
+            ),
+            (
+                Lang::Th,
+                "[เจอ]",
+                "รายการที่แสดง: เจอ 1 · ไม่เจอ 0 · ยังไม่ได้วัด 0",
+            ),
+        ] {
+            let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, lang);
+            let (above, _) = text.split_once(marker).expect("the evidence is rendered");
+            assert_eq!(above.lines().filter(|l| *l == line).count(), 1, "{text}");
+        }
+    }
+
+    #[test]
+    fn the_code_link_is_the_commit_of_an_official_build() {
+        let (mut report, bundle) = report(true);
+        report.header.provenance.commit =
+            Some("2c673c54aeb084cd3773057efbb9ed3b98fd2dbc".to_owned());
+        let text = render(&view::for_mode(&report, Mode::Ss), &bundle, Lang::En);
+        let (before_footer, _) = text.split_once("Evidence only.").expect("footer");
+        assert!(
+            before_footer.contains(
+                "\nCode: https://github.com/aeterna/aeterna-rongroi/tree/2c673c54aeb084cd3773057efbb9ed3b98fd2dbc\n"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn an_unofficial_build_links_the_repository_and_says_its_code_is_not_known() {
+        let (report, bundle) = report(false);
+        let text = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::En);
+        assert!(
+            text.contains(
+                "Code: https://github.com/aeterna/aeterna-rongroi (the code this build was made from is not known)"
+            ),
+            "{text}"
+        );
+        assert!(!text.contains("/tree/"), "{text}");
+        let thai = render(&view::for_mode(&report, Mode::SelfCheck), &bundle, Lang::Th);
+        assert!(
+            thai.contains(
+                "โค้ด: https://github.com/aeterna/aeterna-rongroi (ไม่รู้ว่า build นี้สร้างจากโค้ดของ commit ไหน)"
+            ),
+            "{thai}"
+        );
     }
 
     #[test]

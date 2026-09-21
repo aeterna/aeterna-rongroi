@@ -3,6 +3,11 @@
 - Status: accepted
 - Date: 2026-09-13
 
+**Narrowed by ADR 0051.** A timeline selector (`role: timeline`), which makes no evidence, may select these
+records by `name` or `path`, and SS mode shows the times it selects; the consent question names the
+programs. Decision 1 still holds for rules, and since ADR 0051 the bundle loader refuses a rule that breaks
+it.
+
 ## Context
 
 README's milestone table lists M2 as "Prefetch, BAM, PCA, event-log tamper signals". Since 0.2.0 all

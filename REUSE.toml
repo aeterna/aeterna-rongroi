@@ -67,3 +67,12 @@ path = ["rules/**/tests/**", "rules/**/*.md"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
 SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# LOLDrivers' vulnerable-driver hashes (ADR 0048): data taken from magicsword-io/LOLDrivers under its
+# licence, not this project's. The rule beside it stays CC-BY-SA-4.0. Source, commit, filter and how to
+# rebuild it are in the PROVENANCE.md beside it.
+[[annotations]]
+path = ["rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv"]
+precedence = "override"
+SPDX-FileCopyrightText = "LOLDrivers contributors"
+SPDX-License-Identifier = "Apache-2.0"

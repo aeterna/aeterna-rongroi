@@ -1,0 +1,474 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: view
+---
+{
+  "mode": "self",
+  "header": {
+    "schema_version": 1,
+    "provenance": {
+      "official": false,
+      "version": "0.0.0-test",
+      "commit": null,
+      "exe_sha256": null
+    },
+    "rules_bundle": {
+      "schema_version": 4,
+      "sha256": "[bundle sha256]",
+      "rule_count": 46
+    },
+    "platform": "windows",
+    "os_build": null,
+    "elevated": false,
+    "generated_at": "2026-01-01T00:00:00Z",
+    "boot_time": {
+      "state": "unmeasured",
+      "reason": "read_failed"
+    },
+    "scan_tier": "standard"
+  },
+  "evidence": [
+    {
+      "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
+      "collector": "driver_service",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "f4c99b57-02c8-4e53-82d0-dba8bdc13dda",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": false
+    },
+    {
+      "rule_id": "ff967b28-984b-4de0-b361-58367ae0c2d5",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": false
+    },
+    {
+      "rule_id": "9b318bfa-805d-4edd-81f1-602b57639a69",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": false
+    },
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": false
+    },
+    {
+      "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "53528a11-5af7-4e75-94bf-fca07eec6fcc",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "0999422f-8709-4d85-80e3-39410a85ed6b",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "d5531c55-1a65-4698-9f39-7cf79bbbb7ba",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "061797d3-161d-4783-89e6-caf658973436",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "282115fe-863d-4e2e-9cf5-4eaf8e7545e4",
+      "collector": "fivem_dir",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "c402aedc-1ed7-49a6-998c-0762e17e9bd0",
+      "collector": "fivem_servers",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
+      "rule_id": "fd58dec6-84c1-49cb-806c-10b4614a046f",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "3ec29285-f365-4e60-81fe-818d27c6b47a",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "f47de6d4-05ef-4f33-9aca-2307170fd5ab",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "65ee0ec1-bcda-47a3-a401-98632b42e75f",
+      "collector": "net_config",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "The hosts file as it was when the scan ran. A line removed before the scan is not seen."
+    },
+    {
+      "rule_id": "211d278c-58de-4287-974c-dda6f39a153c",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "a935bb41-6ed4-41a3-9477-7b3fe3a987d9",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "3abb40b8-05a4-4cc9-a2f8-17ba52a98714",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "77646339-caf4-4ade-93ef-133089dac30e",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "8f656238-36d2-4178-98db-87f55432edf7",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "cf83f06e-23b5-47fc-b7a0-b6d1b8192379",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "c9012982-5fc1-4d61-ab0c-0bc1abe93830",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "access_denied",
+      "expected": false
+    },
+    {
+      "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "5ec56c3d-da70-4acc-99d6-2c41c0b75d71",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "98ee9213-39f3-4219-b2ac-f2bb3d21d6cc",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
+      "rule_id": "88eb2aca-a33e-414d-bd0f-cfb87af95a2d",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "869c34b6-7b32-4f56-a281-9f5ac00e43c4",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
+      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "dc858978-954d-418f-a42e-29f06975f4ed",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "a4af8cdc-a009-42ee-8368-7f35e93051fe",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "d2f86e75-7692-468e-88a2-52eb1e24dc30",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
+      "collector": "prefetch",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    }
+  ],
+  "own_traces": [],
+  "unmatched": [
+    {
+      "collector": "install_marker",
+      "observations": [
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\AtlasDesktop",
+            "path": "C:\\Windows\\AtlasDesktop",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\AtlasModules",
+            "path": "C:\\Windows\\AtlasModules",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\Web\\Wallpaper\\MeetRevision",
+            "path": "C:\\Windows\\Web\\Wallpaper\\MeetRevision",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "registry_key",
+            "marker": "HKLM\\SOFTWARE\\AtlasOS",
+            "path": "HKLM\\SOFTWARE\\AtlasOS",
+            "present": false
+          }
+        }
+      ]
+    },
+    {
+      "collector": "net_config",
+      "observations": [
+        {
+          "collector": "net_config",
+          "fields": {
+            "location": "hosts",
+            "path": "C:\\Windows\\System32\\drivers\\etc\\hosts",
+            "present": false
+          }
+        }
+      ]
+    },
+    {
+      "collector": "posture",
+      "observations": [
+        {
+          "collector": "posture",
+          "fields": {
+            "exception_chain_validation": "not_configured",
+            "object_namespace_protection": "not_configured",
+            "script_block_logging": "not_configured",
+            "script_block_logging_pwsh": "not_configured",
+            "script_block_logging_pwsh_user": "not_configured",
+            "script_block_logging_user": "not_configured",
+            "speculative_execution_mitigations": "not_configured"
+          }
+        }
+      ]
+    },
+    {
+      "collector": "prefetch",
+      "observations": [
+        {
+          "collector": "prefetch",
+          "fields": {
+            "folder": "absent"
+          }
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "not_admin": 0,
+    "not_attempted": 0,
+    "not_consented": 1
+  },
+  "listed": {
+    "found": 0,
+    "not_found": 9,
+    "unmeasured": 28
+  },
+  "hidden": {
+    "not_found": 0,
+    "unmeasured_expected": 0,
+    "unmeasured_unexpected": 0,
+    "unmatched": 0
+  },
+  "timeline": {
+    "entries": [
+      {
+        "at": "2026-01-01T00:00:00Z",
+        "collector": null,
+        "field": "generated_at",
+        "place": null,
+        "source": {
+          "kind": "anchor"
+        },
+        "subject": null
+      }
+    ],
+    "bands": [],
+    "unmeasured": [
+      {
+        "collector": "bam",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "pca",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "prefetch",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "reason": "read_failed"
+      }
+    ]
+  },
+  "collector_order": [
+    "posture",
+    "driver_service",
+    "fivem_dir",
+    "fivem_servers",
+    "net_config",
+    "process",
+    "evtx",
+    "prefetch",
+    "bam",
+    "pca",
+    "usn"
+  ]
+}

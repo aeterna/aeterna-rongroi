@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# The key that lists driver services refuses this program (ADR 0048). Measured on no machine: both
+# machines ADR 0046 measured let a token without Administrators read it.
+platform: windows
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+access_denied:
+  - 'HKLM\SYSTEM\CurrentControlSet\Services'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\kbd':
+    Type: 1

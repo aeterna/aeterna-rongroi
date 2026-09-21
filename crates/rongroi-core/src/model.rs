@@ -27,7 +27,7 @@ pub struct Observation {
 
 /// Why a collector, or one field of it, could not look.
 ///
-/// Twelve reasons, and the split between them is the whole of how this program distinguishes "we
+/// Thirteen reasons, and the split between them is the whole of how this program distinguishes "we
 /// checked and there was nothing" from "we could not check". Four of them — [`Self::NotOnThisOs`],
 /// [`Self::ServiceDisabled`], [`Self::SourceAbsent`] and [`Self::SourceEmpty`] — describe a machine
 /// that is behaving exactly as Windows ships it, and ADR 0030 records, for each one, the ordinary
@@ -88,6 +88,11 @@ pub enum UnmeasuredReason {
     ReadFailed,
     /// No collector for this rule is available in this build.
     CollectorUnavailable,
+    /// The player chose the standard scan, which does not read this source (ADR 0052).
+    ///
+    /// A fact about the scan, like [`Self::NotAdmin`]: the collector's tier is `full`, and the scan
+    /// was not. No machine produces it, so no rule may declare it in `unmeasured_when`.
+    NotConsented,
 }
 
 impl UnmeasuredReason {
@@ -106,6 +111,7 @@ impl UnmeasuredReason {
             Self::BudgetSpent => "budget_spent",
             Self::ReadFailed => "read_failed",
             Self::CollectorUnavailable => "collector_unavailable",
+            Self::NotConsented => "not_consented",
         }
     }
 
@@ -115,7 +121,10 @@ impl UnmeasuredReason {
     /// evidence instead of repeating it as a row per rule: N red-looking lines carrying one fact is
     /// the shape that teaches a reviewer to stop reading (ADR 0027, ADR 0030).
     pub fn is_scope_statement(self) -> bool {
-        matches!(self, Self::NotAdmin | Self::NotAttempted)
+        matches!(
+            self,
+            Self::NotAdmin | Self::NotAttempted | Self::NotConsented
+        )
     }
 
     /// Whether a view must list this reason even when the rule declared it in `unmeasured_when`.
@@ -385,6 +394,58 @@ pub struct ReportHeader {
     /// `unmeasured` / `not_attempted`.
     #[serde(default)]
     pub boot_time: BootTime,
+    /// The machine's `ProfilesDirectory`, expanded, when the scan could read it (ADR 0049). It is
+    /// what SS-mode redaction treats as a profile root besides the fixed ones, and nothing else reads
+    /// it; the SS view drops it. Additive, and [`REPORT_SCHEMA_VERSION`] stays at 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profiles_directory: Option<String>,
+    /// Which scan the player chose before it started (ADR 0052). Additive, and
+    /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed was a standard scan.
+    #[serde(default)]
+    pub scan_tier: ScanTier,
+}
+
+/// How much a scan reads, chosen before it starts (ADR 0052).
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ScanTier {
+    /// The ordinary scan. Every collector whose tier is `full` is `not_consented`.
+    #[default]
+    Standard,
+    /// The standard scan and the sources the player agreed to at its start.
+    Full,
+}
+
+impl ScanTier {
+    /// Stable identifier used in JSON.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Full => "full",
+        }
+    }
+}
+
+/// A kind of value SS mode hides even after a full scan, each behind its own answer (ADR 0052).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SensitiveKind {
+    /// A value that identifies a game server: an endpoint, a server cache folder's name.
+    ServerIdentity,
+    /// A value that identifies an account.
+    AccountIdentifier,
+}
+
+impl SensitiveKind {
+    /// Stable identifier used in JSON.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ServerIdentity => "server_identity",
+            Self::AccountIdentifier => "account_identifier",
+        }
+    }
 }
 
 /// One observation that describes aeterna-rongroi itself rather than the machine it scanned.
@@ -415,6 +476,53 @@ pub struct UnmatchedGroup {
     pub observations: Vec<Observation>,
 }
 
+/// Observations of one collector that one timeline selector matched (ADR 0051).
+///
+/// Not evidence: no state, no strength, no count. The same observations stay in
+/// [`Report::unmatched`] when no rule matched them, so what an SS view counts does not change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TimelineSelection {
+    /// Id of the timeline selector (`UUIDv4`), for its text.
+    pub selector_id: String,
+    /// Id of the collector that saw them.
+    pub collector: String,
+    /// The observations, as that collector reported them.
+    pub observations: Vec<Observation>,
+}
+
+/// The two fields of a collector's observations that bound what the source could see (ADR 0051).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CoverageFields {
+    /// The field holding the oldest time the source still holds.
+    pub from: String,
+    /// The field holding the newest.
+    pub to: String,
+    /// The discriminator value of the one observation that describes the whole source, when the
+    /// collector's other observations carry the same two fields about something narrower: `usn`'s
+    /// `journal`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+}
+
+/// A collector, or one of the places it reads, whose times could not be read (ADR 0051).
+///
+/// The timeline shows the reason where a coverage band or the entries would be, so an absent entry
+/// is never read as "nothing happened". A scope reason — `not_admin` — is one of these too: it is
+/// the one place the `usn` collector's `not_admin` reaches a reviewer while no rule reads `usn`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnmeasuredSource {
+    /// Id of the collector.
+    pub collector: String,
+    /// The discriminator value of the place, when only that place could not be read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// Why.
+    pub reason: UnmeasuredReason,
+}
+
 /// A full scan result, before a view decides what to show.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Report {
@@ -431,6 +539,31 @@ pub struct Report {
     /// reads back with none, which is what it meant (ADR 0014).
     #[serde(default)]
     pub unmatched: Vec<UnmatchedGroup>,
+    /// What each timeline selector matched (ADR 0051). Additive, and [`REPORT_SCHEMA_VERSION`] stays
+    /// at 1: a report written before it existed reads back with none.
+    #[serde(default)]
+    pub timeline_selections: Vec<TimelineSelection>,
+    /// For each collector, the fields its `fields()` declares as timestamps (ADR 0051). The core
+    /// never guesses a time from a value's shape, so a report written before this field existed
+    /// reads back with none and shows no timeline entries.
+    #[serde(default)]
+    pub timestamp_fields: BTreeMap<String, Vec<String>>,
+    /// For each collector that declares one, its discriminator (ADR 0044): which field names the
+    /// place an observation is about, for the timeline to show beside a time. Additive.
+    #[serde(default)]
+    pub discriminators: BTreeMap<String, String>,
+    /// For each collector that has them, the fields that bound what its source could see
+    /// (ADR 0051). Additive.
+    #[serde(default)]
+    pub coverage_fields: BTreeMap<String, CoverageFields>,
+    /// Collectors, or places, that declare timestamp fields and could not read them (ADR 0051).
+    /// Additive.
+    #[serde(default)]
+    pub unmeasured_sources: Vec<UnmeasuredSource>,
+    /// For each collector that declares one, the fields SS mode hides and the kind of each
+    /// (ADR 0052). Copied from the collectors' declarations, which the core cannot see. Additive.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub sensitive_fields: BTreeMap<String, BTreeMap<String, SensitiveKind>>,
 }
 
 #[cfg(test)]

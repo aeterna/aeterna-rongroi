@@ -21,11 +21,13 @@ a fresh UUID. The placeholders fail `cargo xtask check-rules` until you fill the
 | `title` | yes | short, English |
 | `description` | yes | what it means, why it matters, and what it does **not** prove. Shown to the reader beside every row, whatever the state (ADR 0027) |
 | `status` | yes | `experimental` · `test` · `stable` · `deprecated` |
+| `role` | no | `evidence`, the default, or `timeline` — see [Timeline selectors](#timeline-selectors) (ADR 0051) |
 | `collector` | yes | must equal the first folder name, and must be a collector in this build |
 | `strength` | yes | `execution` · `presence` · `tamper` · `posture` · `context` |
 | `match` | yes | map of `field` — or `field\|operator` — → value; **all** of them must hold to match. Strings compare without regard to ASCII case (ADR 0025). Every field name must be one the collector declares it can emit, and every operator one its kind can take — `check-rules` rejects the rest and names the one it meant (ADR 0026, ADR 0029). The whole vocabulary is in [How matching works](#how-matching-works) |
+| `match_lists` | no | map of `field` → a CSV file **beside `rule.yaml`**; the file's first column becomes a list under `match` for that field when the bundle loads, so it matches when the field equals any of them (ADR 0048). The file is plain: its first line is the header naming the field, with no `#` comment lines, no blank lines, no quoting and no byte-order mark. Every later line's first column is compared **exactly as written** — so a value with surrounding whitespace or still wrapped in a quote is refused, not silently unmatchable — and must be non-empty and unique, and for `sha256` 64 lowercase hex characters; the file must have at least one row after the header. A field is in `match` or `match_lists`, never both. Every `match_lists` file needs a `REUSE.toml` annotation whatever its licence, because it cannot carry a `#` SPDX comment. For data kept under another licence, such as a vendored hash list — see [A list kept in a data file](#a-list-kept-in-a-data-file) |
 | `cased` | no | **field** names compared byte for byte instead; everything left out folds case. One entry covers every comparison the rule makes against that field |
-| `allow` | no | legitimate software excluded by `sha256` (the file) or `signer_cert_sha256` (the certificate that signed it) — exactly one per entry, never a file's or a signer's name: certificates stolen from a real publisher carry its name (ADR 0035). Revocation is not checked, so an allowed certificate that is later stolen and revoked stays allowed until the entry is removed. `prefetch`, `bam` and `pca` emit neither, so a rule on them has nothing to allow by, and no rule on them names a program by `name` or `path` (ADR 0034). No gate refuses that rule; review does |
+| `allow` | no | legitimate software excluded by `sha256` (the file) or `signer_cert_sha256` (the certificate that signed it) — exactly one per entry, never a file's or a signer's name: certificates stolen from a real publisher carry its name (ADR 0035). Revocation is not checked, so an allowed certificate that is later stolen and revoked stays allowed until the entry is removed. `prefetch`, `bam` and `pca` emit neither, so a rule on them has nothing to allow by, and no rule on them names a program by `name` or `path` (ADR 0034). The bundle loader refuses such a rule since ADR 0051; a timeline selector may |
 | `retention` | yes | how far back the source can see, in words for the user |
 | `unmeasured_when` | no | reason codes you expect on some machines. A reason named here is **counted** in SS mode; one that is not is **listed**, because it means something you did not anticipate stopped the measurement (ADR 0027). Every entry must be a reason the collector can report — `check-rules` rejects the rest and names what it does report. `partial`, `budget_spent` and `read_failed` may not be named at all: a view lists them whatever you declare, so `check-rules` refuses the line (ADR 0030, ADR 0032) |
 | `falsepositives` | yes | what legitimately produces this evidence; never empty. Shown to the reader beside every `found` row (ADR 0027), so write it for them |
@@ -106,6 +108,51 @@ never "no match" — ADR 0002 is what that protects, and ADR 0029 has the table 
 | `startswith` `endswith` `contains` | `unmeasured` |
 | `exists: true` | `unmeasured` |
 | `exists: false` | `unmeasured` — checked **before** matching, because a field nobody could read is also a field that is not there, and without that order the rule would be `found` and the report would say "we looked and it is not there" |
+
+## Timeline selectors
+
+A file with `role: timeline` is a **timeline selector** (rule format version 4, ADR 0051). It is written,
+fixtured, translated and reviewed like a rule, and it makes no evidence: it is never `found`, `not_found` or
+`unmeasured`, it is never counted, and the observations it matches stay unmatched. What it does is put the
+timestamp fields of those observations on the report's timeline — in Self mode and **in SS mode** — each
+shown with the selector's title, description and `falsepositives`.
+
+- `strength` is `context`, and `unmeasured_when` is left out: there is no row for it to count. A source
+  that could not be read is on the timeline whatever the file says.
+- It may select `prefetch`, `bam` and `pca` records by `name` or `path`, which a rule may not (ADR 0034).
+  Its text says "Windows recorded a program named …", never that the program ran, and its
+  `falsepositives` say that a rename defeats it and that a missing time is not evidence.
+- It widens what SS mode shows. The consent text (`crates/rongroi-cli/src/output.rs`, the desktop's
+  `consent.shows`) and `PRIVACY.md` name what it selects, in the same change.
+- Its fixtures are checked as a rule's are: the positive one must match, the negative one must not.
+  `check-baseline` asks whether a baseline confronts it, and does not ask whether it is quiet, because a
+  selection is not a `found`.
+- Which fields are times comes from the collector's `fields()` (`Field::timestamp`). A selector on a
+  collector with no timestamp field selects nothing that reaches the timeline.
+
+## A list kept in a data file
+
+Some lists are data rather than rule text: 1,847 driver hashes are not something a reviewer reads line by
+line, and a list taken from another project keeps that project's licence. Put such a list in a CSV file in
+the rule's own folder and name it in `match_lists`:
+
+```yaml
+match_lists:
+  sha256: loldrivers-vulnerable-drivers.csv
+```
+
+- Only the first column is read, as the text before the first comma. Other columns are for the reader.
+- The file is plain: its first line is the header naming the field, with no `#` comment lines, no blank
+  lines, no quoting and no byte-order mark. Every value is compared exactly as written, so a value with
+  surrounding whitespace or still wrapped in the quotes a spreadsheet export adds is refused rather than
+  accepted and left unable to ever match. The file must have at least one row after the header.
+- Every `match_lists` file needs a `REUSE.toml` annotation, whatever its licence: it is data, not rule
+  text, so it cannot carry the `#` SPDX comment every other source file does.
+- A file under another licence also needs a `PROVENANCE.md` beside it saying where it came from, the
+  commit or version, the date taken, the filter applied and the command that rebuilds it.
+- The file travels in the rules bundle, so the bundle SHA-256 in every report covers it.
+- `cargo xtask rules-reference` names the file and how many values it holds instead of printing them.
+- The rule format is version 3 from this key on (ADR 0048).
 
 ## What the reader sees
 
@@ -191,7 +238,8 @@ They are synthetic observations — never real player data, never cheat binaries
 ```
 
 Optional: `gaps` (field → reason) and `expect_matches`. `status: test` and `stable` require at least one of
-each kind.
+each kind. Every rule, `experimental` included, needs a `tests/` folder holding at least one fixture file,
+because the report links to it and `check-rules` refuses a rule without one (ADR 0045).
 
 ## Translations
 

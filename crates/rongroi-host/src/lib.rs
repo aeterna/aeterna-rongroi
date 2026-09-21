@@ -137,14 +137,55 @@ pub trait RegistrySource {
     fn read_value(&self, key: &str, value: &str) -> Result<Option<RegistryData>, SourceError>;
 }
 
-/// One entry directly inside a directory. Only what collectors need: nothing about times, size or ACLs
-/// is read (ADR 0009).
+/// One entry directly inside a directory, with what the listing itself holds about it (ADR 0009,
+/// ADR 0050): its size and its creation and last-write times. Nothing about its owner, ACL, other
+/// attributes or last-access time is read, and nothing is opened to get these values.
+///
+/// The times are what the file system recorded, which programs update as they create, copy, extract
+/// and write files, and which any program able to write a file can set. A last-write time earlier than
+/// a creation time is ordinary. No value orders two events on its own (ADR 0050).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntryInfo {
     /// Name inside the directory, without any parent path.
     pub name: String,
     /// `true` for a regular file; `false` for a directory or anything else.
     pub is_file: bool,
+    /// Size in bytes as the listing reports it. `None` for anything that is not a file, and when the
+    /// listing did not provide one.
+    pub size: Option<u64>,
+    /// Creation time, in whole seconds (see [`listed_time`]). `None` when the listing did not provide
+    /// one or it is outside the range a [`jiff::Timestamp`] represents — never a stand-in value.
+    pub created: Option<jiff::Timestamp>,
+    /// Last-write time, in whole seconds, with the same meaning of `None` as [`Self::created`].
+    pub modified: Option<jiff::Timestamp>,
+}
+
+impl DirEntryInfo {
+    /// An entry the listing said nothing more about than its name and whether it is a file.
+    pub fn named(name: impl Into<String>, is_file: bool) -> Self {
+        Self {
+            name: name.into(),
+            is_file,
+            size: None,
+            created: None,
+            modified: None,
+        }
+    }
+}
+
+/// A time a directory listing reported, as a timestamp in whole seconds (ADR 0050).
+///
+/// The sub-second part is dropped by rounding down, towards the earlier second, so an instant before
+/// 1970 is not moved later. The 100-nanosecond part of a file time adds nothing a reviewer reads, and
+/// makes two reports of the same machine easier to match. `None` means the value is outside the range
+/// [`jiff::Timestamp`] represents.
+pub fn listed_time(time: std::time::SystemTime) -> Option<jiff::Timestamp> {
+    let exact = jiff::Timestamp::try_from(time).ok()?;
+    let mut seconds = exact.as_second();
+    if exact.subsec_nanosecond() < 0 {
+        seconds -= 1;
+    }
+    jiff::Timestamp::from_second(seconds).ok()
 }
 
 /// Read-only access to the file system. Paths are absolute and Windows-style, e.g. `C:\Users\a\x.dll`.
@@ -369,6 +410,80 @@ pub trait BootTimeSource {
     fn since_boot(&self) -> Result<std::time::Duration, SourceError>;
 }
 
+/// A volume's change journal as `FSCTL_QUERY_USN_JOURNAL` states it, without its identifier
+/// (ADR 0047). The identifier stays inside the host: it is needed to read the journal and would
+/// identify one machine across two reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UsnJournalState {
+    /// `FirstUsn`: "The number of first record that can be read from the journal."
+    pub first_usn: i64,
+    /// `NextUsn` when the journal was queried: the read stops once it reaches this.
+    pub next_usn: i64,
+    /// `LowestValidUsn`: "The first record that was written into the journal for this journal
+    /// instance." Equal to `first_usn` while nothing has been trimmed since the journal was made.
+    pub lowest_valid_usn: i64,
+    /// `MaximumSize`, in bytes: the size Windows trims the journal back to.
+    pub maximum_size: u64,
+}
+
+/// How a read of a change journal ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UsnReadEnd {
+    /// Every buffer from `first_usn` up to `next_usn` was handed to the visitor.
+    Complete,
+    /// The journal was trimmed past the read, or deleted, while it was being read: some of it was
+    /// handed over and the rest cannot be.
+    JournalChanged,
+    /// The visitor asked to stop.
+    Stopped,
+}
+
+/// A read of a change journal: what the journal said about itself, and how the read ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UsnJournalRead {
+    /// The journal's state when it was queried, before the read.
+    pub state: UsnJournalState,
+    /// How the read ended.
+    pub end: UsnReadEnd,
+}
+
+/// A file or folder's identifiers, in the two forms a change journal record names a parent by
+/// (ADR 0047).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileId {
+    /// The 128-bit identifier `GetFileInformationByHandleEx` reports with `FileIdInfo`, which a version
+    /// 3 record carries.
+    pub id_128: [u8; 16],
+    /// `nFileIndexHigh` and `nFileIndexLow` from `GetFileInformationByHandle`, which a version 2 record
+    /// carries.
+    pub index_64: u64,
+    /// `FileIdInfo`'s `VolumeSerialNumber`: the volume `id_128` and `index_64` belong to. Both
+    /// identifiers are only ever unique within one volume, so a caller comparing two [`FileId`]s must
+    /// compare this field first — a folder reached through a junction to another volume can otherwise
+    /// share a number with an unrelated file on the volume the journal belongs to.
+    pub volume_serial: u64,
+}
+
+/// Read-only access to the NTFS change journal of a volume (ADR 0047).
+pub trait UsnJournalSource {
+    /// Queries the journal of `volume` (a drive letter) and reads it from its first record to the
+    /// `NextUsn` the query returned, handing each output buffer to `visit` as the control code returned
+    /// it: the next USN, eight bytes, then records. A buffer with no record is not handed over.
+    ///
+    /// `Ok(None)` when the volume has no active journal. `visit` returning `ControlFlow::Break` ends
+    /// the read with [`UsnReadEnd::Stopped`]. Nothing on the volume is changed.
+    fn read_usn_journal(
+        &self,
+        volume: char,
+        visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError>;
+
+    /// The identifiers of the file or folder at `path`. `Ok(None)` when nothing is there. `path` may
+    /// also be a drive root such as `C:\`, so a caller can read a volume's own identifier to compare
+    /// against.
+    fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError>;
+}
+
 /// Size of one read when a file is streamed through SHA-256.
 const READ_BLOCK: usize = 64 * 1024;
 
@@ -493,6 +608,7 @@ pub trait Host:
     + FirmwareSource
     + ProcessSource
     + BootTimeSource
+    + UsnJournalSource
 {
     /// Operating system family.
     fn platform(&self) -> Platform;
@@ -633,6 +749,24 @@ impl BootTimeSource for NonWindowsHost {
     }
 }
 
+impl UsnJournalSource for NonWindowsHost {
+    fn read_usn_journal(
+        &self,
+        _volume: char,
+        _visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no NTFS change journal on this platform".to_owned(),
+        ))
+    }
+
+    fn file_id(&self, _path: &str) -> Result<Option<FileId>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file identifiers on this platform".to_owned(),
+        ))
+    }
+}
+
 impl Host for NonWindowsHost {
     fn platform(&self) -> Platform {
         Platform::Other
@@ -650,6 +784,43 @@ impl Host for NonWindowsHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::time::{Duration, UNIX_EPOCH};
+
+    fn at(text: &str) -> jiff::Timestamp {
+        text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_listed_time_keeps_whole_seconds_and_drops_the_rest() {
+        let exact = UNIX_EPOCH + Duration::new(1_789_000_000, 999_999_900);
+        assert_eq!(listed_time(exact), Some(at("2026-09-10T00:26:40Z")));
+        let whole = UNIX_EPOCH + Duration::from_secs(1_789_000_000);
+        assert_eq!(listed_time(whole), Some(at("2026-09-10T00:26:40Z")));
+    }
+
+    /// Rounding towards zero would move an instant before 1970 later than it was. The file-time epoch
+    /// is 1601, and a copied file can carry a write time that far back.
+    #[test]
+    fn a_listed_time_before_1970_rounds_to_the_earlier_second() {
+        let before = UNIX_EPOCH - Duration::new(10, 100);
+        assert_eq!(listed_time(before), Some(at("1969-12-31T23:59:49Z")));
+        // 1601-01-01 to 1970-01-01: 134 774 days, 11 644 473 600 seconds.
+        let filetime_epoch = UNIX_EPOCH - Duration::from_hours(134_774 * 24);
+        assert_eq!(
+            listed_time(filetime_epoch),
+            Some(at("1601-01-01T00:00:00Z"))
+        );
+    }
+
+    #[test]
+    fn a_named_entry_carries_no_size_and_no_times() {
+        let entry = DirEntryInfo::named("a.dll", true);
+        assert_eq!(
+            (entry.size, entry.created, entry.modified),
+            (None, None, None)
+        );
+    }
 
     #[test]
     fn non_windows_host_reads_no_files_and_no_environment() {

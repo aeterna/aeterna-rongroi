@@ -4,16 +4,17 @@
 
 //! A fake machine described in `fixtures/hosts/<name>/host.yaml`. See `fixtures/hosts/PROVENANCE.md`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use serde::Deserialize;
 
 use crate::{
     BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DirEntryInfo,
-    EnvironmentSource, EventLogConfigSource, FilesystemSource, FirmwareSecureBoot, FirmwareSource,
-    Host, Platform, ProcessRecord, ProcessSource, RegistryData, RegistrySource, SignatureCheck,
-    SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
+    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
+    FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistryData, RegistrySource,
+    SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
+    UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -68,6 +69,10 @@ struct HostFile {
     milliseconds_since_boot: Option<u64>,
     #[serde(default)]
     event_log_channels: Option<BTreeMap<String, FixtureChannel>>,
+    /// The system volume's change journal (ADR 0047). Absent means the fixture never modelled it,
+    /// which the accessors report as `Unsupported`.
+    #[serde(default)]
+    usn_journal: Option<FixtureUsnJournal>,
 }
 
 /// What a fixture says the Event Log service states about one channel (ADR 0042). A fixture with no
@@ -280,6 +285,15 @@ struct FixtureFile {
     from: Option<String>,
     #[serde(default)]
     read_only: Option<bool>,
+    /// What the listing reports as the entry's size (ADR 0050). A directory has none.
+    #[serde(default)]
+    size: Option<u64>,
+    /// The listing's creation time, RFC 3339 in whole seconds (ADR 0050).
+    #[serde(default)]
+    created: Option<String>,
+    /// The listing's last-write time, RFC 3339 in whole seconds (ADR 0050).
+    #[serde(default)]
+    modified: Option<String>,
 }
 
 /// What a fixture says Windows would report about a file's embedded signature (ADR 0035). An absent
@@ -370,6 +384,11 @@ struct FixtureEntry {
     /// Whether the file carries the read-only attribute. `None` describes a fixture that never said,
     /// which is not the same as saying it does not (ADR 0037).
     read_only: Option<bool>,
+    /// What a listing reports beside the name (ADR 0050). `None` is a value the fixture never wrote,
+    /// which a listing returns as "not provided", never as a zero or an epoch.
+    size: Option<u64>,
+    created: Option<jiff::Timestamp>,
+    modified: Option<jiff::Timestamp>,
 }
 
 /// Paths and registry keys are compared case-insensitively and without a trailing separator, like Windows.
@@ -440,6 +459,17 @@ fn resolve_file(
         .signature
         .map(|signature| resolve_signature(signature, &described.name, origin))
         .transpose()?;
+    if described.directory && described.size.is_some() {
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "directory `{}` has a `size:`; a listing reports a size for files only",
+                described.name
+            ),
+        });
+    }
+    let created = listed_time_of(described.created.as_deref(), &described.name, origin)?;
+    let modified = listed_time_of(described.modified.as_deref(), &described.name, origin)?;
     Ok(FixtureEntry {
         name: described.name,
         sha256: described.sha256,
@@ -447,7 +477,35 @@ fn resolve_file(
         directory: described.directory,
         content,
         read_only: described.read_only,
+        size: described.size,
+        created,
+        modified,
     })
+}
+
+/// Parses a `created:` or `modified:` value. A live listing never reports a fraction of a second
+/// (ADR 0050), so a fixture that writes one describes something no machine returns, and fails to load.
+fn listed_time_of(
+    text: Option<&str>,
+    name: &str,
+    origin: &str,
+) -> Result<Option<jiff::Timestamp>, FixtureError> {
+    let Some(text) = text else {
+        return Ok(None);
+    };
+    let fail = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message,
+    };
+    let instant: jiff::Timestamp = text
+        .parse()
+        .map_err(|error: jiff::Error| fail(format!("entry `{name}` time `{text}`: {error}")))?;
+    if instant.subsec_nanosecond() != 0 {
+        return Err(fail(format!(
+            "entry `{name}` time `{text}` has a fraction of a second; a listing reports whole seconds"
+        )));
+    }
+    Ok(Some(instant))
 }
 
 /// Turns one described registry value into a stored one, reading a `from:` file now rather than
@@ -473,6 +531,336 @@ fn resolve_value(
     Ok(StoredValue { name, data })
 }
 
+/// A fixture's change journal (ADR 0047). Records are written as groups, because a baseline describes
+/// hundreds of them; the host encodes each group into that many records with the documented
+/// `USN_RECORD_V2` or `USN_RECORD_V3` layout and a name of two characters, so the collector reads the
+/// same bytes it reads on a real machine.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureUsnJournal {
+    /// The drive letter whose journal this is.
+    #[serde(default = "default_usn_volume")]
+    volume: char,
+    #[serde(default)]
+    state: FixtureUsnState,
+    #[serde(default = "default_usn_maximum_size")]
+    maximum_size: u64,
+    /// Records have been trimmed since the journal was made: `FirstUsn` above `LowestValidUsn`.
+    #[serde(default)]
+    trimmed: bool,
+    #[serde(default)]
+    ends: FixtureUsnEnd,
+    /// Folder path → a small number the host turns into both identifiers.
+    #[serde(default)]
+    folders: BTreeMap<String, u64>,
+    /// Paths under `folders:` whose identifier carries a different volume serial than the journal's —
+    /// the shape a folder reached through a junction to another volume has, so attributing a record to
+    /// it by identifier alone would be wrong (ADR 0047 amendment: junctions).
+    #[serde(default)]
+    other_volume_folders: Vec<String>,
+    #[serde(default)]
+    records: Vec<FixtureUsnRecords>,
+}
+
+fn default_usn_volume() -> char {
+    'C'
+}
+
+/// 32 MiB, the `MaximumSize` measured on a GitHub-hosted runner (ADR 0047).
+fn default_usn_maximum_size() -> u64 {
+    33_554_432
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum FixtureUsnState {
+    #[default]
+    Active,
+    /// `ERROR_JOURNAL_NOT_ACTIVE`: the volume has no journal.
+    NotActive,
+    /// The volume handle was refused.
+    AccessDenied,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum FixtureUsnEnd {
+    #[default]
+    Complete,
+    JournalChanged,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureUsnRecords {
+    /// A folder under `folders:`, or absent for a folder nobody watches.
+    #[serde(default)]
+    parent: Option<String>,
+    #[serde(default = "default_usn_major")]
+    major: u16,
+    reasons: Vec<FixtureUsnReason>,
+    #[serde(default = "default_usn_count")]
+    count: u32,
+    /// When the first record of the group was written; the rest are spread evenly up to `last`.
+    #[serde(default)]
+    first: Option<String>,
+    #[serde(default)]
+    last: Option<String>,
+}
+
+fn default_usn_major() -> u16 {
+    3
+}
+
+fn default_usn_count() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureUsnReason {
+    DataOverwrite,
+    DataExtend,
+    DataTruncation,
+    FileCreate,
+    FileDelete,
+    RenameOldName,
+    RenameNewName,
+    BasicInfoChange,
+    Close,
+}
+
+impl FixtureUsnReason {
+    fn flag(self) -> u32 {
+        match self {
+            Self::DataOverwrite => 0x0000_0001,
+            Self::DataExtend => 0x0000_0002,
+            Self::DataTruncation => 0x0000_0004,
+            Self::FileCreate => 0x0000_0100,
+            Self::FileDelete => 0x0000_0200,
+            Self::RenameOldName => 0x0000_1000,
+            Self::RenameNewName => 0x0000_2000,
+            Self::BasicInfoChange => 0x0000_8000,
+            Self::Close => 0x8000_0000,
+        }
+    }
+}
+
+/// A journal as the host hands it over: its state, how a read ends, the encoded buffers and the folder
+/// identifiers.
+#[derive(Debug, Clone)]
+struct StoredUsnJournal {
+    volume: char,
+    state: FixtureUsnState,
+    journal: UsnJournalState,
+    end: UsnReadEnd,
+    buffers: Vec<Vec<u8>>,
+    /// Lower-cased, normalised path → identifier.
+    folders: BTreeMap<String, FileId>,
+}
+
+/// Records per encoded buffer: a real buffer is 1 MiB, and several small ones exercise the
+/// collector's loop over more than one.
+const USN_RECORDS_PER_BUFFER: usize = 500;
+/// The parent of a record whose group names no folder: an identifier no `folders:` entry produces.
+const UNWATCHED_PARENT: u64 = u64::MAX;
+/// FILETIME of 1970-01-01T00:00:00Z.
+const UNIX_EPOCH_AS_FILETIME: i128 = 116_444_736_000_000_000;
+/// NTFS's root directory record number, for the `FileId` a fixture answers a drive root with.
+const NTFS_ROOT_DIRECTORY_RECORD: u64 = 5;
+/// `volume_serial` of the journal's own volume — every folder under `folders:` gets this, unless it is
+/// also listed in `other_volume_folders`.
+const JOURNAL_VOLUME_SERIAL: u64 = 0xAAAA_AAAA;
+/// `volume_serial` of a folder reached through a junction to a different volume than the journal's.
+const OTHER_VOLUME_SERIAL: u64 = 0xBBBB_BBBB;
+
+fn file_id_for(number: u64, volume_serial: u64) -> FileId {
+    let mut id_128 = [0u8; 16];
+    id_128[..8].copy_from_slice(&number.to_le_bytes());
+    FileId {
+        id_128,
+        index_64: number,
+        volume_serial,
+    }
+}
+
+fn filetime_of(text: &str, origin: &str) -> Result<u64, FixtureError> {
+    let instant: jiff::Timestamp =
+        text.parse()
+            .map_err(|error: jiff::Error| FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal time `{text}`: {error}"),
+            })?;
+    u64::try_from(instant.as_nanosecond() / 100 + UNIX_EPOCH_AS_FILETIME).map_err(|_| {
+        FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!("usn_journal time `{text}` is before 1601"),
+        }
+    })
+}
+
+fn encode_record(major: u16, parent: FileId, written: u64, reason: u32) -> Vec<u8> {
+    if major == 2 {
+        let mut record = vec![0u8; 64];
+        record[0..4].copy_from_slice(&64u32.to_le_bytes());
+        record[4..6].copy_from_slice(&2u16.to_le_bytes());
+        record[16..24].copy_from_slice(&parent.index_64.to_le_bytes());
+        record[32..40].copy_from_slice(&written.to_le_bytes());
+        record[40..44].copy_from_slice(&reason.to_le_bytes());
+        record[56..58].copy_from_slice(&4u16.to_le_bytes());
+        record[58..60].copy_from_slice(&60u16.to_le_bytes());
+        record[60..64].copy_from_slice(&[b'f', 0, b'x', 0]);
+        record
+    } else {
+        let mut record = vec![0u8; 80];
+        record[0..4].copy_from_slice(&80u32.to_le_bytes());
+        record[4..6].copy_from_slice(&major.to_le_bytes());
+        record[24..40].copy_from_slice(&parent.id_128);
+        record[48..56].copy_from_slice(&written.to_le_bytes());
+        record[56..60].copy_from_slice(&reason.to_le_bytes());
+        record[72..74].copy_from_slice(&4u16.to_le_bytes());
+        record[74..76].copy_from_slice(&76u16.to_le_bytes());
+        record[76..80].copy_from_slice(&[b'f', 0, b'x', 0]);
+        record
+    }
+}
+
+/// Turns `folders:` and `other_volume_folders:` into identifiers, rejecting an
+/// `other_volume_folders` entry that names no `folders:` entry: a fixture that claims a junction over
+/// a folder nobody said existed (ADR 0047 amendment: junctions).
+fn resolve_usn_folders(
+    described: &FixtureUsnJournal,
+    origin: &str,
+) -> Result<BTreeMap<String, FileId>, FixtureError> {
+    let folder_keys: BTreeSet<String> = described
+        .folders
+        .keys()
+        .map(|path| normalise_path(path))
+        .collect();
+    for path in &described.other_volume_folders {
+        if !folder_keys.contains(&normalise_path(path)) {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "usn_journal other_volume_folders `{path}` is not under `folders:`"
+                ),
+            });
+        }
+    }
+    let other_volume: BTreeSet<String> = described
+        .other_volume_folders
+        .iter()
+        .map(|path| normalise_path(path))
+        .collect();
+    Ok(described
+        .folders
+        .iter()
+        .map(|(path, number)| {
+            let key = normalise_path(path);
+            let serial = if other_volume.contains(&key) {
+                OTHER_VOLUME_SERIAL
+            } else {
+                JOURNAL_VOLUME_SERIAL
+            };
+            (key, file_id_for(*number, serial))
+        })
+        .collect())
+}
+
+fn resolve_usn_journal(
+    described: FixtureUsnJournal,
+    origin: &str,
+) -> Result<StoredUsnJournal, FixtureError> {
+    let folders = resolve_usn_folders(&described, origin)?;
+    let mut records = Vec::new();
+    for group in described.records {
+        let parent = match &group.parent {
+            None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
+            Some(path) => {
+                *folders
+                    .get(&normalise_path(path))
+                    .ok_or_else(|| FixtureError::Parse {
+                        path: origin.to_owned(),
+                        message: format!(
+                            "usn_journal record parent `{path}` is not under `folders:`"
+                        ),
+                    })?
+            }
+        };
+        if group.major != 2 && group.major != 3 {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal major version {} is not 2 or 3", group.major),
+            });
+        }
+        let reason = group
+            .reasons
+            .iter()
+            .fold(0u32, |flags, reason| flags | reason.flag());
+        let first = group
+            .first
+            .as_deref()
+            .map(|text| filetime_of(text, origin))
+            .transpose()?
+            .unwrap_or(133_000_000_000_000_000);
+        let last = group
+            .last
+            .as_deref()
+            .map(|text| filetime_of(text, origin))
+            .transpose()?
+            .unwrap_or(first);
+        if last < first {
+            let first_text = group.first.as_deref().unwrap_or("<default>");
+            let last_text = group.last.as_deref().unwrap_or("<default>");
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
+                ),
+            });
+        }
+        let span = last.saturating_sub(first);
+        let steps = u64::from(group.count.saturating_sub(1)).max(1);
+        for index in 0..group.count {
+            let written = first + span / steps * u64::from(index);
+            let written = if index + 1 == group.count {
+                last
+            } else {
+                written
+            };
+            records.push(encode_record(group.major, parent, written, reason));
+        }
+    }
+    let first_usn: i64 = if described.trimmed { 4096 } else { 0 };
+    let mut buffers = Vec::new();
+    let mut usn = first_usn;
+    for chunk in records.chunks(USN_RECORDS_PER_BUFFER) {
+        let bytes: usize = chunk.iter().map(Vec::len).sum();
+        usn += i64::try_from(bytes).unwrap_or(i64::MAX);
+        let mut buffer = usn.to_le_bytes().to_vec();
+        for record in chunk {
+            buffer.extend_from_slice(record);
+        }
+        buffers.push(buffer);
+    }
+    Ok(StoredUsnJournal {
+        volume: described.volume.to_ascii_uppercase(),
+        state: described.state,
+        journal: UsnJournalState {
+            first_usn,
+            next_usn: usn,
+            lowest_valid_usn: 0,
+            maximum_size: described.maximum_size,
+        },
+        end: match described.ends {
+            FixtureUsnEnd::Complete => UsnReadEnd::Complete,
+            FixtureUsnEnd::JournalChanged => UsnReadEnd::JournalChanged,
+        },
+        buffers,
+        folders,
+    })
+}
+
 /// A fake machine for tests. Registry keys, value names, directory paths and environment variable names
 /// are case-insensitive, like Windows.
 #[derive(Debug, Clone)]
@@ -491,6 +879,7 @@ pub struct FixtureHost {
     milliseconds_since_boot: Option<u64>,
     /// Keyed by the lower-cased channel name, like every other name this host compares.
     event_log_channels: Option<BTreeMap<String, StoredChannel>>,
+    usn_journal: Option<StoredUsnJournal>,
 }
 
 impl FixtureHost {
@@ -574,6 +963,10 @@ impl FixtureHost {
                         })
                         .collect::<Result<BTreeMap<_, _>, FixtureError>>()
                 })
+                .transpose()?,
+            usn_journal: file
+                .usn_journal
+                .map(|journal| resolve_usn_journal(journal, origin))
                 .transpose()?,
         })
     }
@@ -774,6 +1167,9 @@ impl FilesystemSource for FixtureHost {
                 .map(|file| DirEntryInfo {
                     name: file.name.clone(),
                     is_file: !file.directory,
+                    size: file.size,
+                    created: file.created,
+                    modified: file.modified,
                 })
                 .collect()
         }))
@@ -910,6 +1306,68 @@ impl BootTimeSource for FixtureHost {
                     "this fixture host does not describe a boot time".to_owned(),
                 )
             })
+    }
+}
+
+impl UsnJournalSource for FixtureHost {
+    /// The buffers the fixture's `usn_journal:` block encodes, for its one volume. No block, or another
+    /// volume, is `Unsupported`: a fixture written before this source existed must not claim a machine
+    /// with no journal.
+    fn read_usn_journal(
+        &self,
+        volume: char,
+        visit: &mut dyn FnMut(&[u8]) -> std::ops::ControlFlow<()>,
+    ) -> Result<Option<UsnJournalRead>, SourceError> {
+        let journal = self
+            .usn_journal
+            .as_ref()
+            .filter(|journal| journal.volume == volume.to_ascii_uppercase())
+            .ok_or_else(|| {
+                SourceError::Unsupported(format!(
+                    "this fixture host does not describe the change journal of {volume}:"
+                ))
+            })?;
+        match journal.state {
+            FixtureUsnState::NotActive => return Ok(None),
+            FixtureUsnState::AccessDenied => return Err(SourceError::AccessDenied),
+            FixtureUsnState::Active => {}
+        }
+        for buffer in &journal.buffers {
+            if visit(buffer).is_break() {
+                return Ok(Some(UsnJournalRead {
+                    state: journal.journal,
+                    end: UsnReadEnd::Stopped,
+                }));
+            }
+        }
+        Ok(Some(UsnJournalRead {
+            state: journal.journal,
+            end: journal.end,
+        }))
+    }
+
+    /// The identifier of a folder under `usn_journal: folders:`, or of the journal volume's own root
+    /// (`X:\`), answered with the journal's own `volume_serial` and NTFS's root directory record
+    /// number (ADR 0047 amendment: junctions). A path named in `access_denied` is refused, as a key or
+    /// folder named there is.
+    fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError> {
+        let journal = self.usn_journal.as_ref().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe file identifiers".to_owned(),
+            )
+        })?;
+        let key = normalise_path(path);
+        if self.access_denied.contains(&key) {
+            return Err(SourceError::AccessDenied);
+        }
+        let root = format!("{}:", journal.volume.to_ascii_lowercase());
+        if key == root {
+            return Ok(Some(file_id_for(
+                NTFS_ROOT_DIRECTORY_RECORD,
+                JOURNAL_VOLUME_SERIAL,
+            )));
+        }
+        Ok(journal.folders.get(&key).copied())
     }
 }
 
@@ -1385,18 +1843,9 @@ processes:
         assert_eq!(
             host.list_dir(r"c:\users\FIXTUREUSER\appdata\local\example"),
             Ok(Some(vec![
-                DirEntryInfo {
-                    name: "readable.dll".to_owned(),
-                    is_file: true,
-                },
-                DirEntryInfo {
-                    name: "unreadable.dll".to_owned(),
-                    is_file: true,
-                },
-                DirEntryInfo {
-                    name: "cache".to_owned(),
-                    is_file: false,
-                },
+                DirEntryInfo::named("readable.dll", true),
+                DirEntryInfo::named("unreadable.dll", true),
+                DirEntryInfo::named("cache", false),
             ]))
         );
     }
@@ -1618,6 +2067,56 @@ processes:
     }
 
     #[test]
+    fn a_listing_reports_the_size_and_times_the_fixture_wrote_and_nothing_else() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      size: 42\n      created: 2026-09-01T10:00:00Z\n      modified: 2025-01-02T03:04:05Z\n    - name: sub\n      directory: true\n      created: 2026-09-02T00:00:00Z\n    - name: silent.log\n",
+            "inline",
+        )
+        .unwrap();
+        let at = |text: &str| Some(text.parse::<jiff::Timestamp>().unwrap());
+        assert_eq!(
+            host.list_dir(r"C:\p"),
+            Ok(Some(vec![
+                DirEntryInfo {
+                    name: "a.log".to_owned(),
+                    is_file: true,
+                    size: Some(42),
+                    created: at("2026-09-01T10:00:00Z"),
+                    modified: at("2025-01-02T03:04:05Z"),
+                },
+                DirEntryInfo {
+                    created: at("2026-09-02T00:00:00Z"),
+                    ..DirEntryInfo::named("sub", false)
+                },
+                DirEntryInfo::named("silent.log", true),
+            ]))
+        );
+    }
+
+    #[test]
+    fn a_fixture_listing_refuses_what_no_listing_reports() {
+        for (yaml, needle) in [
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: sub\n      directory: true\n      size: 1\n",
+                "files only",
+            ),
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      created: 2026-09-01T10:00:00.5Z\n",
+                "fraction of a second",
+            ),
+            (
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: a.log\n      modified: yesterday\n",
+                "`yesterday`",
+            ),
+        ] {
+            let error = FixtureHost::from_yaml_str(yaml, "inline")
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(needle), "{error}");
+        }
+    }
+
+    #[test]
     fn a_denied_folder_denies_the_read_only_attribute_too() {
         let host = FixtureHost::from_yaml_str(
             "platform: windows\naccess_denied: ['C:\\p']\nfilesystem:\n  'C:\\p':\n    - name: a.pf\n      read_only: false\n",
@@ -1807,5 +2306,213 @@ processes:
             host.read_file(r"C:\x\y.dll"),
             Err(SourceError::Unsupported(_))
         ));
+    }
+
+    fn read_all(
+        host: &FixtureHost,
+        volume: char,
+    ) -> (Result<Option<UsnJournalRead>, SourceError>, Vec<Vec<u8>>) {
+        let mut buffers = Vec::new();
+        let read = host.read_usn_journal(volume, &mut |bytes| {
+            buffers.push(bytes.to_vec());
+            std::ops::ControlFlow::Continue(())
+        });
+        (read, buffers)
+    }
+
+    #[test]
+    fn a_usn_journal_block_encodes_version_3_records_under_their_folders() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+usn_journal:
+  maximum_size: 33554432
+  folders:
+    'C:\Windows\Prefetch': 7
+  records:
+    - parent: 'C:\Windows\Prefetch'
+      reasons: [file_create, close]
+      count: 3
+      first: '2026-09-08T01:11:56Z'
+      last: '2026-09-14T16:22:50Z'
+    - reasons: [data_extend]
+",
+            "inline",
+        )
+        .unwrap();
+
+        let (read, buffers) = read_all(&host, 'C');
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.end, UsnReadEnd::Complete);
+        assert_eq!(read.state.maximum_size, 33_554_432);
+        assert_eq!(read.state.first_usn, read.state.lowest_valid_usn);
+        assert_eq!(buffers.len(), 1);
+        let bytes = &buffers[0];
+        // Next USN, then four 80-byte version 3 records.
+        assert_eq!(bytes.len(), 8 + 4 * 80);
+        let parent = |record: usize| &bytes[8 + record * 80 + 24..8 + record * 80 + 40];
+        let mut prefetch = [0u8; 16];
+        prefetch[..8].copy_from_slice(&7u64.to_le_bytes());
+        assert_eq!(parent(0), prefetch);
+        assert_eq!(parent(2), prefetch);
+        assert_ne!(parent(3), prefetch);
+        let reason = |record: usize| {
+            u32::from_le_bytes(
+                bytes[8 + record * 80 + 56..8 + record * 80 + 60]
+                    .try_into()
+                    .unwrap(),
+            )
+        };
+        assert_eq!(reason(0), 0x8000_0100);
+        assert_eq!(reason(3), 0x0000_0002);
+
+        assert_eq!(
+            host.file_id(r"c:\windows\prefetch").unwrap(),
+            Some(FileId {
+                id_128: prefetch,
+                index_64: 7,
+                volume_serial: JOURNAL_VOLUME_SERIAL,
+            })
+        );
+        assert_eq!(
+            host.file_id(r"C:\Windows\System32\winevt\Logs").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn a_usn_journal_block_can_describe_every_way_a_read_ends() {
+        let not_active = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  state: not_active\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(read_all(&not_active, 'C').0, Ok(None));
+
+        let denied = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  state: access_denied\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(read_all(&denied, 'C').0, Err(SourceError::AccessDenied));
+
+        let changed = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  ends: journal_changed\n  trimmed: true\n  records:\n    - reasons: [close]\n",
+            "inline",
+        )
+        .unwrap();
+        let read = read_all(&changed, 'C').0.unwrap().unwrap();
+        assert_eq!(read.end, UsnReadEnd::JournalChanged);
+        assert_ne!(read.state.first_usn, read.state.lowest_valid_usn);
+
+        let other_volume =
+            FixtureHost::from_yaml_str("platform: windows\nusn_journal: {}\n", "inline").unwrap();
+        assert!(matches!(
+            read_all(&other_volume, 'D').0,
+            Err(SourceError::Unsupported(_))
+        ));
+
+        let undescribed = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            read_all(&undescribed, 'C').0,
+            Err(SourceError::Unsupported(_))
+        ));
+        assert!(matches!(
+            undescribed.file_id(r"C:\Windows\Prefetch"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn a_visitor_that_breaks_stops_the_read_and_version_2_records_are_64_bytes() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [close]\n      major: 2\n      count: 2000\n",
+            "inline",
+        )
+        .unwrap();
+        let mut seen = 0usize;
+        let read = host
+            .read_usn_journal('C', &mut |bytes| {
+                seen += 1;
+                assert_eq!((bytes.len() - 8) % 64, 0);
+                std::ops::ControlFlow::Break(())
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!(read.end, UsnReadEnd::Stopped);
+        assert_eq!(seen, 1);
+    }
+
+    #[test]
+    fn a_folder_named_in_access_denied_has_no_identifier_to_give() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\naccess_denied:\n  - 'C:\\Windows\\Prefetch'\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.file_id(r"C:\Windows\Prefetch"),
+            Err(SourceError::AccessDenied)
+        );
+    }
+
+    /// A record group whose `last` is before its `first` is a transposed fixture, not a group with a
+    /// negative span: it is rejected like every other invalid `usn_journal` group, rather than
+    /// silently clamped to a span of zero with a final record that jumps backward.
+    #[test]
+    fn a_record_group_with_last_before_first_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [close]\n      first: '2026-09-14T00:00:00Z'\n      last: '2026-09-13T00:00:00Z'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(error.to_string().contains("last"), "{error}");
+    }
+
+    /// A caller compares a folder's identifier against the journal volume's own, so the drive root has
+    /// to answer with the journal's `volume_serial` too — this is what lets `usn` tell a folder reached
+    /// through a junction to another volume apart from one really on the system volume.
+    #[test]
+    fn a_drive_root_answers_with_the_journal_volume_serial() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nusn_journal: {}\n", "inline").unwrap();
+        let root = host.file_id(r"C:\").unwrap().unwrap();
+        assert_eq!(root.volume_serial, JOURNAL_VOLUME_SERIAL);
+        assert_eq!(root.index_64, NTFS_ROOT_DIRECTORY_RECORD);
+        // Spelled without the trailing backslash, or in another case: the same answer.
+        assert_eq!(host.file_id("c:").unwrap().unwrap(), root);
+    }
+
+    /// `other_volume_folders` is how a fixture describes a folder reached through a junction: same
+    /// drive letter, different volume underneath.
+    #[test]
+    fn a_folder_in_other_volume_folders_carries_the_other_volume_serial() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n    'C:\\Plugins': 4\n  other_volume_folders:\n    - 'C:\\Plugins'\n",
+            "inline",
+        )
+        .unwrap();
+        let prefetch = host.file_id(r"C:\Windows\Prefetch").unwrap().unwrap();
+        let plugins = host.file_id(r"C:\Plugins").unwrap().unwrap();
+        assert_eq!(prefetch.volume_serial, JOURNAL_VOLUME_SERIAL);
+        assert_eq!(plugins.volume_serial, OTHER_VOLUME_SERIAL);
+        assert_ne!(prefetch.volume_serial, plugins.volume_serial);
+    }
+
+    /// A path in `other_volume_folders` that no `folders:` entry describes is a fixture that claims a
+    /// junction over a folder nobody said existed, so it is rejected rather than silently ignored.
+    #[test]
+    fn an_other_volume_folders_entry_missing_from_folders_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  folders:\n    'C:\\Windows\\Prefetch': 1\n  other_volume_folders:\n    - 'C:\\Elsewhere'\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(
+            error.to_string().contains("other_volume_folders"),
+            "{error}"
+        );
     }
 }

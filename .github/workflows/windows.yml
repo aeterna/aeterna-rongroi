@@ -97,6 +97,24 @@ jobs:
             @(Get-WinEvent -LogName $log -ErrorAction SilentlyContinue |
               Where-Object { $_.ToXml() -match 'rongroi_host_windows' })
           }
+          # The log is written asynchronously. On probe run 34918508064 (60 offline runs on six runners, a
+          # throwaway workflow since deleted) one read straight after nextest returned saw fewer than the 22
+          # events in 59 runs, none of them in one, and every missing event arrived within 1.4 s. One read
+          # therefore failed the step now and then, and could also have missed a late event 53. So the
+          # test process's events are read once they stop arriving: the same non-zero count on readings
+          # two seconds apart, for at most 60 seconds, as the next step waits. A log that records nothing
+          # still fails, after the 60 seconds.
+          function SettledEvents {
+            $events = @(); $clock = [Diagnostics.Stopwatch]::StartNew()
+            while ($true) {
+              $now = OurEvents
+              if ($now.Count -gt 0 -and $now.Count -eq $events.Count) { break }
+              $events = $now
+              if ($clock.Elapsed.TotalSeconds -ge 60) { break }
+              Start-Sleep -Seconds 2
+            }
+            [pscustomobject]@{ Events = $events; Seconds = $clock.Elapsed.TotalSeconds }
+          }
           # At the log's default maximum a burst of events from another process overwrites the test's
           # (measured; see the next step), so it is raised here and put back at the end.
           $originalMaxSize = (Get-WinEvent -ListLog $log).MaximumSizeInBytes
@@ -107,10 +125,14 @@ jobs:
 
           cargo nextest run -p rongroi-host-windows --locked --profile ci --run-ignored only -E 'test(/live_offline_/)'
           if ($LASTEXITCODE -ne 0) { throw 'the offline signature tests failed' }
-          $offline = OurEvents
-          Write-Output ("offline: {0} CAPI2 events from the test process, ids: {1}" -f $offline.Count, (($offline | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))
-          if ($offline.Count -eq 0) { throw 'CAPI2 recorded nothing from the offline tests, so their silence proves nothing' }
-          $fetched = @($offline | Where-Object Id -eq 53)
+          $offline = SettledEvents
+          Write-Output ("offline: {0} CAPI2 events from the test process after {1:n1} s, ids: {2}" -f $offline.Events.Count, $offline.Seconds, (($offline.Events | Group-Object Id | ForEach-Object { "$($_.Name)x$($_.Count)" }) -join ' '))
+          if ($offline.Events.Count -eq 0) {
+            $info = Get-WinEvent -ListLog $log
+            if ($info.FileSize -ge $info.MaximumSizeInBytes) { throw 'the CAPI2 log reached its maximum and overwrites its oldest events, so the offline tests'' may have been lost' }
+            throw 'CAPI2 recorded nothing from the offline tests within 60 s, so their silence proves nothing'
+          }
+          $fetched = @($offline.Events | Where-Object Id -eq 53)
           if ($fetched.Count -gt 0) {
             $fetched | Select-Object -First 3 | ForEach-Object { Write-Output $_.ToXml() }
             throw "the offline signature check retrieved objects from the network ($($fetched.Count) event 53)"
@@ -120,8 +142,9 @@ jobs:
           wevtutil cl $log
           cargo nextest run -p rongroi-host-windows --locked --profile ci --run-ignored only -E 'test(/live_online_/)'
           if ($LASTEXITCODE -ne 0) { throw 'the online positive-twin test failed' }
-          $online = @(OurEvents | Where-Object Id -eq 53)
-          Write-Output "online: $($online.Count) event 53 from the test process"
+          $settled = SettledEvents
+          $online = @($settled.Events | Where-Object Id -eq 53)
+          Write-Output ("online: {0} event 53 of {1} CAPI2 events from the test process after {2:n1} s" -f $online.Count, $settled.Events.Count, $settled.Seconds)
           if ($online.Count -eq 0) { throw 'the positive twin fetched nothing the log recorded, so the offline result above is not evidence' }
           wevtutil sl $log /e:false
           wevtutil cl $log
@@ -438,6 +461,11 @@ jobs:
       # the privilege is held, so it also proves the read answers rather than reporting missing rights.
       - name: Firmware read leaves its privilege as it found it
         run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_firmware_/)'
+      # ADR 0047. The runner is elevated and its system volume has a change journal: the collector's
+      # source reads it on a volume handle without write access, to the end, and a folder's identifier
+      # finds records under it. Nothing the journal holds is printed.
+      - name: Change journal reads without write access
+        run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_usn_/)'
       - name: Build the desktop app (unofficial build, no installer)
         run: pnpm -C apps/desktop tauri build --no-bundle
       - name: Live smoke — the CLI reads this machine
@@ -468,6 +496,58 @@ jobs:
             $reason = if ($_.reason) { $_.reason } else { '-' }
             Write-Output "evidence: $($_.rule_id) $($_.collector) $($_.state) $reason"
           }
+          # ADR 0047. The collector's own reading of this runner: the counts and times a baseline takes,
+          # and nothing the journal names. The runner is elevated, so the journal must be read.
+          $usn = @($report.unmatched | Where-Object { $_.collector -eq 'usn' } | ForEach-Object { $_.observations })
+          if ($usn.Count -eq 0) { throw 'the usn collector produced no observation on an elevated runner' }
+          $journal = $usn | Where-Object { $_.fields.location -eq 'journal' }
+          if (-not $journal -or $journal.fields.records -le 0) { throw 'the usn collector read no record from the system volume journal' }
+          $usn | ForEach-Object { Write-Output "usn: $($_.fields | ConvertTo-Json -Compress)" }
+          # ADR 0048. The collector's own reading of this runner: every driver service, its start, path and
+          # hash, which the baseline reproduces. A runner image's drivers belong to no person.
+          $drivers = @($report.unmatched | Where-Object { $_.collector -eq 'driver_service' } | ForEach-Object { $_.observations })
+          $matched = @($report.evidence | Where-Object { $_.collector -eq 'driver_service' -and $_.state -eq 'found' } | ForEach-Object { $_.observations })
+          $all = @($drivers + $matched | Where-Object { $_ })
+          if ($all.Count -eq 0) { throw 'the driver_service collector produced no observation on the runner' }
+          $hashed = @($all | Where-Object { $_.fields.sha256 })
+          if ($hashed.Count -eq 0) { throw 'the driver_service collector hashed no driver file on the runner' }
+          Write-Output "driver_service count: $($all.Count) services, $($hashed.Count) hashed"
+          $all | ForEach-Object { Write-Output "driver_service: $($_.fields | ConvertTo-Json -Compress)" }
+          # ADR 0054. The collector's own reading of this runner's network settings: the hosts file's
+          # path and line count, whether a proxy is set, and how many firewall rules there are, beside
+          # PowerShell's own count of the local store. No hosts line, address or rule name is printed.
+          $net = @(@($report.unmatched | Where-Object { $_.collector -eq 'net_config' } | ForEach-Object { $_.observations }) +
+            @($report.evidence | Where-Object { $_.collector -eq 'net_config' -and $_.state -eq 'found' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ })
+          $hostsFile = @($net | Where-Object { $_.fields.location -eq 'hosts' -and $null -ne $_.fields.present })
+          if ($hostsFile.Count -ne 1) { throw "net_config did not read the hosts file on the runner: $($net.Count) observations" }
+          $proxy = @($net | Where-Object { $_.fields.location -eq 'proxy' })
+          if ($proxy.Count -ne 1) { throw 'net_config did not read the proxy settings on the runner' }
+          $store = @($net | Where-Object { $_.fields.location -eq 'firewall' -and $null -ne $_.fields.firewall_rules })
+          if ($store.Count -ne 1 -or $store[0].fields.firewall_rules -le 0) { throw 'net_config read no firewall rule on the runner' }
+          Write-Output "net_config hosts: $($hostsFile[0].fields | ConvertTo-Json -Compress)"
+          Write-Output "net_config proxy: $($proxy[0].fields | ConvertTo-Json -Compress)"
+          Write-Output "net_config firewall: $($store[0].fields | ConvertTo-Json -Compress)"
+          try {
+            Write-Output "Get-NetFirewallRule PersistentStore: $(@(Get-NetFirewallRule -PolicyStore PersistentStore -ErrorAction Stop).Count)"
+          } catch {
+            Write-Output "Get-NetFirewallRule PersistentStore: $($_.Exception.Message)"
+          }
+          # ADR 0052. `--full` asks on standard error before anything is read, and only `yes` starts a full
+          # scan: `no` gives the standard scan, whose `full` collectors are `not_consented`, and `yes` gives a
+          # full scan that calls them. The runner has no FiveM for GTA V Enhanced, so its server cache
+          # folder is `absent`; no folder name is printed.
+          $standardScan = ('no' | & cargo run --locked --quiet -p rongroi-cli -- scan --full --json | Out-String) | ConvertFrom-Json
+          if ($standardScan.header.scan_tier -ne 'standard') { throw "scan --full answered no ran a $($standardScan.header.scan_tier) scan" }
+          $notConsented = @($standardScan.evidence | Where-Object { $_.collector -eq 'fivem_servers' -and $_.reason -eq 'not_consented' })
+          if ($notConsented.Count -eq 0) { throw 'a standard scan did not report the full collector as not_consented' }
+          $fullScan = ('yes' | & cargo run --locked --quiet -p rongroi-cli -- scan --full --json | Out-String) | ConvertFrom-Json
+          if ($fullScan.header.scan_tier -ne 'full') { throw "scan --full answered yes ran a $($fullScan.header.scan_tier) scan" }
+          $servers = @(@($fullScan.unmatched | Where-Object { $_.collector -eq 'fivem_servers' } | ForEach-Object { $_.observations }) +
+            @($fullScan.evidence | Where-Object { $_.collector -eq 'fivem_servers' -and $_.state -eq 'found' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ })
+          if ($servers.Count -eq 0) { throw 'fivem_servers produced no observation in a full scan' }
+          Write-Output "full scan: fivem_servers folder=$(@($servers | Where-Object { $_.fields.folder } | ForEach-Object { $_.fields.folder }) -join ',') server_folders=$(@($servers | Where-Object { $_.fields.server_folder }).Count)"
           # ADR 0038: the firmware reading compared with PowerShell's own reading of the same UEFI
           # variable on this machine. A runner is not an ordinary Windows PC, so this says the two
           # readers agree, not what an ordinary PC reports.

@@ -13,6 +13,10 @@ use sha2::{Digest, Sha256};
 
 include!("build_marker.rs");
 
+/// The repository this program's code is published in (ADR 0045). From the workspace manifest, so
+/// there is one place it is written.
+pub const REPOSITORY_URL: &str = env!("CARGO_PKG_REPOSITORY");
+
 /// Build provenance shown in every report header and in the UI banner.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Provenance {
@@ -54,6 +58,23 @@ impl Provenance {
             commit: commit.map(str::to_owned),
             exe_sha256,
         }
+    }
+
+    /// The commit whose code this binary is: only an official build's commit says that (ADR 0045).
+    pub fn code_commit(&self) -> Option<&str> {
+        if self.official {
+            self.commit.as_deref()
+        } else {
+            None
+        }
+    }
+
+    /// Where to read this binary's code: its commit for an official build, the repository otherwise.
+    pub fn code_url(&self) -> String {
+        self.code_commit().map_or_else(
+            || REPOSITORY_URL.to_owned(),
+            |commit| format!("{REPOSITORY_URL}/tree/{commit}"),
+        )
     }
 }
 
@@ -146,5 +167,26 @@ mod tests {
             sha256_hex(b""),
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
+    }
+
+    #[test]
+    fn code_url_is_the_commit_of_an_official_build_and_the_repository_otherwise() {
+        assert_eq!(REPOSITORY_URL, "https://github.com/aeterna/aeterna-rongroi");
+        let commit = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
+        let official = Provenance::from_parts(Some("1"), "0.3.0", Some(commit), None);
+        assert_eq!(official.code_commit(), Some(commit));
+        assert_eq!(
+            official.code_url(),
+            format!("https://github.com/aeterna/aeterna-rongroi/tree/{commit}")
+        );
+        // An unofficial build may carry a commit, but not the code that commit names.
+        for other in [
+            Provenance::from_parts(None, "0.3.0", Some(commit), None),
+            Provenance::from_parts(Some("1"), "0.3.0", None, None),
+            Provenance::from_parts(None, "0.3.0", None, None),
+        ] {
+            assert_eq!(other.code_commit(), None, "{other:?}");
+            assert_eq!(other.code_url(), REPOSITORY_URL, "{other:?}");
+        }
     }
 }

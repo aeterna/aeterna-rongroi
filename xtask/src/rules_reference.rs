@@ -21,7 +21,8 @@ use std::path::Path;
 use anyhow::{Context, bail};
 use rongroi_core::bundle::{Bundle, BundleError, BundleInfo};
 use rongroi_core::rules::{
-    MatchKey, Operator, RelatedKind, Rule, RuleText, SourcedRule, Status, parse_match_key,
+    MatchKey, Operator, RelatedKind, Rule, RuleFiles, RuleText, SourcedRule, Status,
+    parse_match_key,
 };
 use rongroi_core::source_tree::collect_bundle_json;
 
@@ -222,8 +223,18 @@ struct Words {
     instant: [Phrase; 4],
     present: &'static str,
     absent: &'static str,
+    /// A `match_lists` condition's values: how many, and the file (ADR 0048).
+    listed_in: fn(usize, &str) -> String,
     statuses: [&'static str; 4],
     related_kinds: [&'static str; 5],
+    /// The heading and the paragraph above the timeline selectors (ADR 0051).
+    selectors_heading: &'static str,
+    selectors_intro: &'static str,
+    /// The fact line that says a file is a timeline selector.
+    role: &'static str,
+    role_timeline: &'static str,
+    /// The heading of a timeline selector's ordinary causes, which it shows beside every entry.
+    selector_causes: &'static str,
 }
 
 const fn one(words: &'static str) -> Phrase {
@@ -292,6 +303,7 @@ const EN: Words = Words {
     ],
     present: "the field is present",
     absent: "the field is absent",
+    listed_in: listed_in_en,
     statuses: [
         "being developed",
         "believed correct; has a positive and a negative fixture",
@@ -305,6 +317,15 @@ const EN: Words = Words {
         "merges",
         "similar to",
     ],
+    selectors_heading: "Timeline selectors",
+    selectors_intro: "A timeline selector is written like a rule and produces no evidence: the observations it matches put \
+        their times on the report's timeline, in Self and SS mode, each with the text and the ordinary causes \
+        below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector \
+        may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not \
+        (ADR 0034): a name says nothing about which program it was, and each one says so.",
+    role: "Role",
+    role_timeline: "a timeline selector: its matches are times on the timeline, never evidence",
+    selector_causes: "Ordinary things behind these times",
 };
 
 const TH: Words = Words {
@@ -373,6 +394,7 @@ const TH: Words = Words {
     ],
     present: "มีฟิลด์นี้",
     absent: "ไม่มีฟิลด์นี้",
+    listed_in: listed_in_th,
     statuses: [
         "อยู่ระหว่างพัฒนา",
         "เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ",
@@ -380,7 +402,23 @@ const TH: Words = Words {
         "เก็บไว้เป็นประวัติ ไม่ถูกประเมิน",
     ],
     related_kinds: ["เปลี่ยนชื่อมาจาก", "ใช้แทน", "ดัดแปลงมาจาก", "รวมมาจาก", "คล้ายกับ"],
+    selectors_heading: "timeline selector",
+    selectors_intro: "timeline selector เขียนแบบเดียวกับ rule แต่ไม่สร้างหลักฐาน สิ่งที่เห็นที่มันเลือกจะเอาเวลาของตัวเองไปวางบน \
+        timeline ของรายงาน ทั้งโหมด Self และ SS พร้อมข้อความและเรื่องปกติด้านล่าง มันไม่เคยเป็น เจอ ไม่เจอ หรือ \
+        ยังไม่ได้วัด และไม่ถูกนับ (ADR 0051) timeline selector เลือกบันทึกของ Prefetch, BAM และ Program \
+        Compatibility Assistant ตามชื่อได้ ซึ่ง rule ทำไม่ได้ (ADR 0034) ชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน และทุกตัวเขียนบอกไว้",
+    role: "บทบาท",
+    role_timeline: "timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน",
+    selector_causes: "เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้",
 };
+
+fn listed_in_en(count: usize, file: &str) -> String {
+    format!("the {count} values in the first column of `{file}`, a file beside the rule")
+}
+
+fn listed_in_th(count: usize, file: &str) -> String {
+    format!("{count} ค่าในคอลัมน์แรกของ `{file}` ซึ่งเป็นไฟล์ที่อยู่ข้าง rule")
+}
 
 fn generated_comment() -> String {
     format!(
@@ -482,11 +520,15 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
     )
 }
 
-/// One page: every rule in `bundle`, grouped by collector and then by category, in path order.
-fn render(bundle: &Bundle, lang: Lang, labels: &Labels) -> String {
-    let words = lang.words();
-    let mut groups: BTreeMap<&str, BTreeMap<&str, Vec<&SourcedRule>>> = BTreeMap::new();
+/// Files of one role, grouped by collector and then by category, in path order.
+type Groups<'b> = BTreeMap<&'b str, BTreeMap<&'b str, Vec<&'b SourcedRule>>>;
+
+fn groups_of(bundle: &Bundle, timeline: bool) -> Groups<'_> {
+    let mut groups: Groups<'_> = BTreeMap::new();
     for sourced in bundle.rules() {
+        if sourced.rule.is_timeline_selector() != timeline {
+            continue;
+        }
         let category = sourced.path.split('/').nth(1).unwrap_or_default();
         groups
             .entry(sourced.rule.collector.as_str())
@@ -500,30 +542,62 @@ fn render(bundle: &Bundle, lang: Lang, labels: &Labels) -> String {
             rules.sort_by(|a, b| a.path.cmp(&b.path));
         }
     }
+    groups
+}
+
+/// One page: every rule in `bundle`, grouped by collector and then by category, in path order, and
+/// then every timeline selector the same way, in a section of its own (ADR 0051).
+fn render(bundle: &Bundle, lang: Lang, labels: &Labels) -> String {
+    let words = lang.words();
+    let rules = groups_of(bundle, false);
+    let selectors = groups_of(bundle, true);
 
     let mut out = (words.intro)(bundle.info());
     let _ = writeln!(out, "\n## {}\n", words.contents);
-    for (collector, categories) in &groups {
-        let _ = writeln!(out, "- {}", code(collector));
-        for sourced in categories.values().flatten() {
-            let title = title(bundle, &sourced.rule, lang);
-            let _ = writeln!(
-                out,
-                "  - [{}](#{}) — {} · {}",
-                prose_line(&title),
-                anchor(&sourced.rule.id),
-                code(sourced.rule.strength.as_str()),
-                code(status_code(sourced.rule.status)),
-            );
+    let contents = |out: &mut String, groups: &Groups<'_>, indent: &str| {
+        for (collector, categories) in groups {
+            let _ = writeln!(out, "{indent}- {}", code(collector));
+            for sourced in categories.values().flatten() {
+                let title = title(bundle, &sourced.rule, lang);
+                let _ = writeln!(
+                    out,
+                    "{indent}  - [{}](#{}) — {} · {}",
+                    prose_line(&title),
+                    anchor(&sourced.rule.id),
+                    code(sourced.rule.strength.as_str()),
+                    code(status_code(sourced.rule.status)),
+                );
+            }
         }
+    };
+    contents(&mut out, &rules, "");
+    if !selectors.is_empty() {
+        let _ = writeln!(out, "- {}", words.selectors_heading);
+        contents(&mut out, &selectors, "  ");
     }
 
-    for (collector, categories) in &groups {
+    for (collector, categories) in &rules {
         let _ = writeln!(out, "\n## {} {}", words.collector_heading, code(collector));
         for (category, rules) in categories {
             let _ = writeln!(out, "\n### {} / {}", code(collector), code(category));
             for sourced in rules {
                 render_rule(&mut out, bundle, sourced, lang, labels);
+            }
+        }
+    }
+    if !selectors.is_empty() {
+        let _ = writeln!(
+            out,
+            "\n## {}\n\n{}",
+            words.selectors_heading,
+            prose_block(words.selectors_intro, "")
+        );
+        for (collector, categories) in &selectors {
+            for (category, rules) in categories {
+                let _ = writeln!(out, "\n### {} / {}", code(collector), code(category));
+                for sourced in rules {
+                    render_rule(&mut out, bundle, sourced, lang, labels);
+                }
             }
         }
     }
@@ -546,6 +620,8 @@ fn render_rule(
             description: rule.description.clone(),
             falsepositives: rule.falsepositives.clone(),
             retention: rule.retention.clone(),
+            status: rule.status,
+            files: RuleFiles::of(sourced),
         });
     // `Bundle::text` falls back to English per field; the page says where it did.
     let marker = |same: bool| {
@@ -591,6 +667,33 @@ fn render_rule(
         prose_block(&text.retention, "")
     );
 
+    // A timeline selector makes no `unmeasured` row and may declare no reason (ADR 0051).
+    if !rule.is_timeline_selector() {
+        render_unmeasured(out, rule, words, labels);
+    }
+
+    let causes = if rule.is_timeline_selector() {
+        words.selector_causes
+    } else {
+        labels
+            .get("", "falsepositives")
+            .unwrap_or("Ordinary things that also produce this")
+    };
+    let _ = writeln!(
+        out,
+        "\n**{}**{}\n",
+        prose_line(causes),
+        marker(text.falsepositives == rule.falsepositives)
+    );
+    for item in &text.falsepositives {
+        let _ = writeln!(out, "- {}", prose_block(item, "  "));
+    }
+
+    render_links(out, bundle, rule, lang);
+}
+
+/// The reasons a rule named as ordinary on some machines.
+fn render_unmeasured(out: &mut String, rule: &Rule, words: &Words, labels: &Labels) {
     let _ = writeln!(out, "\n**{}**\n", words.unmeasured);
     if rule.unmeasured_when.is_empty() {
         let _ = writeln!(out, "{}", words.unmeasured_none);
@@ -603,22 +706,6 @@ fn render_rule(
             with_label(reason, labels.get("reason", reason))
         );
     }
-
-    let _ = writeln!(
-        out,
-        "\n**{}**{}\n",
-        prose_line(
-            labels
-                .get("", "falsepositives")
-                .unwrap_or("Ordinary things that also produce this")
-        ),
-        marker(text.falsepositives == rule.falsepositives)
-    );
-    for item in &text.falsepositives {
-        let _ = writeln!(out, "- {}", prose_block(item, "  "));
-    }
-
-    render_links(out, bundle, rule, lang);
 }
 
 /// The short facts under a rule's heading: id, file, collector, strength, status, tags, dates.
@@ -632,6 +719,15 @@ fn render_facts(out: &mut String, sourced: &SourcedRule, words: &Words, labels: 
         code(&format!("rules/{}", sourced.path)),
         sourced.path
     );
+    if rule.is_timeline_selector() {
+        let _ = writeln!(
+            out,
+            "- {}: {} — {}",
+            words.role,
+            code(rule.role.as_str()),
+            words.role_timeline
+        );
+    }
     let _ = writeln!(out, "- {}: {}", words.collector, code(&rule.collector));
     let strength = rule.strength.as_str();
     let _ = writeln!(
@@ -748,6 +844,23 @@ fn condition(rule: &Rule, key: &str, value: &serde_json::Value, words: &Words) -
         }
         Operator::Exists => None,
     };
+    let case = if operator.compares_text() && holds_text {
+        if rule.cased.contains(field) {
+            format!(" ({})", words.text_cased)
+        } else {
+            format!(" ({})", words.text_folded)
+        }
+    } else {
+        String::new()
+    };
+    if let Some(file) = rule.match_lists.get(field) {
+        return format!(
+            "{}: {} {}{case}",
+            code(key),
+            words.equals.any,
+            (words.listed_in)(values.len(), file)
+        );
+    }
     let reading = match phrase {
         Some(phrase) => {
             let shown: Vec<String> = values.iter().map(|value| value_code(value)).collect();
@@ -763,15 +876,6 @@ fn condition(rule: &Rule, key: &str, value: &serde_json::Value, words: &Words) -
             Some(false) => words.absent.to_owned(),
             None => value_code(value),
         },
-    };
-    let case = if operator.compares_text() && holds_text {
-        if rule.cased.contains(field) {
-            format!(" ({})", words.text_cased)
-        } else {
-            format!(" ({})", words.text_folded)
-        }
-    } else {
-        String::new()
     };
     format!("{}: {reading}{case}", code(key))
 }
@@ -1007,6 +1111,43 @@ related:
         insta::assert_snapshot!(render(&bundle(), Lang::Th, &labels(Lang::Th)));
     }
 
+    const SELECTOR: &str = "id: 4d3c2b1a-0f9e-4d8c-8b7a-6f5e4d3c2b1a\ntitle: When Prefetch recorded a program named game.exe\ndescription: Puts a time on the timeline.\nstatus: experimental\nrole: timeline\ncollector: prefetch\nstrength: context\nmatch:\n  name: game.exe\nretention: What Prefetch still holds.\nfalsepositives: [Any program of that name]\nauthor: tests\ndate: 2026-09-17\n";
+
+    /// ADR 0051: timeline selectors are listed after the rules, in a section of their own, with their
+    /// role and without an unmeasured block, which they may not have.
+    #[test]
+    fn timeline_selectors_have_their_own_section() {
+        let mut json: serde_json::Value = serde_json::from_str(&bundle_json()).unwrap();
+        json["rules"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "path": "prefetch/timeline/game-by-name/rule.yaml",
+                "yaml": SELECTOR,
+            }));
+        let bundle = Bundle::from_bundle_json(&json.to_string()).unwrap();
+        let page = render(&bundle, Lang::En, &labels(Lang::En));
+        let (before, section) = page.split_once("\n## Timeline selectors\n").unwrap();
+        assert!(
+            before.contains("- Timeline selectors\n  - `prefetch`"),
+            "{before}"
+        );
+        assert!(!before.contains("game.exe`"), "{before}");
+        assert!(
+            section.contains("- Role: `timeline` — a timeline selector"),
+            "{section}"
+        );
+        assert!(
+            section.contains("**Ordinary things behind these times**"),
+            "{section}"
+        );
+        let own = section.split_once("4d3c2b1a").unwrap().1;
+        assert!(!own.contains("Not measured, and named"), "{own}");
+
+        let without = render(&self::bundle(), Lang::En, &labels(Lang::En));
+        assert!(!without.contains("Timeline selectors"), "{without}");
+    }
+
     #[test]
     fn page_is_the_same_whatever_order_the_rules_arrive_in() {
         let reversed: serde_json::Value = serde_json::from_str(&bundle_json()).unwrap();
@@ -1240,5 +1381,58 @@ related:
         let text = fs::read_to_string(&path).unwrap().replace('\n', "\r\n");
         fs::write(&path, text).unwrap();
         run(&tmp.0, &Args { check: true }).unwrap();
+    }
+
+    /// ADR 0048: a CSV directly beside a `rule.yaml` travels with that rule, and a CSV at the top of
+    /// `rules/` — `known-fps.csv`, `unconfronted.csv` — beside no rule does not.
+    #[test]
+    fn the_bundle_carries_the_csv_files_beside_a_rule_and_no_other() {
+        let tmp = TempRoot::new("bundle-data");
+        tmp.write("posture/memory-integrity/listed/rule.yaml", "id: x\n");
+        tmp.write(
+            "posture/memory-integrity/listed/states.csv",
+            "hvci\r\ndisabled\r\n",
+        );
+        tmp.write("posture/memory-integrity/listed/notes.txt", "not data\n");
+        tmp.write("known-fps.csv", "rule_id\n");
+
+        let json: serde_json::Value =
+            serde_json::from_str(&collect_bundle_json(&tmp.0).unwrap()).unwrap();
+
+        let rules = json["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 1);
+        assert_eq!(
+            rules[0]["data"],
+            serde_json::json!({ "states.csv": "hvci\ndisabled\n" })
+        );
+    }
+
+    /// ADR 0048: a listed condition is read aloud as the file and how many values it holds, never as
+    /// the values — 1,847 hashes on the reference page would be a data dump, not rule text.
+    #[test]
+    fn a_listed_condition_names_its_file_and_row_count() {
+        let hash_a = "a".repeat(64);
+        let hash_b = "b".repeat(64);
+        let json = serde_json::json!({
+            "rules": [{
+                "path": "driver_service/vulnerable-driver/listed/rule.yaml",
+                "yaml": "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7\ntitle: T\ndescription: D.\nstatus: test\ncollector: driver_service\nstrength: posture\nmatch_lists:\n  sha256: hashes.csv\nretention: Now.\nfalsepositives: [F]\nauthor: tests\ndate: 2026-09-15\n",
+                "data": { "hashes.csv": format!("sha256\n{hash_a}\n{hash_b}\n") },
+            }],
+            "i18n": [],
+        })
+        .to_string();
+        let bundle = rongroi_core::bundle::Bundle::from_bundle_json(&json).unwrap();
+        let rule = &bundle.rules()[0].rule;
+        let value = rule.matcher["sha256"].clone();
+
+        let en = condition(rule, "sha256", &value, &EN);
+        assert!(
+            en.contains("the 2 values in the first column of `hashes.csv`"),
+            "{en}"
+        );
+        assert!(!en.contains(&hash_a), "{en}");
+        let th = condition(rule, "sha256", &value, &TH);
+        assert!(th.contains("2 ค่าในคอลัมน์แรกของ `hashes.csv`"), "{th}");
     }
 }

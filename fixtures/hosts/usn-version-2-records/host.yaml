@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# An elevated Windows 11 scan whose system volume journal holds version 2 records under the Prefetch
+# folder, attributed by the folder's 64-bit index rather than its 128-bit identifier.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  WinDir: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+usn_journal:
+  folders:
+    'C:\Windows\Prefetch': 1
+  records:
+    - parent: 'C:\Windows\Prefetch'
+      major: 2
+      reasons: [file_delete, close]
+      count: 3

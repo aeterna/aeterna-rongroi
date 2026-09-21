@@ -3,9 +3,14 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, the list of running processes, what the Program Compatibility Assistant, Windows
+FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders, the list of running processes, the drivers
+registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
-event logs hold.
+event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
+for each folder those collectors read, with no file name, and the settings that decide where network
+traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM, and what
+Windows says this installation is, with how the services Windows ships with are set to start, and
+whether six named places are on this PC.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -20,6 +25,15 @@ report can say whether FiveM's own program carries the signature FiveM was measu
 find that one file it lists the names in the program folder; **no other file there is reported**, and
 nothing is read from inside it but what the hash and the signature check consume.
 
+Of FiveM's **log, crash and cache folders** in both editions it reads only what listing each folder
+gives: how many files and subfolders it holds, the files' total size, the earliest and latest creation and
+last-write times among them, and the folder's own times (ADR 0053). Of each folder FiveM for GTA V Enhanced
+keeps per server, it reads when it was created and last changed and how many entries it holds. **It reads
+no file name and no folder name there**, and opens no file: a log's or a crash dump's name can carry a date,
+and a server folder's name identifies the server. The times are what Windows recorded, which programs set as
+they copy and extract files; they are specific enough to match two reports of the same PC (ADR 0050).
+SS mode shows these times on its [timeline](#the-timeline) (ADR 0051).
+
 **Since ADR 0036 rules read these files, so SS mode shows them.** Each file in a plugin folder, and
 `FiveM.exe` when its signature is not the expected one, matches a rule and is shown to the person
 watching — its path with your user name replaced, its hash, its signature and the signer's name. The
@@ -27,6 +41,44 @@ consent question names them before anything is read.
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
 is on disk. It does not read what a program is doing, what is in its memory, or what you typed into it.
+
+Of a driver registered with Windows it reads the name of its driver service, when Windows is set to start
+it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
+graphics card vendor, a VPN, a virtualisation product — because their drivers are registered. It does not
+read which drivers are loaded or what they do.
+
+Of the **network settings** it reads three things, and never a record of where traffic went: not which
+sites or servers you connected to, not the DNS cache, not the connections open now, not the firewall log,
+and nothing captured off the network (ADR 0054).
+
+- **The hosts file.** It counts the lines in effect. Of a line that gives a name under `cfx.re`,
+  `fivem.net` or `rockstargames.com` an address, it reads that name, the address and the line's number.
+  **Every other line is counted and never reported**: they are your own choices about the rest of the
+  internet. In SS mode the address is shown only as its kind — loopback, unspecified, private or public —
+  because an address can name your own server.
+- **The proxy.** Whether your Windows account has a proxy switched on, and whether a proxy server or a
+  setup script is set. **Never the address of either**, which can name your employer's or your own
+  server, and never the list of your VPN and dial-up connections Windows keeps beside it.
+- **The Windows Firewall rules.** How many rules there are, and of each rule for a program in a FiveM
+  folder, whether it allows or blocks, whether it is on, its direction, protocol and network profiles, and
+  the program's path. **Never a rule's name or description**, which anyone who made the rule could write
+  anything in. Rules for other programs are only counted.
+
+No rule reads the proxy or the firewall rules, so SS mode shows only how many of them there were.
+
+Of **what Windows says this installation is** it reads the edition and build values `winver` shows, the
+registered organisation, and the manufacturer, model and support link Settings shows — the last three are
+where two published Windows-modification playbooks write their own name (ADR 0056). **It does not read
+`RegisteredOwner`**, the name of the person who set the PC up. It also reads, for each of eight services
+Windows ships with — Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy,
+Search and telemetry — whether its key is there and how it is set to start. No other service is read, and
+no service is started, stopped or changed.
+
+Of the **six named places** it reads one thing each: whether the place is there. Five are what the Atlas
+and ReviOS Windows modifications install — folders and a registry key of theirs — and the sixth is
+Microsoft's own, the folder Windows keeps Defender's engine in, read for its absence (ADR 0057).
+**What is inside a folder is never listed, reported or hashed**, and no value is read from the registry
+key. Nothing is opened for writing.
 
 Of a Prefetch file it reads the program's name, how many times Windows recorded it running and when it
 last ran. **A Prefetch file also lists every file that program loaded — normally hundreds of paths,
@@ -39,7 +91,7 @@ Of Windows' Background Activity Moderator it reads which programs ran and when. 
 **per user account**, and the account is named by a SID — an identifier of the account *and* of the
 Windows installation it belongs to. **No part of that SID is reported**, hashed or otherwise: the report
 says how many accounts had records and nothing else about them. The path of a program is reported only
-when it starts with a drive letter, because that is the only shape SS mode knows how to redact. A path
+when it starts with a drive letter, because that is a shape SS mode knows how to redact. A path
 written any other way can carry your account name with nothing to replace it, so it is withheld rather
 than shown — and the report says it was withheld, rather than leaving you to notice it is missing.
 Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
@@ -58,6 +110,14 @@ or because the tool's own time limit ran out — is **named in the report as one
 than passed over in silence. A log the tool never opened at all, because that time limit was already gone
 when its turn came, is named as one it did not look at — which is a different thing and is said in
 different words.
+
+Of the change journal it reads, for the Windows drive only, how many records the journal holds, when the
+oldest and newest were written, whether older records have been trimmed from it, and the journal's maximum
+size; and for each of the Prefetch, event log and Program Compatibility Assistant folders and FiveM's two
+plugin folders, how many records name that folder, how many of those created, deleted, renamed or changed
+a file, and when the oldest and newest of that folder's records were written. **It reads no file name**: the journal names every file
+changed on the drive, and the program's parser skips the name without keeping it. It reports no journal
+identifier and no file number, because each would identify your PC across two reports.
 
 Of the machine's security settings it also reads two more (ADR 0038). One is what the PC's **firmware**
 itself says about Secure Boot, beside what Windows says — one on/off value, nothing that names a person.
@@ -93,6 +153,26 @@ not a conclusion and not "when you turned your PC on": a "Shut down" with Fast S
 Windows ships, and sleep and hibernation do not start the count again, so on an ordinary PC it is often
 days old. It does say roughly when the PC was last restarted, which is a small fact about your day, and
 two reports taken before the next restart show the same time. The consent question names it (ADR 0039).
+
+### A full scan reads more, and only if you agree before it starts
+
+There are two scans (ADR 0052). Everything above is the **standard scan**, which every run makes. A
+**full scan** also reads the sources below, and only when you agree to it **before the scan starts**, in
+the program that will read them: the command-line version asks when you run `scan --full` and starts the
+full scan only if you type `yes`; the desktop app's "Full scan" button starts the program again, and a
+Windows dialog lists what a full scan reads before anything is read. Anything but yes is the standard
+scan. No flag, shortcut or script answers for you, and a standard scan never touches these sources at
+all — the report says, once, how many checks only a full scan answers.
+
+What a full scan reads today:
+
+- **The name of each server cache folder FiveM for GTA V Enhanced keeps**, one per server the game
+  joined, with when each was created and last changed (ADR 0055). What the name is made from is not
+  known. It stays the same for that server on this PC, so it can match two reports of this PC; whether
+  another PC gets the same name is not known. Nothing inside those folders is read.
+
+A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
+reads a browser's history, a messenger's storage, or anything that holds a password or a token.
 
 ### When the tool says it could not answer
 
@@ -133,8 +213,63 @@ or allow remote access.
 | Consent screen | no | yes — you may refuse |
 | Evidence shown | everything | rule matches, plus counts of what was not found or could not be answered for a reason the rule itself said is ordinary. A check this program stopped short of is shown, because that is its own limit and not a fact about your PC |
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
-| Paths | full | your user-profile folder is replaced with `%USERPROFILE%` |
+| Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
+| A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
+| What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, a separate choice that is off until you turn it on |
 | When Windows last started | shown | shown, as one time at the top of the report |
+| Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
+
+### The timeline
+
+Both modes show the times the report holds in one list, oldest first, with the span each Windows log and
+the change journal could see, and the sources whose times could not be read (ADR 0051). The list never
+calls anything a gap or a cleaning: an order of recorded times is not an order of events.
+
+In Self mode the list holds every time the scan read. In SS mode it holds the times of the evidence SS mode
+shows, when this scan ran and when Windows last started, and these, which SS mode did not show before
+ADR 0051:
+
+- **the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named
+  `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe`, and any name that begins `FiveM_b` and ends `_GTAProcess.exe`**, with that name. Windows records only a name, so this says when a program of that
+  name ran, not which program it was. Programs of any other name are still only counted;
+- the times of FiveM's log, crash and cache folders, and of each Enhanced server cache folder, without its
+  name. These times can match two reports of this PC;
+- the oldest and newest record each Windows event log holds, with the log's path;
+- the oldest and newest change the change journal holds for each folder it counts.
+
+The same list is on the consent screen. Each entry that comes from this list is shown with the ordinary
+things that produce it.
+
+### Which folders count as your user-profile folder
+
+SS mode replaces the folder that holds your profile and the name after it, wherever a path names it:
+
+- `Users\<your name>` directly under any drive, such as `D:\Users\<your name>`, in any upper or lower case;
+- `Documents and Settings\<your name>`, the older name Windows still answers to, and its usual short 8.3
+  form;
+- the same folders reached through a drive's administrative share, such as `\\<pc>\C$\Users\<your name>`.
+  The PC name before `C$` is shown as written;
+- the folder your PC creates new profiles in, when it has been moved away from `Users`. The scan reads that
+  setting (`ProfilesDirectory`) so that SS mode can use it. A Self-mode report carries it; an SS-mode
+  report does not, and neither does the part of the app that is shown before you choose a mode.
+
+It reads `\` and `/` alike and applies `.` and `..` in a path, and it still finds the name
+when a second path follows the first with nothing between them.
+
+What it does **not** cover, so a path in one of these is shown as it is, with your account name in it if
+the folder carries one (ADR 0049):
+
+- a profile moved for one account on its own, to a folder that is neither of the above. Reading every
+  account's profile location to redact it would put the list of accounts on your PC into the report, which
+  is more than this check needs;
+- a path written without a drive letter — a device or volume path, or a network share other than a drive's
+  administrative share. Background Activity Moderator paths of that kind are withheld, as described above;
+  the path of a running program is reported as Windows gives it;
+- the short 8.3 name of a moved profile folder, and the rarer short names Windows makes when many folders
+  begin alike;
+- a moved profile folder whose name has non-ASCII letters, written in a different case.
+
+If any of these could apply to you, look at the report in Self mode first.
 
 ### Program names are not redacted, and that can matter
 
@@ -157,12 +292,14 @@ tool did, not more. Paths in it are redacted in SS mode like any other.
 
 ### What a collector saw that no rule matched
 
-Some collectors read things no rule asks about — the list of programs you are running, what Windows
-recorded about programs that ran, and whether each FiveM plugin folder was there. **Self mode lists
-them**, under "unmatched observations", so that you can read what the tool saw and judge it yourself.
+Some collectors read things no rule asks about — the list of programs you are running, the drivers
+registered with Windows, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
+Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
+can read what the tool saw and judge it yourself.
 
-**SS mode does not list them.** It says how many there were and nothing more. That mode promises to show
-only what matches a rule, and the names of every file and every running program on your PC are not that:
+**SS mode does not list them.** It says how many there were and nothing more, except for the times its
+[timeline](#the-timeline) names, program by program, on the consent screen. That mode promises to show
+what matches a rule and that list, and the names of every file and every running program on your PC are not that:
 they would tell whoever is watching what you have open, which is none of the check's business. Replacing
 your user name in paths would not change that, so the list is withheld rather than redacted.
 

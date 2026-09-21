@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: c9012982-5fc1-4d61-ab0c-0bc1abe93830
+title: Windows Update's service cannot start on this PC
+description: >-
+  The `wuauserv` service is set never to start, or its key is not there at all. A PC that cannot
+    update keeps whatever Windows it was installed with, which is how a pre-modified image stays as it
+    was shipped, and it is also what several tweaking scripts do on an ordinary installation
+    (ADR 0056). Windows ships this service set to start on demand. It says how the PC is kept up to
+    date and is not evidence of cheating.
+status: experimental
+collector: os_image
+strength: posture
+match:
+  service_wuauserv: [absent, disabled]
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+# `access_denied` removed (ADR 0057, amending ADR 0056): a limited-token measurement on 2026-09-21 read every value this rule needs, so a refusal is a machine nobody anticipated and belongs in front of a reviewer rather than in the scope line.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - An owner who turned Windows Update off to stop reboots, or to keep a driver a later update replaces
+  - A PC managed by an employer or a school that updates it another way
+  - A pre-modified Windows image or a tweaking script the owner installed for performance
+references:
+  - https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview
+author: aeterna-rongroi contributors
+date: 2026-09-20
+tags: [posture, os_image]

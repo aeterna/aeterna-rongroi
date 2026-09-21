@@ -19,7 +19,8 @@ export type UnmeasuredReason =
   | "partial"
   | "budget_spent"
   | "read_failed"
-  | "collector_unavailable";
+  | "collector_unavailable"
+  | "not_consented";
 
 export type Strength = "execution" | "presence" | "tamper" | "posture" | "context";
 
@@ -64,6 +65,19 @@ export interface ReportHeader {
   elevated: boolean | null;
   generated_at: string;
   boot_time: BootTime;
+  /** The machine's profile root, for SS-mode redaction only; absent from an SS view (ADR 0049). */
+  profiles_directory?: string;
+  /** Which scan the player chose before it started; absent from an older report, which was standard (ADR 0052). */
+  scan_tier?: ScanTier;
+}
+
+/** How much a scan reads, chosen before it starts (ADR 0052). */
+export type ScanTier = "standard" | "full";
+
+/** What the player agreed SS mode may show beyond its default, each default no (ADR 0052). */
+export interface SsOptions {
+  server_identity: boolean;
+  account_identifier: boolean;
 }
 
 /**
@@ -85,6 +99,56 @@ export interface UnmatchedGroup {
   observations: Observation[];
 }
 
+/** How many of the evidence a view lists are in each state (ADR 0045). Never added into one number. */
+export interface ListedCounts {
+  found: number;
+  not_found: number;
+  unmeasured: number;
+}
+
+/** Where a timeline entry came from (ADR 0051). */
+export type EntrySource =
+  | { kind: "anchor" }
+  | { kind: "evidence"; rule_id: string }
+  | { kind: "selector"; selector_id: string }
+  | { kind: "observation" };
+
+/** One time value on the timeline. `collector` is null for the scan's own times. */
+export interface TimelineEntry {
+  at: string;
+  collector: string | null;
+  field: string;
+  place: string | null;
+  source: EntrySource;
+  subject: string | null;
+}
+
+/** The span one source could see. "Nothing recorded" can be read only inside it. */
+export interface CoverageBand {
+  collector: string;
+  place: string | null;
+  subject: string | null;
+  from: string;
+  to: string;
+}
+
+/** A source of times, or one place of it, that could not be read. */
+export interface UnmeasuredSource {
+  collector: string;
+  place?: string;
+  reason: UnmeasuredReason;
+}
+
+/**
+ * The times a view may show, oldest first, with the spans that bound them (ADR 0051). Nothing is
+ * computed from the entries: no gap, no count, no summary. Built in Rust for each mode.
+ */
+export interface Timeline {
+  entries: TimelineEntry[];
+  bands: CoverageBand[];
+  unmeasured: UnmeasuredSource[];
+}
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
@@ -98,7 +162,11 @@ export interface ReportView {
    * administrator rights left unanswered — one fact about the scan rather than one per rule, and the
    * one with a remedy. It is not a fourth hidden count; the same checks are in `hidden` (ADR 0027).
    */
-  scope: { not_admin: number; not_attempted: number };
+  scope: { not_admin: number; not_attempted: number; not_consented?: number };
+  listed: ListedCounts;
+  timeline: Timeline;
+  /** The order collector groups appear in, from the core (ADR 0051). */
+  collector_order: string[];
   hidden: {
     not_found: number;
     unmeasured_expected: number;
@@ -107,10 +175,27 @@ export interface ReportView {
   };
 }
 
+/** Where a rule, its fixtures and its collector are in the repository, from its root (ADR 0045). */
+export interface RuleFiles {
+  rule: string;
+  fixtures: string;
+  collector: string;
+  references: string[];
+}
+
 export interface RuleText {
   title: string;
   description: string;
   falsepositives: string[];
   /** Look-back note for `not_found`, translated. Evidence keeps the English source. */
   retention: string;
+  status: "experimental" | "test" | "stable" | "deprecated";
+  files: RuleFiles;
+}
+
+/** Where this binary's code can be read (ADR 0045). `commit` is set for an official build only. */
+export interface CodeLinks {
+  repository: string;
+  code: string;
+  commit: string | null;
 }

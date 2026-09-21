@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::provenance::sha256_hex;
 use crate::rules::{
-    self, Problem, RULES_SCHEMA_VERSION, Rule, RuleText, SourcedRule, Translations,
+    self, Problem, RULES_SCHEMA_VERSION, Rule, RuleFiles, RuleText, SourcedRule, Translations,
 };
 
 const EMBEDDED: &str = include_str!(concat!(env!("OUT_DIR"), "/rules_bundle.json"));
@@ -22,7 +22,7 @@ pub struct BundleInfo {
     pub schema_version: u32,
     /// SHA-256 of the raw bundle.
     pub sha256: String,
-    /// Number of rules in the bundle, including deprecated ones.
+    /// Number of rule files in the bundle, deprecated ones and timeline selectors (ADR 0051) included.
     pub rule_count: usize,
 }
 
@@ -55,6 +55,9 @@ struct RawBundle {
 struct RawRule {
     path: String,
     yaml: String,
+    /// The CSV files beside the rule, by file name (ADR 0048). Absent for a rule that has none.
+    #[serde(default)]
+    data: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -82,12 +85,19 @@ impl Bundle {
         let raw: RawBundle = serde_json::from_str(json)?;
 
         let mut rules = Vec::with_capacity(raw.rules.len());
+        let mut problems = Vec::new();
         for file in raw.rules {
-            let rule: Rule =
+            let mut rule: Rule =
                 serde_saphyr::from_str(&file.yaml).map_err(|e| BundleError::Parse {
                     path: file.path.clone(),
                     message: e.to_string(),
                 })?;
+            for message in rules::expand_match_lists(&mut rule, &file.data) {
+                problems.push(Problem {
+                    path: file.path.clone(),
+                    message,
+                });
+            }
             rules.push(SourcedRule {
                 path: file.path,
                 rule,
@@ -107,7 +117,7 @@ impl Bundle {
             translations.insert(file.lang, texts);
         }
 
-        let problems = rules::validate(&rules, &translations);
+        problems.extend(rules::validate(&rules, &translations));
         if !problems.is_empty() {
             return Err(BundleError::Invalid(problems));
         }
@@ -143,7 +153,8 @@ impl Bundle {
 
     /// Text of a rule in `lang`, falling back to English for anything not translated.
     pub fn text(&self, rule_id: &str, lang: &str) -> Option<RuleText> {
-        let rule = &self.rules.iter().find(|s| s.rule.id == rule_id)?.rule;
+        let sourced = self.rules.iter().find(|s| s.rule.id == rule_id)?;
+        let rule = &sourced.rule;
         let translated = self
             .translations
             .get(lang)
@@ -161,6 +172,8 @@ impl Bundle {
             retention: translated
                 .and_then(|t| t.retention.clone())
                 .unwrap_or_else(|| rule.retention.clone()),
+            status: rule.status,
+            files: RuleFiles::of(sourced),
         })
     }
 }
@@ -233,5 +246,75 @@ mod tests {
         let a = Bundle::from_bundle_json(&bundle_json("")).unwrap();
         let b = Bundle::from_bundle_json(&bundle_json("# changed\n")).unwrap();
         assert_ne!(a.info().sha256, b.info().sha256);
+    }
+
+    #[test]
+    fn text_carries_the_status_and_files_of_the_rule() {
+        let bundle = Bundle::from_bundle_json(&bundle_json("")).unwrap();
+        let text = bundle
+            .text("7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7", "th")
+            .unwrap();
+        assert_eq!(text.status, crate::rules::Status::Test);
+        assert_eq!(text.files.rule, "rules/posture/boot/example/rule.yaml");
+        assert_eq!(text.files.fixtures, "rules/posture/boot/example/tests");
+        assert_eq!(
+            text.files.collector,
+            "crates/rongroi-collectors/src/posture.rs"
+        );
+        assert!(text.files.references.is_empty());
+    }
+
+    /// A path the UI shows must lead somewhere: every embedded rule names files that exist in the
+    /// workspace it was built from (ADR 0045).
+    #[test]
+    fn every_embedded_rule_names_files_that_exist() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let bundle = Bundle::embedded().unwrap();
+        for sourced in bundle.rules() {
+            let files = crate::rules::RuleFiles::of(sourced);
+            assert!(root.join(&files.rule).is_file(), "{}", files.rule);
+            assert!(root.join(&files.fixtures).is_dir(), "{}", files.fixtures);
+            assert!(root.join(&files.collector).is_file(), "{}", files.collector);
+        }
+    }
+
+    const LISTED_RULE: &str = "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7\ntitle: Listed\ndescription: Listed description.\nstatus: test\ncollector: posture\nstrength: posture\nmatch_lists:\n  hvci: states.csv\nretention: Now.\nfalsepositives: [Legacy BIOS]\nauthor: tests\ndate: 2026-09-15\n";
+
+    /// ADR 0048: the data file travels in the bundle beside its rule, and the loaded rule's `match`
+    /// holds its first column.
+    #[test]
+    fn a_rule_data_file_is_expanded_when_the_bundle_loads() {
+        let json = serde_json::json!({
+            "rules": [{
+                "path": "posture/memory-integrity/listed/rule.yaml",
+                "yaml": LISTED_RULE,
+                "data": { "states.csv": "hvci,note\ndisabled,off\n" },
+            }],
+            "i18n": [],
+        })
+        .to_string();
+        let bundle = Bundle::from_bundle_json(&json).unwrap();
+        assert_eq!(
+            bundle.rules()[0].rule.matcher.get("hvci"),
+            Some(&serde_json::json!(["disabled"]))
+        );
+    }
+
+    #[test]
+    fn a_rule_whose_data_file_is_not_in_the_bundle_is_invalid() {
+        let json = serde_json::json!({
+            "rules": [{ "path": "posture/memory-integrity/listed/rule.yaml", "yaml": LISTED_RULE }],
+            "i18n": [],
+        })
+        .to_string();
+        let Err(BundleError::Invalid(problems)) = Bundle::from_bundle_json(&json) else {
+            panic!("expected an invalid bundle");
+        };
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.message.contains("not a file beside rule.yaml")),
+            "{problems:?}"
+        );
     }
 }

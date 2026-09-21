@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Both FiveM editions with their log, crash and cache folders (ADR 0053). Legacy's log folder holds two
+# files with sizes and times, one file the listing gave no times for, and a subfolder; its parent lists
+# the folder's own times. The crash folder is empty. Of the launch-mode caches only the default one is
+# there. Enhanced's server cache holds two server folders — one of them unreadable — and a folder whose
+# name is not a server folder's. Every name, size and time is invented.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+access_denied:
+  - 'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\servercache\bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app':
+    - name: logs
+      directory: true
+      created: 2026-06-11T13:18:00Z
+      modified: 2026-09-13T12:37:00Z
+    - name: crashes
+      directory: true
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\logs':
+    - name: first.log
+      size: 100
+      created: 2026-09-07T05:40:00Z
+      modified: 2026-09-07T05:41:00Z
+    - name: second.log
+      size: 250
+      created: 2026-09-13T12:37:00Z
+      modified: 2026-09-13T12:38:00Z
+    - name: untimed.log
+    - name: archive
+      directory: true
+      created: 2020-01-01T00:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\crashes': []
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache':
+    - name: db
+      directory: true
+    - name: unconfirmed
+      directory: true
+  'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\servercache':
+    - name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      directory: true
+      created: 2026-09-09T14:32:00Z
+      modified: 2026-09-15T09:18:00Z
+    - name: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      directory: true
+      created: 2026-09-15T11:03:00Z
+      modified: 2026-09-15T11:05:00Z
+    - name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bak-20260909
+      directory: true
+      created: 2026-09-06T08:30:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\servercache\aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
+    - name: '0123456789abcdef'
+      directory: true
+    - name: 'fedcba9876543210'
+      directory: true
+    - name: '00112233445566778899'
+      directory: true

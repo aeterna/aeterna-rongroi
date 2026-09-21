@@ -81,7 +81,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{self, EvtxFile, EvtxRecord};
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Collector, Field};
+use crate::{Collector, Coverage, Field};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -256,6 +256,15 @@ impl Collector for Evtx {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    /// Each log's oldest and newest record (ADR 0051): the span that log could show.
+    fn coverage(&self) -> Option<Coverage> {
+        Some(Coverage {
+            from: "oldest_record_time",
+            to: "newest_record_time",
+            place: None,
+        })
     }
 
     /// Lists `%SystemRoot%\System32\winevt\Logs` and reads every `.evtx` file in it, within
@@ -940,7 +949,7 @@ fn configured(observation: &mut Observation, config: &ChannelConfig, path: &str,
 /// written as `%4`, so `Microsoft-Windows-Kernel-Boot%4Operational.evtx` holds one. A `%` counts as the
 /// start of a variable only when a name beginning with a letter or `_`, made of letters, digits and
 /// `_`, runs up to the next `%`; every other `%` is kept as it is.
-fn expand_windows_directory(path: &str, root: &str) -> Option<String> {
+pub(crate) fn expand_windows_directory(path: &str, root: &str) -> Option<String> {
     let root = root.trim_end_matches(['\\', '/']);
     if root.is_empty() {
         return None;
@@ -1769,10 +1778,7 @@ mod tests {
         let entries = |names: &[&str]| {
             names
                 .iter()
-                .map(|name| rongroi_host::DirEntryInfo {
-                    name: (*name).to_owned(),
-                    is_file: true,
-                })
+                .map(|name| rongroi_host::DirEntryInfo::named(*name, true))
                 .collect()
         };
 

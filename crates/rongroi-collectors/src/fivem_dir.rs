@@ -11,18 +11,27 @@
 //! found. Its observations carry their own `location` so a reader never mistakes one edition's folder
 //! for the other's.
 //!
-//! Of each folder the collector reports whether it is there and how many files it holds, and of each
-//! file its path, its SHA-256 and what Windows says about the signature embedded in it. Nothing about
-//! timestamps, size, owner or subfolders (ADR 0009).
+//! Of each plugin folder the collector reports whether it is there and how many files it holds, and of
+//! each file its path, its SHA-256 and what Windows says about the signature embedded in it. Nothing
+//! about timestamps, size, owner or subfolders there (ADR 0009).
 //!
 //! It also reads **`FiveM.exe` itself**, in each edition's program folder, with the same four facts, so
 //! that a rule can ask whether the client carries the signature `FiveM` is published with (ADR 0036). Of
 //! the program folder it reads only the names of its entries, to find that one file; nothing else in
 //! it is reported. Legitimate software puts files in the plugin folders too, which is why the rules on
 //! them describe a file and its signature and never what the file is (ADR 0036).
+//!
+//! And it reports **`FiveM`'s log, crash and cache folders** in both editions as *folder activity*: how
+//! many files and subfolders the listing holds, the files' total size, the earliest and latest of their
+//! creation and last-write times, and the folder's own times — never a file name, and no file is opened
+//! (ADR 0050, ADR 0053). Of each Enhanced per-server cache folder it reports when it was created and
+//! last changed and how many entries it holds, and not its name, which identifies a server (ADR 0053).
+//! These times are what the file system recorded; programs set them as they copy and extract files,
+//! and a small or recent folder is also what a new install or a cleared cache leaves.
 
 use std::collections::BTreeMap;
 
+use jiff::Timestamp;
 use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
 use rongroi_host::{DirEntryInfo, Host, Platform, SignatureCheck, SourceError};
 
@@ -54,6 +63,27 @@ pub const LEGACY_EXE_LOCATION: &str = "legacy_exe";
 /// Value of the `location` field for Enhanced's `FiveM.exe`.
 pub const ENHANCED_EXE_LOCATION: &str = "enhanced_exe";
 
+// FiveM's own log, crash and cache folders (ADR 0053), measured on one Windows 11 machine. The Legacy
+// cache names also appear in FiveM's public source; the Enhanced client's source is not public.
+
+/// Value of the `location` field for Legacy's log folder, `%LOCALAPPDATA%\FiveM\FiveM.app\logs`.
+pub const LEGACY_LOGS_LOCATION: &str = "legacy_logs";
+/// Value of the `location` field for Legacy's crash folder.
+pub const LEGACY_CRASHES_LOCATION: &str = "legacy_crashes";
+/// Value of the `location` field for Legacy's `data\cache` folder.
+pub const LEGACY_CACHE_LOCATION: &str = "legacy_cache";
+/// Value of the `location` field for Legacy's resource caches, one per launch mode (`variant`).
+pub const LEGACY_SERVER_CACHE_LOCATION: &str = "legacy_server_cache";
+/// Value of the `location` field for Enhanced's log folder, `%APPDATA%\FiveM for GTAV Enhanced\logs`.
+pub const ENHANCED_LOGS_LOCATION: &str = "enhanced_logs";
+/// Value of the `location` field for Enhanced's game crash folder.
+pub const ENHANCED_CRASHES_LOCATION: &str = "enhanced_crashes";
+/// Value of the `location` field for Enhanced's launcher crash folder.
+pub const ENHANCED_LAUNCHER_CRASHES_LOCATION: &str = "enhanced_launcher_crashes";
+/// Value of the `location` field for Enhanced's per-server cache folder,
+/// `%LOCALAPPDATA%\FiveM for GTAV Enhanced\servercache`, and for each server folder inside it.
+pub const ENHANCED_SERVER_CACHE_LOCATION: &str = "enhanced_server_cache";
+
 const ID: &str = "fivem_dir";
 
 /// The field that says which place an observation is about: every observation carries it, and a place
@@ -68,6 +98,12 @@ enum Reads {
     /// A program folder: an observation for the one file of this name, when it is there, and nothing
     /// about the folder or anything else in it (ADR 0036).
     OneFile(&'static str),
+    /// A log, crash or cache folder: one folder-activity observation, and nothing about any file by
+    /// name (ADR 0053).
+    FolderActivity,
+    /// Enhanced's server cache: folder activity, and one observation per server folder inside it with
+    /// its times and entry count, never its name (ADR 0053).
+    FolderActivityAndServers,
 }
 
 /// One folder this collector looks in.
@@ -80,33 +116,110 @@ struct Location {
     relative: &'static str,
     /// What is reported of it.
     reads: Reads,
+    /// `FiveM`'s launch-mode suffix, for the places that exist once per mode (ADR 0053). A place with a
+    /// variant that is not there is not reported: most machines hold only the default one.
+    variant: Option<&'static str>,
 }
 
 /// Every folder this collector looks in, in the order observations are reported.
-const LOCATIONS: [Location; 4] = [
+const LOCATIONS: [Location; 14] = [
     Location {
         name: PLUGINS_LOCATION,
         base: LOCAL_APP_DATA,
         relative: PLUGINS_RELATIVE_PATH,
         reads: Reads::EveryFile,
+        variant: None,
     },
     Location {
         name: ENHANCED_ASI_LOCATION,
         base: ROAMING_APP_DATA,
         relative: ENHANCED_ASI_RELATIVE_PATH,
         reads: Reads::EveryFile,
+        variant: None,
     },
     Location {
         name: LEGACY_EXE_LOCATION,
         base: LOCAL_APP_DATA,
         relative: LEGACY_PROGRAM_RELATIVE_PATH,
         reads: Reads::OneFile(CLIENT_EXE_NAME),
+        variant: None,
     },
     Location {
         name: ENHANCED_EXE_LOCATION,
         base: LOCAL_APP_DATA,
         relative: ENHANCED_PROGRAM_RELATIVE_PATH,
         reads: Reads::OneFile(CLIENT_EXE_NAME),
+        variant: None,
+    },
+    Location {
+        name: LEGACY_LOGS_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: r"FiveM\FiveM.app\logs",
+        reads: Reads::FolderActivity,
+        variant: None,
+    },
+    Location {
+        name: LEGACY_CRASHES_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: r"FiveM\FiveM.app\crashes",
+        reads: Reads::FolderActivity,
+        variant: None,
+    },
+    Location {
+        name: LEGACY_CACHE_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: r"FiveM\FiveM.app\data\cache",
+        reads: Reads::FolderActivity,
+        variant: None,
+    },
+    Location {
+        name: LEGACY_SERVER_CACHE_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: r"FiveM\FiveM.app\data\server-cache",
+        reads: Reads::FolderActivity,
+        variant: Some("default"),
+    },
+    Location {
+        name: LEGACY_SERVER_CACHE_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: r"FiveM\FiveM.app\data\server-cache-priv",
+        reads: Reads::FolderActivity,
+        variant: Some("priv"),
+    },
+    Location {
+        name: LEGACY_SERVER_CACHE_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: r"FiveM\FiveM.app\data\server-cache-fxdk",
+        reads: Reads::FolderActivity,
+        variant: Some("fxdk"),
+    },
+    Location {
+        name: ENHANCED_LOGS_LOCATION,
+        base: ROAMING_APP_DATA,
+        relative: r"FiveM for GTAV Enhanced\logs",
+        reads: Reads::FolderActivity,
+        variant: None,
+    },
+    Location {
+        name: ENHANCED_CRASHES_LOCATION,
+        base: ROAMING_APP_DATA,
+        relative: r"FiveM for GTAV Enhanced\gta5enhanced\crashes",
+        reads: Reads::FolderActivity,
+        variant: None,
+    },
+    Location {
+        name: ENHANCED_LAUNCHER_CRASHES_LOCATION,
+        base: ROAMING_APP_DATA,
+        relative: r"FiveM for GTAV Enhanced\launcher_crashes",
+        reads: Reads::FolderActivity,
+        variant: None,
+    },
+    Location {
+        name: ENHANCED_SERVER_CACHE_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: r"FiveM for GTAV Enhanced\servercache",
+        reads: Reads::FolderActivityAndServers,
+        variant: None,
     },
 ];
 
@@ -124,27 +237,46 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// observations about that folder (ADR 0044): a rule that could match there and matches on any one of
 /// them must come out `Unmeasured`, never `NotFound`.
 ///
-/// Two kinds of observation, disjoint by the fields they carry, as `pca`'s are (ADR 0020): **a folder**
-/// (`location`, `folder`, and `files` when it was listed) and **a file** (`location`, `path`, and
-/// whichever of `sha256`, `signature`, `signer` and `signer_cert_sha256` could be read). A program
-/// folder produces only the second kind, for `FiveM.exe` (ADR 0036).
-const FIELDS: [Field; 8] = [
+/// Three kinds of observation, disjoint by the fields they carry, as `pca`'s are (ADR 0020):
+///
+/// - **a folder** (`location`, `folder`, `variant` for a place that has one, and — when it was listed —
+///   `files`; a log, crash or cache folder also carries its folder activity: `folders`, `size_bytes`,
+///   `files_without_times`, the four `earliest_*`/`latest_*` bounds and its own `created_at` and
+///   `modified_at`, each only when the listing provided it);
+/// - **a file** (`location`, `path`, and whichever of `sha256`, `signature`, `signer` and
+///   `signer_cert_sha256` could be read). A program folder produces only this kind, for `FiveM.exe`
+///   (ADR 0036);
+/// - **a server cache folder** (`location: enhanced_server_cache`, `created_at`, `modified_at` and
+///   `entries`, each when it could be read) — told apart from its parent's folder observation by having
+///   no `folder` field (ADR 0053).
+const FIELDS: [Field; 19] = [
+    Field::timestamp("created_at"),
+    Field::timestamp("earliest_created_at"),
+    Field::timestamp("earliest_modified_at"),
+    Field::number("entries"),
     Field::number("files"),
+    Field::number("files_without_times"),
     Field::text("folder"),
+    Field::number("folders"),
+    Field::timestamp("latest_created_at"),
+    Field::timestamp("latest_modified_at"),
     Field::text("location"),
+    Field::timestamp("modified_at"),
     Field::text("path"),
     Field::text("sha256"),
     Field::text("signature"),
     Field::text("signer"),
     Field::text("signer_cert_sha256"),
+    Field::number("size_bytes"),
+    Field::text("variant"),
 ];
 
 /// The `folder` value of a folder that is there and was listed.
-const FOLDER_LISTED: &str = "listed";
+pub(crate) const FOLDER_LISTED: &str = "listed";
 /// The `folder` value of a folder that is not there: that edition is not installed for this user.
-const FOLDER_ABSENT: &str = "absent";
+pub(crate) const FOLDER_ABSENT: &str = "absent";
 /// The `folder` value of a folder that could not be listed; the reason is in the run's `gaps`.
-const FOLDER_UNREADABLE: &str = "unreadable";
+pub(crate) const FOLDER_UNREADABLE: &str = "unreadable";
 
 /// The `fivem_dir` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -229,10 +361,24 @@ impl Collector for FivemDir {
                         .collect();
                     observations.extend(file_observations(host, location, &folder, named));
                 }
+                // A launch-mode cache that is not there is the ordinary case for all but one mode, so it
+                // is not reported; a place with no variant says it is absent, as a plugin folder does.
+                (Ok(None), Reads::FolderActivity | Reads::FolderActivityAndServers) => {
+                    if location.variant.is_none() {
+                        observations.push(folder_observation(location, FOLDER_ABSENT, None));
+                    }
+                }
+                (Ok(Some((folder, entries))), Reads::FolderActivity) => {
+                    observations.push(activity_observation(host, location, &folder, &entries));
+                }
+                (Ok(Some((folder, entries))), Reads::FolderActivityAndServers) => {
+                    observations.push(activity_observation(host, location, &folder, &entries));
+                    observations.extend(server_observations(host, location, &folder, &entries));
+                }
                 (Err(reason), reads) => {
                     // A program folder carries no folder observation, so the gap is what says it could
                     // not be read.
-                    if reads == Reads::EveryFile {
+                    if !matches!(reads, Reads::OneFile(_)) {
                         observations.push(folder_observation(location, FOLDER_UNREADABLE, None));
                     }
                     unread.push((location, reason));
@@ -316,10 +462,144 @@ fn folder_observation(location: &Location, state: &str, files: Option<usize>) ->
     if let Some(files) = files {
         fields.insert("files".to_owned(), serde_json::Value::from(files));
     }
+    if let Some(variant) = location.variant {
+        fields.insert("variant".to_owned(), serde_json::Value::from(variant));
+    }
     Observation {
         collector: ID.to_owned(),
         fields,
     }
+}
+
+/// A timestamp as the report writes every time: RFC 3339 in UTC.
+fn time_value(time: Timestamp) -> serde_json::Value {
+    serde_json::Value::from(time.to_string())
+}
+
+/// What the listing of one log, crash or cache folder holds, as one observation (ADR 0053).
+///
+/// Only the folder's own entries: nothing below them is listed and no file is opened. A file whose
+/// size or a time the listing did not provide is left out of the sum and the bounds and counted in
+/// `files_without_times`, so a bound never claims a file it did not see. An empty folder has no
+/// bounds, rather than bounds that describe nothing.
+fn activity_observation(
+    host: &dyn Host,
+    location: &Location,
+    folder: &str,
+    entries: &[DirEntryInfo],
+) -> Observation {
+    let files: Vec<&DirEntryInfo> = entries.iter().filter(|entry| entry.is_file).collect();
+    let mut observation = folder_observation(location, FOLDER_LISTED, Some(files.len()));
+    let fields = &mut observation.fields;
+    fields.insert(
+        "folders".to_owned(),
+        serde_json::Value::from(entries.len() - files.len()),
+    );
+    let size: u64 = files.iter().filter_map(|file| file.size).sum();
+    fields.insert("size_bytes".to_owned(), serde_json::Value::from(size));
+    let without = files
+        .iter()
+        .filter(|file| file.size.is_none() || file.created.is_none() || file.modified.is_none())
+        .count();
+    fields.insert(
+        "files_without_times".to_owned(),
+        serde_json::Value::from(without),
+    );
+    let created = files.iter().filter_map(|file| file.created);
+    let modified = files.iter().filter_map(|file| file.modified);
+    for (name, value) in [
+        ("earliest_created_at", created.clone().min()),
+        ("latest_created_at", created.max()),
+        ("earliest_modified_at", modified.clone().min()),
+        ("latest_modified_at", modified.max()),
+    ] {
+        if let Some(value) = value {
+            fields.insert(name.to_owned(), time_value(value));
+        }
+    }
+    let (created_at, modified_at) = own_times(host, folder);
+    insert_times(fields, created_at, modified_at);
+    observation
+}
+
+pub(crate) fn insert_times(
+    fields: &mut BTreeMap<String, serde_json::Value>,
+    created_at: Option<Timestamp>,
+    modified_at: Option<Timestamp>,
+) {
+    if let Some(time) = created_at {
+        fields.insert("created_at".to_owned(), time_value(time));
+    }
+    if let Some(time) = modified_at {
+        fields.insert("modified_at".to_owned(), time_value(time));
+    }
+}
+
+/// A folder's own creation and last-write times, from its parent's listing (ADR 0050). Either is `None`
+/// when the parent could not be listed or did not provide it: that is one missing value, not a gap,
+/// because the folder itself was read.
+fn own_times(host: &dyn Host, folder: &str) -> (Option<Timestamp>, Option<Timestamp>) {
+    let Some((parent, name)) = folder.rsplit_once('\\') else {
+        return (None, None);
+    };
+    let Ok(Some(entries)) = host.list_dir(parent) else {
+        return (None, None);
+    };
+    entries
+        .into_iter()
+        .find(|entry| !entry.is_file && entry.name.eq_ignore_ascii_case(name))
+        .map_or((None, None), |entry| (entry.created, entry.modified))
+}
+
+/// Whether a folder in Enhanced's server cache has the shape `FiveM` gives a server's folder: 40
+/// hexadecimal characters. Anything else there — a folder someone renamed — is counted by the folder
+/// activity only (ADR 0053).
+pub(crate) fn is_server_folder(name: &str) -> bool {
+    name.len() == 40 && name.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// One observation per server folder: its times and how many entries its own listing holds. Never
+/// its name or path, which identify a server (ADR 0053). Ordered by time, not by name, so the order
+/// says nothing the fields do not.
+fn server_observations(
+    host: &dyn Host,
+    location: &Location,
+    folder: &str,
+    entries: &[DirEntryInfo],
+) -> Vec<Observation> {
+    let mut servers: Vec<(Option<Timestamp>, Option<Timestamp>, Option<usize>)> = entries
+        .iter()
+        .filter(|entry| !entry.is_file && is_server_folder(&entry.name))
+        .map(|entry| {
+            // One listing of that folder and nothing below it. A folder that cannot be listed keeps its
+            // times and carries no count; it is one item, not a gap in the run.
+            let count = host
+                .list_dir(&format!(r"{folder}\{}", entry.name))
+                .ok()
+                .flatten()
+                .map(|inside| inside.len());
+            (entry.created, entry.modified, count)
+        })
+        .collect();
+    servers.sort();
+    servers
+        .into_iter()
+        .map(|(created_at, modified_at, count)| {
+            let mut fields = BTreeMap::new();
+            fields.insert(
+                "location".to_owned(),
+                serde_json::Value::from(location.name),
+            );
+            insert_times(&mut fields, created_at, modified_at);
+            if let Some(count) = count {
+                fields.insert("entries".to_owned(), serde_json::Value::from(count));
+            }
+            Observation {
+                collector: ID.to_owned(),
+                fields,
+            }
+        })
+        .collect()
 }
 
 fn file_observations(
@@ -584,7 +864,7 @@ mod tests {
     #[test]
     fn every_place_unreadable_is_a_gap_for_the_whole_run() {
         let host = inline(
-            "platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\naccess_denied:\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\plugins'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced'\n",
+            "platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\naccess_denied:\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\plugins'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\logs'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\crashes'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\cache'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache-priv'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache-fxdk'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced\\servercache'\n",
         );
         let run = FivemDir.collect(&host);
         let (observations, gaps) = measured(&run);
@@ -639,12 +919,27 @@ mod tests {
         let run = FivemDir.collect(&host);
         let (observations, gaps) = measured(&run);
         assert!(gaps.is_empty(), "{gaps:?}");
+        // `%APPDATA%` holds every Enhanced place but its program and server cache folders.
         assert_eq!(
             unread_places(&run),
-            [(
-                ENHANCED_ASI_LOCATION.to_owned(),
-                UnmeasuredReason::ReadFailed
-            )]
+            [
+                (
+                    ENHANCED_ASI_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+                (
+                    ENHANCED_LOGS_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+                (
+                    ENHANCED_CRASHES_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+                (
+                    ENHANCED_LAUNCHER_CRASHES_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+            ]
         );
         assert_eq!(
             folder(observations, PLUGINS_LOCATION),
@@ -670,6 +965,18 @@ mod tests {
                 (PLUGINS_LOCATION.to_owned(), UnmeasuredReason::AccessDenied),
                 (
                     ENHANCED_ASI_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+                (
+                    ENHANCED_LOGS_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+                (
+                    ENHANCED_CRASHES_LOCATION.to_owned(),
+                    UnmeasuredReason::ReadFailed
+                ),
+                (
+                    ENHANCED_LAUNCHER_CRASHES_LOCATION.to_owned(),
                     UnmeasuredReason::ReadFailed
                 ),
             ]
@@ -780,7 +1087,21 @@ mod tests {
             .filter(|observation| observation.fields.contains_key("folder"))
             .filter_map(|observation| field(observation, "location"))
             .collect();
-        assert_eq!(locations, [PLUGINS_LOCATION, ENHANCED_ASI_LOCATION]);
+        // Every place but the two program folders has a folder observation (ADR 0053).
+        assert_eq!(
+            locations,
+            [
+                PLUGINS_LOCATION,
+                ENHANCED_ASI_LOCATION,
+                LEGACY_LOGS_LOCATION,
+                LEGACY_CRASHES_LOCATION,
+                LEGACY_CACHE_LOCATION,
+                ENHANCED_LOGS_LOCATION,
+                ENHANCED_CRASHES_LOCATION,
+                ENHANCED_LAUNCHER_CRASHES_LOCATION,
+                ENHANCED_SERVER_CACHE_LOCATION,
+            ]
+        );
     }
 
     /// No program folder, or one without `FiveM.exe`, reports nothing: the plugin folders' own
@@ -830,5 +1151,191 @@ mod tests {
                 format!(r"{PLUGINS_DIR}\unreadable-plugin.dll"),
             ]
         );
+    }
+
+    /// The observation that is a folder's own, for `location` and, when given, `variant`.
+    fn activity<'a>(
+        observations: &'a [Observation],
+        location: &str,
+        variant: Option<&str>,
+    ) -> &'a Observation {
+        observations
+            .iter()
+            .find(|observation| {
+                field(observation, "location") == Some(location)
+                    && observation.fields.contains_key("folder")
+                    && field(observation, "variant") == variant
+            })
+            .unwrap_or_else(|| panic!("no folder observation for {location}: {observations:?}"))
+    }
+
+    fn number(observation: &Observation, name: &str) -> Option<u64> {
+        observation
+            .fields
+            .get(name)
+            .and_then(serde_json::Value::as_u64)
+    }
+
+    /// A log folder's activity: counts, the size of the files that have one, the bounds over the files
+    /// that have times, how many were left out, and the folder's own times from its parent's listing.
+    /// No file name reaches the report (ADR 0053).
+    #[test]
+    fn a_log_folder_is_reported_as_activity_and_never_file_by_file() {
+        let run = FivemDir.collect(&fixture("fivem-dir-folder-activity"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert!(unread_places(&run).is_empty());
+        let logs = activity(observations, LEGACY_LOGS_LOCATION, None);
+        assert_eq!(field(logs, "folder"), Some("listed"));
+        assert_eq!(number(logs, "files"), Some(3));
+        assert_eq!(number(logs, "folders"), Some(1));
+        assert_eq!(number(logs, "size_bytes"), Some(350));
+        assert_eq!(number(logs, "files_without_times"), Some(1));
+        for (name, value) in [
+            ("earliest_created_at", "2026-09-07T05:40:00Z"),
+            ("latest_created_at", "2026-09-13T12:37:00Z"),
+            ("earliest_modified_at", "2026-09-07T05:41:00Z"),
+            ("latest_modified_at", "2026-09-13T12:38:00Z"),
+            ("created_at", "2026-06-11T13:18:00Z"),
+            ("modified_at", "2026-09-13T12:37:00Z"),
+        ] {
+            assert_eq!(field(logs, name), Some(value), "{name}");
+        }
+        let text = serde_json::to_string(observations).unwrap();
+        for name in [
+            "first.log",
+            "untimed.log",
+            "archive",
+            "aaaaaaaa",
+            "bbbbbbbb",
+        ] {
+            assert!(!text.contains(name), "{name} reached the report");
+        }
+        assert!(files(observations).is_empty());
+    }
+
+    /// An empty folder has counts and no bounds; a parent with no times for it gives no own times.
+    #[test]
+    fn an_empty_folder_has_no_bounds_and_an_unlisted_parent_gives_no_own_times() {
+        let run = FivemDir.collect(&fixture("fivem-dir-folder-activity"));
+        let (observations, _) = measured(&run);
+        let crashes = activity(observations, LEGACY_CRASHES_LOCATION, None);
+        assert_eq!(number(crashes, "files"), Some(0));
+        assert_eq!(number(crashes, "size_bytes"), Some(0));
+        for name in [
+            "earliest_created_at",
+            "latest_modified_at",
+            "created_at",
+            "modified_at",
+        ] {
+            assert_eq!(field(crashes, name), None, "{name}");
+        }
+        let server_cache = activity(observations, LEGACY_SERVER_CACHE_LOCATION, Some("default"));
+        assert_eq!(number(server_cache, "folders"), Some(2));
+        assert_eq!(field(server_cache, "created_at"), None);
+    }
+
+    /// A place with a launch mode that is not there says nothing; a place without one says it is absent.
+    #[test]
+    fn an_absent_launch_mode_cache_is_not_reported_and_an_absent_folder_is() {
+        let run = FivemDir.collect(&fixture("fivem-dir-folder-activity"));
+        let (observations, _) = measured(&run);
+        let variants: Vec<&str> = observations
+            .iter()
+            .filter(|observation| {
+                field(observation, "location") == Some(LEGACY_SERVER_CACHE_LOCATION)
+            })
+            .filter_map(|observation| field(observation, "variant"))
+            .collect();
+        assert_eq!(variants, ["default"]);
+        assert_eq!(
+            folder(observations, LEGACY_CACHE_LOCATION),
+            ("absent".to_owned(), None)
+        );
+        assert_eq!(
+            folder(observations, ENHANCED_LOGS_LOCATION),
+            ("absent".to_owned(), None)
+        );
+    }
+
+    /// Each server folder: its times and entry count, ordered by time, never its name. A folder that
+    /// cannot be listed keeps its times and loses its count without becoming a gap; a folder whose name
+    /// is not a server folder's is counted by the folder activity only.
+    #[test]
+    fn each_server_folder_is_dated_and_counted_and_not_named() {
+        let run = FivemDir.collect(&fixture("fivem-dir-folder-activity"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert!(unread_places(&run).is_empty());
+        let parent = activity(observations, ENHANCED_SERVER_CACHE_LOCATION, None);
+        assert_eq!(number(parent, "folders"), Some(3));
+        let servers: Vec<(Option<&str>, Option<&str>, Option<u64>)> = observations
+            .iter()
+            .filter(|observation| {
+                field(observation, "location") == Some(ENHANCED_SERVER_CACHE_LOCATION)
+                    && !observation.fields.contains_key("folder")
+            })
+            .map(|observation| {
+                let keys: Vec<&str> = observation.fields.keys().map(String::as_str).collect();
+                assert!(
+                    keys.iter().all(|key| {
+                        ["created_at", "entries", "location", "modified_at"].contains(key)
+                    }),
+                    "{keys:?}"
+                );
+                (
+                    field(observation, "created_at"),
+                    field(observation, "modified_at"),
+                    number(observation, "entries"),
+                )
+            })
+            .collect();
+        assert_eq!(
+            servers,
+            [
+                (
+                    Some("2026-09-09T14:32:00Z"),
+                    Some("2026-09-15T09:18:00Z"),
+                    Some(3)
+                ),
+                (
+                    Some("2026-09-15T11:03:00Z"),
+                    Some("2026-09-15T11:05:00Z"),
+                    None
+                ),
+            ]
+        );
+    }
+
+    /// An unreadable log folder is a gap for its own observations only, and says it was unreadable.
+    #[test]
+    fn an_unreadable_log_folder_is_a_gap_for_that_place_only() {
+        let run = FivemDir.collect(&fixture("fivem-dir-folder-activity-denied"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(
+            unread_places(&run),
+            [(
+                LEGACY_LOGS_LOCATION.to_owned(),
+                UnmeasuredReason::AccessDenied
+            )]
+        );
+        assert_eq!(
+            folder(observations, LEGACY_LOGS_LOCATION),
+            ("unreadable".to_owned(), None)
+        );
+        assert_eq!(
+            folder(observations, PLUGINS_LOCATION),
+            ("listed".to_owned(), Some(0))
+        );
+    }
+
+    #[test]
+    fn a_server_folder_name_is_forty_hex_characters() {
+        assert!(is_server_folder(&"a".repeat(40)));
+        assert!(is_server_folder(&"0F".repeat(20)));
+        assert!(!is_server_folder(&"a".repeat(39)));
+        assert!(!is_server_folder(&"g".repeat(40)));
+        assert!(!is_server_folder(&format!("{}.bak", "a".repeat(40))));
     }
 }

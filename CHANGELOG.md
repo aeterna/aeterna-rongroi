@@ -5,6 +5,157 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-21
+
+### Added
+- The `install_marker` collector and three rules for the named places a Windows modification installs
+  (ADR 0057): Atlas' module and desktop folders and its registry key, ReviOS' own tool and wallpaper
+  folders, and — read for its absence — the folder Windows keeps Defender's engine in. It answers every
+  place on every machine, `present: true` or `present: false`, so a rule for them is confronted by a
+  baseline. A folder is read for one bit and **what is inside it never reaches a report**.
+- Three more settings on `posture` and a rule for each (ADR 0057): the speculative-execution
+  mitigations, SEHOP and the kernel object-namespace protection — the switches a gaming tweak script
+  flips, whoever wrote it. `not_configured` stays a different answer from `enabled`.
+- The `os_image` collector and seven rules for what Windows says this installation is (ADR 0056): the
+  edition and build values `winver` shows, the registered organisation, and the manufacturer, model and
+  support link Settings shows — where the Atlas and ReviOS playbooks write their own name — and how each
+  of eight services Windows ships with is set to start, or that its key is not there at all, which is
+  what a pre-modified image that removed the component looks like. `RegisteredOwner`, a person's name, is
+  not read. Every rule is `posture` and says in its own text that a person may run whatever operating
+  system they like on their own PC.
+- Listed counts: every report view carries how many of the evidence it lists are found, not found and
+  not measured, and the text report prints them on one line above the evidence. Three numbers, never
+  one (ADR 0045).
+- The code link: the text report prints, above its closing footer line, where to read this binary's
+  code — the commit of an official build, or the repository with a note that the code of an unofficial
+  build is not known. Rule text now carries each rule's status and where its rule, fixtures and
+  collector are in the repository, checked to exist by a test (ADR 0045).
+- The desktop report reads in layers (ADR 0045). Three counts of what the view lists — found, not found,
+  not measured — each a filter, sit above the rows with the sentence that no report proves a PC clean.
+  Rows are grouped by collector under plain names; a match starts open with its ordinary causes, other
+  rows start closed with the description cut to two lines, and the not-found rows of a group fold into
+  one line. Each row opens technical details: the observation as a table, the rule id, status,
+  collector, strength and reason code, and where the rule, its fixtures and its collector are in the
+  repository. A new About & code screen shows the repository and this build's commit as copyable text and
+  QR codes drawn in Rust, how to check a downloaded file, and why no button opens a web page. No plugin,
+  no JavaScript dependency and no network code were added.
+- The `usn` collector: the Windows drive's NTFS change journal, read on a volume handle that cannot write
+  and through the two read control codes only, counted per folder other collectors read — records, and
+  how many created, deleted, renamed or changed a file, with the first and last time. No file name,
+  journal identifier or file number reaches the report. No rule reads it yet. `DeviceIoControl` and
+  `CreateFileW` are each banned in `clippy.toml` outside one read-only wrapper, and `fuzz_usn` joins the
+  fuzz smoke run (ADR 0047).
+- `match_lists` in the rule format: a rule can keep a long list of values for one field in a CSV file
+  beside `rule.yaml`, carried in the rules bundle and expanded into `match` when it loads. The reference
+  pages name the file and its row count. Rule format version 3 (ADR 0048).
+- The `driver_service` collector: every driver service registered with Windows, with its start setting,
+  the path its `ImagePath` resolves to and the SHA-256 of that file. Every relative `ImagePath` is read
+  under `%SystemRoot%`; a refused, unreadable or unresolved file leaves the hash a gap, and hashing stops
+  after 30 seconds. No administrator rights are needed (ADR 0048).
+- A vulnerable-driver rule (`posture`, status `test`): a driver service registered on the PC whose file's
+  SHA-256 is one of 1,847 verified vulnerable-driver hashes from LOLDrivers at commit `1c60ea1`, vendored
+  under Apache-2.0 beside the rule with how to rebuild it (`cargo xtask loldrivers`). A `found` row shows
+  the hash; the data file gives the LOLDrivers entry. Hardware utilities install such drivers, and the rule
+  says so (ADR 0046, ADR 0048).
+
+### Changed
+- The `os_image` rules no longer declare `access_denied`: a limited-token measurement on 2026-09-21
+  read every value they need, so a machine that refuses one is shown to a reviewer as a row rather
+  than counted in the scope line (ADR 0057, amending ADR 0056).
+- SS-mode redaction knows more profile folders (ADR 0049). Besides `X:\Users\<name>`, it replaces
+  `Documents and Settings\<name>` and its 8.3 short name, the same folders reached through a drive's
+  administrative share, and the machine's own `ProfilesDirectory` when it has been moved. It reads `\` and
+  `/` in any mix and run, applies `.` and `..`, and finds a second path
+  written straight after a name. The scan reads `ProfilesDirectory` into the report header
+  (`profiles_directory`, additive, schema stays at 1); an SS view and the header the app reads outside a view
+  drop it. `redact_user_paths` is now `redact_profile_paths`. What is still not reached — a profile moved for
+  one account on its own, paths without a drive letter, some 8.3 short names — is listed in `PRIVACY.md`.
+- The desktop report header no longer shows the executable's SHA-256. It is on About & code, with the
+  commit, the rules bundle SHA-256 and how to check a downloaded file (ADR 0045).
+- The vulnerable-driver list is designed (ADR 0046, accepted): LOLDrivers' vulnerable drivers by SHA-256,
+  matched against registered driver services as `posture`, vendored as a data file under its own licence.
+  No collector code until its rights, `ImagePath` forms and cost are measured. Loaded modules, the
+  Authenticode hash and Microsoft's blocklist switch are not read.
+- The USN change journal is designed (ADR 0047, accepted): counts of records per folder other collectors
+  already read, with file names dropped in the parser and no journal identifier in the report. The
+  measurement on a GitHub-hosted runner found the journal readable on a handle without write access, and
+  the collector is under Added.
+- ADR 0046 and ADR 0047 carry measurements from a GitHub-hosted Windows Server 2025 runner under an
+  elevated token, a restricted token and a standard account. Driver services and their files were readable
+  without Administrators there, and hashing them took 15.5 seconds cold. The USN journal read on a volume
+  handle opened without write access, returned only version 3 records, and matched folders by their 128-bit
+  identifier; without Administrators the volume could not be opened.
+- ADR 0046 carries measurements from a Windows 11 PC and the LOLDrivers count. Under the limited token all
+  464 driver services were read and all 463 driver files hashed, including those in `DriverStore` and
+  `Program Files`, and a relative `SysWOW64\` `ImagePath` the runner did not have was found. LOLDrivers at
+  commit `1c60ea1` holds 1,865 distinct SHA-256 values for vulnerable drivers; 97 samples carry no file
+  SHA-256.
+- The `driver_service` collector is designed (ADR 0048, accepted): registered driver services with each file's
+  SHA-256 and `Start`, a resolver that reads relative `ImagePath` values under `%SystemRoot%`, a 30-second
+  budget, and a vulnerable-driver rule whose `match_lists` names a vendored file of 1,847 verified LOLDrivers
+  hashes. Rule format version 3.
+- A directory listing returns each entry's size and its creation and last-write times, read from the
+  listing without opening the entry and kept in whole seconds, as a basis for showing when FiveM's cache,
+  log and crash folders changed. The last-access time stays unread. Fixture hosts can describe the three
+  values, and refuse a directory with a size or a time with a fraction of a second. No collector emits the
+  values yet, so reports are unchanged (ADR 0050, accepted).
+- The timeline (ADR 0051, accepted): both front ends list the times a report holds, oldest first, with
+  when the scan ran and when Windows started as anchors, the span each event log and the change journal
+  could see, and the sources whose times could not be read — including the change journal's `not_admin`,
+  which reached no output before. Self mode's timeline holds every time the scan read. SS mode's holds the
+  times of the evidence it lists and what **timeline selectors** select: rule files with `role: timeline`
+  (rule format version 4) that make no evidence and no count. Nine ship: FiveM and GTA V executables by
+  name in Prefetch, BAM and PCA (`experimental`), each watched folder's journal times, each event log's
+  oldest and newest record, and FiveM's folder activity. The consent question and PRIVACY.md name what the
+  SS timeline shows, program by program. The desktop groups rows in an order the core now decides. A rule
+  on Prefetch, BAM or PCA that matches `name` or `path` is now refused when the bundle loads (ADR 0034).
+- Two scan tiers (ADR 0052). A **full scan** reads more than the standard one, and only when the player
+  says yes before it starts, in the process that reads: `scan --full` asks on standard error and only
+  `yes` starts it; the desktop app's "Full scan" button starts a new copy with the same token, which asks
+  in a Windows dialog before any collector runs and before any WebView exists. No flag answers for the
+  player. In a standard scan a `full` collector is not called: its rules are unmeasured with the new
+  reason `not_consented`, a scope statement said once above the evidence. The header carries `scan_tier`.
+  A field a `full` collector declares sensitive is shown in SS mode as `%SERVER_IDENTITY%` or
+  `%ACCOUNT_IDENTIFIER%` unless the player agreed to show that kind, a separate question, default no.
+- The first `full` collector, `fivem_servers`: the name of each server cache folder FiveM for GTA V
+  Enhanced keeps, with its creation and last-write times, and one `context` rule that lists them
+  (ADR 0055). What the name is made from is not known.
+- ADR 0052 records a Windows 11 measurement: under UAC's default settings, a process started with
+  `CreateProcessW` from an elevated copy is elevated, and from a standard copy is standard, with no consent
+  prompt in between. A desktop copy started for a full scan neither gains nor loses administrator rights.
+- `fivem_dir` reports FiveM's log, crash and cache folders in both editions as folder activity — how many
+  files and subfolders, their total size, the earliest and latest file times, and the folder's own times —
+  and each Enhanced server cache folder's creation and last-change times and entry count, with no file or
+  folder name. No rule reads them: Self mode lists them and SS mode counts them. The consent question and
+  PRIVACY.md say so (ADR 0053, accepted).
+- The `net_config` collector: the settings that decide where network traffic goes, never a record of
+  where it went (ADR 0054). Of the hosts file, found through `DataBasePath`, it counts the lines in effect
+  and reports only the lines that give a name under `cfx.re`, `fivem.net` or `rockstargames.com` an
+  address, with the address and its kind; of the current user's proxy, whether it is on and whether a
+  server or a setup script is set, never their addresses; of the Windows Firewall rules, how many there
+  are and, for each rule for a program in a FiveM folder, its action, state, direction, protocol,
+  profiles and program path, never its name or description. SS mode never shows a hosts line's address,
+  only its kind (`view::SS_WITHHELD_FIELDS`). One `posture` rule, `experimental`: the hosts file gives a
+  FiveM or Rockstar name an address. The consent question, PRIVACY.md and both screenshare guides say what
+  is read. The owner decided that no record of where traffic went is read: not SRUM, the DNS cache, the
+  live TCP table, the firewall log or a packet capture.
+- ADR 0054 records a second Windows 11 measurement: the hosts file's folder (`DataBasePath`), the proxy
+  values and the firewall rules key all read the same with and without administrator rights; FiveM's four
+  firewall rules include two for GTA V Enhanced's executable inside FiveM's folder, so the collector finds
+  FiveM's rules by folder rather than by file name.
+- ADR 0052 and ADR 0055 record the measurement of the shipped full scan on that PC: the dialog a copy
+  started with `--full` shows appeared 266 ms after the process started, as the foreground window and
+  topmost, and closing it gave the standard scan; `scan --full` answered `yes` read the Enhanced server
+  cache folder the same with an elevated and with a limited token, so that read needs no administrator
+  rights. Driving the desktop start screen's "Full scan" button was not measured: from the window handle,
+  UI Automation lists only the `WebView2` control's own button, not the page's.
+
+### Fixed
+- A `SYSTEMTIME` value in an Event Log record whose milliseconds were above 4294 overflowed a `u32` in the
+  vendored `evtx` crate: a panic in a test or fuzz build, and in a release build a silently wrapped value.
+  It is now refused like every other value above 999, the record is rejected and the rest of the chunk is
+  read. Found by `fuzz_evtx` in CI; the fourth patch in `third_party/evtx` (PROVENANCE.md).
+
 ## [0.3.0] - 2026-09-14
 
 ### Added

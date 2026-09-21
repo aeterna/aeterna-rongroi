@@ -2887,6 +2887,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
+
+[[package]]
 name = "quick-xml"
 version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3071,7 +3077,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3085,9 +3091,10 @@ dependencies = [
 
 [[package]]
 name = "rongroi-collectors"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "insta",
+ "jiff",
  "rongroi-core",
  "rongroi-host",
  "rongroi-parsers",
@@ -3096,7 +3103,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "jiff",
  "serde",
@@ -3109,9 +3116,10 @@ dependencies = [
 
 [[package]]
 name = "rongroi-desktop"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "jiff",
+ "qrcode",
  "rongroi-collectors",
  "rongroi-core",
  "rongroi-host",
@@ -3124,8 +3132,9 @@ dependencies = [
 
 [[package]]
 name = "rongroi-host"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
+ "jiff",
  "serde",
  "serde-saphyr",
  "sha2 0.11.0",
@@ -3134,9 +3143,10 @@ dependencies = [
 
 [[package]]
 name = "rongroi-host-windows"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rongroi-host",
+ "rongroi-parsers",
  "thiserror 2.0.20",
  "windows 0.62.2",
  "windows-registry",
@@ -3144,7 +3154,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-parsers"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "evtx",
  "jiff",
@@ -5303,7 +5313,7 @@ checksum = "7ca9e40826ae2b2be66854381e4f5d4745aed3c295d7977ccfe8f405bc992b8f"
 
 [[package]]
 name = "xtask"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -5313,6 +5323,7 @@ dependencies = [
  "rongroi-core",
  "rongroi-host",
  "serde",
+ "serde-saphyr",
  "serde_json",
  "uuid",
 ]

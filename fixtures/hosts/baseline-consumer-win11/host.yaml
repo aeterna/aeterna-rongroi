@@ -19,6 +19,52 @@ env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
 registry:
+  # What Windows says this installation is, and how the services Windows ships with are set to start
+  # (ADR 0056). Every value below was measured on one Windows 11 PC (build 26220, DisplayVersion 25H2)
+  # on 2026-09-20 with an elevated token — including `ProductName`, which still reads "Windows 10 Home"
+  # on a genuine Windows 11, and the OEM information an ordinary retail board carries.
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    ProductName: "Windows 10 Home"
+    EditionID: "Core"
+    CompositionEditionID: "Core"
+    DisplayVersion: "25H2"
+    CurrentBuild: "26220"
+    UBR: 9492
+    BuildLabEx: "26100.6.amd64fre.ge_release_flt.260716-1700"
+    InstallationType: "Client"
+    RegisteredOrganization: ""
+  'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation':
+    Manufacturer: "Msi"
+    Model: "MS-7A36"
+    SupportURL: "http://www.msi.com/"
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinDefend':
+    Start: 2
+  # Measured on the same PC on 2026-09-21 (ADR 0057): object-namespace protection as Windows ships
+  # it, and no override of the speculative-execution mitigations and no SEHOP switch written at all.
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager':
+    ProtectionMode: 1
+  'HKLM\SYSTEM\CurrentControlSet\Services\EventLog':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\SysMain':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\DPS':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\WSearch':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\DiagTrack':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\wuauserv':
+    Start: 3
+  'HKLM\SYSTEM\CurrentControlSet\Services\WerSvc':
+    Start: 3
+  # ADR 0054: the proxy off and FiveM's firewall rules, as on `baseline-elevated-win11`; both were
+  # read without administrator rights on the PC measured. No `%SystemRoot%` is set here, so the hosts
+  # file is not read on this host.
+  'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings':
+    ProxyEnable: 0
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules':
+    fixture-rule-1: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=6|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
+    fixture-rule-2: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=17|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
   'HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State':
     UEFISecureBootEnabled: 1
 filesystem:

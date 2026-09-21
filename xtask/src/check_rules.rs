@@ -83,6 +83,17 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         let positive = json_files(&tests_dir.join("positive"))?;
         let negative = json_files(&tests_dir.join("negative"))?;
 
+        // Every rule links to `tests/` from the report, `experimental` ones included (ADR 0045), and
+        // git keeps no empty folder — so a rule missing this one can never have been given even one
+        // fixture. `status.needs_fixtures()` below asks a stricter question (a positive *and* a
+        // negative fixture) that only `test` and `stable` must answer; this one is unconditional.
+        if !tests_dir.is_dir() {
+            problems.push(format!(
+                "rules/{}: every rule needs a tests/ folder with at least one fixture file; the report links to it (ADR 0045)",
+                sourced.path
+            ));
+        }
+
         if sourced.rule.status.needs_fixtures() {
             if positive.is_empty() {
                 problems.push(format!(
@@ -234,7 +245,7 @@ impl Vocabulary {
     /// or in a fixture shows it. Since ADR 0030 every one of the twelve reasons has a producer in
     /// some collector, so that half of the check is now entirely about which collector:
     /// `not_on_this_os` is `pca` and nothing else, `service_disabled` is `prefetch` and nothing
-    /// else, and `budget_spent` is `evtx` and nothing else.
+    /// else, and `budget_spent` is `evtx` and `usn` and nothing else (ADR 0047).
     ///
     /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
     /// true for is one a view lists whatever the rule said, so declaring it is a suppression that
@@ -258,6 +269,14 @@ impl Vocabulary {
             if reason.is_always_listed() {
                 problems.push(format!(
                     "rules/{path}: `unmeasured_when` names `{name}`, which no rule may declare; a view lists it whatever the rule says, because it names a read that did not finish rather than a kind of machine"
+                ));
+                continue;
+            }
+            // No machine produces it: the scan does, when the player chose the standard one, and every
+            // rule counts it as expected already (ADR 0052).
+            if *reason == UnmeasuredReason::NotConsented {
+                problems.push(format!(
+                    "rules/{path}: `unmeasured_when` names `{name}`, which no rule may declare; it says which scan the player chose, not anything about the machine, and every rule already expects it"
                 ));
                 continue;
             }
@@ -459,6 +478,14 @@ mod tests {
         fs::write(path, contents).expect("write fixture file");
     }
 
+    /// A rule directory's `tests/` folder, present but holding nothing. Used by tests whose fixture
+    /// content is beside the point, so the unconditional "every rule needs a tests/ folder" check
+    /// (ADR 0045) does not add a second, unrelated problem to their assertions. Git itself never keeps
+    /// a folder this empty; only this in-process temp tree can.
+    fn write_empty_tests_dir(rule_dir: &Path) {
+        fs::create_dir_all(rule_dir.join("tests")).expect("create empty tests dir");
+    }
+
     /// Modelled on the real `rules/posture/boot/secure-boot-disabled/rule.yaml`.
     const VALID_RULE: &str = "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7
 title: Secure Boot is turned off
@@ -564,18 +591,17 @@ date: 2026-09-11
     #[test]
     fn duplicate_rule_id_is_rejected() {
         let tmp = TempRoot::new("dup-id");
-        // `experimental` does not need fixtures, so the only expected problem is the duplicate id.
+        // `experimental` does not need fixtures, so with a tests/ folder present the only expected
+        // problem is the duplicate id.
         let rule = VALID_RULE.replace("status: test", "status: experimental");
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled-copy/rule.yaml"),
-            &rule,
-        );
+        let first = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        let second = tmp
+            .path()
+            .join("rules/posture/boot/secure-boot-disabled-copy");
+        write(&first.join("rule.yaml"), &rule);
+        write(&second.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&first);
+        write_empty_tests_dir(&second);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -587,6 +613,46 @@ date: 2026-09-11
             "{:?}",
             outcome.problems
         );
+    }
+
+    /// An `experimental` rule needs no positive or negative fixture, but it still needs the `tests/`
+    /// folder itself: the report links to it for every rule (ADR 0045), and git keeps no folder this
+    /// empty, so a rule missing it can never have even one fixture committed for it.
+    #[test]
+    fn an_experimental_rule_without_a_tests_folder_is_rejected() {
+        let tmp = TempRoot::new("no-tests-folder");
+        let rule = VALID_RULE.replace("status: test", "status: experimental");
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        // No `tests/` folder at all — not even an empty one.
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0].contains(
+                "rules/posture/boot/secure-boot-disabled/rule.yaml: every rule needs a tests/ folder with at least one fixture file; the report links to it (ADR 0045)"
+            ),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
+    /// The mirror of the rejection above: once the `tests/` folder exists — even empty, which git
+    /// cannot actually keep, but which is enough for this gate — an `experimental` rule passes without
+    /// a positive or negative fixture. `status: test` and `stable` are the ones that need more, in
+    /// `status_test_without_negative_fixture_is_rejected` below.
+    #[test]
+    fn an_experimental_rule_with_only_an_empty_tests_folder_passes() {
+        let tmp = TempRoot::new("empty-tests-folder");
+        let rule = VALID_RULE.replace("status: test", "status: experimental");
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert!(outcome.problems.is_empty(), "{:?}", outcome.problems);
     }
 
     /// Gate (2): a `status: test` rule with no negative fixture must be rejected.
@@ -618,15 +684,14 @@ date: 2026-09-11
     #[test]
     fn a_rule_naming_a_collector_this_build_does_not_have_is_rejected() {
         let tmp = TempRoot::new("unknown-collector");
-        // `experimental` needs no fixtures, so the collector id is the only expected problem.
+        // `experimental` needs no fixtures, so with a tests/ folder present the collector id is the
+        // only expected problem.
         let rule = VALID_RULE
             .replace("status: test", "status: experimental")
             .replace("collector: posture", "collector: postures");
-        write(
-            &tmp.path()
-                .join("rules/postures/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/postures/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -657,11 +722,9 @@ date: 2026-09-11
         let rule = VALID_RULE
             .replace("status: test", "status: experimental")
             .replace("  secure_boot: disabled", "  secure_boo: disabled");
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -683,11 +746,9 @@ date: 2026-09-11
         let rule = VALID_RULE
             .replace("status: test", "status: experimental")
             .replace("  secure_boot: disabled", "  wallpaper: blue");
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -699,7 +760,7 @@ date: 2026-09-11
         );
         assert!(
             outcome.problems[0]
-                .contains("it emits hvci, script_block_logging, script_block_logging_pwsh, script_block_logging_pwsh_user, script_block_logging_user, secure_boot, secure_boot_firmware, test_signing, tpm, tpm_spec_version"),
+                .contains("it emits exception_chain_validation, hvci, object_namespace_protection, script_block_logging, script_block_logging_pwsh, script_block_logging_pwsh_user, script_block_logging_user, secure_boot, secure_boot_firmware, speculative_execution_mitigations, test_signing, tpm, tpm_spec_version"),
             "{:?}",
             outcome.problems
         );
@@ -729,6 +790,32 @@ date: 2026-09-11
     /// written "this one is ordinary on some machines" and the report lists it anyway. `posture`
     /// reads registry values and a platform API and has no service to be switched off, so
     /// `service_disabled` — which since ADR 0030 `prefetch` does produce — is still wrong here.
+    /// `not_consented` is a fact about which scan the player chose, produced by the scan and never by
+    /// a collector reading a machine, so no rule may declare it (ADR 0052).
+    #[test]
+    fn not_consented_is_rejected_in_unmeasured_when() {
+        let tmp = TempRoot::new("not-consented");
+        let rule = VALID_RULE
+            .replace("status: test", "status: experimental")
+            .replace(
+                "retention: Current setting only.",
+                "retention: Current setting only.\nunmeasured_when: [not_consented]",
+            );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
+
+        let outcome = check(tmp.path()).expect("check-rules should run to completion");
+
+        assert_eq!(outcome.problems.len(), 1, "{:?}", outcome.problems);
+        assert!(
+            outcome.problems[0]
+                .contains("`unmeasured_when` names `not_consented`, which no rule may declare"),
+            "{:?}",
+            outcome.problems
+        );
+    }
+
     #[test]
     fn an_unmeasured_when_reason_this_build_cannot_produce_is_rejected() {
         let tmp = TempRoot::new("dead-reason");
@@ -738,11 +825,9 @@ date: 2026-09-11
                 "retention: Current setting only.",
                 "retention: Current setting only.\nunmeasured_when: [service_disabled]",
             );
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -775,11 +860,9 @@ date: 2026-09-11
                 "retention: Current setting only.",
                 "retention: Current setting only.\nunmeasured_when: [source_empty]",
             );
-        write(
-            &tmp.path()
-                .join("rules/posture/boot/secure-boot-disabled/rule.yaml"),
-            &rule,
-        );
+        let dir = tmp.path().join("rules/posture/boot/secure-boot-disabled");
+        write(&dir.join("rule.yaml"), &rule);
+        write_empty_tests_dir(&dir);
 
         let outcome = check(tmp.path()).expect("check-rules should run to completion");
 
@@ -840,9 +923,9 @@ date: 2026-09-11
 
     /// Every reason a view always lists is refused, not `read_failed` alone — so a later addition to
     /// `is_always_listed` is covered here without this test being edited. `budget_spent` is `evtx`'s
-    /// and `partial` is reported by more than one collector, so each is checked on a collector that
-    /// can produce it: without that, the message would be the collector one and this test would pass
-    /// while proving nothing.
+    /// and `usn`'s (ADR 0047) and `partial` is reported by more than one collector, so each is checked
+    /// on a collector that can produce it: without that, the message would be the collector one and
+    /// this test would pass while proving nothing.
     #[test]
     fn every_always_listed_reason_is_refused() {
         for reason in [
@@ -868,6 +951,7 @@ date: 2026-09-11
             UnmeasuredReason::SourceAbsent,
             UnmeasuredReason::SourceEmpty,
             UnmeasuredReason::CollectorUnavailable,
+            UnmeasuredReason::NotConsented,
         ] {
             assert!(
                 !reason.is_always_listed(),
@@ -878,11 +962,14 @@ date: 2026-09-11
     }
 
     /// ADR 0027 recorded `not_on_this_os` and `service_disabled` as having no producer anywhere in
-    /// this build, so no rule could declare either. ADR 0030 gave each one exactly one, and this is
-    /// what that means for the gate: the reason is now usable, and only on the collector that can
-    /// actually report it. Asserted against the vocabulary the shipped executable builds, so a
-    /// collector that later stops producing one fails here rather than silently accepting a
-    /// suppression that never fires.
+    /// this build, so no rule could declare either. ADR 0030 gave each one exactly one owner, and
+    /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
+    /// both spending the same 30-second-budget idea on two different sources), and ADR 0048 a third
+    /// (`driver_service`, spending it on hashing driver files). This is what that means for the
+    /// gate: each reason is usable only on the collector(s) that can actually report it. Asserted
+    /// against the vocabulary the shipped executable builds, so a collector that later starts or
+    /// stops producing one fails here rather than silently accepting a suppression that never fires,
+    /// or missing one that now can.
     #[test]
     fn the_revived_reasons_belong_to_one_collector_each() {
         let vocabulary = Vocabulary::of_this_build();
@@ -893,20 +980,23 @@ date: 2026-09-11
                 .is_some_and(|reasons| reasons.contains(reason))
         };
 
-        for (reason, owner) in [
-            ("not_on_this_os", "pca"),
-            ("service_disabled", "prefetch"),
-            ("budget_spent", "evtx"),
-            ("not_attempted", "evtx"),
+        for (reason, owners) in [
+            ("not_on_this_os", &["pca"] as &[&str]),
+            ("service_disabled", &["prefetch"]),
+            ("budget_spent", &["driver_service", "evtx", "usn"]),
+            ("not_attempted", &["evtx"]),
         ] {
-            assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
+            for owner in owners {
+                assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
+            }
             for other in rongroi_collectors::all() {
-                if other.id() == owner {
+                if owners.contains(&other.id()) {
                     continue;
                 }
                 assert!(
                     !reports(other.id(), reason),
-                    "`{}` also reports `{reason}`; the ADR 0030 table says only `{owner}` does",
+                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047 and \
+                     ADR 0048, names only {owners:?} as owners",
                     other.id()
                 );
             }
@@ -985,13 +1075,20 @@ date: 2026-09-11
         )
     }
 
+    /// [`prefetch_rule`] as a timeline selector, the one kind of file that may name `name` or `path`
+    /// on `prefetch` (ADR 0034, ADR 0051). The field-kind gates apply to it as to a rule.
+    fn prefetch_selector(match_block: &str) -> String {
+        prefetch_rule(match_block).replace(
+            "strength: execution\n",
+            "strength: context\nrole: timeline\n",
+        )
+    }
+
     fn problems_for(label: &str, rule: &str) -> Vec<String> {
         let tmp = TempRoot::new(label);
-        write(
-            &tmp.path()
-                .join("rules/prefetch/execution/example/rule.yaml"),
-            rule,
-        );
+        let dir = tmp.path().join("rules/prefetch/execution/example");
+        write(&dir.join("rule.yaml"), rule);
+        write_empty_tests_dir(&dir);
         check(tmp.path())
             .expect("check-rules should run to completion")
             .problems
@@ -1016,7 +1113,7 @@ date: 2026-09-11
     /// to a player as a thing looked for and not there.
     #[test]
     fn an_empty_value_list_is_rejected() {
-        let problems = problems_for("empty-list", &prefetch_rule("  name: []\n"));
+        let problems = problems_for("empty-list", &prefetch_selector("  name: []\n"));
 
         assert_eq!(problems.len(), 1, "{problems:?}");
         assert!(problems[0].contains("has an empty list"), "{problems:?}");
@@ -1027,7 +1124,7 @@ date: 2026-09-11
     /// for field names, arriving through the operator instead.
     #[test]
     fn an_ordinal_comparison_against_a_text_field_is_rejected() {
-        let problems = problems_for("ordinal-on-text", &prefetch_rule("  name|gt: 2\n"));
+        let problems = problems_for("ordinal-on-text", &prefetch_selector("  name|gt: 2\n"));
 
         assert_eq!(problems.len(), 1, "{problems:?}");
         assert!(
@@ -1074,12 +1171,27 @@ date: 2026-09-11
     fn the_operators_are_accepted_where_the_field_kind_takes_them() {
         let problems = problems_for(
             "good-operators",
-            &prefetch_rule(
+            &prefetch_selector(
                 "  name: [FiveM.exe, cmd.exe]\n  path|startswith: 'C:\\\\Windows\\\\'\n  path|endswith: .pf\n  path|contains: Prefetch\n  run_count|gte: 2\n  rejected|gt: 0\n  last_run|lt: \"2026-09-13T00:00:00Z\"\n  read|exists: false\n",
             ),
         );
 
         assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    /// ADR 0034 decision 1 is a gate since ADR 0051: the same conditions in a rule are refused.
+    #[test]
+    fn a_rule_on_prefetch_that_names_a_program_is_rejected() {
+        let problems = problems_for(
+            "rule-by-name",
+            &prefetch_rule("  name: FiveM.exe\n  run_count|gte: 2\n"),
+        );
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains("a rule on `prefetch` may not match `name`"),
+            "{problems:?}"
+        );
     }
 
     /// Every field a collector declares carries a kind, so the first rule written for any of them

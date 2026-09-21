@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 8f656238-36d2-4178-98db-87f55432edf7
+title: Microsoft Defender's service is not registered on this PC
+description: >-
+  Windows has no `WinDefend` service key at all. Windows ships with one, and turning Defender off in
+    Settings or installing another antivirus leaves the key in place, so this is what a Windows image
+    that removed the component looks like — the kind sold as a lighter or faster Windows (ADR 0056). A
+    machine without Defender also has no Defender log for a reviewer to read. It says what was
+    installed on the PC; it is not evidence that anything was cheated.
+status: experimental
+collector: os_image
+strength: posture
+match:
+  service_windefend: absent
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+# `access_denied` removed (ADR 0057, amending ADR 0056): a limited-token measurement on 2026-09-21 read every value this rule needs, so a refusal is a machine nobody anticipated and belongs in front of a reviewer rather than in the scope line.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - A pre-modified Windows image installed for performance, for an old PC or for a small disk, by somebody who never touched a game
+  - A Windows edition or a managed build that ships without Defender
+  - A removal tool run by the PC's owner or by whoever set the PC up for them
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/services/service-installation
+author: aeterna-rongroi contributors
+date: 2026-09-20
+tags: [posture, os_image]

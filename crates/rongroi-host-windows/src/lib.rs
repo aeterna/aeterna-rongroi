@@ -16,6 +16,8 @@ pub mod filesystem;
 
 pub mod boot_time;
 
+pub mod dialog;
+
 pub mod elevate;
 
 pub mod event_log;
@@ -24,8 +26,12 @@ pub mod firmware;
 
 pub mod process;
 
+pub mod relaunch;
+
 pub mod signature;
 
 pub mod system_integrity;
 
 pub mod tpm;
+
+pub mod usn_journal;

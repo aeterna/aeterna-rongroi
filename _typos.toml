@@ -15,6 +15,8 @@ extend-exclude = [
   # Correcting spelling in it would be a divergence from upstream that carries no benefit and makes
   # the next re-sync harder to verify.
   "third_party/evtx/",
+  # LOLDrivers' driver file names (ADR 0048): upstream data, not prose.
+  "rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv",
 ]
 
 [default.extend-words]
@@ -22,3 +24,13 @@ extend-exclude = [
 hve = "hve"
 # `notatin` is the name of a Rust registry-hive crate evaluated in ADR 0041.
 notatin = "notatin"
+
+[default.extend-identifiers]
+# `amd64fre` is part of Windows' own `BuildLabEx` string, measured on a real PC (ADR 0056): the build
+# lab, the architecture and a free (non-checked) build, written as Microsoft writes it.
+amd64fre = "amd64fre"
+
+# Windows driver and service names in baseline-elevated-win11's driver services (ADR 0048), read from a GitHub-hosted runner: data, not prose.
+NDProxy = "NDProxy"
+SerCx = "SerCx"
+SerCx2 = "SerCx2"

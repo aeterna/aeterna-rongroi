@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: a4af8cdc-a009-42ee-8368-7f35e93051fe
+title: The kernel object namespace is not protected as Windows ships it
+description: >-
+  Windows is told not to keep programs of different privilege levels apart in the kernel object
+    namespace, a protection it ships switched on (measured on an ordinary PC). Switching it off makes
+    it easier for one program to reach another's named objects. Some tweak scripts do it, and some old
+    software asks for it. It is a setting the owner of the machine chose and it is not evidence of
+    cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  object_namespace_protection: disabled
+retention: Current state only. It says nothing about how the PC was set up in the past.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - Older software whose own instructions ask for this protection to be switched off
+  - A tweaking script or a pre-modified Windows image the owner installed for performance
+  - A PC managed by an employer whose policy sets it this way
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/sync/object-namespaces
+author: aeterna-rongroi contributors
+date: 2026-09-21
+tags: [posture, mitigations]

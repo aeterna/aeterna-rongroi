@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Synthetic fixture host — see ../PROVENANCE.md.
 # Three launch records whose paths are three different shapes: one rooted at a drive letter, which is
-# the only shape `rongroi_core::view::redact_user_paths` can reach; one UNC path and one device path,
-# neither of which it can, and which therefore reach no report at all (ADR 0020).
+# the shape `rongroi_core::view::redact_profile_paths` was first written for; one UNC path and one device
+# path, which `pca` withholds, and which therefore reach no report at all (ADR 0020, ADR 0049).
 #
 # The bytes are written inline rather than added to `fixtures/parsers/`: they exist to exercise the
 # collector's withholding, not the parser, and the parser corpora are also fuzz seeds. The account

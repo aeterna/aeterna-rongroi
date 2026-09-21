@@ -32,6 +32,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Two deep so a pull request's merge commit has its base (`HEAD^1`) for the LOLDrivers step.
+          fetch-depth: 2
       - name: Install the toolchain pinned in rust-toolchain.toml
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -55,6 +57,45 @@ jobs:
       # error names that command.
       - name: Rule reference pages match the rules
         run: cargo xtask rules-reference --check
+      # The vulnerable-driver data file is rebuilt from LOLDrivers at the commit its PROVENANCE.md names and
+      # compared with the committed file (ADR 0048). Only `yaml/` is fetched, one commit deep, and the step
+      # fails if any other file lands on disk. A pull request fetches only when it changes the data file's
+      # folder, xtask, Cargo.lock or this workflow, so no other pull request waits on LOLDrivers being
+      # reachable; every push to dev and main fetches. The program itself still never fetches the list.
+      - name: LOLDrivers data file matches its source commit
+        env:
+          EVENT: ${{ github.event_name }}
+          GIT_LFS_SKIP_SMUDGE: "1"
+        run: |
+          set -euo pipefail
+          dir=rules/driver_service/vulnerable-driver/loldrivers-listed
+          # Captured first: `git diff | grep -q` under pipefail reads a match as a failed pipeline.
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if [ "$EVENT" = pull_request ] \
+            && ! grep -q -E "^(${dir}/|xtask/|Cargo\.lock$|\.github/workflows/ci\.yml$)" <<<"$changed"; then
+            echo "This pull request changes nothing the data file is built from or checked by: not fetched."
+            exit 0
+          fi
+          # shellcheck disable=SC2016 # the backticks are the literal Markdown around the commit
+          commit=$(sed -n 's/^| Commit | `\([0-9a-f]\{40\}\)`.*/\1/p' "$dir/PROVENANCE.md")
+          if [ -z "$commit" ]; then
+            echo "::error::no 40-digit commit on the Commit row of $dir/PROVENANCE.md"
+            exit 1
+          fi
+          src="$RUNNER_TEMP/loldrivers"
+          git init -q "$src"
+          git -C "$src" remote add origin https://github.com/magicsword-io/LOLDrivers.git
+          git -C "$src" fetch -q --depth 1 --filter=blob:none origin "$commit"
+          git -C "$src" sparse-checkout set --no-cone '/yaml/'
+          git -C "$src" -c advice.detachedHead=false checkout -q FETCH_HEAD
+          outside=$(find "$src" -path "$src/.git" -prune -o -type f ! -path "$src/yaml/*" -print)
+          if [ -n "$outside" ]; then
+            echo "::error::files outside yaml/ were checked out:"
+            echo "$outside"
+            exit 1
+          fi
+          echo "yaml files: $(find "$src/yaml" -type f -name '*.yaml' | wc -l)"
+          cargo xtask loldrivers --checkout "$src" --check
       - name: Clean baseline (the rule set stays quiet on an ordinary machine)
         run: cargo xtask check-baseline
       - name: Locales
@@ -103,7 +144,7 @@ jobs:
         run: |
           mkdir -p fuzz/corpus/fuzz_bam fuzz/corpus/fuzz_pca_app_launch \
                    fuzz/corpus/fuzz_pca_general fuzz/corpus/fuzz_filetime \
-                   fuzz/corpus/fuzz_prefetch fuzz/corpus/fuzz_evtx
+                   fuzz/corpus/fuzz_prefetch fuzz/corpus/fuzz_evtx fuzz/corpus/fuzz_usn
           cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam \
             -- -max_total_time=30 -timeout=10
           cargo +nightly fuzz run fuzz_pca_app_launch fuzz/corpus/fuzz_pca_app_launch fixtures/parsers/pca-app-launch \
@@ -115,6 +156,8 @@ jobs:
           cargo +nightly fuzz run fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch \
             -- -max_total_time=30 -timeout=10
           cargo +nightly fuzz run fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx \
+            -- -max_total_time=30 -timeout=10
+          cargo +nightly fuzz run fuzz_usn fuzz/corpus/fuzz_usn fixtures/parsers/usn \
             -- -max_total_time=30 -timeout=10
       # A crash leaves its input in fuzz/artifacts/. Keeping it is the difference between "a target
       # failed" and being able to reproduce it with `cargo fuzz run <target> <file>`.

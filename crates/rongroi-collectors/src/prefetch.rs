@@ -21,7 +21,7 @@
 //!
 //! - **`loaded_files` is withheld whole.** It is normally hundreds of paths, some of them under a
 //!   user's profile, and Prefetch writes them as `\VOLUME{…}\USERS\<account>\…` — a shape
-//!   `rongroi_core::view::redact_user_paths` does not touch, because it has no drive letter. It is
+//!   `rongroi_core::view::redact_profile_paths` does not touch, because it has no drive letter. It is
 //!   also, on its own, a list of what a person has on their computer, which ADR 0014 already refused
 //!   to let redaction stand in for withholding.
 //! - **`volumes` is withheld whole**, device path, serial number and creation time alike. A volume

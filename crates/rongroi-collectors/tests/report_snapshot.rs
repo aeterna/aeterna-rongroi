@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use rongroi_collectors::scan::{self, ScanContext};
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::SelfIdentity;
-use rongroi_core::model::Mode;
+use rongroi_core::model::{Mode, ScanTier};
 use rongroi_core::provenance::Provenance;
 use rongroi_core::view;
 use rongroi_host::FixtureHost;
@@ -24,6 +24,14 @@ fn report_for(host: &str) -> rongroi_core::model::Report {
 }
 
 fn report_for_self(host: &str, self_identity: SelfIdentity) -> rongroi_core::model::Report {
+    report_at(host, self_identity, ScanTier::Standard)
+}
+
+fn report_at(
+    host: &str,
+    self_identity: SelfIdentity,
+    tier: ScanTier,
+) -> rongroi_core::model::Report {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures/hosts")
         .join(host);
@@ -33,6 +41,7 @@ fn report_for_self(host: &str, self_identity: SelfIdentity) -> rongroi_core::mod
         provenance: Provenance::from_parts(None, "0.0.0-test", None, None),
         generated_at: "2026-01-01T00:00:00Z".to_owned(),
         self_identity,
+        tier,
     };
     scan::run(&host, &bundle, context)
 }
@@ -281,7 +290,8 @@ fn process_own_trace_self_view() {
     // out before any rule runs, so the one that is ours is not repeated among them (ADR 0014).
     // The fixture describes no registry, so `posture` also has one unmatched observation: its
     // four `script_block_logging` fields, each `not_configured`, which is an answer rather than a gap
-    // (ADR 0038).
+    // (ADR 0038). `install_marker` has one too: its registry marker needs no environment variable, so
+    // it is answered `present: false` while the five folder markers are gaps (ADR 0057).
     let process = report
         .unmatched
         .iter()
@@ -293,7 +303,7 @@ fn process_own_trace_self_view() {
         .iter()
         .map(|group| group.collector.as_str())
         .collect();
-    assert_eq!(collectors, ["posture", "process"]);
+    assert_eq!(collectors, ["install_marker", "posture", "process"]);
     let unmatched = serde_json::to_string(&report.unmatched).unwrap();
     assert!(!unmatched.contains("aeterna-rongroi"), "{unmatched}");
     let view = view::for_mode(&report, Mode::SelfCheck);
@@ -492,6 +502,121 @@ fn a_log_that_could_not_be_read_leaves_the_clearing_rules_unmeasured() {
         }
         assert_eq!(seen, 2, "{host}: both rules must reach the report");
     }
+}
+
+/// The whole `HKLM\SYSTEM\CurrentControlSet\Services` key refused makes `driver_service` itself
+/// `Unmeasured` (ADR 0048), which every rule reading that collector inherits — here the one
+/// vulnerable-driver rule. Self mode carries it as an ordinary unmeasured row (Minor 6 of the PR 3
+/// review).
+#[test]
+fn driver_service_refused_self_view() {
+    let view = view::for_mode(&report_for("driver-service-refused"), Mode::SelfCheck);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// The same refusal in SS mode: `access_denied` is not in this rule's `unmeasured_when`
+/// (`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`), so it is an unexpected
+/// reason and SS mode lists it rather than only counting it (Minor 6 of the PR 3 review).
+#[test]
+fn driver_service_refused_ss_view() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason};
+
+    const VULNERABLE_DRIVER_LISTED: &str = "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3";
+
+    let report = report_for("driver-service-refused");
+    let evidence = report
+        .evidence
+        .iter()
+        .find(|evidence| evidence.rule_id == VULNERABLE_DRIVER_LISTED)
+        .unwrap_or_else(|| panic!("{VULNERABLE_DRIVER_LISTED} did not reach the report"));
+    assert!(
+        matches!(
+            evidence.state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::AccessDenied,
+                expected: false,
+            }
+        ),
+        "{:?}",
+        evidence.state
+    );
+
+    let view = view::for_mode(&report, Mode::Ss);
+    assert!(
+        view.evidence
+            .iter()
+            .any(|row| row.rule_id == VULNERABLE_DRIVER_LISTED),
+        "SS mode does not list {VULNERABLE_DRIVER_LISTED}"
+    );
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// A driver service whose file's SHA-256 is the vendored data file's first row is `Found`, with that
+/// hash on the row, and SS mode lists it — `ss_lists` admits every match whatever the rule's
+/// `strength`, and this rule is `posture` (Minor 6 of the PR 3 review).
+#[test]
+fn driver_service_listed_ss_view() {
+    use rongroi_core::model::EvidenceState;
+
+    const VULNERABLE_DRIVER_LISTED: &str = "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3";
+    const LISTED_SHA256: &str = "000547560fea0dd4b477eb28bf781ea67bf83c748945ce8923f90fdd14eb7a4b";
+
+    let report = report_for("driver-service-listed");
+    let evidence = report
+        .evidence
+        .iter()
+        .find(|evidence| evidence.rule_id == VULNERABLE_DRIVER_LISTED)
+        .unwrap_or_else(|| panic!("{VULNERABLE_DRIVER_LISTED} did not reach the report"));
+    let EvidenceState::Found { observations } = &evidence.state else {
+        panic!("expected Found, got {:?}", evidence.state);
+    };
+    assert!(
+        observations.iter().any(|observation| {
+            observation
+                .fields
+                .get("sha256")
+                .and_then(|value| value.as_str())
+                == Some(LISTED_SHA256)
+        }),
+        "{observations:?}"
+    );
+
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    assert!(json.contains(LISTED_SHA256), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// A hosts line for a listed name is `Found`. SS mode lists it with the kind of address and without the
+/// address itself, which Self mode shows (ADR 0054, owner decision 2); the proxy's server and the
+/// firewall rules reach neither view as evidence, since no rule reads them.
+#[test]
+fn net_config_listed_name_ss_view() {
+    const HOSTS_RULE: &str = "65ee0ec1-bcda-47a3-a401-98632b42e75f";
+
+    let report = report_for("net-config-listed-name");
+    let evidence = report
+        .evidence
+        .iter()
+        .find(|evidence| evidence.rule_id == HOSTS_RULE)
+        .unwrap_or_else(|| panic!("{HOSTS_RULE} did not reach the report"));
+    assert!(
+        matches!(&evidence.state, rongroi_core::model::EvidenceState::Found { observations } if observations.len() == 2),
+        "{evidence:?}"
+    );
+
+    let own = serde_json::to_string(&view::for_mode(&report, Mode::SelfCheck)).unwrap();
+    assert!(own.contains("192.0.2.10"), "{own}");
+    let view = view::for_mode(&report, Mode::Ss);
+    let json = serde_json::to_string(&view).unwrap();
+    for withheld in ["192.0.2.10", "proxy.example.test", "Example"] {
+        assert!(
+            !json.contains(withheld),
+            "{withheld} reached the SS view: {json}"
+        );
+    }
+    assert!(json.contains("\"address_kind\":\"public\""), "{json}");
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
 /// The boot time is a fact about the scan's context, so both views carry it unchanged: SS mode's

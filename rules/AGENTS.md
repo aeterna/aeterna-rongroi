@@ -13,14 +13,18 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   measurement (ADR 0027). Every entry must be a reason that collector can report — `check-rules`
   rejects the rest and names what the collector does report. Since ADR 0030 every one of the twelve
   reasons has a producer, so the check is entirely about *which* collector: `not_on_this_os` is `pca`
-  alone, `service_disabled` is `prefetch` alone, `budget_spent` and `not_attempted` are `evtx` alone.
-  Declaring a reason you have not thought about hides a result a reviewer should have seen.
+  alone, `service_disabled` is `prefetch` alone, `not_attempted` is `evtx` alone, and `budget_spent` is
+  `evtx`, `usn` (ADR 0047) and `driver_service` (ADR 0048). Declaring a reason you have not thought
+  about hides a result a reviewer should have seen.
 - **`partial`, `budget_spent` and `read_failed` cannot be declared away**, and since ADR 0032 naming
   any of them is a `check-rules` failure rather than a line that changes nothing. All three say the
   artifact was reachable and the read of it did not finish — a fact about the scan, not one about a
   kind of machine that an author could have anticipated (ADR 0030, ADR 0032). `access_denied` and
   `source_absent` are the other side of that line and stay declarable: they say the program never
   reached the artifact, and why, in terms of how the machine is set up.
+- **`not_consented` is not declarable either.** It is the scan's, not the machine's: a `full` collector's
+  rules get it in a standard scan, every rule already expects it, and `check-rules` refuses it in
+  `unmeasured_when` (ADR 0052).
 - **`source_absent` and `source_empty` are opposite statements.** "This PC has no such record" and
   "the record's place is there and holds nothing" were one word until ADR 0030; a rule that means one
   must not declare the other. `source_empty` in particular is **never** evidence that anything was
@@ -30,8 +34,14 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   signer's name, which a stolen certificate carries too (ADR 0035).
 - **No rule on `prefetch`, `bam` or `pca` names a program** by `name` or `path` (ADR 0034). Nothing those
   collectors emit identifies software, so such a rule cannot `allow` the legitimate program with that name
-  and a rename defeats it. No gate refuses it — `check-rules` and `check-baseline` both accept a rule for
-  one named executable — so it is on the reviewer.
+  and a rename defeats it. Since ADR 0051 the bundle loader, and so `check-rules`, refuses such a rule.
+- **A timeline selector** (`role: timeline`, ADR 0051) is written like a rule and makes no evidence: what
+  it matches puts its times on the timeline, in SS mode too. It is the one kind of file that may select
+  `prefetch`, `bam` or `pca` records by `name` or `path`, it is `strength: context`, and it has no
+  `unmeasured_when`. Its `falsepositives` are shown beside its times, so they must say that a name does
+  not identify a program and that a missing time is not evidence. **A new selector on those three
+  collectors widens what SS mode shows**, so the consent text in `crates/rongroi-cli/src/output.rs`, the
+  desktop's `consent.shows` and `PRIVACY.md` must name what it selects, in the same change.
 - **`match` compares strings without regard to ASCII case.** `path: "C:\\Windows\\Temp\\x.exe"` matches
   `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in and a rule that
   missed one would report `not_found` — a thing looked for and not there. Non-ASCII letters are **not**
@@ -110,7 +120,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   a log-clearing rule, whose record a later clearing removes — must not be `posture`, or the report
   grows a row that reads as "we looked and it is clean", which is the closest this program can come to a
   verdict (ADR 0002, ADR 0031).
-- `status: test` or `stable` needs a positive and a negative fixture in `tests/`. Fixtures are
+- `status: test` or `stable` needs a positive and a negative fixture in `tests/`. Every rule,
+  `experimental` included, needs a `tests/` folder holding at least one fixture file, because the report
+  links to it and `check-rules` refuses a rule without one (ADR 0045). Fixtures are
   hand-written observations, so they test the engine and the predicate — **not** that a real machine
   produces the strings the rule matches. Where the matched value comes from Windows rather than from our
   own collector, and no file in this repository carries it, `experimental` is what the evidence supports
@@ -137,3 +149,18 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   without a documented false-positive reason. Bypasses are reported privately via
   [`SECURITY.md`](../SECURITY.md).
 - Rules, translations and fixtures in this folder are CC-BY-SA-4.0.
+- **Every data file named in `match_lists` needs a `REUSE.toml` annotation, whatever its licence**
+  (ADR 0048) — it is data, not rule text, so it cannot carry the `#` SPDX comment every other source file
+  does. It is plain: a header line naming the field, no `#` comment lines, no blank lines, no quoting, no
+  byte-order mark, and at least one row after the header; every value is compared exactly as written, so a
+  value with surrounding whitespace or a quote is refused rather than left unable to ever match. **One
+  under another licence** also needs `precedence = "override"` and a `PROVENANCE.md` beside it: the
+  source, the commit or version, the date taken, the filter applied and the command that rebuilds it.
+  Never commit the thing the list describes — a list of vulnerable drivers is hashes, not drivers.
+- **A change to a `loldrivers-*.csv` or its `PROVENANCE.md` is reviewed by running it, not by reading
+  it.** The `rust (ubuntu)` job's step "LOLDrivers data file matches its source commit" fetches
+  `magicsword-io/LOLDrivers` at the commit `PROVENANCE.md` names (`yaml/` only) and runs
+  `cargo xtask loldrivers --checkout <dir> --check` against it; the task itself refuses a checkout that is
+  not at that commit. On a pull request the step fetches only when the diff touches that folder,
+  `xtask/`, `Cargo.lock` or `ci.yml`, and otherwise logs that it did not — so a reviewer of a data change
+  reads that step's log for the pull request's head and confirms it ran the check, not the skip line.

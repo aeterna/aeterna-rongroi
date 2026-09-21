@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: bf213176-ed26-4c02-935e-99925abc7db7
+title: When BAM recorded a program named like FiveM's game process
+description: >-
+  Puts on the timeline the time the Windows Background Activity Moderator (BAM) recorded for a
+  program named FiveM_b<number>_GTAProcess.exe, the name FiveM gives the game process it starts,
+  with the game build in place of <number>. The record holds a name, not which program it was, so
+  this shows when a program of that name ran according to this record, not that FiveM or GTA V ran.
+  It is not evidence of anything, and a missing entry does not mean the game never ran.
+status: experimental
+# A timeline selector (ADR 0051): it makes no evidence and selects by name, which ADR 0034 forbids a rule.
+role: timeline
+collector: bam
+strength: context
+match:
+  name|startswith: FiveM_b
+  name|endswith: _GTAProcess.exe
+retention: >-
+  Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so
+  an older run leaves no entry here.
+falsepositives:
+  - Any program whose name begins with FiveM_b and ends with _GTAProcess.exe — the record holds a
+    name and nothing that identifies the program, so a program renamed to that shape is recorded
+    under it
+  - A program of another name is not selected, whatever it is, so an absent entry does not mean that
+    nothing ran
+  - Windows not keeping a record — BAM entries older than seven days are removed when Windows
+    starts
+  - Windows keeping the record after the program's files were removed
+author: aeterna-rongroi contributors
+date: 2026-09-17
+tags: [bam, timeline]

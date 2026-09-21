@@ -1,0 +1,15 @@
+{
+  "description": "An ordinary PC, where neither value was written",
+  "observations": [
+    {
+      "collector": "posture",
+      "fields": {
+        "secure_boot": "enabled",
+        "test_signing": "disabled",
+        "speculative_execution_mitigations": "not_configured",
+        "exception_chain_validation": "not_configured",
+        "object_namespace_protection": "enabled"
+      }
+    }
+  ]
+}

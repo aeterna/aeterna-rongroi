@@ -1,0 +1,19 @@
+{
+  "description": "Defender's service is set never to start",
+  "observations": [
+    {
+      "collector": "os_image",
+      "fields": {
+        "product_name": "Windows 10 Home",
+        "edition_id": "Core",
+        "registered_organization": "",
+        "oem_manufacturer": "Msi",
+        "oem_model": "MS-7A36",
+        "service_windefend": "disabled",
+        "service_eventlog": "automatic",
+        "service_wuauserv": "manual"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

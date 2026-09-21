@@ -16,9 +16,9 @@ beside every Found row the program shows the ordinary things that also produce i
 
 | Rules bundle | |
 |---|---|
-| Rule format | 2 |
-| Rules | 21 |
-| SHA-256 | `e0838b0ae433890050f500cec4f8a0a03b7f5cb26bf9af510f8f7eb8f9c9baa4` |
+| Rule format | 4 |
+| Rules | 46 |
+| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -41,6 +41,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 ## Contents
 
+- `driver_service`
+  - [A registered driver is on LOLDrivers' list of vulnerable drivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
   - [An event log file was cleared](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [The Security log records that it was cleared](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
@@ -54,6 +56,22 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A file in FiveM's plugins folder carries a valid embedded signature](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
   - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
+- `fivem_servers`
+  - [FiveM for GTA V Enhanced keeps a cache folder for a server](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
+- `install_marker`
+  - [A folder or key the Atlas playbook installs is on this PC](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
+  - [A folder the ReviOS playbook installs is on this PC](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
+  - [Microsoft Defender's platform folder is not on this PC](#rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab) — `posture` · `experimental`
+- `net_config`
+  - [The hosts file gives a FiveM or Rockstar name an address](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
+- `os_image`
+  - [The OEM manufacturer shown in Settings is a Windows-modification project](#rule-211d278c-58de-4287-974c-dda6f39a153c) — `posture` · `experimental`
+  - [The OEM model shown in Settings names a Windows-modification playbook](#rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9) — `posture` · `experimental`
+  - [The registered organisation names a Windows-modification playbook](#rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714) — `posture` · `experimental`
+  - [Microsoft Defender's service is set never to start](#rule-77646339-caf4-4ade-93ef-133089dac30e) — `posture` · `experimental`
+  - [Microsoft Defender's service is not registered on this PC](#rule-8f656238-36d2-4178-98db-87f55432edf7) — `posture` · `experimental`
+  - [The Windows Event Log service does not start with Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
+  - [Windows Update's service cannot start on this PC](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -63,9 +81,70 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [A per-user policy turns Windows PowerShell script block logging off](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [Memory integrity (HVCI) is configured off](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
+  - [Structured exception handling overwrite protection (SEHOP) is switched off](#rule-dc858978-954d-418f-a42e-29f06975f4ed) — `posture` · `experimental`
+  - [The kernel object namespace is not protected as Windows ships it](#rule-a4af8cdc-a009-42ee-8368-7f35e93051fe) — `posture` · `experimental`
+  - [The speculative-execution mitigations are switched off](#rule-d2f86e75-7692-468e-88a2-52eb1e24dc30) — `posture` · `experimental`
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+- Timeline selectors
+  - `bam`
+    - [When BAM recorded a program named like FiveM's game process](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
+    - [When BAM recorded a program named like FiveM or GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
+  - `evtx`
+    - [A Windows event log's oldest and newest record](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
+  - `fivem_dir`
+    - [When FiveM's log, crash and cache folders were written](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
+  - `pca`
+    - [When Program Compatibility Assistant recorded a program named like FiveM's game process](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
+    - [When Program Compatibility Assistant recorded a program named like FiveM or GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `prefetch`
+    - [When Prefetch recorded a program named like FiveM's game process](#rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db) — `context` · `experimental`
+    - [When Prefetch recorded a program named like FiveM or GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
+  - `usn`
+    - [When the change journal recorded changes in a watched folder](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+
+## Collector `driver_service`
+
+### `driver_service` / `vulnerable-driver`
+
+<a id="rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3"></a>
+
+#### A registered driver is on LOLDrivers' list of vulnerable drivers
+
+- Id: `98f6e2b8-6d23-4202-bc7f-06587ebdd2f3`
+- File: [`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`](../rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml)
+- Collector: `driver_service`
+- Strength: `posture`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `posture`, `drivers`
+- Written: 2026-09-15
+
+**About this check**
+
+A driver service registered on this PC points at a file whose SHA-256 LOLDrivers lists as a verified vulnerable driver: a signed driver with a known weakness that a program running as administrator can use to reach the Windows kernel; the LOLDrivers entry says what this one allows. Windows loads a signed driver unless Microsoft's vulnerable-driver blocklist names it, and this program does not read whether that blocklist is on. The row shows the file's SHA-256; find that hash in rules/driver\_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv in this program's repository to see the LOLDrivers entry id and file name. This says the driver is registered, not that it is loaded, that anything used it, or why it is installed, and ordinary hardware utilities install such drivers.
+
+**Matches when all of these hold for one observation**
+
+- `sha256`: is one of the 1847 values in the first column of `loldrivers-vulnerable-drivers.csv`, a file beside the rule (text, ASCII case ignored)
+
+**Look-back**
+
+The driver services registered when the scan ran. A driver that was registered and removed before the scan is not seen.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Overclocking, fan and RGB control, and hardware-monitoring utilities, which install drivers of this kind; LOLDrivers' RTCore64.sys entry is the MSI Afterburner driver
+- A driver service left registered after its program was uninstalled, whose file is still on disk
+
+**References**
+
+- <https://github.com/magicsword-io/LOLDrivers>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## Collector `evtx`
 
@@ -587,6 +666,493 @@ Only the files present when the scan ran, and only the attempt made during it. A
 
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
 
+## Collector `fivem_servers`
+
+### `fivem_servers` / `enhanced`
+
+<a id="rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0"></a>
+
+#### FiveM for GTA V Enhanced keeps a cache folder for a server
+
+- Id: `c402aedc-1ed7-49a6-998c-0762e17e9bd0`
+- File: [`rules/fivem_servers/enhanced/server-cache-folder/rule.yaml`](../rules/fivem_servers/enhanced/server-cache-folder/rule.yaml)
+- Collector: `fivem_servers`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `fivem_servers`, `full_scan`
+- Written: 2026-09-18
+
+**About this check**
+
+FiveM for GTA V Enhanced keeps one cache folder per server it joined, and this row is one of them: the folder's name, and when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so the same name in two reports of this PC is the same server. Whether another PC gets the same name for that server is not known. SS mode shows the name only if the player agreed to show server identities. Read only in a full scan. This says that the game joined a server, not what anyone did on it.
+
+**Matches when all of these hold for one observation**
+
+- `server_folder|exists`: the field is present
+
+**Look-back**
+
+The server cache folders there when the scan ran. A folder the player, a cleaner or a reinstall removed is not seen, and whether FiveM removes old ones itself is not known.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Joining any server with FiveM for GTA V Enhanced, which is what leaves these folders
+- A folder kept from a server joined long ago, or by another person using this Windows account
+
+## Collector `install_marker`
+
+### `install_marker` / `modified-build`
+
+<a id="rule-fd58dec6-84c1-49cb-806c-10b4614a046f"></a>
+
+#### A folder or key the Atlas playbook installs is on this PC
+
+- Id: `fd58dec6-84c1-49cb-806c-10b4614a046f`
+- File: [`rules/install_marker/modified-build/atlas-files-present/rule.yaml`](../rules/install_marker/modified-build/atlas-files-present/rule.yaml)
+- Collector: `install_marker`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `install_marker`
+- Written: 2026-09-21
+
+**About this check**
+
+One of the places the Atlas playbook creates when it is applied is here: its module folder, its desktop folder of configuration scripts, or its own registry key. Atlas turns off parts of Windows, and some of those parts are what this program and a server's anti-cheat read. Which operating system to run is the owner's choice; this row says what is installed, not that anything was cheated. What is inside the folder was not read.
+
+**Matches when all of these hold for one observation**
+
+- `marker`: is one of `%SystemRoot%\AtlasModules`, `%SystemRoot%\AtlasDesktop`, `HKLM\SOFTWARE\AtlasOS` (text, ASCII case ignored)
+- `present`: is `true`
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied the playbook for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- A folder or key left behind after the playbook was removed or reverted
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-3ec29285-f365-4e60-81fe-818d27c6b47a"></a>
+
+#### A folder the ReviOS playbook installs is on this PC
+
+- Id: `3ec29285-f365-4e60-81fe-818d27c6b47a`
+- File: [`rules/install_marker/modified-build/revios-files-present/rule.yaml`](../rules/install_marker/modified-build/revios-files-present/rule.yaml)
+- Collector: `install_marker`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `install_marker`
+- Written: 2026-09-21
+
+**About this check**
+
+One of the places the ReviOS playbook creates when it is applied is here: the folder of its own tool, or the wallpaper folder it installs. ReviOS turns off parts of Windows, some of which are what this program and a server's anti-cheat read. Which operating system to run is the owner's choice; this row says what is installed, not that anything was cheated. What is inside the folder was not read.
+
+**Matches when all of these hold for one observation**
+
+- `marker`: is one of `%ProgramFiles%\Revision Tool`, `%SystemRoot%\Web\Wallpaper\MeetRevision` (text, ASCII case ignored)
+- `present`: is `true`
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied the playbook for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- A folder left behind after the playbook was removed or reverted
+
+**References**
+
+- <https://github.com/meetrevision/playbook>
+
+### `install_marker` / `windows-components`
+
+<a id="rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab"></a>
+
+#### Microsoft Defender's platform folder is not on this PC
+
+- Id: `f47de6d4-05ef-4f33-9aca-2307170fd5ab`
+- File: [`rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml`](../rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml)
+- Collector: `install_marker`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `install_marker`
+- Written: 2026-09-21
+
+**About this check**
+
+The folder Windows keeps Defender's engine in is not there. Turning Defender off in Settings, and installing another antivirus, both leave the folder in place, so this is what a Windows image that removed the component looks like. Read it beside whether the Defender service is still registered, which says which of the two happened. It describes what is installed on the PC and is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `marker`: is `%ProgramData%\Microsoft\Windows Defender\Platform` (text, ASCII case ignored)
+- `present`: is `false`
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A pre-modified Windows image installed for performance, for an old PC or for a small disk, by somebody who never touched a game
+- A Windows edition or a managed build that ships without Defender
+- A removal tool run by the PC's owner or by whoever set the PC up for them
+- A PC whose Defender is installed somewhere else than the folder Windows uses by default
+
+**References**
+
+- <https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/microsoft-defender-antivirus-windows>
+
+## Collector `net_config`
+
+### `net_config` / `hosts`
+
+<a id="rule-65ee0ec1-bcda-47a3-a401-98632b42e75f"></a>
+
+#### The hosts file gives a FiveM or Rockstar name an address
+
+- Id: `65ee0ec1-bcda-47a3-a401-98632b42e75f`
+- File: [`rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml`](../rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml)
+- Collector: `net_config`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `net_config`, `hosts`
+- Written: 2026-09-18
+
+**About this check**
+
+A line in effect in this PC's hosts file gives a name under cfx.re, fivem.net or rockstargames.com an address of its own, so Windows uses that address for the name instead of asking a DNS server. The row shows the name, the line and the kind of address: loopback or unspecified sends the name nowhere, which is how blocklists block a service; private or public sends it to another machine. SS mode shows only the kind, because the address itself can name the player's own server. This does not say what wrote the line, when, or whether any program used it.
+
+**Matches when all of these hold for one observation**
+
+- `host_name|exists`: the field is present
+- `location`: is `hosts` (text, ASCII case ignored)
+
+**Look-back**
+
+The hosts file as it was when the scan ran. A line removed before the scan is not seen.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Ad, tracking and telemetry blocklists, which point Rockstar names at 0.0.0.0 or 127.0.0.1
+- Guides that block the Rockstar launcher's update or sign-in servers by editing the hosts file
+- Software that writes its own hosts entries, such as a VPN, a security suite or a development tool
+
+## Collector `os_image`
+
+### `os_image` / `modified-build`
+
+<a id="rule-211d278c-58de-4287-974c-dda6f39a153c"></a>
+
+#### The OEM manufacturer shown in Settings is a Windows-modification project
+
+- Id: `211d278c-58de-4287-974c-dda6f39a153c`
+- File: [`rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml`](../rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+Settings shows \`Atlas Team\` as the manufacturer of this PC. That is the value the Atlas playbook writes over the board or laptop manufacturer's own when it is applied, read from its own source (ADR 0056). It describes the operating system the PC runs, which a person may choose on their own machine, and proves nothing about cheating.
+
+**Matches when all of these hold for one observation**
+
+- `oem_manufacturer`: is `Atlas Team` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied the Atlas playbook for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- Any account with administrator rights can write this value, so it can also have been typed by hand
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9"></a>
+
+#### The OEM model shown in Settings names a Windows-modification playbook
+
+- Id: `a935bb41-6ed4-41a3-9477-7b3fe3a987d9`
+- File: [`rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+Settings shows a device model that begins with the name one of two published Windows-modification playbooks writes there — Atlas or ReviOS. On an unmodified PC this value is the board or laptop model its manufacturer wrote (\`MS-7A36\` was measured on an ordinary machine), so this is the same statement the registered organisation makes, from the second place the playbooks write it (ADR 0056). It describes the operating system the PC runs and proves nothing about cheating.
+
+**Matches when all of these hold for one observation**
+
+- `oem_model|startswith`: starts with one of `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied one of these playbooks for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- Any account with administrator rights can write this value, so it can also have been typed by hand
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+<a id="rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714"></a>
+
+#### The registered organisation names a Windows-modification playbook
+
+- Id: `3abb40b8-05a4-4cc9-a2f8-17ba52a98714`
+- File: [`rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+\`winver\` shows a registered organisation that begins with the name one of two published Windows-modification playbooks writes there — Atlas or ReviOS. Both write it themselves, from their own source, when they are applied over an ordinary Windows installation (ADR 0056). Such a playbook turns off parts of Windows, and some of those parts are what this program and a server's anti-cheat read. It says what operating system the PC runs, which a person is entitled to choose on their own machine, and it does not prove that anything was cheated.
+
+**Matches when all of these hold for one observation**
+
+- `registered_organization|startswith`: starts with one of `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied one of these playbooks for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- Somebody who typed one of these names into the registered organisation by hand, which any account with administrator rights may do
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+### `os_image` / `windows-components`
+
+<a id="rule-77646339-caf4-4ade-93ef-133089dac30e"></a>
+
+#### Microsoft Defender's service is set never to start
+
+- Id: `77646339-caf4-4ade-93ef-133089dac30e`
+- File: [`rules/os_image/windows-components/defender-service-disabled/rule.yaml`](../rules/os_image/windows-components/defender-service-disabled/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+The \`WinDefend\` service is registered and its start type is \`disabled\`, so Windows does not start it. \*\*Installing another antivirus does exactly this\*\*, and it is the single most ordinary reason for this row; a tweaking script that turns Defender off is another. Read it beside what else the report says, never on its own, and read it as a description of the machine rather than as evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `service_windefend`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Any third-party antivirus, which disables Defender's service when it installs itself
+- A PC managed by an employer or a school whose policy turns Defender off
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-8f656238-36d2-4178-98db-87f55432edf7"></a>
+
+#### Microsoft Defender's service is not registered on this PC
+
+- Id: `8f656238-36d2-4178-98db-87f55432edf7`
+- File: [`rules/os_image/windows-components/defender-service-not-registered/rule.yaml`](../rules/os_image/windows-components/defender-service-not-registered/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+Windows has no \`WinDefend\` service key at all. Windows ships with one, and turning Defender off in Settings or installing another antivirus leaves the key in place, so this is what a Windows image that removed the component looks like — the kind sold as a lighter or faster Windows (ADR 0056). A machine without Defender also has no Defender log for a reviewer to read. It says what was installed on the PC; it is not evidence that anything was cheated.
+
+**Matches when all of these hold for one observation**
+
+- `service_windefend`: is `absent` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A pre-modified Windows image installed for performance, for an old PC or for a small disk, by somebody who never touched a game
+- A Windows edition or a managed build that ships without Defender
+- A removal tool run by the PC's owner or by whoever set the PC up for them
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379"></a>
+
+#### The Windows Event Log service does not start with Windows
+
+- Id: `cf83f06e-23b5-47fc-b7a0-b6d1b8192379`
+- File: [`rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml`](../rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+The \`EventLog\` service is set to start on demand or never, or its key is not there at all. That service writes the Windows logs this program reads, so on such a machine an absent record is not the same statement as "nothing happened" — there may have been nothing to write it. Windows sets this service to start automatically, and both a stripped image and a tweaking script are known to change it. It describes the machine; it does not show that anything was removed or cheated.
+
+**Matches when all of these hold for one observation**
+
+- `service_eventlog`: is one of `absent`, `disabled`, `manual` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A pre-modified Windows image installed for performance, by somebody who never touched a game
+- A tweaking script the owner ran for performance or for privacy
+- A managed build whose policy sets the service differently
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging>
+
+<a id="rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830"></a>
+
+#### Windows Update's service cannot start on this PC
+
+- Id: `c9012982-5fc1-4d61-ab0c-0bc1abe93830`
+- File: [`rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml`](../rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+The \`wuauserv\` service is set never to start, or its key is not there at all. A PC that cannot update keeps whatever Windows it was installed with, which is how a pre-modified image stays as it was shipped, and it is also what several tweaking scripts do on an ordinary installation (ADR 0056). Windows ships this service set to start on demand. It says how the PC is kept up to date and is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `service_wuauserv`: is one of `absent`, `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- An owner who turned Windows Update off to stop reboots, or to keep a driver a later update replaces
+- A PC managed by an employer or a school that updates it another way
+- A pre-modified Windows image or a tweaking script the owner installed for performance
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview>
+
 ## Collector `posture`
 
 ### `posture` / `boot`
@@ -914,6 +1480,125 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/enable-virtualization-based-protection-of-code-integrity>
 
+### `posture` / `mitigations`
+
+<a id="rule-dc858978-954d-418f-a42e-29f06975f4ed"></a>
+
+#### Structured exception handling overwrite protection (SEHOP) is switched off
+
+- Id: `dc858978-954d-418f-a42e-29f06975f4ed`
+- File: [`rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml`](../rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `mitigations`
+- Written: 2026-09-21
+
+**About this check**
+
+Windows is told not to validate the exception handler chain, a protection against one way of hijacking a program's control flow. Switching it off is a step several gaming tweak scripts take, and some older software asks for it. It is a setting the owner of the machine chose and it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `exception_chain_validation`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Older software whose own instructions ask for this protection to be switched off
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+- A PC managed by an employer whose policy sets it this way
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/security/threat-protection/overview-of-threat-mitigations-in-windows-10>
+
+<a id="rule-a4af8cdc-a009-42ee-8368-7f35e93051fe"></a>
+
+#### The kernel object namespace is not protected as Windows ships it
+
+- Id: `a4af8cdc-a009-42ee-8368-7f35e93051fe`
+- File: [`rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml`](../rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `mitigations`
+- Written: 2026-09-21
+
+**About this check**
+
+Windows is told not to keep programs of different privilege levels apart in the kernel object namespace, a protection it ships switched on (measured on an ordinary PC). Switching it off makes it easier for one program to reach another's named objects. Some tweak scripts do it, and some old software asks for it. It is a setting the owner of the machine chose and it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `object_namespace_protection`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Older software whose own instructions ask for this protection to be switched off
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+- A PC managed by an employer whose policy sets it this way
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/sync/object-namespaces>
+
+<a id="rule-d2f86e75-7692-468e-88a2-52eb1e24dc30"></a>
+
+#### The speculative-execution mitigations are switched off
+
+- Id: `d2f86e75-7692-468e-88a2-52eb1e24dc30`
+- File: [`rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml`](../rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `mitigations`
+- Written: 2026-09-21
+
+**About this check**
+
+Windows is told to turn off the mitigations for Spectre variant 2 and Meltdown, by the pair of values that together mean off. The mitigations cost a few percent of performance, and turning them off is a step several gaming tweak scripts take; it also leaves the PC exposed to the processor flaws they were written for. It is a setting the owner of the machine chose and it is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `speculative_execution_mitigations`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only. It says nothing about how the PC was set up in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- An owner who followed performance advice for an older processor, on which these mitigations cost the most
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+- A PC set up this way by a shop or by whoever built it
+
+**References**
+
+- <https://support.microsoft.com/en-us/topic/kb4073119-windows-client-guidance-for-it-pros-to-protect-against-silicon-based-microarchitectural-and-speculative-execution-side-channel-vulnerabilities-35820a8a-ae13-1299-88cc-357f104f5b11>
+
 ### `posture` / `tpm`
 
 <a id="rule-66d513b5-fe61-415a-9385-9d01f85c3ef5"></a>
@@ -1002,3 +1687,309 @@ The attribute as it is at the moment of the scan, on the Prefetch files still in
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+## Timeline selectors
+
+A timeline selector is written like a rule and produces no evidence: the observations it matches put their times on the report's timeline, in Self and SS mode, each with the text and the ordinary causes below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not (ADR 0034): a name says nothing about which program it was, and each one says so.
+
+### `bam` / `timeline`
+
+<a id="rule-bf213176-ed26-4c02-935e-99925abc7db7"></a>
+
+#### When BAM recorded a program named like FiveM's game process
+
+- Id: `bf213176-ed26-4c02-935e-99925abc7db7`
+- File: [`rules/bam/timeline/fivem-game-process-by-name/rule.yaml`](../rules/bam/timeline/fivem-game-process-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Background Activity Moderator (BAM) recorded for a program named FiveM\_b\<number\>\_GTAProcess.exe, the name FiveM gives the game process it starts, with the game build in place of \<number\>. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name|endswith`: ends with `_GTAProcess.exe` (text, ASCII case ignored)
+- `name|startswith`: starts with `FiveM_b` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older run leaves no entry here.
+
+**Ordinary things behind these times**
+
+- Any program whose name begins with FiveM\_b and ends with \_GTAProcess.exe — the record holds a name and nothing that identifies the program, so a program renamed to that shape is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not keeping a record — BAM entries older than seven days are removed when Windows starts
+- Windows keeping the record after the program's files were removed
+
+<a id="rule-19dc7372-391e-4874-9c94-92ee6170f2df"></a>
+
+#### When BAM recorded a program named like FiveM or GTA V
+
+- Id: `19dc7372-391e-4874-9c94-92ee6170f2df`
+- File: [`rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Background Activity Moderator (BAM) recorded for a program named FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their executables. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name`: is one of `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older run leaves no entry here.
+
+**Ordinary things behind these times**
+
+- Any program of one of these names — the record holds a name and nothing that identifies the program, so a program renamed to one of them is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not keeping a record — BAM entries older than seven days are removed when Windows starts
+- Windows keeping the record after the program's files were removed
+
+### `evtx` / `timeline`
+
+<a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
+
+#### A Windows event log's oldest and newest record
+
+- Id: `87b47713-1ed3-415e-bc07-9cd0b953d7c1`
+- File: [`rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml`](../rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `evtx`
+- Strength: `context`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `evtx`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time of the oldest and the newest record each Windows event log file still holds. The span between them is what that log can show; a time outside it is one the log says nothing about. A short span is not evidence that a log was cleared.
+
+**Matches when all of these hold for one observation**
+
+- `oldest_record_time|exists`: the field is present
+
+**Look-back**
+
+The log files as they are at the moment of the scan. Each log has a size limit and overwrites its oldest records when it is full.
+
+**Ordinary things behind these times**
+
+- A log that reached its size limit and overwrote its oldest records, which busy logs do within days
+- A new Windows installation, or a reset
+- A log cleared by an administrator, by an installer or by a maintenance tool
+
+### `fivem_dir` / `timeline`
+
+<a id="rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"></a>
+
+#### When FiveM's log, crash and cache folders were written
+
+- Id: `2ef0da16-e65e-4bb6-90c5-0898ffc93ad8`
+- File: [`rules/fivem_dir/timeline/folder-activity-times/rule.yaml`](../rules/fivem_dir/timeline/folder-activity-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `fivem_dir`
+- Strength: `context`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `fivem_dir`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the times FiveM's log, crash and cache folders report, for GTA V Legacy and Enhanced: when each folder was created and last changed, the earliest and latest file times in it, and when each Enhanced server cache folder was created and last changed. These are the times the file system reports, which the program that writes a file can set. A server cache folder is shown without its name. None of this is evidence of anything.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is one of `legacy_logs`, `legacy_crashes`, `legacy_cache`, `legacy_server_cache`, `enhanced_logs`, `enhanced_crashes`, `enhanced_launcher_crashes`, `enhanced_server_cache` (text, ASCII case ignored)
+
+**Look-back**
+
+The folders as they are at the moment of the scan. FiveM writes, rotates and removes its own logs, crash reports and cache, and a player can clear them.
+
+**Ordinary things behind these times**
+
+- FiveM writing, rotating and removing its own logs, crash reports and cache in ordinary use
+- The player clearing FiveM's cache or logs
+- Reinstalling FiveM, moving it to another PC, or restoring it from a backup
+- A backup, sync or copy tool that sets file times
+
+### `pca` / `timeline`
+
+<a id="rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5"></a>
+
+#### When Program Compatibility Assistant recorded a program named like FiveM's game process
+
+- Id: `eaf79187-e067-43ed-9afe-bffe65e6b2e5`
+- File: [`rules/pca/timeline/fivem-game-process-by-name/rule.yaml`](../rules/pca/timeline/fivem-game-process-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `pca`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pca`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Program Compatibility Assistant recorded for a program named FiveM\_b\<number\>\_GTAProcess.exe, the name FiveM gives the game process it starts, with the game build in place of \<number\>. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name|endswith`: ends with `_GTAProcess.exe` (text, ASCII case ignored)
+- `name|startswith`: starts with `FiveM_b` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what the Program Compatibility Assistant files still hold. Windows keeps these files on Windows 11 22H2 and later.
+
+**Ordinary things behind these times**
+
+- Any program whose name begins with FiveM\_b and ends with \_GTAProcess.exe — the record holds a name and nothing that identifies the program, so a program renamed to that shape is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing a record — these files exist only on Windows 11 22H2 and later
+- Windows keeping the record after the program's files were removed
+
+<a id="rule-6487719d-15cf-422c-8b8a-858647091fd1"></a>
+
+#### When Program Compatibility Assistant recorded a program named like FiveM or GTA V
+
+- Id: `6487719d-15cf-422c-8b8a-858647091fd1`
+- File: [`rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `pca`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pca`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time the Windows Program Compatibility Assistant recorded for a program named FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their executables. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name`: is one of `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (text, ASCII case ignored)
+
+**Look-back**
+
+Only what the Program Compatibility Assistant files still hold. Windows keeps these files on Windows 11 22H2 and later.
+
+**Ordinary things behind these times**
+
+- Any program of one of these names — the record holds a name and nothing that identifies the program, so a program renamed to one of them is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing a record — these files exist only on Windows 11 22H2 and later
+- Windows keeping the record after the program's files were removed
+
+### `prefetch` / `timeline`
+
+<a id="rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db"></a>
+
+#### When Prefetch recorded a program named like FiveM's game process
+
+- Id: `d377e008-0a08-4d6e-adf2-f6cbc8b978db`
+- File: [`rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `prefetch`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `prefetch`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time Windows' Prefetch recorded for a program named FiveM\_b\<number\>\_GTAProcess.exe, the name FiveM gives the game process it starts, with the game build in place of \<number\>. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name|endswith`: ends with `_GTAProcess.exe` (text, ASCII case ignored)
+- `name|startswith`: starts with `FiveM_b` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the Prefetch files still in the folder, and only the most recent run each one records. Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+
+**Ordinary things behind these times**
+
+- Any program whose name begins with FiveM\_b and ends with \_GTAProcess.exe — the record holds a name and nothing that identifies the program, so a program renamed to that shape is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing or not keeping a record — Prefetch switched off, a Prefetch file Windows removed, or a folder emptied by a clean-up tool
+- Windows keeping the record after the program's files were removed
+
+<a id="rule-a81a1693-2982-4004-8f40-186c2b90a6a2"></a>
+
+#### When Prefetch recorded a program named like FiveM or GTA V
+
+- Id: `a81a1693-2982-4004-8f40-186c2b90a6a2`
+- File: [`rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `prefetch`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `prefetch`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the time Windows' Prefetch recorded for a program named FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe or PlayGTAV.exe, the names FiveM and GTA V give their executables. The record holds a name, not which program it was, so this shows when a program of that name ran according to this record, not that FiveM or GTA V ran. It is not evidence of anything, and a missing entry does not mean the game never ran.
+
+**Matches when all of these hold for one observation**
+
+- `name`: is one of `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the Prefetch files still in the folder, and only the most recent run each one records. Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+
+**Ordinary things behind these times**
+
+- Any program of one of these names — the record holds a name and nothing that identifies the program, so a program renamed to one of them is recorded under it
+- A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
+- Windows not writing or not keeping a record — Prefetch switched off, a Prefetch file Windows removed, or a folder emptied by a clean-up tool
+- Windows keeping the record after the program's files were removed
+
+### `usn` / `timeline`
+
+<a id="rule-82c71896-ef70-492d-b6fc-8671c09b5e1c"></a>
+
+#### When the change journal recorded changes in a watched folder
+
+- Id: `82c71896-ef70-492d-b6fc-8671c09b5e1c`
+- File: [`rules/usn/timeline/watched-folder-record-times/rule.yaml`](../rules/usn/timeline/watched-folder-record-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `usn`
+- Strength: `context`
+- Status: `test` — believed correct; has a positive and a negative fixture
+- Tags: `usn`, `timeline`
+- Written: 2026-09-17
+
+**About this check**
+
+Puts on the timeline the oldest and newest change the NTFS change journal still holds for each folder this program watches: Prefetch, the event log folder, the Program Compatibility Assistant folder and FiveM's plugin folders. The journal counts changes without saying which program made them, so a time here is when a file in that folder was created, changed, renamed or deleted, by anyone, including Windows and FiveM. It is not evidence that anything was removed.
+
+**Matches when all of these hold for one observation**
+
+- `folder`: is `identified` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the records the journal still holds. The journal has a fixed size and drops its oldest records as new ones arrive, so it reaches back only as far as its size allows.
+
+**Ordinary things behind these times**
+
+- Windows writing and removing Prefetch files, event logs and compatibility records in ordinary use
+- FiveM, its updater and plugins installed or removed by the player changing files in the plugin folders
+- Disk clean-up, backup, antivirus and optimisation tools
+- A folder with no change in the journal's span has no time here, which does not mean nothing changed before it

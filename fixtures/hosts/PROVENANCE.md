@@ -16,6 +16,8 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-enhanced-asi` | Windows 11 with only FiveM for GTA V Enhanced: one file in `%APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\asi`, and one in the `mods` folder beside it, which the collector does not read (ADR 0035) | `fivem_dir` collector tests |
 | `fivem-dir-client-exe` | Windows 11 with both FiveM editions, each program folder holding `FiveM.exe` beside the other entries a real one has (ADR 0036): Legacy's validly signed and spelled in lower case, Enhanced's with nothing embedded, and `modify.exe` beside it, which is never reported. Every hash and certificate is invented, and `Example Signer` is nobody | `fivem_dir` collector tests, report snapshot tests |
 | `fivem-dir-client-folder-denied` | Windows 11, Legacy installed with an empty plugin folder and its program folder, where `FiveM.exe` is, unreadable | `fivem_dir` collector tests, report snapshot tests |
+| `fivem-dir-folder-activity` | Windows 11 with both FiveM editions and their log, crash and cache folders (ADR 0053): Legacy's log folder with two timed files, one untimed file and a subfolder, its crash folder empty, only the default launch-mode cache; Enhanced's server cache with two server folders, one unreadable, and a renamed folder. Every name, size and time is invented | `fivem_dir` collector tests |
+| `fivem-dir-folder-activity-denied` | Windows 11, Legacy with an empty plugin folder and its log folder unreadable (ADR 0053) | `fivem_dir` collector tests |
 | `fivem-dir-not-installed` | Windows 11 with neither FiveM edition: `%LOCALAPPDATA%` and `%APPDATA%` are set and neither plugin folder exists | `fivem_dir` collector tests |
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
@@ -61,6 +63,19 @@ none contains a real person's user name, host name, SID or files.
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below) | `cargo xtask check-baseline` |
 | `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below), and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable. Its `EnablePrefetcher`, its files' read-only attribute and the Event Log service's answer for its one channel are measured values (below) | `cargo xtask check-baseline` |
+| `usn-journal-read` | An elevated Windows 11 scan whose system volume journal holds records under three watched folders — Prefetch, the Event Log folder and FiveM Legacy's plugin folder — and one group nobody watches, with the journal trimmed since it was made. Enhanced's folder is not there | `usn` collector tests |
+| `usn-journal-not-active` | An elevated Windows 11 scan whose system volume has no active change journal at all (`ERROR_JOURNAL_NOT_ACTIVE`) | `usn` collector tests |
+| `usn-journal-access-denied` | A Windows 11 scan without administrator rights whose system volume handle is refused | `usn` collector tests |
+| `usn-journal-access-denied-elevated` | The same denial with administrator rights already held, where restarting as administrator would not help | `usn` collector tests |
+| `usn-journal-changed` | An elevated Windows 11 scan whose system volume journal was trimmed or replaced while the read was in progress, so the read ends `journal_changed` with one Prefetch record already read | `usn` collector tests |
+| `usn-version-2-records` | An elevated Windows 11 scan whose system volume journal holds version 2 records under the Prefetch folder, attributed by the folder's 64-bit index rather than its 128-bit identifier | `usn` collector tests |
+| `usn-folders-unreadable` | An elevated Windows 11 scan where the Prefetch folder is unlistable, `%APPDATA%` is not set so Enhanced's plugin folder cannot be located, and Legacy's plugin folder is on a second volume the journal was not read from | `usn` collector tests |
+| `usn-not-described` | An elevated Windows 11 scan written before this fixture source existed: it never modelled the change journal at all, which the accessors report as `Unsupported` | `usn` collector tests |
+| `usn-folder-on-other-volume` | An elevated Windows 11 scan whose FiveM Legacy plugin folder shares Prefetch's drive letter but is reached through a junction to another volume (e.g. `mklink /J`): its identifier carries a different volume serial than the system volume's own, so its records are not credited to it | `usn` collector tests |
+| `driver-service-forms` | A Windows 11 scan whose driver services cover every `ImagePath` form the resolver knows and one it does not, and each file outcome the collector distinguishes: absent, `\SystemRoot\`, relative under `System32` and `SysWOW64`, `\??\X:\`, a bare drive letter, a quoted path an unknown form, a refused file, an unrecorded hash and a missing file, beside a `Type: 32` service that is not a driver | `driver_service` collector tests |
+| `driver-service-refused` | The key that lists driver services (`HKLM\SYSTEM\CurrentControlSet\Services`) refused to this program. Measured on no machine: both machines ADR 0046 measured let a token without Administrators read it | `driver_service` collector tests, report snapshots |
+| `net-config-listed-name` | The three places `net_config` reads (ADR 0054) in the shapes measured on one Windows 11 PC, with invented values: a hosts file whose lines give a Rockstar subdomain an unspecified address and a FiveM name a public one beside a line for an unlisted name, a proxy on with a server set, and one firewall rule for FiveM.exe beside one for another program and one that is not a rule | `net_config` report snapshot |
+| `driver-service-listed` | A Windows 11 scan with one driver service whose file's SHA-256 is the vendored `loldrivers-vulnerable-drivers.csv`'s first row (LOLDrivers id `ff74f03e-e4ce-4242-bfe3-60601056bb34`, `CorsairLLAccess64.sys`), so the vulnerable-driver rule can be exercised through the real bundle. The service name and path are invented; only the hash is real, copied from the data file | report snapshots |
 
 **`FiveM.exe` in `baseline-consumer-win11` and `baseline-elevated-win11` is measured, not written.**
 Measured 2026-09-13 on one Windows 11 machine, build 26220, read-only, with `Get-FileHash`,
@@ -75,6 +90,43 @@ name or other file from that machine is in the fixture. Only the entries the col
 described — the folder's shortcut and manifest are left out, as the collector never reports them. What
 this does not claim: that a player's `FiveM.exe` has this hash — it changes with every FiveM update —
 or that the certificate stays the same after 2027-09-05, when it expires.
+
+**The change journal in the baselines is a runner's, not a PC's.** `baseline-elevated-win11`'s
+`usn_journal:` block is rebuilt from the `usn` collector's observations of a GitHub-hosted Windows Server
+2025 runner (`windows.yml` run 34930942657, 2026-09-15): the same counts per folder, the same first and
+last record times, and one group for the journal's other records, whose count reproduces the runner's
+journal total of 381 333 records. Which reasons shared a record is not in an observation, so the groups
+are the fewest that give those counts. Neither non-elevated baseline (`baseline-consumer-win11`,
+`baseline-hardened-win11`) sets `%SystemRoot%`, so `usn` is `read_failed` on both before it reaches a
+journal — as `prefetch` and `evtx` are, which need `%SystemRoot%` too, and `pca`, whose `%WinDir%` is unset
+there as well — and neither describes a change journal. A refused volume is not a baseline's measurement:
+a standard account and a restricted token were both refused it with error 5 in `windows.yml` run
+34868203532 (ADR 0047, "Measured on a runner"), which the `usn-journal-access-denied` hosts describe. The runner had no FiveM
+installed, so its two plugin folders came back `folder: absent`; `baseline-elevated-win11` already
+describes an installed, empty Legacy plugin folder (above), so its `usn_journal: folders:` lists that
+path instead, giving `plugins` zero records there rather than repeating the runner's absence. Enhanced's
+plugin folder is not described by this baseline and stays absent, as it already was.
+
+**The network settings in the baselines are shapes, not a PC's values (ADR 0054).** On 2026-09-17 one
+Windows 11 PC (build 26220) was measured read-only with a limited and an elevated token, printing counts
+and shapes only: `DataBasePath` was `%SystemRoot%\System32\drivers\etc`; the hosts file was UTF-8 with a
+byte-order mark, 36 lines of which 6 were in effect — one loopback, two private and three other
+addresses — and none named a listed name; `ProxyEnable` was `0` with no other proxy value; and the
+firewall rules key held `REG_SZ` values of the form `v2.<n>|key=value|…|`, FiveM's being two allow-in
+rules (TCP and UDP) for `FiveM.exe` and two for GTA V Enhanced's executable in FiveM's folder.
+`baseline-elevated-win11` holds a hosts file, a proxy and firewall rules of those shapes, and
+`baseline-consumer-win11` the proxy and the two `FiveM.exe` rules. Every name, address, value name,
+profile and rule text in them is invented; nothing was copied from that PC. `baseline-consumer-win11`
+sets no `%SystemRoot%`, so its hosts file is not read there.
+
+**The driver services in the baselines are a runner's, not a PC's.** `baseline-elevated-win11`'s driver
+service keys and files are rebuilt from the `driver_service` collector's observations of a GitHub-hosted
+Windows Server 2025 runner (`windows.yml` run 34955915842, 2026-09-15): 424 services, 424 hashed. Each
+`ImagePath` is written as the path the collector resolved rather than the form the runner's registry held,
+and `Type` is 1 for every service; the collector's own tests cover the other forms. A runner image has
+Microsoft's drivers only, so this says nothing about a gaming PC's. No driver list from anyone's own PC is
+used (ADR 0046). Neither non-elevated baseline sets `%SystemRoot%`, so `driver_service` is `read_failed`
+on both.
 
 **Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
 posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,
@@ -103,8 +155,8 @@ Each one is a written profile; a setting in it is never changed to silence a rul
 
 **What a baseline leaves out is a claim too.** A source a baseline does not describe is not read, the
 collector is `Unmeasured`, and a rule for it passes the gate whatever it says — which is what
-`baseline-consumer-win11` and `baseline-hardened-win11` do to `pca`, `prefetch`, `bam` and `evtx`: neither
-sets `WinDir` or `SystemRoot` and neither carries a BAM key. `baseline-elevated-win11` was added for that
+`baseline-consumer-win11` and `baseline-hardened-win11` do to `pca`, `prefetch`, `bam`, `evtx` and `usn`:
+neither sets `WinDir` or `SystemRoot` and neither carries a BAM key. `baseline-elevated-win11` was added for that
 (ADR 0026) and is the host on which every collector in the build is `Measured` with no gaps. Its artifacts
 hold the shapes a careless rule fires on — a game executable run from a Downloads folder, `cmd.exe` with a
 Prefetch record, a BAM entry whose path is a device path — because leaving those out would make the claim

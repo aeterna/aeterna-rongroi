@@ -15,9 +15,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 | rules bundle | |
 |---|---|
-| รูปแบบ rule | 2 |
-| จำนวน rule | 21 |
-| SHA-256 | `e0838b0ae433890050f500cec4f8a0a03b7f5cb26bf9af510f8f7eb8f9c9baa4` |
+| รูปแบบ rule | 4 |
+| จำนวน rule | 46 |
+| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -37,6 +37,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 ## สารบัญ
 
+- `driver_service`
+  - [ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
   - [มี event log ไฟล์หนึ่งถูกล้าง](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [Security log มีบันทึกว่าตัวเองถูกล้าง](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
@@ -50,6 +52,22 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่มีลายเซ็นฝังในไฟล์ซึ่งถูกต้อง](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
   - [ตรวจลายเซ็นของไฟล์ FiveM ไม่ได้](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
+- `fivem_servers`
+  - [FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
+- `install_marker`
+  - [มีโฟลเดอร์หรือคีย์ที่ Atlas playbook ติดตั้งอยู่บนเครื่องนี้](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
+  - [มีโฟลเดอร์ที่ ReviOS playbook ติดตั้งอยู่บนเครื่องนี้](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
+  - [ไม่มีโฟลเดอร์ platform ของ Microsoft Defender บนเครื่องนี้](#rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab) — `posture` · `experimental`
+- `net_config`
+  - [ไฟล์ hosts กำหนด address ให้ชื่อของ FiveM หรือ Rockstar](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
+- `os_image`
+  - [ผู้ผลิตเครื่อง (OEM manufacturer) ที่ Settings แสดง เป็นโครงการดัดแปลง Windows](#rule-211d278c-58de-4287-974c-dda6f39a153c) — `posture` · `experimental`
+  - [รุ่นเครื่อง (OEM model) ที่ Settings แสดง เป็นชื่อ playbook ที่ดัดแปลง Windows](#rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9) — `posture` · `experimental`
+  - [ชื่อองค์กรที่จดทะเบียนไว้เป็นชื่อ playbook ที่ดัดแปลง Windows](#rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714) — `posture` · `experimental`
+  - [เซอร์วิสของ Microsoft Defender ถูกตั้งไว้ไม่ให้เริ่มทำงานเลย](#rule-77646339-caf4-4ade-93ef-133089dac30e) — `posture` · `experimental`
+  - [เครื่องนี้ไม่มีเซอร์วิสของ Microsoft Defender ลงทะเบียนไว้เลย](#rule-8f656238-36d2-4178-98db-87f55432edf7) — `posture` · `experimental`
+  - [เซอร์วิส Windows Event Log ไม่ได้เริ่มพร้อม Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
+  - [เซอร์วิส Windows Update เริ่มทำงานไม่ได้บนเครื่องนี้](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -59,9 +77,71 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ Windows PowerShell](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
+  - [ปิด SEHOP (การตรวจสอบสายตัวจัดการข้อยกเว้น) ไว้](#rule-dc858978-954d-418f-a42e-29f06975f4ed) — `posture` · `experimental`
+  - [object namespace ของเคอร์เนลไม่ได้ถูกป้องกันแบบที่ Windows ตั้งมา](#rule-a4af8cdc-a009-42ee-8368-7f35e93051fe) — `posture` · `experimental`
+  - [ปิดการป้องกัน speculative execution ไว้](#rule-d2f86e75-7692-468e-88a2-52eb1e24dc30) — `posture` · `experimental`
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+- timeline selector
+  - `bam`
+    - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
+    - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
+  - `evtx`
+    - [record เก่าสุดและใหม่สุดของ event log ของ Windows](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
+  - `fivem_dir`
+    - [เวลาที่โฟลเดอร์ log, crash และ cache ของ FiveM ถูกเขียน](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
+  - `pca`
+    - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
+    - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `prefetch`
+    - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db) — `context` · `experimental`
+    - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
+  - `usn`
+    - [เวลาที่ change journal บันทึกการเปลี่ยนแปลงในโฟลเดอร์ที่เฝ้าดู](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+
+## collector `driver_service`
+
+### `driver_service` / `vulnerable-driver`
+
+<a id="rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3"></a>
+
+#### ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers
+
+- ชื่อภาษาอังกฤษ: A registered driver is on LOLDrivers' list of vulnerable drivers
+- id: `98f6e2b8-6d23-4202-bc7f-06587ebdd2f3`
+- ไฟล์: [`rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml`](../rules/driver_service/vulnerable-driver/loldrivers-listed/rule.yaml)
+- collector: `driver_service`
+- strength: `posture` — สถานะเครื่อง
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `posture`, `drivers`
+- เขียนเมื่อ: 2026-09-15
+
+**เกี่ยวกับการตรวจนี้**
+
+driver service ที่ลงทะเบียนไว้บนเครื่องนี้ชี้ไปที่ไฟล์ซึ่ง SHA-256 ตรงกับไดรเวอร์มีช่องโหว่ที่ LOLDrivers ยืนยันแล้ว คือไดรเวอร์ที่มีลายเซ็นแต่มีจุดอ่อนที่รู้กันอยู่ ซึ่งโปรแกรมที่รันด้วยสิทธิ์ผู้ดูแลระบบใช้เข้าถึง kernel ของ Windows ได้ รายการใน LOLDrivers บอกว่าตัวนี้ทำอะไรได้บ้าง Windows โหลดไดรเวอร์ที่มีลายเซ็น เว้นแต่รายการบล็อกไดรเวอร์มีช่องโหว่ของ Microsoft ระบุไว้ และโปรแกรมนี้ไม่ได้อ่านว่ารายการบล็อกนั้นเปิดอยู่หรือไม่ แถวนี้แสดง SHA-256 ของไฟล์ ค้นหา hash นั้นใน rules/driver\_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv ใน repository ของโปรแกรมนี้เพื่อดู id ของรายการใน LOLDrivers และชื่อไฟล์ ข้อนี้บอกว่าไดรเวอร์ลงทะเบียนไว้ ไม่ได้บอกว่าถูกโหลดอยู่ ไม่ได้บอกว่ามีอะไรใช้มัน หรือทำไมถึงติดตั้งไว้ และโปรแกรมฮาร์ดแวร์ทั่วไปก็ติดตั้งไดรเวอร์แบบนี้
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `sha256`: เป็นค่าใดค่าหนึ่งใน 1847 ค่าในคอลัมน์แรกของ `loldrivers-vulnerable-drivers.csv` ซึ่งเป็นไฟล์ที่อยู่ข้าง rule (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+driver service ที่ลงทะเบียนไว้ตอนสแกน ไดรเวอร์ที่เคยลงทะเบียนแล้วถูกลบออกก่อนสแกนจะไม่เห็น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- โปรแกรมโอเวอร์คล็อก ควบคุมพัดลมและไฟ RGB และโปรแกรมดูสถานะฮาร์ดแวร์ ซึ่งติดตั้งไดรเวอร์แบบนี้ รายการ RTCore64.sys ของ LOLDrivers คือไดรเวอร์ของ MSI Afterburner
+- driver service ที่ยังลงทะเบียนค้างไว้หลังถอนโปรแกรมออกแล้ว โดยไฟล์ยังอยู่บนดิสก์
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/magicsword-io/LOLDrivers>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## collector `evtx`
 
@@ -594,6 +674,505 @@ FiveM.exe ในโฟลเดอร์โปรแกรมของ FiveM for
 
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
 
+## collector `fivem_servers`
+
+### `fivem_servers` / `enhanced`
+
+<a id="rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0"></a>
+
+#### FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้
+
+- ชื่อภาษาอังกฤษ: FiveM for GTA V Enhanced keeps a cache folder for a server
+- id: `c402aedc-1ed7-49a6-998c-0762e17e9bd0`
+- ไฟล์: [`rules/fivem_servers/enhanced/server-cache-folder/rule.yaml`](../rules/fivem_servers/enhanced/server-cache-folder/rule.yaml)
+- collector: `fivem_servers`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `fivem_servers`, `full_scan`
+- เขียนเมื่อ: 2026-09-18
+
+**เกี่ยวกับการตรวจนี้**
+
+FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache หนึ่งโฟลเดอร์ต่อหนึ่งเซิร์ฟเวอร์ที่เคยเข้า แถวนี้คือหนึ่งในนั้น พร้อมชื่อโฟลเดอร์ เวลาที่สร้าง และเวลาที่แก้ไขล่าสุด ยังไม่รู้ว่าชื่อนี้คำนวณมาจากอะไร แต่ชื่อของเซิร์ฟเวอร์เดิมบนเครื่องนี้จะเหมือนเดิม ชื่อเดียวกันในรายงานสองฉบับจากเครื่องนี้จึงเป็นเซิร์ฟเวอร์เดียวกัน ยังไม่รู้ว่าเครื่องอื่นได้ชื่อเดียวกันสำหรับเซิร์ฟเวอร์นั้นหรือไม่ โหมด SS แสดงชื่อก็ต่อเมื่อผู้เล่นยินยอมให้แสดงตัวตนของเซิร์ฟเวอร์ อ่านเฉพาะการสแกนแบบ Full ข้อนี้บอกว่าเกมเคยเข้าเซิร์ฟเวอร์ ไม่ได้บอกว่าใครทำอะไรในนั้น
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `server_folder|exists`: มีฟิลด์นี้
+
+**ย้อนดูได้**
+
+โฟลเดอร์ cache ของเซิร์ฟเวอร์ที่มีอยู่ตอนสแกน โฟลเดอร์ที่ผู้เล่น โปรแกรมทำความสะอาด หรือการติดตั้งใหม่ลบไปแล้วจะไม่เห็น และยังไม่รู้ว่า FiveM ลบโฟลเดอร์เก่าเองหรือไม่
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- การเข้าเซิร์ฟเวอร์ใดก็ได้ด้วย FiveM for GTA V Enhanced ซึ่งเป็นสิ่งที่ทิ้งโฟลเดอร์เหล่านี้ไว้
+- โฟลเดอร์ที่ค้างมาจากเซิร์ฟเวอร์ที่เข้านานแล้ว หรือจากคนอื่นที่ใช้บัญชี Windows นี้
+
+## collector `install_marker`
+
+### `install_marker` / `modified-build`
+
+<a id="rule-fd58dec6-84c1-49cb-806c-10b4614a046f"></a>
+
+#### มีโฟลเดอร์หรือคีย์ที่ Atlas playbook ติดตั้งอยู่บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: A folder or key the Atlas playbook installs is on this PC
+- id: `fd58dec6-84c1-49cb-806c-10b4614a046f`
+- ไฟล์: [`rules/install_marker/modified-build/atlas-files-present/rule.yaml`](../rules/install_marker/modified-build/atlas-files-present/rule.yaml)
+- collector: `install_marker`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `install_marker`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+พบที่ใดที่หนึ่งที่ Atlas playbook สร้างขึ้นตอนถูกนำไปใช้ ได้แก่ โฟลเดอร์โมดูล โฟลเดอร์สคริปต์ตั้งค่าบนเดสก์ท็อป หรือคีย์รีจิสทรีของตัวมันเอง Atlas ปิดการทำงานบางส่วนของ Windows และบางส่วนนั้นคือสิ่งที่โปรแกรมนี้กับระบบกันโกงของเซิร์ฟเวอร์อ่าน การเลือกระบบปฏิบัติการเป็นสิทธิ์ของเจ้าของเครื่อง แถวนี้บอกว่ามีอะไรติดตั้งอยู่ ไม่ได้บอกว่ามีการโกง และไม่ได้อ่านว่าข้างในโฟลเดอร์มีอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `marker`: เป็นค่าใดค่าหนึ่งใน `%SystemRoot%\AtlasModules`, `%SystemRoot%\AtlasDesktop`, `HKLM\SOFTWARE\AtlasOS` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `present`: เป็น `true`
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook นี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- โฟลเดอร์หรือคีย์ที่ค้างอยู่หลังถอน playbook ออกหรือย้อนค่ากลับแล้ว
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-3ec29285-f365-4e60-81fe-818d27c6b47a"></a>
+
+#### มีโฟลเดอร์ที่ ReviOS playbook ติดตั้งอยู่บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: A folder the ReviOS playbook installs is on this PC
+- id: `3ec29285-f365-4e60-81fe-818d27c6b47a`
+- ไฟล์: [`rules/install_marker/modified-build/revios-files-present/rule.yaml`](../rules/install_marker/modified-build/revios-files-present/rule.yaml)
+- collector: `install_marker`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `install_marker`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+พบที่ใดที่หนึ่งที่ ReviOS playbook สร้างขึ้นตอนถูกนำไปใช้ ได้แก่ โฟลเดอร์ของเครื่องมือตัวมันเอง หรือโฟลเดอร์วอลเปเปอร์ที่มันติดตั้ง ReviOS ปิดการทำงานบางส่วนของ Windows ซึ่งบางส่วนคือสิ่งที่โปรแกรมนี้กับระบบกันโกงของเซิร์ฟเวอร์อ่าน การเลือกระบบปฏิบัติการเป็นสิทธิ์ของเจ้าของเครื่อง แถวนี้บอกว่ามีอะไรติดตั้งอยู่ ไม่ได้บอกว่ามีการโกง และไม่ได้อ่านว่าข้างในโฟลเดอร์มีอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `marker`: เป็นค่าใดค่าหนึ่งใน `%ProgramFiles%\Revision Tool`, `%SystemRoot%\Web\Wallpaper\MeetRevision` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `present`: เป็น `true`
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook นี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- โฟลเดอร์ที่ค้างอยู่หลังถอน playbook ออกหรือย้อนค่ากลับแล้ว
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/meetrevision/playbook>
+
+### `install_marker` / `windows-components`
+
+<a id="rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab"></a>
+
+#### ไม่มีโฟลเดอร์ platform ของ Microsoft Defender บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender's platform folder is not on this PC
+- id: `f47de6d4-05ef-4f33-9aca-2307170fd5ab`
+- ไฟล์: [`rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml`](../rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml)
+- collector: `install_marker`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `install_marker`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+ไม่มีโฟลเดอร์ที่ Windows ใช้เก็บเอนจิ้นของ Defender อยู่ การปิด Defender ใน Settings หรือการติดตั้งแอนตี้ไวรัสตัวอื่น ต่างก็ยังทิ้งโฟลเดอร์นี้ไว้ สภาพแบบนี้จึงเป็นหน้าตาของอิมเมจ Windows ที่ถอดส่วนประกอบนี้ออก ให้อ่านคู่กับว่าเซอร์วิสของ Defender ยังลงทะเบียนอยู่หรือไม่ ซึ่งจะบอกว่าเป็นกรณีไหนในสองกรณี แถวนี้บอกว่าเครื่องติดตั้งอะไรไว้ ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `marker`: เป็น `%ProgramData%\Microsoft\Windows Defender\Platform` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `present`: เป็น `false`
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- อิมเมจ Windows ที่ถูกดัดแปลงมาก่อนติดตั้ง เพื่อความเร็ว เพื่อเครื่องเก่า หรือเพื่อดิสก์เล็ก โดยคนที่ไม่เกี่ยวกับเกม
+- Windows รุ่นหรือ build ที่องค์กรดูแล ซึ่งไม่มี Defender มาให้ตั้งแต่ต้น
+- เครื่องมือถอด Defender ที่เจ้าของเครื่องหรือคนที่ตั้งเครื่องให้เป็นคนรัน
+- เครื่องที่ติดตั้ง Defender ไว้ที่อื่นซึ่งไม่ใช่โฟลเดอร์มาตรฐานของ Windows
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/microsoft-defender-antivirus-windows>
+
+## collector `net_config`
+
+### `net_config` / `hosts`
+
+<a id="rule-65ee0ec1-bcda-47a3-a401-98632b42e75f"></a>
+
+#### ไฟล์ hosts กำหนด address ให้ชื่อของ FiveM หรือ Rockstar
+
+- ชื่อภาษาอังกฤษ: The hosts file gives a FiveM or Rockstar name an address
+- id: `65ee0ec1-bcda-47a3-a401-98632b42e75f`
+- ไฟล์: [`rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml`](../rules/net_config/hosts/fivem-or-rockstar-name-in-hosts/rule.yaml)
+- collector: `net_config`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `net_config`, `hosts`
+- เขียนเมื่อ: 2026-09-18
+
+**เกี่ยวกับการตรวจนี้**
+
+บรรทัดที่มีผลในไฟล์ hosts ของเครื่องนี้กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com เอง Windows จึงใช้ address นั้นกับชื่อนั้นแทนการถาม DNS server แถวนี้แสดงชื่อ บรรทัด และชนิดของ address ถ้าเป็น loopback หรือ unspecified ชื่อนั้นจะไม่ไปไหน ซึ่งเป็นวิธีที่ blocklist ใช้บล็อกบริการ ถ้าเป็น private หรือ public ชื่อนั้นจะถูกส่งไปเครื่องอื่น โหมด SS แสดงแค่ชนิด เพราะ address เองอาจเป็นเซิร์ฟเวอร์ของผู้เล่น ข้อนี้ไม่ได้บอกว่าอะไรเขียนบรรทัดนี้ เขียนเมื่อไร หรือมีโปรแกรมใช้มันหรือไม่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `host_name|exists`: มีฟิลด์นี้
+- `location`: เป็น `hosts` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+ไฟล์ hosts ตามที่เป็นอยู่ตอนสแกน บรรทัดที่ถูกลบไปก่อนสแกนจะไม่เห็น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- blocklist ของโฆษณา การติดตาม และ telemetry ซึ่งชี้ชื่อของ Rockstar ไปที่ 0.0.0.0 หรือ 127.0.0.1
+- คู่มือที่บล็อกเซิร์ฟเวอร์อัปเดตหรือเซิร์ฟเวอร์ sign-in ของ Rockstar launcher ด้วยการแก้ไฟล์ hosts
+- ซอฟต์แวร์ที่เขียนบรรทัดของตัวเองลงไฟล์ hosts เช่น VPN ชุดโปรแกรมความปลอดภัย หรือเครื่องมือพัฒนาโปรแกรม
+
+## collector `os_image`
+
+### `os_image` / `modified-build`
+
+<a id="rule-211d278c-58de-4287-974c-dda6f39a153c"></a>
+
+#### ผู้ผลิตเครื่อง (OEM manufacturer) ที่ Settings แสดง เป็นโครงการดัดแปลง Windows
+
+- ชื่อภาษาอังกฤษ: The OEM manufacturer shown in Settings is a Windows-modification project
+- id: `211d278c-58de-4287-974c-dda6f39a153c`
+- ไฟล์: [`rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml`](../rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+Settings แสดงผู้ผลิตเครื่องนี้ว่า \`Atlas Team\` ซึ่งเป็นค่าที่ Atlas playbook เขียนทับชื่อผู้ผลิตเมนบอร์ดหรือโน้ตบุ๊กจริง ตอนถูกนำไปใช้ อ่านได้จากซอร์สของตัวมันเอง (ADR 0056) ข้อนี้บอกว่าเครื่องใช้ระบบปฏิบัติการแบบไหน ซึ่งเจ้าของเครื่องเลือกเองได้ และไม่ได้พิสูจน์ว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `oem_manufacturer`: เป็น `Atlas Team` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ Atlas playbook เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- บัญชีที่มีสิทธิ์ผู้ดูแลเขียนค่านี้ได้ จึงอาจถูกพิมพ์ใส่เองก็ได้
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9"></a>
+
+#### รุ่นเครื่อง (OEM model) ที่ Settings แสดง เป็นชื่อ playbook ที่ดัดแปลง Windows
+
+- ชื่อภาษาอังกฤษ: The OEM model shown in Settings names a Windows-modification playbook
+- id: `a935bb41-6ed4-41a3-9477-7b3fe3a987d9`
+- ไฟล์: [`rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+รุ่นเครื่องที่ Settings แสดง ขึ้นต้นด้วยชื่อที่ playbook ดัดแปลง Windows สองตัวเขียนไว้ คือ Atlas หรือ ReviOS บนเครื่องที่ไม่ถูกดัดแปลง ค่านี้คือรุ่นเมนบอร์ดหรือรุ่นโน้ตบุ๊กที่ผู้ผลิตเขียนไว้ (วัดได้จริงว่าเป็น \`MS-7A36\` บนเครื่องทั่วไปเครื่องหนึ่ง) ข้อนี้จึงพูดเรื่องเดียวกับชื่อองค์กร แต่มาจากที่ที่สองที่ playbook เขียน (ADR 0056) เป็นการบอกว่าเครื่องใช้ระบบปฏิบัติการแบบไหน ไม่ได้พิสูจน์ว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `oem_model|startswith`: ขึ้นต้นด้วยค่าใดค่าหนึ่งใน `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook เหล่านี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- บัญชีที่มีสิทธิ์ผู้ดูแลเขียนค่านี้ได้ จึงอาจถูกพิมพ์ใส่เองก็ได้
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+<a id="rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714"></a>
+
+#### ชื่อองค์กรที่จดทะเบียนไว้เป็นชื่อ playbook ที่ดัดแปลง Windows
+
+- ชื่อภาษาอังกฤษ: The registered organisation names a Windows-modification playbook
+- id: `3abb40b8-05a4-4cc9-a2f8-17ba52a98714`
+- ไฟล์: [`rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+ชื่อองค์กรที่ \`winver\` แสดง ขึ้นต้นด้วยชื่อที่ playbook ดัดแปลง Windows สองตัวเขียนไว้เอง คือ Atlas หรือ ReviOS ทั้งสองตัวเขียนค่านี้เองตอนถูกนำไปใช้กับ Windows ที่ติดตั้งตามปกติ (ADR 0056) playbook แบบนี้ปิดการทำงานบางส่วนของ Windows และบางส่วนนั้นคือสิ่งที่โปรแกรมนี้กับระบบกันโกงของเซิร์ฟเวอร์อ่าน ข้อนี้บอกว่าเครื่องใช้ระบบปฏิบัติการแบบไหน ซึ่งเจ้าของเครื่องมีสิทธิ์เลือกเอง และไม่ได้พิสูจน์ว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `registered_organization|startswith`: ขึ้นต้นด้วยค่าใดค่าหนึ่งใน `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook เหล่านี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- คนที่พิมพ์ชื่อเหล่านี้ลงในช่ององค์กรเอง ซึ่งบัญชีที่มีสิทธิ์ผู้ดูแลทำได้
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+### `os_image` / `windows-components`
+
+<a id="rule-77646339-caf4-4ade-93ef-133089dac30e"></a>
+
+#### เซอร์วิสของ Microsoft Defender ถูกตั้งไว้ไม่ให้เริ่มทำงานเลย
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender's service is set never to start
+- id: `77646339-caf4-4ade-93ef-133089dac30e`
+- ไฟล์: [`rules/os_image/windows-components/defender-service-disabled/rule.yaml`](../rules/os_image/windows-components/defender-service-disabled/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+เซอร์วิส \`WinDefend\` ลงทะเบียนอยู่ แต่ตั้งค่าการเริ่มทำงานไว้เป็น \`disabled\` Windows จึงไม่เริ่มมัน \*\*การติดตั้งแอนตี้ไวรัสตัวอื่นทำแบบนี้พอดี\*\* และเป็นเหตุผลที่ธรรมดาที่สุดของแถวนี้ ส่วนสคริปต์ปรับแต่งที่ปิด Defender ก็เป็นอีกเหตุผลหนึ่ง ให้อ่านข้อนี้คู่กับสิ่งอื่นในรายงาน ไม่ใช่อ่านลำพัง และอ่านในฐานะคำอธิบายลักษณะเครื่อง ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_windefend`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- แอนตี้ไวรัสของเจ้าอื่นทุกตัว ซึ่งปิดเซอร์วิสของ Defender ตอนติดตั้งตัวเอง
+- เครื่องที่บริษัทหรือโรงเรียนดูแล และนโยบายสั่งปิด Defender
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-8f656238-36d2-4178-98db-87f55432edf7"></a>
+
+#### เครื่องนี้ไม่มีเซอร์วิสของ Microsoft Defender ลงทะเบียนไว้เลย
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender's service is not registered on this PC
+- id: `8f656238-36d2-4178-98db-87f55432edf7`
+- ไฟล์: [`rules/os_image/windows-components/defender-service-not-registered/rule.yaml`](../rules/os_image/windows-components/defender-service-not-registered/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อยู่เลย ปกติ Windows มีมาให้ และการปิด Defender ใน Settings หรือการติดตั้งแอนตี้ไวรัสตัวอื่นก็ยังทิ้งคีย์นี้ไว้ สภาพแบบนี้จึงเป็นหน้าตาของอิมเมจ Windows ที่ถอดส่วนประกอบนี้ออก แบบที่ขายกันว่าเบากว่าหรือเร็วกว่า (ADR 0056) เครื่องที่ไม่มี Defender ก็ไม่มี log ของ Defender ให้ผู้ตรวจอ่านด้วย ข้อนี้บอกว่าเครื่องติดตั้งอะไรไว้ ไม่ใช่หลักฐานว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_windefend`: เป็น `absent` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- อิมเมจ Windows ที่ถูกดัดแปลงมาก่อนติดตั้ง เพื่อความเร็ว เพื่อเครื่องเก่า หรือเพื่อดิสก์เล็ก โดยคนที่ไม่เกี่ยวกับเกม
+- Windows รุ่นหรือ build ที่องค์กรดูแล ซึ่งไม่มี Defender มาให้ตั้งแต่ต้น
+- เครื่องมือถอด Defender ที่เจ้าของเครื่องหรือคนที่ตั้งเครื่องให้เป็นคนรัน
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379"></a>
+
+#### เซอร์วิส Windows Event Log ไม่ได้เริ่มพร้อม Windows
+
+- ชื่อภาษาอังกฤษ: The Windows Event Log service does not start with Windows
+- id: `cf83f06e-23b5-47fc-b7a0-b6d1b8192379`
+- ไฟล์: [`rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml`](../rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+เซอร์วิส \`EventLog\` ถูกตั้งให้เริ่มเมื่อเรียกใช้ หรือไม่ให้เริ่มเลย หรือไม่มีคีย์ของมันอยู่เลย เซอร์วิสนี้คือตัวเขียน log ของ Windows ที่โปรแกรมนี้อ่าน บนเครื่องแบบนั้น "ไม่มีบันทึก" จึงไม่ได้แปลว่า "ไม่มีอะไรเกิดขึ้น" เพราะอาจไม่มีใครเขียนมันตั้งแต่แรก ปกติ Windows ตั้งให้เริ่มอัตโนมัติ และทั้งอิมเมจที่ถูกตัดส่วนประกอบและสคริปต์ปรับแต่งต่างก็เคยเปลี่ยนค่านี้ ข้อนี้บอกลักษณะเครื่อง ไม่ได้แสดงว่ามีอะไรถูกลบหรือมีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_eventlog`: เป็นค่าใดค่าหนึ่งใน `absent`, `disabled`, `manual` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- อิมเมจ Windows ที่ถูกดัดแปลงมาก่อนติดตั้งเพื่อความเร็ว โดยคนที่ไม่เกี่ยวกับเกม
+- สคริปต์ปรับแต่งที่เจ้าของเครื่องรันเพื่อความเร็วหรือความเป็นส่วนตัว
+- build ที่องค์กรดูแล ซึ่งนโยบายตั้งค่าเซอร์วิสนี้ไว้ต่างออกไป
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging>
+
+<a id="rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830"></a>
+
+#### เซอร์วิส Windows Update เริ่มทำงานไม่ได้บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: Windows Update's service cannot start on this PC
+- id: `c9012982-5fc1-4d61-ab0c-0bc1abe93830`
+- ไฟล์: [`rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml`](../rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+เซอร์วิส \`wuauserv\` ถูกตั้งไว้ไม่ให้เริ่มเลย หรือไม่มีคีย์ของมันอยู่ เครื่องที่อัปเดตไม่ได้จะคงอยู่กับ Windows ชุดที่ติดตั้งมาตอนแรก ซึ่งเป็นวิธีที่อิมเมจที่ถูกดัดแปลงใช้รักษาสภาพเดิมไว้ และสคริปต์ปรับแต่งหลายตัวก็ทำแบบนี้กับ Windows ปกติเช่นกัน (ADR 0056) ปกติ Windows ตั้งเซอร์วิสนี้ให้เริ่มเมื่อเรียกใช้ ข้อนี้บอกว่าเครื่องได้รับอัปเดตอย่างไร ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_wuauserv`: เป็นค่าใดค่าหนึ่งใน `absent`, `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เจ้าของเครื่องปิด Windows Update เองเพื่อไม่ให้รีสตาร์ต หรือเพื่อรักษาไดรเวอร์ที่อัปเดตรุ่นหลังจะไปทับ
+- เครื่องที่บริษัทหรือโรงเรียนดูแลและอัปเดตด้วยวิธีอื่น
+- อิมเมจ Windows ที่ถูกดัดแปลง หรือสคริปต์ปรับแต่งที่เจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview>
+
 ## collector `posture`
 
 ### `posture` / `boot`
@@ -929,6 +1508,128 @@ Windows ถูกตั้งค่าไม่ให้บังคับใช
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/enable-virtualization-based-protection-of-code-integrity>
 
+### `posture` / `mitigations`
+
+<a id="rule-dc858978-954d-418f-a42e-29f06975f4ed"></a>
+
+#### ปิด SEHOP (การตรวจสอบสายตัวจัดการข้อยกเว้น) ไว้
+
+- ชื่อภาษาอังกฤษ: Structured exception handling overwrite protection (SEHOP) is switched off
+- id: `dc858978-954d-418f-a42e-29f06975f4ed`
+- ไฟล์: [`rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml`](../rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `mitigations`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ถูกสั่งไม่ให้ตรวจสอบสายของตัวจัดการข้อยกเว้น ซึ่งเป็นการป้องกันการยึดเส้นทางการทำงานของโปรแกรมรูปแบบหนึ่ง การปิดมันเป็นขั้นตอนหนึ่งของสคริปต์ปรับแต่งเพื่อเกมหลายตัว และซอฟต์แวร์เก่าบางตัวก็ขอให้ปิด ค่านี้เจ้าของเครื่องเป็นคนตั้ง และไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `exception_chain_validation`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ซอฟต์แวร์เก่าที่คู่มือของตัวเองบอกให้ปิดการป้องกันนี้
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+- เครื่องที่องค์กรดูแลและนโยบายตั้งค่าไว้แบบนี้
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/security/threat-protection/overview-of-threat-mitigations-in-windows-10>
+
+<a id="rule-a4af8cdc-a009-42ee-8368-7f35e93051fe"></a>
+
+#### object namespace ของเคอร์เนลไม่ได้ถูกป้องกันแบบที่ Windows ตั้งมา
+
+- ชื่อภาษาอังกฤษ: The kernel object namespace is not protected as Windows ships it
+- id: `a4af8cdc-a009-42ee-8368-7f35e93051fe`
+- ไฟล์: [`rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml`](../rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `mitigations`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ถูกสั่งไม่ให้แยกโปรแกรมที่มีระดับสิทธิ์ต่างกันออกจากกันใน object namespace ของเคอร์เนล ซึ่งเป็นการป้องกันที่ Windows เปิดมาให้ (วัดได้จากเครื่องทั่วไป) การปิดมันทำให้โปรแกรมหนึ่งเข้าถึงวัตถุที่มีชื่อของอีกโปรแกรมได้ง่ายขึ้น สคริปต์ปรับแต่งบางตัวทำแบบนี้ และซอฟต์แวร์เก่าบางตัวก็ขอให้ปิด ค่านี้เจ้าของเครื่องเป็นคนตั้ง และไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `object_namespace_protection`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ซอฟต์แวร์เก่าที่คู่มือของตัวเองบอกให้ปิดการป้องกันนี้
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+- เครื่องที่องค์กรดูแลและนโยบายตั้งค่าไว้แบบนี้
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/sync/object-namespaces>
+
+<a id="rule-d2f86e75-7692-468e-88a2-52eb1e24dc30"></a>
+
+#### ปิดการป้องกัน speculative execution ไว้
+
+- ชื่อภาษาอังกฤษ: The speculative-execution mitigations are switched off
+- id: `d2f86e75-7692-468e-88a2-52eb1e24dc30`
+- ไฟล์: [`rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml`](../rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `mitigations`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ถูกสั่งให้ปิดการป้องกัน Spectre variant 2 และ Meltdown ด้วยค่าคู่หนึ่งที่รวมกันแล้วแปลว่าปิด การป้องกันนี้กินประสิทธิภาพไปไม่กี่เปอร์เซ็นต์ และการปิดมันเป็นขั้นตอนหนึ่งของสคริปต์ปรับแต่งเพื่อเกมหลายตัว ขณะเดียวกันก็ทำให้เครื่องเปิดรับช่องโหว่ระดับโปรเซสเซอร์ที่การป้องกันนี้ถูกเขียนขึ้นมารับมือ ค่านี้เจ้าของเครื่องเป็นคนตั้ง และไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `speculative_execution_mitigations`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เจ้าของเครื่องทำตามคำแนะนำเรื่องความเร็วสำหรับโปรเซสเซอร์รุ่นเก่า ซึ่งเสียประสิทธิภาพจากการป้องกันนี้มากที่สุด
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+- ร้านหรือคนประกอบเครื่องตั้งค่าแบบนี้มาให้
+
+**แหล่งอ้างอิง**
+
+- <https://support.microsoft.com/en-us/topic/kb4073119-windows-client-guidance-for-it-pros-to-protect-against-silicon-based-microarchitectural-and-speculative-execution-side-channel-vulnerabilities-35820a8a-ae13-1299-88cc-357f104f5b11>
+
 ### `posture` / `tpm`
 
 <a id="rule-66d513b5-fe61-415a-9385-9d01f85c3ef5"></a>
@@ -1019,3 +1720,318 @@ Windows ถูกตั้งค่าไม่ให้บังคับใช
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+## timeline selector
+
+timeline selector เขียนแบบเดียวกับ rule แต่ไม่สร้างหลักฐาน สิ่งที่เห็นที่มันเลือกจะเอาเวลาของตัวเองไปวางบน timeline ของรายงาน ทั้งโหมด Self และ SS พร้อมข้อความและเรื่องปกติด้านล่าง มันไม่เคยเป็น เจอ ไม่เจอ หรือ ยังไม่ได้วัด และไม่ถูกนับ (ADR 0051) timeline selector เลือกบันทึกของ Prefetch, BAM และ Program Compatibility Assistant ตามชื่อได้ ซึ่ง rule ทำไม่ได้ (ADR 0034) ชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน และทุกตัวเขียนบอกไว้
+
+### `bam` / `timeline`
+
+<a id="rule-bf213176-ed26-4c02-935e-99925abc7db7"></a>
+
+#### เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM
+
+- ชื่อภาษาอังกฤษ: When BAM recorded a program named like FiveM's game process
+- id: `bf213176-ed26-4c02-935e-99925abc7db7`
+- ไฟล์: [`rules/bam/timeline/fivem-game-process-by-name/rule.yaml`](../rules/bam/timeline/fivem-game-process-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `bam`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `bam`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Background Activity Moderator (BAM) ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM\_b\<ตัวเลข\>\_GTAProcess.exe ซึ่งเป็นชื่อที่ FiveM ตั้งให้ process เกมที่มันเปิด โดยตัวเลขคือ build ของเกม บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name|endswith`: ลงท้ายด้วย `_GTAProcess.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `name|startswith`: ขึ้นต้นด้วย `FiveM_b` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ BAM ยังเก็บอยู่ Windows ลบรายการ BAM ที่เก่ากว่าเจ็ดวันทุกครั้งที่เริ่มทำงาน การรันที่เก่ากว่านั้นจึงไม่มีรายการเหลือ
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ชื่อขึ้นต้นด้วย FiveM\_b และลงท้ายด้วย \_GTAProcess.exe — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อให้เป็นรูปนี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เก็บบันทึกไว้ — รายการ BAM ที่เก่ากว่าเจ็ดวันถูกลบทุกครั้งที่ Windows เริ่มทำงาน
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+<a id="rule-19dc7372-391e-4874-9c94-92ee6170f2df"></a>
+
+#### เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V
+
+- ชื่อภาษาอังกฤษ: When BAM recorded a program named like FiveM or GTA V
+- id: `19dc7372-391e-4874-9c94-92ee6170f2df`
+- ไฟล์: [`rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/bam/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `bam`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `bam`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Background Activity Moderator (BAM) ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe หรือ PlayGTAV.exe ซึ่งเป็นชื่อไฟล์โปรแกรมของ FiveM และ GTA V บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name`: เป็นค่าใดค่าหนึ่งใน `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ BAM ยังเก็บอยู่ Windows ลบรายการ BAM ที่เก่ากว่าเจ็ดวันทุกครั้งที่เริ่มทำงาน การรันที่เก่ากว่านั้นจึงไม่มีรายการเหลือ
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ใช้ชื่อเหล่านี้ — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อเป็นชื่อเหล่านี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เก็บบันทึกไว้ — รายการ BAM ที่เก่ากว่าเจ็ดวันถูกลบทุกครั้งที่ Windows เริ่มทำงาน
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `evtx` / `timeline`
+
+<a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
+
+#### record เก่าสุดและใหม่สุดของ event log ของ Windows
+
+- ชื่อภาษาอังกฤษ: A Windows event log's oldest and newest record
+- id: `87b47713-1ed3-415e-bc07-9cd0b953d7c1`
+- ไฟล์: [`rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml`](../rules/evtx/timeline/log-oldest-and-newest-record/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `evtx`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า record เก่าสุดและใหม่สุดที่ไฟล์ event log แต่ละไฟล์ยังเก็บไว้มีเวลาเท่าไร ช่วงระหว่างสองเวลานี้คือสิ่งที่ log นั้นแสดงได้ เวลาที่อยู่นอกช่วงนี้เป็นเวลาที่ log ไม่ได้บอกอะไรเลย ช่วงที่สั้นไม่ใช่หลักฐานว่ามีการล้าง log
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `oldest_record_time|exists`: มีฟิลด์นี้
+
+**ย้อนดูได้**
+
+ไฟล์ log ตามที่เป็นอยู่ตอนสแกน log แต่ละตัวมีขนาดจำกัดและเขียนทับ record เก่าสุดเมื่อเต็ม
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- log ที่เต็มขนาดที่ตั้งไว้แล้วเขียนทับ record เก่าสุด ซึ่ง log ที่มีการเขียนบ่อยเป็นแบบนี้ได้ภายในไม่กี่วัน
+- ติดตั้ง Windows ใหม่ หรือรีเซ็ตเครื่อง
+- log ที่ถูกล้างโดยผู้ดูแลระบบ ตัวติดตั้งโปรแกรม หรือเครื่องมือบำรุงรักษา
+
+### `fivem_dir` / `timeline`
+
+<a id="rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"></a>
+
+#### เวลาที่โฟลเดอร์ log, crash และ cache ของ FiveM ถูกเขียน
+
+- ชื่อภาษาอังกฤษ: When FiveM's log, crash and cache folders were written
+- id: `2ef0da16-e65e-4bb6-90c5-0898ffc93ad8`
+- ไฟล์: [`rules/fivem_dir/timeline/folder-activity-times/rule.yaml`](../rules/fivem_dir/timeline/folder-activity-times/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `fivem_dir`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `fivem_dir`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าโฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced รายงานเวลาอะไรไว้บ้าง ได้แก่ เวลาที่แต่ละโฟลเดอร์ถูกสร้างและแก้ไขล่าสุด เวลาของไฟล์ที่เก่าสุดกับใหม่สุดในโฟลเดอร์ และเวลาที่โฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced ถูกสร้างและแก้ไขล่าสุด เวลาเหล่านี้เป็นเวลาที่ระบบไฟล์รายงาน ซึ่งโปรแกรมที่เขียนไฟล์ตั้งเองได้ โฟลเดอร์ cache ของเซิร์ฟเวอร์แสดงโดยไม่มีชื่อ ข้อนี้ไม่ใช่หลักฐานของสิ่งใด
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `location`: เป็นค่าใดค่าหนึ่งใน `legacy_logs`, `legacy_crashes`, `legacy_cache`, `legacy_server_cache`, `enhanced_logs`, `enhanced_crashes`, `enhanced_launcher_crashes`, `enhanced_server_cache` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+โฟลเดอร์ตามที่เป็นอยู่ตอนสแกน FiveM เขียน หมุนเวียน และลบ log, รายงาน crash และ cache ของตัวเอง และผู้เล่นล้างเองได้
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- FiveM เขียน หมุนเวียน และลบ log, รายงาน crash และ cache ของตัวเองตามการใช้งานปกติ
+- ผู้เล่นล้าง cache หรือ log ของ FiveM เอง
+- ติดตั้ง FiveM ใหม่ ย้ายไปเครื่องอื่น หรือกู้คืนจากข้อมูลสำรอง
+- โปรแกรมสำรองข้อมูล ซิงก์ หรือคัดลอกไฟล์ที่ตั้งเวลาของไฟล์
+
+### `pca` / `timeline`
+
+<a id="rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5"></a>
+
+#### เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM
+
+- ชื่อภาษาอังกฤษ: When Program Compatibility Assistant recorded a program named like FiveM's game process
+- id: `eaf79187-e067-43ed-9afe-bffe65e6b2e5`
+- ไฟล์: [`rules/pca/timeline/fivem-game-process-by-name/rule.yaml`](../rules/pca/timeline/fivem-game-process-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `pca`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pca`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Program Compatibility Assistant ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM\_b\<ตัวเลข\>\_GTAProcess.exe ซึ่งเป็นชื่อที่ FiveM ตั้งให้ process เกมที่มันเปิด โดยตัวเลขคือ build ของเกม บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name|endswith`: ลงท้ายด้วย `_GTAProcess.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `name|startswith`: ขึ้นต้นด้วย `FiveM_b` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ไฟล์ของ Program Compatibility Assistant ยังเก็บอยู่ Windows มีไฟล์เหล่านี้ตั้งแต่ Windows 11 22H2 ขึ้นไป
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ชื่อขึ้นต้นด้วย FiveM\_b และลงท้ายด้วย \_GTAProcess.exe — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อให้เป็นรูปนี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนบันทึก — ไฟล์เหล่านี้มีเฉพาะใน Windows 11 22H2 ขึ้นไป
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+<a id="rule-6487719d-15cf-422c-8b8a-858647091fd1"></a>
+
+#### เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V
+
+- ชื่อภาษาอังกฤษ: When Program Compatibility Assistant recorded a program named like FiveM or GTA V
+- id: `6487719d-15cf-422c-8b8a-858647091fd1`
+- ไฟล์: [`rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/pca/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `pca`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pca`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Program Compatibility Assistant ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe หรือ PlayGTAV.exe ซึ่งเป็นชื่อไฟล์โปรแกรมของ FiveM และ GTA V บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name`: เป็นค่าใดค่าหนึ่งใน `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะสิ่งที่ไฟล์ของ Program Compatibility Assistant ยังเก็บอยู่ Windows มีไฟล์เหล่านี้ตั้งแต่ Windows 11 22H2 ขึ้นไป
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ใช้ชื่อเหล่านี้ — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อเป็นชื่อเหล่านี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนบันทึก — ไฟล์เหล่านี้มีเฉพาะใน Windows 11 22H2 ขึ้นไป
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `prefetch` / `timeline`
+
+<a id="rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db"></a>
+
+#### เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM
+
+- ชื่อภาษาอังกฤษ: When Prefetch recorded a program named like FiveM's game process
+- id: `d377e008-0a08-4d6e-adf2-f6cbc8b978db`
+- ไฟล์: [`rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-game-process-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `prefetch`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `prefetch`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Prefetch ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM\_b\<ตัวเลข\>\_GTAProcess.exe ซึ่งเป็นชื่อที่ FiveM ตั้งให้ process เกมที่มันเปิด โดยตัวเลขคือ build ของเกม บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name|endswith`: ลงท้ายด้วย `_GTAProcess.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `name|startswith`: ขึ้นต้นด้วย `FiveM_b` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะไฟล์ Prefetch ที่ยังอยู่ในโฟลเดอร์ และเฉพาะเวลารันล่าสุดที่แต่ละไฟล์บันทึกไว้ Windows ลบไฟล์ Prefetch เองได้ และเครื่องที่ปิด Prefetch จะไม่มีไฟล์เลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ชื่อขึ้นต้นด้วย FiveM\_b และลงท้ายด้วย \_GTAProcess.exe — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อให้เป็นรูปนี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนหรือไม่ได้เก็บบันทึกไว้ — ปิด Prefetch อยู่ Windows ลบไฟล์ Prefetch ไปแล้ว หรือโปรแกรมทำความสะอาดล้างโฟลเดอร์
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+<a id="rule-a81a1693-2982-4004-8f40-186c2b90a6a2"></a>
+
+#### เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V
+
+- ชื่อภาษาอังกฤษ: When Prefetch recorded a program named like FiveM or GTA V
+- id: `a81a1693-2982-4004-8f40-186c2b90a6a2`
+- ไฟล์: [`rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml`](../rules/prefetch/timeline/fivem-or-gta-v-by-name/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `prefetch`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `prefetch`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Prefetch ของ Windows บันทึกเวลาไว้เมื่อไรสำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5\_Enhanced.exe หรือ PlayGTAV.exe ซึ่งเป็นชื่อไฟล์โปรแกรมของ FiveM และ GTA V บันทึกนี้มีแค่ชื่อ ไม่ได้บอกว่าเป็นโปรแกรมไหน จึงบอกได้แค่ว่าโปรแกรมที่ชื่อนี้รันเมื่อไรตามบันทึกนี้ ไม่ได้บอกว่า FiveM หรือ GTA V รัน ข้อนี้ไม่ใช่หลักฐานของสิ่งใด และการไม่มีรายการไม่ได้แปลว่าไม่เคยเล่นเกม
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `name`: เป็นค่าใดค่าหนึ่งใน `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะไฟล์ Prefetch ที่ยังอยู่ในโฟลเดอร์ และเฉพาะเวลารันล่าสุดที่แต่ละไฟล์บันทึกไว้ Windows ลบไฟล์ Prefetch เองได้ และเครื่องที่ปิด Prefetch จะไม่มีไฟล์เลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- โปรแกรมใดก็ได้ที่ใช้ชื่อเหล่านี้ — บันทึกมีแค่ชื่อ ไม่มีอะไรระบุว่าเป็นโปรแกรมไหน โปรแกรมที่ถูกเปลี่ยนชื่อเป็นชื่อเหล่านี้จึงถูกบันทึกด้วยชื่อนั้น
+- โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
+- Windows ไม่ได้เขียนหรือไม่ได้เก็บบันทึกไว้ — ปิด Prefetch อยู่ Windows ลบไฟล์ Prefetch ไปแล้ว หรือโปรแกรมทำความสะอาดล้างโฟลเดอร์
+- Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `usn` / `timeline`
+
+<a id="rule-82c71896-ef70-492d-b6fc-8671c09b5e1c"></a>
+
+#### เวลาที่ change journal บันทึกการเปลี่ยนแปลงในโฟลเดอร์ที่เฝ้าดู
+
+- ชื่อภาษาอังกฤษ: When the change journal recorded changes in a watched folder
+- id: `82c71896-ef70-492d-b6fc-8671c09b5e1c`
+- ไฟล์: [`rules/usn/timeline/watched-folder-record-times/rule.yaml`](../rules/usn/timeline/watched-folder-record-times/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `test` — เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ
+- tag: `usn`, `timeline`
+- เขียนเมื่อ: 2026-09-17
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าการเปลี่ยนแปลงที่เก่าสุดและใหม่สุดที่ NTFS change journal ยังเก็บไว้ของแต่ละโฟลเดอร์ที่โปรแกรมนี้เฝ้าดู (Prefetch, โฟลเดอร์ event log, โฟลเดอร์ Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM) เกิดขึ้นเมื่อไร journal นับการเปลี่ยนแปลงโดยไม่บอกว่าโปรแกรมไหนเป็นคนทำ เวลาในข้อนี้จึงเป็นเวลาที่มีไฟล์ในโฟลเดอร์นั้นถูกสร้าง แก้ไข เปลี่ยนชื่อ หรือลบ โดยใครก็ได้ รวมถึง Windows และ FiveM ข้อนี้ไม่ใช่หลักฐานว่ามีการลบสิ่งใด
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะ record ที่ journal ยังเก็บอยู่ journal มีขนาดจำกัดและทิ้ง record เก่าสุดเมื่อมี record ใหม่ จึงย้อนหลังได้เท่าที่ขนาดของมันเก็บไหว
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- Windows เขียนและลบไฟล์ Prefetch, event log และบันทึกความเข้ากันได้ตามการใช้งานปกติ
+- FiveM ตัวอัปเดตของมัน และ plugin ที่ผู้เล่นติดตั้งหรือถอดออก เปลี่ยนไฟล์ในโฟลเดอร์ plugin
+- โปรแกรมทำความสะอาดดิสก์ สำรองข้อมูล แอนตี้ไวรัส และโปรแกรมปรับแต่งเครื่อง
+- โฟลเดอร์ที่ไม่มีการเปลี่ยนแปลงในช่วงที่ journal ครอบคลุมจะไม่มีเวลาในข้อนี้ ซึ่งไม่ได้แปลว่าก่อนหน้านั้นไม่มีอะไรเปลี่ยน

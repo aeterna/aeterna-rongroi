@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 82c71896-ef70-492d-b6fc-8671c09b5e1c
+title: When the change journal recorded changes in a watched folder
+description: >-
+  Puts on the timeline the oldest and newest change the NTFS change journal still holds for each
+  folder this program watches: Prefetch, the event log folder, the Program Compatibility Assistant
+  folder and FiveM's plugin folders. The journal counts changes without saying which program made
+  them, so a time here is when a file in that folder was created, changed, renamed or deleted, by
+  anyone, including Windows and FiveM. It is not evidence that anything was removed.
+status: test
+# A timeline selector (ADR 0051). The journal's own span is the coverage band, not an entry.
+role: timeline
+collector: usn
+strength: context
+match:
+  folder: identified
+retention: >-
+  Only the records the journal still holds. The journal has a fixed size and drops its oldest records
+  as new ones arrive, so it
+  reaches back only as far as its size allows.
+falsepositives:
+  - Windows writing and removing Prefetch files, event logs and compatibility records in ordinary use
+  - FiveM, its updater and plugins installed or removed by the player changing files in the plugin
+    folders
+  - Disk clean-up, backup, antivirus and optimisation tools
+  - A folder with no change in the journal's span has no time here, which does not mean nothing
+    changed before it
+author: aeterna-rongroi contributors
+date: 2026-09-17
+tags: [usn, timeline]

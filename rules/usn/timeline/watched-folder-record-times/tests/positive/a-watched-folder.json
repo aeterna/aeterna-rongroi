@@ -1,0 +1,20 @@
+{
+  "description": "A watched folder the journal holds records for",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "prefetch",
+        "folder": "identified",
+        "records": 12,
+        "created": 4,
+        "deleted": 3,
+        "renamed": 0,
+        "data_changed": 5,
+        "first_seen": "2026-09-10T08:00:00Z",
+        "last_seen": "2026-09-16T21:14:03Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

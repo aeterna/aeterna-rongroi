@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: dc858978-954d-418f-a42e-29f06975f4ed
+title: Structured exception handling overwrite protection (SEHOP) is switched off
+description: >-
+  Windows is told not to validate the exception handler chain, a protection against one way of
+    hijacking a program's control flow. Switching it off is a step several gaming tweak scripts take,
+    and some older software asks for it. It is a setting the owner of the machine chose and it is not
+    evidence of cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  exception_chain_validation: disabled
+retention: Current state only. It says nothing about how the PC was set up in the past.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - Older software whose own instructions ask for this protection to be switched off
+  - A tweaking script or a pre-modified Windows image the owner installed for performance
+  - A PC managed by an employer whose policy sets it this way
+references:
+  - https://learn.microsoft.com/en-us/windows/security/threat-protection/overview-of-threat-mitigations-in-windows-10
+author: aeterna-rongroi contributors
+date: 2026-09-21
+tags: [posture, mitigations]

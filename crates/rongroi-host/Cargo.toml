@@ -17,6 +17,8 @@ publish.workspace = true
 fixture = ["dep:serde", "dep:serde-saphyr"]
 
 [dependencies]
+# jiff: the listing's creation and last-write times are timestamps on `DirEntryInfo` (ADR 0050).
+jiff.workspace = true
 serde = { workspace = true, optional = true }
 serde-saphyr = { workspace = true, optional = true }
 sha2.workspace = true

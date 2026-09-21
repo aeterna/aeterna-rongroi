@@ -73,16 +73,17 @@ The English is R3's recommended wording except where noted; the Thai is beside i
 |---|---|---|---|---|
 | `not_windows` | "not running on Windows" | "ไม่ได้รันบน Windows" | every collector | The scan is not on Windows. Never on a player's PC; universal in this repository's own tests |
 | `not_on_this_os` | "this version of Windows does not keep this record" | "Windows รุ่นนี้ไม่ได้เก็บข้อมูลส่วนนี้" | `pca` | The build is older than 22621. **Common** — Windows 10 is still a large share of gaming PCs, and on every one the absence of `appcompat\pca` means nothing |
-| `not_admin` | "Windows would not show this without administrator rights" | "ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน" | `pca`, `prefetch`, `bam`, `evtx` | An ordinary scan that was not restarted as administrator. **Very common** — which is why it is a scope statement and not a row (ADR 0027) |
+| `not_admin` | "Windows would not show this without administrator rights" | "ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน" | `pca`, `prefetch`, `bam`, `evtx`, `usn` | An ordinary scan that was not restarted as administrator. **Very common** — which is why it is a scope statement and not a row (ADR 0027) |
 | `not_attempted` | "this was not read — the scan stopped before reaching it" | "ไม่ได้อ่านส่วนนี้ เพราะการสแกนหยุดก่อนจะถึง" | `evtx` | A log whose turn came after the 30-second budget was already spent. **Rare** — it needs the budget to run out first |
-| `access_denied` | "Windows refused to open this" | "Windows ไม่อนุญาตให้เปิดอ่าน" | `pca`, `prefetch`, `bam`, `evtx`, `posture`, `process`, `fivem_dir` | Denied with the rights already held. Uncommon, and the one denial restarting does not fix |
+| `access_denied` | "Windows refused to open this" | "Windows ไม่อนุญาตให้เปิดอ่าน" | `pca`, `prefetch`, `bam`, `evtx`, `posture`, `process`, `fivem_dir`, `usn` | Denied with the rights already held. Uncommon, and the one denial restarting does not fix |
 | `service_disabled` | "the Windows service that writes this record is switched off" | "บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่" | `prefetch` | `EnablePrefetcher` is `0` or `2`. **Uncommon** — Windows ships `3`; it takes a performance tweak or an optimiser script to change |
-| `source_absent` | "this PC has no such record to read" | "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน" | `pca`, `prefetch`, `bam`, `evtx`, `posture` | The folder or key is not there. For `posture` — a registry value the machine does not report, e.g. Secure Boot on a legacy-BIOS PC — **common**, and all four shipped rules declare it |
+| `source_absent` | "this PC has no such record to read" | "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน" | `pca`, `prefetch`, `bam`, `evtx`, `posture`, `usn` | The folder or key is not there. For `posture` — a registry value the machine does not report, e.g. Secure Boot on a legacy-BIOS PC — **common**, and all four shipped rules declare it |
 | `source_empty` | "the place this is kept is there and holds nothing" | "มีที่เก็บข้อมูลอยู่ แต่ว่างเปล่า" | `pca`, `prefetch`, `bam`, `evtx` | Prefetch: a cleaning tip or optimiser, or eviction at the 1024-file cap — **common on a gaming PC**. BAM: see below. PCA: a clean install that has written nothing — **common**. Event Log: a maintenance script that cleared every log |
-| `partial` | "part of this was read and part of it was not" | "อ่านได้บางส่วน ไม่ครบ" | `pca`, `prefetch`, `bam` | A `.pf` from an older Windows, a PCA line with no delimiter, a BAM value too short. **Uncommon but not rare** — an upgraded machine keeps `.pf` files this parser does not decode |
-| `budget_spent` | "this program stopped reading before it finished" | "โปรแกรมนี้หยุดอ่านก่อนจะครบ" | `evtx` | The 30-second budget ran out. **Rare**, and it is this program's limit, not the machine's |
+| `partial` | "part of this was read and part of it was not" | "อ่านได้บางส่วน ไม่ครบ" | `pca`, `prefetch`, `bam`, `usn` | A `.pf` from an older Windows, a PCA line with no delimiter, a BAM value too short. **Uncommon but not rare** — an upgraded machine keeps `.pf` files this parser does not decode |
+| `budget_spent` | "this program stopped reading before it finished" | "โปรแกรมนี้หยุดอ่านก่อนจะครบ" | `evtx`, `usn`, `driver_service` | The 30-second budget ran out. **Rare**, and it is this program's limit, not the machine's; for `usn`, the same budget on reading the change journal (ADR 0047); for `driver_service`, the same budget on hashing driver files (ADR 0048) |
 | `read_failed` | "this could not be read" | "อ่านข้อมูลนี้ไม่ได้" | every collector that reads a source | I/O failure, a file past the 64 MiB cap (ADR 0019), an unset `%SystemRoot%`. Uncommon |
 | `collector_unavailable` | "this build does not read that" | "build นี้ยังไม่ได้อ่านส่วนนี้" | the engine | A rule for a collector this build has none of. Never in a shipped build; it is the ADR 0026 gate |
+| `not_consented` | "only a full scan reads this, and this was the standard scan" | "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน" | the scan, for a `full` collector (ADR 0052) | The player chose the standard scan. **Very common** — it is the default — so it is a scope statement, every rule expects it, and no rule may declare it. Added by ADR 0052 as a thirteenth reason |
 
 Three wordings depart from R3:
 
@@ -180,7 +181,7 @@ ADR 0027's filter stands, with `UnmeasuredReason` answering two questions about 
 | `not_found`, `posture` strength | listed (ADR 0011) | listed |
 | `not_found`, any other strength | counted | listed |
 | `unmeasured`, `partial` or `budget_spent` | **listed, declared or not** | listed |
-| `unmeasured`, `not_admin` or `not_attempted` | **scope statement** | listed, and the scope statement |
+| `unmeasured`, `not_admin`, `not_attempted` or `not_consented` (ADR 0052) | **scope statement** | listed, and the scope statement |
 | `unmeasured`, reason in `unmeasured_when` | counted | listed |
 | `unmeasured`, reason not in `unmeasured_when` | listed | listed |
 

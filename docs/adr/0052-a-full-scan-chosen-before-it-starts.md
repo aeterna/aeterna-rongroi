@@ -1,0 +1,238 @@
+# ADR 0052 — A full scan, chosen before it starts
+
+- Status: accepted — the owner decided the four questions below on 2026-09-17; implemented on 2026-09-18
+  with its first `full` collector (ADR 0055)
+- Date: 2026-09-16
+
+## Context
+
+The sources proposed next read more about the player than anything the program reads today:
+
+- FiveM's own logs, which name the servers the game connected to;
+- the per-server cache folders FiveM for GTA V Enhanced keeps, whose names identify a server;
+- the lists of modules in FiveM's crash dumps, whose paths can name a user folder;
+- counts of the Rockstar, Social Club and Steam profiles on the PC.
+
+The owner decided on 2026-09-16 that these are collected only when the player agrees, at the start, to a
+fuller scan than the ordinary one.
+
+Today consent does not gate collection. Every collector runs before any question is asked:
+
+- the desktop app scans before its window exists, so that nothing the WebView does can change what was
+  measured (`apps/desktop/src-tauri/src/main.rs`, ADR 0001, ADR 0012);
+- the CLI asks its question only in SS mode, and only about what is shown, after parsing arguments and
+  before scanning (`crates/rongroi-cli/src/main.rs`); Self mode asks nothing.
+
+Consent then decides what SS mode shows (`rongroi_core::view`). For sources whose mere reading is the thing
+a player may refuse, that is too late.
+
+## Decision
+
+### 1. Two scan tiers, and each collector belongs to one
+
+`Collector` gains `fn tier(&self) -> ScanTier`, `Standard` by default. `ScanTier` is `standard` or `full`.
+Every collector that exists today stays `standard`. A collector is `full` when its own ADR says so, and the
+ADR says why.
+
+`scan::run` takes the chosen tier. A `full` collector in a `standard` scan is not called: its run is
+`Unmeasured { reason: not_consented }`, so its rules are unmeasured and say why, and no function of it
+touches the machine.
+
+The report header gains `scan_tier`. It is additive, as `boot_time` and `profiles_directory` were, and
+`REPORT_SCHEMA_VERSION` stays at 1; a report without it was a standard scan.
+
+### 2. `not_consented` is a thirteenth reason, and a scope statement
+
+`UnmeasuredReason::NotConsented`, in words "the player chose the ordinary scan, which does not read this".
+Like `not_admin` and `not_attempted` it is one fact about the scan, so `is_scope_statement` is true: it is
+never a row, and `ScopeNotes` gains `not_consented`, stated once above the evidence in both modes. ADR 0030's
+table gains the row. A rule may not declare it in `unmeasured_when`, because no machine produces it.
+
+### 3. The choice is made before the scan, in the process that scans
+
+**CLI.** `scan --full` asks, on standard error and before any collector runs, a question that lists what a
+full scan reads. Only `yes` starts a full scan; anything else starts the standard scan and says so. `--yes`
+answers the SS-mode question only, never this one, and no flag answers it. A full scan therefore needs a
+person at the keyboard; a script gets the standard scan. `--elevate` forwards `--full`, and the elevated copy
+asks again, in its own window, because it is the process that reads.
+
+**Desktop.** The app starts as today and runs the standard scan. The report screen offers "Full scan". It
+does not scan in place (ADR 0012's reason stands): it starts a new copy of the program with `--full` and
+exits, as the elevation button does. The new copy, **before any collector runs and before any WebView
+exists**, shows the same list in a native Windows dialog. Yes starts a full scan; No or closing the dialog
+starts the standard scan. The dialog belongs to Windows, not to the WebView, so the property ADR 0001 and
+ADR 0012 protect — the report is measured before the WebView exists — holds.
+
+The new copy is meant to keep the token of the copy that started it, so that asking for a full scan neither
+gains nor drops administrator rights. The call is `CreateProcessW` with no token argument: measured, it gives
+a child of an elevated copy the same elevated token without another UAC prompt, and a child of a standard copy
+the same limited token (section "Measured"). The elevation button forwards `--full` when the current scan is
+full.
+
+**The flag alone never reads anything.** A shortcut or a script that passes `--full` gets the question, not a
+full scan. The question is asked by the process that will read, every time, so no earlier answer is trusted.
+
+### 4. What SS mode shows from a full scan
+
+- The SS consent question lists, when `scan_tier` is `full`, what the full scan read, and SS mode shows the
+  evidence of `full` collectors only after that answer.
+- Two kinds of value stay hidden in SS mode even then, each behind its own question the player answers
+  separately, default no:
+  - a **server identity** — an endpoint from a log, a server cache folder's name;
+  - an **account identifier** — should any collector ever emit one (the first ones emit counts only).
+
+  A collector marks such a field in its declaration (`Field::sensitive(kind)`, ADR 0026). `view` replaces
+  its value with a placeholder that says which question would show it, as it replaces a user name
+  (ADR 0049). The placeholder is in the view, never only in the UI (AGENTS.md hard rule 5).
+- Self mode shows everything the full scan read, as it does today.
+
+### 5. What a full scan does not change
+
+Everything in AGENTS.md's hard rules: no network code, read-only collectors, no verdict, no score. A full
+scan reads more; it does not read differently. No `full` collector may read a browser's history, a
+messenger's storage or any store that holds a credential or a token, whatever the player agrees to
+(`crates/rongroi-collectors/AGENTS.md`).
+
+### 6. Initial assignments, for the ADRs that add the sources
+
+| Source (proposed) | Tier | Sensitive field |
+|---|---|---|
+| Counts and times of FiveM's cache, log and crash folders (ADR 0050's first consumer) | standard | — |
+| Number of Enhanced per-server cache folders and their times | standard | — |
+| An Enhanced per-server cache folder's name | full | server identity |
+| Endpoints and plugin names in FiveM's logs | full | server identity (endpoints) |
+| Module lists in FiveM's crash dumps | full | — (paths redacted as today) |
+| Counts of Rockstar, Social Club and Steam profiles | full | — |
+
+## Alternatives weighed
+
+| Alternative | Why not |
+|---|---|
+| Ask in the WebView, then scan in the same process | Undoes the property ADR 0001 and ADR 0012 protect for every full scan. |
+| Ask in the WebView, then trust `--full` in the new copy | A flag anyone can put in a shortcut would read the most personal sources without the player seeing the list. |
+| Collect everything always, and gate only what is shown | The owner's decision is that these sources are not read without agreement; a report the player saves with `--json` would hold them for whoever opens the file. |
+| A per-source checklist at start | More choices than a screenshare can walk through, and each source's reason lives in its ADR; one list with two sensitive switches in SS mode covers the owner's cases. |
+| `--yes-full` for scripts | A scripted full scan has no player at the keyboard to agree. |
+
+## Measured
+
+On one Windows 11 PC (build 26220), 2026-09-16, with the owner's permission. UAC as Windows ships it:
+`EnableLUA` 1, `ConsentPromptBehaviorAdmin` 5, `PromptOnSecureDesktop` 1, `FilterAdministratorToken` not
+set. A parent PowerShell process called `CreateProcessW` with `CREATE_NO_WINDOW` and no other flag, no token
+and no inherited handles; the child read its own token. Scheduled tasks gave the parents their tokens; the
+task, the script and its output were deleted afterwards.
+
+| Parent | Parent's token | Child's token |
+|---|---|---|
+| task at `HIGHEST`, on the signed-in desktop | elevated, elevation type full, high integrity, session 3 | elevated, elevation type full, high integrity, session 3 |
+| task at `LIMITED`, on the signed-in desktop | not elevated, elevation type limited, medium integrity, session 3 | not elevated, elevation type limited, medium integrity, session 3 |
+| an SSH session | elevated, elevation type default, high integrity, session 0 | elevated, elevation type default, high integrity, session 0 |
+
+The elevated case finished without anyone at the machine, so no consent prompt stood between the parent and
+the child. A copy started this way neither gains nor loses administrator rights.
+
+### The dialog and the two tiers, on the same PC, 2026-09-20
+
+The binaries built from `dev` at `d6e1246` were run on that PC with the owner's permission, from scheduled
+tasks on the signed-in desktop; the task, the scripts, the binaries and their output were deleted
+afterwards, and nothing measured was written into this repository beyond the numbers below.
+
+- The desktop copy started with `--full` showed the dialog 266 ms after the process started, before any
+  window of its own existed. `GetForegroundWindow` returned that dialog's handle, `WS_EX_TOPMOST` was set on
+  it, and its two buttons read `&Yes` and `&No`. So a dialog shown before a Tauri window exists does come to
+  the front on this configuration.
+- Closing that dialog, which `MessageBoxW` answers as No, gave the standard scan: its window appeared 6.6 s
+  later.
+- The CLI's `scan --full` answered `yes` on standard input gave `scan_tier: full` at a task running with an
+  elevated token and at one running with a limited token. Both reports listed the same three server cache
+  folders, each named with 40 hexadecimal characters, with the same creation and last-write times, and the
+  same `folder: listed`, `server_folders: 3`. The scope statements differed only in `not_admin`, 6 under the
+  limited token and 0 under the elevated one, from other collectors. Listing that folder needs no
+  administrator rights (ADR 0055).
+
+## What is unverified
+
+- The token a `CreateProcessW` child receives under UAC settings other than the default one measured
+  below — for example `ConsentPromptBehaviorAdmin` values that prompt for credentials, or
+  `FilterAdministratorToken` set for the built-in Administrator account.
+- Whether either binary could ever be started with a manifest that requires administrator rights, which would
+  make `CreateProcessW` fail with `ERROR_ELEVATION_REQUIRED`. Today neither declares a level: the desktop app
+  embeds `tauri-build` 2.6.3's default manifest, which has no `requestedExecutionLevel`, and the CLI has no
+  build script that embeds one; what its linker embeds by default was not checked. The desktop app has run
+  without administrator rights (ADR 0045's Windows check).
+- Which native dialog API fits: `MessageBoxW` is enough for a yes/no over a text list; `TaskDialogIndirect`
+  gives an expandable list. The `windows` crate feature names for either are not checked here and must be
+  grepped, not guessed.
+- Whether a native dialog shown before a Tauri window exists is brought to the front on Windows 11
+  configurations other than the one measured above — a PC with a full-screen game in front, for example.
+- Whether the desktop start screen's "Full scan" button starts the copy that asks. The button's command and
+  the arguments it forwards are covered by tests in `commands.rs` and `App.test.tsx`, and the copy it starts
+  is the one measured above, but the click itself was not driven on a real PC: from the window handle, UI
+  Automation lists only the `WebView2` control's own Refresh button, not the page's, so the page's button
+  cannot be invoked that way, and driving the mouse was not attempted on a PC in use.
+
+## Owner decisions (2026-09-17)
+
+1. The desktop copy asks in a native pre-scan dialog (section 3); the flag alone is never trusted.
+2. No bypass for scripts (section 3).
+3. Server identities and account identifiers are hidden in SS mode unless the player turns each on
+   (section 4).
+4. The initial assignments of section 6 stand. The first two rows shipped as `standard` with ADR 0053.
+   The crash-dump row needs a range read of a file larger than ADR 0019's 64 MiB limit, which is an ADR of
+   its own before that collector.
+
+The tier is implemented together with its first `full` collector — an Enhanced server cache folder's name,
+or the endpoints in FiveM's logs — because until one exists it changes nothing a player sees. The two
+unverified points above about the relaunch and the dialog are measured on a real Windows PC then.
+
+## Implementation (2026-09-18)
+
+- `rongroi-core`: `ScanTier` (`standard`, `full`) and `SensitiveKind` (`server_identity`,
+  `account_identifier`) in the model; `UnmeasuredReason::NotConsented`, a scope statement;
+  `ReportHeader.scan_tier` and `Report.sensitive_fields`, both additive; `ScopeNotes.not_consented`.
+  `Rule::expects_unmeasured` answers true for `not_consented`: no rule may declare it, and a standard scan
+  is the ordinary one, so SS mode counts it as expected rather than listing it as a surprise.
+- `view`: `SsOptions` and `for_mode_with`. In SS mode every value of a field a collector declared
+  sensitive is replaced by `%SERVER_IDENTITY%` or `%ACCOUNT_IDENTIFIER%` before the view is built — in the
+  evidence, the timeline selections, the unmatched observations and own traces — unless the option for its
+  kind is on. `for_mode` and `timeline` keep their signatures and show nothing more.
+- `rongroi-collectors`: `Collector::tier`, `Field::sensitive`, `sensitive_kinds(tier)`;
+  `ScanContext.tier`; `scan::run` does not call a collector whose tier is above the scan's, and reports
+  its run as `not_consented`. A `not_consented` source is not listed among the timeline's unmeasured
+  sources: it was not read, and the scope statement says so once. A test holds every `standard` collector
+  to declaring no sensitive field.
+- The first `full` collector is `fivem_servers` (ADR 0055).
+- CLI: `scan --full` asks on standard error before any collector runs; only `yes` starts a full scan, and
+  anything else — end of input too — starts the standard scan and says so. `--elevate` forwards `--full`,
+  and the elevated copy asks again. In SS mode, after the consent question, which names what a full scan
+  read, each kind of sensitive value the scan's collectors declare is asked about separately, default no;
+  `--yes` answers the consent question only, so a scripted SS scan shows no sensitive value.
+- `rongroi-host-windows`: `relaunch::relaunch_same_token`, with `std::process::Command`, which calls
+  `CreateProcessW` with no token argument (read from the standard library's source for Rust 1.98.1); and
+  `dialog::ask_yes_no`, a `MessageBoxW` with Yes and No, No the default, topmost and set to the
+  foreground. The dialog API chosen is `MessageBoxW`: a yes-or-no over a short list does not need
+  `TaskDialogIndirect`.
+- Desktop: a copy started with `--full` shows the dialog, in English and Thai, before the scan and before
+  any window of its own; Yes is a full scan, No or closing it the standard one. The start screen says which
+  scan ran and, after a standard one, offers "Full scan", which starts a copy with `--full` through
+  `relaunch_same_token` and exits. The elevation button forwards `--full` only when the current scan was
+  full, so a player who answered No is not asked again. After a full scan the SS consent screen names what
+  it read and offers a switch to show server identities, off by default; `report_view` takes the options.
+- `xtask`: `check-baseline` scans at `full`; `check-rules` refuses `not_consented` in `unmeasured_when`.
+- The Windows job runs `scan --full` with `no` and with `yes` on standard input and checks the header and
+  the full collector's runs.
+
+## Consequences
+
+- `rongroi-collectors`: `ScanTier`, `Collector::tier`, `Field::sensitive`; `scan::run` takes a tier;
+  the cross-collector tests run both tiers.
+- `rongroi-core`: `UnmeasuredReason::NotConsented`, `ScopeNotes.not_consented`, header `scan_tier`, the
+  sensitive-value placeholders and the SS options in `view`.
+- `rongroi-host-windows`: a same-token relaunch beside `elevate`, and the native dialog.
+- CLI: `--full` and its question; `--elevate` forwards it.
+- Desktop: the "Full scan" button, the pre-scan dialog, the SS consent screen's extra list and switches.
+- `xtask`: `check-baseline` scans at `full`; `check-rules` refuses `not_consented` in `unmeasured_when`.
+- `PRIVACY.md`, `docs/architecture.md`, ADR 0030's table, the SS guides and both READMEs describe the two
+  tiers in the change that adds the first `full` collector. Until then the tier exists and changes nothing
+  a player sees.
+- `CONVENTIONS.md`'s glossary gains **scan tier**, **full scan** and **sensitive field**.

@@ -43,7 +43,8 @@ never does.
 5. When it runs, the header must say **official build**. If it says **UNOFFICIAL BUILD**, or the
    hash does not match, **stop**. The result means nothing.
 
-The report header also prints the program's own `exe sha256`. It should match `SHA256SUMS`. A
+The CLI report header also prints the program's own `exe sha256`. In the window version it is not in
+the report header: open **About & code**, which shows it as **SHA-256**. It should match `SHA256SUMS`. A
 match shows the running file is consistent with the release. It cannot prove it: a modified program
 could print any value.
 
@@ -79,8 +80,8 @@ line.
 
 ## 4. Run SS mode
 
-SS mode is the screenshare view. It asks the player for consent first. It lists only what matched a
-rule, and it replaces the player's user folder in paths with `%USERPROFILE%`.
+SS mode is the screenshare view. It asks the player for consent first. It lists what matched a rule and
+a timeline of the times its consent screen names, and it replaces the player's user folder in paths with `%USERPROFILE%`.
 
 **Window version:** **Screenshare check (SS mode)** → read the consent screen → **I agree — show the
 SS view**. The window version scans when it starts, **before** its window opens, so the window cannot
@@ -184,6 +185,35 @@ These are counts of what SS mode does not list. §7 says why.
 | A Prefetch file is marked read-only | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
 | An event log file is marked read-only | tamper | `experimental` | the same two |
 | An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
+| A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
+| FiveM for GTA V Enhanced keeps a cache folder for a server (full scan only) | context | `experimental` | joining any server with FiveM for GTA V Enhanced, a folder kept from a server joined long ago or by another person on the same Windows account |
+| The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
+| The registered organisation names a Windows-modification playbook | posture | `experimental` | anyone who applied Atlas or ReviOS for privacy, battery life or an old PC; a second-hand PC that came with it; a name typed in by hand |
+| The OEM model shown in Settings names a Windows-modification playbook | posture | `experimental` | the same three |
+| The OEM manufacturer shown in Settings is a Windows-modification project | posture | `experimental` | the same three |
+| Microsoft Defender's service is not registered on this PC | posture | `experimental` | a pre-modified Windows image installed for performance or an old PC, an edition or managed build without Defender, a removal tool the owner ran |
+| Microsoft Defender's service is set never to start | posture | `experimental` | **any third-party antivirus**, which disables it when it installs itself; an employer's or school's policy; a tweaking script or pre-modified image |
+| The Windows Event Log service does not start with Windows | posture | `experimental` | a pre-modified Windows image, a tweaking script the owner ran, a managed build whose policy sets it differently |
+| Windows Update's service cannot start on this PC | posture | `experimental` | an owner who turned updates off to stop reboots or keep a driver, a PC updated another way by an employer, a tweaking script or pre-modified image |
+| A folder or key the Atlas playbook installs is on this PC | posture | `experimental` | anyone who applied the playbook and never touched a game, a second-hand PC that came with it, a folder left behind after it was removed |
+| A folder the ReviOS playbook installs is on this PC | posture | `experimental` | the same three |
+| Microsoft Defender's platform folder is not on this PC | posture | `experimental` | a pre-modified Windows image, an edition or managed build without Defender, a removal tool the owner ran, a Defender installed somewhere other than the default folder |
+| The speculative-execution mitigations are switched off | posture | `experimental` | performance advice for an older processor, a tweaking script or pre-modified image, a PC set up this way by the shop that built it |
+| Structured exception handling overwrite protection (SEHOP) is switched off | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+| The kernel object namespace is not protected as Windows ships it | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+
+Four things to know about the thirteen rows above, which are all about **which Windows this is**:
+
+- **None of them is about cheating.** A person may install any operating system on a PC they own. What
+  they say is which parts of Windows are there and how they are set — including the parts this program
+  and a server's anti-cheat read.
+- **"Defender's service is disabled" is most often another antivirus.** That is what installing one
+  does. Read it beside the platform-folder row: a service that is registered and disabled, with the
+  folder still there, is the ordinary picture.
+- **The two playbooks name themselves; the pre-modified ISOs do not.** Atlas and ReviOS write their own
+  name where Windows shows it, so those rows say which one. KernelOS, Ghost Spectre and images built
+  with tiny11builder publish no such name, so what you see instead is which components are missing.
+- **Nothing inside the folders was read.** The folder rows answer one question — is it there.
 
 Three things to know about the two log-clearing rules:
 
@@ -211,7 +241,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the other fifteen are new in 0.3.0. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last sixteen — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new after 0.3.0 and are not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -220,6 +250,44 @@ scan was not restarted with somebody else's administrator password. The firmware
 The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
 what a record in it says. None of them says who changed it or when, and on the one Windows 11 machine
 this project measured, all three were "Not found".
+
+Three things to know about the vulnerable-driver rule:
+
+- **A hardware utility is enough to trigger it.** On the one Windows 11 PC this project scanned, it was
+  "Found" twice, both times for drivers that ASUS signed, on a PC with ASUS's graphics-card utility
+  installed ([ADR 0048](adr/0048-the-driver-service-collector.md)). The drivers on LOLDrivers' list are
+  genuine, signed drivers with a known weakness.
+- **Registered is not loaded, and not used.** The row says a driver service points at that file. It does
+  not say the driver is running, that anything used its weakness, or who installed it. The row gives the
+  service name, the file path and its SHA-256: search for the hash in the rule's list (the
+  [rule reference](rules-reference.md) names the file) to see which LOLDrivers entry it is, and ask the
+  player which program the service belongs to.
+- **Windows may still block it.** Microsoft keeps its own list of vulnerable drivers that Windows refuses
+  to load. This program does not read whether that list is on, and a driver on LOLDrivers' list is not
+  necessarily on Microsoft's.
+
+Three things to know about a full scan (ADR 0052, ADR 0055):
+
+- **The player chooses it before the scan starts**, in the program that reads: `scan --full` asks and only
+  `yes` starts it; in the desktop app, "Full scan" restarts the program and a Windows dialog asks before
+  anything is read. You cannot start one for them with a flag. A standard scan says once, above the
+  evidence, how many checks only a full scan answers.
+- **A server cache folder row says the game joined a server, nothing more.** Its name is shown as
+  `%SERVER_IDENTITY%` unless the player also agreed to show server names. The same name in two reports of
+  one PC is the same server; whether another PC gets the same name is not known, so do not compare it with
+  a folder on your own PC.
+- **Its absence says nothing.** A player who never used GTA V Enhanced, reinstalled it, or deleted the
+  folder has none.
+
+Two things to know about the hosts-file rule:
+
+- **The kind of address is what to read.** `loopback` or `unspecified` sends the name nowhere, which is
+  how a blocklist blocks a service; `private` or `public` sends it to another machine. SS mode shows only
+  the kind: the address itself can name the player's own server, so ask them if you need it.
+- **It reads settings, not traffic.** This program never reads where a PC connected — not the DNS cache,
+  the open connections or any log of them ([ADR 0054](adr/0054-network-settings-not-network-traffic.md)).
+  The proxy and the Windows Firewall rules for FiveM are read too, and no rule reads them: an allowed
+  FiveM program and a proxy are what ordinary PCs have. SS mode only counts them.
 
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
@@ -234,13 +302,22 @@ that ran (Prefetch, BAM, the Program Compatibility Assistant), and the list of r
 so they are *unmatched observations*:
 
 - **Self mode** lists them, for the player.
-- **SS mode** shows only how many there were.
+- **SS mode** shows only how many there were, except on its timeline.
 
-This is deliberate. The consent screen promises "only what matches a rule". A list of every program
+This is deliberate. The consent screen promises what matches a rule, and a timeline it names. A list of every program
 someone ran would show staff what else is on that PC. Replacing the user name in the paths would not
 change that. [ADR 0034](adr/0034-prefetch-bam-and-pca-carry-no-identity.md) explains why there is no
 rule for them: these records name a program only by its file name or path, so renaming the file
 defeats such a rule, and it cannot tell a legitimate program with the same name apart.
+
+**The timeline** (ADR 0051) is the one exception, and the consent screen names it program by program:
+for programs named `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` or
+`FiveM_b<number>_GTAProcess.exe`, SS mode shows the time Windows recorded, with the name. It is not a
+row and not evidence. A name is all Windows keeps, so a time there says a program **of that name** ran
+then, not that the game did, and a missing time does not say the game never ran. The timeline also
+shows the times of FiveM's log, crash and cache folders, the span each Windows log and the change
+journal could see, and which of those could not be read. Read a time only inside its source's span, and
+never read the space between two times as something someone removed.
 
 Self mode is the player's view, and the player's consent covers SS mode. Asking to see Self mode is
 asking for something the player did not agree to.

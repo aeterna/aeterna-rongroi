@@ -4,10 +4,12 @@
 
 //! Turns collector runs and rules into evidence. Pure: no I/O, no clock, no platform checks.
 
+use std::collections::BTreeMap;
+
 use crate::bundle::Bundle;
 use crate::model::{
     CollectorRun, DiscriminatorGaps, Evidence, EvidenceState, Observation, OwnTraceEntry, Report,
-    ReportHeader, UnmatchedGroup, UnmeasuredReason,
+    ReportHeader, TimelineSelection, UnmatchedGroup, UnmeasuredReason,
 };
 use crate::rules::{MatchKey, Operator, Rule, Status};
 
@@ -60,23 +62,62 @@ pub fn evaluate(
     self_identity: &SelfIdentity,
 ) -> Report {
     let (runs, own_traces) = partition_own_traces(runs, self_identity);
-    let active: Vec<&Rule> = bundle
+    let (selectors, active): (Vec<&Rule>, Vec<&Rule>) = bundle
         .rules()
         .iter()
         .map(|sourced| &sourced.rule)
         .filter(|rule| rule.status != Status::Deprecated)
-        .collect();
+        .partition(|rule| rule.is_timeline_selector());
     let evidence = active
         .iter()
         .map(|rule| evaluate_rule(rule, &runs))
         .collect();
+    // Only rules decide what is unmatched: an observation a timeline selector picks out is still one
+    // no rule matched, and an SS view still counts it rather than listing it (ADR 0051).
     let unmatched = unmatched_observations(&runs, &active);
+    let timeline_selections = selectors
+        .iter()
+        .filter_map(|selector| selection(selector, &runs))
+        .collect();
     Report {
         header,
         evidence,
         own_traces,
         unmatched,
+        timeline_selections,
+        timestamp_fields: BTreeMap::new(),
+        discriminators: BTreeMap::new(),
+        coverage_fields: BTreeMap::new(),
+        unmeasured_sources: Vec::new(),
+        sensitive_fields: std::collections::BTreeMap::new(),
     }
+}
+
+/// What one timeline selector matched, or `None` when it matched nothing or its collector did not
+/// look. A collector that did not look is on the timeline as an unmeasured source instead, so the
+/// selector has nothing of its own to add (ADR 0051).
+fn selection(selector: &Rule, runs: &[CollectorRun]) -> Option<TimelineSelection> {
+    let CollectorRun::Measured {
+        collector,
+        observations,
+        discriminator_gaps,
+        ..
+    } = runs
+        .iter()
+        .find(|run| run.collector() == selector.collector)?
+    else {
+        return None;
+    };
+    let observations: Vec<Observation> = observations
+        .iter()
+        .filter(|observation| matches_in_run(selector, observation, discriminator_gaps))
+        .cloned()
+        .collect();
+    (!observations.is_empty()).then(|| TimelineSelection {
+        selector_id: selector.id.clone(),
+        collector: collector.clone(),
+        observations,
+    })
 }
 
 /// What the collectors saw that no rule matched, grouped by collector (ADR 0014).
@@ -684,6 +725,8 @@ date: 2026-09-12
             elevated: None,
             generated_at: "2026-01-01T00:00:00Z".to_owned(),
             boot_time: crate::model::BootTime::default(),
+            profiles_directory: None,
+            scan_tier: crate::model::ScanTier::Standard,
         }
     }
 
@@ -895,6 +938,86 @@ date: 2026-09-12
         assert_eq!(report.own_traces.len(), 1, "{:?}", report.own_traces);
         assert_eq!(report.own_traces[0].observation, ours);
         assert_eq!(report.unmatched, unmatched_process(vec![theirs]));
+    }
+
+    /// A timeline selector on `process`, which ships none; the tests bring their own.
+    const SELECTOR: &str = "id: 6a1e0c3b-2d4f-4e8a-9b7c-5f3a1d2e4c60
+title: t
+description: d
+status: experimental
+role: timeline
+collector: process
+strength: context
+match:
+  name: FiveM.exe
+retention: Running processes only.
+falsepositives: [x]
+author: a
+date: 2026-09-17
+";
+
+    /// ADR 0051: a timeline selector is not evidence. Its matches go to the timeline, and what it
+    /// matched stays unmatched, so an SS view counts exactly what it counted before.
+    #[test]
+    fn a_timeline_selector_makes_no_evidence_and_leaves_its_matches_unmatched() {
+        let bundle = bundle_of(&[SELECTOR]);
+        let fivem = process_observation(&[("name", "FiveM.exe")]);
+        let other = process_observation(&[("name", "steam.exe")]);
+        let report = evaluate(
+            &bundle,
+            &[process_run(vec![fivem.clone(), other.clone()])],
+            header(),
+            &SelfIdentity::default(),
+        );
+        assert!(report.evidence.is_empty(), "{:?}", report.evidence);
+        assert_eq!(
+            report.timeline_selections,
+            vec![TimelineSelection {
+                selector_id: "6a1e0c3b-2d4f-4e8a-9b7c-5f3a1d2e4c60".to_owned(),
+                collector: "process".to_owned(),
+                observations: vec![fivem.clone()],
+            }]
+        );
+        assert_eq!(report.unmatched, unmatched_process(vec![fivem, other]));
+    }
+
+    /// Beside a rule matching the same observation, the selector changes nothing about the rule, and
+    /// the observation is evidence and not unmatched, as it was without the selector.
+    #[test]
+    fn a_timeline_selector_does_not_change_what_a_rule_found() {
+        let fivem = process_observation(&[("name", "FiveM.exe")]);
+        let run = [process_run(vec![fivem.clone()])];
+        let without = evaluate(
+            &bundle_of(&[FIVEM_RULE]),
+            &run,
+            header(),
+            &SelfIdentity::default(),
+        );
+        let with = evaluate(
+            &bundle_of(&[FIVEM_RULE, SELECTOR]),
+            &run,
+            header(),
+            &SelfIdentity::default(),
+        );
+        assert_eq!(with.evidence, without.evidence);
+        assert!(with.unmatched.is_empty(), "{:?}", with.unmatched);
+        assert_eq!(with.timeline_selections.len(), 1);
+    }
+
+    /// Nothing matched, or nothing looked: no selection, rather than an empty one.
+    #[test]
+    fn a_timeline_selector_with_nothing_to_select_adds_nothing() {
+        let bundle = bundle_of(&[SELECTOR]);
+        let steam = process_run(vec![process_observation(&[("name", "steam.exe")])]);
+        let unmeasured = CollectorRun::Unmeasured {
+            collector: "process".to_owned(),
+            reason: UnmeasuredReason::AccessDenied,
+        };
+        for runs in [vec![steam], vec![unmeasured], vec![]] {
+            let report = evaluate(&bundle, &runs, header(), &SelfIdentity::default());
+            assert!(report.timeline_selections.is_empty(), "{runs:?}");
+            assert!(report.evidence.is_empty(), "{runs:?}");
+        }
     }
 
     /// `process` ships without a rule (ADR 0010), and `fivem_dir` did until ADR 0036. Such a collector

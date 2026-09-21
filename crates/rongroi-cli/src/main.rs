@@ -14,9 +14,9 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use rongroi_collectors::scan::{self, ScanContext};
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::SelfIdentity;
-use rongroi_core::model::Mode;
+use rongroi_core::model::{Mode, ScanTier, SensitiveKind};
 use rongroi_core::provenance::Provenance;
-use rongroi_core::view;
+use rongroi_core::view::{self, SsOptions};
 use rongroi_host::Host;
 
 use crate::output::Lang;
@@ -55,6 +55,10 @@ struct ScanArgs {
     /// Skip the SS-mode consent question (the player has already agreed).
     #[arg(long)]
     yes: bool,
+    /// Ask for a full scan, which reads more than the standard one (ADR 0052). The question is asked
+    /// every time, before anything is read; only `yes` starts it, and no flag answers it.
+    #[arg(long)]
+    full: bool,
     /// Restart with administrator rights before scanning (Windows only). Windows asks you to confirm.
     #[arg(long)]
     elevate: bool,
@@ -113,9 +117,33 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
         return relaunch_elevated(args.lang);
     }
 
-    if mode == Mode::Ss && !args.yes && !ask_consent(args.lang)? {
+    // Asked by the process that reads, before any collector runs, every time: a flag in a shortcut
+    // is not a player agreeing (ADR 0052). `--yes` does not answer it.
+    let tier = if args.full && ask_full(args.lang)? {
+        ScanTier::Full
+    } else {
+        if args.full {
+            eprintln!("{}", output::full_declined(args.lang));
+        }
+        ScanTier::Standard
+    };
+
+    if mode == Mode::Ss && !args.yes && !ask_consent(args.lang, tier)? {
         eprintln!("{}", output::declined(args.lang));
         return Ok(());
+    }
+    // Each kind of sensitive value the scan could read is its own question, default no. `--yes`
+    // answers the consent question only, so a scripted SS scan shows none of them (ADR 0052).
+    let mut options = SsOptions::default();
+    if mode == Mode::Ss && !args.yes {
+        for kind in rongroi_collectors::sensitive_kinds(tier) {
+            if ask_yes(output::sensitive_question(args.lang, kind))? {
+                match kind {
+                    SensitiveKind::ServerIdentity => options.server_identity = true,
+                    SensitiveKind::AccountIdentifier => options.account_identifier = true,
+                }
+            }
+        }
     }
 
     let provenance = Provenance::current();
@@ -132,9 +160,10 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
         provenance,
         generated_at: jiff::Timestamp::now().to_string(),
         self_identity,
+        tier,
     };
     let report = scan::run(host.as_ref(), &bundle, context);
-    let view = view::for_mode(&report, mode);
+    let view = view::for_mode_with(&report, mode, options);
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&view)?);
@@ -149,15 +178,31 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
 /// Standard output is the report, and with `--json` it is the file someone redirected it into.
 /// Written there, the question went into that file instead of in front of the player, and the
 /// program sat waiting for an answer to a question nobody could see.
-fn ask_consent(lang: Lang) -> anyhow::Result<bool> {
-    eprint!("{}", output::consent(lang));
+fn ask_consent(lang: Lang, tier: ScanTier) -> anyhow::Result<bool> {
+    ask_yes(&output::consent_for(lang, tier))
+}
+
+/// Asks `question` on standard error; `y` or `yes` is yes, anything else — end of input too — is no.
+fn ask_yes(question: &str) -> anyhow::Result<bool> {
+    Ok(matches!(read_answer(question)?.as_str(), "y" | "yes"))
+}
+
+/// The full-scan question. Only `yes` is yes: a stray `y` is not agreement to read more (ADR 0052).
+fn ask_full(lang: Lang) -> anyhow::Result<bool> {
+    Ok(is_full_answer(&read_answer(&output::full_question(lang))?))
+}
+
+fn is_full_answer(answer: &str) -> bool {
+    answer == "yes"
+}
+
+/// Prints `question` on standard error and reads one line, trimmed and lower-cased.
+fn read_answer(question: &str) -> anyhow::Result<String> {
+    eprint!("{question}");
     std::io::stderr().flush()?;
     let mut answer = String::new();
     std::io::stdin().lock().read_line(&mut answer)?;
-    Ok(matches!(
-        answer.trim().to_ascii_lowercase().as_str(),
-        "y" | "yes"
-    ))
+    Ok(answer.trim().to_ascii_lowercase())
 }
 
 /// Waits for Enter, on a window that would otherwise close with the report still unread.
@@ -235,6 +280,23 @@ mod tests {
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|arg| (*arg).to_owned()).collect()
+    }
+
+    /// `--full` reaches the elevated copy, which asks again in its own window (ADR 0052).
+    #[test]
+    fn the_elevated_copy_keeps_the_full_flag() {
+        assert_eq!(
+            elevated_args(args(&["scan", "--full", "--elevate"])),
+            args(&["scan", "--full", "--pause-at-exit"]),
+        );
+    }
+
+    #[test]
+    fn only_yes_starts_a_full_scan() {
+        assert!(is_full_answer("yes"));
+        for answer in ["y", "", "no", "ye", "yes please", "ใช่"] {
+            assert!(!is_full_answer(answer), "{answer}");
+        }
     }
 
     #[test]

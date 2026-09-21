@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# The three names are what the two playbooks write, read from their own source (ADR 0056):
+# Atlas sets `Atlas Playbook <version>` and ReviOS `ReviOS 10 <version>` / `ReviOS 11 <version>`,
+# so the version is left to `startswith` and a new release needs no change here.
+id: 3abb40b8-05a4-4cc9-a2f8-17ba52a98714
+title: The registered organisation names a Windows-modification playbook
+description: >-
+  `winver` shows a registered organisation that begins with the name one of two published
+    Windows-modification playbooks writes there — Atlas or ReviOS. Both write it themselves, from their
+    own source, when they are applied over an ordinary Windows installation (ADR 0056). Such a playbook
+    turns off parts of Windows, and some of those parts are what this program and a server's
+    anti-cheat read. It says what operating system the PC runs, which a person is entitled to choose on
+    their own machine, and it does not prove that anything was cheated.
+status: experimental
+collector: os_image
+strength: posture
+match:
+  registered_organization|startswith: ["Atlas Playbook", "ReviOS 10", "ReviOS 11"]
+retention: Current setting only. It says nothing about how the PC was configured in the past.
+# `access_denied` removed (ADR 0057, amending ADR 0056): a limited-token measurement on 2026-09-21 read every value this rule needs, so a refusal is a machine nobody anticipated and belongs in front of a reviewer rather than in the scope line.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - Anyone who applied one of these playbooks for privacy, for battery life or for an old PC, and never touched a game
+  - A PC bought second-hand with the playbook already applied
+  - Somebody who typed one of these names into the registered organisation by hand, which any account with administrator rights may do
+references:
+  - https://github.com/Atlas-OS/Atlas
+  - https://github.com/meetrevision/playbook
+author: aeterna-rongroi contributors
+date: 2026-09-20
+tags: [posture, os_image]
