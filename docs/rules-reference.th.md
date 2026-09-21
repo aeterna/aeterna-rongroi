@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 40 |
-| SHA-256 | `5641a0b939c265d41d0f4f4cadf107b1a42e8ca9eaa6506b1266bd748599c916` |
+| จำนวน rule | 46 |
+| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -54,6 +54,10 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [ตรวจลายเซ็นของไฟล์ FiveM ไม่ได้](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `fivem_servers`
   - [FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
+- `install_marker`
+  - [มีโฟลเดอร์หรือคีย์ที่ Atlas playbook ติดตั้งอยู่บนเครื่องนี้](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
+  - [มีโฟลเดอร์ที่ ReviOS playbook ติดตั้งอยู่บนเครื่องนี้](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
+  - [ไม่มีโฟลเดอร์ platform ของ Microsoft Defender บนเครื่องนี้](#rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab) — `posture` · `experimental`
 - `net_config`
   - [ไฟล์ hosts กำหนด address ให้ชื่อของ FiveM หรือ Rockstar](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
 - `os_image`
@@ -73,6 +77,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
   - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ Windows PowerShell](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
+  - [ปิด SEHOP (การตรวจสอบสายตัวจัดการข้อยกเว้น) ไว้](#rule-dc858978-954d-418f-a42e-29f06975f4ed) — `posture` · `experimental`
+  - [object namespace ของเคอร์เนลไม่ได้ถูกป้องกันแบบที่ Windows ตั้งมา](#rule-a4af8cdc-a009-42ee-8368-7f35e93051fe) — `posture` · `experimental`
+  - [ปิดการป้องกัน speculative execution ไว้](#rule-d2f86e75-7692-468e-88a2-52eb1e24dc30) — `posture` · `experimental`
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
@@ -705,6 +712,139 @@ FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache หนึ่
 - การเข้าเซิร์ฟเวอร์ใดก็ได้ด้วย FiveM for GTA V Enhanced ซึ่งเป็นสิ่งที่ทิ้งโฟลเดอร์เหล่านี้ไว้
 - โฟลเดอร์ที่ค้างมาจากเซิร์ฟเวอร์ที่เข้านานแล้ว หรือจากคนอื่นที่ใช้บัญชี Windows นี้
 
+## collector `install_marker`
+
+### `install_marker` / `modified-build`
+
+<a id="rule-fd58dec6-84c1-49cb-806c-10b4614a046f"></a>
+
+#### มีโฟลเดอร์หรือคีย์ที่ Atlas playbook ติดตั้งอยู่บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: A folder or key the Atlas playbook installs is on this PC
+- id: `fd58dec6-84c1-49cb-806c-10b4614a046f`
+- ไฟล์: [`rules/install_marker/modified-build/atlas-files-present/rule.yaml`](../rules/install_marker/modified-build/atlas-files-present/rule.yaml)
+- collector: `install_marker`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `install_marker`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+พบที่ใดที่หนึ่งที่ Atlas playbook สร้างขึ้นตอนถูกนำไปใช้ ได้แก่ โฟลเดอร์โมดูล โฟลเดอร์สคริปต์ตั้งค่าบนเดสก์ท็อป หรือคีย์รีจิสทรีของตัวมันเอง Atlas ปิดการทำงานบางส่วนของ Windows และบางส่วนนั้นคือสิ่งที่โปรแกรมนี้กับระบบกันโกงของเซิร์ฟเวอร์อ่าน การเลือกระบบปฏิบัติการเป็นสิทธิ์ของเจ้าของเครื่อง แถวนี้บอกว่ามีอะไรติดตั้งอยู่ ไม่ได้บอกว่ามีการโกง และไม่ได้อ่านว่าข้างในโฟลเดอร์มีอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `marker`: เป็นค่าใดค่าหนึ่งใน `%SystemRoot%\AtlasModules`, `%SystemRoot%\AtlasDesktop`, `HKLM\SOFTWARE\AtlasOS` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `present`: เป็น `true`
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook นี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- โฟลเดอร์หรือคีย์ที่ค้างอยู่หลังถอน playbook ออกหรือย้อนค่ากลับแล้ว
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-3ec29285-f365-4e60-81fe-818d27c6b47a"></a>
+
+#### มีโฟลเดอร์ที่ ReviOS playbook ติดตั้งอยู่บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: A folder the ReviOS playbook installs is on this PC
+- id: `3ec29285-f365-4e60-81fe-818d27c6b47a`
+- ไฟล์: [`rules/install_marker/modified-build/revios-files-present/rule.yaml`](../rules/install_marker/modified-build/revios-files-present/rule.yaml)
+- collector: `install_marker`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `install_marker`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+พบที่ใดที่หนึ่งที่ ReviOS playbook สร้างขึ้นตอนถูกนำไปใช้ ได้แก่ โฟลเดอร์ของเครื่องมือตัวมันเอง หรือโฟลเดอร์วอลเปเปอร์ที่มันติดตั้ง ReviOS ปิดการทำงานบางส่วนของ Windows ซึ่งบางส่วนคือสิ่งที่โปรแกรมนี้กับระบบกันโกงของเซิร์ฟเวอร์อ่าน การเลือกระบบปฏิบัติการเป็นสิทธิ์ของเจ้าของเครื่อง แถวนี้บอกว่ามีอะไรติดตั้งอยู่ ไม่ได้บอกว่ามีการโกง และไม่ได้อ่านว่าข้างในโฟลเดอร์มีอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `marker`: เป็นค่าใดค่าหนึ่งใน `%ProgramFiles%\Revision Tool`, `%SystemRoot%\Web\Wallpaper\MeetRevision` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `present`: เป็น `true`
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook นี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- โฟลเดอร์ที่ค้างอยู่หลังถอน playbook ออกหรือย้อนค่ากลับแล้ว
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/meetrevision/playbook>
+
+### `install_marker` / `windows-components`
+
+<a id="rule-f47de6d4-05ef-4f33-9aca-2307170fd5ab"></a>
+
+#### ไม่มีโฟลเดอร์ platform ของ Microsoft Defender บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender's platform folder is not on this PC
+- id: `f47de6d4-05ef-4f33-9aca-2307170fd5ab`
+- ไฟล์: [`rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml`](../rules/install_marker/windows-components/defender-platform-folder-absent/rule.yaml)
+- collector: `install_marker`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `install_marker`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+ไม่มีโฟลเดอร์ที่ Windows ใช้เก็บเอนจิ้นของ Defender อยู่ การปิด Defender ใน Settings หรือการติดตั้งแอนตี้ไวรัสตัวอื่น ต่างก็ยังทิ้งโฟลเดอร์นี้ไว้ สภาพแบบนี้จึงเป็นหน้าตาของอิมเมจ Windows ที่ถอดส่วนประกอบนี้ออก ให้อ่านคู่กับว่าเซอร์วิสของ Defender ยังลงทะเบียนอยู่หรือไม่ ซึ่งจะบอกว่าเป็นกรณีไหนในสองกรณี แถวนี้บอกว่าเครื่องติดตั้งอะไรไว้ ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `marker`: เป็น `%ProgramData%\Microsoft\Windows Defender\Platform` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `present`: เป็น `false`
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- อิมเมจ Windows ที่ถูกดัดแปลงมาก่อนติดตั้ง เพื่อความเร็ว เพื่อเครื่องเก่า หรือเพื่อดิสก์เล็ก โดยคนที่ไม่เกี่ยวกับเกม
+- Windows รุ่นหรือ build ที่องค์กรดูแล ซึ่งไม่มี Defender มาให้ตั้งแต่ต้น
+- เครื่องมือถอด Defender ที่เจ้าของเครื่องหรือคนที่ตั้งเครื่องให้เป็นคนรัน
+- เครื่องที่ติดตั้ง Defender ไว้ที่อื่นซึ่งไม่ใช่โฟลเดอร์มาตรฐานของ Windows
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/microsoft-defender-antivirus-windows>
+
 ## collector `net_config`
 
 ### `net_config` / `hosts`
@@ -777,7 +917,6 @@ Settings แสดงผู้ผลิตเครื่องนี้ว่�
 **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
 
 - `not_windows` — ไม่ได้รันบน Windows
-- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
 - `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
@@ -818,7 +957,6 @@ Settings แสดงผู้ผลิตเครื่องนี้ว่�
 **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
 
 - `not_windows` — ไม่ได้รันบน Windows
-- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
 - `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
@@ -860,7 +998,6 @@ Settings แสดงผู้ผลิตเครื่องนี้ว่�
 **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
 
 - `not_windows` — ไม่ได้รันบน Windows
-- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
 - `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
@@ -904,7 +1041,6 @@ Settings แสดงผู้ผลิตเครื่องนี้ว่�
 **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
 
 - `not_windows` — ไม่ได้รันบน Windows
-- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
 - `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
@@ -945,7 +1081,6 @@ Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อย
 **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
 
 - `not_windows` — ไม่ได้รันบน Windows
-- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
 - `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
@@ -986,7 +1121,6 @@ Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อย
 **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
 
 - `not_windows` — ไม่ได้รันบน Windows
-- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
 - `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
@@ -1027,7 +1161,6 @@ Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อย
 **ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
 
 - `not_windows` — ไม่ได้รันบน Windows
-- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
 - `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
@@ -1374,6 +1507,128 @@ Windows ถูกตั้งค่าไม่ให้บังคับใช
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/enable-virtualization-based-protection-of-code-integrity>
+
+### `posture` / `mitigations`
+
+<a id="rule-dc858978-954d-418f-a42e-29f06975f4ed"></a>
+
+#### ปิด SEHOP (การตรวจสอบสายตัวจัดการข้อยกเว้น) ไว้
+
+- ชื่อภาษาอังกฤษ: Structured exception handling overwrite protection (SEHOP) is switched off
+- id: `dc858978-954d-418f-a42e-29f06975f4ed`
+- ไฟล์: [`rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml`](../rules/posture/mitigations/exception-chain-validation-disabled/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `mitigations`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ถูกสั่งไม่ให้ตรวจสอบสายของตัวจัดการข้อยกเว้น ซึ่งเป็นการป้องกันการยึดเส้นทางการทำงานของโปรแกรมรูปแบบหนึ่ง การปิดมันเป็นขั้นตอนหนึ่งของสคริปต์ปรับแต่งเพื่อเกมหลายตัว และซอฟต์แวร์เก่าบางตัวก็ขอให้ปิด ค่านี้เจ้าของเครื่องเป็นคนตั้ง และไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `exception_chain_validation`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ซอฟต์แวร์เก่าที่คู่มือของตัวเองบอกให้ปิดการป้องกันนี้
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+- เครื่องที่องค์กรดูแลและนโยบายตั้งค่าไว้แบบนี้
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/security/threat-protection/overview-of-threat-mitigations-in-windows-10>
+
+<a id="rule-a4af8cdc-a009-42ee-8368-7f35e93051fe"></a>
+
+#### object namespace ของเคอร์เนลไม่ได้ถูกป้องกันแบบที่ Windows ตั้งมา
+
+- ชื่อภาษาอังกฤษ: The kernel object namespace is not protected as Windows ships it
+- id: `a4af8cdc-a009-42ee-8368-7f35e93051fe`
+- ไฟล์: [`rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml`](../rules/posture/mitigations/object-namespace-protection-disabled/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `mitigations`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ถูกสั่งไม่ให้แยกโปรแกรมที่มีระดับสิทธิ์ต่างกันออกจากกันใน object namespace ของเคอร์เนล ซึ่งเป็นการป้องกันที่ Windows เปิดมาให้ (วัดได้จากเครื่องทั่วไป) การปิดมันทำให้โปรแกรมหนึ่งเข้าถึงวัตถุที่มีชื่อของอีกโปรแกรมได้ง่ายขึ้น สคริปต์ปรับแต่งบางตัวทำแบบนี้ และซอฟต์แวร์เก่าบางตัวก็ขอให้ปิด ค่านี้เจ้าของเครื่องเป็นคนตั้ง และไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `object_namespace_protection`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ซอฟต์แวร์เก่าที่คู่มือของตัวเองบอกให้ปิดการป้องกันนี้
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+- เครื่องที่องค์กรดูแลและนโยบายตั้งค่าไว้แบบนี้
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/sync/object-namespaces>
+
+<a id="rule-d2f86e75-7692-468e-88a2-52eb1e24dc30"></a>
+
+#### ปิดการป้องกัน speculative execution ไว้
+
+- ชื่อภาษาอังกฤษ: The speculative-execution mitigations are switched off
+- id: `d2f86e75-7692-468e-88a2-52eb1e24dc30`
+- ไฟล์: [`rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml`](../rules/posture/mitigations/speculative-execution-mitigations-disabled/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `mitigations`
+- เขียนเมื่อ: 2026-09-21
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ถูกสั่งให้ปิดการป้องกัน Spectre variant 2 และ Meltdown ด้วยค่าคู่หนึ่งที่รวมกันแล้วแปลว่าปิด การป้องกันนี้กินประสิทธิภาพไปไม่กี่เปอร์เซ็นต์ และการปิดมันเป็นขั้นตอนหนึ่งของสคริปต์ปรับแต่งเพื่อเกมหลายตัว ขณะเดียวกันก็ทำให้เครื่องเปิดรับช่องโหว่ระดับโปรเซสเซอร์ที่การป้องกันนี้ถูกเขียนขึ้นมารับมือ ค่านี้เจ้าของเครื่องเป็นคนตั้ง และไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `speculative_execution_mitigations`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้ถูกตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เจ้าของเครื่องทำตามคำแนะนำเรื่องความเร็วสำหรับโปรเซสเซอร์รุ่นเก่า ซึ่งเสียประสิทธิภาพจากการป้องกันนี้มากที่สุด
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+- ร้านหรือคนประกอบเครื่องตั้งค่าแบบนี้มาให้
+
+**แหล่งอ้างอิง**
+
+- <https://support.microsoft.com/en-us/topic/kb4073119-windows-client-guidance-for-it-pros-to-protect-against-silicon-based-microarchitectural-and-speculative-execution-side-channel-vulnerabilities-35820a8a-ae13-1299-88cc-357f104f5b11>
 
 ### `posture` / `tpm`
 

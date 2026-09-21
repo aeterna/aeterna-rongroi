@@ -11,6 +11,7 @@ pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
 pub mod fivem_servers;
+pub mod install_marker;
 pub mod net_config;
 pub mod os_image;
 pub mod paths;
@@ -214,6 +215,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(evtx::Evtx::default()),
         Box::new(fivem_dir::FivemDir),
         Box::new(fivem_servers::FivemServers),
+        Box::new(install_marker::InstallMarker),
         Box::new(net_config::NetConfig),
         Box::new(os_image::OsImage),
         Box::new(pca::Pca),

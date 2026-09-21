@@ -1,0 +1,16 @@
+{
+  "description": "The SEHOP switch is written to off",
+  "observations": [
+    {
+      "collector": "posture",
+      "fields": {
+        "secure_boot": "enabled",
+        "test_signing": "disabled",
+        "speculative_execution_mitigations": "not_configured",
+        "exception_chain_validation": "disabled",
+        "object_namespace_protection": "enabled"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -54,6 +54,27 @@ pub const SCRIPT_BLOCK_INVOCATION_LOGGING_VALUE: &str = "EnableScriptBlockInvoca
 /// under the same root instead (ADR 0038).
 pub const USE_WINDOWS_POWERSHELL_POLICY_VALUE: &str = "UseWindowsPowerShellPolicySetting";
 
+/// Where Windows keeps the override that turns the speculative-execution mitigations off (ADR 0057).
+pub const MEMORY_MANAGEMENT_KEY: &str =
+    r"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
+/// The override itself, and the mask that says which of its bits Windows reads.
+pub const FEATURE_SETTINGS_OVERRIDE_VALUE: &str = "FeatureSettingsOverride";
+/// The mask beside it. Both must say 3 for the mitigations to be off, so both are read.
+pub const FEATURE_SETTINGS_OVERRIDE_MASK_VALUE: &str = "FeatureSettingsOverrideMask";
+/// The value that turns both Spectre variant 2 and Meltdown mitigations off.
+const FEATURE_SETTINGS_OFF: u32 = 3;
+
+/// The kernel key holding the SEHOP switch.
+pub const SESSION_MANAGER_KERNEL_KEY: &str =
+    r"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\kernel";
+/// A `1` here turns Structured Exception Handling Overwrite Protection off.
+pub const DISABLE_EXCEPTION_CHAIN_VALIDATION_VALUE: &str = "DisableExceptionChainValidation";
+
+/// The Session Manager key holding the object-namespace protection mode.
+pub const SESSION_MANAGER_KEY: &str = r"HKLM\SYSTEM\CurrentControlSet\Control\Session Manager";
+/// `1` is what Windows ships (measured, ADR 0057); `0` turns the protection off.
+pub const PROTECTION_MODE_VALUE: &str = "ProtectionMode";
+
 const ID: &str = "posture";
 
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
@@ -81,14 +102,17 @@ const REASONS: [UnmeasuredReason; 5] = [
 /// two fields so a rule can compare them (ADR 0038). The four `script_block_logging` fields are one
 /// policy as each PowerShell applies it, per engine and per hive; a policy nobody wrote and a policy
 /// written to off are different statements about a machine, so none of them is a gap when absent.
-const FIELDS: [Field; 10] = [
+const FIELDS: [Field; 13] = [
+    Field::text("exception_chain_validation"),
     Field::text("hvci"),
+    Field::text("object_namespace_protection"),
     Field::text("script_block_logging"),
     Field::text("script_block_logging_pwsh"),
     Field::text("script_block_logging_pwsh_user"),
     Field::text("script_block_logging_user"),
     Field::text("secure_boot"),
     Field::text("secure_boot_firmware"),
+    Field::text("speculative_execution_mitigations"),
     Field::text("test_signing"),
     Field::text("tpm"),
     Field::text("tpm_spec_version"),
@@ -124,6 +148,24 @@ impl Collector for Posture {
         record(&mut fields, &mut gaps, "secure_boot", secure_boot(host));
         record(&mut fields, &mut gaps, "hvci", hvci(host));
         record(&mut fields, &mut gaps, "test_signing", test_signing(host));
+        record(
+            &mut fields,
+            &mut gaps,
+            "speculative_execution_mitigations",
+            speculative_execution_mitigations(host),
+        );
+        record(
+            &mut fields,
+            &mut gaps,
+            "exception_chain_validation",
+            exception_chain_validation(host),
+        );
+        record(
+            &mut fields,
+            &mut gaps,
+            "object_namespace_protection",
+            object_namespace_protection(host),
+        );
         record(
             &mut fields,
             &mut gaps,
@@ -257,6 +299,63 @@ fn secure_boot_firmware(host: &dyn Host) -> Result<&'static str, UnmeasuredReaso
             Err(UnmeasuredReason::SourceAbsent)
         }
         Err(error) => Err(crate::failure::reason_for(host, &error)),
+    }
+}
+
+/// The word a setting takes when nobody wrote it.
+///
+/// Windows' own default is not reported as if it had been read: "no policy here" and "written to on"
+/// are different statements about a machine, as they are for the PowerShell policies above (ADR 0038).
+const NOT_CONFIGURED: &str = "not_configured";
+
+/// The word a setting takes when it was written to something this program does not read as on or off.
+const CONFIGURED_OTHER: &str = "configured_other";
+
+/// Whether the speculative-execution mitigations — Spectre variant 2 and Meltdown — are switched off
+/// (ADR 0057).
+///
+/// Both the override and its mask have to say 3 for Windows to turn them off, and the tweaking script
+/// this rule was written from writes exactly that pair, so the pair is what `disabled` means here.
+/// Anything else that was written is `configured_other`: it was configured, and not to the state this
+/// program can name.
+fn speculative_execution_mitigations(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
+    let override_value = host
+        .read_u32(MEMORY_MANAGEMENT_KEY, FEATURE_SETTINGS_OVERRIDE_VALUE)
+        .map_err(|error| reason_for(&error))?;
+    let mask = host
+        .read_u32(MEMORY_MANAGEMENT_KEY, FEATURE_SETTINGS_OVERRIDE_MASK_VALUE)
+        .map_err(|error| reason_for(&error))?;
+    Ok(match (override_value, mask) {
+        (None, None) => NOT_CONFIGURED,
+        (Some(FEATURE_SETTINGS_OFF), Some(FEATURE_SETTINGS_OFF)) => "disabled",
+        _ => CONFIGURED_OTHER,
+    })
+}
+
+/// Whether Structured Exception Handling Overwrite Protection (SEHOP) is switched off (ADR 0057).
+fn exception_chain_validation(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
+    match host.read_u32(
+        SESSION_MANAGER_KERNEL_KEY,
+        DISABLE_EXCEPTION_CHAIN_VALIDATION_VALUE,
+    ) {
+        // The value says what is *disabled*, so its sense is the other way round from the switches
+        // above: 1 turns the protection off.
+        Ok(Some(1)) => Ok("disabled"),
+        Ok(Some(0)) => Ok("enabled"),
+        Ok(None) => Ok(NOT_CONFIGURED),
+        Ok(Some(_)) => Ok(CONFIGURED_OTHER),
+        Err(error) => Err(reason_for(&error)),
+    }
+}
+
+/// Whether the kernel object namespace is protected as Windows ships it (ADR 0057).
+fn object_namespace_protection(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
+    match host.read_u32(SESSION_MANAGER_KEY, PROTECTION_MODE_VALUE) {
+        Ok(Some(1)) => Ok("enabled"),
+        Ok(Some(0)) => Ok("disabled"),
+        Ok(None) => Ok(NOT_CONFIGURED),
+        Ok(Some(_)) => Ok(CONFIGURED_OTHER),
+        Err(error) => Err(reason_for(&error)),
     }
 }
 
@@ -507,6 +606,98 @@ firmware:
         );
     }
 
+    /// The pair the tweaking script writes (ADR 0057). Either one alone is not that statement.
+    #[test]
+    fn the_speculative_execution_mitigations_are_disabled_only_on_the_pair() {
+        let run = Posture.collect(&inline(
+            "platform: windows
+registry:
+  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management':
+    FeatureSettingsOverride: 3
+    FeatureSettingsOverrideMask: 3
+",
+        ));
+        assert_eq!(
+            field(&run, "speculative_execution_mitigations"),
+            Some("disabled")
+        );
+
+        let half = Posture.collect(&inline(
+            "platform: windows
+registry:
+  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management':
+    FeatureSettingsOverride: 3
+",
+        ));
+        assert_eq!(
+            field(&half, "speculative_execution_mitigations"),
+            Some("configured_other")
+        );
+    }
+
+    /// Nobody wrote the value: not the same statement as "the mitigations are on" (ADR 0038).
+    #[test]
+    fn a_machine_nobody_configured_says_so_for_each_of_the_three_settings() {
+        let run = Posture.collect(&inline(ORDINARY));
+        assert_eq!(
+            field(&run, "speculative_execution_mitigations"),
+            Some("not_configured")
+        );
+        assert_eq!(
+            field(&run, "exception_chain_validation"),
+            Some("not_configured")
+        );
+        assert_eq!(
+            field(&run, "object_namespace_protection"),
+            Some("not_configured")
+        );
+    }
+
+    /// `DisableExceptionChainValidation` names what is off, so its sense is inverted.
+    #[test]
+    fn the_sehop_switch_reads_the_other_way_round() {
+        let off = Posture.collect(&inline(
+            "platform: windows
+registry:
+  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel':
+    DisableExceptionChainValidation: 1
+",
+        ));
+        assert_eq!(field(&off, "exception_chain_validation"), Some("disabled"));
+        let on = Posture.collect(&inline(
+            "platform: windows
+registry:
+  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel':
+    DisableExceptionChainValidation: 0
+",
+        ));
+        assert_eq!(field(&on, "exception_chain_validation"), Some("enabled"));
+    }
+
+    /// 1 is what an ordinary PC was measured to carry (ADR 0057); 0 turns the protection off.
+    #[test]
+    fn the_object_namespace_protection_mode_is_read_as_windows_ships_it() {
+        let shipped = Posture.collect(&inline(
+            "platform: windows
+registry:
+  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager':
+    ProtectionMode: 1
+",
+        ));
+        assert_eq!(
+            field(&shipped, "object_namespace_protection"),
+            Some("enabled")
+        );
+        let off = Posture.collect(&inline(
+            "platform: windows
+registry:
+  'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager':
+    ProtectionMode: 0
+",
+        ));
+        assert_eq!(field(&off, "object_namespace_protection"), Some("disabled"));
+    }
+
     #[test]
     fn access_denied_is_a_gap() {
         let run = Posture.collect(&fixture("registry-access-denied"));
@@ -604,13 +795,16 @@ tpm:
         assert_eq!(
             names,
             [
+                "exception_chain_validation",
                 "hvci",
+                "object_namespace_protection",
                 "script_block_logging",
                 "script_block_logging_pwsh",
                 "script_block_logging_pwsh_user",
                 "script_block_logging_user",
                 "secure_boot",
                 "secure_boot_firmware",
+                "speculative_execution_mitigations",
                 "test_signing",
                 "tpm",
                 "tpm_spec_version"

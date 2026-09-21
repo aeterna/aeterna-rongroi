@@ -6,6 +6,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The `install_marker` collector and three rules for the named places a Windows modification installs
+  (ADR 0057): Atlas' module and desktop folders and its registry key, ReviOS' own tool and wallpaper
+  folders, and — read for its absence — the folder Windows keeps Defender's engine in. It answers every
+  place on every machine, `present: true` or `present: false`, so a rule for them is confronted by a
+  baseline. A folder is read for one bit and **what is inside it never reaches a report**.
+- Three more settings on `posture` and a rule for each (ADR 0057): the speculative-execution
+  mitigations, SEHOP and the kernel object-namespace protection — the switches a gaming tweak script
+  flips, whoever wrote it. `not_configured` stays a different answer from `enabled`.
 - The `os_image` collector and seven rules for what Windows says this installation is (ADR 0056): the
   edition and build values `winver` shows, the registered organisation, and the manufacturer, model and
   support link Settings shows — where the Atlas and ReviOS playbooks write their own name — and how each
@@ -49,6 +57,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   says so (ADR 0046, ADR 0048).
 
 ### Changed
+- The `os_image` rules no longer declare `access_denied`: a limited-token measurement on 2026-09-21
+  read every value they need, so a machine that refuses one is shown to a reviewer as a row rather
+  than counted in the scope line (ADR 0057, amending ADR 0056).
 - SS-mode redaction knows more profile folders (ADR 0049). Besides `X:\Users\<name>`, it replaces
   `Documents and Settings\<name>` and its 8.3 short name, the same folders reached through a drive's
   administrative share, and the machine's own `ProfilesDirectory` when it has been moved. It reads `\` and

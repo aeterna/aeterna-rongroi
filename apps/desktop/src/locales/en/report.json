@@ -84,6 +84,7 @@
     "fivem_dir": "FiveM files",
     "net_config": "Network settings (hosts, proxy, firewall)",
     "os_image": "What Windows says this installation is",
+    "install_marker": "Places a Windows modification installs",
     "process": "Running programs",
     "evtx": "Windows event logs",
     "prefetch": "Windows Prefetch",

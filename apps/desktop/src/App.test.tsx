@@ -247,14 +247,16 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
-    // Nine not-measured rules are hidden: the firmware reading needs administrator rights, which this
+    // Twelve not-measured rules are hidden: the firmware reading needs administrator rights, which this
     // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038);
-    // the full-scan rule, because this was a standard scan, which every rule expects (ADR 0052); and the
+    // the full-scan rule, because this was a standard scan, which every rule expects (ADR 0052); the
     // seven `os_image` rules, because this fixture describes no `CurrentVersion` key for them to read
-    // (ADR 0056).
+    // (ADR 0056); and three `install_marker` rules, because the fixture sets no environment variable
+    // for the folders they name (ADR 0057). The one unmatched observation is `install_marker`'s
+    // registry marker, which needs no environment variable and answered `present: false`.
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 9 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
+        "Hidden in SS mode: 1 not found · 12 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -386,6 +388,10 @@ describe("App", () => {
   });
 
   it("shows no unmatched section when every observation matched a rule", async () => {
+    // The view is given no unmatched group, which is the case under test. The fixture behind
+    // `selfView` does produce one — `install_marker` answers its registry marker `present: false` on
+    // a host that describes no environment (ADR 0057) — and that is another test's business.
+    viewOverride = { ...selfView, unmatched: [] };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
     // The evidence proves the view arrived, so the section is absent by choice and not by timing.
@@ -465,7 +471,7 @@ describe("App", () => {
     expect(await screen.findByText("Not measured (not expected)")).toBeTruthy();
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 3 not measured (expected) · 0 not measured (not expected) · 0 unmatched observations",
+        "Hidden in SS mode: 1 not found · 3 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
       ),
     ).toBeTruthy();
   });

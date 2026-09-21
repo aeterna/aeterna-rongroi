@@ -38,6 +38,10 @@ registry:
     SupportURL: "http://www.msi.com/"
   'HKLM\SYSTEM\CurrentControlSet\Services\WinDefend':
     Start: 2
+  # Measured on the same PC on 2026-09-21 (ADR 0057): object-namespace protection as Windows ships
+  # it, and no override of the speculative-execution mitigations and no SEHOP switch written at all.
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager':
+    ProtectionMode: 1
   'HKLM\SYSTEM\CurrentControlSet\Services\EventLog':
     Start: 2
   'HKLM\SYSTEM\CurrentControlSet\Services\SysMain':

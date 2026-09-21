@@ -290,7 +290,8 @@ fn process_own_trace_self_view() {
     // out before any rule runs, so the one that is ours is not repeated among them (ADR 0014).
     // The fixture describes no registry, so `posture` also has one unmatched observation: its
     // four `script_block_logging` fields, each `not_configured`, which is an answer rather than a gap
-    // (ADR 0038).
+    // (ADR 0038). `install_marker` has one too: its registry marker needs no environment variable, so
+    // it is answered `present: false` while the five folder markers are gaps (ADR 0057).
     let process = report
         .unmatched
         .iter()
@@ -302,7 +303,7 @@ fn process_own_trace_self_view() {
         .iter()
         .map(|group| group.collector.as_str())
         .collect();
-    assert_eq!(collectors, ["posture", "process"]);
+    assert_eq!(collectors, ["install_marker", "posture", "process"]);
     let unmatched = serde_json::to_string(&report.unmatched).unwrap();
     assert!(!unmatched.contains("aeterna-rongroi"), "{unmatched}");
     let view = view::for_mode(&report, Mode::SelfCheck);

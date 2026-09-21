@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: d2f86e75-7692-468e-88a2-52eb1e24dc30
+title: The speculative-execution mitigations are switched off
+description: >-
+  Windows is told to turn off the mitigations for Spectre variant 2 and Meltdown, by the pair of
+    values that together mean off. The mitigations cost a few percent of performance, and turning them
+    off is a step several gaming tweak scripts take; it also leaves the PC exposed to the processor
+    flaws they were written for. It is a setting the owner of the machine chose and it is not evidence
+    of cheating.
+status: experimental
+collector: posture
+strength: posture
+match:
+  speculative_execution_mitigations: disabled
+retention: Current state only. It says nothing about how the PC was set up in the past.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - An owner who followed performance advice for an older processor, on which these mitigations cost the most
+  - A tweaking script or a pre-modified Windows image the owner installed for performance
+  - A PC set up this way by a shop or by whoever built it
+references:
+  - https://support.microsoft.com/en-us/topic/kb4073119-windows-client-guidance-for-it-pros-to-protect-against-silicon-based-microarchitectural-and-speculative-execution-side-channel-vulnerabilities-35820a8a-ae13-1299-88cc-357f104f5b11
+author: aeterna-rongroi contributors
+date: 2026-09-21
+tags: [posture, mitigations]

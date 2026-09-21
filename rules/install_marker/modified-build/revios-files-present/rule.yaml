@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# Both places were read from the ReviOS playbook's own published source, not from memory (ADR 0057).
+id: 3ec29285-f365-4e60-81fe-818d27c6b47a
+title: A folder the ReviOS playbook installs is on this PC
+description: >-
+  One of the places the ReviOS playbook creates when it is applied is here: the folder of its own
+    tool, or the wallpaper folder it installs. ReviOS turns off parts of Windows, some of which are what
+    this program and a server's anti-cheat read. Which operating system to run is the owner's choice;
+    this row says what is installed, not that anything was cheated. What is inside the folder was not
+    read.
+status: experimental
+collector: install_marker
+strength: posture
+match:
+  marker: ["%ProgramFiles%\\Revision Tool", "%SystemRoot%\\Web\\Wallpaper\\MeetRevision"]
+  present: true
+retention: Current state only. It says nothing about how the PC was set up in the past.
+unmeasured_when: [not_windows, access_denied, source_absent]
+falsepositives:
+  - Anyone who applied the playbook for privacy, for battery life or for an old PC, and never touched a game
+  - A PC bought second-hand with the playbook already applied
+  - A folder left behind after the playbook was removed or reverted
+references:
+  - https://github.com/meetrevision/playbook
+author: aeterna-rongroi contributors
+date: 2026-09-21
+tags: [posture, install_marker]
