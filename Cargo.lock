@@ -3077,7 +3077,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3091,7 +3091,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-collectors"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "insta",
  "jiff",
@@ -3103,7 +3103,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "jiff",
  "serde",
@@ -3116,7 +3116,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-desktop"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "jiff",
  "qrcode",
@@ -3132,7 +3132,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-host"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "jiff",
  "serde",
@@ -3143,7 +3143,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-host-windows"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "rongroi-host",
  "rongroi-parsers",
@@ -3154,7 +3154,7 @@ dependencies = [
 
 [[package]]
 name = "rongroi-parsers"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "evtx",
  "jiff",
@@ -5313,7 +5313,7 @@ checksum = "7ca9e40826ae2b2be66854381e4f5d4745aed3c295d7977ccfe8f405bc992b8f"
 
 [[package]]
 name = "xtask"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
