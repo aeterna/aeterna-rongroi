@@ -54,6 +54,23 @@ be `unmeasured` there.
 > technical switch and Back from About & code; reading its QR code with a phone is still unchecked
 > ([ADR 0045](adr/0045-reading-the-report-in-layers-and-where-its-code-is.md)).
 >
+> **The same machine, 2026-09-21: the first run of `os_image`, `install_marker` and the three new
+> `posture` settings** ([ADR 0056](adr/0056-what-windows-says-this-installation-is.md),
+> [ADR 0057](adr/0057-named-places-and-the-mitigation-switches.md)). The CLI was cross-built and run
+> there, and every value it read matched, string for string, what the three baseline hosts in
+> `fixtures/hosts/` assert — `ProductName` `Windows 10 Home` on a genuine 25H2 build, `EditionID` and
+> `CompositionEditionID` `Core`, `BuildLabEx` `26100.6.amd64fre.ge_release_flt.260716-1700`, `UBR`
+> 9492, an empty `RegisteredOrganization`, the board vendor's `Msi` / `MS-7A36` /
+> `http://www.msi.com/`, six services `automatic` and `wuauserv` and `WerSvc` `manual`,
+> `object_namespace_protection` `enabled` and the other two settings `not_configured`.
+> `install_marker` answered all six of its places: the five a modification installs `present: false`,
+> with the paths this PC expands them to, and Defender's platform folder `present: true`.
+>
+> **All thirteen rules read `not_found`** on that machine — no false positive on an ordinary PC. They
+> stay `experimental` all the same: a *positive* match has never been seen on a real machine, because
+> nobody has run this on a PC carrying one of these builds. The binary was deleted from that machine
+> after the run.
+>
 > The CI job remains a second, different machine rather than a substitute: it has a real `winevt\Logs`
 > folder and an elevated token, so it parses real event-log bytes on every run, and it says nothing about
 > the non-elevated branch an ordinary scan takes.
