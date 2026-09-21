@@ -74,6 +74,40 @@ usn_journal:
       first: '2026-09-08T01:12:08.3678392Z'
       last: '2026-09-15T05:07:08.7795416Z'
 registry:
+  # What Windows says this installation is, and how the services Windows ships with are set to start
+  # (ADR 0056). Every value below was measured on one Windows 11 PC (build 26220, DisplayVersion 25H2)
+  # on 2026-09-20 with an elevated token — including `ProductName`, which still reads "Windows 10 Home"
+  # on a genuine Windows 11, and the OEM information an ordinary retail board carries.
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    ProductName: "Windows 10 Home"
+    EditionID: "Core"
+    CompositionEditionID: "Core"
+    DisplayVersion: "25H2"
+    CurrentBuild: "26220"
+    UBR: 9492
+    BuildLabEx: "26100.6.amd64fre.ge_release_flt.260716-1700"
+    InstallationType: "Client"
+    RegisteredOrganization: ""
+  'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation':
+    Manufacturer: "Msi"
+    Model: "MS-7A36"
+    SupportURL: "http://www.msi.com/"
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinDefend':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\EventLog':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\SysMain':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\DPS':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\WSearch':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\DiagTrack':
+    Start: 2
+  'HKLM\SYSTEM\CurrentControlSet\Services\wuauserv':
+    Start: 3
+  'HKLM\SYSTEM\CurrentControlSet\Services\WerSvc':
+    Start: 3
   # ADR 0054: the three places `net_config` reads, in the shapes measured on one Windows 11 PC (build
   # 26220) on 2026-09-17, with invented values and value names — no rule, name or line from that PC is copied. The
   # hosts folder is the value measured there; the proxy is off as it was there; the firewall holds

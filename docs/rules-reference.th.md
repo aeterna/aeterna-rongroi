@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 33 |
-| SHA-256 | `61fe3637182ef641faba709b0d7e020ff8010e5f4320765e18a6155e8616b88b` |
+| จำนวน rule | 40 |
+| SHA-256 | `5641a0b939c265d41d0f4f4cadf107b1a42e8ca9eaa6506b1266bd748599c916` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -56,6 +56,14 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
 - `net_config`
   - [ไฟล์ hosts กำหนด address ให้ชื่อของ FiveM หรือ Rockstar](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
+- `os_image`
+  - [ผู้ผลิตเครื่อง (OEM manufacturer) ที่ Settings แสดง เป็นโครงการดัดแปลง Windows](#rule-211d278c-58de-4287-974c-dda6f39a153c) — `posture` · `experimental`
+  - [รุ่นเครื่อง (OEM model) ที่ Settings แสดง เป็นชื่อ playbook ที่ดัดแปลง Windows](#rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9) — `posture` · `experimental`
+  - [ชื่อองค์กรที่จดทะเบียนไว้เป็นชื่อ playbook ที่ดัดแปลง Windows](#rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714) — `posture` · `experimental`
+  - [เซอร์วิสของ Microsoft Defender ถูกตั้งไว้ไม่ให้เริ่มทำงานเลย](#rule-77646339-caf4-4ade-93ef-133089dac30e) — `posture` · `experimental`
+  - [เครื่องนี้ไม่มีเซอร์วิสของ Microsoft Defender ลงทะเบียนไว้เลย](#rule-8f656238-36d2-4178-98db-87f55432edf7) — `posture` · `experimental`
+  - [เซอร์วิส Windows Event Log ไม่ได้เริ่มพร้อม Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
+  - [เซอร์วิส Windows Update เริ่มทำงานไม่ได้บนเครื่องนี้](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -736,6 +744,301 @@ FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache หนึ่
 - blocklist ของโฆษณา การติดตาม และ telemetry ซึ่งชี้ชื่อของ Rockstar ไปที่ 0.0.0.0 หรือ 127.0.0.1
 - คู่มือที่บล็อกเซิร์ฟเวอร์อัปเดตหรือเซิร์ฟเวอร์ sign-in ของ Rockstar launcher ด้วยการแก้ไฟล์ hosts
 - ซอฟต์แวร์ที่เขียนบรรทัดของตัวเองลงไฟล์ hosts เช่น VPN ชุดโปรแกรมความปลอดภัย หรือเครื่องมือพัฒนาโปรแกรม
+
+## collector `os_image`
+
+### `os_image` / `modified-build`
+
+<a id="rule-211d278c-58de-4287-974c-dda6f39a153c"></a>
+
+#### ผู้ผลิตเครื่อง (OEM manufacturer) ที่ Settings แสดง เป็นโครงการดัดแปลง Windows
+
+- ชื่อภาษาอังกฤษ: The OEM manufacturer shown in Settings is a Windows-modification project
+- id: `211d278c-58de-4287-974c-dda6f39a153c`
+- ไฟล์: [`rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml`](../rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+Settings แสดงผู้ผลิตเครื่องนี้ว่า \`Atlas Team\` ซึ่งเป็นค่าที่ Atlas playbook เขียนทับชื่อผู้ผลิตเมนบอร์ดหรือโน้ตบุ๊กจริง ตอนถูกนำไปใช้ อ่านได้จากซอร์สของตัวมันเอง (ADR 0056) ข้อนี้บอกว่าเครื่องใช้ระบบปฏิบัติการแบบไหน ซึ่งเจ้าของเครื่องเลือกเองได้ และไม่ได้พิสูจน์ว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `oem_manufacturer`: เป็น `Atlas Team` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ Atlas playbook เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- บัญชีที่มีสิทธิ์ผู้ดูแลเขียนค่านี้ได้ จึงอาจถูกพิมพ์ใส่เองก็ได้
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9"></a>
+
+#### รุ่นเครื่อง (OEM model) ที่ Settings แสดง เป็นชื่อ playbook ที่ดัดแปลง Windows
+
+- ชื่อภาษาอังกฤษ: The OEM model shown in Settings names a Windows-modification playbook
+- id: `a935bb41-6ed4-41a3-9477-7b3fe3a987d9`
+- ไฟล์: [`rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+รุ่นเครื่องที่ Settings แสดง ขึ้นต้นด้วยชื่อที่ playbook ดัดแปลง Windows สองตัวเขียนไว้ คือ Atlas หรือ ReviOS บนเครื่องที่ไม่ถูกดัดแปลง ค่านี้คือรุ่นเมนบอร์ดหรือรุ่นโน้ตบุ๊กที่ผู้ผลิตเขียนไว้ (วัดได้จริงว่าเป็น \`MS-7A36\` บนเครื่องทั่วไปเครื่องหนึ่ง) ข้อนี้จึงพูดเรื่องเดียวกับชื่อองค์กร แต่มาจากที่ที่สองที่ playbook เขียน (ADR 0056) เป็นการบอกว่าเครื่องใช้ระบบปฏิบัติการแบบไหน ไม่ได้พิสูจน์ว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `oem_model|startswith`: ขึ้นต้นด้วยค่าใดค่าหนึ่งใน `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook เหล่านี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- บัญชีที่มีสิทธิ์ผู้ดูแลเขียนค่านี้ได้ จึงอาจถูกพิมพ์ใส่เองก็ได้
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+<a id="rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714"></a>
+
+#### ชื่อองค์กรที่จดทะเบียนไว้เป็นชื่อ playbook ที่ดัดแปลง Windows
+
+- ชื่อภาษาอังกฤษ: The registered organisation names a Windows-modification playbook
+- id: `3abb40b8-05a4-4cc9-a2f8-17ba52a98714`
+- ไฟล์: [`rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+ชื่อองค์กรที่ \`winver\` แสดง ขึ้นต้นด้วยชื่อที่ playbook ดัดแปลง Windows สองตัวเขียนไว้เอง คือ Atlas หรือ ReviOS ทั้งสองตัวเขียนค่านี้เองตอนถูกนำไปใช้กับ Windows ที่ติดตั้งตามปกติ (ADR 0056) playbook แบบนี้ปิดการทำงานบางส่วนของ Windows และบางส่วนนั้นคือสิ่งที่โปรแกรมนี้กับระบบกันโกงของเซิร์ฟเวอร์อ่าน ข้อนี้บอกว่าเครื่องใช้ระบบปฏิบัติการแบบไหน ซึ่งเจ้าของเครื่องมีสิทธิ์เลือกเอง และไม่ได้พิสูจน์ว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `registered_organization|startswith`: ขึ้นต้นด้วยค่าใดค่าหนึ่งใน `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คนที่ใช้ playbook เหล่านี้เพื่อความเป็นส่วนตัว เพื่อประหยัดแบตเตอรี่ หรือเพื่อเครื่องเก่า โดยไม่เกี่ยวกับเกมเลย
+- เครื่องมือสองที่ซื้อต่อมาโดยมี playbook ติดมาอยู่แล้ว
+- คนที่พิมพ์ชื่อเหล่านี้ลงในช่ององค์กรเอง ซึ่งบัญชีที่มีสิทธิ์ผู้ดูแลทำได้
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+### `os_image` / `windows-components`
+
+<a id="rule-77646339-caf4-4ade-93ef-133089dac30e"></a>
+
+#### เซอร์วิสของ Microsoft Defender ถูกตั้งไว้ไม่ให้เริ่มทำงานเลย
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender's service is set never to start
+- id: `77646339-caf4-4ade-93ef-133089dac30e`
+- ไฟล์: [`rules/os_image/windows-components/defender-service-disabled/rule.yaml`](../rules/os_image/windows-components/defender-service-disabled/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+เซอร์วิส \`WinDefend\` ลงทะเบียนอยู่ แต่ตั้งค่าการเริ่มทำงานไว้เป็น \`disabled\` Windows จึงไม่เริ่มมัน \*\*การติดตั้งแอนตี้ไวรัสตัวอื่นทำแบบนี้พอดี\*\* และเป็นเหตุผลที่ธรรมดาที่สุดของแถวนี้ ส่วนสคริปต์ปรับแต่งที่ปิด Defender ก็เป็นอีกเหตุผลหนึ่ง ให้อ่านข้อนี้คู่กับสิ่งอื่นในรายงาน ไม่ใช่อ่านลำพัง และอ่านในฐานะคำอธิบายลักษณะเครื่อง ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_windefend`: เป็น `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- แอนตี้ไวรัสของเจ้าอื่นทุกตัว ซึ่งปิดเซอร์วิสของ Defender ตอนติดตั้งตัวเอง
+- เครื่องที่บริษัทหรือโรงเรียนดูแล และนโยบายสั่งปิด Defender
+- สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-8f656238-36d2-4178-98db-87f55432edf7"></a>
+
+#### เครื่องนี้ไม่มีเซอร์วิสของ Microsoft Defender ลงทะเบียนไว้เลย
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender's service is not registered on this PC
+- id: `8f656238-36d2-4178-98db-87f55432edf7`
+- ไฟล์: [`rules/os_image/windows-components/defender-service-not-registered/rule.yaml`](../rules/os_image/windows-components/defender-service-not-registered/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อยู่เลย ปกติ Windows มีมาให้ และการปิด Defender ใน Settings หรือการติดตั้งแอนตี้ไวรัสตัวอื่นก็ยังทิ้งคีย์นี้ไว้ สภาพแบบนี้จึงเป็นหน้าตาของอิมเมจ Windows ที่ถอดส่วนประกอบนี้ออก แบบที่ขายกันว่าเบากว่าหรือเร็วกว่า (ADR 0056) เครื่องที่ไม่มี Defender ก็ไม่มี log ของ Defender ให้ผู้ตรวจอ่านด้วย ข้อนี้บอกว่าเครื่องติดตั้งอะไรไว้ ไม่ใช่หลักฐานว่ามีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_windefend`: เป็น `absent` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- อิมเมจ Windows ที่ถูกดัดแปลงมาก่อนติดตั้ง เพื่อความเร็ว เพื่อเครื่องเก่า หรือเพื่อดิสก์เล็ก โดยคนที่ไม่เกี่ยวกับเกม
+- Windows รุ่นหรือ build ที่องค์กรดูแล ซึ่งไม่มี Defender มาให้ตั้งแต่ต้น
+- เครื่องมือถอด Defender ที่เจ้าของเครื่องหรือคนที่ตั้งเครื่องให้เป็นคนรัน
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379"></a>
+
+#### เซอร์วิส Windows Event Log ไม่ได้เริ่มพร้อม Windows
+
+- ชื่อภาษาอังกฤษ: The Windows Event Log service does not start with Windows
+- id: `cf83f06e-23b5-47fc-b7a0-b6d1b8192379`
+- ไฟล์: [`rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml`](../rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+เซอร์วิส \`EventLog\` ถูกตั้งให้เริ่มเมื่อเรียกใช้ หรือไม่ให้เริ่มเลย หรือไม่มีคีย์ของมันอยู่เลย เซอร์วิสนี้คือตัวเขียน log ของ Windows ที่โปรแกรมนี้อ่าน บนเครื่องแบบนั้น "ไม่มีบันทึก" จึงไม่ได้แปลว่า "ไม่มีอะไรเกิดขึ้น" เพราะอาจไม่มีใครเขียนมันตั้งแต่แรก ปกติ Windows ตั้งให้เริ่มอัตโนมัติ และทั้งอิมเมจที่ถูกตัดส่วนประกอบและสคริปต์ปรับแต่งต่างก็เคยเปลี่ยนค่านี้ ข้อนี้บอกลักษณะเครื่อง ไม่ได้แสดงว่ามีอะไรถูกลบหรือมีการโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_eventlog`: เป็นค่าใดค่าหนึ่งใน `absent`, `disabled`, `manual` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- อิมเมจ Windows ที่ถูกดัดแปลงมาก่อนติดตั้งเพื่อความเร็ว โดยคนที่ไม่เกี่ยวกับเกม
+- สคริปต์ปรับแต่งที่เจ้าของเครื่องรันเพื่อความเร็วหรือความเป็นส่วนตัว
+- build ที่องค์กรดูแล ซึ่งนโยบายตั้งค่าเซอร์วิสนี้ไว้ต่างออกไป
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging>
+
+<a id="rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830"></a>
+
+#### เซอร์วิส Windows Update เริ่มทำงานไม่ได้บนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: Windows Update's service cannot start on this PC
+- id: `c9012982-5fc1-4d61-ab0c-0bc1abe93830`
+- ไฟล์: [`rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml`](../rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml)
+- collector: `os_image`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `os_image`
+- เขียนเมื่อ: 2026-09-20
+
+**เกี่ยวกับการตรวจนี้**
+
+เซอร์วิส \`wuauserv\` ถูกตั้งไว้ไม่ให้เริ่มเลย หรือไม่มีคีย์ของมันอยู่ เครื่องที่อัปเดตไม่ได้จะคงอยู่กับ Windows ชุดที่ติดตั้งมาตอนแรก ซึ่งเป็นวิธีที่อิมเมจที่ถูกดัดแปลงใช้รักษาสภาพเดิมไว้ และสคริปต์ปรับแต่งหลายตัวก็ทำแบบนี้กับ Windows ปกติเช่นกัน (ADR 0056) ปกติ Windows ตั้งเซอร์วิสนี้ให้เริ่มเมื่อเรียกใช้ ข้อนี้บอกว่าเครื่องได้รับอัปเดตอย่างไร ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `service_wuauserv`: เป็นค่าใดค่าหนึ่งใน `absent`, `disabled` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นค่าที่ตั้งไว้ตอนนี้เท่านั้น บอกไม่ได้ว่าในอดีตเครื่องนี้เคยตั้งค่าไว้อย่างไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เจ้าของเครื่องปิด Windows Update เองเพื่อไม่ให้รีสตาร์ต หรือเพื่อรักษาไดรเวอร์ที่อัปเดตรุ่นหลังจะไปทับ
+- เครื่องที่บริษัทหรือโรงเรียนดูแลและอัปเดตด้วยวิธีอื่น
+- อิมเมจ Windows ที่ถูกดัดแปลง หรือสคริปต์ปรับแต่งที่เจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview>
 
 ## collector `posture`
 

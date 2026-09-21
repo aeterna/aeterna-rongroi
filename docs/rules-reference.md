@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 33 |
-| SHA-256 | `61fe3637182ef641faba709b0d7e020ff8010e5f4320765e18a6155e8616b88b` |
+| Rules | 40 |
+| SHA-256 | `5641a0b939c265d41d0f4f4cadf107b1a42e8ca9eaa6506b1266bd748599c916` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -60,6 +60,14 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [FiveM for GTA V Enhanced keeps a cache folder for a server](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
 - `net_config`
   - [The hosts file gives a FiveM or Rockstar name an address](#rule-65ee0ec1-bcda-47a3-a401-98632b42e75f) — `posture` · `experimental`
+- `os_image`
+  - [The OEM manufacturer shown in Settings is a Windows-modification project](#rule-211d278c-58de-4287-974c-dda6f39a153c) — `posture` · `experimental`
+  - [The OEM model shown in Settings names a Windows-modification playbook](#rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9) — `posture` · `experimental`
+  - [The registered organisation names a Windows-modification playbook](#rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714) — `posture` · `experimental`
+  - [Microsoft Defender's service is set never to start](#rule-77646339-caf4-4ade-93ef-133089dac30e) — `posture` · `experimental`
+  - [Microsoft Defender's service is not registered on this PC](#rule-8f656238-36d2-4178-98db-87f55432edf7) — `posture` · `experimental`
+  - [The Windows Event Log service does not start with Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
+  - [Windows Update's service cannot start on this PC](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -726,6 +734,294 @@ The hosts file as it was when the scan ran. A line removed before the scan is no
 - Ad, tracking and telemetry blocklists, which point Rockstar names at 0.0.0.0 or 127.0.0.1
 - Guides that block the Rockstar launcher's update or sign-in servers by editing the hosts file
 - Software that writes its own hosts entries, such as a VPN, a security suite or a development tool
+
+## Collector `os_image`
+
+### `os_image` / `modified-build`
+
+<a id="rule-211d278c-58de-4287-974c-dda6f39a153c"></a>
+
+#### The OEM manufacturer shown in Settings is a Windows-modification project
+
+- Id: `211d278c-58de-4287-974c-dda6f39a153c`
+- File: [`rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml`](../rules/os_image/modified-build/oem-manufacturer-is-a-windows-modification-project/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+Settings shows \`Atlas Team\` as the manufacturer of this PC. That is the value the Atlas playbook writes over the board or laptop manufacturer's own when it is applied, read from its own source (ADR 0056). It describes the operating system the PC runs, which a person may choose on their own machine, and proves nothing about cheating.
+
+**Matches when all of these hold for one observation**
+
+- `oem_manufacturer`: is `Atlas Team` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied the Atlas playbook for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- Any account with administrator rights can write this value, so it can also have been typed by hand
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+
+<a id="rule-a935bb41-6ed4-41a3-9477-7b3fe3a987d9"></a>
+
+#### The OEM model shown in Settings names a Windows-modification playbook
+
+- Id: `a935bb41-6ed4-41a3-9477-7b3fe3a987d9`
+- File: [`rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/oem-model-names-a-windows-modification-playbook/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+Settings shows a device model that begins with the name one of two published Windows-modification playbooks writes there — Atlas or ReviOS. On an unmodified PC this value is the board or laptop model its manufacturer wrote (\`MS-7A36\` was measured on an ordinary machine), so this is the same statement the registered organisation makes, from the second place the playbooks write it (ADR 0056). It describes the operating system the PC runs and proves nothing about cheating.
+
+**Matches when all of these hold for one observation**
+
+- `oem_model|startswith`: starts with one of `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied one of these playbooks for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- Any account with administrator rights can write this value, so it can also have been typed by hand
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+<a id="rule-3abb40b8-05a4-4cc9-a2f8-17ba52a98714"></a>
+
+#### The registered organisation names a Windows-modification playbook
+
+- Id: `3abb40b8-05a4-4cc9-a2f8-17ba52a98714`
+- File: [`rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml`](../rules/os_image/modified-build/organisation-names-a-windows-modification-playbook/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+\`winver\` shows a registered organisation that begins with the name one of two published Windows-modification playbooks writes there — Atlas or ReviOS. Both write it themselves, from their own source, when they are applied over an ordinary Windows installation (ADR 0056). Such a playbook turns off parts of Windows, and some of those parts are what this program and a server's anti-cheat read. It says what operating system the PC runs, which a person is entitled to choose on their own machine, and it does not prove that anything was cheated.
+
+**Matches when all of these hold for one observation**
+
+- `registered_organization|startswith`: starts with one of `Atlas Playbook`, `ReviOS 10`, `ReviOS 11` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Anyone who applied one of these playbooks for privacy, for battery life or for an old PC, and never touched a game
+- A PC bought second-hand with the playbook already applied
+- Somebody who typed one of these names into the registered organisation by hand, which any account with administrator rights may do
+
+**References**
+
+- <https://github.com/Atlas-OS/Atlas>
+- <https://github.com/meetrevision/playbook>
+
+### `os_image` / `windows-components`
+
+<a id="rule-77646339-caf4-4ade-93ef-133089dac30e"></a>
+
+#### Microsoft Defender's service is set never to start
+
+- Id: `77646339-caf4-4ade-93ef-133089dac30e`
+- File: [`rules/os_image/windows-components/defender-service-disabled/rule.yaml`](../rules/os_image/windows-components/defender-service-disabled/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+The \`WinDefend\` service is registered and its start type is \`disabled\`, so Windows does not start it. \*\*Installing another antivirus does exactly this\*\*, and it is the single most ordinary reason for this row; a tweaking script that turns Defender off is another. Read it beside what else the report says, never on its own, and read it as a description of the machine rather than as evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `service_windefend`: is `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Any third-party antivirus, which disables Defender's service when it installs itself
+- A PC managed by an employer or a school whose policy turns Defender off
+- A tweaking script or a pre-modified Windows image the owner installed for performance
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-8f656238-36d2-4178-98db-87f55432edf7"></a>
+
+#### Microsoft Defender's service is not registered on this PC
+
+- Id: `8f656238-36d2-4178-98db-87f55432edf7`
+- File: [`rules/os_image/windows-components/defender-service-not-registered/rule.yaml`](../rules/os_image/windows-components/defender-service-not-registered/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+Windows has no \`WinDefend\` service key at all. Windows ships with one, and turning Defender off in Settings or installing another antivirus leaves the key in place, so this is what a Windows image that removed the component looks like — the kind sold as a lighter or faster Windows (ADR 0056). A machine without Defender also has no Defender log for a reviewer to read. It says what was installed on the PC; it is not evidence that anything was cheated.
+
+**Matches when all of these hold for one observation**
+
+- `service_windefend`: is `absent` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A pre-modified Windows image installed for performance, for an old PC or for a small disk, by somebody who never touched a game
+- A Windows edition or a managed build that ships without Defender
+- A removal tool run by the PC's owner or by whoever set the PC up for them
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/services/service-installation>
+
+<a id="rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379"></a>
+
+#### The Windows Event Log service does not start with Windows
+
+- Id: `cf83f06e-23b5-47fc-b7a0-b6d1b8192379`
+- File: [`rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml`](../rules/os_image/windows-components/event-log-service-not-automatic/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+The \`EventLog\` service is set to start on demand or never, or its key is not there at all. That service writes the Windows logs this program reads, so on such a machine an absent record is not the same statement as "nothing happened" — there may have been nothing to write it. Windows sets this service to start automatically, and both a stripped image and a tweaking script are known to change it. It describes the machine; it does not show that anything was removed or cheated.
+
+**Matches when all of these hold for one observation**
+
+- `service_eventlog`: is one of `absent`, `disabled`, `manual` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A pre-modified Windows image installed for performance, by somebody who never touched a game
+- A tweaking script the owner ran for performance or for privacy
+- A managed build whose policy sets the service differently
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging>
+
+<a id="rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830"></a>
+
+#### Windows Update's service cannot start on this PC
+
+- Id: `c9012982-5fc1-4d61-ab0c-0bc1abe93830`
+- File: [`rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml`](../rules/os_image/windows-components/windows-update-service-cannot-start/rule.yaml)
+- Collector: `os_image`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `os_image`
+- Written: 2026-09-20
+
+**About this check**
+
+The \`wuauserv\` service is set never to start, or its key is not there at all. A PC that cannot update keeps whatever Windows it was installed with, which is how a pre-modified image stays as it was shipped, and it is also what several tweaking scripts do on an ordinary installation (ADR 0056). Windows ships this service set to start on demand. It says how the PC is kept up to date and is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `service_wuauserv`: is one of `absent`, `disabled` (text, ASCII case ignored)
+
+**Look-back**
+
+Current setting only. It says nothing about how the PC was configured in the past.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- An owner who turned Windows Update off to stop reboots, or to keep a driver a later update replaces
+- A PC managed by an employer or a school that updates it another way
+- A pre-modified Windows image or a tweaking script the owner installed for performance
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview>
 
 ## Collector `posture`
 
