@@ -129,6 +129,21 @@ Microsoft's drivers only, so this says nothing about a gaming PC's. No driver li
 used (ADR 0046). Neither non-elevated baseline sets `%SystemRoot%`, so `driver_service` is `read_failed`
 on both.
 
+**What starts by itself in `baseline-elevated-win11` is a runner's, not a PC's.** Its program services,
+`Run` values and scheduled task files are rebuilt from the `autostart` collector's own reading of a
+GitHub-hosted Windows Server 2025 runner (`windows.yml` run 36735184291, 2026-09-30): 278 program
+services, 2 `Run` values and 87 task actions in 82 task files, 34 files hashed, no gap. Each `ImagePath`
+is written as the path the collector resolved, quoted, and each `ServiceDll` as its resolved path, with
+`Type` 16, or 32 beside a `ServiceDll`; each task file holds only the kinds of its triggers, whether it is
+enabled and its commands, quoted. The files outside the Windows folder are described with the hash and
+signature the runner reported; a file the runner did not have (Edge's updater) is not described, so it
+reads as missing there too. Two things are not the runner's: the eight services `os_image` reads keep the
+`Start` measured on the Windows 11 PC this baseline otherwise describes (three differ from the runner's),
+and the account SIDs in four task names are replaced with an invented one. The autostart rule is `found`
+on this baseline, on GitHub's provisioning agent; `rules/known-fps.csv` accepts it (ADR 0060, owner
+decision 6). A runner image says nothing about what a gaming PC starts. Neither non-elevated baseline sets
+`%SystemRoot%`, so `autostart` is `read_failed` on both.
+
 **Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
 posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,
 `registry-access-denied`, `baseline-hardened-win11` and `baseline-consumer-win11` — declares

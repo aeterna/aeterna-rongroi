@@ -1088,7 +1088,10 @@ mod tests {
     #[test]
     fn consent_names_every_kind_of_source() {
         let named: &[(&str, &[&str])] = &[
-            ("autostart", &["Run", "RunOnce", "scheduled task", "SHA-256"]),
+            (
+                "autostart",
+                &["Run", "RunOnce", "scheduled task", "SHA-256"],
+            ),
             ("bam", &["BAM"]),
             ("driver_service", &["driver"]),
             ("evtx", &["event log"]),

@@ -38,6 +38,8 @@ env:
   SystemRoot: 'C:\Windows'
   WinDir: 'C:\Windows'
   ProgramFiles: 'C:\Program Files'
+  ProgramFiles(x86): 'C:\Program Files (x86)'
+  ProgramW6432: 'C:\Program Files'
   ProgramData: 'C:\ProgramData'
 # The change journal (ADR 0047): counts and first and last times taken from the `usn` collector's own
 # reading of a GitHub-hosted Windows Server 2025 runner (windows.yml run 34930942657), rebuilt as record
@@ -96,24 +98,40 @@ registry:
     SupportURL: "http://www.msi.com/"
   'HKLM\SYSTEM\CurrentControlSet\Services\WinDefend':
     Start: 2
+    Type: 16
+    ImagePath: '"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26080.4-0\MsMpEng.exe"'
   # Measured on the same PC on 2026-09-21 (ADR 0057): object-namespace protection as Windows ships
   # it, and no override of the speculative-execution mitigations and no SEHOP switch written at all.
   'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager':
     ProtectionMode: 1
   'HKLM\SYSTEM\CurrentControlSet\Services\EventLog':
     Start: 2
+    Type: 32
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
   'HKLM\SYSTEM\CurrentControlSet\Services\SysMain':
     Start: 2
+    Type: 32
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
   'HKLM\SYSTEM\CurrentControlSet\Services\DPS':
     Start: 2
+    Type: 32
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
   'HKLM\SYSTEM\CurrentControlSet\Services\WSearch':
     Start: 2
+    Type: 16
+    ImagePath: '"C:\Windows\system32\SearchIndexer.exe"'
   'HKLM\SYSTEM\CurrentControlSet\Services\DiagTrack':
     Start: 2
+    Type: 32
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
   'HKLM\SYSTEM\CurrentControlSet\Services\wuauserv':
     Start: 3
+    Type: 32
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
   'HKLM\SYSTEM\CurrentControlSet\Services\WerSvc':
     Start: 3
+    Type: 32
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
   # ADR 0054: the three places `net_config` reads, in the shapes measured on one Windows 11 PC (build
   # 26220) on 2026-09-17, with invented values and value names — no rule, name or line from that PC is copied. The
   # hosts folder is the value measured there; the proxy is off as it was there; the firewall holds
@@ -1850,6 +1868,1599 @@ registry:
     Type: 1
     Start: 3
     ImagePath: 'C:\Windows\system32\drivers\ztdns.sys'
+  # ADR 0060: the program services, Run values and their ServiceDll/TriggerInfo keys `autostart` reads,
+  # rebuilt from the collector's own reading of a GitHub-hosted Windows Server 2025 runner (see
+  # PROVENANCE.md). Each ImagePath is the path the collector resolved, quoted, and each ServiceDll the
+  # resolved path; Type is 16, or 32 beside a ServiceDll. A runner image's services belong to no person.
+  'HKLM\SYSTEM\CurrentControlSet\Services\ALG':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\System32\alg.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Apache':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\tools\Apache24\bin\httpd.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppHostSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\inetsrv\apphostsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppHostSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppIDSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\appidsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppIDSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppIDSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\Appinfo\Parameters':
+    ServiceDll: 'C:\Windows\System32\appinfo.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Appinfo':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Appinfo\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppMgmt\Parameters':
+    ServiceDll: 'C:\Windows\System32\appmgmts.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppMgmt':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppReadiness\Parameters':
+    ServiceDll: 'C:\Windows\system32\AppReadiness.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppReadiness':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppVClient':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\Windows\system32\AppVClient.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppXSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\appxdeploymentserver.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppXSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AppXSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\aspnet_state':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\aspnet_state.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AudioEndpointBuilder\Parameters':
+    ServiceDll: 'C:\Windows\System32\AudioEndpointBuilder.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AudioEndpointBuilder':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Audiosrv\Parameters':
+    ServiceDll: 'C:\Windows\System32\Audiosrv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Audiosrv':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AxInstSV\Parameters':
+    ServiceDll: 'C:\Windows\System32\AxInstSV.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\AxInstSV':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BDESVC\Parameters':
+    ServiceDll: 'C:\Windows\System32\bdesvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BDESVC':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BDESVC\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\BFE\Parameters':
+    ServiceDll: 'C:\Windows\System32\bfe.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BFE':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BITS\Parameters':
+    ServiceDll: 'C:\Windows\System32\qmgr.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BITS':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BluetoothUserService\Parameters':
+    ServiceDll: 'C:\Windows\System32\Microsoft.Bluetooth.UserService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BluetoothUserService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BluetoothUserService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\BluetoothUserService_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BluetoothUserService_c9067\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\BrokerInfrastructure\Parameters':
+    ServiceDll: 'C:\Windows\System32\psmsrv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BrokerInfrastructure':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BTAGService\Parameters':
+    ServiceDll: 'C:\Windows\System32\BTAGService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BTAGService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BTAGService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthAvctpSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\BthAvctpSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthAvctpSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\BthAvctpSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\bthserv\Parameters':
+    ServiceDll: 'C:\Windows\system32\bthserv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bthserv':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\bthserv\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\camsvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\CapabilityAccessManager.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\camsvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CaptureService\Parameters':
+    ServiceDll: 'C:\Windows\System32\CaptureService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CaptureService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CaptureService_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cbdhsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\cbdhsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cbdhsvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\cbdhsvc_c9067':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CDPSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\CDPSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CDPSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CDPSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\CDPUserSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\CDPUserSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CDPUserSvc':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CertPropSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\certprop.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CertPropSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CertPropSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\ClipSVC\Parameters':
+    ServiceDll: 'C:\Windows\System32\ClipSVC.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ClipSVC':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ClipSVC\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\CloudBackupRestoreSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\CloudRestoreLauncher.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CloudBackupRestoreSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CloudBackupRestoreSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\COMSysApp':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\dllhost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ConsentUxUserSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\ConsentUxClient.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ConsentUxUserSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ConsentUxUserSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CoreMessagingRegistrar\Parameters':
+    ServiceDll: 'C:\Windows\system32\coremessaging.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CoreMessagingRegistrar':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CredentialEnrollmentManagerUserSvc':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\CredentialEnrollmentManager.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CredentialEnrollmentManagerUserSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\CredentialEnrollmentManager.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CryptSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\cryptsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CryptSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CryptSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\CscService\Parameters':
+    ServiceDll: 'C:\Windows\System32\cscsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CscService':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\CscService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\DcomLaunch\Parameters':
+    ServiceDll: 'C:\Windows\system32\rpcss.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DcomLaunch':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dcsvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\dcsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dcsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dcsvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\defragsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\defragsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\defragsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceAssociationBrokerSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\deviceaccess.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceAssociationBrokerSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceAssociationBrokerSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceAssociationService\Parameters':
+    ServiceDll: 'C:\Windows\system32\das.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceAssociationService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceAssociationService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceInstall\Parameters':
+    ServiceDll: 'C:\Windows\system32\umpnpmgr.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceInstall':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DeviceInstall\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevicePickerUserSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\Windows.Devices.Picker.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevicePickerUserSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevicePickerUserSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevicesFlowUserSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\DevicesFlowBroker.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevicesFlowUserSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevicesFlowUserSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevQueryBroker\Parameters':
+    ServiceDll: 'C:\Windows\system32\DevQueryBroker.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevQueryBroker':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DevQueryBroker\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\Dhcp\Parameters':
+    ServiceDll: 'C:\Windows\system32\dhcpcore.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Dhcp':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DiagTrack\Parameters':
+    ServiceDll: 'C:\Windows\system32\diagtrack.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DispBrokerDesktopSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\DispBroker.Desktop.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DispBrokerDesktopSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DisplayEnhancementService\Parameters':
+    ServiceDll: 'C:\Windows\system32\Microsoft.Graphics.Display.DisplayEnhancementService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DisplayEnhancementService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DisplayEnhancementService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\DmEnrollmentSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\Windows.Internal.Management.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DmEnrollmentSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dmwappushservice\Parameters':
+    ServiceDll: 'C:\Windows\system32\dmwappushsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dmwappushservice':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dmwappushservice\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters':
+    ServiceDll: 'C:\Windows\System32\dnsrslvr.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Dnscache':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\docker':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\system32\dockerd.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DoSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\dosvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DoSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DoSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\dot3svc\Parameters':
+    ServiceDll: 'C:\Windows\System32\dot3svc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\dot3svc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DPS\Parameters':
+    ServiceDll: 'C:\Windows\system32\dps.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DsmSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\DeviceSetupManager.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DsmSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DsmSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\DsSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\DsSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DsSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\DsSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\EapHost\Parameters':
+    ServiceDll: 'C:\Windows\System32\eapsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EapHost':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\edgeupdate':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Program Files (x86)\Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\edgeupdate\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\edgeupdatem':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files (x86)\Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\edgeupdatem\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\EFS\Parameters':
+    ServiceDll: 'C:\Windows\system32\efssvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EFS':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EFS\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\embeddedmode\Parameters':
+    ServiceDll: 'C:\Windows\System32\embeddedmodesvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\embeddedmode':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\embeddedmode\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\EntAppSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\EnterpriseAppMgmtSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EntAppSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Parameters':
+    ServiceDll: 'C:\Windows\System32\wevtsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EventSystem\Parameters':
+    ServiceDll: 'C:\Windows\system32\es.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\EventSystem':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FabricHostSvc':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files\Microsoft Service Fabric\bin\FabricHost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\fdPHost\Parameters':
+    ServiceDll: 'C:\Windows\system32\fdPHost.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\fdPHost':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FDResPub\Parameters':
+    ServiceDll: 'C:\Windows\system32\fdrespub.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FDResPub':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FDResPub\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\FontCache\Parameters':
+    ServiceDll: 'C:\Windows\system32\FntCache.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FontCache':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FontCache3.0.0.0':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\Microsoft.Net\Framework64\v3.0\WPF\PresentationFontCache.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FrameServer\Parameters':
+    ServiceDll: 'C:\Windows\system32\FrameServer.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FrameServer':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FrameServer\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\FrameServerMonitor\Parameters':
+    ServiceDll: 'C:\Windows\system32\FrameServerMonitor.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FrameServerMonitor':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\FrameServerMonitor\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\GameInputSvc':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\System32\GameInputSvc.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\GameInputSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\GoogleChromeElevationService':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files\Google\Chrome\Application\153.0.8010.53\elevation_service.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\GoogleUpdaterInternalService152.0.7933.0':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\Program Files (x86)\Google\GoogleUpdater\152.0.7933.0\updater.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\GoogleUpdaterService152.0.7933.0':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\Program Files (x86)\Google\GoogleUpdater\152.0.7933.0\updater.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\gpsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\gpsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\gpsvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\gpsvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\GraphicsPerfSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\GraphicsPerfSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\GraphicsPerfSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\GraphicsPerfSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\HgClientService\Parameters':
+    ServiceDll: 'C:\Windows\system32\hgclientservice.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HgClientService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HgClientService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\hidserv\Parameters':
+    ServiceDll: 'C:\Windows\system32\hidserv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hidserv':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hidserv\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\hns\Parameters':
+    ServiceDll: 'C:\Windows\System32\HostNetSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hns':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hns\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\hpatchmon\Parameters':
+    ServiceDll: 'C:\Windows\system32\hpatchmon.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\hpatchmon':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HvHost\Parameters':
+    ServiceDll: 'C:\Windows\System32\hvhostsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HvHost':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\HvHost\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\IKEEXT\Parameters':
+    ServiceDll: 'C:\Windows\System32\ikeext.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IKEEXT':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\IKEEXT\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\InstallService\Parameters':
+    ServiceDll: 'C:\Windows\system32\InstallService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\InstallService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\InventorySvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\inventorysvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\InventorySvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iphlpsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\iphlpsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\iphlpsvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KeyIso\Parameters':
+    ServiceDll: 'C:\Windows\system32\keyiso.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KeyIso':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KeyIso\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\KPSSVC\Parameters':
+    ServiceDll: 'C:\Windows\system32\kpssvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KPSSVC':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KtmRm\Parameters':
+    ServiceDll: 'C:\Windows\system32\msdtckrm.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KtmRm':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\KtmRm\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters':
+    ServiceDll: 'C:\Windows\system32\srvsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters':
+    ServiceDll: 'C:\Windows\System32\wkssvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LanmanWorkstation':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lfsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\lfsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lfsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lfsvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\LicenseManager\Parameters':
+    ServiceDll: 'C:\Windows\system32\LicenseManagerSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LicenseManager':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LicenseManager\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\lltdsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\lltdsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lltdsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lmhosts\Parameters':
+    ServiceDll: 'C:\Windows\System32\lmhsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lmhosts':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\lmhosts\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\LocalKdc\Parameters':
+    ServiceDll: 'C:\Windows\system32\localkdcsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LocalKdc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LSM\Parameters':
+    ServiceDll: 'C:\Windows\System32\lsm.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LSM':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LxpSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\LanguageOverlayServer.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\LxpSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MapsBroker\Parameters':
+    ServiceDll: 'C:\Windows\System32\moshost.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MapsBroker':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\McpManagementService\Parameters':
+    ServiceDll: 'C:\Windows\System32\McpManagementService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\McpManagementService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MDCoreSvc':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26080.4-0\MpDefenderCoreService.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MicrosoftEdgeElevationService':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files (x86)\Microsoft\Edge\Application\153.0.4234.48\elevation_service.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MongoDB':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\Program Files\MongoDB\Server\7.0\bin\mongod.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MozillaMaintenance':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files (x86)\Mozilla Maintenance Service\maintenanceservice.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mpssvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\mpssvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\mpssvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSDTC':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\System32\msdtc.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSiSCSI\Parameters':
+    ServiceDll: 'C:\Windows\system32\iscsiexe.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSiSCSI':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\msiserver':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\msiexec.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\MSMQ':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\system32\mqsvc.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NaturalAuthentication\Parameters':
+    ServiceDll: 'C:\Windows\System32\NaturalAuth.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NaturalAuthentication':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NaturalAuthentication\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\NcaSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\ncasvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NcaSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NcaSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\NcbService\Parameters':
+    ServiceDll: 'C:\Windows\System32\ncbservice.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NcbService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NcbService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters':
+    ServiceDll: 'C:\Windows\system32\netlogon.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Netlogon':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Netman\Parameters':
+    ServiceDll: 'C:\Windows\System32\netman.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Netman':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetMsmqActivator':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\SMSvcHost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetPipeActivator':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\SMSvcHost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\netprofm\Parameters':
+    ServiceDll: 'C:\Windows\System32\netprofmsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\netprofm':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetSetupSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\NetSetupSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetSetupSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetSetupSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetTcpActivator':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\SMSvcHost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NetTcpPortSharing':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\SMSvcHost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NgcCtnrSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\NgcCtnrSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NgcCtnrSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NgcCtnrSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\NgcSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\ngcsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NgcSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NgcSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\nginx':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\ProgramData\Chocolatey\lib\NSSM\tools\nssm.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NlaSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\netprofmsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NlaSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NPSMSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\npsm.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NPSMSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\NPSMSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nsi\Parameters':
+    ServiceDll: 'C:\Windows\system32\nsisvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nsi':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nvagent\Parameters':
+    ServiceDll: 'C:\Windows\System32\NvAgent.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\nvagent':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\OneSyncSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\APHostService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\OneSyncSvc':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\P9RdrService\Parameters':
+    ServiceDll: 'C:\Windows\system32\p9rdrservice.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\P9RdrService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\P9RdrService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\P9RdrService_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\P9RdrService_c9067\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\PcaSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\pcasvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PcaSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PcaSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\PerfHost':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\SysWow64\perfhost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PimIndexMaintenanceSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\PimIndexMaintenance.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PimIndexMaintenanceSvc':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pla\Parameters':
+    ServiceDll: 'C:\Windows\system32\pla.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\pla':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PlugPlay\Parameters':
+    ServiceDll: 'C:\Windows\system32\umpnpmgr.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PlugPlay':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent\Parameters':
+    ServiceDll: 'C:\Windows\System32\ipsecsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\postgresql-x64-17':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Power\Parameters':
+    ServiceDll: 'C:\Windows\system32\umpo.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Power':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintDeviceConfigurationService\Parameters':
+    ServiceDll: 'C:\Windows\System32\PrintDeviceConfigurationService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintDeviceConfigurationService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintDeviceConfigurationService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintNotify\Parameters':
+    ServiceDll: 'C:\Windows\system32\spool\drivers\x64\3\PrintConfig.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintNotify':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintScanBrokerService\Parameters':
+    ServiceDll: 'C:\Windows\System32\PrintScanBrokerService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintScanBrokerService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintWorkflowUserSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\PrintWorkflowService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintWorkflowUserSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintWorkflowUserSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintWorkflowUserSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PrintWorkflowUserSvc_c9067\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\ProfSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\profsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ProfSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PushToInstall\Parameters':
+    ServiceDll: 'C:\Windows\system32\PushToInstall.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PushToInstall':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\PushToInstall\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\QWAVE\Parameters':
+    ServiceDll: 'C:\Windows\system32\qwave.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\QWAVE':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasAuto\Parameters':
+    ServiceDll: 'C:\Windows\System32\rasauto.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasAuto':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasMan\Parameters':
+    ServiceDll: 'C:\Windows\System32\rasmans.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RasMan':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RdAgent':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\WindowsAzure\GuestAgent_2.7.41491.1243_2026-09-30_151415\WaAppAgent.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\refsdedupsvc':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\System32\ReFsDedupSvc.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RemoteAccess\Parameters':
+    ServiceDll: 'C:\Windows\System32\mprdim.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RemoteAccess':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RemoteRegistry\Parameters':
+    ServiceDll: 'C:\Windows\system32\regsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RemoteRegistry':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RemoteRegistry\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\RmSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\RMapi.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RmSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RpcEptMapper\Parameters':
+    ServiceDll: 'C:\Windows\System32\RpcEpMap.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RpcEptMapper':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RpcLocator':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\locator.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RpcSs\Parameters':
+    ServiceDll: 'C:\Windows\system32\rpcss.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RpcSs':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\RSoPProv':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\RSoPProv.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sacsvr\Parameters':
+    ServiceDll: 'C:\Windows\system32\sacsvr.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sacsvr':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SamSs':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\system32\lsass.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SCardSvr\Parameters':
+    ServiceDll: 'C:\Windows\System32\SCardSvr.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SCardSvr':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SCardSvr\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\ScDeviceEnum\Parameters':
+    ServiceDll: 'C:\Windows\System32\ScDeviceEnum.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ScDeviceEnum':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ScDeviceEnum\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\Schedule\Parameters':
+    ServiceDll: 'C:\Windows\system32\schedsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Schedule':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Schedule\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\SCPolicySvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\certprop.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SCPolicySvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\seclogon\Parameters':
+    ServiceDll: 'C:\Windows\system32\seclogon.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\seclogon':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SecurityHealthService':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\SecurityHealthService.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SEMgrSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\SEMgrSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SEMgrSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SEMgrSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\SENS\Parameters':
+    ServiceDll: 'C:\Windows\System32\sens.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SENS':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Sense':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files\Windows Defender Advanced Threat Protection\MsSense.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensorDataService':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\System32\SensorDataService.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensorDataService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensorService\Parameters':
+    ServiceDll: 'C:\Windows\system32\SensorService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensorService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensorService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensrSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\sensrsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensrSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SensrSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\SessionEnv\Parameters':
+    ServiceDll: 'C:\Windows\system32\sessenv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SessionEnv':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters':
+    ServiceDll: 'C:\Windows\System32\ipnathlp.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\ShellHWDetection\Parameters':
+    ServiceDll: 'C:\Windows\System32\shsvcs.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ShellHWDetection':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\shpamsvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\Windows.SharedPC.AccountManager.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\shpamsvc':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\smphost\Parameters':
+    ServiceDll: 'C:\Windows\System32\smphost.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\smphost':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SNMPTrap':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\System32\snmptrap.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Spooler':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\System32\spoolsv.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sppsvc':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\system32\sppsvc.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sppsvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\SQLWriter':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Program Files\Microsoft SQL Server\90\Shared\sqlwriter.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SSDPSRV\Parameters':
+    ServiceDll: 'C:\Windows\System32\ssdpsrv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SSDPSRV':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ssh-agent':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\Windows\System32\OpenSSH\ssh-agent.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\sshd':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\System32\OpenSSH\sshd.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SstpSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\sstpsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SstpSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\StateRepository\Parameters':
+    ServiceDll: 'C:\Windows\system32\windows.staterepository.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\StateRepository':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\StiSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\wiaservc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\StiSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\StiSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\StorSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\storsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\StorSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\StorSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\svsvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\svsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\svsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\svsvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\swprv\Parameters':
+    ServiceDll: 'C:\Windows\System32\swprv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\swprv':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SysMain\Parameters':
+    ServiceDll: 'C:\Windows\system32\sysmain.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SystemEventsBroker\Parameters':
+    ServiceDll: 'C:\Windows\System32\SystemEventsBrokerServer.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SystemEventsBroker':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SystemEventsBroker\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\tapisrv\Parameters':
+    ServiceDll: 'C:\Windows\System32\tapisrv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tapisrv':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TermService\Parameters':
+    ServiceDll: 'C:\Windows\System32\termsrv.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TermService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TextInputManagementService\Parameters':
+    ServiceDll: 'C:\Windows\System32\TabSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TextInputManagementService':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TextInputManagementService\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\Themes\Parameters':
+    ServiceDll: 'C:\Windows\system32\themeservice.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Themes':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TieringEngineService':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\TieringEngineService.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TimeBrokerSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\TimeBrokerServer.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TimeBrokerSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TimeBrokerSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\TokenBroker\Parameters':
+    ServiceDll: 'C:\Windows\System32\TokenBroker.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TokenBroker':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TrkWks\Parameters':
+    ServiceDll: 'C:\Windows\System32\trkwks.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TrkWks':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\TrustedInstaller':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\servicing\TrustedInstaller.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tzautoupdate\Parameters':
+    ServiceDll: 'C:\Windows\system32\tzautoupdate.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tzautoupdate':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\tzautoupdate\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\UALSVC\Parameters':
+    ServiceDll: 'C:\Windows\System32\ualsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UALSVC':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UdkUserSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\windowsudkservices.shellcommon.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UdkUserSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UdkUserSvc_c9067':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UevAgentService':
+    Type: 16
+    Start: 4
+    ImagePath: '"C:\Windows\system32\AgentService.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UmRdpService\Parameters':
+    ServiceDll: 'C:\Windows\System32\umrdp.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UmRdpService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UnistoreSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\unistore.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UnistoreSvc':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\upnphost\Parameters':
+    ServiceDll: 'C:\Windows\System32\upnphost.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\upnphost':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UserDataSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\userdataservice.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UserDataSvc':
+    Type: 32
+    Start: 4
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UserManager\Parameters':
+    ServiceDll: 'C:\Windows\System32\usermgr.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UserManager':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UserManager\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\UsoSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\usosvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\UsoSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VaultSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\vaultsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VaultSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vds':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\System32\vds.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmcompute':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\vmcompute.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmcompute\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicguestinterface\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicguestinterface':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicguestinterface\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicheartbeat\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicheartbeat':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicheartbeat\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmickvpexchange\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmickvpexchange':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmickvpexchange\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicrdv\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvcext.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicrdv':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicrdv\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicshutdown\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicshutdown':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicshutdown\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmictimesync\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmictimesync':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmictimesync\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicvmsession\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicvmsession':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicvmsession\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicvss\Parameters':
+    ServiceDll: 'C:\Windows\System32\icsvcvss.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicvss':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmicvss\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\vmms':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\system32\vmms.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VSInstallerElevationService':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\VSInstallerElevationService.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VSS':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\vssvc.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\VSStandardCollectorService150':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files (x86)\Microsoft Visual Studio\Shared\Common\DiagnosticsHub.Collection.Service\StandardCollector.Service.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\W32Time\Parameters':
+    ServiceDll: 'C:\Windows\system32\w32time.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\W32Time':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\w3logsvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\inetsrv\w3logsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\w3logsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\W3SVC\Parameters':
+    ServiceDll: 'C:\Windows\system32\inetsrv\iisw3adm.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\W3SVC':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WaaSMedicSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\WaasMedicSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WaaSMedicSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WalletService\Parameters':
+    ServiceDll: 'C:\Windows\system32\WalletService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WalletService':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WarpJITSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\Windows.WARP.JITService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WarpJITSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WarpJITSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\WAS\Parameters':
+    ServiceDll: 'C:\Windows\system32\inetsrv\iisw3adm.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WAS':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WbioSrvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\wbiosrvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WbioSrvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WbioSrvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wcmsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\wcmsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wcmsvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wcmsvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\wcncsvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\wcncsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wcncsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdiServiceHost\Parameters':
+    ServiceDll: 'C:\Windows\system32\wdi.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdiServiceHost':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdiSystemHost\Parameters':
+    ServiceDll: 'C:\Windows\system32\wdi.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdiSystemHost':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WdNisSvc':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26080.4-0\NisSrv.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wecsvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\wecsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Wecsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WEPHOSTSVC\Parameters':
+    ServiceDll: 'C:\Windows\system32\wephostsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WEPHOSTSVC':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WEPHOSTSVC\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\wercplsupport\Parameters':
+    ServiceDll: 'C:\Windows\System32\wercplsupport.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wercplsupport':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WerSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\WerSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WerSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\WFDSConMgrSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\wfdsconmgrsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WFDSConMgrSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WFDSConMgrSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\WiaRpc\Parameters':
+    ServiceDll: 'C:\Windows\System32\wiarpc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WiaRpc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WindowsAzureGuestAgent':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\WindowsAzure\GuestAgent_2.7.41491.1243_2026-09-30_151415\WindowsAzureGuestAgent.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinHttpAutoProxySvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\winhttp.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinHttpAutoProxySvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Winmgmt\Parameters':
+    ServiceDll: 'C:\Windows\system32\wbem\WMIsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\Winmgmt':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinRM\Parameters':
+    ServiceDll: 'C:\Windows\system32\WsmSvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WinRM':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wisvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\flightsettings.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wisvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wisvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\WlanSvc\Parameters':
+    ServiceDll: 'C:\Windows\System32\wlansvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WlanSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wlidsvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\wlidsvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wlidsvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wlidsvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\WManSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\Windows.Management.Service.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WManSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wmiApSrv':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Windows\system32\wbem\WmiApSrv.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WMPNetworkSvc':
+    Type: 16
+    Start: 3
+    ImagePath: '"C:\Program Files\Windows Media Player\wmpnetwk.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\workfolderssvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\workfolderssvc.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\workfolderssvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WPDBusEnum\Parameters':
+    ServiceDll: 'C:\Windows\system32\wpdbusenum.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WPDBusEnum':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WPDBusEnum\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\WpnService\Parameters':
+    ServiceDll: 'C:\Windows\system32\WpnService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WpnService':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WpnUserService\Parameters':
+    ServiceDll: 'C:\Windows\System32\WpnUserService.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WpnUserService':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WpnUserService_c9067':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Windows\system32\svchost.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WSAIFabricSvc\Parameters':
+    ServiceDll: 'C:\Windows\system32\WSAIFabricHost.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WSAIFabricSvc':
+    Type: 32
+    Start: 2
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\WSLService':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\Program Files\WSL\wslservice.exe"'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wuauserv\Parameters':
+    ServiceDll: 'C:\Windows\system32\wuaueng.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\wuauserv\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\XblAuthManager\Parameters':
+    ServiceDll: 'C:\Windows\System32\XblAuthManager.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\XblAuthManager':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ZTHELPER\Parameters':
+    ServiceDll: 'C:\Windows\System32\zthelper.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\ZTHELPER':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs'
+  'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run':
+    'AzureArcSetup': '"C:\Windows\AzureArcSetup\Systray\AzureArcSysTray.exe"'
+    'SecurityHealth': '"C:\Windows\system32\SecurityHealthSystray.exe"'
 filesystem:
   # ADR 0057: Defender's platform folder, which the same PC has and which a limited token listed on
   # 2026-09-21. The two version folders are the names that PC had; nothing inside them is read, and
@@ -2782,6 +4393,497 @@ filesystem:
   'C:\Windows\System32\DriverStore\FileRepository\wini3ctarget.inf_amd64_9bda3f893989b4a6':
     - name: 'wini3ctarget.sys'
       sha256: 4e8da0a95ffc8c3cc05ae86677357edb6bc68fd031c1f26a0e377d7e7301dcbf
+  # ADR 0060: the scheduled task files and the files outside the Windows folder `autostart` hashed,
+  # rebuilt from the same runner reading. Each task holds only its triggers' kinds, whether it is
+  # enabled and its commands, as the collector reported them; account SIDs in task names are invented.
+  'C:\Program Files (x86)\Google\GoogleUpdater\152.0.7933.0':
+    - name: 'updater.exe'
+      sha256: '7950cefc6810574df9bd6508fe70e15b6d7e2f45d06b2ee6e820408312e474d8'
+      signature:
+        state: 'valid'
+        signer: 'Google LLC'
+        signer_cert_sha256: '2029505d14baf18af60a0d1a7d8b56447db643b32faa849d4c08d2ab1ff3a4fd'
+  'C:\Program Files (x86)\Microsoft Visual Studio\Installer':
+    - name: 'VSInstallerElevationService.exe'
+      sha256: '73a7d10cfb1bd7ffb90f86433d7965be543113e6a765101f152e1c51e92ff911'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: '0ba22e4765f7a160178ec90535c37f024916fbce0d9da63118d69662b5fed7eb'
+  'C:\Program Files (x86)\Microsoft Visual Studio\Installer\resources\app\ServiceHub\Services\Microsoft.VisualStudio.Setup.Service':
+    - name: 'VSIXAutoUpdate.exe'
+      sha256: 'c8c80c720ab74952dc53b5c1159019e4491350c6a1a9c0837542fcb2b456b91a'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'd33927e4dda9b91def9f8ed282549a49217ed8cacf54577a690963cbc5eff3ed'
+    - name: 'VSIXConfigurationUpdater.exe'
+      sha256: 'a122385794b64c3a91356fb4f69e09b081c4c1a69cd7ebc19e4da1a5b09a440d'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: '0ba22e4765f7a160178ec90535c37f024916fbce0d9da63118d69662b5fed7eb'
+  'C:\Program Files (x86)\Microsoft Visual Studio\Shared\Common\DiagnosticsHub.Collection.Service':
+    - name: 'StandardCollector.Service.exe'
+      sha256: 'c89a275e370d2b02d340ee975a3a38ee82ce7e0648b6d91eba61fc96bbd97337'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'b41c444f8cbd49d1b27cc2c76e0f3fb042bf9970b6b6f6b57fc8976514b03952'
+  'C:\Program Files (x86)\Microsoft\Edge\Application\153.0.4234.48':
+    - name: 'elevation_service.exe'
+      sha256: '1579cfce36a9f58ebfbca02c85f1aa65cbe880eb5fea24f1eedf50b9e5186f8d'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'cb97e8e85e8e9321fb2646e9574efd17669b3b0581d24262ac7c8a227433a244'
+  'C:\Program Files (x86)\Mozilla Maintenance Service':
+    - name: 'maintenanceservice.exe'
+      sha256: '780e3b60f5ceca6fe61149834dd7254a96f40f6811022f87ea70157754049cb9'
+      signature:
+        state: 'valid'
+        signer: 'Mozilla Corporation'
+        signer_cert_sha256: '6bfc0ae7ad878d4dbf9e9ec9d09535b0c65b083acd5d58a71c1e883323bb52b3'
+  'C:\Program Files\Google\Chrome\Application\153.0.8010.53':
+    - name: 'elevation_service.exe'
+      sha256: '3046651916b2b64490ab11091acbc38bb749c977e071a966fc4690881fc41f51'
+      signature:
+        state: 'valid'
+        signer: 'Google LLC'
+        signer_cert_sha256: '2029505d14baf18af60a0d1a7d8b56447db643b32faa849d4c08d2ab1ff3a4fd'
+  'C:\Program Files\Microsoft SQL Server\90\Shared':
+    - name: 'sqlwriter.exe'
+      sha256: '1ed300156a96f4caeb3522ffcf63516e44788074756867c5a52c348ab86ccfbc'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'b41c444f8cbd49d1b27cc2c76e0f3fb042bf9970b6b6f6b57fc8976514b03952'
+  'C:\Program Files\Microsoft Service Fabric\bin':
+    - name: 'FabricHost.exe'
+      sha256: '63465606d7988c1996880c3983cd4f0e1460144e40553d6dc80ab75b9788ec3c'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'd33927e4dda9b91def9f8ed282549a49217ed8cacf54577a690963cbc5eff3ed'
+  'C:\Program Files\MongoDB\Server\7.0\bin':
+    - name: 'mongod.exe'
+      sha256: '4c77acf7b6dadc4222a00239bda820ad74e8ff7382e1069fd1e150a522ad5003'
+      signature:
+        state: 'no_embedded_signature'
+  'C:\Program Files\Mozilla Firefox':
+    - name: 'default-browser-agent.exe'
+      sha256: '064a9c97144d77f2c68ecf399186a4885782442f516022d3f004720875c0aa8e'
+      signature:
+        state: 'valid'
+        signer: 'Mozilla Corporation'
+        signer_cert_sha256: '6bfc0ae7ad878d4dbf9e9ec9d09535b0c65b083acd5d58a71c1e883323bb52b3'
+  'C:\Program Files\PostgreSQL\17\bin':
+    - name: 'pg_ctl.exe'
+      sha256: 'eed85e36aabc7cdf99a63bda0a2e33fa3bce8d3c59d6bc12e9e19469706cc012'
+      signature:
+        state: 'no_embedded_signature'
+  'C:\Program Files\WSL':
+    - name: 'wslservice.exe'
+      sha256: 'ef2a648f0d8703a1d48b794632621994cd3ac87441ad7582f25deaa7d38a149d'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'd33927e4dda9b91def9f8ed282549a49217ed8cacf54577a690963cbc5eff3ed'
+  'C:\Program Files\Windows Defender Advanced Threat Protection':
+    - name: 'MsSense.exe'
+      sha256: '5a0d188aebd22004518b8a676483ed3864697aac56561e56e549d93c7b8172b2'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Windows Publisher'
+        signer_cert_sha256: '39ccf3eb95d9f30289357f9ba111fc4311a387a0242eb415b582511ec8bc4702'
+  'C:\Program Files\Windows Media Player':
+    - name: 'wmpnetwk.exe'
+      sha256: '30609f4729f349e682abbfcbab12efc1b9b55393c06070a1bf17af83dda73170'
+      signature:
+        state: 'no_embedded_signature'
+    - name: 'wmpnscfg.exe'
+      sha256: '7c357ad4a20ed83a2a34d1b7307db2d7636cadcbe1384636e39f198708be9407'
+      signature:
+        state: 'no_embedded_signature'
+  'C:\ProgramData\Chocolatey\lib\NSSM\tools':
+    - name: 'nssm.exe'
+      sha256: 'eee9c44c29c2be011f1f1e43bb8c3fca888cb81053022ec5a0060035de16d848'
+      signature:
+        state: 'no_embedded_signature'
+  'C:\ProgramData\GitHub\HostedComputeAgent':
+    - name: 'hosted-compute-agent'
+      sha256: '9dd862527186698d54cdf61e34fff3ff67d6a0b089331f3ca073c8d78ea3e03c'
+      signature:
+        state: 'no_embedded_signature'
+  'C:\ProgramData\GitHub\Primer':
+    - name: 'primer.exe'
+      sha256: 'eb7585fbdf5a2c72b3fdfb3cd4dc6648baab05c3567f3c90c50447d52ae7b7a0'
+      signature:
+        state: 'no_embedded_signature'
+  'C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26080.4-0':
+    - name: 'MpCmdRun.exe'
+      sha256: '540bb6e0b6596cdc636cfb83aca6c462282a5770d6b3044cc49ef06414f1d5fb'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Windows Publisher'
+        signer_cert_sha256: '27ff1e764e0c7f97f14a9264024bcece3124ce9e38836f2bfbaea755292cbc38'
+    - name: 'MpDefenderCoreService.exe'
+      sha256: 'e185fe0598e3b23fa5b4a76b06e1983609857537849cb1ecef2f408bf41f06f6'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Windows Publisher'
+        signer_cert_sha256: 'd3d2ae62b18d0ccf307b61bdc95db2729d192547f47daa8be8b888d436be181a'
+    - name: 'MsMpEng.exe'
+      sha256: '7272962632224709cebd1e7f4560f99a068e513545b530ad7929a085b6a921aa'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Windows Publisher'
+        signer_cert_sha256: 'd3d2ae62b18d0ccf307b61bdc95db2729d192547f47daa8be8b888d436be181a'
+    - name: 'NisSrv.exe'
+      sha256: '644c5560d83234564a3e354bc97f2121b2b78adfaa32de8e5308a82332e3ddb8'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Windows Publisher'
+        signer_cert_sha256: '27ff1e764e0c7f97f14a9264024bcece3124ce9e38836f2bfbaea755292cbc38'
+  'C:\WindowsAzure\GuestAgent_2.7.41491.1243_2026-09-30_151415':
+    - name: 'WaAppAgent.exe'
+      sha256: 'e943a4e0ebd0bb394b92d71945bc273fbe409e21a035aec2f8c3b42525fdf5a5'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'c30b441672c82883d92eddac6d24cb57e9960bda4486c7fb5865e74157f35850'
+    - name: 'WindowsAzureGuestAgent.exe'
+      sha256: '0bd0827684711d456e4233299b5768beb53502e93c7ee8eec32494dcfd2f8f97'
+      signature:
+        state: 'valid'
+        signer: 'Microsoft Corporation'
+        signer_cert_sha256: 'd33927e4dda9b91def9f8ed282549a49217ed8cacf54577a690963cbc5eff3ed'
+  'C:\Windows\System32\Tasks':
+    - name: 'GoogleSystem'
+      directory: true
+    - name: 'HostedComputeAgent'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-agent&quot;</Command></Exec></Actions></Task>'
+    - name: 'Microsoft'
+      directory: true
+    - name: 'MicrosoftEdgeUpdateTaskMachineCore{2DAC648F-6FF6-4857-97D8-9424877BBB61}'
+      content: '<Task><Triggers><CalendarTrigger/><LogonTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Program Files (x86)\Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'MicrosoftEdgeUpdateTaskMachineUA{942EB968-C11A-4BD4-9577-523150453F3C}'
+      content: '<Task><Triggers><CalendarTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Program Files (x86)\Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Mozilla'
+      directory: true
+    - name: 'primer'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\ProgramData\GitHub\Primer\primer.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\GoogleSystem':
+    - name: 'GoogleUpdater'
+      directory: true
+  'C:\Windows\System32\Tasks\GoogleSystem\GoogleUpdater':
+    - name: 'GoogleUpdaterTaskSystem152.0.7933.0{78593637-A9E0-4D72-B0BF-6F7D2A93E536}'
+      content: '<Task><Triggers><CalendarTrigger/><LogonTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Program Files (x86)\Google\GoogleUpdater\152.0.7933.0\updater.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft':
+    - name: 'VisualStudio'
+      directory: true
+    - name: 'Windows'
+      directory: true
+  'C:\Windows\System32\Tasks\Microsoft\VisualStudio':
+    - name: 'Updates'
+      directory: true
+    - name: 'VSIX Auto Update'
+      content: '<Task><Triggers><CalendarTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Program Files (x86)\Microsoft Visual Studio\Installer\resources\app\ServiceHub\Services\Microsoft.VisualStudio.Setup.Service\VSIXAutoUpdate.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\VisualStudio\Updates':
+    - name: 'UpdateConfiguration_S-1-5-21-1000000000-2000000000-3000000000-500'
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Program Files (x86)\Microsoft Visual Studio\Installer\resources\app\ServiceHub\Services\Microsoft.VisualStudio.Setup.Service\VSIXConfigurationUpdater.exe&quot;</Command></Exec><Exec><Command>&quot;C:\Program Files (x86)\Microsoft Visual Studio\Installer\resources\app\ServiceHub\Services\Microsoft.VisualStudio.Setup.Service\VSIXConfigurationUpdater.exe&quot;</Command></Exec><Exec><Command>&quot;C:\Program Files (x86)\Microsoft Visual Studio\Installer\resources\app\ServiceHub\Services\Microsoft.VisualStudio.Setup.Service\VSIXConfigurationUpdater.exe&quot;</Command></Exec><Exec><Command>&quot;C:\Program Files (x86)\Microsoft Visual Studio\Installer\resources\app\ServiceHub\Services\Microsoft.VisualStudio.Setup.Service\VSIXConfigurationUpdater.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows':
+    - name: 'AppID'
+      directory: true
+    - name: 'Application Experience'
+      directory: true
+    - name: 'applicationdata'
+      directory: true
+    - name: 'AppxDeploymentClient'
+      directory: true
+    - name: 'Autochk'
+      directory: true
+    - name: 'Bluetooth'
+      directory: true
+    - name: 'capabilityaccessmanager'
+      directory: true
+    - name: 'Chkdsk'
+      directory: true
+    - name: 'Clip'
+      directory: true
+    - name: 'Customer Experience Improvement Program'
+      directory: true
+    - name: 'Defrag'
+      directory: true
+    - name: 'Device Information'
+      directory: true
+    - name: 'Diagnosis'
+      directory: true
+    - name: 'DirectX'
+      directory: true
+    - name: 'DiskCleanup'
+      directory: true
+    - name: 'DiskDiagnostic'
+      directory: true
+    - name: 'DiskFootprint'
+      directory: true
+    - name: 'Hotpatch'
+      directory: true
+    - name: 'Kernel'
+      directory: true
+    - name: 'Location'
+      directory: true
+    - name: 'Management'
+      directory: true
+    - name: 'MUI'
+      directory: true
+    - name: 'Network Controller'
+      directory: true
+    - name: 'PCRPF'
+      directory: true
+    - name: 'PLA'
+      directory: true
+    - name: 'Plug and Play'
+      directory: true
+    - name: 'PushToInstall'
+      directory: true
+    - name: 'Server Initial Configuration Task'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\srvinitconfig.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Server Manager'
+      directory: true
+    - name: 'Servicing'
+      directory: true
+    - name: 'Software Inventory Logging'
+      directory: true
+    - name: 'SpacePort'
+      directory: true
+    - name: 'Speech'
+      directory: true
+    - name: 'StateRepository'
+      directory: true
+    - name: 'Storage Tiers Management'
+      directory: true
+    - name: 'Time Synchronization'
+      directory: true
+    - name: 'Time Zone'
+      directory: true
+    - name: 'UpdateOrchestrator'
+      directory: true
+    - name: 'UPnP'
+      directory: true
+    - name: 'Windows Defender'
+      directory: true
+    - name: 'Windows Error Reporting'
+      directory: true
+    - name: 'Windows Filtering Platform'
+      directory: true
+    - name: 'Windows Media Sharing'
+      directory: true
+    - name: 'WindowsUpdate'
+      directory: true
+    - name: 'Workplace Join'
+      directory: true
+  'C:\Windows\System32\Tasks\Microsoft\Windows\AppID':
+    - name: 'PolicyConverter'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\appidpolicyconverter.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'VerifiedPublisherCertStoreCheck'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\appidcertstorecheck.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Application Experience':
+    - name: 'MareBackup'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\compattelrunner.exe&quot;</Command></Exec><Exec><Command>&quot;C:\Windows\system32\compattelrunner.exe&quot;</Command></Exec><Exec><Command>&quot;C:\Windows\system32\compattelrunner.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Microsoft Compatibility Appraiser Exp'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\compattelrunner.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'PcaPatchDbTask'
+      content: '<Task><Triggers><TimeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'SdbinstMergeDbTask'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\sdbinst.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'StartupAppTask'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\AppxDeploymentClient':
+    - name: 'Pre-staged app cleanup'
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Autochk':
+    - name: 'Proxy'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Bluetooth':
+    - name: 'UninstallDeviceTask'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\BthUdTask.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Chkdsk':
+    - name: 'SyspartRepair'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\bcdboot.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Clip':
+    - name: 'License Validation'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\ClipUp.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Customer Experience Improvement Program':
+    - name: 'Consolidator'
+      content: '<Task><Triggers><TimeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\wsqmcons.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Defrag':
+    - name: 'ScheduledDefrag'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\defrag.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Device Information':
+    - name: 'Device'
+      content: '<Task><Triggers><TimeTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\devicecensus.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Device User'
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\devicecensus.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Diagnosis':
+    - name: 'UnexpectedCodepath'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\UCConfigTask.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\DirectX':
+    - name: 'DirectXDatabaseUpdater'
+      content: '<Task><Triggers><LogonTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\directxdatabaseupdater.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'DXGIAdapterCache'
+      content: '<Task><Triggers><BootTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\dxgiadaptercache.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\DiskCleanup':
+    - name: 'SilentCleanup'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\cleanmgr.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\DiskDiagnostic':
+    - name: 'Microsoft-Windows-DiskDiagnosticDataCollector'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Microsoft-Windows-DiskDiagnosticResolver'
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\DFDWiz.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\DiskFootprint':
+    - name: 'Diagnostics'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\disksnapshot.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Hotpatch':
+    - name: 'Monitoring'
+      content: '<Task><Triggers><BootTrigger/><LogonTrigger/><TimeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\cmd.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Kernel':
+    - name: 'La57Cleanup'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\la57setup.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Location':
+    - name: 'WindowsActionDialog'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\WindowsActionDialog.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\MUI':
+    - name: 'LPRemove'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\lpremove.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Management':
+    - name: 'Provisioning'
+      directory: true
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Management\Provisioning':
+    - name: 'Cellular'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\ProvTool.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Logon'
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\ProvTool.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'MdmDiagnosticsCleanup'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\MdmDiagnosticsTool.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Retry'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\ProvTool.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'RunOnReboot'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\ProvTool.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Network Controller':
+    - name: 'SDN Diagnostics Task'
+      content: '<Task><Triggers><BootTrigger/><TimeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\SDNDiagnosticsTask.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\PCRPF':
+    - name: 'PCR Prediction Framework Firmware Update Task'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\PLA':
+    - name: 'Server Manager Performance Monitor'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Plug and Play':
+    - name: 'Sysprep Generalize Drivers'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\drvinst.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\PushToInstall':
+    - name: 'LoginCheck'
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\sc.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Registration'
+      content: '<Task><Triggers><TimeTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\sc.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Server Manager':
+    - name: 'CleanupOldPerfLogs'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\cscript.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'ServerManager'
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\ServerManagerLauncher.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Servicing':
+    - name: 'OOBEFodSetup'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\OOBEFodSetup.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Software Inventory Logging':
+    - name: 'Collection'
+      content: '<Task><Triggers><TimeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\cmd.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Configuration'
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\cmd.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\SpacePort':
+    - name: 'SpaceAgentTask'
+      content: '<Task><Triggers><BootTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\SpaceAgent.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'SpaceManagerTask'
+      content: '<Task><Triggers><BootTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\spaceman.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Speech':
+    - name: 'SpeechModelDownloadTask'
+      content: '<Task><Triggers><TimeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\speech_onecore\common\SpeechModelDownload.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\StateRepository':
+    - name: 'MaintenanceTasks'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Storage Tiers Management':
+    - name: 'Storage Tiers Optimization'
+      content: '<Task><Triggers><TimeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\defrag.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Time Synchronization':
+    - name: 'SynchronizeTime'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\sc.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Time Zone':
+    - name: 'SynchronizeTimeZone'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\tzsync.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\UPnP':
+    - name: 'UPnPHostConfig'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\sc.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\UpdateOrchestrator':
+    - name: 'Report policies'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\usoclient.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Schedule Maintenance Work'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\usoclient.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Schedule Scan'
+      content: '<Task><Triggers><TimeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\usoclient.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Schedule Scan Static Task'
+      content: '<Task><Triggers><EventTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\usoclient.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Schedule Wake To Work'
+      content: '<Task><Triggers><TimeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\usoclient.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Schedule Work'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\usoclient.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'USO_UxBroker'
+      content: '<Task><Triggers><CalendarTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\MusNotification.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'UUS Failover Task'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\MLEngineStub.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Windows Defender':
+    - name: 'Windows Defender Cache Maintenance'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26080.4-0\MpCmdRun.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Windows Defender Cleanup'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26080.4-0\MpCmdRun.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Windows Defender Verification'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26080.4-0\MpCmdRun.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Windows Error Reporting':
+    - name: 'QueueReporting'
+      content: '<Task><Triggers><BootTrigger/><TimeTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\wermgr.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Windows Filtering Platform':
+    - name: 'BfeOnServiceStartTypeChange'
+      content: '<Task><Triggers><EventTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Windows Media Sharing':
+    - name: 'UpdateLibrary'
+      content: '<Task><Triggers><EventTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Program Files\Windows Media Player\wmpnscfg.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\WindowsUpdate':
+    - name: 'Scheduled Start'
+      content: '<Task><Triggers><SessionStateChangeTrigger/><TimeTrigger/><WnfStateChangeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\sc.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\Workplace Join':
+    - name: 'Automatic-Device-Join'
+      content: '<Task><Triggers><EventTrigger/><LogonTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\dsregcmd.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'Recovery-Check'
+      content: '<Task><Triggers><LogonTrigger/><SessionStateChangeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\System32\dsregcmd.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\applicationdata':
+    - name: 'appuriverifierdaily'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\AppHostRegistrationVerifier.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'appuriverifierinstall'
+      content: '<Task><Triggers><WnfStateChangeTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\AppHostRegistrationVerifier.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'CleanupTemporaryState'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+    - name: 'DsSvcCleanup'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\dstokenclean.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Microsoft\Windows\capabilityaccessmanager':
+    - name: 'maintenancetasks'
+      content: '<Task><Triggers></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Windows\system32\rundll32.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\Windows\System32\Tasks\Mozilla':
+    - name: 'Firefox Default Browser Agent 308046B0AF4A39CB'
+      content: '<Task><Triggers><CalendarTrigger/></Triggers><Settings><Enabled>true</Enabled></Settings><Actions><Exec><Command>&quot;C:\Program Files\Mozilla Firefox\default-browser-agent.exe&quot;</Command></Exec></Actions></Task>'
+  'C:\tools\Apache24\bin':
+    - name: 'httpd.exe'
+      sha256: '8830d158d8a6e94e0596afbc28b4948714c91e16b7feedb136172e081d8ab0f8'
+      signature:
+        state: 'no_embedded_signature'
 code_integrity:
   enabled: true
   test_signing: false

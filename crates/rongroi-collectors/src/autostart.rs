@@ -1386,6 +1386,32 @@ mod tests {
         }
     }
 
+    /// The baseline reproduces the runner's reading (windows.yml run 36735184291): 278 program
+    /// services, 2 `Run` values and 87 task actions, 34 files hashed, and no gap.
+    #[test]
+    fn baseline_elevated_win11_reproduces_the_runners_autostart_reading() {
+        let run = Autostart::default().collect(&fixture("baseline-elevated-win11"));
+        let (observations, places) = measured(&run);
+        let count = |location: &str| {
+            observations
+                .iter()
+                .filter(|o| text(o, "location") == Some(location))
+                .count()
+        };
+        assert_eq!(
+            (count("service"), count("run"), count("task")),
+            (278, 2, 87)
+        );
+        assert_eq!(
+            observations
+                .iter()
+                .filter(|o| o.fields.contains_key("sha256"))
+                .count(),
+            34
+        );
+        assert!(places.is_empty(), "{places:?}");
+    }
+
     #[test]
     fn a_principal_is_this_account_by_sid_or_by_name() {
         let identity = Identity {
