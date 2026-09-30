@@ -355,6 +355,27 @@ mod tests {
         );
     }
 
+    /// The baseline reproduces the runner's reading (windows.yml run 36735878867): its two drive
+    /// exclusions, of which `C:\` covers `FiveM`'s folders, and no address.
+    #[test]
+    fn baseline_elevated_win11_reproduces_the_runners_exclusions() {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/hosts/baseline-elevated-win11");
+        let run = DefenderExclusion.collect(&FixtureHost::load(&dir).unwrap());
+        let observations = observations(&run);
+        assert_eq!(observations.len(), 3);
+        assert_eq!(exclusion(observations, r"C:\").fields["covers_fivem"], true);
+        assert_eq!(
+            exclusion(observations, r"D:\").fields["covers_fivem"],
+            false
+        );
+        let counted = observations
+            .iter()
+            .find(|o| o.fields.contains_key("ip_addresses"))
+            .unwrap();
+        assert_eq!(counted.fields["ip_addresses"], 0);
+    }
+
     #[test]
     fn a_path_with_no_fivem_folder_to_compare_is_a_gap() {
         let host = inline(
