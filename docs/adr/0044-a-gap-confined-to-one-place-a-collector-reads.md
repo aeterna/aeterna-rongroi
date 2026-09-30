@@ -1,6 +1,6 @@
 # ADR 0044 — A gap confined to one place a collector reads
 
-- Status: proposed
+- Status: accepted — merged with its implementation in #64 and released in 0.3.0 (2026-09-14)
 - Date: 2026-09-14
 - Amends: ADR 0009 (a folder that could not be listed is a gap in every field), ADR 0036 ("Recorded, not
   fixed"), ADR 0029 (when `exists: false` consults a gap)
@@ -148,6 +148,10 @@ snapshot.
   axes would need this revisited.
 - **No other collector was assessed for a discriminator.** `evtx`'s `channel`, for one, says which log
   an observation is about, and whether its gaps should be scoped by it was not examined.
+
+**The status is corrected, not newly decided.** The code this ADR describes was merged in #64 and
+shipped in 0.3.0 on 2026-09-14 while the status still read `proposed`. The line was changed on
+2026-09-30 from that record; no separate decision was taken then.
 
 ## Consequences
 
