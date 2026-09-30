@@ -425,6 +425,63 @@ minutes. A PC in use writes far more records than an idle runner image, and the 
 a time. **On this PC, a count the journal gives is a count for the last 39 minutes before the scan, and
 nothing older.** One PC is not a distribution. How long the journal reaches on other PCs is not known.
 
+#### The probe, on the same PC (2026-09-30)
+
+The probe described under "Before any code: a probe on the PC" ran on the same Windows 11 PC (build 26220)
+on 2026-09-30, once elevated and once under the limited token through a scheduled task with the limited run
+level. It printed only the counts and forms listed there. Its output was not committed, and the script was
+removed from the PC.
+
+**The journal**, elevated:
+
+| | |
+|---|---|
+| `MaximumSize` / `AllocationDelta` | 33 554 432 / 8 388 608 bytes |
+| Trimmed since it was made | yes |
+| Records read | 376 781, all version 3; none damaged |
+| Bytes, calls, time | 43 991 800 bytes in 42 calls, 0.24 s |
+| **Span, oldest to newest record** | **39 minutes** (10:24 to 11:03 UTC) |
+| Records per minute | about 9 650 |
+| Records anywhere on the volume carrying a delete / a rename's old name | 70 315 / 570 |
+
+Two readings of the same PC, fifteen days apart, gave the same 39 minutes. It is still one PC.
+
+**Where the folders are.** All five watched folders and ten of the eleven FiveM folders the probe also looked
+at exist (FiveM Legacy's `mods` does not). Every one that exists has its base variable on the system drive
+letter, no reparse point on the way down, the system volume's serial, and NTFS. **`other_volume` does not
+occur on this PC.**
+
+**Per folder**, of the records whose parent is the folder:
+
+| Folder | Records | Create | Delete | Rename (old / new) | Data change | Close |
+|---|---|---|---|---|---|---|
+| `prefetch` | 409 | 9 | 0 | 0 / 0 | 406 | 136 |
+| `winevt_logs` | 65 | 0 | 0 | 0 / 0 | 65 | 23 |
+| `appcompat_pca` | 2 | 0 | 0 | 0 / 0 | 2 | 1 |
+| `plugins`, `enhanced_asi` | 0 | | | | | |
+| FiveM's own root, `FiveM.app`, `citizen`, `logs`, `crashes`, `data\cache`, `data\server-cache-priv`, Enhanced's roaming folder, its `mods` and its `servercache` | 0 each | | | | | |
+
+No watched folder had a deletion or a rename in the span. So the probe could not measure how many records
+one deleted or renamed file leaves on a PC. Nothing in FiveM's folders changed in those 39 minutes either.
+That says nothing about a span in which FiveM ran or updated.
+
+**Under the limited token:**
+
+- `\\.\C:` was refused with error 5, as on 2026-09-15. The collector reports `not_admin` for the whole run.
+- **Opening the Prefetch folder to read its identifier was also refused, with error 5.** Every other folder
+  could be identified. The runner showed the same for Prefetch without Administrators (above).
+
+What the collector does with that, read from `usn.rs`: `locate` runs first and would record Prefetch as
+`Unreadable(not_admin)`, since `reason_for` maps a denial without elevation to `not_admin`. Then the journal
+read is refused, and `collect` returns `Unmeasured { not_admin }` for the whole run, discarding every
+place's result. So the Prefetch refusal never reaches a report on its own. It is inside the run-level
+`not_admin`, which the timeline shows once and which each rule on `usn` would add to `ScopeNotes`. A
+per-place gap for Prefetch (ADR 0044) would only appear if the volume could be opened without
+Administrators, which neither the runner nor this PC allows. In an elevated scan, `access_denied` on
+Prefetch alone would be a per-place gap confined to `prefetch`, and no proposed rule reads that place.
+Nothing in ADR 0044 or in the proposals below needs to change for this. The collector's test for a refused
+volume already covers the path.
+
 ### What happens today to a folder on another volume
 
 Read from `crates/rongroi-collectors/src/usn.rs` at `0746990`. The journal read is always the system
@@ -482,8 +539,12 @@ need for a reason, and it adds cost:
 - It reads the journal of a drive the player may not think of as part of the check, a game or data drive.
   The collector would still keep no name, but the consent question and `PRIVACY.md` would have to say it.
 
-So the recommendation is the new reason now, and the second journal only if the probe below shows that
-watched FiveM folders on another volume are common and that such volumes have an active journal.
+**`other_volume` has not been seen on a real PC.** The one PC measured has every watched folder on the
+system volume, and the case is known only from the code and the `usn-folder-on-other-volume` fixture. How
+common it is, and whether such a volume has a journal, is not known. The recommendation stays the new
+reason, on weaker grounds than a measurement: it costs little before the first rule ships. Without it,
+the first PC that does have the case would show a row saying a read failed when none did. There is no
+measured case to justify reading a second journal, so that is not proposed.
 
 ### Proposal 1: `other_volume`, a fourteenth reason
 
@@ -508,10 +569,12 @@ watched FiveM folders on another volume are common and that such volumes have an
 ### Proposal 2: the first rule, deletions and renames in FiveM's plugin folders
 
 **Which folders.** Only `plugins` (FiveM for GTA V Legacy) and `enhanced_asi` (FiveM for GTA V Enhanced).
-Both were `identified` with no record in 39 minutes on the PC above. Prefetch and the Event Log folder
-change every few minutes on an ordinary PC, so a rule on their deletions would be found on nearly every
-scan. That is the "sea of red flags" ADR 0027 forbids, and ADR 0047 already says a delete count there is
-not evidence of cleaning. FiveM's cache, log and crash folders are not watched by `usn` and are not proposed.
+Both were `identified` with no record in 39 minutes, in both readings of the PC above. Prefetch and the Event
+Log folder change every few minutes (409 and 65 records in 39 minutes), though neither had a deletion in
+that span. Their deletions come from Windows itself (Prefetch keeps a bounded number of files) and from
+optimisers, and ADR 0047 already says a delete count there is not evidence of cleaning. How often they occur
+on an ordinary PC was not measured, and a rule found on most scans is the "sea of red flags" ADR 0027
+forbids. FiveM's cache, log and crash folders are not watched by `usn` and are not proposed.
 FiveM writes and removes files there itself.
 
 **Why four files and not one.** `match` is a conjunction (ADR 0029), so "a deletion or a rename" is two
@@ -645,7 +708,8 @@ claim otherwise from the journal alone.
 
 ### Before any code: a probe on the PC
 
-A read-only PowerShell probe, kept out of the repository, measures on the same PC, elevated and not:
+A read-only PowerShell probe, kept out of the repository, measures on the same PC, elevated and not. It ran
+on 2026-09-30, and its results are under "The probe, on the same PC" above:
 
 - whether `\\.\C:` opens with `GENERIC_READ` alone;
 - for each watched folder and for FiveM folders `usn` does not watch: whether it exists, whether its base
@@ -665,10 +729,11 @@ GUID. It sends only the two read control codes.
 ### Owner decisions this amendment needs
 
 1. **The reason for a folder on another volume.** Recommended: a new, declarable reason, `other_volume`
-   (Proposal 1), with ADR 0030's table amended in the same change. Alternatives: keep `read_failed`, or
-   read the other volume's journal as well.
-2. **Reading a second volume's journal.** Recommended: not now. Decide after the probe, if it shows watched
-   FiveM folders on another volume with an active journal.
+   (Proposal 1), with ADR 0030's table amended in the same change. The case has not been seen on a real PC:
+   the one PC measured has none, so this rests on the code and a fixture. Alternatives: keep `read_failed`
+   until a PC shows the case, or read the other volume's journal as well.
+2. **Reading a second volume's journal.** Recommended: no. The probe found no watched folder on another
+   volume, so there is nothing measured to justify it. Reopen it if a PC shows the case.
 3. **The first rules.** Recommended: four `context` rules, deletions and renames, one per FiveM plugin
    folder (Proposal 2). Alternative: deletions only, two rules, with renames after a baseline.
 4. **Status.** Recommended: `experimental`, with positive and negative fixtures and an `unconfronted.csv`
@@ -681,11 +746,14 @@ GUID. It sends only the two read control codes.
 
 ### What the amendment does not establish
 
-- How long the journal reaches on PCs other than the one above.
-- How often a player's FiveM folders are on another volume, and whether such volumes have a journal.
+- How long the journal reaches on PCs other than the one above (39 minutes there, twice).
+- Whether any player's FiveM folders are on another volume, and whether such volumes have a journal. The
+  one PC measured has none.
 - Whether FiveM's updater writes in `plugins` or `gta5enhanced\asi`.
 - How the Recycle Bin, and how an update that swaps a file in, show in the journal.
-- How many records one deleted or renamed file leaves on a PC.
+- How many records one deleted or renamed file leaves on a PC. The probe saw no deletion or rename in any
+  watched folder.
+- How often Prefetch and the Event Log folder see deletions on an ordinary PC. None in 39 minutes on one PC.
 
 ## What is not established
 

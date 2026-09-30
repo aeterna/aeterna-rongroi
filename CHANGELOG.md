@@ -30,7 +30,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   read gets a new, declarable reason, `other_volume`, instead of `read_failed`, which SS mode always lists.
   The first rules that read `usn`'s counts: deletions and renames in FiveM's two plugin folders, `context`
   and `experimental`, each row shown with the span the journal covered. On one Windows 11 PC that span was
-  about 39 minutes.
+  39 minutes in two readings, every watched folder was on the system volume, and without Administrators
+  the Prefetch folder could not be identified either, which the run-level `not_admin` already covers.
 
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
