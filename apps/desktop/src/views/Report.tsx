@@ -4,10 +4,11 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { codeLinks, reportView, ruleTexts } from "../api";
+import { ageTexts, codeLinks, reportView, ruleTexts } from "../api";
 import { type EvidenceGroup, groupEvidence, type StateFilter } from "../grouping";
 import { withKeys } from "../keys";
 import type {
+  AgeText,
   BootTime,
   CodeLinks,
   Evidence,
@@ -21,6 +22,7 @@ import type {
 import { EvidenceRow } from "./EvidenceRow";
 import { ReportSummary } from "./ReportSummary";
 import { Timeline } from "./Timeline";
+import { CrossSource, TraceAges } from "./TraceAges";
 
 interface Props {
   mode: Mode;
@@ -33,6 +35,7 @@ export function Report({ mode, options, onBack }: Props) {
   const { t, i18n } = useTranslation("report");
   const [view, setView] = useState<ReportView | null>(null);
   const [texts, setTexts] = useState<Record<string, RuleText>>({});
+  const [ages, setAges] = useState<Record<string, AgeText>>({});
   const [links, setLinks] = useState<CodeLinks | null>(null);
   const [filter, setFilter] = useState<StateFilter | null>(null);
   const [technicalAll, setTechnicalAll] = useState(false);
@@ -43,6 +46,13 @@ export function Report({ mode, options, onBack }: Props) {
 
   useEffect(() => {
     void ruleTexts(i18n.language).then(setTexts);
+  }, [i18n.language]);
+
+  useEffect(() => {
+    // A failed call leaves the retention texts out; the rows themselves still show (ADR 0061).
+    void ageTexts(i18n.language)
+      .then(setAges)
+      .catch(() => {});
   }, [i18n.language]);
 
   useEffect(() => {
@@ -156,7 +166,13 @@ export function Report({ mode, options, onBack }: Props) {
       ))}
 
       {/* After the evidence and apart from it: the times this view may show, in order (ADR 0051). */}
+      {/* Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3). */}
+      <CrossSource statements={view.cross_source ?? []} />
+
       <Timeline timeline={view.timeline} texts={texts} />
+
+      {/* Beside the timeline, in both modes (ADR 0061). */}
+      {view.trace_ages && <TraceAges ages={view.trace_ages} texts={ages} />}
 
       {/* Apart from the evidence, and shown in both modes: this is what the program itself left in
           what the collectors saw, not evidence about the PC (ADR 0010). */}

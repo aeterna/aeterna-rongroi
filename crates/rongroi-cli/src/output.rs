@@ -257,7 +257,7 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
 /// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
 /// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
 /// `check-locales` there.
-fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
+pub(crate) fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
     match (lang, reason) {
         (Lang::En, UnmeasuredReason::NotWindows) => "not running on Windows",
         (Lang::Th, UnmeasuredReason::NotWindows) => "ไม่ได้รันบน Windows",
@@ -334,8 +334,9 @@ pub fn consent(lang: Lang) -> String {
             \x20 - the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are\n\
             \x20 - what Windows says this installation is — the edition, the build, the registered organisation and the manufacturer, model and support link Settings shows, never the registered owner's name — and how each of the services Windows ships with (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) is set to start, or that its key is not there\n\
             \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
+            \x20 - when parts of this PC were set up, as dates and never times: when this Windows installation was installed or last feature-upgraded, the earliest installation date Windows Setup kept and how many it kept, when the Windows drive's change journal, its root folder and its $Recycle.Bin were created, and when FiveM's program folders were created; these dates can match two reports of this PC\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; and the oldest and newest change the journal holds for each folder above. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
@@ -354,8 +355,9 @@ pub fn consent(lang: Lang) -> String {
             \x20 - การตั้งค่าที่กำหนดว่า traffic ของเครือข่ายไปที่ไหน โดยไม่อ่านบันทึกว่าเคยไปที่ไหน: บรรทัดในไฟล์ hosts ที่กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com พร้อม address นั้น (บรรทัดอื่นแค่นับจำนวน) proxy เปิดอยู่หรือไม่ และตั้ง proxy server หรือสคริปต์ตั้งค่า proxy ไว้หรือไม่ โดยไม่อ่าน address ของมัน และ rule ของ Windows Firewall สำหรับโปรแกรมในโฟลเดอร์ของ FiveM พร้อมจำนวน rule ทั้งหมด\n\
             \x20 - สิ่งที่ Windows บอกว่าตัวเองเป็นอะไร — edition, build, ชื่อองค์กรที่จดทะเบียนไว้ และชื่อผู้ผลิต รุ่นเครื่อง กับลิงก์ฝ่ายสนับสนุนที่ Settings แสดง โดยไม่อ่านชื่อเจ้าของที่จดทะเบียนไว้ — และเซอร์วิสที่ Windows มีมาให้แต่ละตัว (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) ถูกตั้งให้เริ่มทำงานแบบไหน หรือไม่มีคีย์ของมันอยู่\n\
             \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
+            \x20 - ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร เป็นวันที่ ไม่ใช่เวลา: Windows ชุดนี้ติดตั้งหรืออัปเกรด feature ครั้งล่าสุดเมื่อไร วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้และเก็บไว้กี่รายการ change journal ของไดรฟ์ Windows, root ของไดรฟ์ และ $Recycle.Bin ถูกสร้างเมื่อไร และโฟลเดอร์โปรแกรมของ FiveM ถูกสร้างเมื่อไร วันที่เหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
@@ -531,7 +533,13 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
 
     out.push_str(&evidence_section(view, bundle, lang));
 
+    // Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3).
+    out.push_str(&crate::trace_ages::statement(&view.cross_source, lang));
+
     out.push_str(&timeline_section(&view.timeline, bundle, lang));
+
+    // Beside the timeline, in both modes: how far back each source reaches (ADR 0061).
+    out.push_str(&crate::trace_ages::section(&view.trace_ages, bundle, lang));
 
     // Both sections come after the evidence and clearly apart from it, in this order.
     out.push_str(&own_traces_section(view, lang));
@@ -892,6 +900,7 @@ mod tests {
             },
             profiles_directory: None,
             scan_tier: rongroi_core::model::ScanTier::Standard,
+            anchors: Vec::new(),
         };
         let evidence = Evidence {
             rule_id: rule.id.clone(),
@@ -920,6 +929,8 @@ mod tests {
                 coverage_fields: std::collections::BTreeMap::new(),
                 unmeasured_sources: Vec::new(),
                 sensitive_fields: std::collections::BTreeMap::new(),
+                age_fields: std::collections::BTreeMap::new(),
+                timeline_selectors: std::collections::BTreeMap::new(),
             },
             bundle,
         )
@@ -1187,6 +1198,37 @@ mod tests {
                 assert!(question.contains(words), "{words} missing from {question}");
             }
             for word in named.iter().flat_map(|(_, words)| words.iter()) {
+                assert!(question.contains(word), "{word} missing from {question}");
+            }
+        }
+    }
+
+    #[test]
+    fn consent_names_the_trace_ages_the_anchors_and_the_statement() {
+        // ADR 0061 decision 8: the anchor dates, the per-source counts and oldest times, and the
+        // statement are named in the change that shows them.
+        for (lang, words) in [
+            (
+                Lang::En,
+                [
+                    "installed or last feature-upgraded",
+                    "$Recycle.Bin",
+                    "how far back each of these records reaches",
+                    "one statement",
+                ],
+            ),
+            (
+                Lang::Th,
+                [
+                    "ติดตั้งหรืออัปเกรด feature ครั้งล่าสุด",
+                    "$Recycle.Bin",
+                    "ย้อนกลับไปได้ไกลแค่ไหน",
+                    "ข้อความหนึ่งข้อ",
+                ],
+            ),
+        ] {
+            let question = consent(lang);
+            for word in words {
                 assert!(question.contains(word), "{word} missing from {question}");
             }
         }

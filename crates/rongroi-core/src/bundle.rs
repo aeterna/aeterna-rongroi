@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::ages::{self, AgeText, AgeTextView, SourcedAgeText};
 use crate::provenance::sha256_hex;
 use crate::rules::{
     self, Problem, RULES_SCHEMA_VERSION, Rule, RuleFiles, RuleText, SourcedRule, Translations,
@@ -49,6 +50,15 @@ pub enum BundleError {
 struct RawBundle {
     rules: Vec<RawRule>,
     i18n: Vec<RawTranslation>,
+    /// `rules/ages/<collector>.yaml` (ADR 0061). Absent from a bundle built before they existed.
+    #[serde(default)]
+    ages: Vec<RawAge>,
+}
+
+#[derive(Deserialize)]
+struct RawAge {
+    path: String,
+    yaml: String,
 }
 
 #[derive(Deserialize)]
@@ -70,6 +80,7 @@ struct RawTranslation {
 #[derive(Debug, Clone)]
 pub struct Bundle {
     rules: Vec<SourcedRule>,
+    ages: Vec<SourcedAgeText>,
     translations: Translations,
     info: BundleInfo,
 }
@@ -117,7 +128,25 @@ impl Bundle {
             translations.insert(file.lang, texts);
         }
 
-        problems.extend(rules::validate(&rules, &translations));
+        let mut ages = Vec::with_capacity(raw.ages.len());
+        for file in raw.ages {
+            let text: AgeText =
+                serde_saphyr::from_str(&file.yaml).map_err(|e| BundleError::Parse {
+                    path: file.path.clone(),
+                    message: e.to_string(),
+                })?;
+            ages.push(SourcedAgeText {
+                path: file.path,
+                text,
+            });
+        }
+        let rule_ids = rules
+            .iter()
+            .map(|sourced| sourced.rule.id.clone())
+            .collect();
+        let age_ids = ages.iter().map(|sourced| sourced.text.id.clone()).collect();
+        problems.extend(ages::validate(&ages, &rule_ids));
+        problems.extend(rules::validate_with_ages(&rules, &age_ids, &translations));
         if !problems.is_empty() {
             return Err(BundleError::Invalid(problems));
         }
@@ -129,6 +158,7 @@ impl Bundle {
         };
         Ok(Self {
             rules,
+            ages,
             translations,
             info,
         })
@@ -137,6 +167,31 @@ impl Bundle {
     /// All rules, sorted by path.
     pub fn rules(&self) -> &[SourcedRule] {
         &self.rules
+    }
+
+    /// The ordinary retention of each source of a trace age, sorted by path (ADR 0061).
+    pub fn ages(&self) -> &[SourcedAgeText] {
+        &self.ages
+    }
+
+    /// The age text of `collector` in `lang`, falling back to English when it is not translated.
+    pub fn age_text(&self, collector: &str, lang: &str) -> Option<AgeTextView> {
+        let text = &self
+            .ages
+            .iter()
+            .find(|sourced| sourced.text.collector == collector)?
+            .text;
+        let retention = self
+            .translations
+            .get(lang)
+            .and_then(|texts| texts.get(&text.id))
+            .and_then(|translated| translated.retention.clone())
+            .unwrap_or_else(|| text.retention.clone());
+        Some(AgeTextView {
+            retention,
+            documented: text.documented,
+            references: text.references.clone(),
+        })
     }
 
     /// Identity of this bundle.

@@ -141,5 +141,117 @@
     "unmatched": "no rule matched this",
     "selectors": "What the selected times mean",
     "selector_causes": "Ordinary things behind these times"
+  },
+  "trace_ages": {
+    "title": "How far back the traces reach",
+    "note": "How far back each source reaches on this PC, beside when parts of this PC were set up. A source that reaches back only a short way is ordinary on many PCs; the causes are listed under each row. Nothing here is evidence on its own, and the report cannot prove a PC is clean.",
+    "anchors": "When parts of this PC were set up",
+    "sources": "How far back each source reaches",
+    "anchor": {
+      "boot_time": "Windows last started",
+      "install_date": "Windows installed or last feature-upgraded (InstallDate)",
+      "setup_earliest_install": "Earliest installation date Windows Setup kept ({{kept}} kept; not documented by Microsoft)",
+      "usn_journal_created": "Change journal created (the identifier read as a time; not documented)",
+      "system_drive_root_created": "System drive root created",
+      "recycle_bin_created": "$Recycle.Bin created, at the system drive root",
+      "fivem_legacy_program_folder_created": "FiveM for GTA V Legacy's program folder created",
+      "fivem_legacy_app_folder_created": "FiveM for GTA V Legacy's FiveM.app folder created",
+      "fivem_enhanced_program_folder_created": "FiveM for GTA V Enhanced's program folder created"
+    },
+    "resets": {
+      "boot_time": "Reset by a restart; not by \"Shut down\" with Fast Startup, sleep or hibernation.",
+      "install_date": "Reset by a feature upgrade, a reset or a reinstall — so it is not when Windows was first installed.",
+      "setup_earliest_install": "A reset or a clean reinstall keeps none.",
+      "usn_journal_created": "Reset when the journal is deleted and made again, when the drive moves between NTFS versions, or on a new drive.",
+      "system_drive_root_created": "Reset by formatting or replacing the drive; whether a disk cloning tool keeps it is not known.",
+      "recycle_bin_created": "Reset by formatting or replacing the drive; whether a disk cloning tool keeps it is not known.",
+      "fivem_legacy_program_folder_created": "Reset by reinstalling FiveM, removing its folder, or moving or recreating the Windows profile.",
+      "fivem_legacy_app_folder_created": "Reset by reinstalling FiveM, removing its folder, or moving or recreating the Windows profile.",
+      "fivem_enhanced_program_folder_created": "Reset by reinstalling FiveM, removing its folder, or moving or recreating the Windows profile."
+    },
+    "on": "{{date}}, {{days}} before this scan",
+    "days_before_one": "{{count}} day",
+    "days_before_other": "{{count}} days",
+    "oldest": "oldest {{at}}, {{days}} before this scan",
+    "holds_nothing": "holds nothing with a time",
+    "count": {
+      "evtx": "{{count}} records",
+      "prefetch": "{{count}} Prefetch files read",
+      "bam": "{{count}} entries",
+      "pca": "{{count}} launch records",
+      "usn": "{{count}} records",
+      "fivem_dir": "{{count}} files",
+      "enhanced_server_cache": "{{count}} server folders"
+    },
+    "extra": {
+      "size_bytes": "size {{value}} bytes",
+      "max_size_bytes": "maximum {{value}} bytes",
+      "enable_prefetcher": "EnablePrefetcher {{value}}",
+      "last_seen": "newest {{value}}",
+      "maximum_size": "maximum size {{value}} bytes",
+      "trimmed": "trimmed since it was made: {{value}}",
+      "latest_modified_at": "latest file written {{value}}"
+    },
+    "not_admin": "not read without administrator rights — not known",
+    "not_read": "not read — {{reason}}",
+    "documented": "documented",
+    "not_documented": "not documented",
+    "references": "Rests on",
+    "folded": "{{logs}} other logs: {{withRecords}} hold records, {{notRead}} not read",
+    "place": {
+      "journal": "the change journal",
+      "legacy_logs": "Legacy logs",
+      "legacy_crashes": "Legacy crashes",
+      "legacy_cache": "Legacy cache",
+      "legacy_server_cache": "Legacy server cache",
+      "enhanced_logs": "Enhanced logs",
+      "enhanced_crashes": "Enhanced crashes",
+      "enhanced_launcher_crashes": "Enhanced launcher crashes",
+      "enhanced_server_cache": "Enhanced server cache"
+    },
+    "causes_intro": "The same results follow from:",
+    "causes": {
+      "reinstall": "Windows installed again or reset, or a new PC",
+      "cleanup": "Disk Cleanup, Storage Sense and clean-up programs in general",
+      "log_size": "a small Event Log size set by policy or by a tool",
+      "prefetch_off": "Prefetch switched off by an older SSD guide",
+      "fivem_reinstalled": "FiveM reinstalled",
+      "moved": "a drive or profile moved",
+      "clock": "a clock that was changed"
+    }
+  },
+  "cross_source": {
+    "title": "FiveM on this PC, beside Windows' records of programs that ran",
+    "fivem": "FiveM",
+    "present": "FiveM.exe is present ({{editions}}).",
+    "absent": "FiveM.exe is not in FiveM's program folders.",
+    "folders_written": "FiveM's own folders were last written {{date}} ({{days}} before this scan).",
+    "servers": "{{count}} server cache folders, the latest written {{date}}.",
+    "edition": {
+      "legacy": "Legacy",
+      "enhanced": "Enhanced"
+    },
+    "source": {
+      "prefetch": "Prefetch",
+      "bam": "BAM",
+      "pca": "PCA"
+    },
+    "selected": "{{count}} entries for those names; the latest is from {{date}}.",
+    "no_entry_named": "no entry for FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b…_GTAProcess.exe. It holds {{count}} entries; the oldest is from {{date}} ({{days}} before this scan).",
+    "no_entry": "no entry for those names. It holds {{count}} entries; the oldest is from {{date}} ({{days}} before this scan).",
+    "could_not_show": "it holds nothing as old as FiveM's last write, so it could not show it.",
+    "not_read_admin": "not read without administrator rights. Whether it holds an entry is not known.",
+    "not_read": "not read — {{reason}}. Whether it holds an entry is not known.",
+    "switched_off": "Prefetch is switched off on this PC; it keeps no such record.",
+    "causes_intro": "This is not evidence of anything. The same result follows from:",
+    "causes": {
+      "reinstall": "Windows installed again, reset, or a new PC, with FiveM's folders copied or synced from before",
+      "cleanup": "Windows' own clean-up (Disk Cleanup, Storage Sense), or a clean-up program of any kind",
+      "prefetch_off": "Prefetch switched off, as some older SSD and performance guides advise",
+      "fivem_reinstalled": "FiveM reinstalled, or its folders moved from another drive or PC",
+      "other_name": "FiveM started under a name these records do not list, or in a way Windows does not record here",
+      "windows_removes": "Windows removing its own records: Prefetch files are replaced, BAM entries expire, PCA records only launches from File Explorer",
+      "clock": "a clock that was changed, so that times from different sources are not on the same clock"
+    }
   }
 }

@@ -45,6 +45,11 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   not identify a program and that a missing time is not evidence. **A new selector on those three
   collectors widens what SS mode shows**, so the consent text in `crates/rongroi-cli/src/output.rs`, the
   desktop's `consent.shows` and `PRIVACY.md` must name what it selects, in the same change.
+- **`rules/ages/<collector>.yaml` says what a source ordinarily keeps** (ADR 0061), shown under its
+  trace-age rows in both modes. It is a fact with a reference, never a verdict: say "not documented by
+  Microsoft" and what the statement rests on where that is so, give no number the measurements disagree
+  about, and never describe how a source could be made to look older or newer. `documented: true` needs
+  a Microsoft Learn reference; `check-rules` requires one file for each collector that declares an age.
 - **`match` compares strings without regard to ASCII case.** `path: "C:\\Windows\\Temp\\x.exe"` matches
   `C:\WINDOWS\Temp\X.EXE`, because Windows does not care which case a path was written in and a rule that
   missed one would report `not_found` — a thing looked for and not there. Non-ASCII letters are **not**

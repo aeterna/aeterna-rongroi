@@ -5,6 +5,7 @@
 //! `aeterna-rongroi-cli`: scan this PC and print evidence. Never prints a verdict.
 
 mod output;
+mod trace_ages;
 
 use std::io::{BufRead, Write};
 use std::process::ExitCode;

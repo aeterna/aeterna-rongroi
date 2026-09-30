@@ -1,0 +1,220 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: "trace_ages_of(&report, Mode::Ss)"
+---
+{
+  "anchors": [
+    {
+      "anchor": "install_date",
+      "state": "measured",
+      "on": "2025-10-21",
+      "source": "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\InstallDate"
+    },
+    {
+      "anchor": "setup_earliest_install",
+      "state": "unmeasured",
+      "reason": "source_absent"
+    },
+    {
+      "anchor": "usn_journal_created",
+      "state": "unmeasured",
+      "reason": "not_admin"
+    },
+    {
+      "anchor": "system_drive_root_created",
+      "state": "measured",
+      "on": "2018-03-02",
+      "source": "%SystemDrive%\\"
+    },
+    {
+      "anchor": "recycle_bin_created",
+      "state": "measured",
+      "on": "2018-03-02",
+      "source": "%SystemDrive%\\$Recycle.Bin"
+    },
+    {
+      "anchor": "fivem_legacy_program_folder_created",
+      "state": "measured",
+      "on": "2024-05-10",
+      "source": "%LOCALAPPDATA%\\FiveM"
+    },
+    {
+      "anchor": "fivem_legacy_app_folder_created",
+      "state": "measured",
+      "on": "2024-05-10",
+      "source": "%LOCALAPPDATA%\\FiveM\\FiveM.app"
+    },
+    {
+      "anchor": "fivem_enhanced_program_folder_created",
+      "state": "unmeasured",
+      "reason": "source_absent"
+    }
+  ],
+  "trace_ages": {
+    "anchors": [
+      {
+        "anchor": "boot_time",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "install_date",
+        "state": "measured",
+        "on": "2025-10-21",
+        "days_before": 72,
+        "source": "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\InstallDate"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "measured",
+        "on": "2018-03-02",
+        "days_before": 2862,
+        "source": "%SystemDrive%\\"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "measured",
+        "on": "2018-03-02",
+        "days_before": 2862,
+        "source": "%SystemDrive%\\$Recycle.Bin"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "measured",
+        "on": "2024-05-10",
+        "days_before": 601,
+        "source": "%LOCALAPPDATA%\\FiveM"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "measured",
+        "on": "2024-05-10",
+        "days_before": 601,
+        "source": "%LOCALAPPDATA%\\FiveM\\FiveM.app"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      }
+    ],
+    "rows": [
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_logs",
+        "state": "measured",
+        "oldest": "2025-12-30T20:45:00Z",
+        "days_before": 1,
+        "count": 1,
+        "extra": {
+          "latest_modified_at": "2025-12-30T21:00:00Z"
+        }
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_cache",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_logs",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_launcher_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_server_cache",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Security.evtx",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      },
+      {
+        "collector": "evtx",
+        "subject": "System.evtx",
+        "state": "measured",
+        "oldest": "2018-07-09T20:49:14.0577461Z",
+        "days_before": 2732,
+        "count": 17,
+        "extra": {
+          "size_bytes": 69632
+        }
+      },
+      {
+        "collector": "prefetch",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      },
+      {
+        "collector": "bam",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      },
+      {
+        "collector": "pca",
+        "state": "measured",
+        "oldest": "2025-11-02T03:04:05Z",
+        "days_before": 59,
+        "count": 1
+      },
+      {
+        "collector": "usn",
+        "place": "journal",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      }
+    ]
+  },
+  "cross_source": []
+}

@@ -84,7 +84,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{self, EvtxFile, EvtxRecord};
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Collector, Coverage, Field};
+use crate::{Age, AgeCount, AgeRows, Collector, Coverage, Field};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -259,6 +259,20 @@ impl Collector for Evtx {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    /// One row per log: its oldest record, how many records it holds, and its size beside the maximum
+    /// the Event Log service states for it (ADR 0061). Which logs come first and which are folded is
+    /// the bundle's to say, not this collector's.
+    fn age(&self) -> Option<Age> {
+        Some(Age {
+            oldest: &["oldest_record_time"],
+            count: AgeCount::Field("entries"),
+            rows: AgeRows::PerValue("log"),
+            places: &[],
+            extra: &["size_bytes", "max_size_bytes"],
+            by_place: &[],
+        })
     }
 
     /// Each log's oldest and newest record (ADR 0051): the span that log could show.

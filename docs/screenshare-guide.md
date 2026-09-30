@@ -377,6 +377,22 @@ refuses some drivers by default, and an ordinary PC measured for this held hundr
 detection. Read a time only inside its source's span, and
 never read the space between two times as something someone removed.
 
+**How far back the traces reach** (ADR 0061) is a section of its own, in both modes, and the consent
+screen names it. For each event log, Prefetch, BAM, the Program Compatibility Assistant, the change journal
+and FiveM's log, crash and cache folders it shows the oldest time still there, how many days before the
+scan that is, and how much the source holds — never a program's or a file's name — with what that source
+ordinarily keeps. Above them are dates of when parts of the PC were set up: `InstallDate` (installed **or
+last feature-upgraded**, not first installed), the earliest installation Windows Setup kept, when the change
+journal, the drive's root and `$Recycle.Bin` were created, and when FiveM's program folders were. Each is
+shown with what ordinarily resets it. A source Windows would not show without administrator rights says
+"not known": it was not read, it is not empty. Nothing in the section is compared for you, and there is no
+"machine age": the dates disagree by years on ordinary PCs.
+
+When Prefetch or BAM was read, holds no entry for the names above and still reaches back before FiveM's
+folders were last written, a **statement** above the timeline puts FiveM's side and those records side by
+side, one line per record, with the ordinary causes of the same result under it. It is not a row and not
+evidence. A record that could not be read is stated as not known, never as "no entry".
+
 Self mode is the player's view, and the player's consent covers SS mode. Asking to see Self mode is
 asking for something the player did not agree to.
 
@@ -419,6 +435,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 | a posture row | anything about the person |
 | `Windows start` days before the scan | the player avoided restarting, or is hiding anything |
 | `Windows start` minutes before the scan | the player restarted to hide something |
+| sources that reach back only days | someone removed traces — full logs, Windows' own clean-up and a new installation all do this |
+| sources that reach back months or years | nothing was removed |
+| setup dates weeks old | Windows was reinstalled to hide something — a feature upgrade resets `InstallDate` on its own |
+| setup dates years old | the PC was never reset or reinstalled |
+| the FiveM statement | FiveM ran and its records were removed — read the causes under it |
+| no FiveM statement | Windows' records of programs that ran are complete |
 
 Treat the report as one piece of evidence for a person to judge, next to everything else your
 server knows.

@@ -10,7 +10,8 @@ use std::collections::BTreeMap;
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::{self, SelfIdentity};
 use rongroi_core::model::{
-    BootTime, CollectorRun, CoverageFields, REPORT_SCHEMA_VERSION, Report, ReportHeader, ScanTier,
+    AgeCount, AgeFields, AgePlace, AgeRows, Anchor, AnchorKind, AnchorState, BootTime,
+    CollectorRun, CoverageFields, REPORT_SCHEMA_VERSION, Report, ReportHeader, ScanTier,
     UnmeasuredReason, UnmeasuredSource,
 };
 use rongroi_core::provenance::Provenance;
@@ -55,6 +56,7 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
             }
         })
         .collect();
+    let anchors = anchors(host, &runs, &context.generated_at);
     let header = ReportHeader {
         schema_version: REPORT_SCHEMA_VERSION,
         provenance: context.provenance,
@@ -66,11 +68,311 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
         boot_time,
         profiles_directory,
         scan_tier: tier,
+        anchors,
     };
     let mut report = engine::evaluate(bundle, &runs, header, &context.self_identity);
     declare_times(&mut report, &collectors, &runs);
     declare_sensitive(&mut report, &collectors);
+    declare_ages(&mut report, &collectors, bundle);
     report
+}
+
+/// Copies into the report how each collector's observations say how far back its source reaches
+/// (ADR 0061). For a collector with a row per value — `evtx`, a row per log — the values listed first
+/// are the ones the bundle reads: the logs its rules and timeline selectors name by channel.
+fn declare_ages(report: &mut Report, collectors: &[Box<dyn crate::Collector>], bundle: &Bundle) {
+    let count = |count: crate::AgeCount| match count {
+        crate::AgeCount::Observations => AgeCount::Observations,
+        crate::AgeCount::Field(field) => AgeCount::Field {
+            field: field.to_owned(),
+        },
+    };
+    let owned = |names: &[&str]| names.iter().map(|name| (*name).to_owned()).collect();
+    for collector in collectors {
+        let Some(age) = collector.age() else {
+            continue;
+        };
+        let (rows, first) = match age.rows {
+            crate::AgeRows::One => (AgeRows::One, Vec::new()),
+            crate::AgeRows::PerPlace => (AgeRows::PerPlace, Vec::new()),
+            crate::AgeRows::PerValue(field) => (
+                AgeRows::PerValue {
+                    field: field.to_owned(),
+                },
+                logs_the_bundle_reads(bundle, collector.id()),
+            ),
+        };
+        report.age_fields.insert(
+            collector.id().to_owned(),
+            AgeFields {
+                oldest: owned(age.oldest),
+                count: count(age.count),
+                rows,
+                places: owned(age.places),
+                extra: owned(age.extra),
+                first,
+                by_place: age
+                    .by_place
+                    .iter()
+                    .map(|place| AgePlace {
+                        place: place.place.to_owned(),
+                        oldest: owned(place.oldest),
+                        count: count(place.count),
+                        without: place.without.map(str::to_owned),
+                    })
+                    .collect(),
+            },
+        );
+    }
+}
+
+/// The file names of the logs the bundle's rules and timeline selectors on `collector` name by
+/// `channel`, sorted: `Microsoft-Windows-CodeIntegrity/Operational` is written to
+/// `Microsoft-Windows-CodeIntegrity%4Operational.evtx`, as Windows names a channel's file. Empty for any
+/// collector but `evtx`.
+fn logs_the_bundle_reads(bundle: &Bundle, collector: &str) -> Vec<String> {
+    if collector != "evtx" {
+        return Vec::new();
+    }
+    let mut logs = std::collections::BTreeSet::new();
+    for sourced in bundle.rules() {
+        let rule = &sourced.rule;
+        if rule.collector != collector || rule.status == rongroi_core::rules::Status::Deprecated {
+            continue;
+        }
+        let Some(value) = rule.matcher.get("channel") else {
+            continue;
+        };
+        let channels: Vec<&str> = match value {
+            serde_json::Value::String(channel) => vec![channel.as_str()],
+            serde_json::Value::Array(channels) => channels
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .collect(),
+            _ => Vec::new(),
+        };
+        for channel in channels {
+            logs.insert(format!("{}.evtx", channel.replace('/', "%4")));
+        }
+    }
+    logs.into_iter().collect()
+}
+
+/// Where Windows keeps the installation's own values.
+const CURRENT_VERSION: &str = r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+/// Where Windows Setup keeps a `Source OS (Updated on …)` subkey per installation a feature upgrade
+/// replaced (ADR 0061). Not documented by Microsoft.
+const SETUP: &str = r"HKLM\SYSTEM\Setup";
+/// The start of those subkeys' names, compared without case.
+const SOURCE_OS: &str = "Source OS";
+
+/// The anchors: dated facts about when parts of this PC were set up (ADR 0061, owner decision 5).
+///
+/// Every one is read without administrator rights except the change journal's, which comes from the
+/// `usn` collector's run rather than from a second read of the journal. Each is a UTC date; a read that
+/// fails is `unmeasured` with its reason, never a guessed date. `boot_time` is not here: it keeps its
+/// own header field and its precision (ADR 0039).
+fn anchors(host: &dyn Host, runs: &[CollectorRun], generated_at: &str) -> Vec<Anchor> {
+    let windows = host.platform() == Platform::Windows;
+    let system_drive = host.env_var("SystemDrive").filter(|drive| {
+        let bytes = drive.as_bytes();
+        bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+    });
+    let local_app_data = host
+        .env_var(crate::fivem_dir::LOCAL_APP_DATA)
+        .map(|base| base.trim_end_matches(['\\', '/']).to_owned())
+        .filter(|base| !base.is_empty());
+    let under = |base: &Option<String>, relative: &str| {
+        base.as_ref().map(|base| format!(r"{base}\{relative}"))
+    };
+    let legacy = crate::fivem_dir::LEGACY_PROGRAM_RELATIVE_PATH;
+    let enhanced = crate::fivem_dir::ENHANCED_PROGRAM_RELATIVE_PATH;
+    let folders = [
+        (
+            AnchorKind::SystemDriveRootCreated,
+            system_drive.as_ref().map(|drive| format!(r"{drive}\")),
+            r"%SystemDrive%\".to_owned(),
+        ),
+        (
+            AnchorKind::RecycleBinCreated,
+            system_drive
+                .as_ref()
+                .map(|drive| format!(r"{drive}\$Recycle.Bin")),
+            r"%SystemDrive%\$Recycle.Bin".to_owned(),
+        ),
+        (
+            AnchorKind::FivemLegacyProgramFolderCreated,
+            under(&local_app_data, legacy),
+            format!(r"%LOCALAPPDATA%\{legacy}"),
+        ),
+        (
+            AnchorKind::FivemLegacyAppFolderCreated,
+            under(&local_app_data, &format!(r"{legacy}\FiveM.app")),
+            format!(r"%LOCALAPPDATA%\{legacy}\FiveM.app"),
+        ),
+        (
+            AnchorKind::FivemEnhancedProgramFolderCreated,
+            under(&local_app_data, enhanced),
+            format!(r"%LOCALAPPDATA%\{enhanced}"),
+        ),
+    ];
+    let mut anchors = vec![install_date(host), setup_earliest_install(host)];
+    anchors.push(usn_journal_created(runs, generated_at));
+    for (kind, path, source) in folders {
+        let state = if windows {
+            folder_created(host, path.as_deref(), source)
+        } else {
+            unmeasured_anchor(UnmeasuredReason::NotWindows)
+        };
+        anchors.push(Anchor {
+            anchor: kind,
+            state,
+        });
+    }
+    anchors
+}
+
+fn unmeasured_anchor(reason: UnmeasuredReason) -> AnchorState {
+    AnchorState::Unmeasured { reason }
+}
+
+/// The UTC date of `time`, the one precision an anchor carries (ADR 0061, owner decision 4).
+fn utc_date(time: jiff::Timestamp) -> String {
+    time.to_zoned(jiff::tz::TimeZone::UTC).date().to_string()
+}
+
+/// A date read from a `REG_DWORD` of seconds since 1970, as `InstallDate` is.
+fn registry_date(host: &dyn Host, key: &str) -> Result<Option<String>, UnmeasuredReason> {
+    match host.read_value(key, "InstallDate") {
+        Ok(Some(RegistryData::Dword(seconds))) => jiff::Timestamp::from_second(i64::from(seconds))
+            .map(|time| Some(utc_date(time)))
+            .map_err(|_| UnmeasuredReason::ReadFailed),
+        Ok(Some(_)) => Err(UnmeasuredReason::ReadFailed),
+        Ok(None) => Ok(None),
+        Err(error) => Err(crate::failure::reason_for(host, &error)),
+    }
+}
+
+/// `InstallDate`: when this installation was installed or last upgraded to a new feature version.
+fn install_date(host: &dyn Host) -> Anchor {
+    let state = if host.platform() == Platform::Windows {
+        match registry_date(host, CURRENT_VERSION) {
+            Ok(Some(on)) => AnchorState::Measured {
+                on,
+                source: format!(r"{CURRENT_VERSION}\InstallDate"),
+                kept: None,
+            },
+            Ok(None) => unmeasured_anchor(UnmeasuredReason::SourceAbsent),
+            Err(reason) => unmeasured_anchor(reason),
+        }
+    } else {
+        unmeasured_anchor(UnmeasuredReason::NotWindows)
+    };
+    Anchor {
+        anchor: AnchorKind::InstallDate,
+        state,
+    }
+}
+
+/// The earliest `InstallDate` among the `Source OS (Updated on …)` subkeys, and how many there are.
+/// No subkey name leaves this function: each carries a date to the second.
+fn setup_earliest_install(host: &dyn Host) -> Anchor {
+    let state = if host.platform() == Platform::Windows {
+        match host.subkeys(SETUP) {
+            Ok(Some(names)) => {
+                let kept: Vec<String> = names
+                    .into_iter()
+                    .filter(|name| {
+                        name.get(..SOURCE_OS.len())
+                            .is_some_and(|head| head.eq_ignore_ascii_case(SOURCE_OS))
+                    })
+                    .collect();
+                let mut dates = Vec::new();
+                let mut failure = None;
+                for name in &kept {
+                    match registry_date(host, &format!(r"{SETUP}\{name}")) {
+                        Ok(Some(date)) => dates.push(date),
+                        Ok(None) => {}
+                        Err(reason) => failure = failure.or(Some(reason)),
+                    }
+                }
+                match (dates.into_iter().min(), failure) {
+                    // A subkey whose date could not be read could hold the earliest one.
+                    (_, Some(reason)) => unmeasured_anchor(reason),
+                    (Some(on), None) => AnchorState::Measured {
+                        on,
+                        source: format!(r"{SETUP}\Source OS (Updated on …)\InstallDate"),
+                        kept: u32::try_from(kept.len()).ok(),
+                    },
+                    (None, None) if kept.is_empty() => {
+                        unmeasured_anchor(UnmeasuredReason::SourceAbsent)
+                    }
+                    (None, None) => unmeasured_anchor(UnmeasuredReason::ReadFailed),
+                }
+            }
+            Ok(None) => unmeasured_anchor(UnmeasuredReason::SourceAbsent),
+            Err(error) => unmeasured_anchor(crate::failure::reason_for(host, &error)),
+        }
+    } else {
+        unmeasured_anchor(UnmeasuredReason::NotWindows)
+    };
+    Anchor {
+        anchor: AnchorKind::SetupEarliestInstall,
+        state,
+    }
+}
+
+/// The date the `usn` collector read from the journal identifier, from its run: the journal is read
+/// once per scan. A date after the scan's own is not a creation time and is not shown.
+fn usn_journal_created(runs: &[CollectorRun], generated_at: &str) -> Anchor {
+    let state = match runs.iter().find(|run| run.collector() == "usn") {
+        None => unmeasured_anchor(UnmeasuredReason::CollectorUnavailable),
+        Some(CollectorRun::Unmeasured { reason, .. }) => unmeasured_anchor(*reason),
+        Some(CollectorRun::Measured { observations, .. }) => {
+            let scan_date = generated_at.parse::<jiff::Timestamp>().ok().map(utc_date);
+            let on = observations
+                .iter()
+                .find(|observation| {
+                    observation.fields.get("location")
+                        == Some(&serde_json::Value::from(crate::usn::JOURNAL_LOCATION))
+                })
+                .and_then(|journal| journal.fields.get("journal_created_on"))
+                .and_then(serde_json::Value::as_str)
+                .filter(|on| scan_date.as_deref().is_some_and(|scan| *on <= scan));
+            match on {
+                Some(on) => AnchorState::Measured {
+                    on: on.to_owned(),
+                    source: "%SystemDrive% change journal identifier".to_owned(),
+                    kept: None,
+                },
+                None => unmeasured_anchor(UnmeasuredReason::ReadFailed),
+            }
+        }
+    };
+    Anchor {
+        anchor: AnchorKind::UsnJournalCreated,
+        state,
+    }
+}
+
+/// A folder's own creation date, read without listing its parent.
+fn folder_created(host: &dyn Host, path: Option<&str>, source: String) -> AnchorState {
+    let Some(path) = path else {
+        // The variable that says where the folder is was not set: nothing was looked at.
+        return unmeasured_anchor(UnmeasuredReason::ReadFailed);
+    };
+    match host.times(path) {
+        Ok(Some(times)) => match times.created {
+            Some(created) => AnchorState::Measured {
+                on: utc_date(created),
+                source,
+                kept: None,
+            },
+            None => unmeasured_anchor(UnmeasuredReason::ReadFailed),
+        },
+        Ok(None) => unmeasured_anchor(UnmeasuredReason::SourceAbsent),
+        Err(error) => unmeasured_anchor(crate::failure::reason_for(host, &error)),
+    }
 }
 
 /// Copies into the report which fields each collector declared sensitive, for `view` to hide in SS
@@ -430,6 +732,140 @@ mod tests {
                 reason: UnmeasuredReason::AccessDenied,
             }]
         );
+    }
+
+    fn fixture_host(name: &str) -> FixtureHost {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/hosts")
+            .join(name);
+        FixtureHost::load(&dir).unwrap()
+    }
+
+    fn anchor_state(report: &Report, kind: AnchorKind) -> AnchorState {
+        report
+            .header
+            .anchors
+            .iter()
+            .find(|anchor| anchor.anchor == kind)
+            .unwrap()
+            .state
+            .clone()
+    }
+
+    /// Every anchor as a UTC date, from the registry, the drive's own folders, `FiveM`'s program folder
+    /// and the change journal's run; Windows Setup's earliest installation with how many it kept, and
+    /// an edition that is not installed as `source_absent` (ADR 0061, owner decision 5).
+    #[test]
+    fn the_anchors_are_utc_dates_with_what_was_read() {
+        let bundle = Bundle::embedded().unwrap();
+        let report = run(
+            &fixture_host("trace-ages-elevated"),
+            &bundle,
+            context(ScanTier::Standard),
+        );
+        let on = |kind| match anchor_state(&report, kind) {
+            AnchorState::Measured { on, .. } => on,
+            AnchorState::Unmeasured { reason } => panic!("{kind:?}: {reason:?}"),
+        };
+        assert_eq!(on(AnchorKind::InstallDate), "2025-10-21");
+        assert_eq!(on(AnchorKind::UsnJournalCreated), "2018-03-01");
+        assert_eq!(on(AnchorKind::SystemDriveRootCreated), "2018-03-02");
+        assert_eq!(on(AnchorKind::RecycleBinCreated), "2018-03-02");
+        assert_eq!(
+            on(AnchorKind::FivemLegacyProgramFolderCreated),
+            "2024-05-10"
+        );
+        assert_eq!(on(AnchorKind::FivemLegacyAppFolderCreated), "2024-05-10");
+        assert_eq!(
+            anchor_state(&report, AnchorKind::SetupEarliestInstall),
+            AnchorState::Measured {
+                on: "2018-03-02".to_owned(),
+                source: r"HKLM\SYSTEM\Setup\Source OS (Updated on …)\InstallDate".to_owned(),
+                kept: Some(2),
+            }
+        );
+        assert_eq!(
+            anchor_state(&report, AnchorKind::FivemEnhancedProgramFolderCreated),
+            AnchorState::Unmeasured {
+                reason: UnmeasuredReason::SourceAbsent
+            }
+        );
+        // No anchor carries a time: a date is what it is compared in, and a second matches reports.
+        for anchor in &report.header.anchors {
+            if let AnchorState::Measured { on, .. } = &anchor.state {
+                assert!(
+                    on.parse::<jiff::civil::Date>().is_ok() && on.len() == 10,
+                    "{on}"
+                );
+            }
+        }
+    }
+
+    /// Without administrator rights the journal is `not_admin`, and the rest still read; on another
+    /// operating system every anchor is `not_windows`.
+    #[test]
+    fn an_anchor_that_could_not_be_read_says_why() {
+        let bundle = Bundle::embedded().unwrap();
+        let limited = run(
+            &fixture_host("trace-ages-limited"),
+            &bundle,
+            context(ScanTier::Standard),
+        );
+        assert_eq!(
+            anchor_state(&limited, AnchorKind::UsnJournalCreated),
+            AnchorState::Unmeasured {
+                reason: UnmeasuredReason::NotAdmin
+            }
+        );
+        assert!(matches!(
+            anchor_state(&limited, AnchorKind::InstallDate),
+            AnchorState::Measured { .. }
+        ));
+        let other = run(
+            &host("platform: other\n"),
+            &bundle,
+            context(ScanTier::Standard),
+        );
+        assert_eq!(other.header.anchors.len(), 8);
+        for anchor in &other.header.anchors {
+            assert_eq!(
+                anchor.state,
+                AnchorState::Unmeasured {
+                    reason: UnmeasuredReason::NotWindows
+                },
+                "{:?}",
+                anchor.anchor
+            );
+        }
+    }
+
+    /// Each collector that declares an age is in the report, and `evtx` lists first the logs the
+    /// bundle's rules and selectors name by channel (ADR 0061, owner decision 3).
+    #[test]
+    fn the_report_declares_ages_and_the_logs_the_bundle_reads() {
+        let bundle = Bundle::embedded().unwrap();
+        let report = run(
+            &host("platform: windows\n"),
+            &bundle,
+            context(ScanTier::Standard),
+        );
+        for collector in crate::all() {
+            assert_eq!(
+                report.age_fields.contains_key(collector.id()),
+                collector.age().is_some(),
+                "{}",
+                collector.id()
+            );
+        }
+        let first = &report.age_fields["evtx"].first;
+        for log in [
+            "Security.evtx",
+            "System.evtx",
+            "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+            "Microsoft-Windows-Windows Defender%4Operational.evtx",
+        ] {
+            assert!(first.iter().any(|name| name == log), "{log}: {first:?}");
+        }
     }
 
     #[test]

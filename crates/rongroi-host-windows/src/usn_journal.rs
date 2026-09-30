@@ -85,6 +85,8 @@ pub fn journal_state(bytes: &[u8]) -> Option<(u64, UsnJournalState)> {
             next_usn: i64_at(16)?,
             lowest_valid_usn: i64_at(24)?,
             maximum_size: u64_at(40)?,
+            // The date only, and the identifier stays here (ADR 0047 amendment, ADR 0061).
+            created_on: rongroi_host::journal_created_on(u64_at(0)?),
         },
     ))
 }
@@ -425,6 +427,18 @@ mod tests {
         assert_eq!(state.next_usn, NEXT_USN);
         assert_eq!(state.lowest_valid_usn, LOWEST_VALID_USN);
         assert_eq!(state.maximum_size, MAXIMUM_SIZE);
+        // 0xDEAD read as a FILETIME is in 1601: no date (ADR 0061).
+        assert_eq!(state.created_on, None);
+        let mut dated = bytes;
+        dated[0..8].copy_from_slice(&132_223_104_000_000_000_u64.to_le_bytes());
+        assert_eq!(
+            journal_state(&dated)
+                .unwrap()
+                .1
+                .created_on
+                .map(|date| date.to_string()),
+            Some("2020-01-01".to_owned())
+        );
         // `MaxUsn` at 32 is not kept: no field may answer with it.
         assert!(
             [state.first_usn, state.next_usn, state.lowest_valid_usn]

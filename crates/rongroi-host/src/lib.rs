@@ -188,6 +188,22 @@ pub fn listed_time(time: std::time::SystemTime) -> Option<jiff::Timestamp> {
     jiff::Timestamp::from_second(seconds).ok()
 }
 
+/// One path's own creation and last-write times, as the file system records them for that entry
+/// (ADR 0061).
+///
+/// The same values a listing of its parent would report, read without listing the parent: the parent
+/// of a profile folder is a profile root, whose listing holds other people's names. The same limits as
+/// [`DirEntryInfo`]'s times apply: any program able to write the entry can set them, and a time is in
+/// whole seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntryTimes {
+    /// Creation time, in whole seconds (see [`listed_time`]); `None` when the file system did not
+    /// provide one or it is outside the range a [`jiff::Timestamp`] represents.
+    pub created: Option<jiff::Timestamp>,
+    /// Last-write time, with the same meaning of `None`.
+    pub modified: Option<jiff::Timestamp>,
+}
+
 /// Read-only access to the file system. Paths are absolute and Windows-style, e.g. `C:\Users\a\x.dll`.
 pub trait FilesystemSource {
     /// Lists what is directly inside `dir`; it never recurses.
@@ -221,6 +237,14 @@ pub trait FilesystemSource {
     /// reports for a file that is gone. The file's contents are not opened, and nothing about the file
     /// is changed by asking.
     fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError>;
+
+    /// The creation and last-write times of the file or folder at `path` itself (ADR 0061).
+    ///
+    /// `path` may be a drive root such as `C:\`. `Ok(None)` means nothing is there, the same fact
+    /// [`FilesystemSource::read_file`] reports for a file that is gone. A link is not followed: the
+    /// times are the entry's own, as a listing of its parent reports them. Nothing is opened for
+    /// reading or writing, and nothing about the entry is changed by asking.
+    fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError>;
 }
 
 /// What Windows says about the Authenticode signature **embedded in** one file, checked without the
@@ -433,6 +457,41 @@ pub struct UsnJournalState {
     pub lowest_valid_usn: i64,
     /// `MaximumSize`, in bytes: the size Windows trims the journal back to.
     pub maximum_size: u64,
+    /// The UTC date the journal's `UsnJournalID` gives when it is read as a `FILETIME`, or `None` when
+    /// that date is not a plausible one (ADR 0047 amendment, ADR 0061). Microsoft documents the
+    /// identifier only as assigned when the journal is created; that it encodes a time is **not
+    /// documented**. The identifier itself never leaves the host, and neither does a time finer than a
+    /// day: to the 100 nanoseconds it names one journal on one PC. See [`journal_created_on`].
+    pub created_on: Option<jiff::civil::Date>,
+}
+
+/// The first date [`journal_created_on`] accepts: Windows 2000, the first Windows with an NTFS change
+/// journal. An identifier that reads as an earlier date is not a creation time.
+const EARLIEST_JOURNAL_DATE: jiff::civil::Date = jiff::civil::date(2000, 1, 1);
+/// The first date [`journal_created_on`] refuses. Far enough out that no real journal reaches it, and
+/// near enough that a number that is not a time at all lands past it.
+const LATEST_JOURNAL_DATE: jiff::civil::Date = jiff::civil::date(2100, 1, 1);
+/// 100-nanosecond intervals from the `FILETIME` epoch (1601-01-01) to the Unix epoch.
+const UNIX_EPOCH_AS_FILETIME: u64 = 116_444_736_000_000_000;
+
+/// The UTC date a change journal identifier gives when it is read as a `FILETIME`, or `None` when it
+/// does not read as a date from 2000 up to 2100 (ADR 0047 amendment, ADR 0061).
+///
+/// That the identifier is a time is not documented by Microsoft: [Using the Change Journal
+/// Identifier](https://learn.microsoft.com/en-us/windows/win32/fileio/using-the-change-journal-identifier)
+/// says only that it is assigned when the journal is created. On one Windows 11 PC it read, twice, as
+/// a date within a day of the oldest installation date Windows Setup kept (ADR 0061). Only the date is
+/// returned, never the value: a date is what a reviewer compares, and the value names one journal.
+pub fn journal_created_on(identifier: u64) -> Option<jiff::civil::Date> {
+    let since_unix = identifier.checked_sub(UNIX_EPOCH_AS_FILETIME)? / 10_000_000;
+    let seconds = i64::try_from(since_unix).ok()?;
+    let date = jiff::Timestamp::from_second(seconds)
+        .ok()?
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .date();
+    (EARLIEST_JOURNAL_DATE..LATEST_JOURNAL_DATE)
+        .contains(&date)
+        .then_some(date)
 }
 
 /// How a read of a change journal ended.
@@ -695,6 +754,12 @@ impl FilesystemSource for NonWindowsHost {
             "no Windows file system on this platform".to_owned(),
         ))
     }
+
+    fn times(&self, _path: &str) -> Result<Option<EntryTimes>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
 }
 
 impl EventLogConfigSource for NonWindowsHost {
@@ -807,6 +872,43 @@ mod tests {
 
     fn at(text: &str) -> jiff::Timestamp {
         text.parse().unwrap()
+    }
+
+    /// A `FILETIME` of 2020-01-01T00:00:00Z plus most of a day: only the UTC date comes back.
+    #[test]
+    fn a_journal_identifier_read_as_a_filetime_gives_its_utc_date() {
+        let new_year = 132_223_104_000_000_000_u64;
+        assert_eq!(
+            journal_created_on(new_year),
+            Some(jiff::civil::date(2020, 1, 1))
+        );
+        let late = new_year + 23 * 3_600 * 10_000_000 + 59 * 60 * 10_000_000;
+        assert_eq!(
+            journal_created_on(late),
+            Some(jiff::civil::date(2020, 1, 1))
+        );
+    }
+
+    /// An identifier that is not a time — a small counter, the epoch, a number past any real date —
+    /// gives no date rather than a wrong one.
+    #[test]
+    fn an_identifier_that_is_not_a_plausible_date_gives_none() {
+        for identifier in [
+            0,
+            1,
+            UNIX_EPOCH_AS_FILETIME,
+            // 1999-12-31: before the first Windows with a change journal.
+            125_911_583_990_000_000,
+            // 2100-01-01.
+            157_469_184_000_000_000,
+            u64::MAX,
+        ] {
+            assert_eq!(journal_created_on(identifier), None, "{identifier}");
+        }
+        assert_eq!(
+            journal_created_on(125_911_584_000_000_000),
+            Some(jiff::civil::date(2000, 1, 1))
+        );
     }
 
     #[test]

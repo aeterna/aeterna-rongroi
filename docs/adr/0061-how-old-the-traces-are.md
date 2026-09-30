@@ -4,6 +4,7 @@
 - Date: 2026-09-30
 - Amended: 2026-09-30, with a read-only measurement on a Windows 11 PC ("Measured on a Windows 11 PC
   (2026-09-30)"); the anchor table and the owner decisions follow it
+- Implemented: in one change with ADR 0047's `journal_created_on` amendment ("As built")
 
 ## Context
 
@@ -501,3 +502,45 @@ The points under "What is unverified" stay open; the changes that build this say
 - Consent text, `PRIVACY.md`, `docs/architecture.md`, both screenshare guides ("what not to conclude" gains
   young sources and young anchors, both ways) and the glossary (**trace age**, **anchor** widened from
   ADR 0051's, **cross-source statement**) change with the code.
+
+## As built
+
+The change that builds this ADR took these choices where the text above leaves them open, each the option
+the ADR recommends or the one that shows less:
+
+- **The declaration.** `Collector::age` names a list of oldest fields, a count (the observations that carry
+  one, or the sum of a number field), whether a row is the collector, one place of it or one value of a field
+  (`evtx`'s `log`), the places that get a row, and the fields shown beside it. `fivem_dir`'s Enhanced server
+  cache is declared apart (`by_place`): counted in server folders and dated by their creation and last-write
+  times, as section 1's table says.
+- **Which logs come first.** The logs the bundle's rules and timeline selectors name by `channel`, derived
+  from the bundle when the scan runs: today `Security`, `System`, `CodeIntegrity/Operational` and
+  `Windows Defender/Operational`. The two PowerShell logs section 1 names are not read by any rule or
+  selector today, so they fold with the rest. The folded line also says how many of those logs could not
+  be read.
+- **Rows with nothing to read.** A declared place with no observation, or whose folder is absent, is
+  `source_absent`; a log refused on its own takes the reason its `read` word gives (`access_denied` without
+  administrator rights is `not_admin`, as the collectors decide it).
+- **Days.** Whole days, rounded down: a source's oldest time against the scan's time; an anchor's date
+  against the scan's UTC date; `boot_time` from its own count.
+- **Anchors.** `source` is a fixed spelling of what was read, with any environment variable unexpanded, so
+  it names no user. `InstallDate` is read and `InstallTime` is not. A `Source OS` subkey whose date could not
+  be read makes the anchor unmeasured, since it could hold the earliest date. The journal date is kept only
+  from 2000 to 2100, and one after the scan's own date is `read_failed`. FiveM's anchors are Legacy's
+  program folder and `FiveM.app`, and Enhanced's program folder; Enhanced's `FiveM.app` is not asked about,
+  since the install measured had none. An edition that is not installed is `source_absent`. The observation
+  fields keep ADR 0053's precision of a second, as every `fivem_dir` time does; only the anchors are dates.
+- **The statement.** It carries no summary sentence, so "none of these" never appears; each record has its
+  line. It is not built unless the bundle holds FiveM's selectors on all three records. A record that is
+  `source_empty`, `source_absent` or `not_on_this_os` takes the "holds nothing as old as T" form; one that is
+  `service_disabled` takes the "switched off" form. The selectors are named by id in the core
+  (`view::FIVEM_SELECTORS`), bound to the rules tree by a test, and the report records which selectors the
+  bundle held (`Report.timeline_selectors`).
+- **Texts.** A reference is a Microsoft Learn page or a document in this repository; `documented: true`
+  needs at least one Microsoft Learn reference. A text is shown once per source, under its last row. The
+  CLI reads the section's and the statement's fixed words from the desktop's locale files, so each exists
+  once.
+
+Not measured by this change: `FilesystemSource::times` on a drive root and `$Recycle.Bin` under a limited
+token, `journal_created_on` on a PC, and the whole section on a PC. The points under "What is unverified"
+stay open.

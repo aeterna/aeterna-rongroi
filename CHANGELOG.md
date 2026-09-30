@@ -6,7 +6,32 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- ADR 0061 is accepted (the owner decided its eight questions on 2026-09-30), not implemented yet: how old
+- **How far back the traces reach** (ADR 0061), in both modes and in both front ends. A new view section
+  lists, for each event log, Prefetch, BAM, PCA, the change journal and each of FiveM's log, crash and cache
+  folders, the oldest time the source still holds, its whole days before the scan, how much it holds, what
+  the source ordinarily keeps — reviewed text in the new `rules/ages/<collector>.yaml`, with its references
+  and whether Microsoft documents it, translated in `rules/i18n/th.yaml` — and, for a source that was not
+  read, the reason: `not_admin` reads "not read without administrator rights — not known", never empty. The
+  event logs the bundle's rules and selectors read are listed first, each with its size beside its maximum;
+  the rest fold into one line. Collectors declare this with `Collector::age`, copied into the additive
+  `Report.age_fields`. Above the rows are **anchors**, UTC dates in the new `ReportHeader.anchors`, where no
+  rule reads them, each shown with what ordinarily resets it: `boot_time`; `InstallDate`, as "installed or
+  last feature-upgraded"; the earliest installation date Windows Setup kept and how many it kept (not
+  documented by Microsoft, no subkey name emitted); the change journal's creation date; the system drive
+  root's and `$Recycle.Bin`'s creation dates through a new `FilesystemSource::times`; and FiveM's program
+  folders. `fivem_dir`'s `FiveM.exe` observations gain `program_folder_created_at` and, for Legacy,
+  `app_folder_created_at`. `usn`'s journal observation gains `journal_created_on`, the date the journal
+  identifier gives when read as a time — undocumented, computed inside the host, never the identifier —
+  amending ADR 0047. One **cross-source statement**, computed in the view and never a rule or evidence, puts
+  FiveM's side beside Prefetch, BAM and PCA only when Prefetch or BAM was read, holds no entry for the names
+  the FiveM timeline selectors list, and reaches back before FiveM's folders were last written; a record not
+  read is "not known", PCA alone never makes it, and the ordinary causes are always printed with it. The
+  report records which timeline selectors the bundle held (`Report.timeline_selectors`). No verdict, score,
+  ranking or colour. The consent question (CLI and desktop, both languages), `PRIVACY.md`, ADR 0034's note,
+  `docs/architecture.md`, the glossary and both screenshare guides say what is read and shown; the CLI takes
+  the section's and the statement's fixed words from the desktop's locale files. Two synthetic fixture hosts
+  cover a PC read with and without administrator rights.
+- ADR 0061 is accepted (the owner decided its eight questions on 2026-09-30), implemented above: how old
   each trace source is, beside when parts of the PC were set up. A "trace ages" section lists, per source
   (each Event Log, Prefetch, BAM, PCA, the USN journal and FiveM's own folders), the oldest time it still
   holds, how much it holds, its ordinary retention with a reference or an "undocumented" mark, and the reason
