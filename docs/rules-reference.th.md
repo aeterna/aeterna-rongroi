@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 54 |
-| SHA-256 | `fe8383f75796054ccea499c83a369c8872dd8ac5e0b7bc89ccf25f3fc359e335` |
+| จำนวน rule | 55 |
+| SHA-256 | `f2aaf3a5c765297d0f031a7781bf1d45c3378bbee5973566762417041c6cfb56` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -39,6 +39,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 - `autostart`
   - [โปรแกรมที่เริ่มทำงานเองไม่มีลายเซ็นฝังในไฟล์ที่ใช้ได้ และอยู่นอกโฟลเดอร์ Windows กับ Program Files](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
+- `defender_exclusion`
+  - [exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
   - [ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
@@ -155,6 +157,46 @@ service ค่าใน Run และ RunOnce และ scheduled task ที่
 - เครื่องมือ open source และเครื่องมือที่สร้างเอง ซึ่งมักไม่ได้เซ็น
 - ไฟล์ที่เซ็นผ่าน catalog ของ Windows ซึ่งการตรวจนี้ไม่ได้อ่าน
 - ค่าใน Run ที่ถูกปิดไว้ใน Task Manager ซึ่งโปรแกรมนี้แยกไม่ออกจากค่าที่เปิดอยู่
+
+## collector `defender_exclusion`
+
+### `defender_exclusion` / `fivem`
+
+<a id="rule-d7191cf3-ce56-480b-8501-66a198f83e08"></a>
+
+#### exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM
+
+- ชื่อภาษาอังกฤษ: A Microsoft Defender exclusion covers a FiveM folder
+- id: `d7191cf3-ce56-480b-8501-66a198f83e08`
+- ไฟล์: [`rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml`](../rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml)
+- collector: `defender_exclusion`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `defender_exclusion`, `posture`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+Microsoft Defender ถูกสั่งไม่ให้สแกนโฟลเดอร์หรือโปรแกรมที่เป็นโฟลเดอร์ของ FiveM เป็นโฟลเดอร์ที่อยู่เหนือขึ้นไป รวมถึงทั้งไดรฟ์ หรือเป็นอะไรบางอย่างที่อยู่ข้างใน โฟลเดอร์ของ FiveM คือของ FiveM for GTA V Legacy และ Enhanced ใน AppData แบบ local และ roaming ของบัญชี Windows ไม่ว่าจะมีอยู่บนเครื่องนี้หรือไม่ แถวนี้แสดง exclusion ตามที่ Defender เก็บไว้ และบอกว่าตั้งไว้ในการตั้งค่าของ Defender เองหรือตั้งโดย policy exclusion ที่มี wildcard จะไม่ถูกเทียบ และยังไม่ได้เทียบกับโฟลเดอร์ของตัวเกมเอง ข้อนี้บอกว่า Defender ถูกสั่งไม่ให้สแกนที่ที่ FiveM เก็บไฟล์ ไม่ได้บอกว่ามีอะไรถูกวางไว้ที่นั่น ใครตั้ง exclusion หรือตั้งเมื่อไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `covers_fivem`: เป็น `true`
+
+**ย้อนดูได้**
+
+exclusion ของ Defender ตามที่เป็นอยู่ตอนสแกน exclusion ที่ถูกลบไปก่อนสแกนจะไม่เห็น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คู่มือเพิ่ม FPS และประสิทธิภาพที่บอกให้ผู้เล่นยกเว้นโฟลเดอร์ของเกมหรือของ FiveM จากการสแกนเพื่อลดอาการกระตุก
+- ตัวติดตั้งหรือ launcher ของเกมและ mod ที่เพิ่ม exclusion ของตัวเอง
+- นักพัฒนาและเครื่องที่ใช้ build โปรแกรมซึ่งยกเว้นทั้งไดรฟ์เพื่อให้ build เร็วขึ้น เหมือนอิมเมจของ runner ที่ GitHub ดูแลซึ่งยกเว้นไดรฟ์ C และ D
+- โปรแกรมความปลอดภัยตัวอื่น หรือผู้ดูแลระบบ ที่จัดการการตั้งค่าของ Defender
 
 ## collector `driver_service`
 

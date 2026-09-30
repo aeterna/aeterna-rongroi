@@ -1,0 +1,9 @@
+{
+  "description": "Defender's settings exclude the whole C drive, and a policy excludes FiveM's own folder",
+  "observations": [
+    { "collector": "defender_exclusion", "fields": { "kind": "path", "set_by": "settings", "exclusion": "C:\\", "covers_fivem": true } },
+    { "collector": "defender_exclusion", "fields": { "kind": "path", "set_by": "policy", "exclusion": "%LOCALAPPDATA%\\FiveM", "covers_fivem": true } },
+    { "collector": "defender_exclusion", "fields": { "set_by": "settings", "ip_addresses": 0 } }
+  ],
+  "expect_matches": 2
+}
