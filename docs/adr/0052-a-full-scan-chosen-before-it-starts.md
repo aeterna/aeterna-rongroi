@@ -100,7 +100,7 @@ messenger's storage or any store that holds a credential or a token, whatever th
 | Counts and times of FiveM's cache, log and crash folders (ADR 0050's first consumer) | standard | — |
 | Number of Enhanced per-server cache folders and their times | standard | — |
 | An Enhanced per-server cache folder's name | full | server identity |
-| Endpoints and plugin names in FiveM's logs | full | server identity (endpoints) |
+| Endpoints and plugin names in FiveM's logs — **parked** by ADR 0058 on 2026-09-30: the logs measured named no joined server | full | server identity (endpoints) |
 | Module lists in FiveM's crash dumps | full | — (paths redacted as today) |
 | Counts of Rockstar, Social Club and Steam profiles | full | — |
 

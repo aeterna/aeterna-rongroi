@@ -5,6 +5,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- ADR 0058, parked by the owner on 2026-09-30: reading FiveM's own logs for the servers a PC joined, as a
+  second `full`-tier collector, is not built. Two read-only measurements on a Windows 11 PC found no server
+  endpoint in either edition's logs — join lines carry no address, name or port. The ADR records the log
+  files' names, sizes, line formats and times, keeps the collector's design (a tolerant parser reporting
+  `partial`, endpoints as server identities hidden in SS mode, no plugin names) as undecided
+  recommendations, and states the measurement that would reopen it. ADR 0052's row for this source says it
+  is parked.
+
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
   profile folder, `%TEMP%\aeterna-rongroi-<process id>`, behind for good, because the folder is deleted
