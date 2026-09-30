@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { codeLinks, reportView, ruleTexts } from "../api";
 import { type EvidenceGroup, groupEvidence, type StateFilter } from "../grouping";
+import { withKeys } from "../keys";
 import type {
   BootTime,
   CodeLinks,
@@ -66,6 +67,7 @@ export function Report({ mode, options, onBack }: Props) {
   // Carried fix (b): whether `codeLinks()` has arrived at all, independent of what it said.
   const linksKnown = links !== null;
   const official = header.provenance.official;
+  const groups = groupEvidence(view.evidence, filter, view.collector_order);
 
   return (
     <section className="report">
@@ -133,7 +135,11 @@ export function Report({ mode, options, onBack }: Props) {
       </div>
 
       {view.evidence.length === 0 && <p>{t("empty")}</p>}
-      {groupEvidence(view.evidence, filter, view.collector_order).map((group) => (
+      {/* A count of 0 is still a filter; choosing it says so rather than showing nothing. */}
+      {view.evidence.length > 0 && groups.length === 0 && (
+        <p className="muted">{t("toolbar.filtered_empty")}</p>
+      )}
+      {groups.map((group) => (
         <Group
           key={group.collector}
           group={group}
@@ -158,8 +164,11 @@ export function Report({ mode, options, onBack }: Props) {
           <details>
             <summary className="muted">{t("own_traces.note")}</summary>
             <ul className="observations">
-              {view.own_traces.map((entry) => (
-                <li key={`${entry.collector}:${fieldsOf(entry.observation)}`}>
+              {withKeys(
+                view.own_traces,
+                (entry) => `${entry.collector}:${fieldsOf(entry.observation)}`,
+              ).map(([key, entry]) => (
+                <li key={key}>
                   <span className="muted">({entry.collector})</span>
                   <div className="detail">{fieldsOf(entry.observation)}</div>
                 </li>
@@ -177,14 +186,20 @@ export function Report({ mode, options, onBack }: Props) {
           <details>
             <summary className="muted">{t("unmatched.note")}</summary>
             <ul className="observations">
-              {view.unmatched.flatMap((group) =>
-                group.observations.map((observation) => (
-                  <li key={`${group.collector}:${fieldsOf(observation)}`}>
-                    <span className="muted">({group.collector})</span>
-                    <div className="detail">{fieldsOf(observation)}</div>
-                  </li>
-                )),
-              )}
+              {withKeys(
+                view.unmatched.flatMap((group) =>
+                  group.observations.map((observation) => ({
+                    collector: group.collector,
+                    observation,
+                  })),
+                ),
+                ({ collector, observation }) => `${collector}:${fieldsOf(observation)}`,
+              ).map(([key, { collector, observation }]) => (
+                <li key={key}>
+                  <span className="muted">({collector})</span>
+                  <div className="detail">{fieldsOf(observation)}</div>
+                </li>
+              ))}
             </ul>
           </details>
         </section>

@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { withKeys } from "../keys";
 import type { Evidence, Observation, RuleFiles, RuleText } from "../types";
 import { CodeLink } from "./CodeLink";
 
@@ -148,27 +149,29 @@ function Technical({
   const observations: Observation[] = item.state === "found" ? item.observations : [];
   return (
     <div className="technical">
-      {observations.map((observation) => (
-        <table className="fields" key={JSON.stringify(observation.fields)}>
-          <caption>{t("layers.observation")}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("layers.field")}</th>
-              <th scope="col">{t("layers.value")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(observation.fields).map(([field, value]) => (
-              <tr key={field}>
-                <th scope="row">{field}</th>
-                <td>
-                  <code className="selectable">{String(value)}</code>
-                </td>
+      {withKeys(observations, (observation) => JSON.stringify(observation.fields)).map(
+        ([key, observation]) => (
+          <table className="fields" key={key}>
+            <caption>{t("layers.observation")}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{t("layers.field")}</th>
+                <th scope="col">{t("layers.value")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      ))}
+            </thead>
+            <tbody>
+              {Object.entries(observation.fields).map(([field, value]) => (
+                <tr key={field}>
+                  <th scope="row">{field}</th>
+                  <td>
+                    <code className="selectable">{String(value)}</code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      )}
       <dl className="facts">
         <dt>{t("layers.rule_id")}</dt>
         <dd>

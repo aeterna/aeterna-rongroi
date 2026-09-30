@@ -79,6 +79,7 @@
     "verify_attestation": "With the GitHub CLI:",
     "verify_unofficial": "If this window shows UNOFFICIAL BUILD or the hash differs, do not rely on its results.",
     "no_web_title": "Why no button opens a web page",
-    "no_web_body": "This program has no network code, so it cannot open a web page. Copy a link into a browser, or scan its QR code with a phone."
+    "no_web_body": "This program has no network code, so it cannot open a web page. Copy a link into a browser, or scan its QR code with a phone.",
+    "load_failed": "What this page shows could not be read from the program."
   }
 }
