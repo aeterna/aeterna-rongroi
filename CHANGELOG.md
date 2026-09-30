@@ -6,12 +6,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Proposed (ADR 0058): a second `full`-tier collector, `fivem_logs`, reading FiveM's own log files in both
-  editions for the servers the game connected to — each endpoint, its address kind, how many files and lines
-  named it and those files' times — through a tolerant parser that reports `partial` when FiveM's
-  undocumented format is not recognised. Endpoints are server identities, hidden in SS mode unless the
-  player agrees, and a server on the player's own PC or network is shown as its kind only. Plugin names are
-  not collected. The line templates are to be measured on a real PC before any code.
+- Proposed (ADR 0058), recommended to be parked: reading FiveM's own logs for the servers a PC joined, as
+  a second `full`-tier collector. Two read-only measurements on a Windows 11 PC found no server endpoint in
+  either edition's logs — join lines carry no address, name or port — so the ADR records the log files'
+  names, sizes, line formats and times, and keeps the collector's design (a tolerant parser reporting
+  `partial`, endpoints as server identities hidden in SS mode, no plugin names) for a PC whose logs do.
 
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
