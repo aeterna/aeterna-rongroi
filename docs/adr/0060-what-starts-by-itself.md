@@ -2,6 +2,7 @@
 
 - Status: proposed — the questions under "Owner decisions" are open
 - Date: 2026-09-30
+- Amended: 2026-09-30, with a measurement on a Windows 11 PC ("Measured on a Windows 11 PC (2026-09-30)")
 
 ## Context
 
@@ -27,8 +28,7 @@ installed, and a reviewer needs two things to tell those apart from the rest: **
 starts by itself**.
 
 This ADR proposes how to read the four places, what reaches a report, the two rules, and what the owner has
-to decide. It records what a GitHub-hosted runner showed; the Windows 11 PC is not measured yet for
-anything but the Defender read (section "Before any code").
+to decide. It records what a GitHub-hosted runner and a Windows 11 PC (build 26220) showed.
 
 ## Measured on a runner
 
@@ -150,11 +150,86 @@ so only the first says anything about a scan.
 The signature checks ran straight after each file was hashed, so they read cached files; their cold cost is
 not measured. Listing and parsing the 211 task files took 4.0–4.9 s in PowerShell, and the COM API 0.5–0.9 s.
 
-## Measured on a PC
+## Measured on a Windows 11 PC (2026-09-30)
 
-Only the Defender read, in P0 (2026-09-16), on a Windows 11 PC (build 26220): an elevated token read
-`Exclusions\Paths` (6 values); a limited token from a scheduled task at `LIMITED` was refused with a
-security exception. Nothing else in this ADR has been measured on a PC.
+**Where and how.** A Windows 11 PC (build 26220), with the owner's permission, running the same probe as
+the runner's third pass in Windows PowerShell 5.1: once elevated, and once as the signed-in account's
+**limited** token through a scheduled task at run level `LIMITED`. The probe printed counts, forms,
+classes of path and timings only — no value name, task name, path, signer, user name, SID or argument.
+Its last line reported the task and its work folder deleted. The output is not kept in this repository.
+In P0 (2026-09-16) the same PC's Defender `Exclusions\Paths` had been read elevated (6 values) and refused
+to a limited token.
+
+### Rights: elevated against limited
+
+| Read | Elevated | Limited |
+|---|---|---|
+| Keys under `...\Services`, and `Type`, `Start`, `ImagePath` in each | 872 of 872 | 872 of 872 |
+| `ServiceDll` of the program services | 230 | 227 — 3 `Parameters` keys refused |
+| `Run` / `RunOnce` under `HKLM`, `HKLM\...\WOW6432Node`, `HKCU` | read | read, the same counts |
+| Listing `%SystemRoot%\System32\Tasks` | 153 folders, 296 files; **1 file refused**, 295 parsed | **refused** at the top folder |
+| Task Scheduler COM API, hidden tasks included | 289 tasks | **214 tasks**, no error |
+| `TaskCache` keys | read (`Tasks`: 289 subkeys) | refused |
+| Defender `Exclusions\*` (all five) | read | **refused**, all five |
+| Defender's policy keys | absent | absent |
+| Resolved files, hashed and signature checked | 410 distinct | 393 distinct (fewer tasks seen) |
+
+So the runner's findings hold for an administrator's limited token on a PC, not only for a standard
+account: tasks read from files are `not_admin`, the COM API gives a quarter fewer tasks with no error, and
+Defender's exclusions are `not_admin`. One more fact only the PC showed: **an elevated read was refused
+one task file** of 296 on an ordinary PC.
+
+### Counts
+
+- **Services**: 343 program services (`0x10` 111, `0x20` 171, `0x110` 7, `0x120` 1, `0x210` 3, `0x50` 1,
+  `0x60` 24, `0xd0` 1, `0xe0` 24). `Start` automatic 99, on demand 239, disabled 5; 122 with `TriggerInfo`,
+  21 delayed. All 343 `ImagePath` values `REG_EXPAND_SZ`; 267 with a variable; 264 with arguments; 249 in
+  `svchost.exe`. Forms: first word then arguments 254, quoted 47, no space 39, **unquoted with a space
+  resolved at a longer prefix 2**, unresolved 1 (1 file missing). 230 `ServiceDll`, all under
+  `%SystemRoot%`, **201 of them with no embedded signature**. Of the 99 that start automatically, the image
+  file is under `%SystemRoot%` for 76, `%ProgramFiles%` 20, `%ProgramData%` 3; the 4 with no embedded
+  signature are all under `%SystemRoot%`.
+- **Run**: `HKLM` 9 values, `WOW6432Node` 2, `HKCU` 13; every `RunOnce` key present and empty. `HKCU`'s 13:
+  7 under `%ProgramFiles%`, 6 under the profile's `AppData\Local`, **every one with a valid embedded
+  signature**; `HKLM`'s: 7 under `%ProgramFiles%`, 2 under `%SystemRoot%` (one with no embedded
+  signature); `WOW6432Node`: 1 `%ProgramFiles%`, 1 `%ProgramData%`, both valid. 11 of the 24 have
+  arguments. `StartupApproved` first bytes: `HKCU\...\Run` `0x02` 8, `0x03` 18, `0x00` 1 (27 values for 13
+  `Run` values); `HKLM\...\Run` `0x02` 4, `0x03` 9, `0x06` 1; `Run32` `0x02` 2, `0x03` 7 — not the runner's
+  `0x04`. What the bytes mean is still not documented.
+- **Tasks** (files, elevated): 138 `Exec` and 159 `ComHandler` actions; 94 `Arguments` elements. Triggers:
+  WNF 111, logon 47, time 43, calendar 28, boot 23, event 12, registration 10, session change 8, idle 6,
+  none 64; 49 disabled, 62 hidden. Principals: 176 service SIDs, 89 groups, 20 account SIDs, 13 account
+  names. **3 task file names carry an account SID.** `Exec` files: `%SystemRoot%` 100, `%ProgramFiles%` 23,
+  other folders on the system drive 7, `%ProgramData%` 4, the profile outside `AppData` 2, `AppData\Local`
+  1, `AppData\Roaming` 1; 19 missing, 1 unreadable. 13 start a Windows script or library host (`rundll32`
+  11, `cmd` 1, `wscript` 1); 7 of those name a file in their arguments, 6 under `%SystemRoot%` and 1 in
+  another folder on the system drive.
+- **Defender**: `Paths` 6 values (under a profile outside `AppData` 3, `%SystemRoot%` 2, another folder on
+  the system drive 1), no wildcard and no variable; `Extensions`, `Processes`, `IpAddresses`,
+  `TemporaryPaths` empty; `Get-MpPreference` listed 6. **None of the 6 is, contains or lies inside a FiveM
+  folder**, and all three FiveM folders exist on this PC. The probe also counted 3 non-empty
+  `InstallFolder*` values under the subkeys of `HKLM\SOFTWARE\Rockstar Games` and its `WOW6432Node` twin;
+  none of the 6 exclusions covers any of them.
+
+### What the proposed rules would match
+
+- **Autostart: 1 row.** A scheduled task, enabled, with a boot or logon trigger, whose file is under the
+  profile outside `AppData` and has no embedded signature. The same one task is the only match with any
+  trigger. No service and no `Run` value would match. What the program is was not printed.
+- **Defender: `not_found`** — no exclusion covers a FiveM folder.
+
+### Cost
+
+| Pass | Distinct files | Bytes | Hashing | Signature checks | Whole probe |
+|---|---|---|---|---|---|
+| elevated | 410 | 857 MB | 3.0 s | 2.3 s | 15.9 s |
+| of which under `%SystemRoot%` | 322 | 233 MB | 1.2 s | — | — |
+| of which outside it | 88 | 624 MB | 1.9 s | — | — |
+| limited | 393 | 854 MB | 1.4 s | 2.1 s | 7.5 s |
+
+The PC was in use, and whether the files were in the cache was not controlled, so these times are not a
+cold scan; the runner's cold passes took 49–104 s for half the bytes. Listing and parsing 296 task files
+took 6.5 s in PowerShell, the COM API 1.9 s.
 
 ## Decision (proposed)
 
@@ -190,8 +265,10 @@ a module both collectors use, with `driver_service`'s behaviour unchanged.
 - **`task`**: the XML files under `%SystemRoot%\System32\Tasks`, recursively. Read: the task's path (its
   file's path below that folder), `Settings/Enabled`, the kinds of its triggers, and each `Exec` action's
   `Command`. **Never read into a report**: `Arguments`, `WorkingDirectory`, the principal's user id,
-  `Author`, `Description`, or any other element. A refused folder or file makes the place `not_admin`
-  without administrator rights and `access_denied` with them. The XML is parsed in `rongroi-parsers`, pure
+  `Author`, `Description`, or any other element. A refused top folder makes the place `not_admin`
+  without administrator rights and `access_denied` with them. A single refused file — which an elevated
+  read met on the PC, 1 of 296 — is a gap `access_denied` confined to `task` (ADR 0044), not a place
+  that could not be read (question 9). The XML is parsed in `rongroi-parsers`, pure
   and fuzzed like every parser (ADR 0013); the files' encoding was not recorded by the probe.
 
 The COM API is not used: it answers a standard user with a subset and no error (measured), it is a call
@@ -297,7 +374,8 @@ match:
   read; an entry switched off in Task Manager, which this program cannot tell from one that is on. A
   `found` row says a program not signed the way this checks is set to start without being asked; it does
   not say what the program does.
-- **`unmeasured_when`**: `not_windows`; `not_admin` is a scope statement already.
+- **`unmeasured_when`**: `not_windows`, and `access_denied` if the owner agrees under question 9: an
+  ordinary PC produced it with administrator rights. `not_admin` is a scope statement already.
 - `unverifiable_offline` is not matched: it is a fact about the check, not the file (ADR 0035).
 
 ### 9. A second collector, `defender_exclusion`
@@ -323,9 +401,10 @@ Defender's exclusions are a setting, not a program, and a limited token is refus
   ones `fivem_dir` already names: `%LOCALAPPDATA%\FiveM`, `%LOCALAPPDATA%\FiveM for GTAV Enhanced` and
   `%APPDATA%\FiveM for GTAV Enhanced`, whether or not they exist on this PC. An exclusion containing `*` or
   `?` has no `covers_fivem`: how Defender reads a wildcard in a folder exclusion is not established here.
-- The game's own folder is not compared: where the game is installed is still unknown on a measured PC
-  (P0 found no install folder for GTA V Legacy in Rockstar's registry keys, only a Steam install value for
-  Enhanced, and the folders it could read did not settle it).
+- The game's own folder is not compared yet. P0 found no install folder for GTA V Legacy in Rockstar's
+  registry keys and only a Steam install value for Enhanced. The PC probe counted 3 non-empty
+  `InstallFolder*` values under Rockstar's keys, but did not print which products' keys hold them, so which
+  of them is the game FiveM starts is not established.
 
 The rule: `rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml`, `posture`, `experimental`,
 `match: { covers_fivem: true }`. **`falsepositives`**: performance and FPS guides that tell players to
@@ -360,34 +439,33 @@ says Defender was told not to scan where FiveM keeps its files; it does not say 
 | Report arguments, or whether there were any | Arguments carry secrets; presence alone tells a reviewer nothing a rule uses |
 | Resolve the file a Windows script host is given | Needs argument text to be read and parsed; question 4 |
 | Hash every file under `%SystemRoot%` | 271 files, 77.5 s cold in one pass; the embedded check reads most of them as `no_embedded_signature` anyway (section 7) |
-| Read `StartupApproved` | Its bytes have no Microsoft-documented meaning; on the runner every first byte was `0x04` |
+| Read `StartupApproved` | Its bytes have no Microsoft-documented meaning; on the runner every first byte was `0x04`, on the PC `0x02` and `0x03` with `0x00` and `0x06` once each |
 | Read every account's `Run` key (`HKEY_USERS`) | Other people's settings; `LiveHost` refuses every root but `HKLM` and `HKCU` |
 | Defender exclusions as a fourth `location` | A different rights profile and a different kind of fact; a limited token is refused all of it |
 | Compare exclusions with the game's folder | The game's folder is not known on a measured PC |
 
 ## What is unverified
 
-- **Everything on a Windows 11 PC** except the Defender read in P0: rights for the task files under a
-  limited token of an administrator account (the runner measured a standard account), how many entries an
-  ordinary gaming PC has in each place, their forms, and how often each rule would read `found`.
-- The cold cost of the signature checks, and of hashing a gaming PC's autostart files.
+- How often each rule reads `found` on gaming PCs other than the one measured, and what the one program
+  it matched there is.
+- Which file the elevated read was refused on the PC, and why.
+- The cold cost of the signature checks, and of hashing a PC's autostart files; the PC's times were not
+  controlled for the cache.
+- Which Rockstar products the 3 `InstallFolder*` values on the PC belong to.
 - Whether Windows starts a service's `ServiceDll` from exactly the value read here in every case, and
   whether the Service Control Manager and Explorer split an unquoted command line exactly as
   `CreateProcessW`'s documentation describes (the runner's 217 services resolved at the first word, which
   every reading agrees on).
 - How Defender expands a variable, or reads a wildcard, in an exclusion; whether exclusions set through
   device management appear under these keys (on the runner the registry and `Get-MpPreference` agreed).
-- Whether the task files and the Task Scheduler's own registration can disagree; on the runner the files
-  held 211 tasks and the COM API listed 209 elevated.
+- Whether the task files and the Task Scheduler's own registration can disagree; the files held 211 tasks
+  and the COM API listed 209 elevated on the runner, and 296 against 289 on the PC (`TaskCache\Tasks`
+  also 289).
 - What `TemporaryPaths` holds, and what `StartupApproved`'s bytes mean.
 
 ## Before any code
 
-1. **The PC measurement.** A read-only probe that prints only counts, forms and classes of path — no
-   value name, task name, path, signer, user name or argument — is prepared for the Windows 11 PC. It runs
-   the runner's measurement once elevated and once as the signed-in account's limited token, through a
-   scheduled task at `LIMITED` that it deletes, with its copied script and output, before it ends. It was
-   exercised on the runner above. Its results are added to this ADR.
+1. ~~The PC measurement~~ — done, "Measured on a Windows 11 PC (2026-09-30)".
 2. The owner's decisions below.
 3. Baselines: the `autostart` and `defender_exclusion` observations of `baseline-*` hosts are rebuilt from
    the collectors' own output on a runner, as `driver_service`'s were (ADR 0048), and
@@ -403,18 +481,28 @@ says Defender was told not to scan where FiveM keeps its files; it does not say 
 4. **Arguments.** (a) Never read into a report, as section 4 proposes; or (b) additionally, for the seven
    Windows script and library hosts only, resolve the first argument that is a drive-letter path to an
    existing file and describe that file — its path, hash and signature, never the argument text.
-   Recommended: (a) now, and (b) as its own change after the PC measurement shows how often it occurs on a
-   gaming PC.
+   Recommended: (a) now. The PC had 13 such actions, 7 naming a file, 1 of those outside `%SystemRoot%`;
+   (b) would add one described file there, so it stays a later change of its own.
 5. **Files under `%SystemRoot%`.** Option B of section 7 — not hashed or checked, reported by path — with a
-   30 s budget for the rest. Recommended: B.
+   30 s budget for the rest. Recommended: B, **with the reason restated after the PC**: there the files
+   under `%SystemRoot%` took 1.2 s of 3.0 s hashing (not cold), so cost alone would not decide it on that
+   PC; what does is that 201 of its 230 service DLLs there have no embedded signature, so checking them
+   says nothing a rule can use. The runner's cold 77.5 s is the case the budget is for.
 6. **The two rules, both `experimental`,** and a `rules/known-fps.csv` row for each on a baseline rebuilt
    from a runner: GitHub's provisioning agent for the first, the image's whole-drive exclusions for the
    second. The alternative is to leave those observations out of the baseline, which would describe a
    machine that no one measured. Recommended: the rows.
 7. **`defender_exclusion` as a second collector, reading paths, processes and extensions and counting IP
-   addresses, with `covers_fivem` against FiveM's three folders only.** Recommended: yes; the game folder
-   waits until where the game is installed is measured.
+   addresses, with `covers_fivem` against FiveM's three folders only.** Recommended: yes. The game folder
+   still waits, but the PC shows Rockstar's `InstallFolder*` values are a candidate source: a follow-up
+   probe that prints which Rockstar product keys hold them (product names, not personal data) would settle
+   it.
 8. **Both collectors in the `standard` tier.** Recommended: yes (section 10).
+9. **A task file refused to an elevated read** (1 of 296 on the PC). (a) A gap `access_denied` confined to
+   `task`, and the rule declares `access_denied` in `unmeasured_when`, so an ordinary PC shows it as a
+   count in SS mode rather than a row; or (b) the same gap, undeclared, so SS mode lists it on that PC.
+   A rule that matched is `found` either way. Recommended: (a), on the PC's evidence that an ordinary PC
+   produces it; new since the PC measurement.
 
 ## Consequences
 

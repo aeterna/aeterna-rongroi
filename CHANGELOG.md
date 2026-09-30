@@ -19,8 +19,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights
   only. Two `experimental` `posture` rules: a program that starts by itself with no valid embedded signature
   outside the Windows and Program Files folders, and an exclusion that covers a FiveM folder. The ADR
-  records a GitHub-hosted runner's measurement under an elevated and a standard account; the owner's
-  decisions are open.
+  records a GitHub-hosted runner's measurement under an elevated and a standard account, and a Windows 11
+  PC's under an elevated and a limited token; the owner's decisions are open.
 
 ### Changed
 - ADR 0059 is accepted (the owner decided its five questions on 2026-09-30); not implemented yet: what
