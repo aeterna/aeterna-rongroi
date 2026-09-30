@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 72820eaf-1469-4ea7-bb0f-17f145d26dfc
+title: A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders
+description: >-
+  Windows is set to start this program by itself — as a service that starts with the PC or on a
+  trigger, a Run or RunOnce value at sign-in, or an enabled scheduled task with a trigger — and its file
+  is outside the Windows folder and Program Files, and carries no embedded signature Windows trusts:
+  either none at all, or one that does not verify. The row shows where the entry is registered, the file's
+  path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads
+  here as having no embedded signature, because this program does not read catalogs. Files under the
+  Windows folder are not checked at all, and a program that starts from inside Program Files is not
+  shown by this rule. Arguments are never read, so this does not say what the program is given to run.
+  This says a program is set to start without being asked; it does not say what the program does, who
+  installed it, or that it ever ran.
+status: experimental
+collector: autostart
+strength: posture
+match:
+  starts_by_itself: true
+  signature: [no_embedded_signature, invalid]
+  path_kind: [program_data, user_profile, other]
+retention: >-
+  The services, Run and RunOnce values and scheduled tasks registered when the scan ran. An entry that
+  was removed before the scan is not seen, and a file that has changed since is read as it is now.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - Programs installed per user into AppData — launchers, chat and voice apps, cloud sync clients — and above all their updaters and helpers
+  - Peripheral, RGB, fan and overclocking utilities
+  - Service wrappers and servers installed from a package manager, such as NSSM from Chocolatey or an Apache web server
+  - Management and provisioning agents, such as a GitHub-hosted runner's own agent
+  - Open-source and self-built tools, which are often not signed
+  - A file signed through a Windows catalog, which this check does not read
+  - A Run entry switched off in Task Manager, which this program cannot tell from one that is on
+author: aeterna-rongroi contributors
+date: 2026-09-30
+tags: [autostart, posture]

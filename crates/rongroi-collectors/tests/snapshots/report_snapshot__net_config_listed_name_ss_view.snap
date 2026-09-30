@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 53
+      "rule_count": 54
     },
     "platform": "windows",
     "os_build": "26100",
@@ -28,6 +28,14 @@ expression: view
     "scan_tier": "standard"
   },
   "evidence": [
+    {
+      "rule_id": "72820eaf-1469-4ea7-bb0f-17f145d26dfc",
+      "collector": "autostart",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
     {
       "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
       "collector": "driver_service",
@@ -310,7 +318,7 @@ expression: view
   "listed": {
     "found": 4,
     "not_found": 10,
-    "unmeasured": 14
+    "unmeasured": 15
   },
   "hidden": {
     "not_found": 4,
@@ -378,6 +386,7 @@ expression: view
   "collector_order": [
     "posture",
     "driver_service",
+    "autostart",
     "fivem_dir",
     "fivem_servers",
     "net_config",

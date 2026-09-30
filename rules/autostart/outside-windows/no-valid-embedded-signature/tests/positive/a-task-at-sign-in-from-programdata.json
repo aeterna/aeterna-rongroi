@@ -1,0 +1,20 @@
+{
+  "description": "An enabled scheduled task with a logon trigger starts a program under ProgramData that has no embedded signature",
+  "observations": [
+    {
+      "collector": "autostart",
+      "fields": {
+        "location": "task",
+        "entry": "\\Vendor\\Agent",
+        "enabled": true,
+        "triggers": "logon",
+        "starts_by_itself": true,
+        "path": "C:\\ProgramData\\Vendor\\agent.exe",
+        "path_kind": "program_data",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

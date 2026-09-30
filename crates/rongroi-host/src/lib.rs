@@ -313,6 +313,15 @@ pub trait EnvironmentSource {
     fn env_var(&self, name: &str) -> Option<String>;
 }
 
+/// Read-only access to which account this program runs as (ADR 0060).
+pub trait AccountSource {
+    /// The SID of the account this process's token belongs to, as `S-1-…` text.
+    ///
+    /// A collector compares it — with a scheduled task's principal, to know whose profile variables a
+    /// command may use — and never reports it: a SID identifies one account on one machine.
+    fn account_sid(&self) -> Result<String, SourceError>;
+}
+
 /// What the running kernel reports about code integrity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeIntegrityOptions {
@@ -609,6 +618,7 @@ pub trait Host:
     + ProcessSource
     + BootTimeSource
     + UsnJournalSource
+    + AccountSource
 {
     /// Operating system family.
     fn platform(&self) -> Platform;
@@ -763,6 +773,14 @@ impl UsnJournalSource for NonWindowsHost {
     fn file_id(&self, _path: &str) -> Result<Option<FileId>, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows file identifiers on this platform".to_owned(),
+        ))
+    }
+}
+
+impl AccountSource for NonWindowsHost {
+    fn account_sid(&self) -> Result<String, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows account on this platform".to_owned(),
         ))
     }
 }

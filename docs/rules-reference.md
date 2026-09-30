@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 53 |
-| SHA-256 | `4525b0bd9cc62c769cf198bbba4b2bba2375a4ae55e34e303b50a044c63bd388` |
+| Rules | 54 |
+| SHA-256 | `fe8383f75796054ccea499c83a369c8872dd8ac5e0b7bc89ccf25f3fc359e335` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -41,6 +41,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 ## Contents
 
+- `autostart`
+  - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
 - `driver_service`
   - [A registered driver is on LOLDrivers' list of vulnerable drivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
@@ -111,6 +113,51 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [When Prefetch recorded a program named like FiveM or GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
   - `usn`
     - [When the change journal recorded changes in a watched folder](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+
+## Collector `autostart`
+
+### `autostart` / `outside-windows`
+
+<a id="rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc"></a>
+
+#### A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders
+
+- Id: `72820eaf-1469-4ea7-bb0f-17f145d26dfc`
+- File: [`rules/autostart/outside-windows/no-valid-embedded-signature/rule.yaml`](../rules/autostart/outside-windows/no-valid-embedded-signature/rule.yaml)
+- Collector: `autostart`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `autostart`, `posture`
+- Written: 2026-09-30
+
+**About this check**
+
+Windows is set to start this program by itself — as a service that starts with the PC or on a trigger, a Run or RunOnce value at sign-in, or an enabled scheduled task with a trigger — and its file is outside the Windows folder and Program Files, and carries no embedded signature Windows trusts: either none at all, or one that does not verify. The row shows where the entry is registered, the file's path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads here as having no embedded signature, because this program does not read catalogs. Files under the Windows folder are not checked at all, and a program that starts from inside Program Files is not shown by this rule. Arguments are never read, so this does not say what the program is given to run. This says a program is set to start without being asked; it does not say what the program does, who installed it, or that it ever ran.
+
+**Matches when all of these hold for one observation**
+
+- `path_kind`: is one of `program_data`, `user_profile`, `other` (text, ASCII case ignored)
+- `signature`: is one of `no_embedded_signature`, `invalid` (text, ASCII case ignored)
+- `starts_by_itself`: is `true`
+
+**Look-back**
+
+The services, Run and RunOnce values and scheduled tasks registered when the scan ran. An entry that was removed before the scan is not seen, and a file that has changed since is read as it is now.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Programs installed per user into AppData — launchers, chat and voice apps, cloud sync clients — and above all their updaters and helpers
+- Peripheral, RGB, fan and overclocking utilities
+- Service wrappers and servers installed from a package manager, such as NSSM from Chocolatey or an Apache web server
+- Management and provisioning agents, such as a GitHub-hosted runner's own agent
+- Open-source and self-built tools, which are often not signed
+- A file signed through a Windows catalog, which this check does not read
+- A Run entry switched off in Task Manager, which this program cannot tell from one that is on
 
 ## Collector `driver_service`
 

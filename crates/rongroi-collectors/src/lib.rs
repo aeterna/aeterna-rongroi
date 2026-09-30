@@ -5,6 +5,7 @@
 //! Collectors read one kind of artifact from a [`Host`] and report what they saw.
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
+pub mod autostart;
 pub mod bam;
 pub mod driver_service;
 pub mod evtx;
@@ -210,6 +211,7 @@ pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKi
 /// Every collector in this build.
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
+        Box::new(autostart::Autostart::default()),
         Box::new(bam::Bam),
         Box::new(driver_service::DriverService::default()),
         Box::new(evtx::Evtx::default()),

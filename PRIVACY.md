@@ -9,8 +9,9 @@ Prefetch and the Background Activity Moderator recorded about programs that ran,
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read, with no file name, and the settings that decide where network
 traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM, and what
-Windows says this installation is, with how the services Windows ships with are set to start, and
-whether six named places are on this PC.
+Windows says this installation is, with how the services Windows ships with are set to start,
+whether six named places are on this PC, and what Windows is set to start by itself — services, `Run`
+and `RunOnce` values and scheduled tasks — with the file each one starts.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -46,6 +47,31 @@ Of a driver registered with Windows it reads the name of its driver service, whe
 it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
 graphics card vendor, a VPN, a virtualisation product — because their drivers are registered. It does not
 read which drivers are loaded or what they do.
+
+Of **what Windows starts by itself** it reads three places (ADR 0060):
+
+- **Services** that are programs rather than drivers: each one's name, how it is set to start, whether it
+  starts on a trigger, and the file it runs — its `ServiceDll` when it has one.
+- **`Run` and `RunOnce`** under the machine's key, the machine's 32-bit key and your Windows account's
+  key: each value's name, and the file its command line starts. Other accounts' keys are not read.
+- **Scheduled tasks**, from the task files Windows keeps in `%SystemRoot%\System32\Tasks`: each task's
+  name and folder, whether it is on, which kinds of trigger start it (at start-up, at sign-in, on a
+  schedule, on an event), and the file each of its programs is. Windows lets only administrators read
+  these files, so a scan without administrator rights says it could not.
+
+**It never reads the arguments a program is given** — not even whether there were any: a command line is
+read only to find where the program's file ends, because arguments are where a token, a password or an
+address is passed to a program. Of a task it also never reads who made it, its description, its working
+folder or the account it runs as into the report; the account is compared with the one running this
+scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file **outside the Windows
+folder** it reads a SHA-256 and what Windows says about its embedded signature, as for FiveM's files;
+files inside the Windows folder are reported by their path alone. The list names software you
+installed — launchers, chat apps, peripheral and RGB utilities — because they set themselves to start.
+
+**In SS mode, the name of a `Run` value and of a scheduled task is never shown**: a task's name can
+carry your account's security identifier, and a `Run` value's name is whatever the program chose. The
+service's name, where the entry is registered, and the file it starts — with your user name hidden —
+are shown when a rule matches.
 
 Of the **network settings** it reads three things, and never a record of where traffic went: not which
 sites or servers you connected to, not the DNS cache, not the connections open now, not the firewall log,
@@ -223,6 +249,7 @@ or allow remote access.
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
 | A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
+| The name of a `Run` value or a scheduled task | shown | **not shown** |
 | What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, a separate choice that is off until you turn it on |
 | When Windows last started | shown | shown, as one time at the top of the report |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |

@@ -33,6 +33,8 @@ Every result is one of three things:
   to your Windows settings. **The CLI version does not use WebView2.**
 - No screenshots, no browser history, no remote access, and no record of where your PC connected: of the
   network it reads only the settings that decide where traffic goes (hosts file, proxy, firewall rules).
+- Of the programs Windows starts by itself (services, `Run`, scheduled tasks) it reads which file each one
+  starts, never the arguments it is given.
 - **A full scan reads more, and only if you say yes before it starts**: today, the names of FiveM for GTA V
   Enhanced's server cache folders. A flag or a script cannot say yes for you, and in SS mode a server's
   name stays hidden unless you agree to show it separately.

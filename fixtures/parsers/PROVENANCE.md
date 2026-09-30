@@ -18,6 +18,7 @@ parallel set of sample bytes to keep in step.
 | `bam/` | `bam::parse_value` | `crates/rongroi-parsers/src/bam.rs`, `tests/fixtures.rs` | `fuzz_bam`, and `fuzz_filetime` — a BAM value's first eight bytes are the `FILETIME` |
 | `pca-app-launch/` | `pca::parse_app_launch_dic` | `crates/rongroi-parsers/src/pca.rs`, `tests/fixtures.rs` | `fuzz_pca_app_launch` |
 | `pca-general/` | `pca::parse_general_db` | `tests/fixtures.rs` | `fuzz_pca_general` |
+| `task/` | `task::parse_task` | `crates/rongroi-parsers/src/task.rs`, `tests/fixtures.rs` | `fuzz_task` |
 | `usn/` | `usn::parse_buffer` | `crates/rongroi-parsers/src/usn.rs`, `tests/fixtures.rs` | `fuzz_usn` |
 
 ## What each file is
@@ -39,6 +40,11 @@ parallel set of sample bytes to keep in step.
 | `pca-general/normal.txt` | Two ordinary `\|`-delimited records |
 | `pca-general/field-count-varies.txt` | One line with more fields than any write-up describes and one with fewer |
 | `pca-general/malformed-lines.txt` | A good line and a line with no delimiter at all |
+| `task/logon-exec-utf16le.xml` | A task file as the Task Scheduler's own format describes it, written by hand: UTF-16 little-endian with a byte-order mark and CRLF lines, a logon and a calendar trigger, an invented account SID as the principal, and one `Exec` action whose command uses `%LOCALAPPDATA%` and which has an `Arguments` element the parser must never return. Not captured from a machine (ADR 0060) |
+| `task/boot-exec-utf8.xml` | A boot-triggered task in UTF-8 with no byte-order mark, running as `S-1-5-18`, with a quoted command |
+| `task/disabled-com-handler-utf16le.xml` | A disabled task whose one action is a COM handler, with a WNF state-change trigger |
+| `task/not-a-task.xml` | Well-formed XML whose root is not `Task` |
+| `task/truncated-utf16le.xml` | The first half of `logon-exec-utf16le.xml`: a file that ends inside an element |
 | `usn/three-version-3-records.bin` | A buffer as `FSCTL_READ_USN_JOURNAL` returns it: next USN 9000, then three 80-byte `USN_RECORD_V3` records named `ab`, two under one parent and one under another, with a create, a close with data extended, and a close with a delete. Written from Microsoft's documented layout (ADR 0047), not captured |
 | `usn/one-version-2-record.bin` | One 64-byte `USN_RECORD_V2` record, whose parent is a 64-bit index |
 | `usn/version-4-then-version-3.bin` | A version 4 record's header, which is skipped, then a version 3 record |

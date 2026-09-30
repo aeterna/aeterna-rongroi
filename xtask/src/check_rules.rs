@@ -245,8 +245,8 @@ impl Vocabulary {
     /// or in a fixture shows it. Since ADR 0030 every reason has a producer in some collector, so
     /// that half of the check is now entirely about which collector: `not_on_this_os` is `pca` and
     /// nothing else, `service_disabled` is `prefetch` and nothing else, `other_volume` is `usn` and
-    /// nothing else (ADR 0047, amendment of 2026-09-30), and `budget_spent` is `evtx`, `usn` and
-    /// `driver_service` and nothing else (ADR 0047, ADR 0048).
+    /// nothing else (ADR 0047, amendment of 2026-09-30), and `budget_spent` is `evtx`, `usn`,
+    /// `driver_service` and `autostart` and nothing else (ADR 0047, ADR 0048, ADR 0060).
     ///
     /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
     /// true for is one a view lists whatever the rule said, so declaring it is a suppression that
@@ -967,7 +967,9 @@ date: 2026-09-11
     /// this build, so no rule could declare either. ADR 0030 gave each one exactly one owner, and
     /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
     /// both spending the same 30-second-budget idea on two different sources), and ADR 0048 a third
-    /// (`driver_service`, spending it on hashing driver files). ADR 0047's amendment of 2026-09-30
+    /// (`driver_service`, spending it on hashing driver files), and ADR 0060 a fourth (`autostart`,
+    /// spending its own on hashing and checking the files that start by themselves). ADR 0047's
+    /// amendment of 2026-09-30
     /// added `other_volume`, whose one owner is `usn`: only it reads one drive's journal for folders
     /// that can be on another. This is what that means for the
     /// gate: each reason is usable only on the collector(s) that can actually report it. Asserted
@@ -987,7 +989,10 @@ date: 2026-09-11
         for (reason, owners) in [
             ("not_on_this_os", &["pca"] as &[&str]),
             ("service_disabled", &["prefetch"]),
-            ("budget_spent", &["driver_service", "evtx", "usn"]),
+            (
+                "budget_spent",
+                &["autostart", "driver_service", "evtx", "usn"],
+            ),
             ("not_attempted", &["evtx"]),
             ("other_volume", &["usn"]),
         ] {
@@ -1000,8 +1005,8 @@ date: 2026-09-11
                 }
                 assert!(
                     !reports(other.id(), reason),
-                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047 and \
-                     ADR 0048, names only {owners:?} as owners",
+                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
+                     ADR 0048 and ADR 0060, names only {owners:?} as owners",
                     other.id()
                 );
             }

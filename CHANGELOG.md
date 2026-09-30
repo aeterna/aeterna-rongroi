@@ -39,7 +39,21 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `partial`, endpoints as server identities hidden in SS mode, no plugin names) as undecided
   recommendations, and states the measurement that would reopen it. ADR 0052's row for this source says it
   is parked.
-- Accepted (ADR 0060), not implemented yet: an `autostart` collector for what Windows starts by itself —
+- The `autostart` collector: what Windows starts by itself (ADR 0060). Program services (`Type` `0x10` or
+  `0x20`), `Run` and `RunOnce` values under `HKLM`, its `WOW6432Node` view and `HKCU`, and every `Exec`
+  action of the scheduled tasks read from their XML files under `%SystemRoot%\System32\Tasks`, parsed by a
+  new `rongroi_parsers::task` (`quick-xml`, already in the lockfile) with a fuzz target. Each entry reports
+  where it is registered, whether it starts by itself, and the file it starts — its path, the kind of folder
+  it is in and, outside the Windows folder, its SHA-256 and embedded signature under a 30-second budget of
+  its own. **No argument is ever read into a report.** Without administrator rights the task files are
+  refused, which is `not_admin` for tasks alone; one file refused to an elevated read is an `access_denied`
+  gap for tasks alone. SS mode never shows a `Run` value's or a task's name (`view::SS_WITHHELD_FIELDS`).
+  One `posture` rule, `experimental`: a program that starts by itself has no valid embedded signature and is
+  outside the Windows and Program Files folders. The resolver's refusals are shared with `driver_service`,
+  whose behaviour is unchanged. A host reads this account's SID, compared with a task's principal and
+  never reported. The consent question, PRIVACY.md, both READMEs and both screenshare guides say what is
+  read.
+- Accepted (ADR 0060), the `autostart` half implemented above: an `autostart` collector for what Windows starts by itself —
   program services, `Run`/`RunOnce` under `HKLM`, its 32-bit view and `HKCU`, and scheduled tasks read from
   their files — with each file's path, SHA-256 and embedded signature, never a command line's arguments; and a
   `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights only.
