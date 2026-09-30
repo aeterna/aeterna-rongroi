@@ -206,7 +206,7 @@ const PROFILE_LIST: &str = r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\P
 /// Every reason there is no value — not Windows, absent, unreadable, another type, not expandable —
 /// is `None`: the view then redacts with the roots every machine has, and a reason would be a field
 /// nothing reads.
-fn profiles_directory(host: &dyn Host) -> Option<String> {
+pub(crate) fn profiles_directory(host: &dyn Host) -> Option<String> {
     if host.platform() != Platform::Windows {
         return None;
     }

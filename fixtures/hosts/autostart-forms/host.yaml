@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+#
+# What starts by itself, in each place `autostart` reads (ADR 0060): program services with an `ImagePath`
+# and a `ServiceDll`, a disabled one, a driver it must leave to `driver_service`; `Run` and `RunOnce`
+# values under `HKCU` and `WOW6432Node`; and scheduled task files, one running as this account with a
+# profile variable, one disabled, one of COM handlers only. Every command line carries arguments that
+# must never reach a report. Synthetic: names, paths, SIDs and hashes are invented.
+platform: windows
+elevated: true
+account_sid: S-1-5-21-1000000000-2000000000-3000000000-1001
+env:
+  SystemRoot: 'C:\Windows'
+  windir: 'C:\Windows'
+  ProgramFiles: 'C:\Program Files'
+  ProgramData: 'C:\ProgramData'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  USERNAME: fixtureuser
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\VendorSvc':
+    Type: 16
+    Start: 2
+    ImagePath: '"C:\ProgramData\Vendor\svc.exe" --background'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedSvc':
+    Type: 32
+    Start: 3
+    ImagePath: '%SystemRoot%\System32\svchost.exe -k netsvcs -p'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedSvc\Parameters':
+    ServiceDll: '%SystemRoot%\System32\shared.dll'
+  'HKLM\SYSTEM\CurrentControlSet\Services\SharedSvc\TriggerInfo': {}
+  'HKLM\SYSTEM\CurrentControlSet\Services\DisabledSvc':
+    Type: 16
+    Start: 4
+    ImagePath: 'C:\Program Files\Vendor\disabled.exe /silent'
+  'HKLM\SYSTEM\CurrentControlSet\Services\kbd':
+    Type: 1
+    Start: 3
+  'HKCU\Software\Microsoft\Windows\CurrentVersion\Run':
+    VendorTray: '%LOCALAPPDATA%\Vendor\tray.exe /silent'
+  'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce':
+    Setup32: '"C:\Program Files\Vendor\setup.exe" secret'
+filesystem:
+  'C:\ProgramData\Vendor':
+    - name: svc.exe
+      sha256: '1111111111111111111111111111111111111111111111111111111111111111'
+      signature:
+        state: no_embedded_signature
+  'C:\Windows\System32':
+    - name: svchost.exe
+    - name: shared.dll
+  'C:\Program Files\Vendor':
+    - name: disabled.exe
+      sha256: '2222222222222222222222222222222222222222222222222222222222222222'
+      signature:
+        state: valid
+        signer: Vendor Ltd
+        signer_cert_sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    - name: setup.exe
+      sha256: '3333333333333333333333333333333333333333333333333333333333333333'
+      signature:
+        state: invalid
+  'C:\Users\fixtureuser\AppData\Local\Vendor':
+    - name: tray.exe
+      sha256: '4444444444444444444444444444444444444444444444444444444444444444'
+      signature:
+        state: valid
+        signer: Vendor Ltd
+        signer_cert_sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  'C:\Users\fixtureuser\AppData\Local\Contoso\Updater':
+    - name: updater.exe
+      sha256: '5555555555555555555555555555555555555555555555555555555555555555'
+      signature:
+        state: valid
+        signer: Contoso Ltd
+        signer_cert_sha256: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  'C:\Windows\System32\Tasks':
+    - name: Vendor
+      directory: true
+    - name: Disabled
+      content: '<Task><Triggers><BootTrigger/></Triggers><Settings><Enabled>false</Enabled></Settings><Actions><Exec><Command>C:\Windows\System32\disabled.exe</Command><Arguments>secret</Arguments></Exec></Actions></Task>'
+    - name: ComOnly
+      content: '<Task><Triggers><LogonTrigger/></Triggers><Actions><ComHandler><ClassId>{00000000-0000-0000-0000-000000000001}</ClassId></ComHandler></Actions></Task>'
+  'C:\Windows\System32\Tasks\Vendor':
+    - name: Updater
+      from: ../../parsers/task/logon-exec-utf16le.xml

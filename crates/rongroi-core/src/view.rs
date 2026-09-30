@@ -16,9 +16,10 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 11] = [
+pub const COLLECTOR_ORDER: [&str; 12] = [
     "posture",
     "driver_service",
+    "autostart",
     "fivem_dir",
     "fivem_servers",
     "net_config",
@@ -30,12 +31,15 @@ pub const COLLECTOR_ORDER: [&str; 11] = [
     "usn",
 ];
 
-/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054).
+/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054, ADR 0060).
 ///
 /// A hosts line's address can name the player's own server; its kind, which `net_config` emits
 /// beside it as `address_kind`, is what separates a blocklist from a redirect and is what SS mode
-/// shows in its place (owner decision 2).
-pub const SS_WITHHELD_FIELDS: [(&str, &str); 1] = [("net_config", "address")];
+/// shows in its place (ADR 0054, owner decision 2). A scheduled task's path can carry an account SID,
+/// and a `Run` value's name is whatever the program chose, so `autostart`'s `entry` is withheld; the
+/// file it starts, its `path`, is shown and redacted like every path (ADR 0060, owner decision 3).
+pub const SS_WITHHELD_FIELDS: [(&str, &str); 2] =
+    [("net_config", "address"), ("autostart", "entry")];
 
 /// What SS mode shows in place of a server identity the player did not agree to show (ADR 0052).
 pub const SERVER_IDENTITY_PLACEHOLDER: &str = "%SERVER_IDENTITY%";
@@ -1514,6 +1518,45 @@ mod tests {
         assert!(fields(&ss, 1).contains_key("address"));
         let own = for_mode(&report, Mode::SelfCheck);
         assert_eq!(fields(&own, 0)["address"], "192.0.2.10");
+    }
+
+    /// A scheduled task's path or a `Run` value's name never reaches an SS view; the service's name,
+    /// where the entry is registered and the file it starts do, the file with the profile redacted
+    /// (ADR 0060, owner decision 3).
+    #[test]
+    fn ss_view_withholds_an_autostart_entry_and_keeps_its_file() {
+        let mut report = report();
+        report.evidence = vec![Evidence {
+            rule_id: "autostart".to_owned(),
+            collector: "autostart".to_owned(),
+            strength: Strength::Posture,
+            state: EvidenceState::Found {
+                observations: vec![Observation {
+                    collector: "autostart".to_owned(),
+                    fields: BTreeMap::from([
+                        ("location".to_owned(), serde_json::Value::from("task")),
+                        (
+                            "entry".to_owned(),
+                            serde_json::Value::from(r"\Updater-S-1-5-21-1-2-3-1001"),
+                        ),
+                        (
+                            "path".to_owned(),
+                            serde_json::Value::from(r"C:\Users\alex\AppData\Local\x.exe"),
+                        ),
+                    ]),
+                }],
+            },
+        }];
+        let fields = |view: &ReportView| match &view.evidence[0].state {
+            EvidenceState::Found { observations } => observations[0].fields.clone(),
+            state => panic!("expected a match, got {state:?}"),
+        };
+        let ss = fields(&for_mode(&report, Mode::Ss));
+        assert!(!ss.contains_key("entry"), "{ss:?}");
+        assert_eq!(ss["location"], "task");
+        assert_eq!(ss["path"], r"%USERPROFILE%\AppData\Local\x.exe");
+        let own = fields(&for_mode(&report, Mode::SelfCheck));
+        assert_eq!(own["entry"], r"\Updater-S-1-5-21-1-2-3-1001");
     }
 
     #[test]
