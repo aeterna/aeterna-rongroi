@@ -34,20 +34,56 @@ What is known about their contents was measured read-only on one Windows 11 PC (
 - The six endpoints and 34 of the URLs, hashed in 84 ways, matched none of the Enhanced server cache folder
   names (ADR 0055): an endpoint from a log cannot be joined to a `fivem_servers` folder.
 
-What was **not** measured: the shape of a log line (its prefix, whether it carries a time), which lines name
-the server the game joined as opposed to a web service it called, the file names and how FiveM rotates or
-deletes them, the largest file's size, the encoding, and whether the logs name plugins. FiveM does not
-document any of it, the Enhanced client is not in FiveM's public source (ADR 0055), and every one of these
-can change with any FiveM update. This ADR therefore decides the boundaries — which files, what leaves the
-parser, what SS mode shows — and leaves the line templates to a measurement that has to come first
-(section 8).
+FiveM does not document its log format, the Enhanced client is not in FiveM's public source (ADR 0055),
+and the format can change with any FiveM update. This ADR therefore decides the boundaries — which files,
+what leaves the parser, what SS mode shows — and takes the line templates from measurement (section 8).
+
+## Measured 2026-09-30 on a Windows 11 PC (build 26220)
+
+Read-only, with the owner's permission, from a PowerShell probe that printed counts, masked file-name shapes
+and masked line shapes only — no host, address, URL, path, user name or line text. It ran once with an
+elevated token and once with a limited one, and **both printed the same results**, so reading these folders
+needs no administrator rights. No FiveM process was running. The probe and its output are not in this
+repository.
+
+| | Legacy `logs` | Enhanced `logs` |
+|---|---|---|
+| Files | 3, all `.log` | 37, all `.log`, no archives |
+| File names (digits masked) | `CitizenFX_log_9999-99-99T999999.log` | four families: `fivem-launcher-<date>_<time>.log` (11), `fivem-for-gtav-enhanced.log-<date>_<time>.log` (11), `cef-<date>_<time>.log` (11), `installer-<date>_<time>.log` (4) |
+| Written | 2026-09-07 to 2026-09-13 | 2026-09-06 to 2026-09-30, a span of 24 days |
+| Sizes | 76,154 to 76,873 bytes; 229,188 in total | 122 to 174,204 bytes, median 25,778; 1,286,926 in total |
+| Lines, longest line | 945; 2,198 characters | 13,747; 277 characters |
+| Line endings | CRLF on every line | CRLF on 11,818 lines, LF alone on 1,929 |
+| Line prefix | every line begins with a bracketed tick count and a bracketed process tag, `[     99999] [a9999_aaaaaaaa]` in shape; 31 lines also hold a `9999-99-99` date | 11,818 lines begin with a bracketed clock time and a bracketed level, `[99-99-9999 99:99:99] [    aaaa]` in shape; 88 lines have a Chromium-style prefix, `[9999/999999.999:aaaa:...`; the rest have none |
+| Time in the file name | 7 hours (25,200 to 25,204 s) from the file's creation time | within 1 s of the file's creation time |
+
+In every file read: no byte-order mark, no NUL byte, no invalid UTF-8; no file above 64 MiB, the largest
+174,204 bytes. No text in the shape of an account identifier (`license:`, `license2:`, `steam:`,
+`discord:`, `fivem:`, `xbl:`, `live:` or `ip:` followed by an identifier) and no e-mail address in any log;
+the Windows user name in no line. Lines holding a drive path: 64 Legacy (24 under `\Users\`) and 81 Enhanced
+(all 81 under `\Users\`). Lines naming a `.dll`: 3 Legacy, 8 Enhanced; naming an `.asi`: none. The newest
+log, last written 12 minutes before, opened for reading while sharing read, write and delete.
+
+Beside the log folders: Legacy's `FiveM.app` folder holds `cef_console.txt` (6 lines, LF, Chromium-style
+prefix), the Legacy `crashes` folder 5 `.gamelog` files, and `%APPDATA%\CitizenFX`'s `kvs` folders a `.log`
+file each; this collector reads none of them (section 1).
+
+**Endpoints: open, pending a second probe.** The probe counted `host:port` text outside URLs and found none in
+any file, against six distinct `host:port` values across 37 files on 2026-09-16. Its pattern did not count a
+host inside a URL, and there were 112 lines with a URL in Enhanced's logs and 3 in Legacy's, 3 Legacy lines
+with an IPv4 address and no port, and 3,704 Enhanced lines containing "Downloading", 22 of them with "for"
+later on the line. A second probe counts hosts inside URLs by scheme and host class and prints the templates
+of those lines and of the "Downloading" lines with every host and path masked. Until it has run, which lines
+name a server, and whether a server's endpoint is in these logs at all, is not established.
 
 ## Decision
 
 ### 1. A collector, `fivem_logs`, in the full tier
 
 It reads the two folders above and nothing else: one listing of each, then each `.log` file directly inside
-it. No subfolder, no other extension, no other FiveM folder. Not the `.gamelog` files beside the crash dumps
+it whose name has a measured family's shape (Legacy `CitizenFX_log_…`; which of Enhanced's four families
+carry endpoints is decided by the second probe, and `cef-` and `installer-` files are not read unless it
+shows they name servers — a CEF log can name the web pages the game's interface opened). No subfolder, no other extension, no other FiveM folder. Not the `.gamelog` files beside the crash dumps
 (ADR 0053 measured them to name no `.dll`; they are not logs of connections), not `%APPDATA%\CitizenFX`'s
 `kvs` (it held no host or URL), and never the NUI or CEF storage, which held text in the shape of a token
 and which `crates/rongroi-collectors/AGENTS.md` and ADR 0052 section 5 put out of reach whatever the player
@@ -60,8 +96,9 @@ folder's observations (ADR 0044).
 A file is read with `FilesystemSource::read_file` (ADR 0019), which opens it for reading only and never
 truncates. FiveM may hold the newest log open for writing while the scan runs; the standard library opens a
 file sharing read, write and delete by default, so the read neither blocks FiveM nor is blocked by it —
-per the standard library's source, to be re-read for the pinned toolchain when this is built, and measured
-by the probe (section 8). The last line of a file being written may be cut short; the parser treats it as
+per the standard library's source, to be re-read for the pinned toolchain when this is built. The newest log
+opened that way on the PC measured, but with no FiveM process running; a read while FiveM writes is not
+measured. The last line of a file being written may be cut short; the parser treats it as
 any other line.
 
 ### 2. Limits
@@ -69,7 +106,7 @@ any other line.
 Every log lives on the machine under examination, so its size and number are chosen by whoever put them
 there.
 
-- **Per file:** `read_file`'s 64 MiB bound. A larger file is not truncated and not range-read; it is
+- **Per file:** `read_file`'s 64 MiB bound; the largest log measured was 174,204 bytes. A larger file is not truncated and not range-read; it is
   counted in `files_too_large` and makes its place `partial` (section 4). A range read is ADR 0052's open
   question for crash dumps and would be its own ADR; logs get one only if a measurement shows ordinary
   logs above the bound.
@@ -124,11 +161,14 @@ and one observation per distinct endpoint per place:
 | `files`, `lines` | number | how many files read, and how many recognised lines, named it |
 | `earliest_created_at`, `latest_modified_at` | timestamp | the earliest creation time and the latest last-write time among the files that named it |
 
-The times are **the files' times from the listing** (ADR 0050), not a time taken from a line. Whether a line
-carries a time of its own, and whether it is a clock time or a tick count since the process started, is not
-known; a time computed from an unmeasured format would be a claim this program cannot support. If the
-measurement shows a clock time on connect lines, adding a per-endpoint time from it is an amendment to this
-ADR, not an implementation choice. The bounds say "a log file created no earlier than this and last written
+The times are **the files' times from the listing** (ADR 0050), not a time taken from a line. Legacy lines
+carry a tick count, not a clock time, and the time in a Legacy file name was 7 hours from its creation time
+on the PC measured, which suggests the name is written in UTC — the PC's offset from UTC was not recorded, so
+that is unverified. Enhanced lines carry a clock time, but whether its date is day-first or month-first and
+which time zone it is in are not measured, and whether the lines that name a server carry it is pending the
+second probe. A time computed from an unmeasured format would be a claim this program cannot support; if the
+second probe settles those points, a per-endpoint time from Enhanced lines is an amendment to this ADR, not
+an implementation choice. The bounds say "a log file created no earlier than this and last written
 no later than this named the endpoint", which ADR 0050 section 3's text already frames as times the file
 system reports.
 
@@ -222,7 +262,9 @@ Ordinary causes the rule text and the view state beside these observations:
 
 Nothing is implemented until the format is measured. The measurement, read-only on a real PC with the
 owner's permission, prints counts and shapes only, never a host, an address, a URL, a user name or a line's
-text:
+text. The first probe (2026-09-30, "Measured" above) covered the files, the encoding, the prefixes and the
+counts; the second covers the endpoint templates, hosts inside URLs by scheme and host class, IPv4 addresses
+without a port, the "Downloading" lines, the Enhanced date order and the time zone. Together they measure:
 
 - the log file names' shapes, counts, sizes and age range, per edition, and whether FiveM keeps a fixed
   number of files or deletes them by age;
@@ -283,15 +325,18 @@ only when the player agrees to show server identities, and a server on the playe
 
 ## What is unverified
 
-- Every line template, the line prefix, whether a line carries a time, and which lines name the joined server
-  rather than a service the client called. The Enhanced "Downloading … for `<host>`" line is known to exist;
+- Which lines name a server at all, their templates, and which name the joined server rather than a service
+  the client called (the second probe).
+- The day and month order and the time zone of Enhanced's line times; that a Legacy file name's time is UTC. The Enhanced "Downloading … for `<host>`" line is known to exist;
   whether its host is the server joined is not.
 - Whether a server only browsed in the server list, not joined, leaves an endpoint in the logs.
-- Log file names, how many FiveM keeps, and when it deletes them, in either edition (also ADR 0053).
-- The largest log file on an ordinary PC, and so whether the 64 MiB bound is ever reached.
-- The encoding of the files.
-- Whether the logs name plugins, or the Windows user name in paths.
-- Whether the newest log opens for reading while FiveM writes it.
+- How many log files FiveM keeps and when it deletes them, in either edition (also ADR 0053): the PC measured
+  held 11 of each main Enhanced family over 24 days and 3 Legacy files over 6 days, which is one sample.
+- Whether the folder under `\Users\` in 105 log lines is the player's profile folder (the Windows user name
+  was in none of them); nothing from a path is emitted, but a later field that did would need ADR 0049's
+  redaction.
+- Which programs the 11 lines naming a `.dll` name; no plugin name is collected (section 6).
+- Whether the newest log opens for reading while FiveM is running and writing it.
 - Whether any of this holds on another FiveM version; the format is expected to change with updates, and
   `files_unrecognised` is how a report says it did.
 
@@ -307,11 +352,14 @@ only when the player agrees to show server identities, and a server on the playe
    and 256 MiB per place, and a wall-clock budget set from a measurement (section 2).
 4. **Plugin names.** Recommendation: not collected by this collector (section 6).
 5. **Times.** Recommendation: the files' creation and last-write bounds per endpoint, not a time parsed from
-   a line, until a measurement shows a clock time on connect lines (section 3).
+   a line, until the second probe shows which lines name a server and the Enhanced clock time's date order
+   and time zone are established (section 3).
 6. **Rules.** Recommendation: one `context`/`experimental` rule listing endpoints and one timeline selector;
    no rule on an endpoint's value and none on an empty folder (section 7).
-7. **The measurement first.** Recommendation: run the read-only probe described in section 8 on the Windows
-   11 PC before any code, and put the measured templates into this ADR when it is accepted.
+7. **The measurement first.** The first probe ran on 2026-09-30 (above). Recommendation: run the second probe
+   before any code, and put the measured templates into this ADR when it is accepted.
+8. **Which Enhanced families are read.** Recommendation: only those the second probe shows naming a server;
+   `cef-` and `installer-` files not read otherwise (section 1).
 
 ## Consequences
 
