@@ -512,7 +512,7 @@ describe("App", () => {
     expect(statements[0]?.textContent).toContain("not a finding about this PC");
   });
 
-  // Each of the twelve reasons reaches a reader as a sentence, never as its identifier: a row
+  // Each of the fourteen reasons reaches a reader as a sentence, never as its identifier: a row
   // reading `source_empty` is a row that says nothing to the person it is about (ADR 0030).
   it.each([
     ["not_on_this_os", "this version of Windows does not keep this record"],
@@ -523,6 +523,7 @@ describe("App", () => {
     ["partial", "part of this was read and part of it was not"],
     ["budget_spent", "this program stopped reading before it finished"],
     ["not_consented", "only a full scan reads this, and this was the standard scan"],
+    ["other_volume", "this is on another drive, and this program reads only the system drive"],
   ])("shows %s as a sentence a non-expert reads", async (reason, sentence) => {
     const first = selfView.evidence[0];
     if (!first) {
@@ -547,6 +548,37 @@ describe("App", () => {
     fireEvent.click(await screen.findByText("Check my own PC"));
     fireEvent.click(await screen.findByText(/^Check: /));
     expect(await screen.findByText(new RegExp(sentence))).toBeTruthy();
+  });
+
+  // A count the change journal gives is for the span it still held; the row says that span, and a
+  // source that held no record says there was none (ADR 0047, amendment of 2026-09-30).
+  it.each([
+    [
+      { state: "span", from: "2026-09-30T10:24:00Z", to: "2026-09-30T11:03:00Z" },
+      /held only 2026-09-30T10:24:00Z to 2026-09-30T11:03:00Z/,
+    ],
+    [{ state: "no_span" }, /so there is no span/],
+  ] as const)("shows the span a row's count is for (%o)", async (band, sentence) => {
+    const first = selfView.evidence[0];
+    if (!first) {
+      throw new Error("the self-view snapshot has no evidence");
+    }
+    viewOverride = {
+      ...selfView,
+      evidence: [
+        {
+          rule_id: first.rule_id,
+          collector: first.collector,
+          strength: first.strength,
+          state: "found",
+          observations: [],
+        },
+      ],
+      row_bands: { [first.rule_id]: band },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText(sentence)).toBeTruthy();
   });
 
   // The third scope statement: which scan the player chose is one fact about the scan (ADR 0052).

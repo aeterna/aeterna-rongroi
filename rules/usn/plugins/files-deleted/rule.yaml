@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 91dc8b45-8355-4554-8a6d-e979e4a95ecd
+title: The change journal holds a deletion in FiveM's plugin folder
+description: >-
+  The NTFS change journal holds at least one record of a file deleted directly inside FiveM for GTA V
+  Legacy's plugin folder. The row gives how many records, and the first and last time. It shows the
+  span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before
+  that span is seen. If this rule finds nothing, it means only that nothing was deleted there within
+  that span. The journal does not record which program changed a file, so this does not say who did it,
+  or that anything was hidden.
+status: experimental
+collector: usn
+# ADR 0047, amendment of 2026-09-30: `context`, so a `not_found` is counted in SS mode, never listed.
+strength: context
+match:
+  location: plugins
+  folder: identified
+  deleted|gte: 1
+retention: >-
+  Only the span the change journal still held when the scan read it, shown beside this row. The journal
+  keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+# `not_admin` is a scope statement and never a row; `access_denied` is not declared, because the folder
+# is in the player's own profile and a denial there is unexpected (ADR 0047, amendment of 2026-09-30).
+unmeasured_when: [not_windows, source_absent, other_volume]
+falsepositives:
+  - The player removed or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+  - FiveM or its updater replaced or removed a file in the folder (not measured for this folder)
+  - A clean-up, "clear FiveM cache" or optimiser tool that empties FiveM's folders
+  - Antivirus software quarantining or removing a file
+  - FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not
+    counted at all, so this can also remove a row that would otherwise be here
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records
+  - https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3
+author: aeterna-rongroi contributors
+date: 2026-09-30
+tags: [usn, plugins]

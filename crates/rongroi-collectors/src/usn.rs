@@ -13,8 +13,10 @@
 //! across two reports (ADR 0021).
 //!
 //! Records are counted, never listed. A count of deletions is not evidence of cleaning: Prefetch keeps
-//! a bounded number of files and removes the rest itself, and a player removes a `ReShade` preset. No rule
-//! reads this collector (ADR 0047, "Rules").
+//! a bounded number of files and removes the rest itself, and a player removes a `ReShade` preset. The
+//! only rules on this collector read the deletions and renames in `FiveM`'s two plugin folders, as
+//! `context` (ADR 0047, amendment of 2026-09-30); no rule reads the Prefetch, Event Log or Program
+//! Compatibility Assistant counts.
 //!
 //! A version 3 record is attributed to a folder by its 128-bit identifier, which ADR 0047 measured on a
 //! GitHub-hosted runner. A version 2 record is attributed by the folder's 64-bit index, which was not
@@ -24,7 +26,9 @@
 //! volume: this collector reads the system volume's own identifier once, from its root (`X:\`), and a
 //! watched folder whose identifier names a different volume — the shape a junction to another drive
 //! produces — is reported `other_volume` rather than counted, because its number could otherwise collide
-//! with an unrelated file's on the volume the journal belongs to.
+//! with an unrelated file's on the volume the journal belongs to. Its fields are a gap with the reason
+//! of the same name, for that place alone (ADR 0044): nothing failed, and no second volume's journal is
+//! read (ADR 0047, amendment of 2026-09-30, owner decisions 1 and 2).
 //!
 //! This program's own launch writes a Prefetch record where Prefetch is on, and the Prefetch counts
 //! include it: a count carries neither a path nor a SHA-256 for ADR 0010 to separate it by.
@@ -95,7 +99,7 @@ const COUNTED: [&str; 9] = [
     "renamed",
 ];
 
-static REASONS: [UnmeasuredReason; 7] = [
+static REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
@@ -103,6 +107,7 @@ static REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::Partial,
     UnmeasuredReason::BudgetSpent,
     UnmeasuredReason::ReadFailed,
+    UnmeasuredReason::OtherVolume,
 ];
 
 /// One folder this collector counts records for.
@@ -504,13 +509,11 @@ impl Tally {
                     "folder".to_owned(),
                     serde_json::Value::from(FOLDER_OTHER_VOLUME),
                 );
-                // Not `not_attempted`: that reason's fixed wording ("this was not read — the scan
-                // stopped before reaching it") and its scope-statement handling in `rongroi-core::view`
-                // both say this program stopped short of something it otherwise would have reached.
-                // A folder on another volume was never reachable from the one journal this collector
-                // reads at all — `folder: other_volume` already says why — so this is a read this
-                // collector could not do, `read_failed`, not one it deferred.
-                Some(UnmeasuredReason::ReadFailed)
+                // Not `not_attempted`, whose words say the scan stopped before reaching it, and not
+                // `read_failed`, which SS mode always lists and no rule may declare: nothing failed.
+                // This collector reads the system volume's journal alone, by design, and the folder
+                // was never within it (ADR 0047, amendment of 2026-09-30, decision 1).
+                Some(UnmeasuredReason::OtherVolume)
             }
         };
         (
@@ -714,9 +717,11 @@ mod tests {
             reason(PREFETCH_LOCATION),
             Some(UnmeasuredReason::AccessDenied)
         );
+        // Its own reason, declarable, and not `read_failed`: nothing failed (ADR 0047, amendment of
+        // 2026-09-30).
         assert_eq!(
             reason(fivem_dir::PLUGINS_LOCATION),
-            Some(UnmeasuredReason::ReadFailed)
+            Some(UnmeasuredReason::OtherVolume)
         );
         assert_eq!(
             reason(fivem_dir::ENHANCED_ASI_LOCATION),
@@ -741,7 +746,7 @@ mod tests {
             .iter()
             .find(|gap| gap.value == fivem_dir::PLUGINS_LOCATION)
             .map(|gap| gap.gaps["records"]);
-        assert_eq!(reason, Some(UnmeasuredReason::ReadFailed));
+        assert_eq!(reason, Some(UnmeasuredReason::OtherVolume));
 
         let prefetch = at(observations, PREFETCH_LOCATION);
         assert_eq!(prefetch.fields["folder"], FOLDER_IDENTIFIED);

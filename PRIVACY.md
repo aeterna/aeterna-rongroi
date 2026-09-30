@@ -119,6 +119,13 @@ a file, and when the oldest and newest of that folder's records were written. **
 changed on the drive, and the program's parser skips the name without keeping it. It reports no journal
 identifier and no file number, because each would identify your PC across two reports.
 
+**Four rules read the deletions and renames of FiveM's two plugin folders** (ADR 0047, amendment of
+2026-09-30). When one matches, SS mode shows that folder's counts and the time of its first and last
+record, beside the span the journal held — still no file name, because none was read. The journal does not
+say which program deleted or renamed a file, and the row says so. The counts of the Prefetch, event log and
+Program Compatibility Assistant folders are read by no rule. A FiveM folder on another drive is not
+counted at all: the report says it is on another drive, and no other drive's journal is read.
+
 Of the machine's security settings it also reads two more (ADR 0038). One is what the PC's **firmware**
 itself says about Secure Boot, beside what Windows says — one on/off value, nothing that names a person.
 Windows only lets a program read a firmware value with a special permission that administrators hold, so

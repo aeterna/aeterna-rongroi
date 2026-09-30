@@ -11,7 +11,7 @@ use rongroi_core::bundle::Bundle;
 use rongroi_core::model::{
     BootTime, EvidenceState, Mode, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
 };
-use rongroi_core::view::{EntrySource, ReportView, Timeline};
+use rongroi_core::view::{EntrySource, ReportView, RowBand, Timeline};
 
 /// Output language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -196,6 +196,23 @@ fn text_timeline(lang: Lang, key: &str) -> &'static str {
         (Lang::Th, "selectors") => "ความหมายของเวลาที่ถูกเลือกมาแสดง",
         (Lang::En, "selector_causes") => "Ordinary things behind these times",
         (Lang::Th, "selector_causes") => "เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้",
+        // The span a row's count is for, beside the row (ADR 0047, amendment of 2026-09-30).
+        (Lang::En, "row_band_found") => {
+            "The source held only {from} to {to} when it was read; what is counted here is from that span."
+        }
+        (Lang::Th, "row_band_found") => "ตอนที่อ่าน แหล่งนี้มีข้อมูลแค่ช่วง {from} ถึง {to} สิ่งที่นับได้ที่นี่มาจากช่วงนี้",
+        (Lang::En, "row_band_not_found") => {
+            "Nothing within this span: {from} to {to}, what the source held when it was read. Nothing \
+             before it was seen."
+        }
+        (Lang::Th, "row_band_not_found") => {
+            "ไม่มีอะไรในช่วงนี้: {from} ถึง {to} ซึ่งเป็นช่วงที่แหล่งนี้มีข้อมูลตอนที่อ่าน ก่อนหน้านั้นมองไม่เห็นเลย"
+        }
+        (Lang::En, "row_band_none") => {
+            "The source held no record when it was read, so there is no span in which anything could \
+             be seen."
+        }
+        (Lang::Th, "row_band_none") => "ตอนที่อ่าน แหล่งนี้ไม่มี record เลย จึงไม่มีช่วงที่จะเห็นอะไรได้",
         _ => "",
     }
 }
@@ -236,7 +253,7 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
 ///
 /// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
 /// name the thing that was not seen and never the person, and say it about the record or about this
-/// program rather than about the machine's owner. The same twelve strings are in
+/// program rather than about the machine's owner. The same fourteen strings are in
 /// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
 /// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
 /// `check-locales` there.
@@ -283,6 +300,13 @@ fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
         }
         (Lang::Th, UnmeasuredReason::NotConsented) => {
             "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน"
+        }
+        // One drive's journal is read, by design, so nothing failed (ADR 0047, amendment of 2026-09-30).
+        (Lang::En, UnmeasuredReason::OtherVolume) => {
+            "this is on another drive, and this program reads only the system drive's change journal"
+        }
+        (Lang::Th, UnmeasuredReason::OtherVolume) => {
+            "ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น"
         }
     }
 }
@@ -618,6 +642,9 @@ fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         if !detail.is_empty() {
             let _ = writeln!(out, "    {detail}");
         }
+        if let Some(band) = view.row_bands.get(&evidence.rule_id) {
+            let _ = writeln!(out, "    {}", row_band_line(band, &evidence.state, lang));
+        }
         // What the rule means and what it does not prove, beside every state; what legitimately
         // produces the same evidence, beside a match only. Both are mandatory in every rule and
         // neither reached a screen before (ADR 0027).
@@ -641,6 +668,21 @@ fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         }
     }
     out
+}
+
+/// The span a row's count is for, in the words its state needs (ADR 0047, amendment of 2026-09-30).
+fn row_band_line(band: &RowBand, state: &EvidenceState, lang: Lang) -> String {
+    match band {
+        RowBand::Span { from, to } => {
+            let key = if matches!(state, EvidenceState::NotFound { .. }) {
+                "row_band_not_found"
+            } else {
+                "row_band_found"
+            };
+            text(lang, key).replace("{from}", from).replace("{to}", to)
+        }
+        RowBand::NoSpan => text(lang, "row_band_none").to_owned(),
+    }
 }
 
 /// The timeline: its note, the spans the sources could show, what could not be read, the times, and
@@ -1285,6 +1327,52 @@ mod tests {
         for cause in &rule.falsepositives {
             assert!(!text.contains(cause), "{text}");
         }
+    }
+
+    /// A row whose count is for a span says the span beside it, in the words its state needs, in
+    /// both languages; a source that held no record says there was no span (ADR 0047, amendment of
+    /// 2026-09-30, decision 3).
+    #[test]
+    fn a_row_with_a_band_says_the_span_its_count_is_for() {
+        let (mut report, bundle) = report(false);
+        let rule = subject(&bundle).clone();
+        let band = RowBand::Span {
+            from: "2026-09-30T10:24:00Z".to_owned(),
+            to: "2026-09-30T11:03:00Z".to_owned(),
+        };
+        let found = {
+            let mut view = view::for_mode(&report, Mode::SelfCheck);
+            view.row_bands.insert(rule.id.clone(), band.clone());
+            render(&view, &bundle, Lang::En)
+        };
+        assert!(
+            found.contains(
+                "The source held only 2026-09-30T10:24:00Z to 2026-09-30T11:03:00Z when it was read"
+            ),
+            "{found}"
+        );
+
+        report.evidence[0].state = EvidenceState::NotFound {
+            retention: rule.retention.clone(),
+        };
+        let mut view = view::for_mode(&report, Mode::SelfCheck);
+        view.row_bands.insert(rule.id.clone(), band);
+        let english = render(&view, &bundle, Lang::En);
+        assert!(
+            english
+                .contains("Nothing within this span: 2026-09-30T10:24:00Z to 2026-09-30T11:03:00Z"),
+            "{english}"
+        );
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(
+            thai.contains("ไม่มีอะไรในช่วงนี้: 2026-09-30T10:24:00Z"),
+            "{thai}"
+        );
+
+        view.row_bands.insert(rule.id.clone(), RowBand::NoSpan);
+        let none = render(&view, &bundle, Lang::En);
+        assert!(none.contains("so there is no span"), "{none}");
+        assert!(!none.contains("Nothing within this span"), "{none}");
     }
 
     /// Two rules that could not be measured for want of administrator rights are one fact about the

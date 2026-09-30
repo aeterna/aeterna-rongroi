@@ -5,12 +5,14 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { withKeys } from "../keys";
-import type { Evidence, Observation, RuleFiles, RuleText } from "../types";
+import type { Evidence, Observation, RowBand, RuleFiles, RuleText } from "../types";
 import { CodeLink } from "./CodeLink";
 
 interface Props {
   item: Evidence;
   text: RuleText | undefined;
+  /** The span this row's count is for, from the core, when it has one (ADR 0047, amendment of 2026-09-30). */
+  band?: RowBand | undefined;
   /** `https://…/blob/<commit>` for an official build, `null` otherwise. */
   fileBase: string | null;
   /** `https://…/tree/<commit>` for an official build, `null` otherwise. */
@@ -30,6 +32,7 @@ interface Props {
 export function EvidenceRow({
   item,
   text,
+  band,
   fileBase,
   treeBase,
   linksKnown,
@@ -76,6 +79,7 @@ export function EvidenceRow({
             </p>
           )}
           <Meaning item={item} text={text} />
+          {band && <Band item={item} band={band} />}
           <button
             type="button"
             className="disclosure"
@@ -128,6 +132,19 @@ function Meaning({ item, text }: { item: Evidence; text: RuleText | undefined })
     case "unmeasured":
       return <p className="detail">{t(`reason.${item.reason}`)}</p>;
   }
+}
+
+/**
+ * The span the row's count is for, beside it: a count the change journal gives is for the span it
+ * still held, and without the span "nothing deleted" reads as "nothing was ever deleted".
+ */
+function Band({ item, band }: { item: Evidence; band: RowBand }) {
+  const { t } = useTranslation("report");
+  if (band.state === "no_span") {
+    return <p className="detail">{t("row_band.none")}</p>;
+  }
+  const key = item.state === "not_found" ? "row_band.not_found" : "row_band.found";
+  return <p className="detail">{t(key, { from: band.from, to: band.to })}</p>;
 }
 
 function Technical({

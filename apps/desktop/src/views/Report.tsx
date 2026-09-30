@@ -14,6 +14,7 @@ import type {
   Mode,
   Observation,
   ReportView,
+  RowBand,
   RuleText,
   SsOptions,
 } from "../types";
@@ -144,6 +145,7 @@ export function Report({ mode, options, onBack }: Props) {
           key={group.collector}
           group={group}
           texts={texts}
+          bands={view.row_bands ?? {}}
           fileBase={fileBase}
           treeBase={treeBase}
           linksKnown={linksKnown}
@@ -226,6 +228,7 @@ export function Report({ mode, options, onBack }: Props) {
 function Group({
   group,
   texts,
+  bands,
   fileBase,
   treeBase,
   linksKnown,
@@ -235,6 +238,7 @@ function Group({
 }: {
   group: EvidenceGroup;
   texts: Record<string, RuleText>;
+  bands: Record<string, RowBand>;
   fileBase: string | null;
   treeBase: string | null;
   linksKnown: boolean;
@@ -257,6 +261,7 @@ function Group({
       key={item.rule_id}
       item={item}
       text={texts[item.rule_id]}
+      band={bands[item.rule_id]}
       fileBase={fileBase}
       treeBase={treeBase}
       linksKnown={linksKnown}

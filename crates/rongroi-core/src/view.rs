@@ -4,7 +4,7 @@
 
 //! What a Self or SS view may show. Privacy is decided here, not in the UI (AGENTS.md hard rule 5).
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -176,6 +176,34 @@ pub struct ReportView {
     /// [`COLLECTOR_ORDER`], so the desktop groups rows in the order the core orders the timeline.
     #[serde(default)]
     pub collector_order: Vec<String>,
+    /// The span each listed `found` or `not_found` row's count is for, by rule id: the coverage band
+    /// of the place its collector's coverage names — for `usn`, the journal (ADR 0047, amendment of
+    /// 2026-09-30, decision 3). Built here so the CLI and the desktop cannot disagree, in both modes.
+    /// Additive; the report schema stays at 1.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub row_bands: BTreeMap<String, RowBand>,
+}
+
+/// The span one row's count is for (ADR 0047, amendment of 2026-09-30, decision 3).
+///
+/// A count the change journal gives is a count for the span it still held when the scan read it — on
+/// one Windows 11 PC, 39 minutes — and nothing older. Shown without that span, "nothing deleted" reads
+/// as "nothing was ever deleted". A `found` row carries it beside its own place's first and last time,
+/// which are that place's records and not the span; a `not_found` row carries it as "nothing within
+/// this span". An `unmeasured` row has none: when the read did not finish the span is not what the
+/// counts cover, and when it never started there is none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum RowBand {
+    /// The oldest and newest record the source held.
+    Span {
+        /// The oldest time the source holds.
+        from: String,
+        /// The newest.
+        to: String,
+    },
+    /// The source was read and held no record, so there is no span, rather than a missing one.
+    NoSpan,
 }
 
 /// Where a timeline entry came from (ADR 0051).
@@ -364,6 +392,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             hidden: HiddenCounts::default(),
             timeline: timeline_of(report, mode),
             collector_order: collector_order(),
+            row_bands: row_bands(report, &report.evidence),
         },
         Mode::Ss => {
             let machine_root = report
@@ -398,6 +427,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 .map(|group| group.observations.len())
                 .sum();
             let listed = listed_counts(&evidence);
+            let row_bands = row_bands(report, &evidence);
             ReportView {
                 mode,
                 header: shown_header(report),
@@ -413,6 +443,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 hidden,
                 timeline: timeline_of(report, mode),
                 collector_order: collector_order(),
+                row_bands,
             }
         }
     }
@@ -544,20 +575,7 @@ fn routes(report: &Report, mode: Mode) -> Vec<(&Observation, EntrySource)> {
 /// The span each source could see, from every observation that carries its coverage fields — in both
 /// modes, because a span is a fact about the source rather than about a program or a file.
 fn bands(report: &Report, redact: impl Fn(String) -> String) -> Vec<CoverageBand> {
-    let observations = report
-        .evidence
-        .iter()
-        .filter_map(|item| match &item.state {
-            EvidenceState::Found { observations } => Some(observations.iter()),
-            _ => None,
-        })
-        .flatten()
-        .chain(
-            report
-                .unmatched
-                .iter()
-                .flat_map(|group| &group.observations),
-        );
+    let observations = band_sources(report);
     let mut seen: HashSet<String> = HashSet::new();
     let mut bands = Vec::new();
     for observation in observations {
@@ -593,6 +611,62 @@ fn bands(report: &Report, redact: impl Fn(String) -> String) -> Vec<CoverageBand
         )
     });
     bands
+}
+
+/// Every observation a band can be read from: what a rule matched, and what no rule matched. The same
+/// set in both modes, because a span is a fact about the source rather than about a program or a file.
+fn band_sources(report: &Report) -> impl Iterator<Item = &Observation> {
+    report
+        .evidence
+        .iter()
+        .filter_map(|item| match &item.state {
+            EvidenceState::Found { observations } => Some(observations.iter()),
+            _ => None,
+        })
+        .flatten()
+        .chain(
+            report
+                .unmatched
+                .iter()
+                .flat_map(|group| &group.observations),
+        )
+}
+
+/// The span each `found` or `not_found` row in `evidence` is for, when its collector's coverage names
+/// one place (ADR 0047, amendment of 2026-09-30, decision 3). A collector whose coverage names no
+/// place — `evtx`, a band per log — gets none, and neither does a row whose collector's place was not
+/// observed at all.
+fn row_bands(report: &Report, evidence: &[Evidence]) -> BTreeMap<String, RowBand> {
+    let mut row_bands = BTreeMap::new();
+    for item in evidence {
+        if matches!(item.state, EvidenceState::Unmeasured { .. }) {
+            continue;
+        }
+        let Some(coverage) = report.coverage_fields.get(&item.collector) else {
+            continue;
+        };
+        let Some(wanted) = coverage.place.as_deref() else {
+            continue;
+        };
+        let Some(source) = band_sources(report).find(|observation| {
+            observation.collector == item.collector
+                && place_of(report, observation).as_deref() == Some(wanted)
+        }) else {
+            continue;
+        };
+        let band = match (
+            time_of(source, &coverage.from),
+            time_of(source, &coverage.to),
+        ) {
+            (Some(from), Some(to)) => RowBand::Span {
+                from: from.to_owned(),
+                to: to.to_owned(),
+            },
+            _ => RowBand::NoSpan,
+        };
+        row_bands.insert(item.rule_id.clone(), band);
+    }
+    row_bands
 }
 
 /// The scan's own times: when it ran, and when Windows last started when that was measured.
@@ -1637,6 +1711,7 @@ mod tests {
             R::BudgetSpent,
             R::ReadFailed,
             R::CollectorUnavailable,
+            R::OtherVolume,
         ] {
             let scope = reason.is_scope_statement();
             let listed = reason.is_always_listed();
@@ -1939,6 +2014,115 @@ mod tests {
         assert_eq!(usn.len(), 1, "{usn:?}");
         assert_eq!(usn[0].place.as_deref(), Some("journal"));
         assert_eq!(usn[0].from, "2025-12-01T00:00:00Z");
+    }
+
+    /// A report with the change journal's own observation, unmatched, and three `usn` rows: one
+    /// found, one not found and one unmeasured, all `context`.
+    fn journal_report(journal_times: bool) -> Report {
+        let mut report = timed_report();
+        let mut journal = vec![("location", "journal")];
+        if journal_times {
+            journal.push(("first_seen", "2025-12-31T23:21:00Z"));
+            journal.push(("last_seen", "2026-01-01T00:00:00Z"));
+        }
+        report.unmatched.push(UnmatchedGroup {
+            collector: "usn".to_owned(),
+            observations: vec![observed("usn", &journal)],
+        });
+        report
+            .discriminators
+            .insert("usn".to_owned(), "location".to_owned());
+        report.coverage_fields.insert(
+            "usn".to_owned(),
+            crate::model::CoverageFields {
+                from: "first_seen".to_owned(),
+                to: "last_seen".to_owned(),
+                place: Some("journal".to_owned()),
+            },
+        );
+        let row = |rule_id: &str, state| Evidence {
+            rule_id: rule_id.to_owned(),
+            collector: "usn".to_owned(),
+            strength: Strength::Context,
+            state,
+        };
+        report.evidence.extend([
+            row(
+                "deleted",
+                EvidenceState::Found {
+                    observations: vec![observed(
+                        "usn",
+                        &[
+                            ("location", "plugins"),
+                            ("first_seen", "2025-12-31T23:40:00Z"),
+                            ("last_seen", "2025-12-31T23:41:00Z"),
+                        ],
+                    )],
+                },
+            ),
+            row(
+                "renamed",
+                EvidenceState::NotFound {
+                    retention: "Only the span the change journal still held.".to_owned(),
+                },
+            ),
+            row(
+                "elsewhere",
+                EvidenceState::Unmeasured {
+                    reason: UnmeasuredReason::OtherVolume,
+                    expected: true,
+                },
+            ),
+        ]);
+        report
+    }
+
+    /// Every `usn` row that looked carries the journal's span, in both modes; one that could not
+    /// look carries none, and a collector whose coverage names no place (`evtx`) is left alone
+    /// (ADR 0047, amendment of 2026-09-30, decision 3).
+    #[test]
+    fn each_row_of_a_collector_whose_coverage_names_a_place_carries_that_places_span() {
+        let report = journal_report(true);
+        let span = RowBand::Span {
+            from: "2025-12-31T23:21:00Z".to_owned(),
+            to: "2026-01-01T00:00:00Z".to_owned(),
+        };
+
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert_eq!(
+            own.row_bands,
+            BTreeMap::from([
+                ("deleted".to_owned(), span.clone()),
+                ("renamed".to_owned(), span.clone()),
+            ])
+        );
+
+        // SS mode lists the match and counts the rest: `context` not found, and an expected reason.
+        let ss = for_mode(&report, Mode::Ss);
+        assert_eq!(ss.row_bands, BTreeMap::from([("deleted".to_owned(), span)]));
+        assert!(ss.evidence.iter().all(|item| item.rule_id != "renamed"));
+    }
+
+    /// A journal read in full that held no record has no span, and the row says so rather than
+    /// showing nothing.
+    #[test]
+    fn a_source_that_held_no_record_gives_its_rows_no_span_rather_than_none() {
+        let own = for_mode(&journal_report(false), Mode::SelfCheck);
+        assert_eq!(own.row_bands.get("renamed"), Some(&RowBand::NoSpan));
+        assert_eq!(own.row_bands.get("deleted"), Some(&RowBand::NoSpan));
+        assert_eq!(own.row_bands.get("elsewhere"), None);
+    }
+
+    /// A report whose collector's place was never observed — `usn` refused, say — gives no band, and
+    /// a view without one serializes as it did before the field existed.
+    #[test]
+    fn without_the_places_observation_there_is_no_row_band() {
+        let mut report = journal_report(true);
+        report.unmatched.retain(|group| group.collector != "usn");
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert!(own.row_bands.is_empty(), "{:?}", own.row_bands);
+        let json = serde_json::to_string(&own).unwrap();
+        assert!(!json.contains("row_bands"), "{json}");
     }
 
     #[test]

@@ -47,7 +47,13 @@
     "budget_spent": "this program stopped reading before it finished",
     "read_failed": "this could not be read",
     "collector_unavailable": "this build does not read that",
-    "not_consented": "only a full scan reads this, and this was the standard scan"
+    "not_consented": "only a full scan reads this, and this was the standard scan",
+    "other_volume": "this is on another drive, and this program reads only the system drive's change journal"
+  },
+  "row_band": {
+    "found": "The source held only {{from}} to {{to}} when it was read; what is counted here is from that span.",
+    "not_found": "Nothing within this span: {{from}} to {{to}}, what the source held when it was read. Nothing before it was seen.",
+    "none": "The source held no record when it was read, so there is no span in which anything could be seen."
   },
   "retention": "Look-back",
   "description": "About this check",

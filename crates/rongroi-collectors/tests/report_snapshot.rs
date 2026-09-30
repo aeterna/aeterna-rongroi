@@ -651,3 +651,121 @@ fn the_boot_time_reaches_both_views_and_an_older_report_reads_back_not_attempted
         }
     );
 }
+
+/// `rules/usn/plugins/files-deleted` and `files-renamed` (ADR 0047, amendment of 2026-09-30).
+const USN_PLUGINS_DELETED: &str = "91dc8b45-8355-4554-8a6d-e979e4a95ecd";
+const USN_PLUGINS_RENAMED: &str = "7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d";
+/// `rules/usn/enhanced-asi/files-deleted` and `files-renamed`.
+const USN_ENHANCED_DELETED: &str = "1c73241b-b7f1-4f91-81d4-8de53db6d119";
+const USN_ENHANCED_RENAMED: &str = "7996285e-8ccf-4b2d-8fec-339a32b95931";
+
+/// Every `usn` row that looked carries the journal's span, from the journal's own observation, in both
+/// modes; the Enhanced folder that is not there is an expected `source_absent`, counted in SS mode
+/// (ADR 0047, amendment of 2026-09-30, decisions 3 and 5).
+#[test]
+fn the_change_journal_rules_carry_the_journals_span_in_both_views() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason};
+    use rongroi_core::view::RowBand;
+
+    let report = report_for("usn-journal-read");
+    let state = |rule_id: &str| {
+        report
+            .evidence
+            .iter()
+            .find(|item| item.rule_id == rule_id)
+            .map(|item| item.state.clone())
+            .unwrap()
+    };
+    // The fixture's plugin folder holds a rename, as its old and its new name, and no deletion.
+    assert!(matches!(
+        state(USN_PLUGINS_RENAMED),
+        EvidenceState::Found { .. }
+    ));
+    assert!(matches!(
+        state(USN_PLUGINS_DELETED),
+        EvidenceState::NotFound { .. }
+    ));
+    for rule_id in [USN_ENHANCED_DELETED, USN_ENHANCED_RENAMED] {
+        assert_eq!(
+            state(rule_id),
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::SourceAbsent,
+                expected: true,
+            }
+        );
+    }
+
+    let journal = report
+        .unmatched
+        .iter()
+        .flat_map(|group| &group.observations)
+        .find(|observation| {
+            observation.collector == "usn" && observation.fields["location"] == "journal"
+        })
+        .unwrap();
+    let span = RowBand::Span {
+        from: journal.fields["first_seen"].as_str().unwrap().to_owned(),
+        to: journal.fields["last_seen"].as_str().unwrap().to_owned(),
+    };
+
+    let own = view::for_mode(&report, Mode::SelfCheck);
+    assert_eq!(own.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
+    assert_eq!(own.row_bands.get(USN_PLUGINS_DELETED), Some(&span));
+    assert_eq!(own.row_bands.get(USN_ENHANCED_DELETED), None);
+
+    // SS mode lists the match with its span, and counts the `context` not-found and the expected gap.
+    let ss = view::for_mode(&report, Mode::Ss);
+    assert!(
+        ss.evidence
+            .iter()
+            .any(|row| row.rule_id == USN_PLUGINS_RENAMED)
+    );
+    assert!(
+        ss.evidence
+            .iter()
+            .all(|row| row.rule_id != USN_PLUGINS_DELETED
+                && row.rule_id != USN_ENHANCED_DELETED
+                && row.rule_id != USN_ENHANCED_RENAMED)
+    );
+    assert_eq!(ss.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
+    assert_eq!(ss.row_bands.len(), 1, "{:?}", ss.row_bands);
+}
+
+/// A plugin folder on another volume is `other_volume`, which the rules declare, so SS mode counts it
+/// rather than listing "this could not be read" — and the timeline still says, once, where it was
+/// (ADR 0047, amendment of 2026-09-30, decision 1).
+#[test]
+fn a_plugin_folder_on_another_volume_is_an_expected_reason_not_a_failed_read() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason, UnmeasuredSource};
+
+    let report = report_for("usn-folder-on-other-volume");
+    for rule_id in [USN_PLUGINS_DELETED, USN_PLUGINS_RENAMED] {
+        let item = report
+            .evidence
+            .iter()
+            .find(|item| item.rule_id == rule_id)
+            .unwrap();
+        assert_eq!(
+            item.state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::OtherVolume,
+                expected: true,
+            },
+            "{rule_id}"
+        );
+    }
+    let ss = view::for_mode(&report, Mode::Ss);
+    assert!(
+        ss.evidence
+            .iter()
+            .all(|row| row.rule_id != USN_PLUGINS_DELETED && row.rule_id != USN_PLUGINS_RENAMED),
+        "{:?}",
+        ss.evidence
+    );
+    assert!(ss.row_bands.is_empty(), "{:?}", ss.row_bands);
+    assert!(ss.timeline.unmeasured.contains(&UnmeasuredSource {
+        collector: "usn".to_owned(),
+        place: Some("plugins".to_owned()),
+        reason: UnmeasuredReason::OtherVolume,
+    }));
+}

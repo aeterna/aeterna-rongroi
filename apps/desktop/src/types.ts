@@ -20,7 +20,8 @@ export type UnmeasuredReason =
   | "budget_spent"
   | "read_failed"
   | "collector_unavailable"
-  | "not_consented";
+  | "not_consented"
+  | "other_volume";
 
 export type Strength = "execution" | "presence" | "tamper" | "posture" | "context";
 
@@ -149,6 +150,13 @@ export interface Timeline {
   unmeasured: UnmeasuredSource[];
 }
 
+/**
+ * The span one row's count is for: the coverage band of the place its collector's coverage names —
+ * for `usn`, the change journal (ADR 0047, amendment of 2026-09-30). `no_span` when the source was
+ * read and held no record. Built in Rust, in both modes.
+ */
+export type RowBand = { state: "span"; from: string; to: string } | { state: "no_span" };
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
@@ -167,6 +175,8 @@ export interface ReportView {
   timeline: Timeline;
   /** The order collector groups appear in, from the core (ADR 0051). */
   collector_order: string[];
+  /** By rule id, for a `found` or `not_found` row whose count is for a span; absent when none is. */
+  row_bands?: Record<string, RowBand>;
   hidden: {
     not_found: number;
     unmeasured_expected: number;

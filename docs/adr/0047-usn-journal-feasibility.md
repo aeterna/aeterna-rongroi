@@ -4,8 +4,8 @@
 - Date: 2026-09-14
 - Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner"): measurement 1 passed
 - Amended: 2026-09-30, accepted: a folder on another volume, and the first rules that read a count
-  ("Amendment (2026-09-30, accepted)"), with two readings of the journal on a Windows 11 PC; not
-  implemented yet
+  ("Amendment (2026-09-30, accepted)"), with two readings of the journal on a Windows 11 PC;
+  implemented (see Consequences)
 
 ## Context
 
@@ -398,8 +398,8 @@ Prefetch folder itself could not be opened (5); the Event Log and PCA folders co
 
 ## Amendment (2026-09-30, accepted — the owner decided the six questions below on 2026-09-30): a folder on another volume, and the first rules that read a count
 
-The owner accepted this amendment on 2026-09-30, with the six decisions listed at its end. Nothing in it is
-built yet. It answers the open question under "What is not established" about a watched folder on another
+The owner accepted this amendment on 2026-09-30, with the six decisions listed at its end, and it is
+implemented (see Consequences). It answers the open question under "What is not established" about a watched folder on another
 volume, and decides the first rules that read a watched folder's counts.
 
 ### Measured on a PC
@@ -775,8 +775,18 @@ GUID. It sends only the two read control codes.
   `source_absent` gaps and folders on another volume (checked by volume serial) as `read_failed` gaps, and
   the program's own Prefetch record counted — are in `docs/architecture.md`'s `usn` row.
 - Accepted by the owner on 2026-09-14, with the five points of the recommendation as written.
-- The amendment of 2026-09-30 was accepted by the owner the same day, with its six decisions. Not
-  implemented yet: `other_volume`, the four rules, the band on each row and ADR 0030's new row come in the
-  change that builds them.
+- The amendment of 2026-09-30 was accepted by the owner the same day, with its six decisions, and is
+  implemented in one change: `UnmeasuredReason::OtherVolume` (`other_volume`), which `usn` alone reports, for
+  a watched folder on another volume, where it reported `read_failed` before, with ADR 0030's table amended
+  and the words in both languages in the CLI and the desktop; the four `context`, `experimental` rules
+  `rules/usn/plugins/files-deleted`, `rules/usn/plugins/files-renamed`,
+  `rules/usn/enhanced-asi/files-deleted` and `rules/usn/enhanced-asi/files-renamed`, each with a positive
+  and a negative fixture, `baseline-elevated-win11` confronting the `plugins` pair and a
+  `rules/unconfronted.csv` row for each of the `enhanced_asi` pair; and `rongroi_core::view::RowBand`,
+  which pairs each `found` and `not_found` row of a collector whose coverage names a place — `usn`, the
+  journal — with that place's span, or says the journal held no record, in both modes
+  (`ReportView::row_bands`). No second volume's journal is read, and nothing was added to the folders `usn`
+  watches.
 - README's M3 row, in both languages, links here: the collector reads the change journal without write
-  access and counts records per watched folder with no file names, and no rule reads it yet.
+  access and counts records per watched folder with no file names, and four `context` rules read the
+  deletions and renames in FiveM's two plugin folders.

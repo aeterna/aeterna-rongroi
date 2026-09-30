@@ -170,10 +170,13 @@ row, declared or not, because each says the artifact was reachable and the read 
 Naming one of those three in `unmeasured_when` is a `check-rules` failure: the line would decide
 nothing, and a line that looks load-bearing and is not is worse than none.
 
-The twelve reasons, and what each says to the reader, are in `docs/architecture.md`; ADR 0030 adds the
+The fourteen reasons, and what each says to the reader, are in `docs/architecture.md`; ADR 0030 adds the
 ordinary condition that produces each and how common it is. The two that most often need declaring:
 `source_absent` ("this PC has no such record to read") and `source_empty` ("the place this is kept is
-there and holds nothing"). They mean opposite things — write the one you mean.
+there and holds nothing"). They mean opposite things — write the one you mean. A rule on one of `usn`'s
+watched folders also declares `other_volume`: that folder can be on another drive than the one whose
+change journal is read, which is how the PC is set up, not a failed read (ADR 0047, amendment of
+2026-09-30).
 
 No rule ships with `cased` today. The `fivem_dir` rules are the first to use a value list and an
 operator, `exists` (ADR 0036). `cased` looks like this, and needs a `#`

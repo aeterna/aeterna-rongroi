@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-09-13
+- Amended: 2026-09-30, by ADR 0047's amendment of that date: a fourteenth reason, `other_volume`, in the table below
 
 ## Context
 
@@ -84,6 +85,7 @@ The English is R3's recommended wording except where noted; the Thai is beside i
 | `read_failed` | "this could not be read" | "อ่านข้อมูลนี้ไม่ได้" | every collector that reads a source | I/O failure, a file past the 64 MiB cap (ADR 0019), an unset `%SystemRoot%`. Uncommon |
 | `collector_unavailable` | "this build does not read that" | "build นี้ยังไม่ได้อ่านส่วนนี้" | the engine | A rule for a collector this build has none of. Never in a shipped build; it is the ADR 0026 gate |
 | `not_consented` | "only a full scan reads this, and this was the standard scan" | "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน" | the scan, for a `full` collector (ADR 0052) | The player chose the standard scan. **Very common** — it is the default — so it is a scope statement, every rule expects it, and no rule may declare it. Added by ADR 0052 as a thirteenth reason |
+| `other_volume` | "this is on another drive, and this program reads only the system drive's change journal" | "ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น" | `usn` (ADR 0047, amendment of 2026-09-30) | A watched folder whose path names another drive letter, or whose identifier names another volume — a profile moved to a game drive, or a junction made to free space on `C:`. How common was not measured: the one Windows 11 PC measured has every watched folder on the system volume. Nothing failed and nothing stopped early, so it is **declarable**, on the same side of ADR 0032's line as `access_denied` and `source_absent`; it is about one place, not the scan, so it is not a scope statement. Added by ADR 0047's amendment of 2026-09-30 as a fourteenth reason; before it, such a folder was `read_failed` |
 
 Three wordings depart from R3:
 
