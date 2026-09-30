@@ -1,6 +1,6 @@
 # ADR 0059 — What Code Integrity and Microsoft Defender already record
 
-- Status: proposed
+- Status: accepted — the owner decided the five questions below on 2026-09-30
 - Date: 2026-09-30
 
 ## Context
@@ -182,7 +182,7 @@ every `evtx` rule — this one included — is `unmeasured / budget_spent`, whic
 lists (ADR 0032). It can make the row disappear into a listed "not measured"; it cannot make it read
 `not_found` over logs that were never read. Moving the Defender log forward would buy an answer only in the
 scans where the budget runs out, and would do it by leaving the other logs' rules unmeasured anyway; it is
-not proposed. How long `evtx` takes on this PC is owner decision 5.
+not done. How long `evtx` takes on this PC is owner decision 5.
 
 ## Decision
 
@@ -344,29 +344,23 @@ CodeIntegrity or Defender log from a machine this project may publish, with both
 - **Whether Server 2022's four 3033 events are what a Windows 11 PC's are.** A server image is not a
   gaming PC. It shows only that a 3033 needs neither a player nor a cheat.
 
-## Owner decisions
+## Owner decisions (2026-09-30)
 
-1. **Code Integrity 3033/3077 as a timeline selector only, with no evidence rule** (section 1).
-   *Recommended: yes*, and firmer after 2026-09-30: 476 3033s on 15 days and 17 driver 3077s on a PC with
-   the defaults on. The alternative is a `context` rule, which would be `found` on it.
-2. **Defender 1116/1117 as a timeline selector only** (section 2). *Recommended: yes*, for the same reason.
-   Revisit if the probe shows 1116 is rare on ordinary PCs, which one PC with 9 does not suggest.
-3. **Defender 5001 as one `context`, `experimental` rule** (section 3). *Recommended: yes.* `test` is
-   supportable on the strings — this code emitted them from real logs on two machines — but the causes of a
-   5001 on a player's PC are not measured yet, and the rules shipped in 0.4.0 all started `experimental`.
-4. **Baseline: three `unconfronted.csv` rows now** (section 5), or vendor the CodeIntegrity and Defender
-   logs of a GitHub runner as a new baseline in a separate change. *Recommended: rows now.* A runner is
-   nobody's machine, but its logs carry its host name and file paths in their payloads, and the Defender log
-   is 1 MB of records; `fixtures/evtx/PROVENANCE.md`'s two scans decide, in their own pull request. If it is
-   done, the 5001 rule would be `found` on it and need a `known-fps.csv` row naming the image — which is
-   the honest result.
-5. **Measure how long `evtx` takes on the PC before the rules merge.** *Recommended: yes* — changed on
-   2026-09-30, since the probe that this decision first asked for has run. One elevated scan of a release
-   build, reporting the folder account's `examined`, `refused` and `budget_exhausted` and the scan's
-   duration. If the budget is near its end, the answer is an ADR on `PARSE_BUDGET`, not a reordering: the
-   rule already fails as a listed `unmeasured`, never as a quiet `not_found`.
+1. Code Integrity 3033 and 3077 get one timeline selector and no evidence rule (section 1).
+2. Defender 1116 and 1117 get one timeline selector and no evidence rule (section 2).
+3. Defender 5001 gets one rule, `context` and `experimental` (section 3).
+4. No baseline is added in this change: the rule and the two selectors each get a `rules/unconfronted.csv`
+   row (section 5). Vendoring a runner's CodeIntegrity and Defender logs as a baseline, if it is ever done,
+   is a separate pull request that runs `fixtures/evtx/PROVENANCE.md`'s two scans first.
+5. **Before the change that adds the rule and the selectors merges**, one elevated scan of a release build on
+   the Windows 11 PC (build 26220) records how long `evtx` takes, with the folder account's `examined`,
+   `refused` and `budget_exhausted`. That measurement is taken on its own and is not part of this ADR's pull
+   request. If the budget is near its end, the answer is an ADR on `PARSE_BUDGET`, not a reordering of the
+   logs (section "Reaching the logs" under the PC measurement).
 
-## Consequences, if accepted
+The points under "What is unverified" stay open; the change that adds the rules says which it measured.
+
+## Consequences
 
 - `rules/evtx/timeline/code-integrity-blocked-image/`, `rules/evtx/timeline/defender-detection/` and
   `rules/evtx/defender/defender-real-time-protection-turned-off/`, each with positive and negative fixtures
