@@ -6,6 +6,19 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- ADR 0061 is accepted (the owner decided its eight questions on 2026-09-30), not implemented yet: how old
+  each trace source is, beside when parts of the PC were set up. A "trace ages" section lists, per source
+  (each Event Log, Prefetch, BAM, PCA, the USN journal and FiveM's own folders), the oldest time it still
+  holds, how much it holds, its ordinary retention with a reference or an "undocumented" mark, and the reason
+  when it was not read — `not_admin` reads "not known", never empty. Anchors in the header are dates with their
+  ordinary resets, never one "machine age": `InstallDate` is shown as "installed or last feature-upgraded".
+  One cross-source statement, computed in the view and never a rule, puts FiveM's presence beside Windows'
+  records of programs that ran, with the causes that produce the same result. No verdict, score or ranking;
+  a reinstall and a new PC stay indistinguishable. A read-only probe on a Windows 11 PC found that a feature
+  upgrade reset `InstallDate`, the Windows and profile folders, key write times and every Event Log's oldest
+  record, while Windows Setup's record of earlier installations, the system drive root and the USN journal
+  identifier read as a time all reached back more than seven years and agreed to the day; BAM held entries
+  47 days old, and full Security and PowerShell logs reached back 2.3 and 0.2 days.
 - What Code Integrity and Microsoft Defender already record, read through the existing `evtx` collector
   with no new read, field or reason (ADR 0059, accepted by the owner on 2026-09-30). One `context`,
   `experimental` rule: **Microsoft Defender recorded that its real-time protection was switched off**
