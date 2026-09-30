@@ -27,12 +27,13 @@ pub struct Observation {
 
 /// Why a collector, or one field of it, could not look.
 ///
-/// Thirteen reasons, and the split between them is the whole of how this program distinguishes "we
+/// Fourteen reasons, and the split between them is the whole of how this program distinguishes "we
 /// checked and there was nothing" from "we could not check". Four of them — [`Self::NotOnThisOs`],
 /// [`Self::ServiceDisabled`], [`Self::SourceAbsent`] and [`Self::SourceEmpty`] — describe a machine
-/// that is behaving exactly as Windows ships it, and ADR 0030 records, for each one, the ordinary
-/// condition that produces it and how common that condition is. A reason that fires on an ordinary
-/// machine is worse than no reason at all, so none of them may be read as a finding.
+/// that is behaving exactly as Windows ships it, and a fifth, [`Self::OtherVolume`], one whose owner
+/// put a folder on another drive. ADR 0030 records, for each one, the ordinary condition that
+/// produces it and how common that condition is. A reason that fires on an ordinary machine is worse
+/// than no reason at all, so none of them may be read as a finding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UnmeasuredReason {
@@ -93,6 +94,14 @@ pub enum UnmeasuredReason {
     /// A fact about the scan, like [`Self::NotAdmin`]: the collector's tier is `full`, and the scan
     /// was not. No machine produces it, so no rule may declare it in `unmeasured_when`.
     NotConsented,
+    /// The place is on another drive than the one whose change journal this program reads.
+    ///
+    /// `usn` reads the system drive's journal alone (ADR 0047, amendment of 2026-09-30, owner
+    /// decision 2), so a watched folder moved to a game or data drive is never within it. Nothing
+    /// failed and nothing stopped early: the program never reached the source, and the reason is how
+    /// the machine is set up, so a rule may declare it, as it may `access_denied` and `source_absent`.
+    /// It is about one place on one machine, not about the scan, so it is not a scope statement.
+    OtherVolume,
 }
 
 impl UnmeasuredReason {
@@ -112,6 +121,7 @@ impl UnmeasuredReason {
             Self::ReadFailed => "read_failed",
             Self::CollectorUnavailable => "collector_unavailable",
             Self::NotConsented => "not_consented",
+            Self::OtherVolume => "other_volume",
         }
     }
 

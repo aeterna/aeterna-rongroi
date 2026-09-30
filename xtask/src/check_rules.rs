@@ -242,10 +242,11 @@ impl Vocabulary {
     /// undeclared one is listed. A reason the rule's collector cannot produce is therefore a
     /// suppression that never fires — the author believes they have said "this one is ordinary
     /// here" and the report will list it anyway — and nothing in the rule file, in `check-baseline`
-    /// or in a fixture shows it. Since ADR 0030 every one of the twelve reasons has a producer in
-    /// some collector, so that half of the check is now entirely about which collector:
-    /// `not_on_this_os` is `pca` and nothing else, `service_disabled` is `prefetch` and nothing
-    /// else, and `budget_spent` is `evtx` and `usn` and nothing else (ADR 0047).
+    /// or in a fixture shows it. Since ADR 0030 every reason has a producer in some collector, so
+    /// that half of the check is now entirely about which collector: `not_on_this_os` is `pca` and
+    /// nothing else, `service_disabled` is `prefetch` and nothing else, `other_volume` is `usn` and
+    /// nothing else (ADR 0047, amendment of 2026-09-30), and `budget_spent` is `evtx`, `usn` and
+    /// `driver_service` and nothing else (ADR 0047, ADR 0048).
     ///
     /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
     /// true for is one a view lists whatever the rule said, so declaring it is a suppression that
@@ -952,6 +953,7 @@ date: 2026-09-11
             UnmeasuredReason::SourceEmpty,
             UnmeasuredReason::CollectorUnavailable,
             UnmeasuredReason::NotConsented,
+            UnmeasuredReason::OtherVolume,
         ] {
             assert!(
                 !reason.is_always_listed(),
@@ -965,7 +967,9 @@ date: 2026-09-11
     /// this build, so no rule could declare either. ADR 0030 gave each one exactly one owner, and
     /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
     /// both spending the same 30-second-budget idea on two different sources), and ADR 0048 a third
-    /// (`driver_service`, spending it on hashing driver files). This is what that means for the
+    /// (`driver_service`, spending it on hashing driver files). ADR 0047's amendment of 2026-09-30
+    /// added `other_volume`, whose one owner is `usn`: only it reads one drive's journal for folders
+    /// that can be on another. This is what that means for the
     /// gate: each reason is usable only on the collector(s) that can actually report it. Asserted
     /// against the vocabulary the shipped executable builds, so a collector that later starts or
     /// stops producing one fails here rather than silently accepting a suppression that never fires,
@@ -985,6 +989,7 @@ date: 2026-09-11
             ("service_disabled", &["prefetch"]),
             ("budget_spent", &["driver_service", "evtx", "usn"]),
             ("not_attempted", &["evtx"]),
+            ("other_volume", &["usn"]),
         ] {
             for owner in owners {
                 assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");

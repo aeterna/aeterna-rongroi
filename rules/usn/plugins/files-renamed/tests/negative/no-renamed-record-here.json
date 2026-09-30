@@ -1,0 +1,52 @@
+{
+  "description": "Synthetic: the plugins folder identified with no renamed record, as both readings of one Windows 11 PC were; the same folder with deleted records only; the other plugin folder with renamed records, which is another place; and this folder on another volume, which carries no count",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "plugins",
+        "folder": "identified",
+        "records": 0,
+        "created": 0,
+        "deleted": 0,
+        "renamed": 0,
+        "data_changed": 0
+      }
+    },
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "plugins",
+        "folder": "identified",
+        "records": 2,
+        "created": 0,
+        "deleted": 2,
+        "renamed": 0,
+        "data_changed": 0,
+        "first_seen": "2026-09-30T10:40:00Z",
+        "last_seen": "2026-09-30T10:40:01Z"
+      }
+    },
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "enhanced_asi",
+        "folder": "identified",
+        "records": 3,
+        "created": 0,
+        "deleted": 0,
+        "renamed": 3,
+        "data_changed": 0,
+        "first_seen": "2026-09-30T10:30:00Z",
+        "last_seen": "2026-09-30T10:30:02Z"
+      }
+    },
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "plugins",
+        "folder": "other_volume"
+      }
+    }
+  ]
+}

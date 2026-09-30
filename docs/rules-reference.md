@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 49 |
-| SHA-256 | `1aa4ba677608d740f351c343934d24f3a86b205a9f109ef3008d290a0d46078d` |
+| Rules | 53 |
+| SHA-256 | `4525b0bd9cc62c769cf198bbba4b2bba2375a4ae55e34e303b50a044c63bd388` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -88,6 +88,11 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+- `usn`
+  - [The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
+  - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
+  - [The change journal holds a deletion in FiveM's plugin folder](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
+  - [The change journal holds a rename in FiveM's plugin folder](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
 - Timeline selectors
   - `bam`
     - [When BAM recorded a program named like FiveM's game process](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
@@ -1735,6 +1740,192 @@ The attribute as it is at the moment of the scan, on the Prefetch files still in
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+## Collector `usn`
+
+### `usn` / `enhanced-asi`
+
+<a id="rule-1c73241b-b7f1-4f91-81d4-8de53db6d119"></a>
+
+#### The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder
+
+- Id: `1c73241b-b7f1-4f91-81d4-8de53db6d119`
+- File: [`rules/usn/enhanced-asi/files-deleted/rule.yaml`](../rules/usn/enhanced-asi/files-deleted/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `enhanced_asi`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file deleted directly inside FiveM for GTA V Enhanced's asi folder. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was deleted there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden. Whether FiveM for GTA V Enhanced loads anything from this folder is not established.
+
+**Matches when all of these hold for one observation**
+
+- `deleted|gte`: is at least `1`
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `enhanced_asi` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player removed or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- FiveM or its updater replaced or removed a file in the folder (not measured for this folder)
+- A clean-up, "clear FiveM cache" or optimiser tool that empties FiveM's folders
+- Antivirus software quarantining or removing a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+<a id="rule-7996285e-8ccf-4b2d-8fec-339a32b95931"></a>
+
+#### The change journal holds a rename in FiveM for GTA V Enhanced's asi folder
+
+- Id: `7996285e-8ccf-4b2d-8fec-339a32b95931`
+- File: [`rules/usn/enhanced-asi/files-renamed/rule.yaml`](../rules/usn/enhanced-asi/files-renamed/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `enhanced_asi`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file renamed directly inside FiveM for GTA V Enhanced's asi folder, moved into it or moved out of it. A rename inside the folder leaves two records, one for the old name and one for the new. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was renamed, moved in or moved out there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden. Whether FiveM for GTA V Enhanced loads anything from this folder is not established.
+
+**Matches when all of these hold for one observation**
+
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `enhanced_asi` (text, ASCII case ignored)
+- `renamed|gte`: is at least `1`
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player renamed, moved or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- An update that writes a new copy of a file and swaps it in by renaming, by FiveM, its updater or a plugin (not measured for this folder)
+- A file moved to the Recycle Bin or to another folder on the same drive, which the journal records as a rename (how the Recycle Bin shows was not measured)
+- Antivirus software quarantining a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+### `usn` / `plugins`
+
+<a id="rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd"></a>
+
+#### The change journal holds a deletion in FiveM's plugin folder
+
+- Id: `91dc8b45-8355-4554-8a6d-e979e4a95ecd`
+- File: [`rules/usn/plugins/files-deleted/rule.yaml`](../rules/usn/plugins/files-deleted/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `plugins`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file deleted directly inside FiveM for GTA V Legacy's plugin folder. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was deleted there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `deleted|gte`: is at least `1`
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `plugins` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player removed or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- FiveM or its updater replaced or removed a file in the folder (not measured for this folder)
+- A clean-up, "clear FiveM cache" or optimiser tool that empties FiveM's folders
+- Antivirus software quarantining or removing a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+<a id="rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d"></a>
+
+#### The change journal holds a rename in FiveM's plugin folder
+
+- Id: `7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d`
+- File: [`rules/usn/plugins/files-renamed/rule.yaml`](../rules/usn/plugins/files-renamed/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `plugins`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file renamed directly inside FiveM for GTA V Legacy's plugin folder, moved into it or moved out of it. A rename inside the folder leaves two records, one for the old name and one for the new. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was renamed, moved in or moved out there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `plugins` (text, ASCII case ignored)
+- `renamed|gte`: is at least `1`
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player renamed, moved or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- An update that writes a new copy of a file and swaps it in by renaming, by FiveM, its updater or a plugin (not measured for this folder)
+- A file moved to the Recycle Bin or to another folder on the same drive, which the journal records as a rename (how the Recycle Bin shows was not measured)
+- Antivirus software quarantining a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
 
 ## Timeline selectors
 

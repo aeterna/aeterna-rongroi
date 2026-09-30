@@ -203,6 +203,10 @@ These are counts of what SS mode does not list. §7 says why.
 | Structured exception handling overwrite protection (SEHOP) is switched off | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
 | The kernel object namespace is not protected as Windows ships it | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
 | Microsoft Defender recorded that its real-time protection was switched off | context | `experimental` | **the PC's maker, a shop or a Windows image** switching it off before the PC was handed over (measured on two GitHub-hosted runner images), the owner switching it off for a while to install something Defender flagged, possibly installing another antivirus, a Defender update or an employer's policy, troubleshooting a slow PC |
+| The change journal holds a deletion in FiveM's plugin folder | context | `experimental` | the player removed or replaced a graphics mod, ReShade, an ENB or another plugin, FiveM or its updater (not measured), a clean-up or optimiser tool, antivirus |
+| The change journal holds a rename in FiveM's plugin folder | context | `experimental` | the player renamed, moved or replaced a plugin, an update that swaps a new copy in by renaming (not measured), a file moved to the Recycle Bin, antivirus quarantine |
+| The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder; whether Enhanced loads this folder at all is not known |
+| The change journal holds a rename in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder |
 
 Four things to know about the thirteen rows above, which are all about **which Windows this is**:
 
@@ -252,7 +256,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last sixteen — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0; the last one, about Defender's real-time protection, is new after 0.4.0 and is not in a released version yet. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last five — Defender's real-time protection and the four about the change journal — are new after 0.4.0 and are not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -299,6 +303,18 @@ Two things to know about the hosts-file rule:
   the open connections or any log of them ([ADR 0054](adr/0054-network-settings-not-network-traffic.md)).
   The proxy and the Windows Firewall rules for FiveM are read too, and no rule reads them: an allowed
   FiveM program and a proxy are what ordinary PCs have. SS mode only counts them.
+
+Four things to know about the four change-journal rules (ADR 0047, amendment of 2026-09-30):
+
+- **A count is for a short span, and the row says which.** Windows' change journal keeps a fixed size and
+  drops its oldest records first. On one Windows 11 PC it held 39 minutes. Every row shows the span it
+  covered: "Not found" means nothing within that span, not "never".
+- **The journal does not say who.** A deletion by the player, by FiveM's updater, by an antivirus and by
+  Windows look alike in it. The row says a file left the folder, not what it was — no file name is read.
+- **They need administrator rights.** Without them, the four are part of the scope line's count of checks
+  administrator rights would answer.
+- **"On another drive" is not a failure.** If the player's FiveM folder is on another drive, the program
+  does not read that drive's journal, and says so instead of counting.
 
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.

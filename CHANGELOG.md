@@ -34,16 +34,24 @@ and the project uses [Semantic Versioning](https://semver.org/).
   the Windows and Program Files folders, and an exclusion that covers a FiveM folder. The ADR records a
   GitHub-hosted runner's measurement under an elevated and a standard account, and a Windows 11 PC's under an
   elevated and a limited token, and the owner's nine decisions of 2026-09-30.
+- The first rules that read the change journal's counts: four `context`, `experimental` rules for a
+  deletion and for a rename in FiveM for GTA V Legacy's plugin folder and in FiveM for GTA V Enhanced's asi
+  folder, each with a positive and a negative fixture (ADR 0047, amendment of 2026-09-30). Each row says
+  the journal does not record which program changed a file. `baseline-elevated-win11` confronts the
+  Legacy pair; no baseline describes Enhanced, so its pair has `rules/unconfronted.csv` rows. No rule reads
+  the Prefetch, event log or Program Compatibility Assistant counts.
+- Every `found` and `not_found` row of the change journal now shows the span the journal held when it was
+  read — on one Windows 11 PC, 39 minutes, in two readings — or says it held no record, in both modes, so
+  "not found" reads as "nothing within this span". The pairing is made in `rongroi-core::view`
+  (`ReportView::row_bands`), so the CLI and the desktop app cannot disagree.
 
 ### Changed
-- An ADR 0047 amendment, accepted by the owner on 2026-09-30 and not implemented yet: a watched folder on
-  another drive than the one whose change journal is read will get a new, declarable reason,
-  `other_volume`, instead of `read_failed`, which SS mode always lists. No second drive's journal is read.
-  The first rules that read `usn`'s counts will be four `context`, `experimental` rules for deletions and
-  renames in FiveM's two plugin folders, each row shown with the span the journal covered. On one
-  Windows 11 PC that span was 39 minutes in two readings, every watched folder was on the system volume,
-  and without Administrators the Prefetch folder could not be identified either, which the run-level
-  `not_admin` already covers.
+- A FiveM plugin folder on another drive than the Windows drive, whose change journal is the one read, is
+  now reported with a new reason, `other_volume` — "this is on another drive, and this program reads only
+  the system drive's change journal" — instead of `read_failed`, which SS mode always lists and no rule can
+  declare. Nothing failed, so rules may declare it. It is the fourteenth reason, `usn`'s alone, in English
+  and Thai in the CLI and the desktop app, and ADR 0030's table has its row. No second drive's journal is
+  read (ADR 0047, amendment of 2026-09-30).
 
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView

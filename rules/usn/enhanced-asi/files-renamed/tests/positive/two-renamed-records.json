@@ -1,0 +1,33 @@
+{
+  "description": "Synthetic: the change journal's enhanced_asi folder with two renamed records, and the journal's own observation",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "journal",
+        "records": 376781,
+        "records_version_2": 0,
+        "records_version_3": 376781,
+        "trimmed": true,
+        "maximum_size": 33554432,
+        "first_seen": "2026-09-30T10:24:00Z",
+        "last_seen": "2026-09-30T11:03:00Z"
+      }
+    },
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "enhanced_asi",
+        "folder": "identified",
+        "records": 2,
+        "created": 0,
+        "deleted": 0,
+        "renamed": 2,
+        "data_changed": 0,
+        "first_seen": "2026-09-30T10:51:12Z",
+        "last_seen": "2026-09-30T10:51:13Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}
