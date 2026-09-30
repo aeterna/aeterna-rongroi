@@ -191,7 +191,8 @@ Every new collector adds a row here in the same PR.
 ## Desktop app
 
 The GUI is a Tauri 2 shell around the same scan. It scans before creating its window, keeps the WebView2
-profile in a temporary folder that is deleted on exit, keeps SmartScreen off inside the WebView, and has a
+profile in a temporary folder that is deleted on exit (a folder left by a copy that was stopped first is
+deleted at the next start, after the scan), keeps SmartScreen off inside the WebView, and has a
 content-security policy that allows no network connections. WebView2's own Windows diagnostics are outside
 the app's control and are disclosed in the consent screen (ADR 0001, PRIVACY.md).
 

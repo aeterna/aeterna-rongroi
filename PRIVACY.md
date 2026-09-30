@@ -202,8 +202,9 @@ or allow remote access.
 - **The GUI uses Microsoft WebView2**, a Windows component. Microsoft documents that WebView2 collects
   some required diagnostic data regardless of settings and follows the Windows *Diagnostic data* setting
   for optional data; crash reports may be sent to Microsoft. aeterna-rongroi turns off SmartScreen inside
-  its WebView and keeps the WebView profile in a temporary folder that is deleted on exit, but it cannot
-  switch off Windows' own diagnostics.
+  its WebView and keeps the WebView profile in a temporary folder that is deleted on exit — or, if the
+  program was stopped before it could delete it, at its next start — but it cannot switch off Windows' own
+  diagnostics.
 - **The CLI version does not use WebView2.** Use it if you want no WebView component involved.
 
 ## What is shown
