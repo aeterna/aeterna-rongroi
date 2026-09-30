@@ -13,14 +13,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `partial`, endpoints as server identities hidden in SS mode, no plugin names) as undecided
   recommendations, and states the measurement that would reopen it. ADR 0052's row for this source says it
   is parked.
-- Proposed (ADR 0060): an `autostart` collector for what Windows starts by itself — program services,
-  `Run`/`RunOnce` under `HKLM`, its 32-bit view and `HKCU`, and scheduled tasks read from their files — with
-  each file's path, SHA-256 and embedded signature, never a command line's arguments; and a
-  `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights
-  only. Two `experimental` `posture` rules: a program that starts by itself with no valid embedded signature
-  outside the Windows and Program Files folders, and an exclusion that covers a FiveM folder. The ADR
-  records a GitHub-hosted runner's measurement under an elevated and a standard account, and a Windows 11
-  PC's under an elevated and a limited token; the owner's decisions are open.
+- Accepted (ADR 0060), not implemented yet: an `autostart` collector for what Windows starts by itself —
+  program services, `Run`/`RunOnce` under `HKLM`, its 32-bit view and `HKCU`, and scheduled tasks read from
+  their files — with each file's path, SHA-256 and embedded signature, never a command line's arguments; and a
+  `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights only.
+  Two `experimental` `posture` rules: a program that starts by itself with no valid embedded signature outside
+  the Windows and Program Files folders, and an exclusion that covers a FiveM folder. The ADR records a
+  GitHub-hosted runner's measurement under an elevated and a standard account, and a Windows 11 PC's under an
+  elevated and a limited token, and the owner's nine decisions of 2026-09-30.
 
 ### Changed
 - ADR 0059 is accepted (the owner decided its five questions on 2026-09-30); not implemented yet: what

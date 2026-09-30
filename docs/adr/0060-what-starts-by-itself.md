@@ -1,6 +1,6 @@
 # ADR 0060 — What starts by itself, and what Defender is told not to scan
 
-- Status: proposed — the questions under "Owner decisions" are open
+- Status: accepted — the owner decided the nine questions below on 2026-09-30
 - Date: 2026-09-30
 - Amended: 2026-09-30, with a measurement on a Windows 11 PC ("Measured on a Windows 11 PC (2026-09-30)")
 
@@ -27,8 +27,8 @@ installed, and a reviewer needs two things to tell those apart from the rest: **
 (its path, SHA-256 and embedded signature, as `fivem_dir` reports them under ADR 0035) and **whether it
 starts by itself**.
 
-This ADR proposes how to read the four places, what reaches a report, the two rules, and what the owner has
-to decide. It records what a GitHub-hosted runner and a Windows 11 PC (build 26220) showed.
+This ADR decides how to read the four places, what reaches a report, and the two rules; the owner's
+decisions are at the end. It records what a GitHub-hosted runner and a Windows 11 PC (build 26220) showed.
 
 ## Measured on a runner
 
@@ -231,7 +231,7 @@ The PC was in use, and whether the files were in the cache was not controlled, s
 cold scan; the runner's cold passes took 49–104 s for half the bytes. Listing and parsing 296 task files
 took 6.5 s in PowerShell, the COM API 1.9 s.
 
-## Decision (proposed)
+## Decision
 
 ### 1. A new collector, `autostart`, not a wider `driver_service`
 
@@ -268,7 +268,7 @@ a module both collectors use, with `driver_service`'s behaviour unchanged.
   `Author`, `Description`, or any other element. A refused top folder makes the place `not_admin`
   without administrator rights and `access_denied` with them. A single refused file — which an elevated
   read met on the PC, 1 of 296 — is a gap `access_denied` confined to `task` (ADR 0044), not a place
-  that could not be read (question 9). The XML is parsed in `rongroi-parsers`, pure
+  that could not be read (owner decision 9). The XML is parsed in `rongroi-parsers`, pure
   and fuzzed like every parser (ADR 0013); the files' encoding was not recorded by the probe.
 
 The COM API is not used: it answers a standard user with a subset and no error (measured), it is a call
@@ -295,7 +295,7 @@ Arguments are where secrets live: a token, a password or an address passed to a 
 collector reads a command line only to find where the program's path ends, and **nothing after it reaches
 an observation**, not even whether there was anything. Task `Arguments` elements are not read.
 
-This has a cost the owner should weigh (question 4). Dropping arguments means the report describes the
+This has a cost, weighed in owner decision 4. Dropping arguments means the report describes the
 program that starts, not what that program is given to run. When that program is one Windows ships for
 running a script or a library (`cmd`, `powershell`, `wscript`, `cscript`, `rundll32`, `mshta`,
 `regsvr32`), the row names that Windows program, under `%SystemRoot%` with its signature. On the runner,
@@ -336,12 +336,12 @@ is one row for a reviewer to read.
 
 ### 7. Hashing, signatures and the budget
 
-Two options, for the owner (question 5):
+Two options were weighed; the owner chose B (owner decision 5):
 
 - **A — hash and check every file.** 300 files, 420 MB, 49–104 s cold on the runner. A budget of its own
   would be spent on nearly every scan, and a spent budget is a `budget_spent` gap on `signature` that makes
   the rule `unmeasured` and listed in SS mode.
-- **B — do not hash or check files whose `path_kind` is `windows`** (recommended). They are reported with
+- **B — do not hash or check files whose `path_kind` is `windows`** (chosen). They are reported with
   `path` and `path_kind`, and `sha256` and `signature` are absent with no gap: not read by design, as a
   missing file is not a gap in ADR 0048. The embedded check says little there anyway — 178 of 205 service
   DLLs under `%SystemRoot%` carry **no embedded signature**, because Windows signs its own files through a
@@ -374,8 +374,8 @@ match:
   read; an entry switched off in Task Manager, which this program cannot tell from one that is on. A
   `found` row says a program not signed the way this checks is set to start without being asked; it does
   not say what the program does.
-- **`unmeasured_when`**: `not_windows`, and `access_denied` if the owner agrees under question 9: an
-  ordinary PC produced it with administrator rights. `not_admin` is a scope statement already.
+- **`unmeasured_when`**: `not_windows` and `access_denied` (owner decision 9): an ordinary PC produced it
+  with administrator rights. `not_admin` is a scope statement already.
 - `unverifiable_offline` is not matched: it is a fact about the check, not the file (ADR 0035).
 
 ### 9. A second collector, `defender_exclusion`
@@ -437,7 +437,7 @@ says Defender was told not to scan where FiveM keeps its files; it does not say 
 | Task Scheduler COM API | A standard user gets a subset with no error (148 of 209), which would read as measured; it is a call into another process and needs new `windows` features |
 | The `TaskCache` registry keys | Undocumented layout; refused to a standard user as well |
 | Report arguments, or whether there were any | Arguments carry secrets; presence alone tells a reviewer nothing a rule uses |
-| Resolve the file a Windows script host is given | Needs argument text to be read and parsed; question 4 |
+| Resolve the file a Windows script host is given | Needs argument text to be read and parsed; left for a later change (owner decision 4) |
 | Hash every file under `%SystemRoot%` | 271 files, 77.5 s cold in one pass; the embedded check reads most of them as `no_embedded_signature` anyway (section 7) |
 | Read `StartupApproved` | Its bytes have no Microsoft-documented meaning; on the runner every first byte was `0x04`, on the PC `0x02` and `0x03` with `0x00` and `0x06` once each |
 | Read every account's `Run` key (`HKEY_USERS`) | Other people's settings; `LiveHost` refuses every root but `HKLM` and `HKCU` |
@@ -466,43 +466,36 @@ says Defender was told not to scan where FiveM keeps its files; it does not say 
 ## Before any code
 
 1. ~~The PC measurement~~ — done, "Measured on a Windows 11 PC (2026-09-30)".
-2. The owner's decisions below.
+2. ~~The owner's decisions~~ — taken on 2026-09-30, below.
 3. Baselines: the `autostart` and `defender_exclusion` observations of `baseline-*` hosts are rebuilt from
    the collectors' own output on a runner, as `driver_service`'s were (ADR 0048), and
    `fixtures/hosts/PROVENANCE.md` says what that does not show.
 
-## Owner decisions (open)
+## Owner decisions (2026-09-30)
 
-1. **A new collector `autostart` for services, `Run`/`RunOnce` and tasks, rather than a wider
-   `driver_service`.** Recommended: yes (section 1).
-2. **Tasks read from the XML files, `not_admin` without administrator rights**, rather than the COM API's
-   silent subset. Recommended: the files (section 2).
-3. **`entry` withheld in SS mode.** Recommended: yes (section 10).
-4. **Arguments.** (a) Never read into a report, as section 4 proposes; or (b) additionally, for the seven
-   Windows script and library hosts only, resolve the first argument that is a drive-letter path to an
-   existing file and describe that file — its path, hash and signature, never the argument text.
-   Recommended: (a) now. The PC had 13 such actions, 7 naming a file, 1 of those outside `%SystemRoot%`;
-   (b) would add one described file there, so it stays a later change of its own.
-5. **Files under `%SystemRoot%`.** Option B of section 7 — not hashed or checked, reported by path — with a
-   30 s budget for the rest. Recommended: B, **with the reason restated after the PC**: there the files
-   under `%SystemRoot%` took 1.2 s of 3.0 s hashing (not cold), so cost alone would not decide it on that
-   PC; what does is that 201 of its 230 service DLLs there have no embedded signature, so checking them
-   says nothing a rule can use. The runner's cold 77.5 s is the case the budget is for.
-6. **The two rules, both `experimental`,** and a `rules/known-fps.csv` row for each on a baseline rebuilt
-   from a runner: GitHub's provisioning agent for the first, the image's whole-drive exclusions for the
-   second. The alternative is to leave those observations out of the baseline, which would describe a
-   machine that no one measured. Recommended: the rows.
-7. **`defender_exclusion` as a second collector, reading paths, processes and extensions and counting IP
-   addresses, with `covers_fivem` against FiveM's three folders only.** Recommended: yes. The game folder
-   still waits, but the PC shows Rockstar's `InstallFolder*` values are a candidate source: a follow-up
-   probe that prints which Rockstar product keys hold them (product names, not personal data) would settle
-   it.
-8. **Both collectors in the `standard` tier.** Recommended: yes (section 10).
-9. **A task file refused to an elevated read** (1 of 296 on the PC). (a) A gap `access_denied` confined to
-   `task`, and the rule declares `access_denied` in `unmeasured_when`, so an ordinary PC shows it as a
-   count in SS mode rather than a row; or (b) the same gap, undeclared, so SS mode lists it on that PC.
-   A rule that matched is `found` either way. Recommended: (a), on the PC's evidence that an ordinary PC
-   produces it; new since the PC measurement.
+1. A new collector, `autostart`, reads program services, `Run`/`RunOnce` and scheduled tasks;
+   `driver_service` is not widened (section 1).
+2. Tasks are read from the XML files under `%SystemRoot%\System32\Tasks`, `not_admin` without
+   administrator rights; the Task Scheduler COM API is not used (section 2).
+3. `entry` is withheld in SS mode (section 10).
+4. Arguments are never read into a report (section 4). Describing the file a Windows script or library host
+   is given is not part of this change; on the PC it would have added one described file.
+5. Files under `%SystemRoot%` are not hashed and their signature is not checked; they are reported by path,
+   and every other file is hashed and checked under a 30 s budget of its own (section 7, option B). What
+   decides it is that 201 of the PC's 230 service DLLs there have no embedded signature; the runner's cold
+   77.5 s is the case the budget is for.
+6. Both rules ship `experimental`, and a baseline rebuilt from a runner carries a `rules/known-fps.csv` row
+   for each: GitHub's provisioning agent for the first, the image's whole-drive exclusions for the second.
+   Those observations stay in the baseline (sections 8 and 9).
+7. `defender_exclusion` is a collector of its own, reading paths, processes and extensions and counting IP
+   addresses, with `covers_fivem` against FiveM's three folders only. The game's folder waits until a
+   measurement says which Rockstar product keys hold the `InstallFolder*` values (section 9).
+8. Both collectors are in the `standard` tier (section 10).
+9. A task file refused to an elevated read is a gap `access_denied` confined to `task`, and the autostart
+   rule declares `access_denied` in `unmeasured_when` (sections 2 and 8).
+
+The points under "What is unverified" stay open; the changes that add the collectors say which they
+measured.
 
 ## Consequences
 
