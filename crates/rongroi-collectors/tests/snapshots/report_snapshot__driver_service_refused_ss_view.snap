@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 53
+      "rule_count": 54
     },
     "platform": "windows",
     "os_build": null,
@@ -290,7 +290,7 @@ expression: view
   },
   "hidden": {
     "not_found": 0,
-    "unmeasured_expected": 10,
+    "unmeasured_expected": 11,
     "unmeasured_unexpected": 0,
     "unmatched": 7
   },
@@ -338,6 +338,7 @@ expression: view
   "collector_order": [
     "posture",
     "driver_service",
+    "autostart",
     "fivem_dir",
     "fivem_servers",
     "net_config",
