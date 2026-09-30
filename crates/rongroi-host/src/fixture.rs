@@ -10,11 +10,11 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DirEntryInfo,
-    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
-    FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistryData, RegistrySource,
-    SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
-    UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
+    AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
+    DirEntryInfo, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
+    FirmwareSecureBoot, FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistryData,
+    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
+    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -73,6 +73,10 @@ struct HostFile {
     /// which the accessors report as `Unsupported`.
     #[serde(default)]
     usn_journal: Option<FixtureUsnJournal>,
+    /// The SID of the account the scan runs as (ADR 0060). Absent means the fixture never modelled
+    /// it, which the accessor reports as `Unsupported`. A fixture's SID is invented, never a real one.
+    #[serde(default)]
+    account_sid: Option<String>,
 }
 
 /// What a fixture says the Event Log service states about one channel (ADR 0042). A fixture with no
@@ -880,6 +884,7 @@ pub struct FixtureHost {
     /// Keyed by the lower-cased channel name, like every other name this host compares.
     event_log_channels: Option<BTreeMap<String, StoredChannel>>,
     usn_journal: Option<StoredUsnJournal>,
+    account_sid: Option<String>,
 }
 
 impl FixtureHost {
@@ -952,6 +957,7 @@ impl FixtureHost {
             firmware: file.firmware,
             processes: file.processes,
             milliseconds_since_boot: file.milliseconds_since_boot,
+            account_sid: file.account_sid,
             event_log_channels: file
                 .event_log_channels
                 .map(|channels| {
@@ -1268,6 +1274,14 @@ impl EventLogConfigSource for FixtureHost {
 impl EnvironmentSource for FixtureHost {
     fn env_var(&self, name: &str) -> Option<String> {
         self.env.get(&name.to_ascii_lowercase()).cloned()
+    }
+}
+
+impl AccountSource for FixtureHost {
+    fn account_sid(&self) -> Result<String, SourceError> {
+        self.account_sid.clone().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe its account".to_owned())
+        })
     }
 }
 
