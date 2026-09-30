@@ -127,8 +127,9 @@ matching file had no embedded signature (none was `invalid`).
 | tasks, enabled with a boot or logon trigger | 1 | `primer.exe` |
 | `Run` | 0 | — |
 
-**A Defender exclusion covers a FiveM folder**: both drive roots cover `%LOCALAPPDATA%\FiveM`, which the
-runner does not have.
+**A Defender exclusion covers a FiveM folder**: the `C:\` root covers `%LOCALAPPDATA%\FiveM`, which the
+runner does not have; the `D:\` root does not (corrected on 2026-10-01 from "both drive roots", after the
+collector's first reading of the runner in #121).
 
 So **both proposed rules would read `found` on a baseline rebuilt from this runner**: the first on
 GitHub's own provisioning agent, the second on the image's whole-drive exclusions. Both are ordinary
@@ -496,6 +497,21 @@ says Defender was told not to scan where FiveM keeps its files; it does not say 
 
 The points under "What is unverified" stay open; the changes that add the collectors say which they
 measured.
+
+## Choices made in the implementation (2026-10-01)
+
+The pull requests that shipped this ADR (#120, #121) met four cases the sections above do not settle. The
+owner had asked that such cases follow the recommendation or the more conservative reading; these are the
+readings taken, recorded here so the ADR matches the code:
+
+1. An unquoted command line with a space, where no prefix names an existing file, is reported without
+   `path` and with no gap: the program is missing, as ADR 0048 treats a missing file (section 3).
+2. A `Parameters` key refused to the token gives that service a `sha256` and `signature` gap, `not_admin`
+   or `access_denied` through `failure::reason_for`, and no `path` (sections 3 and 7).
+3. A Defender exclusion that is not a drive-letter path once expanded, such as a bare process name, or that
+   uses a variable this account does not have, gets no `covers_fivem`, as a wildcard does (section 9).
+4. When neither `%LOCALAPPDATA%` nor `%APPDATA%` is set, a path or process exclusion's `covers_fivem` is a
+   `read_failed` gap (section 9).
 
 ## Consequences
 
