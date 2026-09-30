@@ -5,6 +5,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Proposed (ADR 0058): a second `full`-tier collector, `fivem_logs`, reading FiveM's own log files in both
+  editions for the servers the game connected to — each endpoint, its address kind, how many files and lines
+  named it and those files' times — through a tolerant parser that reports `partial` when FiveM's
+  undocumented format is not recognised. Endpoints are server identities, hidden in SS mode unless the
+  player agrees, and a server on the player's own PC or network is shown as its kind only. Plugin names are
+  not collected. The line templates are to be measured on a real PC before any code.
+
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
   profile folder, `%TEMP%\aeterna-rongroi-<process id>`, behind for good, because the folder is deleted
