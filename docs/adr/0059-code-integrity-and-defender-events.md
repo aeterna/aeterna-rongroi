@@ -176,13 +176,32 @@ inside the 30-second `PARSE_BUDGET`. What is known about that:
   the parse budget; they feed only `configured_path`, `at_configured_path` and `max_size_bytes`, which no rule
   here reads.
 
-**So the Defender channel is reached on this PC as far as one scan shows, and "reliably" is not
-established.** What protects the rule is the failure mode, not the order: if the budget runs out anywhere,
+**So, from these two facts alone, the Defender channel is reached on this PC as far as one scan shows, and
+"reliably" is not established; the timed scan below adds a second, and its limits.** What protects the rule is the failure mode, not the order: if the budget runs out anywhere,
 every `evtx` rule — this one included — is `unmeasured / budget_spent`, which no rule may declare and SS mode
 lists (ADR 0032). It can make the row disappear into a listed "not measured"; it cannot make it read
 `not_found` over logs that were never read. Moving the Defender log forward would buy an answer only in the
 scans where the budget runs out, and would do it by leaving the other logs' rules unmeasured anyway; it is
-not done. How long `evtx` takes on this PC is owner decision 5.
+not done. How long `evtx` takes on this PC is owner decision 5, measured below.
+
+**The timed scan (owner decision 5), 2026-09-30**, same PC. The official 0.4.0 CLI
+(`aeterna-rongroi-cli-0.4.0-windows-x64.exe`), checked against the release's `SHA256SUMS` and with
+`gh attestation verify` exiting 0; `evtx`, its parser and the Windows host code are unchanged between the
+`v2026.09.21-0.4.0` tag and `dev` (`git diff` over those paths is empty). One elevated `scan --json`,
+standard tier, Self mode.
+
+| | |
+|---|---|
+| `.evtx` files in the folder | 414, 318 MiB |
+| folder account | `logs` 414 · `examined` 414 · `refused` 0 · `budget_exhausted` false · `budget_seconds` 30 |
+| whole scan, wall clock, every collector | 20.9 s |
+
+**So on this PC the Defender log, 375th of 414, was read inside the 30-second budget**, and so was every
+other log. `evtx`'s own time was not taken apart from the scan's, so 20.9 s is an upper bound on it. The read
+was **not cold**: the probe had read both channels earlier the same day, and the files were likely still in
+the file cache, so a first scan after a restart may take longer. A PC with a slower disk or a larger folder
+may still spend the budget. When it does, every `evtx` rule is a listed `unmeasured / budget_spent`, never a
+quiet `not_found` (above), so no ADR on `PARSE_BUDGET` is needed now.
 
 ## Decision
 
@@ -332,8 +351,9 @@ CodeIntegrity or Defender log from a machine this project may publish, with both
   decides whether the third `falsepositives` entry is a real cause or a possibility.
 - **Which policy wrote the PC's 3077s** — answered on 2026-09-30: `Microsoft Windows Driver Policy`, all
   drivers. That this name is the vulnerable driver blocklist's is inferred, not documented.
-- **Whether a PC with about 400 logs reaches the Defender log inside the 30-second budget, every time.** One
-  scan on the PC did (inferred from ADR 0042's `not_found`); no duration was recorded.
+- **Whether a PC with about 400 logs reaches the Defender log inside the 30-second budget, every time.** Two
+  scans on the PC did — one inferred from ADR 0042's `not_found`, one timed at 20.9 s for the whole scan on a
+  warm file cache. A cold read, a slower disk or a larger folder is not measured.
 - **How long the Defender log reaches back on a player's PC.** Two months in a fifth of its 16 MiB on the
   PC; a PC with more Defender activity keeps less.
 - **Whether the timeline selectors make the SS timeline unreadable** on a PC with hundreds of blocks. A
@@ -354,9 +374,11 @@ CodeIntegrity or Defender log from a machine this project may publish, with both
    is a separate pull request that runs `fixtures/evtx/PROVENANCE.md`'s two scans first.
 5. **Before the change that adds the rule and the selectors merges**, one elevated scan of a release build on
    the Windows 11 PC (build 26220) records how long `evtx` takes, with the folder account's `examined`,
-   `refused` and `budget_exhausted`. That measurement is taken on its own and is not part of this ADR's pull
-   request. If the budget is near its end, the answer is an ADR on `PARSE_BUDGET`, not a reordering of the
-   logs (section "Reaching the logs" under the PC measurement).
+   `refused` and `budget_exhausted`. If the budget is near its end, the answer is an ADR on `PARSE_BUDGET`,
+   not a reordering of the logs. **Met on 2026-09-30** ("The timed scan" under the PC measurement): 414 of
+   414 logs examined, `budget_exhausted` false, 20.9 s for the whole scan on a warm file cache. No
+   `PARSE_BUDGET` ADR is needed now; a colder or larger PC may still spend the budget, and shows it as a
+   listed `unmeasured`.
 
 The points under "What is unverified" stay open; the change that adds the rules says which it measured.
 
