@@ -1,7 +1,8 @@
 # ADR 0058 — Server endpoints in FiveM's own logs, in a full scan
 
-- Status: proposed — **recommended to be parked**: two measurements on 2026-09-30 found no server endpoint in
-  FiveM's logs on the PC measured (section "What the measurements mean", owner decision 1)
+- Status: parked — the owner decided on 2026-09-30 to build nothing until a measurement on a PC shows a log
+  line that names a joined server: a read-only probe of the kind used here, run on a PC that joined a server within the span its FiveM logs cover, prints the template of a line that names the joined server by an address, or by a name with a port (owner decision 1). Two measurements on 2026-09-30 found no
+  such line on the PC measured (section "What the measurements mean").
 - Date: 2026-09-30
 
 ## Context
@@ -395,9 +396,9 @@ only when the player agrees to show server identities, and a server on the playe
 - Whether any of this holds on another FiveM version; the format is expected to change with updates, and
   `files_unrecognised` is how a report says it did.
 
-## Owner decisions (to be made)
+## Owner decisions
 
-1. **What to do with this source.** Options:
+1. **What to do with this source — decided 2026-09-30: park it.** The options weighed were:
    - **park it** — keep this ADR `proposed`, marked parked, with the measurements and the design; build
      nothing; reopen when a measurement on a PC shows a log line that names a joined server;
    - narrow it to Legacy's IPv4 line — a parser and a fuzz target for three lines whose values may be the
@@ -405,12 +406,15 @@ only when the player agrees to show server identities, and a server on the playe
    - withdraw it — and amend ADR 0052 section 6's row "Endpoints and plugin names in FiveM's logs";
    - keep it proposed with the question open.
 
-   **Recommendation: park it.** The premise is not supported on the one PC measured, narrowing would read a
-   value that may identify the player's connection, and withdrawing would discard a design and a
-   measurement method that a second PC could still need. The condition that ends the parking: a read-only
-   probe of the kind used here, on a PC that joined a server within the logs' span, prints a join line's
-   template holding an address or a name with a port. ADR 0052's row stays, with a note that the source is
-   parked.
+   The owner chose to park it, as recommended: the premise is not supported on the one PC measured,
+   narrowing would read a value that may identify the player's connection, and withdrawing would discard a
+   design and a measurement method that a second PC could still need. Nothing is built. **The parking ends
+   when** a read-only probe of the kind used here, run on a PC that joined a server within the span its FiveM logs cover, prints the template of a line that names the joined server by an address, or by a name with a port. Reopening is a change to this ADR that records that measurement and takes
+   decisions 2 to 8. ADR 0052 section 6's row stays, with a note that the source is parked.
+
+**Decisions 2 to 8 are not decided.** They are the recommendations that would be put to the owner if the
+source is reopened, and no one has agreed to them.
+
 2. **If reopened, which lines are read for endpoints.** Only a closed list of measured templates that name the
    server the game connected to; every other `host:port`-shaped text counted, not reported (section 3).
 3. **If reopened, SS mode.** `endpoint` a server identity behind ADR 0052's switch; `address_kind` always
@@ -428,8 +432,8 @@ only when the player agrees to show server identities, and a server on the playe
 
 ## Consequences
 
-While parked: none in code. ADR 0052 section 6's row for FiveM's logs gains a note pointing here, in the
-change that records owner decision 1. If reopened:
+While parked: none in code. ADR 0052 section 6's row for FiveM's logs carries a note pointing here. If
+reopened:
 
 - `rongroi-parsers`: `fivem_log`, with fixtures under `fixtures/parsers/fivem_log/` and a fuzz target.
 - `rongroi-collectors`: `fivem_logs`, tier `full`, registered in `all()` and after `fivem_servers` in
