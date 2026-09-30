@@ -1,0 +1,18 @@
+{
+  "description": "One 5001 at level 4, the shape measured on two GitHub-hosted runners: each image carried one such record, written while the image was prepared, before anyone used the machine (ADR 0059). The provider and channel are the names the evtx collector produced from those logs; the time is illustrative. The rule matches — and its first falsepositive is that maker.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+      "channel": "Microsoft-Windows-Windows Defender/Operational",
+      "provider": "Microsoft-Windows-Windows Defender",
+      "event_id": 5001, "level": 4, "count": 1,
+      "first_seen": "2026-09-22T04:10:33.120Z", "last_seen": "2026-09-22T04:10:33.120Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+      "channel": "Microsoft-Windows-Windows Defender/Operational",
+      "provider": "Microsoft-Windows-Windows Defender",
+      "event_id": 5007, "level": 4, "count": 526,
+      "first_seen": "2026-09-05T02:00:00.000Z", "last_seen": "2026-09-30T08:00:00.000Z" } }
+  ],
+  "expect_matches": 1
+}

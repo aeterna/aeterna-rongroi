@@ -9,9 +9,12 @@
 //! nothing itself (ADR 0018). Reading the `Security` channel needs an elevated token, so `not_admin`
 //! is an expected outcome of an ordinary scan rather than a defect (ADR 0012, ADR 0024).
 //!
-//! Four rules read this collector — the Security log's own record that it was cleared, and the System
-//! log's record that some log file was (ADR 0031); a log file marked read-only (ADR 0037); and a log
-//! file that is not the file its channel is written to (ADR 0042). Everything else it sees is listed
+//! Five rules read this collector — the Security log's own record that it was cleared, and the System
+//! log's record that some log file was (ADR 0031); a log file marked read-only (ADR 0037); a log file
+//! that is not the file its channel is written to (ADR 0042); and Microsoft Defender's record that its
+//! real-time protection was switched off (ADR 0059). Three timeline selectors put times from it on the
+//! timeline without making evidence: each log's oldest and newest record (ADR 0051), Code Integrity's
+//! refusals to load a file, and Defender's detections (ADR 0059). Everything else it sees is listed
 //! in Self mode as unmatched observations and counted, never listed, in SS mode (ADR 0014).
 //!
 //! # One observation per kind of event, never one per record

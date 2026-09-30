@@ -1,0 +1,18 @@
+{
+  "description": "The Code Integrity log's groups for 3033 and 3077 as the evtx collector emits them, with the provider and channel names it produced from real logs on two GitHub-hosted runners (ADR 0059). The counts echo the shape measured on an ordinary Windows 11 PC; the times are illustrative. Both groups are selected, and nothing in them says which file or which policy.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+      "channel": "Microsoft-Windows-CodeIntegrity/Operational",
+      "provider": "Microsoft-Windows-CodeIntegrity",
+      "event_id": 3033, "level": 2, "count": 476,
+      "first_seen": "2026-09-09T10:12:03.004Z", "last_seen": "2026-09-29T21:40:55.318Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+      "channel": "Microsoft-Windows-CodeIntegrity/Operational",
+      "provider": "Microsoft-Windows-CodeIntegrity",
+      "event_id": 3077, "level": 2, "count": 17,
+      "first_seen": "2026-09-10T08:01:17.552Z", "last_seen": "2026-09-28T08:02:40.119Z" } }
+  ],
+  "expect_matches": 2
+}

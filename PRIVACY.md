@@ -236,6 +236,10 @@ ADR 0051:
 - the times of FiveM's log, crash and cache folders, and of each Enhanced server cache folder, without its
   name. These times can match two reports of this PC;
 - the oldest and newest record each Windows event log holds, with the log's path;
+- the first and last time the Code Integrity log recorded Windows refusing to load a file (events 3033
+  and 3077), and the first and last time Microsoft Defender's log recorded a detection or an action on one
+  (events 1116 and 1117), ADR 0059. The events' contents are not read, so this never says which file
+  was refused, which program asked, or what Defender detected;
 - the oldest and newest change the change journal holds for each folder it counts.
 
 The same list is on the consent screen. Each entry that comes from this list is shown with the ordinary
