@@ -17,6 +17,7 @@ type Screen = "start" | "consent" | "declined" | "about" | { report: Mode; optio
 export function App() {
   const { t, i18n } = useTranslation();
   const [header, setHeader] = useState<ReportHeader | null>(null);
+  const [headerFailed, setHeaderFailed] = useState(false);
   const [screen, setScreen] = useState<Screen>("start");
   // The screen About & code was opened from, so Back returns there: an open report keeps its mode,
   // and an SS report does not ask for consent again.
@@ -26,7 +27,9 @@ export function App() {
   const full = header?.scan_tier === "full";
 
   useEffect(() => {
-    void reportHeader().then(setHeader);
+    void reportHeader()
+      .then(setHeader)
+      .catch(() => setHeaderFailed(true));
   }, []);
 
   return (
@@ -125,7 +128,9 @@ export function App() {
         </section>
       )}
 
-      {screen === "about" && <About onBack={() => setScreen(beforeAbout)} />}
+      {screen === "about" && (
+        <About header={header} headerFailed={headerFailed} onBack={() => setScreen(beforeAbout)} />
+      )}
 
       {typeof screen === "object" && (
         <Report mode={screen.report} options={screen.options} onBack={() => setScreen("start")} />

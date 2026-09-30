@@ -6,6 +6,9 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { codeLinkQr } from "../api";
 
+/** How long the button says "Copied" before it offers to copy again. */
+export const COPIED_FOR_MS = 2000;
+
 interface Props {
   /** What is shown, selectable. */
   text: string;
@@ -22,6 +25,16 @@ export function CodeLink({ text, copy, qr = false }: Props) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   const [image, setImage] = useState<string | null>(null);
+
+  // "Copied" answers one click; left on the button it would still claim so after the clipboard has
+  // changed. A refusal stays, because it says what to do instead.
+  useEffect(() => {
+    if (copied !== "copied") {
+      return;
+    }
+    const timer = setTimeout(() => setCopied("idle"), COPIED_FOR_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   useEffect(() => {
     setImage(null);

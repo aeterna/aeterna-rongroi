@@ -76,7 +76,8 @@
   "toolbar": {
     "technical_all": "Show technical details for every row",
     "filtered": "Showing one state only.",
-    "clear": "Show every state"
+    "clear": "Show every state",
+    "filtered_empty": "No row in this scan is in this state."
   },
   "collector": {
     "posture": "Security settings of this PC",

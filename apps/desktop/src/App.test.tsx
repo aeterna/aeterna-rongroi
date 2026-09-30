@@ -8,10 +8,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
 import type { ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
+import { COPIED_FOR_MS } from "./views/CodeLink";
 
 // Vitest runs with apps/desktop as the working directory.
 const SNAPSHOTS = resolve(process.cwd(), "../../crates/rongroi-collectors/tests/snapshots");
@@ -56,6 +57,9 @@ let linksOverride: { repository: string; code: string; commit: string | null } |
 // Carried fix (b): a `code_links` call that never resolves, so `links` stays `null` — the same shape
 // the UI sees while the call is still in flight or after it failed.
 let linksNeverResolve = false;
+/** An IPC call Rust refused, for the pages that must say so rather than stay blank. */
+let headerFails = false;
+let linksFail = false;
 let clipboardWrites: string[] = [];
 const REPOSITORY = "https://github.com/aeterna/aeterna-rongroi";
 const COMMIT = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
@@ -74,6 +78,8 @@ beforeEach(async () => {
   headerOverride = null;
   linksOverride = null;
   linksNeverResolve = false;
+  headerFails = false;
+  linksFail = false;
   clipboardWrites = [];
   await i18n.changeLanguage("en");
   mockIPC((cmd, args) => {
@@ -81,6 +87,9 @@ beforeEach(async () => {
     const payload = (args ?? {}) as Record<string, unknown>;
     switch (cmd) {
       case "report_header":
+        if (headerFails) {
+          throw new Error("refused");
+        }
         return headerOverride ?? selfView.header;
       case "report_view":
         return viewOverride ?? (payload.mode === "ss" ? ssView : selfView);
@@ -104,6 +113,9 @@ beforeEach(async () => {
       case "code_links":
         if (linksNeverResolve) {
           return new Promise(() => {});
+        }
+        if (linksFail) {
+          throw new Error("refused");
         }
         return linksOverride ?? { repository: REPOSITORY, code: REPOSITORY, commit: null };
       case "relaunch_full":
@@ -647,10 +659,16 @@ describe("App", () => {
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     const buttons = Array.from(summary.querySelectorAll("button"));
     expect(buttons.map((b) => b.textContent)).toEqual([
-      `${selfView.listed.found}found — each one lists ordinary things that also produce it`,
-      `${selfView.listed.not_found}not found — each row says how far back it can see`,
-      `${selfView.listed.unmeasured}not measured — each row says why`,
+      `${selfView.listed.found} found — each one lists ordinary things that also produce it`,
+      `${selfView.listed.not_found} not found — each row says how far back it can see`,
+      `${selfView.listed.unmeasured} not measured — each row says why`,
     ]);
+    // A screen reader reads the count and its words apart, not "1found".
+    expect(
+      screen.getByRole("button", {
+        name: `${selfView.listed.found} found — each one lists ordinary things that also produce it`,
+      }),
+    ).toBeTruthy();
     expect(summary.textContent).toContain("This report cannot prove that a PC is clean.");
   });
 
@@ -666,6 +684,51 @@ describe("App", () => {
     expect(screen.queryByText(/— show what was checked$/)).toBeNull();
     fireEvent.click(screen.getByText("Show every state"));
     expect(found.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  // A count of 0 is a button like the others; choosing it must not leave an empty page.
+  it("says so when the chosen state has no row", async () => {
+    viewOverride = {
+      ...selfView,
+      evidence: selfView.evidence.filter((item) => item.state !== "unmeasured"),
+      listed: { ...selfView.listed, unmeasured: 0 },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const summary = await screen.findByRole("region", { name: "What this scan lists" });
+    expect(screen.queryByText("No row in this scan is in this state.")).toBeNull();
+    fireEvent.click(summary.querySelectorAll("button")[2] as HTMLElement);
+    expect(screen.getByText("No row in this scan is in this state.")).toBeTruthy();
+    // It is about the filter, not the report: the report's own empty sentence stays away.
+    expect(screen.queryByText("No evidence to show.")).toBeNull();
+    fireEvent.click(screen.getByText("Show every state"));
+    expect(screen.queryByText("No row in this scan is in this state.")).toBeNull();
+  });
+
+  // Two copies of one program running are two identical observations (ADR 0010).
+  it("lists two identical observations twice, without a repeated key", async () => {
+    const twin = {
+      collector: "process",
+      fields: { name: "FiveM.exe", path: "C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.exe" },
+    };
+    viewOverride = {
+      ...selfView,
+      unmatched: [{ collector: "process", observations: [twin, twin] }],
+    };
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      render(<App />);
+      fireEvent.click(await screen.findByText("Check my own PC"));
+      const section = await screen.findByRole("region", { name: "Unmatched observations" });
+      expect(section.querySelectorAll("li").length).toBeGreaterThanOrEqual(2);
+      expect(section.textContent?.split("name=FiveM.exe").length).toBe(3);
+      const keyWarnings = errors.mock.calls.filter((call) =>
+        call.some((part) => String(part).includes("same key")),
+      );
+      expect(keyWarnings).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it("groups rows under a plain name for their collector", async () => {
@@ -837,6 +900,58 @@ describe("App", () => {
     expect(screen.getByText(/^Hidden in SS mode:/)).toBeTruthy();
     expect(screen.queryByText("You may refuse.")).toBeNull();
     expect(screen.queryByText("What do you want to do?")).toBeNull();
+  });
+
+  // The header is the app's: About & code does not ask Rust for it a second time.
+  it("asks for the header once, whether or not About & code is opened", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    await screen.findByText(REPOSITORY);
+    expect(calls.filter((cmd) => cmd === "report_header")).toEqual(["report_header"]);
+  });
+
+  it("says on About & code that its details could not be read, and still goes back", async () => {
+    linksFail = true;
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    expect(
+      await screen.findByText("What this page shows could not be read from the program."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText("Back"));
+    expect(await screen.findByText("Check my own PC")).toBeTruthy();
+  });
+
+  it("says on About & code that its details could not be read when the header was refused", async () => {
+    headerFails = true;
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    expect(
+      await screen.findByText("What this page shows could not be read from the program."),
+    ).toBeTruthy();
+  });
+
+  it("offers to copy again after saying Copied", async () => {
+    stubClipboard("ok");
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    await screen.findByText(REPOSITORY);
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getAllByText("Copy link")[0] as HTMLElement);
+      });
+      expect(screen.getByText("Copied")).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(COPIED_FOR_MS - 1);
+      });
+      expect(screen.getByText("Copied")).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.queryByText("Copied")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("says a refused copy and leaves the text to select", async () => {

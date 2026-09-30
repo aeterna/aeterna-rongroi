@@ -12,6 +12,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   folders named exactly as it names its own, never its own, never one whose process id is running, and
   none at all when the process list cannot be read. It runs after the scan, so it cannot change what that
   scan measured.
+- Desktop app polish. About & code no longer stays a blank page when the program cannot answer
+  it: it says the details could not be read and keeps its Back button. It no longer asks for the
+  report header a second time. A count of 0 in the report summary, when chosen as a filter, says that
+  no row is in that state instead of showing nothing. Each count's button is read as "7 found — …", not
+  "7found — …". "Copied" goes back to "Copy link" after two seconds. Two identical observations, such as
+  two copies of one program running, no longer share a React key. New strings are in English and Thai.
 
 ## [0.4.0] - 2026-09-21
 
