@@ -14,6 +14,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   recommendations, and states the measurement that would reopen it. ADR 0052's row for this source says it
   is parked.
 
+### Changed
+- ADR 0059 is proposed: what Code Integrity and Microsoft Defender already record, read through the
+  existing `evtx` collector with no new read. Code Integrity's blocked-image events (3033, 3077) and
+  Defender's detection events (1116, 1117) become timeline selectors rather than rules, because both were
+  measured on ordinary machines; Defender's "real-time protection is disabled" (5001) becomes one `context`
+  rule. Measured on two GitHub-hosted runners, where this code emitted the provider and channel names the
+  rules match, a runner nobody used held four 3033 events, and both runner images carried a 5001 of their
+  own.
+
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
   profile folder, `%TEMP%\aeterna-rongroi-<process id>`, behind for good, because the folder is deleted
