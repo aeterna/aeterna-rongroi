@@ -13,10 +13,10 @@
 
 use std::path::{Path, PathBuf};
 
-use rongroi_parsers::{bam, evtx, filetime, pca, usn};
+use rongroi_parsers::{bam, evtx, filetime, pca, task, usn};
 
 /// The directories that are both an L0 fixture set and a fuzz seed corpus.
-const SEEDED_DIRECTORIES: [&str; 4] = ["bam", "pca-app-launch", "pca-general", "usn"];
+const SEEDED_DIRECTORIES: [&str; 5] = ["bam", "pca-app-launch", "pca-general", "task", "usn"];
 
 /// `fuzz_prefetch`'s seed corpus, which is the one that does not live under `fixtures/parsers/`:
 /// those files are vendored from a third-party corpus under its own licence and `REUSE.toml`
@@ -232,6 +232,39 @@ fn the_usn_fixtures_hold_the_records_their_names_say() {
             .unwrap()
             .records
             .is_empty()
+    );
+}
+
+#[test]
+fn every_task_fixture_is_parsed_or_refused_rather_than_panicking() {
+    for (name, bytes) in fixtures_in("task") {
+        let parsed = task::parse_task(&bytes);
+        let refused = matches!(name.as_str(), "not-a-task.xml" | "truncated-utf16le.xml");
+        assert_eq!(parsed.is_err(), refused, "{name}: {parsed:?}");
+    }
+}
+
+#[test]
+fn the_task_fixtures_hold_what_their_names_say() {
+    let logon = task::parse_task(&fixture("task", "logon-exec-utf16le.xml")).unwrap();
+    assert_eq!(logon.enabled, Some(true));
+    assert_eq!(
+        logon.triggers,
+        vec![task::TriggerKind::Logon, task::TriggerKind::Calendar]
+    );
+    assert_eq!(
+        logon.exec_commands,
+        vec![Some(
+            r"%LOCALAPPDATA%\Contoso\Updater\updater.exe".to_owned()
+        )]
+    );
+    let boot = task::parse_task(&fixture("task", "boot-exec-utf8.xml")).unwrap();
+    assert_eq!(boot.triggers, vec![task::TriggerKind::Boot]);
+    assert_eq!(boot.principal_user_id.as_deref(), Some("S-1-5-18"));
+    let com = task::parse_task(&fixture("task", "disabled-com-handler-utf16le.xml")).unwrap();
+    assert_eq!(
+        (com.enabled, com.exec_commands.len(), com.com_handlers),
+        (Some(false), 0, 1)
     );
 }
 
