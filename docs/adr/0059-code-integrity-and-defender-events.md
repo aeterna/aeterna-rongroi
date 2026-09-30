@@ -117,15 +117,80 @@ real-time protection off before anyone used it writes the same record a person d
 of 202 examined; each whole scan, a debug build, took 36 s and 26 s). In the collector's order the
 CodeIntegrity log is about the 35th file and the Defender log about the 180th, with 74–80 MB of logs read
 before it. The order does not change a rule's answer: a log the budget did not reach gaps every `evtx`
-field, so every `evtx` rule is `unmeasured / budget_spent` and listed (ADR 0024, ADR 0032). Whether a PC
-with twice the logs reaches the end is what the probe below measures.
+field, so every `evtx` rule is `unmeasured / budget_spent` and listed (ADR 0024, ADR 0032). Where the two
+logs fall on a PC with twice the logs is in the next section.
+
+### Measured on a Windows 11 PC (2026-09-30)
+
+The probe described at the end of this ADR, run once elevated on a Windows 11 PC (build 26220) — the same PC
+as the 2026-09-16 measurement — with the owner's permission. It printed counts, ids, levels, times, shapes
+and settings only.
+
+**Code Integrity.** Enabled, circular, 1 052 672 bytes max and at that size, 1 204 records back to
+2026-09-09 — three weeks. Provider and channel as recorded match what this code emits on the runners.
+
+| Id, level | Count | Days | What the probe grouped them by |
+|---|---|---|---|
+| 3033, 2 | 476 | 15 of the 22 | 420: a `.dll` under `Program Files` refused to a process under `Program Files`; 56: a `.dll` under `System32`/`SysWOW64` refused to a process elsewhere under `Windows` |
+| 3077, 2 | 17 | 7 | all 17: a `.sys` under `System32`, policy name `Microsoft Windows Driver Policy` |
+| 3023, 2 | 17 | 7 | the same times as the 3077s: the driver-side record of the same refusals |
+| 3089, 4 | 511 | — | signature records for the above |
+| 3004, 2 | 1 | 1 | — |
+
+Settings beside them: `VulnerableDriverBlocklistEnable` 1; memory integrity's configured `Enabled` 1; Smart
+App Control (`VerifiedAndReputablePolicyState`) 0, off.
+
+So on this PC **every 3077 was a driver refused by a Microsoft driver policy**, with the blocklist and memory
+integrity both on and no App Control policy anybody installed; and **nine in ten 3033s were one installed
+program refusing a DLL of another installed program**, both in `Program Files`, on two days out of three.
+That `Microsoft Windows Driver Policy` is the name the vulnerable driver blocklist carries is not stated on
+the pages read; it is the only driver policy those pages say Windows turns on by default. **Unverified.**
+
+**Defender.** Enabled, circular, 16 777 216 bytes max, 3 215 360 bytes used, 2 821 records back to
+2026-08-01 — two months in a fifth of the log. Real-time protection on, tamper protection on; Security Center
+lists one antivirus product, Defender.
+
+| Id, level | Count | Days |
+|---|---|---|
+| 1116, 3 | 9 | 1 (2026-08-30), within one minute |
+| 1117, 4 | 4 | the same minute |
+| 5001 | 0 | — |
+| 5007, 4 | 582 | — |
+
+Defender's own category and severity for the 13 detection records are one pair, `Trojan` / `Severe`. That is
+all this ADR records of them: what was detected and where is not read, and a category is Defender's label,
+not a finding about the file or about the person. 1116 is level 3 here and level is not in any `match`
+below, so that changes nothing.
+
+**Reaching the logs.** The folder holds 414 `.evtx` files, 333 897 728 bytes. In the collector's order
+(ADR 0024: `Security`, `System`, `Application`, then the rest by lower-cased name) the CodeIntegrity log is
+66th with 80 093 184 bytes before it, and the Defender log is **375th with 305 491 968 bytes — 91 % of the
+folder — before it**. So the Defender rule gets an answer only on a scan that reads nearly the whole folder
+inside the 30-second `PARSE_BUDGET`. What is known about that:
+
+- ADR 0042 records one elevated scan on this PC, on 2026-09-13, in which `event-log-not-at-configured-path`
+  was `not_found`. Since a log the budget did not reach gaps every `evtx` field, that answer means **that scan
+  read every log inside the budget**. Its duration was not recorded, and the folder has grown since.
+- The runners read their whole folder inside the budget with a debug build, but hold about 210 logs, not 414.
+- The Event Log service questions of ADR 0042 have their own 5-second `CONFIG_BUDGET` and are not charged to
+  the parse budget; they feed only `configured_path`, `at_configured_path` and `max_size_bytes`, which no rule
+  here reads.
+
+**So the Defender channel is reached on this PC as far as one scan shows, and "reliably" is not
+established.** What protects the rule is the failure mode, not the order: if the budget runs out anywhere,
+every `evtx` rule — this one included — is `unmeasured / budget_spent`, which no rule may declare and SS mode
+lists (ADR 0032). It can make the row disappear into a listed "not measured"; it cannot make it read
+`not_found` over logs that were never read. Moving the Defender log forward would buy an answer only in the
+scans where the budget runs out, and would do it by leaving the other logs' rules unmeasured anyway; it is
+not proposed. How long `evtx` takes on this PC is owner decision 5.
 
 ## Decision
 
 ### 1. Code Integrity 3033 and 3077: a timeline selector, not a rule
 
-A 3033 was on one of two runners that nobody had used, and 200 of them were on the PC; 3077 was 23 there,
-and on a Windows 11 PC the policy that writes one is, by default, Microsoft's own driver blocklist. A rule
+A 3033 was on one of two runners that nobody had used, and 476 on 15 days were on the PC, nine in ten of
+them one installed program refusing another's DLL; the PC's 17 3077s were all drivers refused by a Microsoft
+driver policy, with the blocklist and memory integrity on. A rule
 on either would be `found` on ordinary machines, and it would put in front of an SS reviewer a row reading
 "Windows blocked an image" with no way to say which image, blocked by which policy, for which process.
 That is the shape of an accusation with the evidence left out.
@@ -164,7 +229,7 @@ dates, and the others are Windows starting up.
 
 ### 2. Defender 1116 and 1117: a timeline selector, not a rule
 
-Neither runner had one; the PC had 9 and 4. What Defender detected is in the payload. A browser toolbar, a
+Neither runner had one; the PC had 9 and 4, all within one minute of one day. What Defender detected is in the payload. A browser toolbar, a
 game trainer, a key generator and a file a download manager fetched are all "malware or other potentially
 unwanted software" to Defender, and a false positive is recorded in the same words. A row saying "Defender
 detected something" names none of them.
@@ -262,16 +327,17 @@ CodeIntegrity or Defender log from a machine this project may publish, with both
 
 ## What is unverified
 
-- **Whether a 5001 is written when another antivirus is installed.** Not documented, not measured. It
+- **Whether a 5001 is written when another antivirus is installed.** Not documented, not measured; the PC
+  has Defender alone, so the probe could not answer it. It
   decides whether the third `falsepositives` entry is a real cause or a possibility.
-- **Which policy wrote the PC's 23 × 3077, and what the 200 × 3033 blocked.** The probe below groups them by
-  the kind of file blocked, where it and the requesting process live, and the policy name — shapes only.
-- **Whether a PC with about 400 logs reaches the Defender log inside the 30-second budget.** Both runners
-  did, with about 210 logs.
-- **How long the Defender log reaches back on a player's PC.** 16 MiB on both runners and, from the PC's
-  record counts, very likely there too; the time span is not measured.
+- **Which policy wrote the PC's 3077s** — answered on 2026-09-30: `Microsoft Windows Driver Policy`, all
+  drivers. That this name is the vulnerable driver blocklist's is inferred, not documented.
+- **Whether a PC with about 400 logs reaches the Defender log inside the 30-second budget, every time.** One
+  scan on the PC did (inferred from ADR 0042's `not_found`); no duration was recorded.
+- **How long the Defender log reaches back on a player's PC.** Two months in a fifth of its 16 MiB on the
+  PC; a PC with more Defender activity keeps less.
 - **Whether the timeline selectors make the SS timeline unreadable** on a PC with hundreds of blocks. A
-  selector adds two times per group, not one per event, so the PC above would add four entries; that is
+  selector adds two times per group, not one per event, so the PC's 476 3033s and 17 3077s would add four entries; that is
   arithmetic from the collector's grouping, not a rendered view.
 - **Which programs on a player's PC use Code Integrity Guard**, and so how many 3033 events an overlay or
   recorder produces there. Microsoft documents the mechanism, not a list.
@@ -281,8 +347,8 @@ CodeIntegrity or Defender log from a machine this project may publish, with both
 ## Owner decisions
 
 1. **Code Integrity 3033/3077 as a timeline selector only, with no evidence rule** (section 1).
-   *Recommended: yes.* The alternative is a `context` rule, which would be `found` on the one ordinary PC
-   measured.
+   *Recommended: yes*, and firmer after 2026-09-30: 476 3033s on 15 days and 17 driver 3077s on a PC with
+   the defaults on. The alternative is a `context` rule, which would be `found` on it.
 2. **Defender 1116/1117 as a timeline selector only** (section 2). *Recommended: yes*, for the same reason.
    Revisit if the probe shows 1116 is rare on ordinary PCs, which one PC with 9 does not suggest.
 3. **Defender 5001 as one `context`, `experimental` rule** (section 3). *Recommended: yes.* `test` is
@@ -294,8 +360,11 @@ CodeIntegrity or Defender log from a machine this project may publish, with both
    is 1 MB of records; `fixtures/evtx/PROVENANCE.md`'s two scans decide, in their own pull request. If it is
    done, the 5001 rule would be `found` on it and need a `known-fps.csv` row naming the image — which is
    the honest result.
-5. **Run the probe on the PC before the implementation** (below). *Recommended: yes.* It answers two of the
-   unverified points above in one run, and its answers go into the `falsepositives` text.
+5. **Measure how long `evtx` takes on the PC before the rules merge.** *Recommended: yes* — changed on
+   2026-09-30, since the probe that this decision first asked for has run. One elevated scan of a release
+   build, reporting the folder account's `examined`, `refused` and `budget_exhausted` and the scan's
+   duration. If the budget is near its end, the answer is an ADR on `PARSE_BUDGET`, not a reordering: the
+   rule already fails as a listed `unmeasured`, never as a quiet `not_found`.
 
 ## Consequences, if accepted
 

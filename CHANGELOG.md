@@ -21,7 +21,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   measured on ordinary machines; Defender's "real-time protection is disabled" (5001) becomes one `context`
   rule. Measured on two GitHub-hosted runners, where this code emitted the provider and channel names the
   rules match, a runner nobody used held four 3033 events, and both runner images carried a 5001 of their
-  own.
+  own. A Windows 11 PC recorded 476 3033 events on 15 days, 17 driver refusals by a Microsoft
+  driver policy, and no 5001; its Defender log sits 91 % of the way through the event log folder, so whether
+  `evtx` reliably reaches it inside its budget is left for a timed scan.
 
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
