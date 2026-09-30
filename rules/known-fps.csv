@@ -20,3 +20,4 @@
 #
 rule_id,baseline,reason,added
 72820eaf-1469-4ea7-bb0f-17f145d26dfc,baseline-elevated-win11,"The runner image's own provisioning agent, C:\ProgramData\GitHub\Primer\primer.exe, is an enabled boot-triggered task with no embedded signature; a management and provisioning agent is a false positive the rule names (ADR 0060, owner decision 6)",2026-09-30
+d7191cf3-ce56-480b-8501-66a198f83e08,baseline-elevated-win11,"The runner image excludes its whole C drive from Microsoft Defender, which covers FiveM's folders; a build machine excluding a whole drive is a false positive the rule names (ADR 0060, owner decision 6)",2026-09-30

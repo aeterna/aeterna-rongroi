@@ -3461,6 +3461,13 @@ registry:
   'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run':
     'AzureArcSetup': '"C:\Windows\AzureArcSetup\Systray\AzureArcSysTray.exe"'
     'SecurityHealth': '"C:\Windows\system32\SecurityHealthSystray.exe"'
+  # ADR 0060, section 9: Microsoft Defender's exclusions as `defender_exclusion` read them on a GitHub-hosted
+  # runner (windows.yml run 36735878867, 2026-09-30): the image excludes its two drives, and nothing else.
+  # `Get-MpPreference` listed the same two. Not a gaming PC's; see PROVENANCE.md.
+  'HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths':
+    'C:\': 0
+    'D:\': 0
+  'HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\IpAddresses': {}
 filesystem:
   # ADR 0057: Defender's platform folder, which the same PC has and which a limited token listed on
   # 2026-09-21. The two version folders are the names that PC had; nothing inside them is read, and

@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 54 |
-| SHA-256 | `fe8383f75796054ccea499c83a369c8872dd8ac5e0b7bc89ccf25f3fc359e335` |
+| Rules | 55 |
+| SHA-256 | `f2aaf3a5c765297d0f031a7781bf1d45c3378bbee5973566762417041c6cfb56` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -43,6 +43,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 - `autostart`
   - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
+- `defender_exclusion`
+  - [A Microsoft Defender exclusion covers a FiveM folder](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
   - [A registered driver is on LOLDrivers' list of vulnerable drivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
@@ -158,6 +160,45 @@ The services, Run and RunOnce values and scheduled tasks registered when the sca
 - Open-source and self-built tools, which are often not signed
 - A file signed through a Windows catalog, which this check does not read
 - A Run entry switched off in Task Manager, which this program cannot tell from one that is on
+
+## Collector `defender_exclusion`
+
+### `defender_exclusion` / `fivem`
+
+<a id="rule-d7191cf3-ce56-480b-8501-66a198f83e08"></a>
+
+#### A Microsoft Defender exclusion covers a FiveM folder
+
+- Id: `d7191cf3-ce56-480b-8501-66a198f83e08`
+- File: [`rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml`](../rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml)
+- Collector: `defender_exclusion`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `defender_exclusion`, `posture`
+- Written: 2026-09-30
+
+**About this check**
+
+Microsoft Defender is told not to scan a folder or a program that is one of FiveM's folders, a folder above one — a whole drive included — or something inside one. FiveM's folders are FiveM for GTA V Legacy's and Enhanced's under the Windows account's local and roaming AppData, whether or not they exist on this PC. The row shows the exclusion as Defender holds it and whether it was set in Defender's own settings or by a policy. An exclusion with a wildcard is not compared, and the game's own folder is not compared yet. This says Defender was told not to scan where FiveM keeps its files; it does not say what was put there, who set the exclusion or when.
+
+**Matches when all of these hold for one observation**
+
+- `covers_fivem`: is `true`
+
+**Look-back**
+
+Defender's exclusions as they were when the scan ran. An exclusion removed before the scan is not seen.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Performance and FPS guides that tell players to exclude the game or FiveM folder from scanning to reduce stutter
+- Game and mod installers and launchers that add their own exclusion
+- Developers and build machines that exclude a whole drive for build speed, as a GitHub-hosted runner image excludes its C and D drives
+- Another security product, or an administrator, managing Defender's settings
 
 ## Collector `driver_service`
 

@@ -144,6 +144,14 @@ on this baseline, on GitHub's provisioning agent; `rules/known-fps.csv` accepts 
 decision 6). A runner image says nothing about what a gaming PC starts. Neither non-elevated baseline sets
 `%SystemRoot%`, so `autostart` is `read_failed` on both.
 
+**Defender's exclusions in `baseline-elevated-win11` are a runner's.** They are the two path exclusions
+`defender_exclusion` read on a GitHub-hosted Windows Server 2025 runner (`windows.yml` run 36735878867,
+2026-09-30), `C:\` and `D:\`, with an empty `IpAddresses` key; `Get-MpPreference` listed the same two.
+`C:\` covers FiveM's folders, so the Defender-exclusion rule is `found` there and `rules/known-fps.csv`
+accepts it (ADR 0060, owner decision 6); `D:\` does not cover them, because this baseline's profile is on
+`C:`. Both non-elevated baselines are refused the exclusions, as a limited token was on the runner and a
+Windows 11 PC, so `defender_exclusion` is `not_admin` there.
+
 **Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
 posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,
 `registry-access-denied`, `baseline-hardened-win11` and `baseline-consumer-win11` — declares

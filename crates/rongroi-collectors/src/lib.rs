@@ -7,6 +7,7 @@
 
 pub mod autostart;
 pub mod bam;
+pub mod defender_exclusion;
 pub mod driver_service;
 pub mod evtx;
 pub mod failure;
@@ -213,6 +214,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
         Box::new(autostart::Autostart::default()),
         Box::new(bam::Bam),
+        Box::new(defender_exclusion::DefenderExclusion),
         Box::new(driver_service::DriverService::default()),
         Box::new(evtx::Evtx::default()),
         Box::new(fivem_dir::FivemDir),

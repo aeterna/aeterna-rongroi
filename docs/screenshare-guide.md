@@ -208,6 +208,7 @@ These are counts of what SS mode does not list. §7 says why.
 | The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder; whether Enhanced loads this folder at all is not known |
 | The change journal holds a rename in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder |
 | A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders | posture | `experimental` | programs installed per user in AppData — launchers, chat and voice apps, cloud sync clients, and above all their updaters and helpers; peripheral, RGB, fan and overclocking utilities; service wrappers and servers from a package manager; management and provisioning agents; open-source and self-built tools; a file signed through a catalog; a Run entry switched off in Task Manager |
+| A Microsoft Defender exclusion covers a FiveM folder | posture | `experimental` | performance and FPS guides that tell players to exclude the game or FiveM folder, game and mod installers and launchers that add their own exclusion, developers and build machines that exclude a whole drive, another security product or an administrator managing Defender |
 
 Four things to know about the thirteen rows above, which are all about **which Windows this is**:
 
@@ -330,6 +331,14 @@ Three things to know about the rule on what starts by itself (ADR 0060):
   a Windows program that runs a script (`cmd`, `powershell`, `rundll32`) is shown as that Windows program.
   Files in the Windows folder are not checked at all. A scan without administrator rights cannot read the
   task files, and says so once above the evidence.
+
+Two things to know about the Defender-exclusion rule (ADR 0060):
+
+- **Excluding the game from scanning is common advice.** FPS guides tell players to do it, and some
+  launchers do it for them. A whole-drive exclusion covers FiveM too; a developer's PC and a GitHub runner
+  have one. The row shows the exclusion as Defender holds it and whether a policy set it.
+- **It needs administrator rights.** Without them the exclusions cannot be read, and the report says so
+  once above the evidence. Network-address exclusions are only counted, never shown.
 
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.

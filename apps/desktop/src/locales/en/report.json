@@ -89,6 +89,7 @@
     "posture": "Security settings of this PC",
     "driver_service": "Drivers registered with Windows",
     "autostart": "Programs that start by themselves (services, Run, scheduled tasks)",
+    "defender_exclusion": "Microsoft Defender exclusions",
     "fivem_dir": "FiveM files",
     "net_config": "Network settings (hosts, proxy, firewall)",
     "os_image": "What Windows says this installation is",

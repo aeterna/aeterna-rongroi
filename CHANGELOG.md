@@ -53,7 +53,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   whose behaviour is unchanged. A host reads this account's SID, compared with a task's principal and
   never reported. The consent question, PRIVACY.md, both READMEs and both screenshare guides say what is
   read.
-- Accepted (ADR 0060), the `autostart` half implemented above: an `autostart` collector for what Windows starts by itself —
+- The `defender_exclusion` collector: what Microsoft Defender is told not to scan (ADR 0060, section 9).
+  The value names of `Exclusions\Paths`, `Processes` and `Extensions` under Defender's own key and its
+  policy key, each with its kind, which key set it and, for a path or a process, whether it covers one of
+  FiveM's three folders (a drive root included; never for a wildcard); of `IpAddresses` only the count,
+  never an address. Refused without administrator rights (`not_admin`), as measured on a runner and a
+  Windows 11 PC. One `posture` rule, `experimental`: a Defender exclusion covers a FiveM folder. The consent
+  question, PRIVACY.md, both READMEs and both screenshare guides say what is read.
+- Accepted (ADR 0060), both halves implemented above: an `autostart` collector for what Windows starts by itself —
   program services, `Run`/`RunOnce` under `HKLM`, its 32-bit view and `HKCU`, and scheduled tasks read from
   their files — with each file's path, SHA-256 and embedded signature, never a command line's arguments; and a
   `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights only.
