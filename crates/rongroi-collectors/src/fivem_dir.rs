@@ -35,7 +35,7 @@ use jiff::Timestamp;
 use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
 use rongroi_host::{DirEntryInfo, Host, Platform, SignatureCheck, SourceError};
 
-use crate::{Collector, Field};
+use crate::{Age, AgeCount, AgePlace, AgeRows, Collector, Field};
 
 /// Environment variable holding the per-user local application data folder.
 pub const LOCAL_APP_DATA: &str = "LOCALAPPDATA";
@@ -85,6 +85,19 @@ pub const ENHANCED_LAUNCHER_CRASHES_LOCATION: &str = "enhanced_launcher_crashes"
 pub const ENHANCED_SERVER_CACHE_LOCATION: &str = "enhanced_server_cache";
 
 const ID: &str = "fivem_dir";
+
+/// The log, crash and cache folders, in the order `LOCATIONS` lists them (ADR 0053): each a source of
+/// its own for a trace age (ADR 0061).
+pub const ACTIVITY_LOCATIONS: [&str; 8] = [
+    LEGACY_LOGS_LOCATION,
+    LEGACY_CRASHES_LOCATION,
+    LEGACY_CACHE_LOCATION,
+    LEGACY_SERVER_CACHE_LOCATION,
+    ENHANCED_LOGS_LOCATION,
+    ENHANCED_CRASHES_LOCATION,
+    ENHANCED_LAUNCHER_CRASHES_LOCATION,
+    ENHANCED_SERVER_CACHE_LOCATION,
+];
 
 /// The field that says which place an observation is about: every observation carries it, and a place
 /// that could not be read is a gap for the observations carrying its value only (ADR 0044).
@@ -245,11 +258,14 @@ const REASONS: [UnmeasuredReason; 3] = [
 ///   `modified_at`, each only when the listing provided it);
 /// - **a file** (`location`, `path`, and whichever of `sha256`, `signature`, `signer` and
 ///   `signer_cert_sha256` could be read). A program folder produces only this kind, for `FiveM.exe`
-///   (ADR 0036);
+///   (ADR 0036), which also carries `program_folder_created_at` — the program folder's own creation
+///   time — and for Legacy `app_folder_created_at`, `FiveM.app`'s, each when it could be read
+///   (ADR 0061);
 /// - **a server cache folder** (`location: enhanced_server_cache`, `created_at`, `modified_at` and
 ///   `entries`, each when it could be read) — told apart from its parent's folder observation by having
 ///   no `folder` field (ADR 0053).
-const FIELDS: [Field; 19] = [
+const FIELDS: [Field; 21] = [
+    Field::timestamp("app_folder_created_at"),
     Field::timestamp("created_at"),
     Field::timestamp("earliest_created_at"),
     Field::timestamp("earliest_modified_at"),
@@ -263,6 +279,7 @@ const FIELDS: [Field; 19] = [
     Field::text("location"),
     Field::timestamp("modified_at"),
     Field::text("path"),
+    Field::timestamp("program_folder_created_at"),
     Field::text("sha256"),
     Field::text("signature"),
     Field::text("signer"),
@@ -297,6 +314,25 @@ impl Collector for FivemDir {
 
     fn discriminator(&self) -> Option<&'static str> {
         Some(DISCRIMINATOR)
+    }
+
+    /// One row per log, crash and cache folder (ADR 0053): the earliest file time it holds, how many
+    /// files, and its latest file write beside them. Enhanced's server cache is counted in server
+    /// folders and dated by them (ADR 0061).
+    fn age(&self) -> Option<Age> {
+        Some(Age {
+            oldest: &["earliest_created_at", "earliest_modified_at"],
+            count: AgeCount::Field("files"),
+            rows: AgeRows::PerPlace,
+            places: &ACTIVITY_LOCATIONS,
+            extra: &["latest_modified_at"],
+            by_place: &[AgePlace {
+                place: ENHANCED_SERVER_CACHE_LOCATION,
+                oldest: &["created_at", "modified_at"],
+                count: AgeCount::Observations,
+                without: Some("folder"),
+            }],
+        })
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {
@@ -359,7 +395,14 @@ impl Collector for FivemDir {
                         .into_iter()
                         .filter(|entry| entry.name.eq_ignore_ascii_case(name))
                         .collect();
-                    observations.extend(file_observations(host, location, &folder, named));
+                    let mut files = file_observations(host, location, &folder, named);
+                    if !files.is_empty() {
+                        let folder_times = install_times(host, location, &folder);
+                        for file in &mut files {
+                            file.fields.extend(folder_times.clone());
+                        }
+                    }
+                    observations.extend(files);
                 }
                 // A launch-mode cache that is not there is the ordinary case for all but one mode, so it
                 // is not reported; a place with no variant says it is absent, as a plugin folder does.
@@ -549,6 +592,36 @@ fn own_times(host: &dyn Host, folder: &str) -> (Option<Timestamp>, Option<Timest
         .into_iter()
         .find(|entry| !entry.is_file && entry.name.eq_ignore_ascii_case(name))
         .map_or((None, None), |entry| (entry.created, entry.modified))
+}
+
+/// Legacy's `FiveM.app`, inside its program folder (ADR 0061).
+const APP_FOLDER_NAME: &str = "FiveM.app";
+
+/// When `FiveM`'s program folder was created on this account, and for Legacy when `FiveM.app` was
+/// (ADR 0061): each folder's own creation time, never `FiveM.exe`'s, which an update replaces. A time
+/// that could not be read is left out, as a hash that could not be read is: the file was still read.
+/// Enhanced's `FiveM.app` is not asked about: the one Enhanced install measured had none.
+fn install_times(
+    host: &dyn Host,
+    location: &Location,
+    folder: &str,
+) -> BTreeMap<String, serde_json::Value> {
+    let created = |path: &str| {
+        host.times(path)
+            .ok()
+            .flatten()
+            .and_then(|times| times.created)
+    };
+    let mut fields = BTreeMap::new();
+    if let Some(time) = created(folder) {
+        fields.insert("program_folder_created_at".to_owned(), time_value(time));
+    }
+    if location.name == LEGACY_EXE_LOCATION
+        && let Some(time) = created(&format!(r"{folder}\{APP_FOLDER_NAME}"))
+    {
+        fields.insert("app_folder_created_at".to_owned(), time_value(time));
+    }
+    fields
 }
 
 /// Whether a folder in Enhanced's server cache has the shape `FiveM` gives a server's folder: 40
@@ -1106,6 +1179,32 @@ mod tests {
 
     /// No program folder, or one without `FiveM.exe`, reports nothing: the plugin folders' own
     /// observations say whether an edition is installed.
+    /// `FiveM.exe`'s observation carries its program folder's creation time and, for Legacy,
+    /// `FiveM.app`'s — each folder's own, not the executable's, which an update replaces (ADR 0061).
+    #[test]
+    fn the_client_carries_its_program_folders_creation_time() {
+        let run = FivemDir.collect(&fixture("trace-ages-elevated"));
+        let (observations, _) = measured(&run);
+        let legacy = observations
+            .iter()
+            .find(|observation| observation.fields["location"] == LEGACY_EXE_LOCATION)
+            .unwrap();
+        assert_eq!(
+            legacy.fields["program_folder_created_at"],
+            "2024-05-10T08:00:00Z"
+        );
+        assert_eq!(
+            legacy.fields["app_folder_created_at"],
+            "2024-05-10T08:01:00Z"
+        );
+        // A folder the fixture gives no time says nothing, rather than a stand-in.
+        let run = FivemDir.collect(&fixture("fivem-dir-client-exe"));
+        let (observations, _) = measured(&run);
+        for observation in observations {
+            assert!(!observation.fields.contains_key("program_folder_created_at"));
+        }
+    }
+
     #[test]
     fn an_absent_executable_is_no_observation_and_no_gap() {
         let host = inline(

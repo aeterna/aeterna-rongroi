@@ -39,7 +39,8 @@ Every result is one of three things:
 - **A full scan reads more, and only if you say yes before it starts**: today, the names of FiveM for GTA V
   Enhanced's server cache folders. A flag or a script cannot say yes for you, and in SS mode a server's
   name stays hidden unless you agree to show it separately.
-- **SS mode** (for screenshare) asks for consent first, shows what matched a rule and a timeline of the times its consent screen lists, and hides your
+- **SS mode** (for screenshare) asks for consent first, shows what matched a rule, a timeline of the times its consent screen lists, and how far back
+  each source reaches beside when parts of the PC were set up ([ADR 0061](docs/adr/0061-how-old-the-traces-are.md)), and hides your
   user name in paths. You may refuse.
 
 Details: [PRIVACY.md](PRIVACY.md).

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# The ordinary retention of this source, shown under its trace-age rows (ADR 0061). Checked 2026-09-30.
+id: ccf59545-5dbf-44a6-961c-fb961c8214f6
+collector: evtx
+retention: >-
+  A log keeps records until it reaches its maximum size; with the default retention, the oldest
+  records are then overwritten, so a full log reaches back only as far as its size allows — on a busy
+  log, days. The size is set per log, and the documented default for the classic logs is 1 MB; the
+  policy settings give other defaults for Security, and most logs on a Windows 11 PC were measured at
+  that 1 MB floor.
+documented: true
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/eventlog/eventlog-key
+  - https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-eventlogservice
+  - docs/adr/0042-what-the-event-log-service-says-a-channel-writes.md

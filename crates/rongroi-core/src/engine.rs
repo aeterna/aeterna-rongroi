@@ -79,6 +79,15 @@ pub fn evaluate(
         .iter()
         .filter_map(|selector| selection(selector, &runs))
         .collect();
+    // Every selector the bundle holds, matched or not, so that "selected nothing" can be told from
+    // "there was no selector to select anything" (ADR 0061).
+    let mut timeline_selectors: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for selector in &selectors {
+        timeline_selectors
+            .entry(selector.collector.clone())
+            .or_default()
+            .push(selector.id.clone());
+    }
     Report {
         header,
         evidence,
@@ -90,6 +99,8 @@ pub fn evaluate(
         coverage_fields: BTreeMap::new(),
         unmeasured_sources: Vec::new(),
         sensitive_fields: std::collections::BTreeMap::new(),
+        age_fields: BTreeMap::new(),
+        timeline_selectors,
     }
 }
 
@@ -727,6 +738,7 @@ date: 2026-09-12
             boot_time: crate::model::BootTime::default(),
             profiles_directory: None,
             scan_tier: crate::model::ScanTier::Standard,
+            anchors: Vec::new(),
         }
     }
 
@@ -1017,6 +1029,9 @@ date: 2026-09-17
             let report = evaluate(&bundle, &runs, header(), &SelfIdentity::default());
             assert!(report.timeline_selections.is_empty(), "{runs:?}");
             assert!(report.evidence.is_empty(), "{runs:?}");
+            // The selector is still named as one the bundle held (ADR 0061).
+            assert_eq!(report.timeline_selectors.len(), 1, "{runs:?}");
+            assert_eq!(report.timeline_selectors["process"].len(), 1, "{runs:?}");
         }
     }
 

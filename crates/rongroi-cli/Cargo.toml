@@ -28,5 +28,9 @@ rongroi-host.workspace = true
 [target.'cfg(windows)'.dependencies]
 rongroi-host-windows.workspace = true
 
+[dev-dependencies]
+# The trace-ages text is checked against a scan of a fixture host (ADR 0061).
+rongroi-host = { workspace = true, features = ["fixture"] }
+
 [lints]
 workspace = true

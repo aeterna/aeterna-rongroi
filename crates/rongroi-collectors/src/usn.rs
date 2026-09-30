@@ -43,7 +43,7 @@ use rongroi_host::{FileId, Host, Platform, UsnReadEnd};
 use rongroi_parsers::usn::{self, ParentReference, UsnRecord};
 
 use crate::failure::reason_for;
-use crate::{Collector, Coverage, Field, evtx, fivem_dir, pca, prefetch};
+use crate::{Age, AgeCount, AgeRows, Collector, Coverage, Field, evtx, fivem_dir, pca, prefetch};
 
 const ID: &str = "usn";
 /// The field that says which place an observation is about (ADR 0044): a watched folder, or the journal.
@@ -70,12 +70,13 @@ pub const FOLDER_OTHER_VOLUME: &str = "other_volume";
 /// ADR 0047 measured about one second for a 32 MiB journal; an administrator can make one larger.
 pub const BUDGET: Duration = Duration::from_secs(30);
 
-static FIELDS: [Field; 13] = [
+static FIELDS: [Field; 14] = [
     Field::number("created"),
     Field::number("data_changed"),
     Field::number("deleted"),
     Field::timestamp("first_seen"),
     Field::text("folder"),
+    Field::text("journal_created_on"),
     Field::timestamp("last_seen"),
     Field::text("location"),
     Field::number("maximum_size"),
@@ -171,6 +172,19 @@ impl Collector for Usn {
         &REASONS
     }
 
+    /// One row, the journal: its oldest record, how many records it held, and beside them its newest
+    /// record, its maximum size and whether it has been trimmed (ADR 0061).
+    fn age(&self) -> Option<Age> {
+        Some(Age {
+            oldest: &["first_seen"],
+            count: AgeCount::Field("records"),
+            rows: AgeRows::PerPlace,
+            places: &[JOURNAL_LOCATION],
+            extra: &["last_seen", "maximum_size", "trimmed"],
+            by_place: &[],
+        })
+    }
+
     fn discriminator(&self) -> Option<&'static str> {
         Some(DISCRIMINATOR)
     }
@@ -237,10 +251,20 @@ impl Collector for Usn {
             Err(error) => return unmeasured(reason_for(host, &error)),
         };
 
-        let mut observations = vec![tally.journal_observation(
+        let mut journal = tally.journal_observation(
             read.state.first_usn != read.state.lowest_valid_usn,
             read.state.maximum_size,
-        )];
+        );
+        // The date the identifier gives when read as a `FILETIME`, which is not documented to be a
+        // time; left out when it gives no plausible date, as a hash that could not be read is. Never
+        // the identifier itself (ADR 0047, amendment of 2026-09-30 for ADR 0061).
+        if let Some(date) = read.state.created_on {
+            journal.fields.insert(
+                "journal_created_on".to_owned(),
+                serde_json::Value::from(date.to_string()),
+            );
+        }
+        let mut observations = vec![journal];
         let mut discriminator_gaps = Vec::new();
         for (place, located) in &places {
             let (observation, gap) = tally.folder_observation(place.location, located);
@@ -539,6 +563,32 @@ mod tests {
             .join("../../fixtures/hosts")
             .join(name);
         FixtureHost::load(&dir).unwrap()
+    }
+
+    /// The journal's creation date, from the identifier read as a `FILETIME` inside the host; a
+    /// journal whose identifier gives no date leaves the field out (ADR 0061).
+    #[test]
+    fn the_journal_carries_the_date_its_identifier_gives() {
+        let journal = |host: &str| {
+            let CollectorRun::Measured { observations, .. } =
+                Usn::default().collect(&fixture(host))
+            else {
+                panic!("{host} was read");
+            };
+            observations
+                .into_iter()
+                .find(|observation| observation.fields["location"] == JOURNAL_LOCATION)
+                .unwrap()
+        };
+        assert_eq!(
+            journal("trace-ages-elevated").fields["journal_created_on"],
+            "2018-03-01"
+        );
+        assert!(
+            !journal("usn-journal-read")
+                .fields
+                .contains_key("journal_created_on")
+        );
     }
 
     fn measured(

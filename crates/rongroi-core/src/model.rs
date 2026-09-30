@@ -413,6 +413,90 @@ pub struct ReportHeader {
     /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed was a standard scan.
     #[serde(default)]
     pub scan_tier: ScanTier,
+    /// Dated facts about when parts of this PC were set up, each with what ordinarily resets it
+    /// (ADR 0061). In the header rather than in an observation so that no rule can read one: a rule on
+    /// "the PC is new" would be a verdict about an innocent fact. UTC dates, never times. Additive, and
+    /// [`REPORT_SCHEMA_VERSION`] stays at 1: a report written before it existed reads back with none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchors: Vec<Anchor>,
+}
+
+/// One anchor: a dated fact about when part of this PC was set up (ADR 0061).
+///
+/// There is no single machine age and the report does not compute one: every anchor has an ordinary
+/// reset, and on the one PC measured they disagreed by seven years. Each is shown with what it is and
+/// what resets it, and a reviewer compares them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Anchor {
+    /// Which fact this is.
+    pub anchor: AnchorKind,
+    /// Its date, or why there is none.
+    #[serde(flatten)]
+    pub state: AnchorState,
+}
+
+/// The anchors a scan reads (ADR 0061, owner decision 5), in the order a view shows them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnchorKind {
+    /// `InstallDate` under `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion`: when this
+    /// installation was installed **or last upgraded to a new feature version**. Never "installed on".
+    InstallDate,
+    /// The earliest `InstallDate` among the `Source OS (Updated on …)` subkeys Windows Setup keeps
+    /// under `HKLM\SYSTEM\Setup`, and how many there are. Not documented by Microsoft.
+    SetupEarliestInstall,
+    /// The date the system drive's change journal identifier gives when read as a `FILETIME`: the
+    /// identifier read as a time, which is not documented (ADR 0047 amendment). Administrators only.
+    UsnJournalCreated,
+    /// The system drive root's own creation date.
+    SystemDriveRootCreated,
+    /// `$Recycle.Bin`'s creation date, at the root of the system drive.
+    RecycleBinCreated,
+    /// `FiveM` for GTA V Legacy's program folder, `%LOCALAPPDATA%\FiveM`, created on this account.
+    FivemLegacyProgramFolderCreated,
+    /// Legacy's `FiveM.app` folder inside it.
+    FivemLegacyAppFolderCreated,
+    /// `FiveM` for GTA V Enhanced's program folder, `%LOCALAPPDATA%\FiveM for GTAV Enhanced`.
+    FivemEnhancedProgramFolderCreated,
+}
+
+impl AnchorKind {
+    /// Stable identifier used in JSON and translation keys.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::InstallDate => "install_date",
+            Self::SetupEarliestInstall => "setup_earliest_install",
+            Self::UsnJournalCreated => "usn_journal_created",
+            Self::SystemDriveRootCreated => "system_drive_root_created",
+            Self::RecycleBinCreated => "recycle_bin_created",
+            Self::FivemLegacyProgramFolderCreated => "fivem_legacy_program_folder_created",
+            Self::FivemLegacyAppFolderCreated => "fivem_legacy_app_folder_created",
+            Self::FivemEnhancedProgramFolderCreated => "fivem_enhanced_program_folder_created",
+        }
+    }
+}
+
+/// An anchor's date, or why there is none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum AnchorState {
+    /// Read.
+    Measured {
+        /// The UTC date, `YYYY-MM-DD`. A date and never a time: a value to the second is the same in
+        /// every report of one PC and would let two be matched (ADR 0061, owner decision 4).
+        on: String,
+        /// What was read, as a fixed spelling with no user name in it: a registry value, or a path
+        /// with its environment variable unexpanded.
+        source: String,
+        /// For [`AnchorKind::SetupEarliestInstall`], how many earlier installations Windows Setup kept.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kept: Option<u32>,
+    },
+    /// Not read. Never a guessed date.
+    Unmeasured {
+        /// Why.
+        reason: UnmeasuredReason,
+    },
 }
 
 /// How much a scan reads, chosen before it starts (ADR 0052).
@@ -533,6 +617,79 @@ pub struct UnmeasuredSource {
     pub reason: UnmeasuredReason,
 }
 
+/// How a collector's observations say how far back its source reaches (ADR 0061), as `scan::run`
+/// copies it from `Collector::age`. The core never guesses which field is a source's oldest time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgeFields {
+    /// The timestamp fields whose minimum over a row's observations is the oldest time it holds.
+    pub oldest: Vec<String>,
+    /// How much a row holds.
+    pub count: AgeCount,
+    /// What one row is.
+    pub rows: AgeRows,
+    /// For [`AgeRows::PerPlace`], the discriminator values that each get a row, in order; the other
+    /// places are not a source of their own. Empty: every place observed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub places: Vec<String>,
+    /// Fields shown beside a row and never compared: a log's size and maximum, a journal's size.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extra: Vec<String>,
+    /// For [`AgeRows::PerValue`], the values listed first, each a row; the rest are folded into one
+    /// line (ADR 0061, owner decision 3). Filled from the bundle: for `evtx`, the logs its rules and
+    /// timeline selectors read.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub first: Vec<String>,
+    /// A place whose row is read differently from the rest: `fivem_dir`'s Enhanced server cache,
+    /// counted in server folders.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub by_place: Vec<AgePlace>,
+}
+
+/// How much a trace-age row holds (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AgeCount {
+    /// The row's observations that carry one of its oldest fields.
+    Observations,
+    /// The sum of one number field over the row's observations.
+    Field {
+        /// The field.
+        field: String,
+    },
+}
+
+/// What one trace-age row is (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AgeRows {
+    /// One row for the collector.
+    One,
+    /// One row per value of the collector's discriminator.
+    PerPlace,
+    /// One row per value of a field: `evtx`'s `log`.
+    PerValue {
+        /// The field.
+        field: String,
+    },
+}
+
+/// One place whose trace-age row is read differently from its collector's other places (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgePlace {
+    /// The discriminator value.
+    pub place: String,
+    /// The oldest fields for this place.
+    pub oldest: Vec<String>,
+    /// How much it holds.
+    pub count: AgeCount,
+    /// Only the place's observations that do not carry this field count: a server folder rather
+    /// than the folder that holds it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub without: Option<String>,
+}
+
 /// A full scan result, before a view decides what to show.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Report {
@@ -574,6 +731,14 @@ pub struct Report {
     /// (ADR 0052). Copied from the collectors' declarations, which the core cannot see. Additive.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub sensitive_fields: BTreeMap<String, BTreeMap<String, SensitiveKind>>,
+    /// For each collector that declares one, how its observations say how far back its source reaches
+    /// (ADR 0061). Additive, and [`REPORT_SCHEMA_VERSION`] stays at 1.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub age_fields: BTreeMap<String, AgeFields>,
+    /// The ids of every timeline selector the bundle held, by collector, whether or not it selected
+    /// anything (ADR 0061): "selected nothing" can be said only of a selector that was there. Additive.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub timeline_selectors: BTreeMap<String, Vec<String>>,
 }
 
 #[cfg(test)]

@@ -769,3 +769,79 @@ fn a_plugin_folder_on_another_volume_is_an_expected_reason_not_a_failed_read() {
         reason: UnmeasuredReason::OtherVolume,
     }));
 }
+
+/// What the trace-ages section and the statement are built from and show, as one document per view.
+fn trace_ages_of(report: &rongroi_core::model::Report, mode: Mode) -> serde_json::Value {
+    let view = view::for_mode(report, mode);
+    serde_json::json!({
+        "anchors": view.header.anchors,
+        "trace_ages": view.trace_ages,
+        "cross_source": view.cross_source,
+    })
+}
+
+/// A PC read with administrator rights: every anchor dated, each source's oldest time and count, the
+/// logs the bundle reads first and the rest folded, and the cross-source statement — Prefetch reaches
+/// back before `FiveM`'s logs were last written and holds no `FiveM` name, BAM was refused, and PCA holds
+/// one (ADR 0061).
+#[test]
+fn trace_ages_elevated_ss_view() {
+    let view = view::for_mode(&report_for("trace-ages-elevated"), Mode::Ss);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+#[test]
+fn trace_ages_elevated_self_and_ss_sections_agree() {
+    let report = report_for("trace-ages-elevated");
+    let own = trace_ages_of(&report, Mode::SelfCheck);
+    assert_eq!(own, trace_ages_of(&report, Mode::Ss));
+    insta::assert_json_snapshot!(own);
+}
+
+/// The same kind of PC without administrator rights: Prefetch, BAM, the Security log and the change
+/// journal are "not read without administrator rights", never empty, and no statement is made
+/// (ADR 0061, owner decisions 1 and 7).
+#[test]
+fn trace_ages_limited_ss_view() {
+    use rongroi_core::model::{AnchorKind, AnchorState, UnmeasuredReason};
+    use rongroi_core::view::TraceAgeState;
+
+    let report = report_for("trace-ages-limited");
+    let view = view::for_mode(&report, Mode::Ss);
+    let not_admin = TraceAgeState::Unmeasured {
+        reason: UnmeasuredReason::NotAdmin,
+    };
+    for (collector, key) in [
+        ("prefetch", None),
+        ("bam", None),
+        ("usn", Some("journal")),
+        ("evtx", Some("Security.evtx")),
+    ] {
+        let row = view
+            .trace_ages
+            .rows
+            .iter()
+            .find(|row| {
+                row.collector == collector
+                    && (key.is_none()
+                        || row.place.as_deref() == key
+                        || row.subject.as_deref() == key)
+            })
+            .unwrap();
+        assert_eq!(row.state, not_admin, "{collector}");
+    }
+    assert!(view.cross_source.is_empty(), "{:?}", view.cross_source);
+    let journal = report
+        .header
+        .anchors
+        .iter()
+        .find(|anchor| anchor.anchor == AnchorKind::UsnJournalCreated)
+        .unwrap();
+    assert_eq!(
+        journal.state,
+        AnchorState::Unmeasured {
+            reason: UnmeasuredReason::NotAdmin
+        }
+    );
+    insta::assert_json_snapshot!(trace_ages_of(&report, Mode::Ss));
+}

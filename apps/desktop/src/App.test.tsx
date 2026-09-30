@@ -110,6 +110,17 @@ beforeEach(async () => {
             },
           },
         };
+      case "age_texts":
+        return {
+          prefetch: {
+            retention:
+              payload.lang === "th"
+                ? "Windows ลบไฟล์ Prefetch เอง"
+                : "Windows removes Prefetch files itself.",
+            documented: false,
+            references: ["docs/adr/0030-the-words-for-what-was-not-measured.md"],
+          },
+        };
       case "code_links":
         if (linksNeverResolve) {
           return new Promise(() => {});
@@ -176,6 +187,75 @@ describe("App", () => {
 
   // ADR 0051: the SS view shows its timeline, with what it never says above it, and the scan's own
   // time as an anchor.
+  // ADR 0061: the SS view shows how far back each source reaches, beside the anchors; a source not
+  // read without administrator rights is "not known", never "empty"; the statement is shown with
+  // every record's line and its ordinary causes in full.
+  it("shows the trace ages and the cross-source statement in SS mode", async () => {
+    viewOverride = snapshot("trace_ages_elevated_ss_view");
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(await screen.findByText("How far back the traces reach")).toBeTruthy();
+    expect(screen.getByText(/beside when parts of this PC were set up/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Windows installed or last feature-upgraded \(InstallDate\): 2025-10-21, 72 days before this scan/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/Earliest installation date Windows Setup kept \(2 kept/)).toBeTruthy();
+    expect(screen.getByText(/1 other logs: 1 hold records, 0 not read/)).toBeTruthy();
+    expect(
+      screen.getByText(/Windows removes Prefetch files itself\. \(not documented/),
+    ).toBeTruthy();
+    expect(screen.getByText("a clock that was changed")).toBeTruthy();
+
+    expect(
+      screen.getByText("FiveM on this PC, beside Windows' records of programs that ran"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /no entry for FiveM\.exe, GTA5\.exe, GTA5_Enhanced\.exe, PlayGTAV\.exe or FiveM_b…_GTAProcess\.exe\. It holds 1 entries; the oldest is from 2016-01-12/,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "not read — Windows refused to open this. Whether it holds an entry is not known.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/This is not evidence of anything/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "a clock that was changed, so that times from different sources are not on the same clock",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says a source not read without administrator rights is not known, in Thai too", async () => {
+    const view = snapshot("trace_ages_elevated_ss_view");
+    const ages = view.trace_ages;
+    if (!ages) {
+      throw new Error("the snapshot has no trace ages");
+    }
+    viewOverride = {
+      ...view,
+      cross_source: [],
+      trace_ages: {
+        ...ages,
+        rows: ages.rows.map((row) =>
+          row.collector === "prefetch"
+            ? { collector: "prefetch", state: "unmeasured", reason: "not_admin" }
+            : row,
+        ),
+      },
+    };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(await screen.findByText("ร่องรอยย้อนกลับไปได้ไกลแค่ไหน")).toBeTruthy();
+    expect(screen.getByText("อ่านไม่ได้เพราะไม่มีสิทธิ์ผู้ดูแลระบบ — ไม่รู้")).toBeTruthy();
+    expect(screen.queryByText("FiveM ในเครื่องนี้ เทียบกับบันทึกของ Windows ว่าโปรแกรมใดเคยรัน")).toBeNull();
+  });
+
   it("shows the timeline in SS mode with its note and the scan time", async () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
@@ -314,6 +394,15 @@ describe("App", () => {
     viewOverride = {
       ...selfView,
       header: { ...selfView.header, boot_time: { state: "unmeasured", reason: "not_windows" } },
+      // The trace ages read the same header in Rust, so their boot-time anchor says the same.
+      trace_ages: selfView.trace_ages && {
+        ...selfView.trace_ages,
+        anchors: selfView.trace_ages.anchors.map((anchor) =>
+          anchor.anchor === "boot_time"
+            ? { anchor: "boot_time", state: "unmeasured", reason: "not_windows" }
+            : anchor,
+        ),
+      },
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
@@ -541,8 +630,10 @@ describe("App", () => {
           expected: false,
         },
       ],
-      // The row is what this test reads; the timeline states its own unmeasured sources.
+      // The row is what this test reads; the timeline and the trace ages state their own
+      // unmeasured sources.
       timeline: { ...selfView.timeline, unmeasured: [] },
+      trace_ages: undefined,
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));

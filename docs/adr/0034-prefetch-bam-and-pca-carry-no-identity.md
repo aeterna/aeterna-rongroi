@@ -8,6 +8,12 @@ records by `name` or `path`, and SS mode shows the times it selects; the consent
 programs. Decision 1 still holds for rules, and since ADR 0051 the bundle loader refuses a rule that breaks
 it.
 
+**Changed again by ADR 0061 (owner decision 8).** SS mode now shows, for Prefetch, BAM and PCA, how many
+entries each holds and the oldest time still in it, in the trace-ages section, and a cross-source statement
+that says whether each holds an entry for the names the FiveM timeline selectors list. No program name is
+shown beyond those names. Decision 2's promise — that SS mode counts these records without showing them —
+now excepts those two numbers per source, and the consent question and `PRIVACY.md` name them.
+
 ## Context
 
 README's milestone table lists M2 as "Prefetch, BAM, PCA, event-log tamper signals". Since 0.2.0 all

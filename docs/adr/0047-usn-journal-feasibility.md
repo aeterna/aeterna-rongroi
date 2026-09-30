@@ -6,6 +6,9 @@
 - Amended: 2026-09-30, accepted: a folder on another volume, and the first rules that read a count
   ("Amendment (2026-09-30, accepted)"), with two readings of the journal on a Windows 11 PC;
   implemented (see Consequences)
+- Amended: 2026-09-30, by ADR 0061 (owner decision 6): the journal observation gains
+  `journal_created_on` ("Amendment for ADR 0061: `journal_created_on`"); "Not `UsnJournalID`" still holds
+  for the identifier itself
 
 ## Context
 
@@ -790,3 +793,26 @@ GUID. It sends only the two read control codes.
 - README's M3 row, in both languages, links here: the collector reads the change journal without write
   access and counts records per watched folder with no file names, and four `context` rules read the
   deletions and renames in FiveM's two plugin folders.
+
+## Amendment for ADR 0061: `journal_created_on` (2026-09-30, accepted with ADR 0061)
+
+ADR 0061's owner decision 6 amends this ADR's "Not `UsnJournalID`" in the change that builds it.
+
+- **What is added.** The journal's own observation (`location: journal`) gains one text field,
+  `journal_created_on`: the UTC date, `YYYY-MM-DD`, that `UsnJournalID` gives when it is read as a
+  `FILETIME`. The host computes the date and hands over nothing else (`UsnJournalState::created_on`,
+  `rongroi_host::journal_created_on`); the identifier never leaves `rongroi-host-windows`, and the report
+  carries no finer time than a day.
+- **What it is, and is not.** Microsoft documents the identifier only as assigned when the journal is
+  created and possibly restamped ([Using the Change Journal
+  Identifier](https://learn.microsoft.com/en-us/windows/win32/fileio/using-the-change-journal-identifier)).
+  That it encodes a time is **not documented**: the report labels it "the identifier read as a time; not
+  documented". On one Windows 11 PC it read, twice, as a date within a day of the oldest installation date
+  Windows Setup kept (ADR 0061, "Measured on a Windows 11 PC").
+- **When it is left out.** An identifier that does not read as a date from 2000-01-01 up to 2100-01-01 gives
+  no date, and the field is absent — a field left out for one item, not a gap. The report header's
+  `usn_journal_created` anchor also refuses a date after the scan's own (`read_failed`).
+- **Rights.** Administrators only, like the rest of `usn` (limited token: error 5, measured). Without them
+  the anchor is `not_admin`.
+- **What still holds.** No identifier, USN or file reference number is reported, and no rule reads
+  `journal_created_on`: it is context for the trace-ages section's anchors (ADR 0061).

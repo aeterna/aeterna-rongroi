@@ -130,6 +130,32 @@ shown with the selector's title, description and `falsepositives`.
 - Which fields are times comes from the collector's `fields()` (`Field::timestamp`). A selector on a
   collector with no timestamp field selects nothing that reaches the timeline.
 
+## What a source ordinarily keeps: `rules/ages/`
+
+The trace-ages section (ADR 0061) shows, under each source's row, what that source ordinarily keeps. The
+words are reviewed data in the bundle, one file per collector that declares `Collector::age`:
+
+```yaml
+id: 4be2c346-393f-446e-a964-6f9318f880e3   # UUIDv4, never reused, the key of its translation
+collector: prefetch                          # the file is rules/ages/prefetch.yaml
+retention: >-
+  Windows removes Prefetch files itself, …
+documented: false                            # whether Microsoft documents what the text states
+references:
+  - docs/adr/0030-the-words-for-what-was-not-measured.md
+```
+
+- Where Microsoft does not document it, the text says "not documented by Microsoft" and names what the
+  statement rests on. `documented: true` needs a reference on Microsoft Learn.
+- It states no number the measurements disagree about: the BAM text gives no number of days (ADR 0061,
+  owner decision 2).
+- Translate `retention` in `rules/i18n/<lang>.yaml` under the file's `id`, as a rule is translated; nothing
+  else of it is translated.
+- The bundle loader refuses a text with no reference, a `documented: true` with no Microsoft Learn
+  reference, a file not named after its collector and a reused id. `cargo xtask check-rules` refuses a
+  collector that declares an age and has no text, and a text for a collector that declares none.
+- The file is in the rules bundle, so its SHA-256 in every report covers it.
+
 ## A list kept in a data file
 
 Some lists are data rather than rule text: 1,847 driver hashes are not something a reviewer reads line by

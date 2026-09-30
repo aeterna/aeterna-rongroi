@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# The ordinary retention of this source, shown under its trace-age rows (ADR 0061). Checked 2026-09-30.
+id: 4be2c346-393f-446e-a964-6f9318f880e3
+collector: prefetch
+retention: >-
+  Windows removes Prefetch files itself, and keeps none when Prefetch is switched off. A cap of
+  1 024 files is widely described; it is not documented by Microsoft, and rests on the descriptions
+  ADR 0030 records.
+documented: false
+references:
+  - docs/adr/0030-the-words-for-what-was-not-measured.md

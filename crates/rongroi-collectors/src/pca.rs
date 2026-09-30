@@ -37,7 +37,7 @@ use rongroi_parsers::pca::{self, PcaLaunchEntry};
 
 use crate::failure::{read_failure, reason_for};
 use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
-use crate::{Collector, Field};
+use crate::{Age, AgeCount, AgeRows, Collector, Field};
 
 /// Environment variable holding the Windows directory.
 pub const WINDOWS_DIR: &str = "WinDir";
@@ -126,6 +126,19 @@ impl Collector for Pca {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    /// One row: the oldest launch time and how many launch records carry one (ADR 0061). The general
+    /// databases carry no time, so they are not in the count.
+    fn age(&self) -> Option<Age> {
+        Some(Age {
+            oldest: &["last_run"],
+            count: AgeCount::Observations,
+            rows: AgeRows::One,
+            places: &[],
+            extra: &[],
+            by_place: &[],
+        })
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {

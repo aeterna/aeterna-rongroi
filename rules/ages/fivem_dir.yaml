@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# The ordinary retention of this source, shown under its trace-age rows (ADR 0061). Checked 2026-09-30.
+id: 7a5654e1-ec64-4833-aa3a-f90e10d2837e
+collector: fivem_dir
+retention: >-
+  FiveM's own folders. How long FiveM keeps its logs, crash dumps and caches is not documented by
+  FiveM and has not been measured.
+documented: false
+references:
+  - docs/adr/0053-fivem-folder-activity.md

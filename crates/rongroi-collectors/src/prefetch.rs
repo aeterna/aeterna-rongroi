@@ -49,7 +49,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::prefetch::{self, PrefetchRecord};
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Collector, Field};
+use crate::{Age, AgeCount, AgeRows, Collector, Field};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -160,6 +160,19 @@ impl Collector for Prefetch {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    /// One row: the oldest of the newest run times each `.pf` file still holds, how many files were
+    /// read, and whether Prefetch is switched on beside it (ADR 0061).
+    fn age(&self) -> Option<Age> {
+        Some(Age {
+            oldest: &["last_run"],
+            count: AgeCount::Field("entries"),
+            rows: AgeRows::One,
+            places: &[],
+            extra: &["enable_prefetcher"],
+            by_place: &[],
+        })
     }
 
     /// Lists `%SystemRoot%\Prefetch` and reads every `.pf` file in it.

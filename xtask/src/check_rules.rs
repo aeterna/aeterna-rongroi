@@ -38,7 +38,10 @@ struct CheckRulesOutcome {
 }
 
 pub fn run(root: &Path) -> anyhow::Result<()> {
-    let outcome = check(root)?;
+    let mut outcome = check(root)?;
+    if outcome.problems.is_empty() {
+        outcome.problems.extend(check_ages(root)?);
+    }
     if outcome.problems.is_empty() {
         println!(
             "check-rules: {} rule(s), {} fixture(s), {} language(s) ok",
@@ -139,6 +142,43 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         fixture_count,
         language_count: bundle.languages().len(),
     })
+}
+
+/// Every collector that declares an age has a text in `rules/ages/<collector>.yaml`, and every text is
+/// for a collector that declares one (ADR 0061). The bundle loader, which [`check`] has already run,
+/// refuses a text with no reference and a `documented: true` with no Microsoft Learn reference.
+///
+/// Apart from [`check`] because it is about the whole tree against the collectors of this build,
+/// which a tree holding one rule is not.
+fn check_ages(root: &Path) -> anyhow::Result<Vec<String>> {
+    let json = collect_bundle_json(&root.join("rules"))?;
+    let bundle = Bundle::from_bundle_json(&json).map_err(|error| anyhow::anyhow!("{error}"))?;
+    let mut problems = Vec::new();
+    check_age_texts(&bundle, &mut problems);
+    Ok(problems)
+}
+
+fn check_age_texts(bundle: &Bundle, problems: &mut Vec<String>) {
+    let declared: std::collections::BTreeSet<&str> = rongroi_collectors::all()
+        .iter()
+        .filter(|collector| collector.age().is_some())
+        .map(|collector| collector.id())
+        .collect();
+    let texts: std::collections::BTreeSet<&str> = bundle
+        .ages()
+        .iter()
+        .map(|sourced| sourced.text.collector.as_str())
+        .collect();
+    for collector in declared.difference(&texts) {
+        problems.push(format!(
+            "rules/ages/{collector}.yaml: collector `{collector}` declares a trace age and has no retention text (ADR 0061)"
+        ));
+    }
+    for collector in texts.difference(&declared) {
+        problems.push(format!(
+            "rules/ages/{collector}.yaml: collector `{collector}` declares no trace age, so this text is never shown (ADR 0061)"
+        ));
+    }
 }
 
 /// What the collectors in this build can be asked about: each collector's id, and the field names it
@@ -523,6 +563,36 @@ date: 2026-09-11
         write(&dir.join("rule.yaml"), VALID_RULE);
         write(&dir.join("tests/positive/on.json"), POSITIVE_FIXTURE);
         write(&dir.join("tests/negative/off.json"), NEGATIVE_FIXTURE);
+    }
+
+    /// This repository has a retention text for every collector that declares a trace age, and none
+    /// for a collector that does not (ADR 0061).
+    #[test]
+    fn this_repository_has_an_age_text_for_every_declared_age() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        assert_eq!(check_ages(&root).unwrap(), Vec::<String>::new());
+    }
+
+    /// A tree with one age text for a collector that declares none, and none for the six that do.
+    #[test]
+    fn a_missing_or_unused_age_text_is_refused() {
+        let tmp = TempRoot::new("ages");
+        write(
+            &tmp.path().join("rules/ages/posture.yaml"),
+            "id: 5b0b1f55-4d2c-4c3e-9d8a-7a6b5c4d3e2f\ncollector: posture\nretention: Now.\ndocumented: false\nreferences: [docs/adr/0011.md]\n",
+        );
+        let problems = check_ages(tmp.path()).unwrap();
+        assert_eq!(problems.len(), 7, "{problems:?}");
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("`evtx` declares a trace age and has no"))
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("`posture` declares no trace age"))
+        );
     }
 
     #[test]

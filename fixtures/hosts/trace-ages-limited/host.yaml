@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# Synthetic (fixtures/hosts/PROVENANCE.md): the same kind of PC scanned without administrator rights,
+# refused what a limited token was refused on the Windows 11 PC ADR 0061 measured — Prefetch, BAM, the
+# Security log and the change journal — so those trace ages are "not known", and no cross-source
+# statement is made. Every date and count is invented.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+  WinDir: 'C:\Windows'
+  SystemDrive: 'C:'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+drive_roots:
+  'C:':
+    created: 2018-03-02T09:00:00Z
+access_denied:
+  - 'C:\Windows\Prefetch'
+  - 'C:\Windows\System32\winevt\Logs\Security.evtx'
+  - 'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings'
+registry:
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    InstallDate: 1761004800
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters':
+    EnablePrefetcher: 3
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    'C:\Users\fixtureuser\Downloads\example.exe':
+      from: '../../parsers/bam/documented-24-byte-value.bin'
+filesystem:
+  'C:\':
+    - name: $Recycle.Bin
+      directory: true
+      created: 2018-03-02T09:05:00Z
+  'C:\Windows\Prefetch':
+    - name: CMD.EXE-D269B812.pf
+      from: '../../prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf'
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      content: "C:\\Windows\\System32\\notepad.exe|2025-11-02 03:04:05\n"
+  'C:\Windows\System32\winevt\Logs':
+    - name: Security.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+    - name: System.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+      read_only: false
+  'C:\Users\fixtureuser\AppData\Local':
+    - name: FiveM
+      directory: true
+      created: 2024-05-10T08:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.app
+      directory: true
+      created: 2024-05-10T08:01:00Z
+    - name: FiveM.exe
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app':
+    - name: logs
+      directory: true
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\logs':
+    - name: CitizenFX_log_2025-12-30T204500.log
+      size: 2048
+      created: 2025-12-30T20:45:00Z
+      modified: 2025-12-30T21:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+event_log_channels: {}
+usn_journal:
+  state: access_denied

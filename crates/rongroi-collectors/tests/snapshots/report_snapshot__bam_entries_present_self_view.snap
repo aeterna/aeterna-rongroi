@@ -25,7 +25,49 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed"
     },
-    "scan_tier": "standard"
+    "scan_tier": "standard",
+    "anchors": [
+      {
+        "anchor": "install_date",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ]
   },
   "evidence": [
     {
@@ -569,5 +611,132 @@ expression: view
     "bam",
     "pca",
     "usn"
-  ]
+  ],
+  "trace_ages": {
+    "anchors": [
+      {
+        "anchor": "boot_time",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "install_date",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ],
+    "rows": [
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_logs",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_crashes",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_logs",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_crashes",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_launcher_crashes",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_server_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "evtx",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "prefetch",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "bam",
+        "state": "measured",
+        "oldest": "2020-01-01T00:00:00Z",
+        "days_before": 2192,
+        "count": 2
+      },
+      {
+        "collector": "pca",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "usn",
+        "place": "journal",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ]
+  }
 }
