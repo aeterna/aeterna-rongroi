@@ -3,6 +3,8 @@
 - Status: accepted — the recommendation below; measurement 1 under "Before any code" passed, and the `usn` collector is implemented (see Consequences)
 - Date: 2026-09-14
 - Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner"): measurement 1 passed
+- Amended: 2026-09-30, proposed: a folder on another volume, and the first rule that reads a count
+  ("Amendment (2026-09-30, proposed)"), with the owner's Windows 11 reading of the journal
 
 ## Context
 
@@ -393,6 +395,298 @@ Prefetch folder itself could not be opened (5); the Event Log and PCA folders co
 7. **A baseline** (measurement 6): the per-folder counts above are the runner's. The fixture is made from a
    run of the collector itself.
 
+## Amendment (2026-09-30, proposed): a folder on another volume, and the first rule that reads a count
+
+This amendment is proposed. Nothing in it is accepted, and nothing it proposes is built. It answers the
+open question under "What is not established" about a watched folder on another volume, and proposes the
+first rule that reads a watched folder's counts. The owner's decisions are listed at its end.
+
+### Measured on a PC
+
+One Windows 11 PC (build 26220), on 2026-09-15, at its owner's request: the command-line scan built from
+`dev` at `ab26a88`, run once elevated and once under the same account's limited token. Nothing from the
+scan was committed. What it showed of `usn`:
+
+| | Elevated | Limited |
+|---|---|---|
+| `\\.\C:` opened with `GENERIC_READ` | yes | no, error 5, so the collector reported `not_admin` |
+| Observations from `usn` | 6: the journal and five folders | none |
+| Journal records read | 387 660, all version 3 (`records_version_2` 0) | — |
+| `maximum_size` | 33 554 432 (32 MiB) | — |
+| `trimmed` | true | — |
+| The journal's span, oldest to newest record | **about 39 minutes** (06:35 to 07:14 UTC) | — |
+| `prefetch` records | 242 | — |
+| `winevt_logs` records | 56 | — |
+| `appcompat_pca` records | 2 | — |
+| `plugins`, `enhanced_asi` | `identified`, 0 records each | — |
+
+The runner's journal had the same maximum size and covered six and a half days. This PC's covered 39
+minutes. A PC in use writes far more records than an idle runner image, and the journal keeps a size, not
+a time. **On this PC, a count the journal gives is a count for the last 39 minutes before the scan, and
+nothing older.** One PC is not a distribution. How long the journal reaches on other PCs is not known.
+
+### What happens today to a folder on another volume
+
+Read from `crates/rongroi-collectors/src/usn.rs` at `0746990`. The journal read is always the system
+volume's, the drive letter of `%SystemRoot%`. Before the read, `locate` classifies each watched folder, and
+a folder is `other_volume` in two cases:
+
+1. **Its base variable names another drive letter.** `%LOCALAPPDATA%` or `%APPDATA%` on `D:` is caught
+   before any file is opened.
+2. **Its path is on the system drive letter, but its identifier names another volume.** The folder's
+   `FileIdInfo` carries a `VolumeSerialNumber` different from the one read from the root of the system
+   volume. That is what a junction to another drive produces (the `usn-folder-on-other-volume` fixture).
+
+For such a folder the collector emits an observation with `location` and `folder: other_volume` and no
+count, and a `DiscriminatorGaps` entry that marks every other field `read_failed` for that `location`
+alone (ADR 0044). The code comment says why it is not `not_attempted`: that reason's words say the scan
+stopped before reaching the source. Its records are never compared, so a record is never credited to a
+folder the journal read never reached.
+
+Where that shows today:
+
+- **No evidence row.** No rule makes evidence from `usn`. The one file that reads it,
+  `usn/timeline/watched-folder-record-times`, is a timeline selector (ADR 0051) and makes none.
+- **The timeline.** `scan.rs` turns the gap on `first_seen` into an unmeasured source: `usn`, that place,
+  `read_failed`. The timeline shows it in both modes, where the folder's times would be.
+
+The problem is the next step. **Once any rule makes evidence from a watched folder's counts, `read_failed`
+becomes a row that SS mode always lists and no rule can declare** (ADR 0032). A PC whose FiveM folder is on
+a game drive would show "this could not be read" on every scan. Nothing failed: this build reads one
+journal by design, and the folder was never within it.
+
+Which folders this can happen to: the three under `%SystemRoot%` are on the system volume by definition,
+because the journal read is chosen from `%SystemRoot%`. The two FiveM folders are under the user's profile,
+which a player can move to another drive, by moving the profile folders or by a junction made to free space
+on `C:`. How common that is on players' PCs was not measured.
+
+### The options
+
+| Option | What a row would say | Against it |
+|---|---|---|
+| Keep `read_failed` | "this could not be read", always listed | A statement of failure where nothing failed, on every scan of such a PC |
+| `source_absent` | "this PC has no such record to read" | The folder is there. ADR 0030 split `source_absent` from `source_empty` because one word for two situations told a reader something false |
+| `not_attempted` | "the scan stopped before reaching it" | Already rejected: the scan did not stop. It is also a scope statement and never a row |
+| **A new reason, `other_volume`** | "this is on another drive, and this program reads only the system drive's change journal" | A fourteenth reason, with the cost of any reason: the enum, the `types.ts` mirror, both locales, ADR 0030's table |
+| Read that volume's journal too | the counts, from the other volume's journal | See below |
+
+**Reading the other volume's journal** would give the counts rather than a reason. It does not remove the
+need for a reason, and it adds cost:
+
+- That volume may have no journal. The runner's `D:`, an NTFS volume, answered 1179
+  (`ERROR_JOURNAL_NOT_ACTIVE`). A volume that is not NTFS has none at all. Each of those is still a place
+  this program cannot count.
+- It is a second volume handle and a second full read inside the same 30-second budget, and a second
+  journal span, which the report would have to show beside the first. A reader who compares two counts over
+  two different spans can be misled by the difference.
+- It reads the journal of a drive the player may not think of as part of the check, a game or data drive.
+  The collector would still keep no name, but the consent question and `PRIVACY.md` would have to say it.
+
+So the recommendation is the new reason now, and the second journal only if the probe below shows that
+watched FiveM folders on another volume are common and that such volumes have an active journal.
+
+### Proposal 1: `other_volume`, a fourteenth reason
+
+- **Code:** `other_volume`, the same word as the `folder` value it goes with (CONVENTIONS.md, one name per
+  idea). `UnmeasuredReason::OtherVolume`.
+- **Words:** "this is on another drive, and this program reads only the system drive's change journal".
+  Thai: "ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น".
+- **Producer:** `usn` alone. `check-rules` then accepts it in `unmeasured_when` only for rules on `usn`.
+- **Declarable.** It is on the same side of ADR 0032's line as `access_denied` and `source_absent`: the
+  program never reached the source, and the reason is how the machine is set up. It is not a read that
+  began and did not finish, so it is not always listed.
+- **Not a scope statement.** It is about one place on one machine, not about the whole scan, so it does not
+  go in `ScopeNotes`.
+- **Where a reviewer still sees it:** the timeline's unmeasured sources carry the place and the reason in
+  both modes, as they do today. A rule that declares `other_volume` is counted in SS mode rather than listed,
+  and the timeline still says, once, that this place was on another drive.
+- **What changes with it:** ADR 0030's table gains a row, `rules/AGENTS.md`'s list of which collector
+  produces which reason, `crates/rongroi-cli/src/output.rs`, `apps/desktop/src/locales/*/report.json` and the
+  `types.ts` mirror. `REPORT_SCHEMA_VERSION` stays at 1. A report written earlier carries no such reason.
+  A reader built before it would refuse a report that has one, as it would any unknown reason.
+
+### Proposal 2: the first rule, deletions and renames in FiveM's plugin folders
+
+**Which folders.** Only `plugins` (FiveM for GTA V Legacy) and `enhanced_asi` (FiveM for GTA V Enhanced).
+Both were `identified` with no record in 39 minutes on the PC above. Prefetch and the Event Log folder
+change every few minutes on an ordinary PC, so a rule on their deletions would be found on nearly every
+scan. That is the "sea of red flags" ADR 0027 forbids, and ADR 0047 already says a delete count there is
+not evidence of cleaning. FiveM's cache, log and crash folders are not watched by `usn` and are not proposed.
+FiveM writes and removes files there itself.
+
+**Why four files and not one.** `match` is a conjunction (ADR 0029), so "a deletion or a rename" is two
+rules. A rule over both places would make a player with only one edition `unmeasured`. The absent folder's
+gap (`source_absent`) reaches any rule whose `location` could match there, and it would cover the other
+place's answer (ADR 0044). So there is one rule per place per reason:
+
+| Path | `match` |
+|---|---|
+| `rules/usn/plugins/files-deleted` | `location: plugins`, `folder: identified`, `deleted\|gte: 1` |
+| `rules/usn/plugins/files-renamed` | `location: plugins`, `folder: identified`, `renamed\|gte: 1` |
+| `rules/usn/enhanced-asi/files-deleted` | `location: enhanced_asi`, `folder: identified`, `deleted\|gte: 1` |
+| `rules/usn/enhanced-asi/files-renamed` | `location: enhanced_asi`, `folder: identified`, `renamed\|gte: 1` |
+
+Renames are included because moving a file out of the folder is a rename, with the old name's record under
+this folder as its parent. Whether Windows' Recycle Bin shows up this way in the journal is not measured
+here. A file moved elsewhere on the same volume is renamed, not deleted.
+
+**The shape of one of them**, as a starting point for the change that adds them:
+
+```yaml
+title: The change journal holds a deletion in FiveM's plugin folder
+description: >-
+  The NTFS change journal holds at least one record of a file deleted directly inside FiveM for GTA V
+  Legacy's plugin folder. The row gives how many records, and the first and last time. It shows the span
+  the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is
+  seen. If this rule finds nothing, it means only that nothing was deleted there within that span. The
+  journal does not record which program deleted a file, so this does not say who did it, or that anything
+  was hidden.
+status: experimental
+collector: usn
+strength: context
+match:
+  location: plugins
+  folder: identified
+  deleted|gte: 1
+retention: >-
+  Only the span the change journal still held when the scan read it, shown beside this row. The journal
+  keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+unmeasured_when: [not_windows, source_absent, other_volume]
+falsepositives:
+  - The player removed or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+  - FiveM or its updater replaced or removed a file in the folder (not measured for this folder)
+  - A clean-up, "clear FiveM cache" or optimiser tool that empties FiveM's folders
+  - Antivirus software quarantining or removing a file
+  - FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted
+    at all, so this can also remove a row that would otherwise be here
+```
+
+Its `renamed` sibling differs in `match` and in two lines: a rename is also what an update that writes a
+new copy and swaps it in by renaming does, and a rename inside the folder yields two records, one for the
+old name and one for the new.
+
+**Counts are records, not files.** A file changed once can leave several records. On the runner the probe's
+one deletion left one record carrying the delete reason, and one file created left three with the create
+reason. The row says "records". The probe below measures, per folder, how many distinct files the records
+were about, without reporting any of them.
+
+**Strength and status.** `context`: a `not_found` from it is counted in SS mode, never listed, because
+"nothing deleted in the last 39 minutes" is not a statement a reviewer should read as a clean result
+(ADR 0031's reasoning for a log-clearing rule). **Status `experimental`**, for three reasons: no ordinary
+baseline of deletions or renames in these folders over a useful span exists (the PC above had no record in
+39 minutes, which says nothing about a day); whether FiveM's updater writes in `plugins` was not measured;
+and how the Recycle Bin shows in the journal was not measured. It still carries a positive and a negative
+fixture. `baseline-elevated-win11`'s `plugins` observation (`identified`, `deleted: 0`, `renamed: 0`)
+confronts the two `plugins` rules. No baseline carries `enhanced_asi` as `identified`, so the two
+`enhanced_asi` rules need a `rules/unconfronted.csv` row until one does.
+
+**`unmeasured_when`.** `not_windows`; `source_absent`, because a player with one edition has no folder for
+the other, and because this is also the reason when the volume has no journal at all (both PCs measured had
+one; the timeline names `usn`'s reason for the whole collector either way); `other_volume` (Proposal 1).
+`not_admin` is not declared: it is a scope statement and never a row whether declared or not. `access_denied`
+is not declared, because the folders are in the player's own profile and a denial there is unexpected.
+`partial`, `budget_spent` and `read_failed` cannot be declared (ADR 0032).
+
+### How this differs from `usn/timeline/watched-folder-record-times`
+
+| | The timeline selector (ADR 0051) | The proposed rules |
+|---|---|---|
+| Kind | `role: timeline`. It makes no evidence | Evidence rules, `strength: context` |
+| What it reads | every watched folder that is `identified` | two FiveM folders, one reason each |
+| Condition | any record | at least one record carrying a delete, or a rename |
+| What reaches a reader | the folder's first and last record time, as timeline entries, in both modes | a `found` row with the counts, always listed in SS mode; `not_found` counted in SS mode |
+| Effect on scope lines | none | each adds to `ScopeNotes.not_admin` in a scan without Administrators |
+| Its gaps | the timeline's unmeasured sources | the row's state, and the timeline's unmeasured sources as today |
+
+The selector answers "when did anything change in this folder". A rule answers "did the journal see a file
+leave this folder", as a row a reviewer can point at, with its ordinary causes beside it.
+
+### Proposal 3: every `usn` row states the journal's span
+
+The journal's span is measured on each scan. ADR 0051 already reads it as `usn`'s coverage band: the
+`first_seen` and `last_seen` of the observation whose `location` is `journal`. Today it is shown only on
+the timeline. A row whose count is for the last 39 minutes, shown without those 39 minutes, is the
+reading this amendment must prevent.
+
+- `rongroi-core::view` pairs every evidence row of a collector whose `Coverage` names a `place` with that
+  place's band: for `usn`, the journal's span. It is done in the core, where the bands are already built,
+  so that the CLI and the desktop cannot disagree, and in both modes.
+- On a `found` row it is shown beside the folder's own `first_seen` and `last_seen`, which are the times
+  of that folder's records, not the span.
+- On a `not_found` row it is shown with `retention`: "nothing within this span". Self mode lists that row;
+  SS mode counts it, because the rules are `context`.
+- An `unmeasured` row has no band. When the read did not finish (`partial`, `budget_spent`, `read_failed`)
+  the span is not what the counts cover, and when it never started there is none.
+- When the journal's observation has no times, because it held no record, the row says there is no span
+  rather than showing none.
+
+`evtx`'s coverage declares no single place (a band per log), so it is untouched by this.
+
+### Without Administrators
+
+Today a scan without Administrators gets `not_admin` from `usn` as a whole. It shows in one place: the
+timeline's unmeasured sources, since ADR 0051. `ScopeNotes` counts rule evidence, and no rule makes evidence
+from `usn`, so the scope line above the evidence does not count it, and the restart-as-administrator offer
+does not mention it.
+
+With the four rules, each is `unmeasured` with `not_admin` in such a scan. `ScopeNotes.not_admin` grows by
+four, in both modes, and none of them is a row (ADR 0027, ADR 0030). No new kind of line appears. The
+existing line's count grows, and the four rules become part of what restarting as administrator gets back.
+Rules on `prefetch`, `bam`, `pca` and `evtx` already put the line there on an ordinary non-elevated scan.
+
+### Who deleted it
+
+The journal does not say. A record carries the file's reference number, its parent's, a time, the reason
+flags and `SourceInfo`, which says only whether the change came from certain classes of system activity
+([USN_RECORD_V3](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3)).
+It names no process and no user. A deletion by the player, by FiveM's updater, by an antivirus and by
+Windows look alike in it. Every row these rules make says so in its `description`, and no future rule may
+claim otherwise from the journal alone.
+
+### Before any code: a probe on the PC
+
+A read-only PowerShell probe, kept out of the repository, measures on the same PC, elevated and not:
+
+- whether `\\.\C:` opens with `GENERIC_READ` alone;
+- for each watched folder and for FiveM folders `usn` does not watch: whether it exists, whether its base
+  variable is on the system drive letter, whether any folder on the way is a reparse point, whether it is
+  on the system volume, and that volume's file system. Volume serials are compared in memory and never
+  printed;
+- the journal's size, whether it is trimmed, its record count and versions, **its span in minutes**, and
+  records per minute;
+- per folder: records, and how many carried a create, delete, rename (old and new name), data change or
+  close, how many distinct files were deleted or renamed away, and how long before the scan the first and
+  last record were;
+- for a folder on another volume: whether that volume has an active journal, and the same numbers from it.
+
+It prints no file name, user name, journal identifier, USN, file reference number, volume serial or volume
+GUID. It sends only the two read control codes.
+
+### Owner decisions this amendment needs
+
+1. **The reason for a folder on another volume.** Recommended: a new, declarable reason, `other_volume`
+   (Proposal 1), with ADR 0030's table amended in the same change. Alternatives: keep `read_failed`, or
+   read the other volume's journal as well.
+2. **Reading a second volume's journal.** Recommended: not now. Decide after the probe, if it shows watched
+   FiveM folders on another volume with an active journal.
+3. **The first rules.** Recommended: four `context` rules, deletions and renames, one per FiveM plugin
+   folder (Proposal 2). Alternative: deletions only, two rules, with renames after a baseline.
+4. **Status.** Recommended: `experimental`, with positive and negative fixtures and an `unconfronted.csv`
+   row for the `enhanced_asi` pair.
+5. **The span on every row.** Recommended: the view pairs each `usn` row with the journal's coverage band,
+   in both modes (Proposal 3).
+6. **Folders not proposed.** Recommended: no rule on `prefetch`, `winevt_logs` or `appcompat_pca` counts,
+   and no FiveM cache, log or crash folder added to `usn`, until a measured baseline shows how often they
+   change on an ordinary PC.
+
+### What the amendment does not establish
+
+- How long the journal reaches on PCs other than the one above.
+- How often a player's FiveM folders are on another volume, and whether such volumes have a journal.
+- Whether FiveM's updater writes in `plugins` or `gta5enhanced\asi`.
+- How the Recycle Bin, and how an update that swaps a file in, show in the journal.
+- How many records one deleted or renamed file leaves on a PC.
+
 ## What is not established
 
 - Every rights and behaviour statement on a Windows 10 or 11 PC. The runner is Windows Server 2025.
@@ -404,8 +698,8 @@ Prefetch folder itself could not be opened (5); the Event Log and PCA folders co
 - The contract of `FSCTL_READ_UNPRIVILEGED_USN_JOURNAL`.
 - Which reason a watched folder on another volume (a junction to a game drive) should carry. The first rule
   that reads a per-folder count must settle it. Today it is `read_failed`, which SS mode always lists and no
-  rule can declare; `not_attempted` was rejected because it says the scan stopped early. It probably needs a
-  new reason, which would amend ADR 0030.
+  rule can declare; `not_attempted` was rejected because it says the scan stopped early. The amendment of
+  2026-09-30 proposes a new reason, `other_volume`, which would amend ADR 0030.
 - Attribution relies on the NTFS `VolumeSerialNumber`. Whether a cloned volume attached to the same PC keeps
   the serial is not verified.
 

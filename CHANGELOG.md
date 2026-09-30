@@ -26,6 +26,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   driver policy, and no 5001; its Defender log sits 91 % of the way through the event log folder, and a timed
   scan of the official 0.4.0 CLI there read all 414 logs inside the 30-second budget (20.9 s for the whole
   scan, on a warm file cache).
+- Proposed (ADR 0047 amendment): a watched folder on another drive than the one whose change journal is
+  read gets a new, declarable reason, `other_volume`, instead of `read_failed`, which SS mode always lists.
+  The first rules that read `usn`'s counts: deletions and renames in FiveM's two plugin folders, `context`
+  and `experimental`, each row shown with the span the journal covered. On one Windows 11 PC that span was
+  about 39 minutes.
 
 ### Fixed
 - A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
