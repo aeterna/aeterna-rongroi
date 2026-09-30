@@ -207,6 +207,7 @@ These are counts of what SS mode does not list. §7 says why.
 | The change journal holds a rename in FiveM's plugin folder | context | `experimental` | the player renamed, moved or replaced a plugin, an update that swaps a new copy in by renaming (not measured), a file moved to the Recycle Bin, antivirus quarantine |
 | The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder; whether Enhanced loads this folder at all is not known |
 | The change journal holds a rename in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder |
+| A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders | posture | `experimental` | programs installed per user in AppData — launchers, chat and voice apps, cloud sync clients, and above all their updaters and helpers; peripheral, RGB, fan and overclocking utilities; service wrappers and servers from a package manager; management and provisioning agents; open-source and self-built tools; a file signed through a catalog; a Run entry switched off in Task Manager |
 
 Four things to know about the thirteen rows above, which are all about **which Windows this is**:
 
@@ -316,6 +317,20 @@ Four things to know about the four change-journal rules (ADR 0047, amendment of 
 - **"On another drive" is not a failure.** If the player's FiveM folder is on another drive, the program
   does not read that drive's journal, and says so instead of counting.
 
+Three things to know about the rule on what starts by itself (ADR 0060):
+
+- **Most PCs have ordinary programs that match it.** A launcher's updater in AppData or an RGB utility's
+  helper is set to start by itself and is often not signed the way this checks. On the one Windows 11 PC
+  this project measured it matched one scheduled task, and on a GitHub runner it matched GitHub's own
+  agent ([ADR 0060](adr/0060-what-starts-by-itself.md)). The row gives the file's path, its SHA-256 and
+  where it is registered (`service`, `run` or `task`): ask the player what the program is.
+- **The name of a `Run` value or a scheduled task is not shown.** A task's name can carry the player's
+  account identifier. The service name, the file and whether it starts by itself are shown.
+- **It says what is set to start, not what it runs.** The arguments a program is given are never read, so
+  a Windows program that runs a script (`cmd`, `powershell`, `rundll32`) is shown as that Windows program.
+  Files in the Windows folder are not checked at all. A scan without administrator rights cannot read the
+  task files, and says so once above the evidence.
+
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
 
@@ -330,6 +345,9 @@ so they are *unmatched observations*:
 
 - **Self mode** lists them, for the player.
 - **SS mode** shows only how many there were, except on its timeline.
+
+Two fields are never shown in SS mode, even on a row that matched: a hosts line's address (only its kind)
+and the name of a `Run` value or a scheduled task.
 
 This is deliberate. The consent screen promises what matches a rule, and a timeline it names. A list of every program
 someone ran would show staff what else is on that PC. Replacing the user name in the paths would not
