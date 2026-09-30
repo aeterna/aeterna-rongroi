@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 46 |
-| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
+| จำนวน rule | 49 |
+| SHA-256 | `1aa4ba677608d740f351c343934d24f3a86b205a9f109ef3008d290a0d46078d` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -40,6 +40,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 - `driver_service`
   - [ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
+  - [Microsoft Defender บันทึกว่าการป้องกันแบบ real-time ถูกปิด](#rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185) — `context` · `experimental`
   - [มี event log ไฟล์หนึ่งถูกล้าง](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [Security log มีบันทึกว่าตัวเองถูกล้าง](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
   - [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
@@ -88,6 +89,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
     - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
     - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
   - `evtx`
+    - [เวลาที่ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์](#rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8) — `context` · `experimental`
+    - [เวลาที่ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง](#rule-63269014-f728-424c-8e18-e36fe79030aa) — `context` · `experimental`
     - [record เก่าสุดและใหม่สุดของ event log ของ Windows](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
   - `fivem_dir`
     - [เวลาที่โฟลเดอร์ log, crash และ cache ของ FiveM ถูกเขียน](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
@@ -144,6 +147,52 @@ driver service ที่ลงทะเบียนไว้ตอนสแก�
 - <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## collector `evtx`
+
+### `evtx` / `defender`
+
+<a id="rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185"></a>
+
+#### Microsoft Defender บันทึกว่าการป้องกันแบบ real-time ถูกปิด
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender recorded that its real-time protection was switched off
+- id: `429f8bc3-3c7d-4924-87f7-7cccefa1a185`
+- ไฟล์: [`rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml`](../rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml)
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `defender`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+log ของ Microsoft Defender มีบันทึกว่าการป้องกันแบบ real-time ซึ่งเป็นส่วนที่สแกนไฟล์ตอนถูกเปิด ถูกปิดไป พร้อมเวลาครั้งแรกและครั้งล่าสุดที่เกิดขึ้น บันทึกนี้ไม่ได้บอกว่าใครปิดหรือปิดเพราะอะไร ถูกเปิดกลับหรือยัง หรือตอนนี้เปิดอยู่หรือไม่ เพราะ log บันทึกการเปลี่ยนแปลง ไม่ได้บันทึกสถานะ บันทึกที่เขียนไว้ก่อนเครื่องถูกส่งมอบ หน้าตาเหมือนบันทึกที่เขียนเมื่อวานทุกอย่าง จึงควรดูเวลาประกอบ
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `channel`: เป็น `Microsoft-Windows-Windows Defender/Operational` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `event_id`: เป็น `5001`
+- `provider`: เป็น `Microsoft-Windows-Windows Defender` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะการปิดที่ยังอยู่ใน log ของ Defender ตามที่เป็นอยู่ตอนนี้ ค่าเริ่มต้นเก็บได้ถึง 16 MiB และเขียนทับบันทึกเก่าสุด และ log ที่ถูกล้างจะไม่มีบันทึกเลย ถ้าไม่มี log ของ Defender อยู่เลย เช่น Defender ถูกถอดออกจากอิมเมจ หรือไฟล์ถูกลบ แถวนี้ก็จะบอกว่าไม่พบเช่นกัน เพราะการตรวจนี้ไม่รู้ว่าเครื่องหนึ่งควรมี log อะไรบ้าง rule เรื่องเซอร์วิสและโฟลเดอร์ platform ของ Defender คือสิ่งที่ตอบคำถามนั้น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้ผลิตเครื่อง ร้านคอม หรืออิมเมจ Windows ปิดการป้องกันแบบ real-time ไว้ก่อนส่งมอบเครื่อง ซึ่งวัดได้บนอิมเมจของ runner ที่ GitHub ให้บริการสองตัว แต่ละตัวมีบันทึกแบบนี้หนึ่งรายการจากก่อนที่จะมีใครใช้งาน
+- เจ้าของเครื่องปิดไว้ชั่วคราวเพื่อติดตั้งหรือรันสิ่งที่ Defender แจ้งเตือน ซึ่งมักเป็น mod เกม เทรนเนอร์ หรือเครื่องมือที่แชร์กันในฟอรัม และเป็นคำแนะนำที่พบบ่อยสำหรับโปรแกรมเหล่านั้นโดยเฉพาะ
+- การติดตั้งแอนตี้ไวรัสตัวอื่น ยังไม่รู้แน่ว่า Defender บันทึกเรื่องนี้ไว้หรือไม่ตอนที่หลีกทางให้ ข้อนี้จึงเป็นความเป็นไปได้ ไม่ใช่สาเหตุที่ยืนยันแล้ว
+- การอัปเดต platform ของ Defender หรือเครื่องมือจัดการเครื่องหรือ group policy ของนายจ้างหรือโรงเรียน
+- การไล่แก้ปัญหาเครื่องช้าหรือเกมกระตุก ซึ่งคำแนะนำในฟอรัมมักเริ่มจากการปิดการสแกนแบบ real-time
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 ### `evtx` / `log-clearing`
 
@@ -1795,6 +1844,89 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
 
 ### `evtx` / `timeline`
+
+<a id="rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8"></a>
+
+#### เวลาที่ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์
+
+- ชื่อภาษาอังกฤษ: When Code Integrity recorded that Windows refused to load a file
+- id: `51bb1937-7ab2-48db-a2f2-78be82ba2fe8`
+- ไฟล์: [`rules/evtx/timeline/code-integrity-blocked-image/rule.yaml`](../rules/evtx/timeline/code-integrity-blocked-image/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `timeline`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity ยังเก็บบันทึกไว้ว่า Windows ปฏิเสธไม่โหลดโปรแกรม DLL หรือไดรเวอร์ที่ลายเซ็นไม่ตรงตามที่กำหนด เกิดขึ้นเมื่อไร เครื่องมือนี้ไม่ได้อ่านเนื้อในของบันทึกเหล่านั้น เวลาในข้อนี้จึงไม่ได้บอกว่าไฟล์ไหนถูกปฏิเสธ โปรแกรมไหนเป็นคนขอโหลด หรือ policy ไหนเป็นคนปฏิเสธ Windows 11 ปฏิเสธไฟล์บางอย่างเป็นค่าเริ่มต้นอยู่แล้ว และเครื่องปกติเครื่องหนึ่งที่วัดไว้มีบันทึกแบบนี้หลายร้อยรายการ ข้อนี้ไม่ใช่หลักฐานว่ามีการ inject อะไร มีการบล็อกโดยตั้งใจ หรือมีอะไรถูกลบ
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `channel`: เป็น `Microsoft-Windows-CodeIntegrity/Operational` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `event_id`: เป็นค่าใดค่าหนึ่งใน `3033`, `3077`
+- `provider`: เป็น `Microsoft-Windows-CodeIntegrity` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะบันทึกที่ log ของ Code Integrity ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ประมาณ 1 MB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม บนเครื่องปกติเครื่องหนึ่งที่วัดไว้ย้อนหลังได้ประมาณสามสัปดาห์ และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- vulnerable driver blocklist ของ Microsoft ซึ่งเปิดเป็นค่าเริ่มต้นใน Windows 11 ปฏิเสธไดรเวอร์รุ่นเก่าที่โปรแกรมจัดการฮาร์ดแวร์ โปรแกรมคุมไฟ RGB และพัดลม เครื่องมือโอเวอร์คล็อก และ anti-cheat รุ่นเก่าติดตั้งไว้
+- memory integrity, Smart App Control หรือ S mode ปฏิเสธไดรเวอร์หรือโปรแกรมที่ไม่ตรงตามข้อกำหนดของมัน
+- โปรแกรมที่ขอให้ Windows โหลดเฉพาะโค้ดที่ Microsoft เซ็นเข้าไปในตัวมัน (Code Integrity Guard) ปฏิเสธ DLL ที่โปรแกรมอื่นพยายามใส่เข้าไป เช่น overlay โปรแกรมอัดหน้าจอ เครื่องมือด้าน input แอนตี้ไวรัส และซอฟต์แวร์ช่วยการเข้าถึง ยังไม่ได้วัดว่าบนเครื่องหนึ่งมีโปรแกรมไหนทำแบบนี้บ้าง
+- ลายเซ็นที่ถูกเพิกถอนหรือหมดอายุแล้วบนไฟล์ที่เครื่องยังมีอยู่
+- App Control policy ที่นายจ้าง โรงเรียน หรือผู้ผลิตเครื่องติดตั้งไว้
+- การไม่มีเวลาในข้อนี้ไม่ได้แปลว่าไม่เคยมีการปฏิเสธก่อนบันทึกที่เก่าสุดของ log
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/operations/event-id-explanations>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
+
+<a id="rule-63269014-f728-424c-8e18-e36fe79030aa"></a>
+
+#### เวลาที่ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง
+
+- ชื่อภาษาอังกฤษ: When Microsoft Defender recorded a detection
+- id: `63269014-f728-424c-8e18-e36fe79030aa`
+- ไฟล์: [`rules/evtx/timeline/defender-detection/rule.yaml`](../rules/evtx/timeline/defender-detection/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `timeline`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าครั้งแรกและครั้งล่าสุดที่ log ของ Microsoft Defender ยังเก็บบันทึกไว้ว่าตรวจพบมัลแวร์หรือซอฟต์แวร์ที่อาจไม่พึงประสงค์ หรือจัดการกับสิ่งที่ตรวจพบ เกิดขึ้นเมื่อไร เครื่องมือนี้ไม่ได้อ่านเนื้อในของบันทึกเหล่านั้น เวลาในข้อนี้จึงไม่ได้บอกว่าตรวจพบอะไร ที่ไหน หรือเคยถูกเปิดใช้งานหรือไม่ และ Defender บันทึกกรณีที่ตัวเองตรวจผิดด้วยข้อความเดียวกัน ข้อนี้ไม่ใช่หลักฐานเกี่ยวกับไฟล์นั้นหรือเกี่ยวกับตัวบุคคล
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `channel`: เป็น `Microsoft-Windows-Windows Defender/Operational` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `event_id`: เป็นค่าใดค่าหนึ่งใน `1116`, `1117`
+- `provider`: เป็น `Microsoft-Windows-Windows Defender` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะบันทึกที่ log ของ Defender ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ถึง 16 MiB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- ซอฟต์แวร์ที่อาจไม่พึงประสงค์ซึ่งพ่วงมากับโปรแกรมฟรี
+- เทรนเนอร์เกม เครื่องมือทำ mod โปรแกรมสร้างคีย์ และซอฟต์แวร์แคร็ก ซึ่งแอนตี้ไวรัสจัดเป็นซอฟต์แวร์ไม่พึงประสงค์หรือเครื่องมือแฮ็ก
+- การตรวจผิดกับโปรแกรมใหม่หรือโปรแกรมที่ไม่มีลายเซ็น
+- ไฟล์ที่ดาวน์โหลดมาแต่ไม่เคยเปิด
+- การตรวจพบในไฟล์ที่ Defender ลบทิ้งทันที
+- การไม่มีเวลาในข้อนี้ไม่ได้แปลว่า Defender ไม่เคยตรวจพบอะไรก่อนบันทึกที่เก่าสุดของ log หรือว่าแอนตี้ไวรัสตัวอื่นไม่เคยตรวจพบ
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 <a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
 

@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 46 |
-| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
+| Rules | 49 |
+| SHA-256 | `1aa4ba677608d740f351c343934d24f3a86b205a9f109ef3008d290a0d46078d` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -44,6 +44,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `driver_service`
   - [A registered driver is on LOLDrivers' list of vulnerable drivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
+  - [Microsoft Defender recorded that its real-time protection was switched off](#rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185) — `context` · `experimental`
   - [An event log file was cleared](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [The Security log records that it was cleared](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
   - [An event log file is marked read-only](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
@@ -92,6 +93,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [When BAM recorded a program named like FiveM's game process](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
     - [When BAM recorded a program named like FiveM or GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
   - `evtx`
+    - [When Code Integrity recorded that Windows refused to load a file](#rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8) — `context` · `experimental`
+    - [When Microsoft Defender recorded a detection](#rule-63269014-f728-424c-8e18-e36fe79030aa) — `context` · `experimental`
     - [A Windows event log's oldest and newest record](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
   - `fivem_dir`
     - [When FiveM's log, crash and cache folders were written](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
@@ -147,6 +150,51 @@ The driver services registered when the scan ran. A driver that was registered a
 - <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## Collector `evtx`
+
+### `evtx` / `defender`
+
+<a id="rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185"></a>
+
+#### Microsoft Defender recorded that its real-time protection was switched off
+
+- Id: `429f8bc3-3c7d-4924-87f7-7cccefa1a185`
+- File: [`rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml`](../rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml)
+- Collector: `evtx`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `defender`
+- Written: 2026-09-30
+
+**About this check**
+
+Microsoft Defender's log holds a record that its real-time protection — the part that scans files as they are opened — was switched off, with the first and last time it happened. It does not say who switched it off or why, whether it was switched on again, or whether it is on now: a log records a change, not a state. A record written before the PC was handed over looks exactly like one written yesterday, so read the times.
+
+**Matches when all of these hold for one observation**
+
+- `channel`: is `Microsoft-Windows-Windows Defender/Operational` (text, ASCII case ignored)
+- `event_id`: is `5001`
+- `provider`: is `Microsoft-Windows-Windows Defender` (text, ASCII case ignored)
+
+**Look-back**
+
+Only switches still in the Defender log as it stands. It holds up to 16 MiB by default and overwrites its oldest records, and a cleared log holds none. If the Defender log is not there at all — Defender removed from the image, or the file deleted — this row also says not found, because this check does not know which logs a PC should have; the rules on Defender's service and platform folder answer that.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+
+**Ordinary things that also produce this**
+
+- The PC's maker, a shop or a Windows image turning real-time protection off before the PC was handed over — measured on two GitHub-hosted runner images, each of which carried one such record from before anyone used it
+- The owner switching it off for a while to install or run something Defender flagged, often a game mod, a trainer or a tool shared on a forum, which is common advice for exactly those programs
+- Installing another antivirus product. Whether Defender records this when it steps aside is not established, so this is a possibility, not a known cause
+- A Defender platform update, or a management tool or group policy of an employer or school
+- Troubleshooting a slow PC or a game that stutters, which forum advice often starts by disabling real-time scanning
+
+**References**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 ### `evtx` / `log-clearing`
 
@@ -1760,6 +1808,87 @@ Only what BAM still holds. Windows removes BAM entries older than seven days whe
 - Windows keeping the record after the program's files were removed
 
 ### `evtx` / `timeline`
+
+<a id="rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8"></a>
+
+#### When Code Integrity recorded that Windows refused to load a file
+
+- Id: `51bb1937-7ab2-48db-a2f2-78be82ba2fe8`
+- File: [`rules/evtx/timeline/code-integrity-blocked-image/rule.yaml`](../rules/evtx/timeline/code-integrity-blocked-image/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `evtx`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `timeline`
+- Written: 2026-09-30
+
+**About this check**
+
+Puts on the timeline the first and last time the Code Integrity log still holds a record of Windows refusing to load a program, a DLL or a driver whose signature did not meet what was required of it. This tool does not read what is inside those records, so a time here does not say which file was refused, which program asked for it or which policy refused it. Windows 11 refuses some files by default, and an ordinary PC measured for this held hundreds of these records. It is not evidence that anything was injected, blocked on purpose or removed.
+
+**Matches when all of these hold for one observation**
+
+- `channel`: is `Microsoft-Windows-CodeIntegrity/Operational` (text, ASCII case ignored)
+- `event_id`: is one of `3033`, `3077`
+- `provider`: is `Microsoft-Windows-CodeIntegrity` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the records the Code Integrity log still holds. It keeps about 1 MB by default and overwrites its oldest records when it is full — on an ordinary PC measured for this, about three weeks — and a cleared log holds none.
+
+**Ordinary things behind these times**
+
+- Microsoft's vulnerable driver blocklist, on by default on Windows 11, refusing an old driver that hardware utilities, RGB and fan control, overclocking tools and older anti-cheat software install
+- Memory integrity, Smart App Control or S mode refusing a driver or program that does not meet their requirements
+- A program that asks Windows to load only Microsoft-signed code into itself (Code Integrity Guard) refusing a DLL that another program tries to place in it — overlays, screen recorders, input tools, antivirus and accessibility software. Which programs on a PC do this is not measured
+- A signature that was revoked or has expired on a file the PC still has
+- An App Control policy an employer, a school or a PC maker installed
+- No time here does not mean nothing was refused before the log's oldest record
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/operations/event-id-explanations>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
+
+<a id="rule-63269014-f728-424c-8e18-e36fe79030aa"></a>
+
+#### When Microsoft Defender recorded a detection
+
+- Id: `63269014-f728-424c-8e18-e36fe79030aa`
+- File: [`rules/evtx/timeline/defender-detection/rule.yaml`](../rules/evtx/timeline/defender-detection/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `evtx`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `timeline`
+- Written: 2026-09-30
+
+**About this check**
+
+Puts on the timeline the first and last time Microsoft Defender's log still holds a record that it detected malware or potentially unwanted software, or acted on something it detected. This tool does not read what is inside those records, so a time here does not say what was detected, where, or whether it was ever run, and Defender records its own mistakes in the same words. It is not evidence about the file or about the person.
+
+**Matches when all of these hold for one observation**
+
+- `channel`: is `Microsoft-Windows-Windows Defender/Operational` (text, ASCII case ignored)
+- `event_id`: is one of `1116`, `1117`
+- `provider`: is `Microsoft-Windows-Windows Defender` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the records Defender's log still holds. It keeps up to 16 MiB by default and overwrites its oldest records when it is full, and a cleared log holds none.
+
+**Ordinary things behind these times**
+
+- Potentially unwanted software bundled with free programs
+- Game trainers, mod tools, key generators and cracked software, which antivirus products flag as unwanted software or hacking tools
+- A false positive on a new or unsigned program
+- A file that was downloaded and never run
+- A detection in a file Defender removed at once
+- No time here does not mean Defender detected nothing before the log's oldest record, or that another antivirus did not
+
+**References**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 <a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
 

@@ -202,6 +202,7 @@ These are counts of what SS mode does not list. §7 says why.
 | The speculative-execution mitigations are switched off | posture | `experimental` | performance advice for an older processor, a tweaking script or pre-modified image, a PC set up this way by the shop that built it |
 | Structured exception handling overwrite protection (SEHOP) is switched off | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
 | The kernel object namespace is not protected as Windows ships it | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+| Microsoft Defender recorded that its real-time protection was switched off | context | `experimental` | **the PC's maker, a shop or a Windows image** switching it off before the PC was handed over (measured on two GitHub-hosted runner images), the owner switching it off for a while to install something Defender flagged, possibly installing another antivirus, a Defender update or an employer's policy, troubleshooting a slow PC |
 
 Four things to know about the thirteen rows above, which are all about **which Windows this is**:
 
@@ -215,6 +216,15 @@ Four things to know about the thirteen rows above, which are all about **which W
   name where Windows shows it, so those rows say which one. KernelOS, Ghost Spectre and images built
   with tiny11builder publish no such name, so what you see instead is which components are missing.
 - **Nothing inside the folders was read.** The folder rows answer one question — is it there.
+
+Three things to know about the Defender row:
+
+- **Read its times.** A record written before the PC was handed over looks exactly like one written
+  yesterday. Both GitHub-hosted runners measured carried one from their image.
+- **It records a change, not a state.** It does not say whether protection is on now, who switched it off,
+  or whether it was switched on again.
+- **Not found says little.** The log rotates, a cleared log holds nothing, and a PC without Defender's log
+  reads not found too.
 
 Three things to know about the two log-clearing rules:
 
@@ -242,7 +252,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last sixteen — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last sixteen — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0; the last one, about Defender's real-time protection, is new after 0.4.0 and is not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -316,8 +326,12 @@ for programs named `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` 
 `FiveM_b<number>_GTAProcess.exe`, SS mode shows the time Windows recorded, with the name. It is not a
 row and not evidence. A name is all Windows keeps, so a time there says a program **of that name** ran
 then, not that the game did, and a missing time does not say the game never ran. The timeline also
-shows the times of FiveM's log, crash and cache folders, the span each Windows log and the change
-journal could see, and which of those could not be read. Read a time only inside its source's span, and
+shows the times of FiveM's log, crash and cache folders, the first and last time the Code Integrity log
+recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection (ADR 0059), the
+span each Windows log and the change journal could see, and which of those could not be read. Those two
+event times are not rows: this program does not read which file was refused or what was detected, Windows 11
+refuses some drivers by default, and an ordinary PC measured for this held hundreds of refusals and a
+detection. Read a time only inside its source's span, and
 never read the space between two times as something someone removed.
 
 Self mode is the player's view, and the player's consent covers SS mode. Asking to see Self mode is

@@ -6,6 +6,19 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- What Code Integrity and Microsoft Defender already record, read through the existing `evtx` collector
+  with no new read, field or reason (ADR 0059, accepted by the owner on 2026-09-30). One `context`,
+  `experimental` rule: **Microsoft Defender recorded that its real-time protection was switched off**
+  (event 5001), whose ordinary causes lead with the PC's maker, because both GitHub-hosted runner images
+  measured carried one. Two timeline selectors, not rules, because both were measured on ordinary machines
+  and the program does not read which file or what threat: the first and last time Code Integrity recorded
+  Windows refusing to load a file (3033, 3077), and Defender's detections (1116, 1117). SS mode now shows
+  those times on its timeline, and the consent screen, the app's consent text and `PRIVACY.md` say so.
+  Each pins provider, channel and event id; the negative fixtures are the neighbouring ids (3089, 5000,
+  5007) and the same id from another provider. No baseline holds either log, so the three have
+  `rules/unconfronted.csv` rows. A Windows 11 PC recorded 476 3033 events on 15 days, 17 driver refusals by a
+  Microsoft driver policy, and no 5001; a timed scan of the official 0.4.0 CLI there read all 414 logs,
+  the Defender log 375th, inside the 30-second budget (20.9 s for the whole scan, on a warm file cache).
 - ADR 0058, parked by the owner on 2026-09-30: reading FiveM's own logs for the servers a PC joined, as a
   second `full`-tier collector, is not built. Two read-only measurements on a Windows 11 PC found no server
   endpoint in either edition's logs — join lines carry no address, name or port. The ADR records the log
@@ -23,17 +36,6 @@ and the project uses [Semantic Versioning](https://semver.org/).
   elevated and a limited token, and the owner's nine decisions of 2026-09-30.
 
 ### Changed
-- ADR 0059 is accepted (the owner decided its five questions on 2026-09-30); not implemented yet: what
-  Code Integrity and Microsoft Defender already record, read through the existing `evtx` collector with no
-  new read. Code Integrity's blocked-image events (3033, 3077) and
-  Defender's detection events (1116, 1117) become timeline selectors rather than rules, because both were
-  measured on ordinary machines; Defender's "real-time protection is disabled" (5001) becomes one `context`
-  rule. Measured on two GitHub-hosted runners, where this code emitted the provider and channel names the
-  rules match, a runner nobody used held four 3033 events, and both runner images carried a 5001 of their
-  own. A Windows 11 PC recorded 476 3033 events on 15 days, 17 driver refusals by a Microsoft
-  driver policy, and no 5001; its Defender log sits 91 % of the way through the event log folder, and a timed
-  scan of the official 0.4.0 CLI there read all 414 logs inside the 30-second budget (20.9 s for the whole
-  scan, on a warm file cache).
 - An ADR 0047 amendment, accepted by the owner on 2026-09-30 and not implemented yet: a watched folder on
   another drive than the one whose change journal is read will get a new, declarable reason,
   `other_volume`, instead of `read_failed`, which SS mode always lists. No second drive's journal is read.

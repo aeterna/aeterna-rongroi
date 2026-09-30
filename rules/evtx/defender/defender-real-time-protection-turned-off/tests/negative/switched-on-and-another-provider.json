@@ -1,0 +1,21 @@
+{
+  "description": "5000, real-time protection enabled, and 5007, a configuration change, from the same provider on the same channel — they differ from the rule only in the event id, and the ordinary PC measured in ADR 0059 held 582 5007s and no 5001. The last group is 5001 from another provider on another channel: an event id means something only with its provider and channel (ADR 0031). That provider and channel are illustrative, not measured, and the counts and times here are illustrative unless the text above says they were measured.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+      "channel": "Microsoft-Windows-Windows Defender/Operational",
+      "provider": "Microsoft-Windows-Windows Defender",
+      "event_id": 5000, "level": 4, "count": 2,
+      "first_seen": "2026-08-02T09:00:00.000Z", "last_seen": "2026-09-20T09:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+      "channel": "Microsoft-Windows-Windows Defender/Operational",
+      "provider": "Microsoft-Windows-Windows Defender",
+      "event_id": 5007, "level": 4, "count": 582,
+      "first_seen": "2026-08-01T09:00:12.000Z", "last_seen": "2026-09-30T06:14:40.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Application.evtx", "channel": "Application", "provider": "ExampleVendor-Updater",
+      "event_id": 5001, "level": 4, "count": 1,
+      "first_seen": "2026-08-01T12:00:00.000Z", "last_seen": "2026-08-01T12:00:00.000Z" } }
+  ]
+}

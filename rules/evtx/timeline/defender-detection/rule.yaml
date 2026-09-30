@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 63269014-f728-424c-8e18-e36fe79030aa
+title: When Microsoft Defender recorded a detection
+description: >-
+  Puts on the timeline the first and last time Microsoft Defender's log still holds a record that it
+  detected malware or potentially unwanted software, or acted on something it detected. This tool does
+  not read what is inside those records, so a time here does not say what was detected, where, or
+  whether it was ever run, and Defender records its own mistakes in the same words. It is not evidence
+  about the file or about the person.
+# A timeline selector (ADR 0051, ADR 0059). Not a rule: the one ordinary PC measured held these
+# records, and a row could not name what was detected (ADR 0059 §2).
+status: experimental
+role: timeline
+collector: evtx
+strength: context
+# The three together, never the event id alone (ADR 0031).
+match:
+  provider: Microsoft-Windows-Windows Defender
+  channel: Microsoft-Windows-Windows Defender/Operational
+  event_id: [1116, 1117]
+retention: >-
+  Only the records Defender's log still holds. It keeps up to 16 MiB by default and overwrites its
+  oldest records when it is full, and a cleared log holds none.
+falsepositives:
+  - Potentially unwanted software bundled with free programs
+  - Game trainers, mod tools, key generators and cracked software, which antivirus products flag as
+    unwanted software or hacking tools
+  - A false positive on a new or unsigned program
+  - A file that was downloaded and never run
+  - A detection in a file Defender removed at once
+  - No time here does not mean Defender detected nothing before the log's oldest record, or that
+    another antivirus did not
+references:
+  - https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus
+author: aeterna-rongroi contributors
+date: 2026-09-30
+tags: [evtx, timeline]

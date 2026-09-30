@@ -224,7 +224,7 @@ fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
     use rongroi_core::model::{EvidenceState, UnmeasuredReason};
 
     for (host, rules) in [
-        ("evtx-access-denied-elevated", 4),
+        ("evtx-access-denied-elevated", 5),
         ("prefetch-access-denied-elevated", 1),
         // `secure-boot-disabled` and `secure-boot-firmware-disagrees`: the fixture denies the
         // registry's Secure Boot key.

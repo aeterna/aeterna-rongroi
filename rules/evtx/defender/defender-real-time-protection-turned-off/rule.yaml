@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 429f8bc3-3c7d-4924-87f7-7cccefa1a185
+title: Microsoft Defender recorded that its real-time protection was switched off
+description: >-
+  Microsoft Defender's log holds a record that its real-time protection — the part that scans files as
+  they are opened — was switched off, with the first and last time it happened. It does not say who
+  switched it off or why, whether it was switched on again, or whether it is on now: a log records a
+  change, not a state. A record written before the PC was handed over looks exactly like one written
+  yesterday, so read the times.
+status: experimental
+collector: evtx
+# Not `posture` (ADR 0059 §3): whether protection is on now is posture, and this does not answer it;
+# and a listed `not_found` would read "never switched off" on a log that rotates, that another
+# antivirus may leave silent, and that is absent where Defender is — the reasoning ADR 0031 gave for
+# the log-clearing rules. Not `tamper`: nothing recorded was removed or altered.
+strength: context
+# The three together, never the event id alone (ADR 0031). 5000 beside it is "real-time protection is
+# enabled".
+match:
+  provider: Microsoft-Windows-Windows Defender
+  channel: Microsoft-Windows-Windows Defender/Operational
+  event_id: 5001
+retention: >-
+  Only switches still in the Defender log as it stands. It holds up to 16 MiB by default and overwrites
+  its oldest records, and a cleared log holds none. If the Defender log is not there at all — Defender
+  removed from the image, or the file deleted — this row also says not found, because this check does
+  not know which logs a PC should have; the rules on Defender's service and platform folder answer that.
+# `access_denied` is left out because an elevated scan read every log on every machine measured, and
+# `source_absent` because every Windows has an Event Log folder (ADR 0032, ADR 0059 §3).
+unmeasured_when: [not_windows, not_admin]
+falsepositives:
+  - The PC's maker, a shop or a Windows image turning real-time protection off before the PC was handed
+    over — measured on two GitHub-hosted runner images, each of which carried one such record from
+    before anyone used it
+  - The owner switching it off for a while to install or run something Defender flagged, often a game
+    mod, a trainer or a tool shared on a forum, which is common advice for exactly those programs
+  - Installing another antivirus product. Whether Defender records this when it steps aside is not
+    established, so this is a possibility, not a known cause
+  - A Defender platform update, or a management tool or group policy of an employer or school
+  - Troubleshooting a slow PC or a game that stutters, which forum advice often starts by disabling
+    real-time scanning
+references:
+  - https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus
+author: aeterna-rongroi contributors
+date: 2026-09-30
+tags: [evtx, defender]
