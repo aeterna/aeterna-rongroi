@@ -78,7 +78,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = live_host();
     let report = scan::run(host.as_ref(), &bundle, context);
 
-    // 2. Only now create the UI, with its profile in a per-run temporary folder.
+    // 2. Only now create the UI, with its profile in a per-run temporary folder. The folders earlier
+    //    runs could not delete because they were stopped go first; the scan is already over.
+    webview_hardening::remove_stale_data_dirs(host.as_ref());
     let data_dir = webview_hardening::run_data_dir();
     let window_dir = data_dir.clone();
     let app = tauri::Builder::default()

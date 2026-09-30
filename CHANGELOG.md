@@ -5,6 +5,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
+  profile folder, `%TEMP%\aeterna-rongroi-<process id>`, behind for good, because the folder is deleted
+  only when the app exits normally. The app now deletes such folders when it starts: only
+  folders named exactly as it names its own, never its own, never one whose process id is running, and
+  none at all when the process list cannot be read. It runs after the scan, so it cannot change what that
+  scan measured.
+
 ## [0.4.0] - 2026-09-21
 
 ### Added
