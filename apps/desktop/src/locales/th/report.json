@@ -89,6 +89,7 @@
     "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
     "driver_service": "ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows",
     "autostart": "โปรแกรมที่เริ่มทำงานเอง (service, Run, scheduled task)",
+    "defender_exclusion": "exclusion ของ Microsoft Defender",
     "fivem_dir": "ไฟล์ของ FiveM",
     "net_config": "การตั้งค่าเครือข่าย (hosts, proxy, firewall)",
     "os_image": "Windows ตัวนี้บอกว่าตัวเองเป็นอะไร",

@@ -11,7 +11,8 @@ for each folder those collectors read, with no file name, and the settings that 
 traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM, and what
 Windows says this installation is, with how the services Windows ships with are set to start,
 whether six named places are on this PC, and what Windows is set to start by itself — services, `Run`
-and `RunOnce` values and scheduled tasks — with the file each one starts.
+and `RunOnce` values and scheduled tasks — with the file each one starts, and what Microsoft Defender
+is told not to scan.
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -72,6 +73,14 @@ installed — launchers, chat apps, peripheral and RGB utilities — because the
 carry your account's security identifier, and a `Run` value's name is whatever the program chose. The
 service's name, where the entry is registered, and the file it starts — with your user name hidden —
 are shown when a rule matches.
+
+Of **Microsoft Defender's exclusions** — the folders, programs and file types Defender is told not to
+scan — it reads each one as Defender holds it, whether Defender's own settings or a policy set it, and,
+for a folder or a program, whether it covers one of FiveM's folders (ADR 0060). Of the network addresses
+Defender is told to skip it reads **only how many there are, never an address**, which can name your or
+your employer's network. Windows lets only administrators read the exclusions, so a scan without
+administrator rights says it could not. An exclusion is shown in SS mode only when it covers a FiveM
+folder, with your user name hidden.
 
 Of the **network settings** it reads three things, and never a record of where traffic went: not which
 sites or servers you connected to, not the DNS cache, not the connections open now, not the firewall log,
