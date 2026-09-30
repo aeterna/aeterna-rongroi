@@ -212,7 +212,7 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
         // The default path is built from the service key's own name, so a name that is itself a
         // separator, a `.`/`..` segment, or a data-stream name (R1: `a:b`) is an unknown form too —
         // nothing else here checks it.
-        if is_unusable_segment(service) || service.contains(['\\', '/', ':']) {
+        if paths::is_unusable_segment(service) || service.contains(['\\', '/', ':']) {
             return None;
         }
         format!(r"{root}\System32\drivers\{service}.sys")
@@ -242,34 +242,13 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
     // F1: every `/` an installer wrote is read as `\`, so the resolved path is always written one way,
     // whichever separator the installer used.
     let resolved = resolved.replace('/', "\\");
-    // R1: a `.` or `..` segment (F1), a repeated or trailing separator (an empty segment), a segment
-    // ending in `.` or a space, or one that names an alternate data stream with a `:` past the drive,
-    // are all unknown forms rather than paths that resolve to the file they appear to name. The
-    // segment right after the drive is also refused when it is the legacy profile folder
-    // `Documents and Settings` (a junction to `Users` on current Windows). SS-mode redaction reaches
-    // that folder too since ADR 0049; the refusal stays because this program does not read the
-    // file a spelling appears to name — no such form was measured on either machine.
-    let mut segments = resolved.split('\\');
-    segments.next(); // the drive segment, e.g. `C:` — not checked here
-    for (index, segment) in segments.enumerate() {
-        if is_unusable_segment(segment)
-            || segment.is_empty()
-            || segment.ends_with(['.', ' '])
-            || segment.contains(':')
-        {
-            return None;
-        }
-        if index == 0 && segment.eq_ignore_ascii_case("Documents and Settings") {
-            return None;
-        }
+    // R1: a `.` or `..` segment (F1), a repeated or trailing separator, a segment ending in `.` or a
+    // space, an alternate data stream, or `Documents and Settings` right after the drive are unknown
+    // forms (`paths::is_refused_form`, shared with `autostart` since ADR 0060).
+    if paths::is_refused_form(&resolved) {
+        return None;
     }
     Some(resolved)
-}
-
-/// Whether a path segment is `.` or `..` — never a real file or folder name, only a way to walk out
-/// of the folder the rest of the path names.
-fn is_unusable_segment(segment: &str) -> bool {
-    segment == "." || segment == ".."
 }
 
 /// What hashing one file came to.
