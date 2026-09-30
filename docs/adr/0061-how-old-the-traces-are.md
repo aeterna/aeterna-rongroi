@@ -544,3 +544,24 @@ the ADR recommends or the one that shows less:
 Not measured by this change: `FilesystemSource::times` on a drive root and `$Recycle.Bin` under a limited
 token, `journal_created_on` on a PC, and the whole section on a PC. The points under "What is unverified"
 stay open.
+
+## Checked on a Windows 11 PC (2026-10-01)
+
+The CLI built from #123's head (`89c2236`) ran on the same Windows 11 PC (build 26220), `scan --mode ss`, in
+English and Thai, once elevated and once with the account's limited token (a scheduled task run with
+`/RL LIMITED`). The binary, the task and the output were deleted from the PC afterwards.
+
+- **Elevated.** Every anchor in decision 5 was read. The change journal's creation date and the earliest
+  date Windows Setup kept fell one day apart, which agrees with the probe's reading of the journal
+  identifier as a time; it is still one PC. The drive root and `$Recycle.Bin` were older than both, and
+  `InstallDate` was the last feature upgrade, as measured on 2026-09-30. The four logs the bundle reads came
+  first, each with its size against its maximum; the other 412 folded into one line.
+- **Limited token.** The journal anchor and the rows of every source that needs administrator rights
+  (the four logs, Prefetch, BAM) read "not read without administrator rights — not known", never as
+  empty. The anchors that need no rights (Setup's dates, the drive root, `$Recycle.Bin`, FiveM's folders)
+  were read as in the elevated run.
+- **The cross-source statement did not appear**, in either run: Prefetch and BAM hold entries under
+  FiveM's names on this PC, which is the ordinary case decision 7 is built for.
+- **Thai** rendered correctly in the console.
+- **Open.** The PCA row read "part of this was read and part of it was not" in both runs, the same file the
+  probe could not take a time from. Whether that is this build's PCA format or this PC's file is not known.
