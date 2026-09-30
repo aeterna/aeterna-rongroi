@@ -3,8 +3,9 @@
 - Status: accepted — the recommendation below; measurement 1 under "Before any code" passed, and the `usn` collector is implemented (see Consequences)
 - Date: 2026-09-14
 - Amended: 2026-09-14, with measurements on a GitHub-hosted runner ("Measured on a runner"): measurement 1 passed
-- Amended: 2026-09-30, proposed: a folder on another volume, and the first rule that reads a count
-  ("Amendment (2026-09-30, proposed)"), with the owner's Windows 11 reading of the journal
+- Amended: 2026-09-30, accepted: a folder on another volume, and the first rules that read a count
+  ("Amendment (2026-09-30, accepted)"), with two readings of the journal on a Windows 11 PC; not
+  implemented yet
 
 ## Context
 
@@ -395,11 +396,11 @@ Prefetch folder itself could not be opened (5); the Event Log and PCA folders co
 7. **A baseline** (measurement 6): the per-folder counts above are the runner's. The fixture is made from a
    run of the collector itself.
 
-## Amendment (2026-09-30, proposed): a folder on another volume, and the first rule that reads a count
+## Amendment (2026-09-30, accepted — the owner decided the six questions below on 2026-09-30): a folder on another volume, and the first rules that read a count
 
-This amendment is proposed. Nothing in it is accepted, and nothing it proposes is built. It answers the
-open question under "What is not established" about a watched folder on another volume, and proposes the
-first rule that reads a watched folder's counts. The owner's decisions are listed at its end.
+The owner accepted this amendment on 2026-09-30, with the six decisions listed at its end. Nothing in it is
+built yet. It answers the open question under "What is not established" about a watched folder on another
+volume, and decides the first rules that read a watched folder's counts.
 
 ### Measured on a PC
 
@@ -478,7 +479,7 @@ place's result. So the Prefetch refusal never reaches a report on its own. It is
 `not_admin`, which the timeline shows once and which each rule on `usn` would add to `ScopeNotes`. A
 per-place gap for Prefetch (ADR 0044) would only appear if the volume could be opened without
 Administrators, which neither the runner nor this PC allows. In an elevated scan, `access_denied` on
-Prefetch alone would be a per-place gap confined to `prefetch`, and no proposed rule reads that place.
+Prefetch alone would be a per-place gap confined to `prefetch`, and none of the rules decided here reads that place.
 Nothing in ADR 0044 or in the proposals below needs to change for this. The collector's test for a refused
 volume already covers the path.
 
@@ -541,12 +542,12 @@ need for a reason, and it adds cost:
 
 **`other_volume` has not been seen on a real PC.** The one PC measured has every watched folder on the
 system volume, and the case is known only from the code and the `usn-folder-on-other-volume` fixture. How
-common it is, and whether such a volume has a journal, is not known. The recommendation stays the new
-reason, on weaker grounds than a measurement: it costs little before the first rule ships. Without it,
-the first PC that does have the case would show a row saying a read failed when none did. There is no
-measured case to justify reading a second journal, so that is not proposed.
+common it is, and whether such a volume has a journal, is not known. The new reason was chosen on weaker
+grounds than a measurement: it costs little before the first rule ships. Without it, the first PC that does
+have the case would show a row saying a read failed when none did. No measured case justified reading a
+second journal, so none is read (owner decision 2).
 
-### Proposal 1: `other_volume`, a fourteenth reason
+### Decision 1: `other_volume`, a fourteenth reason
 
 - **Code:** `other_volume`, the same word as the `folder` value it goes with (CONVENTIONS.md, one name per
   idea). `UnmeasuredReason::OtherVolume`.
@@ -566,7 +567,7 @@ measured case to justify reading a second journal, so that is not proposed.
   `types.ts` mirror. `REPORT_SCHEMA_VERSION` stays at 1. A report written earlier carries no such reason.
   A reader built before it would refuse a report that has one, as it would any unknown reason.
 
-### Proposal 2: the first rule, deletions and renames in FiveM's plugin folders
+### Decision 2: the first rules, deletions and renames in FiveM's plugin folders
 
 **Which folders.** Only `plugins` (FiveM for GTA V Legacy) and `enhanced_asi` (FiveM for GTA V Enhanced).
 Both were `identified` with no record in 39 minutes, in both readings of the PC above. Prefetch and the Event
@@ -574,7 +575,7 @@ Log folder change every few minutes (409 and 65 records in 39 minutes), though n
 that span. Their deletions come from Windows itself (Prefetch keeps a bounded number of files) and from
 optimisers, and ADR 0047 already says a delete count there is not evidence of cleaning. How often they occur
 on an ordinary PC was not measured, and a rule found on most scans is the "sea of red flags" ADR 0027
-forbids. FiveM's cache, log and crash folders are not watched by `usn` and are not proposed.
+forbids. FiveM's cache, log and crash folders are not watched by `usn`, and none is added (owner decision 6).
 FiveM writes and removes files there itself.
 
 **Why four files and not one.** `match` is a conjunction (ADR 0029), so "a deletion or a rename" is two
@@ -593,7 +594,7 @@ Renames are included because moving a file out of the folder is a rename, with t
 this folder as its parent. Whether Windows' Recycle Bin shows up this way in the journal is not measured
 here. A file moved elsewhere on the same volume is renamed, not deleted.
 
-**The shape of one of them**, as a starting point for the change that adds them:
+**The shape of one of them**, as the starting point for the change that adds them:
 
 ```yaml
 title: The change journal holds a deletion in FiveM's plugin folder
@@ -645,14 +646,14 @@ confronts the two `plugins` rules. No baseline carries `enhanced_asi` as `identi
 
 **`unmeasured_when`.** `not_windows`; `source_absent`, because a player with one edition has no folder for
 the other, and because this is also the reason when the volume has no journal at all (both PCs measured had
-one; the timeline names `usn`'s reason for the whole collector either way); `other_volume` (Proposal 1).
+one; the timeline names `usn`'s reason for the whole collector either way); `other_volume` (Decision 1).
 `not_admin` is not declared: it is a scope statement and never a row whether declared or not. `access_denied`
 is not declared, because the folders are in the player's own profile and a denial there is unexpected.
 `partial`, `budget_spent` and `read_failed` cannot be declared (ADR 0032).
 
 ### How this differs from `usn/timeline/watched-folder-record-times`
 
-| | The timeline selector (ADR 0051) | The proposed rules |
+| | The timeline selector (ADR 0051) | The four rules |
 |---|---|---|
 | Kind | `role: timeline`. It makes no evidence | Evidence rules, `strength: context` |
 | What it reads | every watched folder that is `identified` | two FiveM folders, one reason each |
@@ -664,7 +665,7 @@ is not declared, because the folders are in the player's own profile and a denia
 The selector answers "when did anything change in this folder". A rule answers "did the journal see a file
 leave this folder", as a row a reviewer can point at, with its ordinary causes beside it.
 
-### Proposal 3: every `usn` row states the journal's span
+### Decision 3: every `usn` row states the journal's span
 
 The journal's span is measured on each scan. ADR 0051 already reads it as `usn`'s coverage band: the
 `first_seen` and `last_seen` of the observation whose `location` is `journal`. Today it is shown only on
@@ -726,23 +727,18 @@ on 2026-09-30, and its results are under "The probe, on the same PC" above:
 It prints no file name, user name, journal identifier, USN, file reference number, volume serial or volume
 GUID. It sends only the two read control codes.
 
-### Owner decisions this amendment needs
+### Owner decisions (2026-09-30)
 
-1. **The reason for a folder on another volume.** Recommended: a new, declarable reason, `other_volume`
-   (Proposal 1), with ADR 0030's table amended in the same change. The case has not been seen on a real PC:
-   the one PC measured has none, so this rests on the code and a fixture. Alternatives: keep `read_failed`
-   until a PC shows the case, or read the other volume's journal as well.
-2. **Reading a second volume's journal.** Recommended: no. The probe found no watched folder on another
-   volume, so there is nothing measured to justify it. Reopen it if a PC shows the case.
-3. **The first rules.** Recommended: four `context` rules, deletions and renames, one per FiveM plugin
-   folder (Proposal 2). Alternative: deletions only, two rules, with renames after a baseline.
-4. **Status.** Recommended: `experimental`, with positive and negative fixtures and an `unconfronted.csv`
-   row for the `enhanced_asi` pair.
-5. **The span on every row.** Recommended: the view pairs each `usn` row with the journal's coverage band,
-   in both modes (Proposal 3).
-6. **Folders not proposed.** Recommended: no rule on `prefetch`, `winevt_logs` or `appcompat_pca` counts,
-   and no FiveM cache, log or crash folder added to `usn`, until a measured baseline shows how often they
-   change on an ordinary PC.
+1. A folder on another volume is reported with a new, declarable reason, `other_volume` (Decision 1), and
+   ADR 0030's table is amended in the change that adds it. No PC measured so far has the case.
+2. No second volume's journal is read.
+3. The first rules are four `context` rules: deletions and renames, one per FiveM plugin folder, `plugins`
+   and `enhanced_asi` (Decision 2).
+4. They are `experimental`, with a positive and a negative fixture each, and a `rules/unconfronted.csv` row
+   for the `enhanced_asi` pair.
+5. `rongroi-core::view` pairs every `usn` row with the journal's coverage band, in both modes (Decision 3).
+6. No rule reads the `prefetch`, `winevt_logs` or `appcompat_pca` counts, and no FiveM cache, log or crash
+   folder is added to `usn`, until a measured baseline shows how often they change on an ordinary PC.
 
 ### What the amendment does not establish
 
@@ -766,8 +762,8 @@ GUID. It sends only the two read control codes.
 - The contract of `FSCTL_READ_UNPRIVILEGED_USN_JOURNAL`.
 - Which reason a watched folder on another volume (a junction to a game drive) should carry. The first rule
   that reads a per-folder count must settle it. Today it is `read_failed`, which SS mode always lists and no
-  rule can declare; `not_attempted` was rejected because it says the scan stopped early. The amendment of
-  2026-09-30 proposes a new reason, `other_volume`, which would amend ADR 0030.
+  rule can declare; `not_attempted` was rejected because it says the scan stopped early. Settled by the
+  amendment of 2026-09-30: a new reason, `other_volume`, which amends ADR 0030 in the change that adds it.
 - Attribution relies on the NTFS `VolumeSerialNumber`. Whether a cloned volume attached to the same PC keeps
   the serial is not verified.
 
@@ -779,5 +775,8 @@ GUID. It sends only the two read control codes.
   `source_absent` gaps and folders on another volume (checked by volume serial) as `read_failed` gaps, and
   the program's own Prefetch record counted — are in `docs/architecture.md`'s `usn` row.
 - Accepted by the owner on 2026-09-14, with the five points of the recommendation as written.
+- The amendment of 2026-09-30 was accepted by the owner the same day, with its six decisions. Not
+  implemented yet: `other_volume`, the four rules, the band on each row and ADR 0030's new row come in the
+  change that builds them.
 - README's M3 row, in both languages, links here: the collector reads the change journal without write
   access and counts records per watched folder with no file names, and no rule reads it yet.
