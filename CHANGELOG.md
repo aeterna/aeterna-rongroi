@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-01
+
 ### Added
 - **How far back the traces reach** (ADR 0061), in both modes and in both front ends. A new view section
   lists, for each event log, Prefetch, BAM, PCA, the change journal and each of FiveM's log, crash and cache
@@ -31,19 +33,6 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `docs/architecture.md`, the glossary and both screenshare guides say what is read and shown; the CLI takes
   the section's and the statement's fixed words from the desktop's locale files. Two synthetic fixture hosts
   cover a PC read with and without administrator rights.
-- ADR 0061 is accepted (the owner decided its eight questions on 2026-09-30), implemented above: how old
-  each trace source is, beside when parts of the PC were set up. A "trace ages" section lists, per source
-  (each Event Log, Prefetch, BAM, PCA, the USN journal and FiveM's own folders), the oldest time it still
-  holds, how much it holds, its ordinary retention with a reference or an "undocumented" mark, and the reason
-  when it was not read — `not_admin` reads "not known", never empty. Anchors in the header are dates with their
-  ordinary resets, never one "machine age": `InstallDate` is shown as "installed or last feature-upgraded".
-  One cross-source statement, computed in the view and never a rule, puts FiveM's presence beside Windows'
-  records of programs that ran, with the causes that produce the same result. No verdict, score or ranking;
-  a reinstall and a new PC stay indistinguishable. A read-only probe on a Windows 11 PC found that a feature
-  upgrade reset `InstallDate`, the Windows and profile folders, key write times and every Event Log's oldest
-  record, while Windows Setup's record of earlier installations, the system drive root and the USN journal
-  identifier read as a time all reached back more than seven years and agreed to the day; BAM held entries
-  47 days old, and full Security and PowerShell logs reached back 2.3 and 0.2 days.
 - What Code Integrity and Microsoft Defender already record, read through the existing `evtx` collector
   with no new read, field or reason (ADR 0059, accepted by the owner on 2026-09-30). One `context`,
   `experimental` rule: **Microsoft Defender recorded that its real-time protection was switched off**
@@ -57,13 +46,6 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `rules/unconfronted.csv` rows. A Windows 11 PC recorded 476 3033 events on 15 days, 17 driver refusals by a
   Microsoft driver policy, and no 5001; a timed scan of the official 0.4.0 CLI there read all 414 logs,
   the Defender log 375th, inside the 30-second budget (20.9 s for the whole scan, on a warm file cache).
-- ADR 0058, parked by the owner on 2026-09-30: reading FiveM's own logs for the servers a PC joined, as a
-  second `full`-tier collector, is not built. Two read-only measurements on a Windows 11 PC found no server
-  endpoint in either edition's logs — join lines carry no address, name or port. The ADR records the log
-  files' names, sizes, line formats and times, keeps the collector's design (a tolerant parser reporting
-  `partial`, endpoints as server identities hidden in SS mode, no plugin names) as undecided
-  recommendations, and states the measurement that would reopen it. ADR 0052's row for this source says it
-  is parked.
 - The `autostart` collector: what Windows starts by itself (ADR 0060). Program services (`Type` `0x10` or
   `0x20`), `Run` and `RunOnce` values under `HKLM`, its `WOW6432Node` view and `HKCU`, and every `Exec`
   action of the scheduled tasks read from their XML files under `%SystemRoot%\System32\Tasks`, parsed by a
@@ -85,14 +67,6 @@ and the project uses [Semantic Versioning](https://semver.org/).
   never an address. Refused without administrator rights (`not_admin`), as measured on a runner and a
   Windows 11 PC. One `posture` rule, `experimental`: a Defender exclusion covers a FiveM folder. The consent
   question, PRIVACY.md, both READMEs and both screenshare guides say what is read.
-- Accepted (ADR 0060), both halves implemented above: an `autostart` collector for what Windows starts by itself —
-  program services, `Run`/`RunOnce` under `HKLM`, its 32-bit view and `HKCU`, and scheduled tasks read from
-  their files — with each file's path, SHA-256 and embedded signature, never a command line's arguments; and a
-  `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights only.
-  Two `experimental` `posture` rules: a program that starts by itself with no valid embedded signature outside
-  the Windows and Program Files folders, and an exclusion that covers a FiveM folder. The ADR records a
-  GitHub-hosted runner's measurement under an elevated and a standard account, and a Windows 11 PC's under an
-  elevated and a limited token, and the owner's nine decisions of 2026-09-30.
 - The first rules that read the change journal's counts: four `context`, `experimental` rules for a
   deletion and for a rename in FiveM for GTA V Legacy's plugin folder and in FiveM for GTA V Enhanced's asi
   folder, each with a positive and a negative fixture (ADR 0047, amendment of 2026-09-30). Each row says
@@ -105,6 +79,34 @@ and the project uses [Semantic Versioning](https://semver.org/).
   (`ReportView::row_bands`), so the CLI and the desktop app cannot disagree.
 
 ### Changed
+- ADR 0058, parked by the owner on 2026-09-30: reading FiveM's own logs for the servers a PC joined, as a
+  second `full`-tier collector, is not built. Two read-only measurements on a Windows 11 PC found no server
+  endpoint in either edition's logs — join lines carry no address, name or port. The ADR records the log
+  files' names, sizes, line formats and times, keeps the collector's design (a tolerant parser reporting
+  `partial`, endpoints as server identities hidden in SS mode, no plugin names) as undecided
+  recommendations, and states the measurement that would reopen it. ADR 0052's row for this source says it
+  is parked.
+- ADR 0060 (accepted 2026-09-30) records the design of the two collectors shipped above: an `autostart` collector for what Windows starts by itself —
+  program services, `Run`/`RunOnce` under `HKLM`, its 32-bit view and `HKCU`, and scheduled tasks read from
+  their files — with each file's path, SHA-256 and embedded signature, never a command line's arguments; and a
+  `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights only.
+  Two `experimental` `posture` rules: a program that starts by itself with no valid embedded signature outside
+  the Windows and Program Files folders, and an exclusion that covers a FiveM folder. The ADR records a
+  GitHub-hosted runner's measurement under an elevated and a standard account, and a Windows 11 PC's under an
+  elevated and a limited token, and the owner's nine decisions of 2026-09-30.
+- ADR 0061 (accepted 2026-09-30, the owner deciding its eight questions) records the design shipped above: how old
+  each trace source is, beside when parts of the PC were set up. A "trace ages" section lists, per source
+  (each Event Log, Prefetch, BAM, PCA, the USN journal and FiveM's own folders), the oldest time it still
+  holds, how much it holds, its ordinary retention with a reference or an "undocumented" mark, and the reason
+  when it was not read — `not_admin` reads "not known", never empty. Anchors in the header are dates with their
+  ordinary resets, never one "machine age": `InstallDate` is shown as "installed or last feature-upgraded".
+  One cross-source statement, computed in the view and never a rule, puts FiveM's presence beside Windows'
+  records of programs that ran, with the causes that produce the same result. No verdict, score or ranking;
+  a reinstall and a new PC stay indistinguishable. A read-only probe on a Windows 11 PC found that a feature
+  upgrade reset `InstallDate`, the Windows and profile folders, key write times and every Event Log's oldest
+  record, while Windows Setup's record of earlier installations, the system drive root and the USN journal
+  identifier read as a time all reached back more than seven years and agreed to the day; BAM held entries
+  47 days old, and full Security and PowerShell logs reached back 2.3 and 0.2 days.
 - A FiveM plugin folder on another drive than the Windows drive, whose change journal is the one read, is
   now reported with a new reason, `other_volume` — "this is on another drive, and this program reads only
   the system drive's change journal" — instead of `read_failed`, which SS mode always lists and no rule can
