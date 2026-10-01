@@ -9,8 +9,10 @@ Prefetch and the Background Activity Moderator recorded about programs that ran,
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read, with no file name, and the settings that decide where network
 traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM, and what
-Windows says this installation is, with how the services Windows ships with are set to start, and
-whether six named places are on this PC.
+Windows says this installation is, with how the services Windows ships with are set to start,
+whether six named places are on this PC, and what Windows is set to start by itself — services, `Run`
+and `RunOnce` values and scheduled tasks — with the file each one starts, what Microsoft Defender is
+told not to scan, and when parts of this PC were set up, as dates (see [below](#how-far-back-the-traces-reach)).
 Each collector is listed with what it reads in [docs/architecture.md](docs/architecture.md).
 
 Of each file in FiveM's plugin folders it reads its location, a SHA-256 of its contents, and what Windows
@@ -23,7 +25,9 @@ name, and that name is then what the report shows.
 It reads the same four things of `FiveM.exe` in the program folder of each FiveM edition, so that the
 report can say whether FiveM's own program carries the signature FiveM was measured with (ADR 0036). To
 find that one file it lists the names in the program folder; **no other file there is reported**, and
-nothing is read from inside it but what the hash and the signature check consume.
+nothing is read from inside it but what the hash and the signature check consume. Since ADR 0061 it also reads
+when that program folder, and Legacy's `FiveM.app` folder, were created — each folder's own time, to the
+second, as the log and cache folders' times are — and `FiveM.exe`'s row carries them.
 
 Of FiveM's **log, crash and cache folders** in both editions it reads only what listing each folder
 gives: how many files and subfolders it holds, the files' total size, the earliest and latest creation and
@@ -46,6 +50,39 @@ Of a driver registered with Windows it reads the name of its driver service, whe
 it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
 graphics card vendor, a VPN, a virtualisation product — because their drivers are registered. It does not
 read which drivers are loaded or what they do.
+
+Of **what Windows starts by itself** it reads three places (ADR 0060):
+
+- **Services** that are programs rather than drivers: each one's name, how it is set to start, whether it
+  starts on a trigger, and the file it runs — its `ServiceDll` when it has one.
+- **`Run` and `RunOnce`** under the machine's key, the machine's 32-bit key and your Windows account's
+  key: each value's name, and the file its command line starts. Other accounts' keys are not read.
+- **Scheduled tasks**, from the task files Windows keeps in `%SystemRoot%\System32\Tasks`: each task's
+  name and folder, whether it is on, which kinds of trigger start it (at start-up, at sign-in, on a
+  schedule, on an event), and the file each of its programs is. Windows lets only administrators read
+  these files, so a scan without administrator rights says it could not.
+
+**It never reads the arguments a program is given** — not even whether there were any: a command line is
+read only to find where the program's file ends, because arguments are where a token, a password or an
+address is passed to a program. Of a task it also never reads who made it, its description, its working
+folder or the account it runs as into the report; the account is compared with the one running this
+scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file **outside the Windows
+folder** it reads a SHA-256 and what Windows says about its embedded signature, as for FiveM's files;
+files inside the Windows folder are reported by their path alone. The list names software you
+installed — launchers, chat apps, peripheral and RGB utilities — because they set themselves to start.
+
+**In SS mode, the name of a `Run` value and of a scheduled task is never shown**: a task's name can
+carry your account's security identifier, and a `Run` value's name is whatever the program chose. The
+service's name, where the entry is registered, and the file it starts — with your user name hidden —
+are shown when a rule matches.
+
+Of **Microsoft Defender's exclusions** — the folders, programs and file types Defender is told not to
+scan — it reads each one as Defender holds it, whether Defender's own settings or a policy set it, and,
+for a folder or a program, whether it covers one of FiveM's folders (ADR 0060). Of the network addresses
+Defender is told to skip it reads **only how many there are, never an address**, which can name your or
+your employer's network. Windows lets only administrators read the exclusions, so a scan without
+administrator rights says it could not. An exclusion is shown in SS mode only when it covers a FiveM
+folder, with your user name hidden.
 
 Of the **network settings** it reads three things, and never a record of where traffic went: not which
 sites or servers you connected to, not the DNS cache, not the connections open now, not the firewall log,
@@ -119,6 +156,13 @@ a file, and when the oldest and newest of that folder's records were written. **
 changed on the drive, and the program's parser skips the name without keeping it. It reports no journal
 identifier and no file number, because each would identify your PC across two reports.
 
+**Four rules read the deletions and renames of FiveM's two plugin folders** (ADR 0047, amendment of
+2026-09-30). When one matches, SS mode shows that folder's counts and the time of its first and last
+record, beside the span the journal held — still no file name, because none was read. The journal does not
+say which program deleted or renamed a file, and the row says so. The counts of the Prefetch, event log and
+Program Compatibility Assistant folders are read by no rule. A FiveM folder on another drive is not
+counted at all: the report says it is on another drive, and no other drive's journal is read.
+
 Of the machine's security settings it also reads two more (ADR 0038). One is what the PC's **firmware**
 itself says about Secure Boot, beside what Windows says — one on/off value, nothing that names a person.
 Windows only lets a program read a firmware value with a special permission that administrators hold, so
@@ -153,6 +197,19 @@ not a conclusion and not "when you turned your PC on": a "Shut down" with Fast S
 Windows ships, and sleep and hibernation do not start the count again, so on an ordinary PC it is often
 days old. It does say roughly when the PC was last restarted, which is a small fact about your day, and
 two reports taken before the next restart show the same time. The consent question names it (ADR 0039).
+
+It also reads **when parts of this PC were set up**, and keeps each as a **date, never a time**
+(ADR 0061): when this Windows installation was installed or last upgraded to a new feature version
+(`InstallDate`); the earliest installation date Windows Setup kept from before its upgrades, and how many
+it kept — **never the names of those records**, which carry dates to the second; the date the Windows
+drive's change journal identifier gives when it is read as a time — **never the identifier itself**, which
+names one journal on one PC, and only with administrator rights; when the Windows drive's root folder and
+its `$Recycle.Bin` were created; and when FiveM's program folders (and Legacy's `FiveM.app`) were created on
+your account. A date is what these are compared in; a time to the second would be the same in every report
+of this PC. The dates still say something about this PC — when it was set up, when FiveM was installed —
+and two reports of it show the same ones. The folders' times are read without listing the folder above
+them, so no other account's folder name is read. Nothing here is a conclusion: each is shown with what
+ordinarily resets it, and they disagreed by years on the one PC measured.
 
 ### A full scan reads more, and only if you agree before it starts
 
@@ -202,8 +259,9 @@ or allow remote access.
 - **The GUI uses Microsoft WebView2**, a Windows component. Microsoft documents that WebView2 collects
   some required diagnostic data regardless of settings and follows the Windows *Diagnostic data* setting
   for optional data; crash reports may be sent to Microsoft. aeterna-rongroi turns off SmartScreen inside
-  its WebView and keeps the WebView profile in a temporary folder that is deleted on exit, but it cannot
-  switch off Windows' own diagnostics.
+  its WebView and keeps the WebView profile in a temporary folder that is deleted on exit — or, if the
+  program was stopped before it could delete it, at its next start — but it cannot switch off Windows' own
+  diagnostics.
 - **The CLI version does not use WebView2.** Use it if you want no WebView component involved.
 
 ## What is shown
@@ -215,8 +273,11 @@ or allow remote access.
 | What a collector saw that no rule matched | listed | **not listed** — only how many there were |
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
 | A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
+| The name of a `Run` value or a scheduled task | shown | **not shown** |
 | What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, a separate choice that is off until you turn it on |
 | When Windows last started | shown | shown, as one time at the top of the report |
+| When parts of this PC were set up (dates) | shown | shown — [below](#how-far-back-the-traces-reach) |
+| How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
 
 ### The timeline
@@ -235,10 +296,42 @@ ADR 0051:
 - the times of FiveM's log, crash and cache folders, and of each Enhanced server cache folder, without its
   name. These times can match two reports of this PC;
 - the oldest and newest record each Windows event log holds, with the log's path;
+- the first and last time the Code Integrity log recorded Windows refusing to load a file (events 3033
+  and 3077), and the first and last time Microsoft Defender's log recorded a detection or an action on one
+  (events 1116 and 1117), ADR 0059. The events' contents are not read, so this never says which file
+  was refused, which program asked, or what Defender detected;
 - the oldest and newest change the change journal holds for each folder it counts.
 
 The same list is on the consent screen. Each entry that comes from this list is shown with the ordinary
 things that produce it.
+
+### How far back the traces reach
+
+Both modes show a section that puts **how far back each source reaches** beside **when parts of this PC
+were set up** (ADR 0061). For each event log, Windows Prefetch, the Background Activity Moderator, the
+Program Compatibility Assistant, the change journal and each of FiveM's log, crash and cache folders, it
+shows how many entries the source holds and the oldest time still in it, with what that source ordinarily
+keeps. **It names no program and no file**: event logs by their file name, the rest by the source alone.
+The event logs this program's rules read are listed one by one; the others are one line with how many
+there are.
+
+For Prefetch, BAM and the Program Compatibility Assistant this is **new in SS mode**: before ADR 0061 SS
+mode counted their records without saying how many or how old the oldest was (ADR 0034 decision 2). It
+now shows those two numbers. It still shows no program name from them beyond the ones the timeline names
+[above](#the-timeline).
+
+When **FiveM's folders were written more recently than Prefetch or BAM reaches back**, and neither holds
+an entry for the names the timeline lists, both modes also show **one statement** that puts the two side by
+side: whether `FiveM.exe` is there and in which edition, when FiveM's folders were last written, how many
+Enhanced server cache folders there are, and for each of Prefetch, BAM and the Program Compatibility
+Assistant whether it holds those names, how many entries it holds and its oldest date — or that it was not
+read, and so whether it holds one is not known. **It is not evidence and not a finding**: it is always shown
+with the ordinary things that produce the same result, and it names no path, file, user or server.
+
+A source the scan could not read — for example Prefetch, BAM or the change journal without administrator
+rights — is shown as **not known**, never as empty.
+
+The consent question names all of this before anything is read.
 
 ### Which folders count as your user-profile folder
 

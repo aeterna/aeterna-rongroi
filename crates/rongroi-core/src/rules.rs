@@ -556,6 +556,16 @@ impl fmt::Display for Problem {
 
 /// Checks everything about rules and translations that does not need fixture files.
 pub fn validate(rules: &[SourcedRule], translations: &Translations) -> Vec<Problem> {
+    validate_with_ages(rules, &BTreeSet::new(), translations)
+}
+
+/// [`validate`], with the ids of the age texts beside the rules (ADR 0061): a translation may be for
+/// one of them, and then it translates `retention` and nothing else.
+pub fn validate_with_ages(
+    rules: &[SourcedRule],
+    age_ids: &BTreeSet<String>,
+    translations: &Translations,
+) -> Vec<Problem> {
     let mut problems = Vec::new();
     let mut seen_ids = BTreeSet::new();
     for sourced in rules {
@@ -574,7 +584,7 @@ pub fn validate(rules: &[SourcedRule], translations: &Translations) -> Vec<Probl
         validate_path(sourced, &mut report);
         validate_rule(&sourced.rule, &mut report);
     }
-    validate_translations(translations, &seen_ids, &mut problems);
+    validate_translations(translations, &seen_ids, age_ids, &mut problems);
     problems
 }
 
@@ -832,6 +842,7 @@ pub fn is_rfc3339(value: &str) -> bool {
 fn validate_translations(
     translations: &Translations,
     rule_ids: &BTreeSet<String>,
+    age_ids: &BTreeSet<String>,
     problems: &mut Vec<Problem>,
 ) {
     for (lang, texts) in translations {
@@ -847,7 +858,17 @@ fn validate_translations(
             ));
         }
         for (id, text) in texts {
-            if !rule_ids.contains(id) {
+            if age_ids.contains(id) {
+                // An age text has one text to translate (ADR 0061).
+                if text.title.is_some()
+                    || text.description.is_some()
+                    || text.falsepositives.is_some()
+                {
+                    report(format!(
+                        "translation for age text `{id}` may translate `retention` only"
+                    ));
+                }
+            } else if !rule_ids.contains(id) {
                 report(format!("translation for unknown rule id `{id}`"));
             }
             let empty = |field: Option<&str>| field.is_some_and(|t| t.trim().is_empty());
@@ -865,7 +886,8 @@ fn validate_translations(
     }
 }
 
-fn is_uuid_v4(value: &str) -> bool {
+/// Whether `value` is a lower-case `UUIDv4`, the form every rule and age-text id takes.
+pub(crate) fn is_uuid_v4(value: &str) -> bool {
     value.len() == 36
         && value == value.to_ascii_lowercase()
         && uuid::Uuid::parse_str(value).is_ok_and(|id| id.get_version_num() == 4)

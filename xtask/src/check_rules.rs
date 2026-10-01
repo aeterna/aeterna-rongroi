@@ -38,7 +38,10 @@ struct CheckRulesOutcome {
 }
 
 pub fn run(root: &Path) -> anyhow::Result<()> {
-    let outcome = check(root)?;
+    let mut outcome = check(root)?;
+    if outcome.problems.is_empty() {
+        outcome.problems.extend(check_ages(root)?);
+    }
     if outcome.problems.is_empty() {
         println!(
             "check-rules: {} rule(s), {} fixture(s), {} language(s) ok",
@@ -139,6 +142,43 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         fixture_count,
         language_count: bundle.languages().len(),
     })
+}
+
+/// Every collector that declares an age has a text in `rules/ages/<collector>.yaml`, and every text is
+/// for a collector that declares one (ADR 0061). The bundle loader, which [`check`] has already run,
+/// refuses a text with no reference and a `documented: true` with no Microsoft Learn reference.
+///
+/// Apart from [`check`] because it is about the whole tree against the collectors of this build,
+/// which a tree holding one rule is not.
+fn check_ages(root: &Path) -> anyhow::Result<Vec<String>> {
+    let json = collect_bundle_json(&root.join("rules"))?;
+    let bundle = Bundle::from_bundle_json(&json).map_err(|error| anyhow::anyhow!("{error}"))?;
+    let mut problems = Vec::new();
+    check_age_texts(&bundle, &mut problems);
+    Ok(problems)
+}
+
+fn check_age_texts(bundle: &Bundle, problems: &mut Vec<String>) {
+    let declared: std::collections::BTreeSet<&str> = rongroi_collectors::all()
+        .iter()
+        .filter(|collector| collector.age().is_some())
+        .map(|collector| collector.id())
+        .collect();
+    let texts: std::collections::BTreeSet<&str> = bundle
+        .ages()
+        .iter()
+        .map(|sourced| sourced.text.collector.as_str())
+        .collect();
+    for collector in declared.difference(&texts) {
+        problems.push(format!(
+            "rules/ages/{collector}.yaml: collector `{collector}` declares a trace age and has no retention text (ADR 0061)"
+        ));
+    }
+    for collector in texts.difference(&declared) {
+        problems.push(format!(
+            "rules/ages/{collector}.yaml: collector `{collector}` declares no trace age, so this text is never shown (ADR 0061)"
+        ));
+    }
 }
 
 /// What the collectors in this build can be asked about: each collector's id, and the field names it
@@ -242,10 +282,11 @@ impl Vocabulary {
     /// undeclared one is listed. A reason the rule's collector cannot produce is therefore a
     /// suppression that never fires — the author believes they have said "this one is ordinary
     /// here" and the report will list it anyway — and nothing in the rule file, in `check-baseline`
-    /// or in a fixture shows it. Since ADR 0030 every one of the twelve reasons has a producer in
-    /// some collector, so that half of the check is now entirely about which collector:
-    /// `not_on_this_os` is `pca` and nothing else, `service_disabled` is `prefetch` and nothing
-    /// else, and `budget_spent` is `evtx` and `usn` and nothing else (ADR 0047).
+    /// or in a fixture shows it. Since ADR 0030 every reason has a producer in some collector, so
+    /// that half of the check is now entirely about which collector: `not_on_this_os` is `pca` and
+    /// nothing else, `service_disabled` is `prefetch` and nothing else, `other_volume` is `usn` and
+    /// nothing else (ADR 0047, amendment of 2026-09-30), and `budget_spent` is `evtx`, `usn`,
+    /// `driver_service` and `autostart` and nothing else (ADR 0047, ADR 0048, ADR 0060).
     ///
     /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
     /// true for is one a view lists whatever the rule said, so declaring it is a suppression that
@@ -522,6 +563,36 @@ date: 2026-09-11
         write(&dir.join("rule.yaml"), VALID_RULE);
         write(&dir.join("tests/positive/on.json"), POSITIVE_FIXTURE);
         write(&dir.join("tests/negative/off.json"), NEGATIVE_FIXTURE);
+    }
+
+    /// This repository has a retention text for every collector that declares a trace age, and none
+    /// for a collector that does not (ADR 0061).
+    #[test]
+    fn this_repository_has_an_age_text_for_every_declared_age() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        assert_eq!(check_ages(&root).unwrap(), Vec::<String>::new());
+    }
+
+    /// A tree with one age text for a collector that declares none, and none for the six that do.
+    #[test]
+    fn a_missing_or_unused_age_text_is_refused() {
+        let tmp = TempRoot::new("ages");
+        write(
+            &tmp.path().join("rules/ages/posture.yaml"),
+            "id: 5b0b1f55-4d2c-4c3e-9d8a-7a6b5c4d3e2f\ncollector: posture\nretention: Now.\ndocumented: false\nreferences: [docs/adr/0011.md]\n",
+        );
+        let problems = check_ages(tmp.path()).unwrap();
+        assert_eq!(problems.len(), 7, "{problems:?}");
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("`evtx` declares a trace age and has no"))
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("`posture` declares no trace age"))
+        );
     }
 
     #[test]
@@ -952,6 +1023,7 @@ date: 2026-09-11
             UnmeasuredReason::SourceEmpty,
             UnmeasuredReason::CollectorUnavailable,
             UnmeasuredReason::NotConsented,
+            UnmeasuredReason::OtherVolume,
         ] {
             assert!(
                 !reason.is_always_listed(),
@@ -965,7 +1037,11 @@ date: 2026-09-11
     /// this build, so no rule could declare either. ADR 0030 gave each one exactly one owner, and
     /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
     /// both spending the same 30-second-budget idea on two different sources), and ADR 0048 a third
-    /// (`driver_service`, spending it on hashing driver files). This is what that means for the
+    /// (`driver_service`, spending it on hashing driver files), and ADR 0060 a fourth (`autostart`,
+    /// spending its own on hashing and checking the files that start by themselves). ADR 0047's
+    /// amendment of 2026-09-30
+    /// added `other_volume`, whose one owner is `usn`: only it reads one drive's journal for folders
+    /// that can be on another. This is what that means for the
     /// gate: each reason is usable only on the collector(s) that can actually report it. Asserted
     /// against the vocabulary the shipped executable builds, so a collector that later starts or
     /// stops producing one fails here rather than silently accepting a suppression that never fires,
@@ -983,8 +1059,12 @@ date: 2026-09-11
         for (reason, owners) in [
             ("not_on_this_os", &["pca"] as &[&str]),
             ("service_disabled", &["prefetch"]),
-            ("budget_spent", &["driver_service", "evtx", "usn"]),
+            (
+                "budget_spent",
+                &["autostart", "driver_service", "evtx", "usn"],
+            ),
             ("not_attempted", &["evtx"]),
+            ("other_volume", &["usn"]),
         ] {
             for owner in owners {
                 assert!(reports(owner, reason), "`{owner}` cannot report `{reason}`");
@@ -995,8 +1075,8 @@ date: 2026-09-11
                 }
                 assert!(
                     !reports(other.id(), reason),
-                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047 and \
-                     ADR 0048, names only {owners:?} as owners",
+                    "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
+                     ADR 0048 and ADR 0060, names only {owners:?} as owners",
                     other.id()
                 );
             }

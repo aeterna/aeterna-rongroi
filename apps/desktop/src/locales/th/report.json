@@ -47,7 +47,13 @@
     "budget_spent": "โปรแกรมนี้หยุดอ่านก่อนจะครบ",
     "read_failed": "อ่านข้อมูลนี้ไม่ได้",
     "collector_unavailable": "build นี้ยังไม่ได้อ่านส่วนนี้",
-    "not_consented": "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน"
+    "not_consented": "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน",
+    "other_volume": "ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น"
+  },
+  "row_band": {
+    "found": "ตอนที่อ่าน แหล่งนี้มีข้อมูลแค่ช่วง {{from}} ถึง {{to}} สิ่งที่นับได้ที่นี่มาจากช่วงนี้",
+    "not_found": "ไม่มีอะไรในช่วงนี้: {{from}} ถึง {{to}} ซึ่งเป็นช่วงที่แหล่งนี้มีข้อมูลตอนที่อ่าน ก่อนหน้านั้นมองไม่เห็นเลย",
+    "none": "ตอนที่อ่าน แหล่งนี้ไม่มี record เลย จึงไม่มีช่วงที่จะเห็นอะไรได้"
   },
   "retention": "ย้อนดูได้",
   "description": "เกี่ยวกับการตรวจนี้",
@@ -76,11 +82,14 @@
   "toolbar": {
     "technical_all": "แสดงรายละเอียดทางเทคนิคทุกแถว",
     "filtered": "กำลังแสดงสถานะเดียว",
-    "clear": "แสดงทุกสถานะ"
+    "clear": "แสดงทุกสถานะ",
+    "filtered_empty": "ไม่มีแถวใดในการสแกนนี้อยู่ในสถานะนี้"
   },
   "collector": {
     "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
     "driver_service": "ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows",
+    "autostart": "โปรแกรมที่เริ่มทำงานเอง (service, Run, scheduled task)",
+    "defender_exclusion": "exclusion ของ Microsoft Defender",
     "fivem_dir": "ไฟล์ของ FiveM",
     "net_config": "การตั้งค่าเครือข่าย (hosts, proxy, firewall)",
     "os_image": "Windows ตัวนี้บอกว่าตัวเองเป็นอะไร",
@@ -132,5 +141,117 @@
     "unmatched": "ไม่มี rule ไหนตรง",
     "selectors": "ความหมายของเวลาที่ถูกเลือกมาแสดง",
     "selector_causes": "เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้"
+  },
+  "trace_ages": {
+    "title": "ร่องรอยย้อนกลับไปได้ไกลแค่ไหน",
+    "note": "แต่ละแหล่งในเครื่องนี้ย้อนกลับไปได้ไกลแค่ไหน เทียบกับเวลาที่ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้ง แหล่งที่ย้อนกลับไปได้ไม่ไกลเป็นเรื่องปกติของเครื่องจำนวนมาก สาเหตุอยู่ใต้แต่ละแถว ไม่มีอะไรในส่วนนี้เป็นหลักฐานได้ด้วยตัวเอง และรายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด",
+    "anchors": "ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร",
+    "sources": "แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน",
+    "anchor": {
+      "boot_time": "Windows เริ่มทำงานครั้งล่าสุด",
+      "install_date": "Windows ติดตั้งหรืออัปเกรด feature ครั้งล่าสุด (InstallDate)",
+      "setup_earliest_install": "วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้ (เก็บไว้ {{kept}} รายการ ไม่มีเอกสารจาก Microsoft)",
+      "usn_journal_created": "change journal ถูกสร้าง (อ่านตัวระบุเป็นเวลา ไม่มีเอกสาร)",
+      "system_drive_root_created": "root ของไดรฟ์ระบบถูกสร้าง",
+      "recycle_bin_created": "$Recycle.Bin ที่ root ของไดรฟ์ระบบถูกสร้าง",
+      "fivem_legacy_program_folder_created": "โฟลเดอร์โปรแกรมของ FiveM for GTA V Legacy ถูกสร้าง",
+      "fivem_legacy_app_folder_created": "โฟลเดอร์ FiveM.app ของ FiveM for GTA V Legacy ถูกสร้าง",
+      "fivem_enhanced_program_folder_created": "โฟลเดอร์โปรแกรมของ FiveM for GTA V Enhanced ถูกสร้าง"
+    },
+    "resets": {
+      "boot_time": "เริ่มใหม่เมื่อ restart ไม่เริ่มใหม่เมื่อกด \"Shut down\" ขณะเปิด Fast Startup, sleep หรือ hibernate",
+      "install_date": "เปลี่ยนเมื่ออัปเกรด feature, reset หรือติดตั้งใหม่ จึงไม่ใช่วันที่ติดตั้ง Windows ครั้งแรก",
+      "setup_earliest_install": "การ reset หรือการติดตั้งใหม่แบบล้างเครื่องจะไม่เหลือรายการนี้เลย",
+      "usn_journal_created": "เปลี่ยนเมื่อ journal ถูกลบแล้วสร้างใหม่ เมื่อไดรฟ์ถูกย้ายไปมาระหว่าง NTFS รุ่นต่าง ๆ หรือเป็นไดรฟ์ใหม่",
+      "system_drive_root_created": "เปลี่ยนเมื่อ format หรือเปลี่ยนไดรฟ์ ยังไม่รู้ว่าโปรแกรม clone ดิสก์เก็บค่านี้ไว้หรือไม่",
+      "recycle_bin_created": "เปลี่ยนเมื่อ format หรือเปลี่ยนไดรฟ์ ยังไม่รู้ว่าโปรแกรม clone ดิสก์เก็บค่านี้ไว้หรือไม่",
+      "fivem_legacy_program_folder_created": "เปลี่ยนเมื่อติดตั้ง FiveM ใหม่ ลบโฟลเดอร์ของมัน หรือย้ายหรือสร้างโปรไฟล์ Windows ใหม่",
+      "fivem_legacy_app_folder_created": "เปลี่ยนเมื่อติดตั้ง FiveM ใหม่ ลบโฟลเดอร์ของมัน หรือย้ายหรือสร้างโปรไฟล์ Windows ใหม่",
+      "fivem_enhanced_program_folder_created": "เปลี่ยนเมื่อติดตั้ง FiveM ใหม่ ลบโฟลเดอร์ของมัน หรือย้ายหรือสร้างโปรไฟล์ Windows ใหม่"
+    },
+    "on": "{{date}} ({{days}}ก่อนสแกน)",
+    "days_before_one": "{{count}} วัน",
+    "days_before_other": "{{count}} วัน",
+    "oldest": "เก่าสุด {{at}} ({{days}}ก่อนสแกน)",
+    "holds_nothing": "ไม่มีรายการที่มีเวลา",
+    "count": {
+      "evtx": "{{count}} record",
+      "prefetch": "อ่านไฟล์ Prefetch ได้ {{count}} ไฟล์",
+      "bam": "{{count}} รายการ",
+      "pca": "{{count}} รายการที่บันทึกการเปิดโปรแกรม",
+      "usn": "{{count}} record",
+      "fivem_dir": "{{count}} ไฟล์",
+      "enhanced_server_cache": "{{count}} โฟลเดอร์ของเซิร์ฟเวอร์"
+    },
+    "extra": {
+      "size_bytes": "ขนาด {{value}} ไบต์",
+      "max_size_bytes": "สูงสุด {{value}} ไบต์",
+      "enable_prefetcher": "EnablePrefetcher {{value}}",
+      "last_seen": "ใหม่สุด {{value}}",
+      "maximum_size": "ขนาดสูงสุด {{value}} ไบต์",
+      "trimmed": "ถูกตัดทิ้งตั้งแต่สร้าง: {{value}}",
+      "latest_modified_at": "ไฟล์ถูกเขียนล่าสุด {{value}}"
+    },
+    "not_admin": "อ่านไม่ได้เพราะไม่มีสิทธิ์ผู้ดูแลระบบ — ไม่รู้",
+    "not_read": "อ่านไม่ได้ — {{reason}}",
+    "documented": "มีเอกสาร",
+    "not_documented": "ไม่มีเอกสาร",
+    "references": "อ้างอิง",
+    "folded": "log อื่นอีก {{logs}} ตัว: มี record {{withRecords}} ตัว อ่านไม่ได้ {{notRead}} ตัว",
+    "place": {
+      "journal": "change journal",
+      "legacy_logs": "log ของ Legacy",
+      "legacy_crashes": "crash ของ Legacy",
+      "legacy_cache": "cache ของ Legacy",
+      "legacy_server_cache": "cache เซิร์ฟเวอร์ของ Legacy",
+      "enhanced_logs": "log ของ Enhanced",
+      "enhanced_crashes": "crash ของ Enhanced",
+      "enhanced_launcher_crashes": "crash ของ launcher ของ Enhanced",
+      "enhanced_server_cache": "cache เซิร์ฟเวอร์ของ Enhanced"
+    },
+    "causes_intro": "ผลแบบเดียวกันเกิดได้จาก:",
+    "causes": {
+      "reinstall": "ติดตั้ง Windows ใหม่, Reset หรือเป็น PC เครื่องใหม่",
+      "cleanup": "Disk Cleanup, Storage Sense และโปรแกรมล้างเครื่องทั่วไป",
+      "log_size": "ขนาด Event Log เล็กที่ตั้งโดยนโยบายหรือโดยเครื่องมือ",
+      "prefetch_off": "ปิด Prefetch ตามคู่มือ SSD รุ่นเก่า",
+      "fivem_reinstalled": "ติดตั้ง FiveM ใหม่",
+      "moved": "ย้ายไดรฟ์หรือโปรไฟล์",
+      "clock": "นาฬิกาเครื่องถูกเปลี่ยน"
+    }
+  },
+  "cross_source": {
+    "title": "FiveM ในเครื่องนี้ เทียบกับบันทึกของ Windows ว่าโปรแกรมใดเคยรัน",
+    "fivem": "FiveM",
+    "present": "พบ FiveM.exe ({{editions}})",
+    "absent": "ไม่พบ FiveM.exe ในโฟลเดอร์โปรแกรมของ FiveM",
+    "folders_written": "โฟลเดอร์ของ FiveM ถูกเขียนครั้งล่าสุด {{date}} ({{days}}ก่อนสแกน)",
+    "servers": "มีโฟลเดอร์ cache ของเซิร์ฟเวอร์ {{count}} โฟลเดอร์ ล่าสุดถูกเขียน {{date}}",
+    "edition": {
+      "legacy": "Legacy",
+      "enhanced": "Enhanced"
+    },
+    "source": {
+      "prefetch": "Prefetch",
+      "bam": "BAM",
+      "pca": "PCA"
+    },
+    "selected": "มีรายการของชื่อเหล่านี้ {{count}} รายการ ล่าสุดคือ {{date}}",
+    "no_entry_named": "ไม่มีรายการของ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b…_GTAProcess.exe มีรายการทั้งหมด {{count}} รายการ เก่าสุดคือ {{date}} ({{days}}ก่อนสแกน)",
+    "no_entry": "ไม่มีรายการของชื่อเหล่านี้ มีรายการทั้งหมด {{count}} รายการ เก่าสุดคือ {{date}} ({{days}}ก่อนสแกน)",
+    "could_not_show": "ไม่มีรายการใดเก่าเท่ากับครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียน จึงแสดงสิ่งนั้นไม่ได้",
+    "not_read_admin": "อ่านไม่ได้เพราะไม่มีสิทธิ์ผู้ดูแลระบบ จึงไม่รู้ว่ามีรายการหรือไม่",
+    "not_read": "อ่านไม่ได้ — {{reason}} จึงไม่รู้ว่ามีรายการหรือไม่",
+    "switched_off": "Prefetch ถูกปิดอยู่ในเครื่องนี้ จึงไม่มีบันทึกแบบนี้",
+    "causes_intro": "ข้อมูลนี้ไม่ใช่หลักฐานของสิ่งใด ผลแบบเดียวกันเกิดได้จาก:",
+    "causes": {
+      "reinstall": "ติดตั้ง Windows ใหม่, Reset หรือเป็น PC เครื่องใหม่ แล้วคัดลอกหรือ sync โฟลเดอร์ของ FiveM มาจากเดิม",
+      "cleanup": "การล้างของ Windows เอง (Disk Cleanup, Storage Sense) หรือโปรแกรมล้างเครื่องทุกชนิด",
+      "prefetch_off": "ปิด Prefetch ตามคู่มือ SSD หรือคู่มือเพิ่มความเร็วรุ่นเก่า",
+      "fivem_reinstalled": "ติดตั้ง FiveM ใหม่ หรือย้ายโฟลเดอร์ของ FiveM มาจากดิสก์หรือเครื่องอื่น",
+      "other_name": "เปิด FiveM ด้วยชื่อที่ไม่อยู่ในรายการนี้ หรือด้วยวิธีที่ Windows ไม่ได้บันทึกไว้ที่นี่",
+      "windows_removes": "Windows ลบบันทึกของตัวเอง: ไฟล์ Prefetch ถูกแทนที่, รายการ BAM หมดอายุ, PCA บันทึกเฉพาะการเปิดจาก File Explorer",
+      "clock": "นาฬิกาเครื่องถูกเปลี่ยน ทำให้เวลาจากแต่ละแหล่งไม่ได้อยู่บนนาฬิกาเดียวกัน"
+    }
   }
 }

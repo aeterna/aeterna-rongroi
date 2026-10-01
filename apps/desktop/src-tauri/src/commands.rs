@@ -142,6 +142,26 @@ pub fn rule_texts(state: State<'_, AppState>, lang: &str) -> BTreeMap<String, Ru
         .collect()
 }
 
+/// Each source's ordinary retention in `lang`, keyed by collector (ADR 0061).
+#[tauri::command]
+pub fn age_texts(
+    state: State<'_, AppState>,
+    lang: &str,
+) -> BTreeMap<String, rongroi_core::ages::AgeTextView> {
+    state
+        .bundle
+        .ages()
+        .iter()
+        .filter_map(|sourced| {
+            let collector = &sourced.text.collector;
+            state
+                .bundle
+                .age_text(collector, lang)
+                .map(|text| (collector.clone(), text))
+        })
+        .collect()
+}
+
 /// Where this binary's code can be read (ADR 0045).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct CodeLinks {

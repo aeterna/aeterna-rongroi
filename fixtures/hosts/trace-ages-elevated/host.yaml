@@ -1,0 +1,94 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# Synthetic (fixtures/hosts/PROVENANCE.md): a PC scanned with administrator rights whose sources and
+# anchors all read, for the trace ages and the cross-source statement (ADR 0061). Every date, count and
+# identifier is invented. BAM is refused although the scan is elevated, so one line of the statement is
+# "not read".
+platform: windows
+os_build: "26100"
+elevated: true
+milliseconds_since_boot: 302400000
+env:
+  SystemRoot: 'C:\Windows'
+  WinDir: 'C:\Windows'
+  SystemDrive: 'C:'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+drive_roots:
+  'C:':
+    created: 2018-03-02T09:00:00Z
+    modified: 2025-12-31T10:00:00Z
+access_denied:
+  - 'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings'
+registry:
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    InstallDate: 1761004800
+  'HKLM\SYSTEM\Setup\Source OS (Updated on 3/4/2021 05:06:07)':
+    InstallDate: 1520000000
+  'HKLM\SYSTEM\Setup\Source OS (Updated on 10/21/2025 00:00:00)':
+    InstallDate: 1614834367
+  'HKLM\SYSTEM\Setup\Status':
+    Example: 1
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    'C:\Users\fixtureuser\Downloads\example.exe':
+      from: '../../parsers/bam/documented-24-byte-value.bin'
+filesystem:
+  'C:\':
+    - name: $Recycle.Bin
+      directory: true
+      created: 2018-03-02T09:05:00Z
+      modified: 2025-11-01T00:00:00Z
+    - name: Windows
+      directory: true
+      created: 2025-10-21T00:00:00Z
+  'C:\Windows\Prefetch':
+    - name: CMD.EXE-D269B812.pf
+      from: '../../prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf'
+      read_only: false
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      content: "C:\\Program Files\\FiveM\\FiveM.exe|2025-12-20 10:00:00\nC:\\Windows\\System32\\notepad.exe|2025-11-02 03:04:05\n"
+  'C:\Windows\System32\winevt\Logs':
+    - name: System.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+      read_only: false
+    - name: Microsoft-Windows-LanguagePackSetup%4Operational.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'
+      read_only: false
+  'C:\Users\fixtureuser\AppData\Local':
+    - name: FiveM
+      directory: true
+      created: 2024-05-10T08:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.app
+      directory: true
+      created: 2024-05-10T08:01:00Z
+    - name: FiveM.exe
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+      signature: { state: no_embedded_signature }
+      created: 2025-12-26T00:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app':
+    - name: logs
+      directory: true
+      created: 2024-05-10T08:02:00Z
+      modified: 2025-12-30T21:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\logs':
+    - name: CitizenFX_log_2025-12-30T204500.log
+      size: 2048
+      created: 2025-12-30T20:45:00Z
+      modified: 2025-12-30T21:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+event_log_channels:
+  Microsoft-Windows-LanguagePackSetup/Operational:
+    log_file_path: '%SystemRoot%\System32\Winevt\Logs\Microsoft-Windows-LanguagePackSetup%4Operational.evtx'
+    max_size_bytes: 1052672
+usn_journal:
+  maximum_size: 33554432
+  trimmed: true
+  journal_id: 131643936000000000
+  records:
+    - reasons: [data_overwrite, close]
+      count: 5
+      first: '2025-12-31T23:20:00Z'
+      last: '2025-12-31T23:59:00Z'

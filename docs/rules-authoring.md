@@ -130,6 +130,32 @@ shown with the selector's title, description and `falsepositives`.
 - Which fields are times comes from the collector's `fields()` (`Field::timestamp`). A selector on a
   collector with no timestamp field selects nothing that reaches the timeline.
 
+## What a source ordinarily keeps: `rules/ages/`
+
+The trace-ages section (ADR 0061) shows, under each source's row, what that source ordinarily keeps. The
+words are reviewed data in the bundle, one file per collector that declares `Collector::age`:
+
+```yaml
+id: 4be2c346-393f-446e-a964-6f9318f880e3   # UUIDv4, never reused, the key of its translation
+collector: prefetch                          # the file is rules/ages/prefetch.yaml
+retention: >-
+  Windows removes Prefetch files itself, …
+documented: false                            # whether Microsoft documents what the text states
+references:
+  - docs/adr/0030-the-words-for-what-was-not-measured.md
+```
+
+- Where Microsoft does not document it, the text says "not documented by Microsoft" and names what the
+  statement rests on. `documented: true` needs a reference on Microsoft Learn.
+- It states no number the measurements disagree about: the BAM text gives no number of days (ADR 0061,
+  owner decision 2).
+- Translate `retention` in `rules/i18n/<lang>.yaml` under the file's `id`, as a rule is translated; nothing
+  else of it is translated.
+- The bundle loader refuses a text with no reference, a `documented: true` with no Microsoft Learn
+  reference, a file not named after its collector and a reused id. `cargo xtask check-rules` refuses a
+  collector that declares an age and has no text, and a text for a collector that declares none.
+- The file is in the rules bundle, so its SHA-256 in every report covers it.
+
 ## A list kept in a data file
 
 Some lists are data rather than rule text: 1,847 driver hashes are not something a reviewer reads line by
@@ -170,10 +196,13 @@ row, declared or not, because each says the artifact was reachable and the read 
 Naming one of those three in `unmeasured_when` is a `check-rules` failure: the line would decide
 nothing, and a line that looks load-bearing and is not is worse than none.
 
-The twelve reasons, and what each says to the reader, are in `docs/architecture.md`; ADR 0030 adds the
+The fourteen reasons, and what each says to the reader, are in `docs/architecture.md`; ADR 0030 adds the
 ordinary condition that produces each and how common it is. The two that most often need declaring:
 `source_absent` ("this PC has no such record to read") and `source_empty` ("the place this is kept is
-there and holds nothing"). They mean opposite things — write the one you mean.
+there and holds nothing"). They mean opposite things — write the one you mean. A rule on one of `usn`'s
+watched folders also declares `other_volume`: that folder can be on another drive than the one whose
+change journal is read, which is how the PC is set up, not a failed read (ADR 0047, amendment of
+2026-09-30).
 
 No rule ships with `cased` today. The `fivem_dir` rules are the first to use a value list and an
 operator, `exists` (ADR 0036). `cased` looks like this, and needs a `#`

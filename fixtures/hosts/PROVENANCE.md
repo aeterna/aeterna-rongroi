@@ -63,6 +63,8 @@ none contains a real person's user name, host name, SID or files.
 | `baseline-hardened-win11` | Windows 11 as Microsoft ships it: Secure Boot on, memory integrity configured on, test signing off, TPM 2.0, no FiveM, ordinary programs running | `cargo xtask check-baseline` |
 | `baseline-consumer-win11` | Ordinary consumer Windows 11: no memory-integrity policy key at all, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below) | `cargo xtask check-baseline` |
 | `baseline-elevated-win11` | The ordinary Windows 11 PC of a FiveM player, scanned after the restart-as-administrator offer was accepted: `baseline-hardened-win11`'s posture, FiveM installed with an empty plugin folder and `FiveM.exe` as measured (below), and PCA, Prefetch, the Event Log folder and the BAM state key all present and readable. Its `EnablePrefetcher`, its files' read-only attribute and the Event Log service's answer for its one channel are measured values (below) | `cargo xtask check-baseline` |
+| `trace-ages-elevated` | An elevated Windows 11 scan whose trace ages and anchors all read (ADR 0061): `InstallDate`, two `Source OS` records, a journal identifier that reads as a date, the drive root's and `$Recycle.Bin`'s times, FiveM Legacy's program and `FiveM.app` folders with a log folder, one vendored Prefetch file, two event logs from the vendored sample, and a PCA launch file naming `FiveM.exe`. BAM is refused although the scan is elevated, so one line of the cross-source statement is "not read". Every date, count and identifier is invented | report snapshots, `scan` and `usn` and `fivem_dir` tests, the CLI's trace-ages text |
+| `trace-ages-limited` | The same kind of PC scanned without administrator rights, refused what the Windows 11 PC ADR 0061 measured refused under a limited token — Prefetch, BAM, the Security log and the change journal — so those trace ages are "not known" and no cross-source statement is made | report snapshots, `scan` tests, the CLI's trace-ages text |
 | `usn-journal-read` | An elevated Windows 11 scan whose system volume journal holds records under three watched folders — Prefetch, the Event Log folder and FiveM Legacy's plugin folder — and one group nobody watches, with the journal trimmed since it was made. Enhanced's folder is not there | `usn` collector tests |
 | `usn-journal-not-active` | An elevated Windows 11 scan whose system volume has no active change journal at all (`ERROR_JOURNAL_NOT_ACTIVE`) | `usn` collector tests |
 | `usn-journal-access-denied` | A Windows 11 scan without administrator rights whose system volume handle is refused | `usn` collector tests |
@@ -74,6 +76,7 @@ none contains a real person's user name, host name, SID or files.
 | `usn-folder-on-other-volume` | An elevated Windows 11 scan whose FiveM Legacy plugin folder shares Prefetch's drive letter but is reached through a junction to another volume (e.g. `mklink /J`): its identifier carries a different volume serial than the system volume's own, so its records are not credited to it | `usn` collector tests |
 | `driver-service-forms` | A Windows 11 scan whose driver services cover every `ImagePath` form the resolver knows and one it does not, and each file outcome the collector distinguishes: absent, `\SystemRoot\`, relative under `System32` and `SysWOW64`, `\??\X:\`, a bare drive letter, a quoted path an unknown form, a refused file, an unrecorded hash and a missing file, beside a `Type: 32` service that is not a driver | `driver_service` collector tests |
 | `driver-service-refused` | The key that lists driver services (`HKLM\SYSTEM\CurrentControlSet\Services`) refused to this program. Measured on no machine: both machines ADR 0046 measured let a token without Administrators read it | `driver_service` collector tests, report snapshots |
+| `autostart-forms` | An elevated Windows 11 scan with program services (an `ImagePath` quoted with arguments, a `ServiceDll` under `%SystemRoot%` with a `TriggerInfo` key, a disabled one) beside a driver, a `Run` value under `HKCU` using `%LOCALAPPDATA%` and a `RunOnce` value under `WOW6432Node`, and scheduled task files: one running as the scan's account whose command uses `%LOCALAPPDATA%` (read `from:` `fixtures/parsers/task/`), one disabled, one of COM handlers only. Every command line carries arguments the collector must not report. The account SID is invented | `autostart` collector tests |
 | `net-config-listed-name` | The three places `net_config` reads (ADR 0054) in the shapes measured on one Windows 11 PC, with invented values: a hosts file whose lines give a Rockstar subdomain an unspecified address and a FiveM name a public one beside a line for an unlisted name, a proxy on with a server set, and one firewall rule for FiveM.exe beside one for another program and one that is not a rule | `net_config` report snapshot |
 | `driver-service-listed` | A Windows 11 scan with one driver service whose file's SHA-256 is the vendored `loldrivers-vulnerable-drivers.csv`'s first row (LOLDrivers id `ff74f03e-e4ce-4242-bfe3-60601056bb34`, `CorsairLLAccess64.sys`), so the vulnerable-driver rule can be exercised through the real bundle. The service name and path are invented; only the hash is real, copied from the data file | report snapshots |
 
@@ -127,6 +130,29 @@ and `Type` is 1 for every service; the collector's own tests cover the other for
 Microsoft's drivers only, so this says nothing about a gaming PC's. No driver list from anyone's own PC is
 used (ADR 0046). Neither non-elevated baseline sets `%SystemRoot%`, so `driver_service` is `read_failed`
 on both.
+
+**What starts by itself in `baseline-elevated-win11` is a runner's, not a PC's.** Its program services,
+`Run` values and scheduled task files are rebuilt from the `autostart` collector's own reading of a
+GitHub-hosted Windows Server 2025 runner (`windows.yml` run 36735184291, 2026-09-30): 278 program
+services, 2 `Run` values and 87 task actions in 82 task files, 34 files hashed, no gap. Each `ImagePath`
+is written as the path the collector resolved, quoted, and each `ServiceDll` as its resolved path, with
+`Type` 16, or 32 beside a `ServiceDll`; each task file holds only the kinds of its triggers, whether it is
+enabled and its commands, quoted. The files outside the Windows folder are described with the hash and
+signature the runner reported; a file the runner did not have (Edge's updater) is not described, so it
+reads as missing there too. Two things are not the runner's: the eight services `os_image` reads keep the
+`Start` measured on the Windows 11 PC this baseline otherwise describes (three differ from the runner's),
+and the account SIDs in four task names are replaced with an invented one. The autostart rule is `found`
+on this baseline, on GitHub's provisioning agent; `rules/known-fps.csv` accepts it (ADR 0060, owner
+decision 6). A runner image says nothing about what a gaming PC starts. Neither non-elevated baseline sets
+`%SystemRoot%`, so `autostart` is `read_failed` on both.
+
+**Defender's exclusions in `baseline-elevated-win11` are a runner's.** They are the two path exclusions
+`defender_exclusion` read on a GitHub-hosted Windows Server 2025 runner (`windows.yml` run 36735878867,
+2026-09-30), `C:\` and `D:\`, with an empty `IpAddresses` key; `Get-MpPreference` listed the same two.
+`C:\` covers FiveM's folders, so the Defender-exclusion rule is `found` there and `rules/known-fps.csv`
+accepts it (ADR 0060, owner decision 6); `D:\` does not cover them, because this baseline's profile is on
+`C:`. Both non-elevated baselines are refused the exclusions, as a limited token was on the runner and a
+Windows 11 PC, so `defender_exclusion` is `not_admin` there.
 
 **Firmware and the PowerShell logging policy (ADR 0038).** Every `elevated: false` host that describes
 posture — `secure-boot-on`, `secure-boot-off`, `test-signing-on`, `tpm-absent`,

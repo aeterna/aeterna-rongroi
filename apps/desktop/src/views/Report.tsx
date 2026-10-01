@@ -4,21 +4,25 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { codeLinks, reportView, ruleTexts } from "../api";
+import { ageTexts, codeLinks, reportView, ruleTexts } from "../api";
 import { type EvidenceGroup, groupEvidence, type StateFilter } from "../grouping";
+import { withKeys } from "../keys";
 import type {
+  AgeText,
   BootTime,
   CodeLinks,
   Evidence,
   Mode,
   Observation,
   ReportView,
+  RowBand,
   RuleText,
   SsOptions,
 } from "../types";
 import { EvidenceRow } from "./EvidenceRow";
 import { ReportSummary } from "./ReportSummary";
 import { Timeline } from "./Timeline";
+import { CrossSource, TraceAges } from "./TraceAges";
 
 interface Props {
   mode: Mode;
@@ -31,6 +35,7 @@ export function Report({ mode, options, onBack }: Props) {
   const { t, i18n } = useTranslation("report");
   const [view, setView] = useState<ReportView | null>(null);
   const [texts, setTexts] = useState<Record<string, RuleText>>({});
+  const [ages, setAges] = useState<Record<string, AgeText>>({});
   const [links, setLinks] = useState<CodeLinks | null>(null);
   const [filter, setFilter] = useState<StateFilter | null>(null);
   const [technicalAll, setTechnicalAll] = useState(false);
@@ -41,6 +46,13 @@ export function Report({ mode, options, onBack }: Props) {
 
   useEffect(() => {
     void ruleTexts(i18n.language).then(setTexts);
+  }, [i18n.language]);
+
+  useEffect(() => {
+    // A failed call leaves the retention texts out; the rows themselves still show (ADR 0061).
+    void ageTexts(i18n.language)
+      .then(setAges)
+      .catch(() => {});
   }, [i18n.language]);
 
   useEffect(() => {
@@ -66,6 +78,7 @@ export function Report({ mode, options, onBack }: Props) {
   // Carried fix (b): whether `codeLinks()` has arrived at all, independent of what it said.
   const linksKnown = links !== null;
   const official = header.provenance.official;
+  const groups = groupEvidence(view.evidence, filter, view.collector_order);
 
   return (
     <section className="report">
@@ -133,11 +146,16 @@ export function Report({ mode, options, onBack }: Props) {
       </div>
 
       {view.evidence.length === 0 && <p>{t("empty")}</p>}
-      {groupEvidence(view.evidence, filter, view.collector_order).map((group) => (
+      {/* A count of 0 is still a filter; choosing it says so rather than showing nothing. */}
+      {view.evidence.length > 0 && groups.length === 0 && (
+        <p className="muted">{t("toolbar.filtered_empty")}</p>
+      )}
+      {groups.map((group) => (
         <Group
           key={group.collector}
           group={group}
           texts={texts}
+          bands={view.row_bands ?? {}}
           fileBase={fileBase}
           treeBase={treeBase}
           linksKnown={linksKnown}
@@ -148,7 +166,13 @@ export function Report({ mode, options, onBack }: Props) {
       ))}
 
       {/* After the evidence and apart from it: the times this view may show, in order (ADR 0051). */}
+      {/* Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3). */}
+      <CrossSource statements={view.cross_source ?? []} />
+
       <Timeline timeline={view.timeline} texts={texts} />
+
+      {/* Beside the timeline, in both modes (ADR 0061). */}
+      {view.trace_ages && <TraceAges ages={view.trace_ages} texts={ages} />}
 
       {/* Apart from the evidence, and shown in both modes: this is what the program itself left in
           what the collectors saw, not evidence about the PC (ADR 0010). */}
@@ -158,8 +182,11 @@ export function Report({ mode, options, onBack }: Props) {
           <details>
             <summary className="muted">{t("own_traces.note")}</summary>
             <ul className="observations">
-              {view.own_traces.map((entry) => (
-                <li key={`${entry.collector}:${fieldsOf(entry.observation)}`}>
+              {withKeys(
+                view.own_traces,
+                (entry) => `${entry.collector}:${fieldsOf(entry.observation)}`,
+              ).map(([key, entry]) => (
+                <li key={key}>
                   <span className="muted">({entry.collector})</span>
                   <div className="detail">{fieldsOf(entry.observation)}</div>
                 </li>
@@ -177,14 +204,20 @@ export function Report({ mode, options, onBack }: Props) {
           <details>
             <summary className="muted">{t("unmatched.note")}</summary>
             <ul className="observations">
-              {view.unmatched.flatMap((group) =>
-                group.observations.map((observation) => (
-                  <li key={`${group.collector}:${fieldsOf(observation)}`}>
-                    <span className="muted">({group.collector})</span>
-                    <div className="detail">{fieldsOf(observation)}</div>
-                  </li>
-                )),
-              )}
+              {withKeys(
+                view.unmatched.flatMap((group) =>
+                  group.observations.map((observation) => ({
+                    collector: group.collector,
+                    observation,
+                  })),
+                ),
+                ({ collector, observation }) => `${collector}:${fieldsOf(observation)}`,
+              ).map(([key, { collector, observation }]) => (
+                <li key={key}>
+                  <span className="muted">({collector})</span>
+                  <div className="detail">{fieldsOf(observation)}</div>
+                </li>
+              ))}
             </ul>
           </details>
         </section>
@@ -211,6 +244,7 @@ export function Report({ mode, options, onBack }: Props) {
 function Group({
   group,
   texts,
+  bands,
   fileBase,
   treeBase,
   linksKnown,
@@ -220,6 +254,7 @@ function Group({
 }: {
   group: EvidenceGroup;
   texts: Record<string, RuleText>;
+  bands: Record<string, RowBand>;
   fileBase: string | null;
   treeBase: string | null;
   linksKnown: boolean;
@@ -242,6 +277,7 @@ function Group({
       key={item.rule_id}
       item={item}
       text={texts[item.rule_id]}
+      band={bands[item.rule_id]}
       fileBase={fileBase}
       treeBase={treeBase}
       linksKnown={linksKnown}

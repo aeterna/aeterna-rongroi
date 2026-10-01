@@ -5,7 +5,9 @@
 //! Collectors read one kind of artifact from a [`Host`] and report what they saw.
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
+pub mod autostart;
 pub mod bam;
+pub mod defender_exclusion;
 pub mod driver_service;
 pub mod evtx;
 pub mod failure;
@@ -172,6 +174,16 @@ pub trait Collector {
     fn coverage(&self) -> Option<Coverage> {
         None
     }
+    /// How this collector's observations say how far back its source reaches, when they do, or
+    /// `None` (ADR 0061).
+    ///
+    /// The core never guesses which field is a source's oldest time; `scan::run` copies this into the
+    /// report, and the trace-ages view reads it. A collector that declares one also has a text in
+    /// `rules/ages/<collector>.yaml` saying what the source ordinarily keeps, which
+    /// `cargo xtask check-rules` requires.
+    fn age(&self) -> Option<Age> {
+        None
+    }
     /// Which scan reads this collector (ADR 0052). A `full` collector is not called in a standard
     /// scan: its run is `not_consented`. A collector is `full` when its own ADR says so.
     fn tier(&self) -> ScanTier {
@@ -192,6 +204,56 @@ pub struct Coverage {
     pub place: Option<&'static str>,
 }
 
+/// What [`Collector::age`] declares (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Age {
+    /// The timestamp fields whose minimum over a row's observations is the oldest time it holds.
+    pub oldest: &'static [&'static str],
+    /// How much a row holds.
+    pub count: AgeCount,
+    /// What one row is.
+    pub rows: AgeRows,
+    /// For [`AgeRows::PerPlace`], the discriminator values that each get a row, in order.
+    pub places: &'static [&'static str],
+    /// Fields shown beside a row and never compared.
+    pub extra: &'static [&'static str],
+    /// Places whose row is read differently from the rest.
+    pub by_place: &'static [AgePlace],
+}
+
+/// How much a trace-age row holds (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgeCount {
+    /// The row's observations that carry one of its oldest fields.
+    Observations,
+    /// The sum of one number field over the row's observations.
+    Field(&'static str),
+}
+
+/// What one trace-age row is (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgeRows {
+    /// One row for the collector.
+    One,
+    /// One row per value of the collector's discriminator.
+    PerPlace,
+    /// One row per value of a field.
+    PerValue(&'static str),
+}
+
+/// One place whose trace-age row is read differently (ADR 0061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AgePlace {
+    /// The discriminator value.
+    pub place: &'static str,
+    /// The oldest fields for this place.
+    pub oldest: &'static [&'static str],
+    /// How much it holds.
+    pub count: AgeCount,
+    /// Only the place's observations without this field count.
+    pub without: Option<&'static str>,
+}
+
 /// Every kind of sensitive value the collectors a scan at `tier` would call declare, so a front end
 /// can ask about each before the scan starts (ADR 0052).
 pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKind> {
@@ -210,7 +272,9 @@ pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKi
 /// Every collector in this build.
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
+        Box::new(autostart::Autostart::default()),
         Box::new(bam::Bam),
+        Box::new(defender_exclusion::DefenderExclusion),
         Box::new(driver_service::DriverService::default()),
         Box::new(evtx::Evtx::default()),
         Box::new(fivem_dir::FivemDir),
@@ -362,6 +426,59 @@ mod tests {
             );
         }
         assert_eq!(declared, 2, "evtx and usn declare a span");
+    }
+
+    /// A declared age names fields the collector declares, of the kinds the view reads them as: its
+    /// oldest fields are timestamps, a counted field is a number, a row per place needs a
+    /// discriminator, and the six collectors ADR 0061 names declare one (ADR 0061).
+    #[test]
+    fn a_declared_age_names_declared_fields_of_the_right_kind() {
+        let mut declared = BTreeSet::new();
+        for collector in all() {
+            let Some(age) = collector.age() else {
+                continue;
+            };
+            declared.insert(collector.id());
+            let kind = |name: &str| {
+                collector
+                    .fields()
+                    .iter()
+                    .find(|field| field.name == name)
+                    .map(|field| field.kind)
+            };
+            let id = collector.id();
+            let oldest = age
+                .oldest
+                .iter()
+                .chain(age.by_place.iter().flat_map(|place| place.oldest));
+            for name in oldest {
+                assert_eq!(kind(name), Some(FieldKind::Timestamp), "{id}: `{name}`");
+            }
+            let counts = std::iter::once(age.count).chain(age.by_place.iter().map(|p| p.count));
+            for count in counts {
+                if let AgeCount::Field(name) = count {
+                    assert_eq!(kind(name), Some(FieldKind::Number), "{id}: `{name}`");
+                }
+            }
+            for name in age.extra {
+                assert!(kind(name).is_some(), "{id}: `{name}`");
+            }
+            for place in age.by_place {
+                assert!(age.places.contains(&place.place), "{id}: `{}`", place.place);
+                if let Some(name) = place.without {
+                    assert!(kind(name).is_some(), "{id}: `{name}`");
+                }
+            }
+            match age.rows {
+                AgeRows::One => assert!(age.places.is_empty(), "{id}"),
+                AgeRows::PerPlace => assert!(collector.discriminator().is_some(), "{id}"),
+                AgeRows::PerValue(name) => assert_eq!(kind(name), Some(FieldKind::Text), "{id}"),
+            }
+        }
+        assert_eq!(
+            declared,
+            BTreeSet::from(["bam", "evtx", "fivem_dir", "pca", "prefetch", "usn"])
+        );
     }
 
     /// A gap names the field it is a gap in, so a `gaps` key outside the declared list is the same

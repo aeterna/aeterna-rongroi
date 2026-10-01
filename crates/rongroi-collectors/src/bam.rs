@@ -45,7 +45,7 @@ use rongroi_parsers::error::ParseError;
 
 use crate::failure::{read_failure, reason_for};
 use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
-use crate::{Collector, Field};
+use crate::{Age, AgeCount, AgeRows, Collector, Field};
 
 /// The key holding one subkey per user account that BAM has recorded anything for.
 pub const USER_SETTINGS_KEY: &str =
@@ -139,6 +139,18 @@ impl Collector for Bam {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    /// One row: the oldest `last_run` BAM still holds and how many values decoded (ADR 0061).
+    fn age(&self) -> Option<Age> {
+        Some(Age {
+            oldest: &["last_run"],
+            count: AgeCount::Field("entries"),
+            rows: AgeRows::One,
+            places: &[],
+            extra: &[],
+            by_place: &[],
+        })
     }
 
     /// Enumerates the account keys under [`USER_SETTINGS_KEY`] and reads every value in each of them.

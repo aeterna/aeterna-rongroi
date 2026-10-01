@@ -7,7 +7,7 @@
 //! Everything here opens for reading only: nothing is written, renamed, deleted or locked, and no
 //! timestamp is changed (AGENTS.md hard rule 2). No `unsafe` is needed — `std::fs` is enough.
 
-use rongroi_host::{DirEntryInfo, EnvironmentSource, FilesystemSource, SourceError};
+use rongroi_host::{DirEntryInfo, EntryTimes, EnvironmentSource, FilesystemSource, SourceError};
 
 use crate::LiveHost;
 
@@ -91,6 +91,21 @@ impl FilesystemSource for LiveHost {
             Err(error) => Err(SourceError::from_io(&error)),
         }
     }
+
+    /// `symlink_metadata` again, for the reason `is_read_only` uses it: the entry's own times, never a
+    /// link's target's, read without listing the parent (ADR 0061). The standard library opens the
+    /// entry with no read or write access, and falls back to a listing of it when that is refused. A
+    /// drive root such as `C:\` is answered the same way.
+    fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError> {
+        match std::fs::symlink_metadata(path) {
+            Ok(metadata) => Ok(Some(EntryTimes {
+                created: metadata.created().ok().and_then(rongroi_host::listed_time),
+                modified: metadata.modified().ok().and_then(rongroi_host::listed_time),
+            })),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(SourceError::from_io(&error)),
+        }
+    }
 }
 
 impl EnvironmentSource for LiveHost {
@@ -140,6 +155,30 @@ mod tests {
                 assert_eq!(time.subsec_nanosecond(), 0);
             }
         }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A folder's own times on a real file system, the same values its parent's listing reports, and a
+    /// path that is not there (ADR 0061).
+    #[test]
+    fn a_paths_own_times_match_its_parents_listing() {
+        let dir = std::env::temp_dir().join(format!("rongroi-times-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("inner")).unwrap();
+        let listed = LiveHost.list_dir(dir.to_str().unwrap()).unwrap().unwrap();
+        let inner = listed.iter().find(|entry| entry.name == "inner").unwrap();
+        let times = LiveHost
+            .times(dir.join("inner").to_str().unwrap())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (times.created, times.modified),
+            (inner.created, inner.modified)
+        );
+        assert!(times.created.is_some());
+        assert_eq!(
+            LiveHost.times(dir.join("absent").to_str().unwrap()),
+            Ok(None)
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

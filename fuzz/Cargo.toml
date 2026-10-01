@@ -86,6 +86,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "fuzz_task"
+path = "fuzz_targets/fuzz_task.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "fuzz_usn"
 path = "fuzz_targets/fuzz_usn.rs"
 test = false

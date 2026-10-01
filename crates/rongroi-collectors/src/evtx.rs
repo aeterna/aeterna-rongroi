@@ -9,9 +9,12 @@
 //! nothing itself (ADR 0018). Reading the `Security` channel needs an elevated token, so `not_admin`
 //! is an expected outcome of an ordinary scan rather than a defect (ADR 0012, ADR 0024).
 //!
-//! Four rules read this collector — the Security log's own record that it was cleared, and the System
-//! log's record that some log file was (ADR 0031); a log file marked read-only (ADR 0037); and a log
-//! file that is not the file its channel is written to (ADR 0042). Everything else it sees is listed
+//! Five rules read this collector — the Security log's own record that it was cleared, and the System
+//! log's record that some log file was (ADR 0031); a log file marked read-only (ADR 0037); a log file
+//! that is not the file its channel is written to (ADR 0042); and Microsoft Defender's record that its
+//! real-time protection was switched off (ADR 0059). Three timeline selectors put times from it on the
+//! timeline without making evidence: each log's oldest and newest record (ADR 0051), Code Integrity's
+//! refusals to load a file, and Defender's detections (ADR 0059). Everything else it sees is listed
 //! in Self mode as unmatched observations and counted, never listed, in SS mode (ADR 0014).
 //!
 //! # One observation per kind of event, never one per record
@@ -81,7 +84,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{self, EvtxFile, EvtxRecord};
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Collector, Coverage, Field};
+use crate::{Age, AgeCount, AgeRows, Collector, Coverage, Field};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -256,6 +259,20 @@ impl Collector for Evtx {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    /// One row per log: its oldest record, how many records it holds, and its size beside the maximum
+    /// the Event Log service states for it (ADR 0061). Which logs come first and which are folded is
+    /// the bundle's to say, not this collector's.
+    fn age(&self) -> Option<Age> {
+        Some(Age {
+            oldest: &["oldest_record_time"],
+            count: AgeCount::Field("entries"),
+            rows: AgeRows::PerValue("log"),
+            places: &[],
+            extra: &["size_bytes", "max_size_bytes"],
+            by_place: &[],
+        })
     }
 
     /// Each log's oldest and newest record (ADR 0051): the span that log could show.

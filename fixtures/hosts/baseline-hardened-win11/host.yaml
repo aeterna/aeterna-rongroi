@@ -17,6 +17,10 @@ elevated: false
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+# Microsoft Defender's exclusions are refused to a token without administrator rights, as measured on a
+# runner and a Windows 11 PC (ADR 0060), so `defender_exclusion` is `not_admin` here.
+access_denied:
+  - 'HKLM\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths'
 registry:
   # What Windows says this installation is, and how the services Windows ships with are set to start
   # (ADR 0056). Every value below was measured on one Windows 11 PC (build 26220, DisplayVersion 25H2)

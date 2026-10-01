@@ -1,0 +1,774 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: view
+---
+{
+  "mode": "ss",
+  "header": {
+    "schema_version": 1,
+    "provenance": {
+      "official": false,
+      "version": "0.0.0-test",
+      "commit": null,
+      "exe_sha256": null
+    },
+    "rules_bundle": {
+      "schema_version": 4,
+      "sha256": "[bundle sha256]",
+      "rule_count": 55
+    },
+    "platform": "windows",
+    "os_build": "26100",
+    "elevated": true,
+    "generated_at": "2026-01-01T00:00:00Z",
+    "boot_time": {
+      "state": "measured",
+      "booted_at": "2025-12-28T12:00:00Z",
+      "seconds_since_boot": 302400
+    },
+    "scan_tier": "standard",
+    "anchors": [
+      {
+        "anchor": "install_date",
+        "state": "measured",
+        "on": "2025-10-21",
+        "source": "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\InstallDate"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "measured",
+        "on": "2018-03-02",
+        "source": "HKLM\\SYSTEM\\Setup\\Source OS (Updated on …)\\InstallDate",
+        "kept": 2
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "measured",
+        "on": "2018-03-01",
+        "source": "%SystemDrive% change journal identifier"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "measured",
+        "on": "2018-03-02",
+        "source": "%SystemDrive%\\"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "measured",
+        "on": "2018-03-02",
+        "source": "%SystemDrive%\\$Recycle.Bin"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "measured",
+        "on": "2024-05-10",
+        "source": "%LOCALAPPDATA%\\FiveM"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "measured",
+        "on": "2024-05-10",
+        "source": "%LOCALAPPDATA%\\FiveM\\FiveM.app"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "rule_id": "72820eaf-1469-4ea7-bb0f-17f145d26dfc",
+      "collector": "autostart",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "d7191cf3-ce56-480b-8501-66a198f83e08",
+      "collector": "defender_exclusion",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Defender's exclusions as they were when the scan ran. An exclusion removed before the scan is not seen."
+    },
+    {
+      "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
+      "collector": "driver_service",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "The driver services registered when the scan ran. A driver that was registered and removed before the scan is not seen."
+    },
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "evtx",
+          "fields": {
+            "at_configured_path": false,
+            "configured_path": "%SystemRoot%\\System32\\Winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+            "entries": 17,
+            "intact": true,
+            "log": "System.evtx",
+            "max_size_bytes": 1052672,
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\System.evtx",
+            "read_only": false,
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "app_folder_created_at": "2024-05-10T08:01:00Z",
+            "location": "legacy_exe",
+            "path": "%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.exe",
+            "program_folder_created_at": "2024-05-10T08:00:00Z",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "signature": "no_embedded_signature"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "fd58dec6-84c1-49cb-806c-10b4614a046f",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "65ee0ec1-bcda-47a3-a401-98632b42e75f",
+      "collector": "net_config",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "The hosts file as it was when the scan ran. A line removed before the scan is not seen."
+    },
+    {
+      "rule_id": "77646339-caf4-4ade-93ef-133089dac30e",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "8f656238-36d2-4178-98db-87f55432edf7",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "os_image",
+          "fields": {
+            "service_diagtrack": "absent",
+            "service_dps": "absent",
+            "service_eventlog": "absent",
+            "service_sysmain": "absent",
+            "service_wersvc": "absent",
+            "service_windefend": "absent",
+            "service_wsearch": "absent",
+            "service_wuauserv": "absent"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "cf83f06e-23b5-47fc-b7a0-b6d1b8192379",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "os_image",
+          "fields": {
+            "service_diagtrack": "absent",
+            "service_dps": "absent",
+            "service_eventlog": "absent",
+            "service_sysmain": "absent",
+            "service_wersvc": "absent",
+            "service_windefend": "absent",
+            "service_wsearch": "absent",
+            "service_wuauserv": "absent"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "c9012982-5fc1-4d61-ab0c-0bc1abe93830",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "os_image",
+          "fields": {
+            "service_diagtrack": "absent",
+            "service_dps": "absent",
+            "service_eventlog": "absent",
+            "service_sysmain": "absent",
+            "service_wersvc": "absent",
+            "service_windefend": "absent",
+            "service_wsearch": "absent",
+            "service_wuauserv": "absent"
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "98ee9213-39f3-4219-b2ac-f2bb3d21d6cc",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
+      "rule_id": "88eb2aca-a33e-414d-bd0f-cfb87af95a2d",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "869c34b6-7b32-4f56-a281-9f5ac00e43c4",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
+      "rule_id": "dc858978-954d-418f-a42e-29f06975f4ed",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "a4af8cdc-a009-42ee-8368-7f35e93051fe",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "d2f86e75-7692-468e-88a2-52eb1e24dc30",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    }
+  ],
+  "own_traces": [],
+  "unmatched": [],
+  "scope": {
+    "not_admin": 0,
+    "not_attempted": 0,
+    "not_consented": 1
+  },
+  "listed": {
+    "found": 5,
+    "not_found": 12,
+    "unmeasured": 3
+  },
+  "hidden": {
+    "not_found": 11,
+    "unmeasured_expected": 13,
+    "unmeasured_unexpected": 0,
+    "unmatched": 36
+  },
+  "timeline": {
+    "entries": [
+      {
+        "at": "2018-07-09T20:49:14.0577461Z",
+        "collector": "evtx",
+        "field": "oldest_record_time",
+        "place": null,
+        "source": {
+          "kind": "evidence",
+          "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f"
+        },
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\System.evtx"
+      },
+      {
+        "at": "2018-07-09T20:49:14.0577461Z",
+        "collector": "evtx",
+        "field": "oldest_record_time",
+        "place": null,
+        "source": {
+          "kind": "selector",
+          "selector_id": "87b47713-1ed3-415e-bc07-9cd0b953d7c1"
+        },
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx"
+      },
+      {
+        "at": "2018-08-03T06:44:06.4185334Z",
+        "collector": "evtx",
+        "field": "newest_record_time",
+        "place": null,
+        "source": {
+          "kind": "evidence",
+          "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f"
+        },
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\System.evtx"
+      },
+      {
+        "at": "2018-08-03T06:44:06.4185334Z",
+        "collector": "evtx",
+        "field": "newest_record_time",
+        "place": null,
+        "source": {
+          "kind": "selector",
+          "selector_id": "87b47713-1ed3-415e-bc07-9cd0b953d7c1"
+        },
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx"
+      },
+      {
+        "at": "2024-05-10T08:00:00Z",
+        "collector": "fivem_dir",
+        "field": "program_folder_created_at",
+        "place": "legacy_exe",
+        "source": {
+          "kind": "evidence",
+          "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb"
+        },
+        "subject": "%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.exe"
+      },
+      {
+        "at": "2024-05-10T08:01:00Z",
+        "collector": "fivem_dir",
+        "field": "app_folder_created_at",
+        "place": "legacy_exe",
+        "source": {
+          "kind": "evidence",
+          "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb"
+        },
+        "subject": "%USERPROFILE%\\AppData\\Local\\FiveM\\FiveM.exe"
+      },
+      {
+        "at": "2024-05-10T08:02:00Z",
+        "collector": "fivem_dir",
+        "field": "created_at",
+        "place": "legacy_logs",
+        "source": {
+          "kind": "selector",
+          "selector_id": "2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"
+        },
+        "subject": null
+      },
+      {
+        "at": "2025-12-20T10:00:00Z",
+        "collector": "pca",
+        "field": "last_run",
+        "place": null,
+        "source": {
+          "kind": "selector",
+          "selector_id": "6487719d-15cf-422c-8b8a-858647091fd1"
+        },
+        "subject": "fivem.exe"
+      },
+      {
+        "at": "2025-12-28T12:00:00Z",
+        "collector": null,
+        "field": "boot_time",
+        "place": null,
+        "source": {
+          "kind": "anchor"
+        },
+        "subject": null
+      },
+      {
+        "at": "2025-12-30T20:45:00Z",
+        "collector": "fivem_dir",
+        "field": "earliest_created_at",
+        "place": "legacy_logs",
+        "source": {
+          "kind": "selector",
+          "selector_id": "2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"
+        },
+        "subject": null
+      },
+      {
+        "at": "2025-12-30T20:45:00Z",
+        "collector": "fivem_dir",
+        "field": "latest_created_at",
+        "place": "legacy_logs",
+        "source": {
+          "kind": "selector",
+          "selector_id": "2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"
+        },
+        "subject": null
+      },
+      {
+        "at": "2025-12-30T21:00:00Z",
+        "collector": "fivem_dir",
+        "field": "earliest_modified_at",
+        "place": "legacy_logs",
+        "source": {
+          "kind": "selector",
+          "selector_id": "2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"
+        },
+        "subject": null
+      },
+      {
+        "at": "2025-12-30T21:00:00Z",
+        "collector": "fivem_dir",
+        "field": "latest_modified_at",
+        "place": "legacy_logs",
+        "source": {
+          "kind": "selector",
+          "selector_id": "2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"
+        },
+        "subject": null
+      },
+      {
+        "at": "2025-12-30T21:00:00Z",
+        "collector": "fivem_dir",
+        "field": "modified_at",
+        "place": "legacy_logs",
+        "source": {
+          "kind": "selector",
+          "selector_id": "2ef0da16-e65e-4bb6-90c5-0898ffc93ad8"
+        },
+        "subject": null
+      },
+      {
+        "at": "2026-01-01T00:00:00Z",
+        "collector": null,
+        "field": "generated_at",
+        "place": null,
+        "source": {
+          "kind": "anchor"
+        },
+        "subject": null
+      }
+    ],
+    "bands": [
+      {
+        "collector": "evtx",
+        "place": null,
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\System.evtx",
+        "from": "2018-07-09T20:49:14.0577461Z",
+        "to": "2018-08-03T06:44:06.4185334Z"
+      },
+      {
+        "collector": "evtx",
+        "place": null,
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+        "from": "2018-07-09T20:49:14.0577461Z",
+        "to": "2018-08-03T06:44:06.4185334Z"
+      },
+      {
+        "collector": "usn",
+        "place": "journal",
+        "subject": null,
+        "from": "2025-12-31T23:20:00Z",
+        "to": "2025-12-31T23:59:00Z"
+      }
+    ],
+    "unmeasured": [
+      {
+        "collector": "bam",
+        "reason": "access_denied"
+      },
+      {
+        "collector": "usn",
+        "place": "prefetch",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "place": "winevt_logs",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "place": "appcompat_pca",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "place": "plugins",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "place": "enhanced_asi",
+        "reason": "source_absent"
+      }
+    ]
+  },
+  "collector_order": [
+    "posture",
+    "driver_service",
+    "autostart",
+    "defender_exclusion",
+    "fivem_dir",
+    "fivem_servers",
+    "net_config",
+    "process",
+    "evtx",
+    "prefetch",
+    "bam",
+    "pca",
+    "usn"
+  ],
+  "trace_ages": {
+    "anchors": [
+      {
+        "anchor": "boot_time",
+        "state": "measured",
+        "on": "2025-12-28T12:00:00Z",
+        "days_before": 3
+      },
+      {
+        "anchor": "install_date",
+        "state": "measured",
+        "on": "2025-10-21",
+        "days_before": 72,
+        "source": "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\InstallDate"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "measured",
+        "on": "2018-03-02",
+        "days_before": 2862,
+        "source": "HKLM\\SYSTEM\\Setup\\Source OS (Updated on …)\\InstallDate",
+        "kept": 2
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "measured",
+        "on": "2018-03-01",
+        "days_before": 2863,
+        "source": "%SystemDrive% change journal identifier"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "measured",
+        "on": "2018-03-02",
+        "days_before": 2862,
+        "source": "%SystemDrive%\\"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "measured",
+        "on": "2018-03-02",
+        "days_before": 2862,
+        "source": "%SystemDrive%\\$Recycle.Bin"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "measured",
+        "on": "2024-05-10",
+        "days_before": 601,
+        "source": "%LOCALAPPDATA%\\FiveM"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "measured",
+        "on": "2024-05-10",
+        "days_before": 601,
+        "source": "%LOCALAPPDATA%\\FiveM\\FiveM.app"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      }
+    ],
+    "rows": [
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_logs",
+        "state": "measured",
+        "oldest": "2025-12-30T20:45:00Z",
+        "days_before": 1,
+        "count": 1,
+        "extra": {
+          "latest_modified_at": "2025-12-30T21:00:00Z"
+        }
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_cache",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_logs",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_launcher_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_server_cache",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Security.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "System.evtx",
+        "state": "measured",
+        "oldest": "2018-07-09T20:49:14.0577461Z",
+        "days_before": 2732,
+        "count": 17,
+        "extra": {
+          "max_size_bytes": 1052672,
+          "size_bytes": 69632
+        }
+      },
+      {
+        "collector": "prefetch",
+        "state": "measured",
+        "oldest": "2016-01-12T20:07:03.9810694Z",
+        "days_before": 3641,
+        "count": 1
+      },
+      {
+        "collector": "bam",
+        "state": "unmeasured",
+        "reason": "access_denied"
+      },
+      {
+        "collector": "pca",
+        "state": "measured",
+        "oldest": "2025-11-02T03:04:05Z",
+        "days_before": 59,
+        "count": 2
+      },
+      {
+        "collector": "usn",
+        "place": "journal",
+        "state": "measured",
+        "oldest": "2025-12-31T23:20:00Z",
+        "days_before": 0,
+        "count": 5,
+        "extra": {
+          "last_seen": "2025-12-31T23:59:00Z",
+          "maximum_size": 33554432,
+          "trimmed": true
+        }
+      }
+    ],
+    "folded_logs": {
+      "collector": "evtx",
+      "logs": 1,
+      "with_records": 1,
+      "not_read": 0
+    }
+  },
+  "cross_source": [
+    {
+      "fivem": {
+        "editions": [
+          "legacy"
+        ],
+        "folders_written": "2025-12-30",
+        "folders_days_before": 1,
+        "server_folders": 0
+      },
+      "sources": [
+        {
+          "collector": "prefetch",
+          "line": "no_entry",
+          "entries": 1,
+          "oldest": "2016-01-12",
+          "days_before": 3641
+        },
+        {
+          "collector": "bam",
+          "line": "not_read",
+          "reason": "access_denied"
+        },
+        {
+          "collector": "pca",
+          "line": "selected",
+          "entries": 1,
+          "latest": "2025-12-20"
+        }
+      ]
+    }
+  ]
+}

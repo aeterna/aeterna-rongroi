@@ -5,6 +5,129 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-01
+
+### Added
+- **How far back the traces reach** (ADR 0061), in both modes and in both front ends. A new view section
+  lists, for each event log, Prefetch, BAM, PCA, the change journal and each of FiveM's log, crash and cache
+  folders, the oldest time the source still holds, its whole days before the scan, how much it holds, what
+  the source ordinarily keeps — reviewed text in the new `rules/ages/<collector>.yaml`, with its references
+  and whether Microsoft documents it, translated in `rules/i18n/th.yaml` — and, for a source that was not
+  read, the reason: `not_admin` reads "not read without administrator rights — not known", never empty. The
+  event logs the bundle's rules and selectors read are listed first, each with its size beside its maximum;
+  the rest fold into one line. Collectors declare this with `Collector::age`, copied into the additive
+  `Report.age_fields`. Above the rows are **anchors**, UTC dates in the new `ReportHeader.anchors`, where no
+  rule reads them, each shown with what ordinarily resets it: `boot_time`; `InstallDate`, as "installed or
+  last feature-upgraded"; the earliest installation date Windows Setup kept and how many it kept (not
+  documented by Microsoft, no subkey name emitted); the change journal's creation date; the system drive
+  root's and `$Recycle.Bin`'s creation dates through a new `FilesystemSource::times`; and FiveM's program
+  folders. `fivem_dir`'s `FiveM.exe` observations gain `program_folder_created_at` and, for Legacy,
+  `app_folder_created_at`. `usn`'s journal observation gains `journal_created_on`, the date the journal
+  identifier gives when read as a time — undocumented, computed inside the host, never the identifier —
+  amending ADR 0047. One **cross-source statement**, computed in the view and never a rule or evidence, puts
+  FiveM's side beside Prefetch, BAM and PCA only when Prefetch or BAM was read, holds no entry for the names
+  the FiveM timeline selectors list, and reaches back before FiveM's folders were last written; a record not
+  read is "not known", PCA alone never makes it, and the ordinary causes are always printed with it. The
+  report records which timeline selectors the bundle held (`Report.timeline_selectors`). No verdict, score,
+  ranking or colour. The consent question (CLI and desktop, both languages), `PRIVACY.md`, ADR 0034's note,
+  `docs/architecture.md`, the glossary and both screenshare guides say what is read and shown; the CLI takes
+  the section's and the statement's fixed words from the desktop's locale files. Two synthetic fixture hosts
+  cover a PC read with and without administrator rights.
+- What Code Integrity and Microsoft Defender already record, read through the existing `evtx` collector
+  with no new read, field or reason (ADR 0059, accepted by the owner on 2026-09-30). One `context`,
+  `experimental` rule: **Microsoft Defender recorded that its real-time protection was switched off**
+  (event 5001), whose ordinary causes lead with the PC's maker, because both GitHub-hosted runner images
+  measured carried one. Two timeline selectors, not rules, because both were measured on ordinary machines
+  and the program does not read which file or what threat: the first and last time Code Integrity recorded
+  Windows refusing to load a file (3033, 3077), and Defender's detections (1116, 1117). SS mode now shows
+  those times on its timeline, and the consent screen, the app's consent text and `PRIVACY.md` say so.
+  Each pins provider, channel and event id; the negative fixtures are the neighbouring ids (3089, 5000,
+  5007) and the same id from another provider. No baseline holds either log, so the three have
+  `rules/unconfronted.csv` rows. A Windows 11 PC recorded 476 3033 events on 15 days, 17 driver refusals by a
+  Microsoft driver policy, and no 5001; a timed scan of the official 0.4.0 CLI there read all 414 logs,
+  the Defender log 375th, inside the 30-second budget (20.9 s for the whole scan, on a warm file cache).
+- The `autostart` collector: what Windows starts by itself (ADR 0060). Program services (`Type` `0x10` or
+  `0x20`), `Run` and `RunOnce` values under `HKLM`, its `WOW6432Node` view and `HKCU`, and every `Exec`
+  action of the scheduled tasks read from their XML files under `%SystemRoot%\System32\Tasks`, parsed by a
+  new `rongroi_parsers::task` (`quick-xml`, already in the lockfile) with a fuzz target. Each entry reports
+  where it is registered, whether it starts by itself, and the file it starts — its path, the kind of folder
+  it is in and, outside the Windows folder, its SHA-256 and embedded signature under a 30-second budget of
+  its own. **No argument is ever read into a report.** Without administrator rights the task files are
+  refused, which is `not_admin` for tasks alone; one file refused to an elevated read is an `access_denied`
+  gap for tasks alone. SS mode never shows a `Run` value's or a task's name (`view::SS_WITHHELD_FIELDS`).
+  One `posture` rule, `experimental`: a program that starts by itself has no valid embedded signature and is
+  outside the Windows and Program Files folders. The resolver's refusals are shared with `driver_service`,
+  whose behaviour is unchanged. A host reads this account's SID, compared with a task's principal and
+  never reported. The consent question, PRIVACY.md, both READMEs and both screenshare guides say what is
+  read.
+- The `defender_exclusion` collector: what Microsoft Defender is told not to scan (ADR 0060, section 9).
+  The value names of `Exclusions\Paths`, `Processes` and `Extensions` under Defender's own key and its
+  policy key, each with its kind, which key set it and, for a path or a process, whether it covers one of
+  FiveM's three folders (a drive root included; never for a wildcard); of `IpAddresses` only the count,
+  never an address. Refused without administrator rights (`not_admin`), as measured on a runner and a
+  Windows 11 PC. One `posture` rule, `experimental`: a Defender exclusion covers a FiveM folder. The consent
+  question, PRIVACY.md, both READMEs and both screenshare guides say what is read.
+- The first rules that read the change journal's counts: four `context`, `experimental` rules for a
+  deletion and for a rename in FiveM for GTA V Legacy's plugin folder and in FiveM for GTA V Enhanced's asi
+  folder, each with a positive and a negative fixture (ADR 0047, amendment of 2026-09-30). Each row says
+  the journal does not record which program changed a file. `baseline-elevated-win11` confronts the
+  Legacy pair; no baseline describes Enhanced, so its pair has `rules/unconfronted.csv` rows. No rule reads
+  the Prefetch, event log or Program Compatibility Assistant counts.
+- Every `found` and `not_found` row of the change journal now shows the span the journal held when it was
+  read — on one Windows 11 PC, 39 minutes, in two readings — or says it held no record, in both modes, so
+  "not found" reads as "nothing within this span". The pairing is made in `rongroi-core::view`
+  (`ReportView::row_bands`), so the CLI and the desktop app cannot disagree.
+
+### Changed
+- ADR 0058, parked by the owner on 2026-09-30: reading FiveM's own logs for the servers a PC joined, as a
+  second `full`-tier collector, is not built. Two read-only measurements on a Windows 11 PC found no server
+  endpoint in either edition's logs — join lines carry no address, name or port. The ADR records the log
+  files' names, sizes, line formats and times, keeps the collector's design (a tolerant parser reporting
+  `partial`, endpoints as server identities hidden in SS mode, no plugin names) as undecided
+  recommendations, and states the measurement that would reopen it. ADR 0052's row for this source says it
+  is parked.
+- ADR 0060 (accepted 2026-09-30) records the design of the two collectors shipped above: an `autostart` collector for what Windows starts by itself —
+  program services, `Run`/`RunOnce` under `HKLM`, its 32-bit view and `HKCU`, and scheduled tasks read from
+  their files — with each file's path, SHA-256 and embedded signature, never a command line's arguments; and a
+  `defender_exclusion` collector for Microsoft Defender's exclusions, readable with administrator rights only.
+  Two `experimental` `posture` rules: a program that starts by itself with no valid embedded signature outside
+  the Windows and Program Files folders, and an exclusion that covers a FiveM folder. The ADR records a
+  GitHub-hosted runner's measurement under an elevated and a standard account, and a Windows 11 PC's under an
+  elevated and a limited token, and the owner's nine decisions of 2026-09-30.
+- ADR 0061 (accepted 2026-09-30, the owner deciding its eight questions) records the design shipped above: how old
+  each trace source is, beside when parts of the PC were set up. A "trace ages" section lists, per source
+  (each Event Log, Prefetch, BAM, PCA, the USN journal and FiveM's own folders), the oldest time it still
+  holds, how much it holds, its ordinary retention with a reference or an "undocumented" mark, and the reason
+  when it was not read — `not_admin` reads "not known", never empty. Anchors in the header are dates with their
+  ordinary resets, never one "machine age": `InstallDate` is shown as "installed or last feature-upgraded".
+  One cross-source statement, computed in the view and never a rule, puts FiveM's presence beside Windows'
+  records of programs that ran, with the causes that produce the same result. No verdict, score or ranking;
+  a reinstall and a new PC stay indistinguishable. A read-only probe on a Windows 11 PC found that a feature
+  upgrade reset `InstallDate`, the Windows and profile folders, key write times and every Event Log's oldest
+  record, while Windows Setup's record of earlier installations, the system drive root and the USN journal
+  identifier read as a time all reached back more than seven years and agreed to the day; BAM held entries
+  47 days old, and full Security and PowerShell logs reached back 2.3 and 0.2 days.
+- A FiveM plugin folder on another drive than the Windows drive, whose change journal is the one read, is
+  now reported with a new reason, `other_volume` — "this is on another drive, and this program reads only
+  the system drive's change journal" — instead of `read_failed`, which SS mode always lists and no rule can
+  declare. Nothing failed, so rules may declare it. It is the fourteenth reason, `usn`'s alone, in English
+  and Thai in the CLI and the desktop app, and ADR 0030's table has its row. No second drive's journal is
+  read (ADR 0047, amendment of 2026-09-30).
+
+### Fixed
+- A desktop app stopped before it could close — ended from Task Manager, for example — left its WebView
+  profile folder, `%TEMP%\aeterna-rongroi-<process id>`, behind for good, because the folder is deleted
+  only when the app exits normally. The app now deletes such folders when it starts: only
+  folders named exactly as it names its own, never its own, never one whose process id is running, and
+  none at all when the process list cannot be read. It runs after the scan, so it cannot change what that
+  scan measured.
+- Desktop app polish. About & code no longer stays a blank page when the program cannot answer
+  it: it says the details could not be read and keeps its Back button. It no longer asks for the
+  report header a second time. A count of 0 in the report summary, when chosen as a filter, says that
+  no row is in that state instead of showing nothing. Each count's button is read as "7 found — …", not
+  "7found — …". "Copied" goes back to "Copy link" after two seconds. Two identical observations, such as
+  two copies of one program running, no longer share a React key. New strings are in English and Thai.
+
 ## [0.4.0] - 2026-09-21
 
 ### Added

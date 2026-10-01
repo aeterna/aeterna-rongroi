@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 46 |
-| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
+| จำนวน rule | 55 |
+| SHA-256 | `1189336b89f6ee78d45c5d5603e40ab87361ebd0c6da986fb9d56b530b96e3ee` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -37,9 +37,14 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 ## สารบัญ
 
+- `autostart`
+  - [โปรแกรมที่เริ่มทำงานเองไม่มีลายเซ็นฝังในไฟล์ที่ใช้ได้ และอยู่นอกโฟลเดอร์ Windows กับ Program Files](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
+- `defender_exclusion`
+  - [exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
   - [ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
+  - [Microsoft Defender บันทึกว่าการป้องกันแบบ real-time ถูกปิด](#rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185) — `context` · `experimental`
   - [มี event log ไฟล์หนึ่งถูกล้าง](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [Security log มีบันทึกว่าตัวเองถูกล้าง](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
   - [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
@@ -83,11 +88,18 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+- `usn`
+  - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
+  - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
+  - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ plugin ของ FiveM](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
+  - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ plugin ของ FiveM](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
 - timeline selector
   - `bam`
     - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
     - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
   - `evtx`
+    - [เวลาที่ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์](#rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8) — `context` · `experimental`
+    - [เวลาที่ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง](#rule-63269014-f728-424c-8e18-e36fe79030aa) — `context` · `experimental`
     - [record เก่าสุดและใหม่สุดของ event log ของ Windows](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
   - `fivem_dir`
     - [เวลาที่โฟลเดอร์ log, crash และ cache ของ FiveM ถูกเขียน](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
@@ -99,6 +111,92 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
     - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
   - `usn`
     - [เวลาที่ change journal บันทึกการเปลี่ยนแปลงในโฟลเดอร์ที่เฝ้าดู](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+
+## collector `autostart`
+
+### `autostart` / `outside-windows`
+
+<a id="rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc"></a>
+
+#### โปรแกรมที่เริ่มทำงานเองไม่มีลายเซ็นฝังในไฟล์ที่ใช้ได้ และอยู่นอกโฟลเดอร์ Windows กับ Program Files
+
+- ชื่อภาษาอังกฤษ: A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders
+- id: `72820eaf-1469-4ea7-bb0f-17f145d26dfc`
+- ไฟล์: [`rules/autostart/outside-windows/no-valid-embedded-signature/rule.yaml`](../rules/autostart/outside-windows/no-valid-embedded-signature/rule.yaml)
+- collector: `autostart`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `autostart`, `posture`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows ถูกตั้งให้เริ่มโปรแกรมนี้เอง ไม่ว่าจะเป็น service ที่เริ่มพร้อมเครื่องหรือเมื่อมี trigger ค่าใน Run หรือ RunOnce ตอน sign-in หรือ scheduled task ที่เปิดอยู่และมี trigger และไฟล์ของมันอยู่นอกโฟลเดอร์ Windows กับ Program Files และไม่มีลายเซ็นฝังในไฟล์ที่ Windows เชื่อถือ คือไม่มีเลย หรือมีแต่ตรวจแล้วไม่ผ่าน แถวนี้แสดงว่าลงทะเบียนไว้ที่ไหน path ของไฟล์ SHA-256 และผลการตรวจลายเซ็น ไฟล์ที่เซ็นผ่าน catalog ของ Windows จะอ่านได้ว่าไม่มีลายเซ็นฝังในไฟล์ เพราะโปรแกรมนี้ไม่อ่าน catalog ไฟล์ในโฟลเดอร์ Windows ไม่ถูกตรวจเลย และโปรแกรมที่เริ่มจากใน Program Files จะไม่แสดงใน rule นี้ โปรแกรมนี้ไม่อ่าน argument เลย จึงไม่ได้บอกว่าโปรแกรมถูกสั่งให้รันอะไร ข้อนี้บอกว่ามีโปรแกรมถูกตั้งให้เริ่มเองโดยไม่ต้องมีใครสั่ง ไม่ได้บอกว่าโปรแกรมทำอะไร ใครติดตั้ง หรือเคยรันจริงหรือไม่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `path_kind`: เป็นค่าใดค่าหนึ่งใน `program_data`, `user_profile`, `other` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `signature`: เป็นค่าใดค่าหนึ่งใน `no_embedded_signature`, `invalid` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `starts_by_itself`: เป็น `true`
+
+**ย้อนดูได้**
+
+service ค่าใน Run และ RunOnce และ scheduled task ที่ลงทะเบียนไว้ตอนสแกน รายการที่ถูกลบไปก่อนสแกนจะไม่เห็น และไฟล์ที่เปลี่ยนไปแล้วจะถูกอ่านตามที่เป็นอยู่ตอนนี้
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- โปรแกรมที่ติดตั้งแยกตามผู้ใช้ไว้ใน AppData เช่น launcher แอปแชตและเสียง โปรแกรม sync ไฟล์ขึ้น cloud และโดยเฉพาะตัวอัปเดตกับตัวช่วยของโปรแกรมเหล่านี้
+- โปรแกรมของอุปกรณ์ต่อพ่วง ไฟ RGB พัดลม และการโอเวอร์คล็อก
+- ตัวห่อ service และเซิร์ฟเวอร์ที่ติดตั้งผ่าน package manager เช่น NSSM จาก Chocolatey หรือเว็บเซิร์ฟเวอร์ Apache
+- agent สำหรับจัดการหรือเตรียมเครื่อง เช่น agent ของ runner ที่ GitHub ดูแล
+- เครื่องมือ open source และเครื่องมือที่สร้างเอง ซึ่งมักไม่ได้เซ็น
+- ไฟล์ที่เซ็นผ่าน catalog ของ Windows ซึ่งการตรวจนี้ไม่ได้อ่าน
+- ค่าใน Run ที่ถูกปิดไว้ใน Task Manager ซึ่งโปรแกรมนี้แยกไม่ออกจากค่าที่เปิดอยู่
+
+## collector `defender_exclusion`
+
+### `defender_exclusion` / `fivem`
+
+<a id="rule-d7191cf3-ce56-480b-8501-66a198f83e08"></a>
+
+#### exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM
+
+- ชื่อภาษาอังกฤษ: A Microsoft Defender exclusion covers a FiveM folder
+- id: `d7191cf3-ce56-480b-8501-66a198f83e08`
+- ไฟล์: [`rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml`](../rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml)
+- collector: `defender_exclusion`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `defender_exclusion`, `posture`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+Microsoft Defender ถูกสั่งไม่ให้สแกนโฟลเดอร์หรือโปรแกรมที่เป็นโฟลเดอร์ของ FiveM เป็นโฟลเดอร์ที่อยู่เหนือขึ้นไป รวมถึงทั้งไดรฟ์ หรือเป็นอะไรบางอย่างที่อยู่ข้างใน โฟลเดอร์ของ FiveM คือของ FiveM for GTA V Legacy และ Enhanced ใน AppData แบบ local และ roaming ของบัญชี Windows ไม่ว่าจะมีอยู่บนเครื่องนี้หรือไม่ แถวนี้แสดง exclusion ตามที่ Defender เก็บไว้ และบอกว่าตั้งไว้ในการตั้งค่าของ Defender เองหรือตั้งโดย policy exclusion ที่มี wildcard จะไม่ถูกเทียบ และยังไม่ได้เทียบกับโฟลเดอร์ของตัวเกมเอง ข้อนี้บอกว่า Defender ถูกสั่งไม่ให้สแกนที่ที่ FiveM เก็บไฟล์ ไม่ได้บอกว่ามีอะไรถูกวางไว้ที่นั่น ใครตั้ง exclusion หรือตั้งเมื่อไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `covers_fivem`: เป็น `true`
+
+**ย้อนดูได้**
+
+exclusion ของ Defender ตามที่เป็นอยู่ตอนสแกน exclusion ที่ถูกลบไปก่อนสแกนจะไม่เห็น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- คู่มือเพิ่ม FPS และประสิทธิภาพที่บอกให้ผู้เล่นยกเว้นโฟลเดอร์ของเกมหรือของ FiveM จากการสแกนเพื่อลดอาการกระตุก
+- ตัวติดตั้งหรือ launcher ของเกมและ mod ที่เพิ่ม exclusion ของตัวเอง
+- นักพัฒนาและเครื่องที่ใช้ build โปรแกรมซึ่งยกเว้นทั้งไดรฟ์เพื่อให้ build เร็วขึ้น เหมือนอิมเมจของ runner ที่ GitHub ดูแลซึ่งยกเว้นไดรฟ์ C และ D
+- โปรแกรมความปลอดภัยตัวอื่น หรือผู้ดูแลระบบ ที่จัดการการตั้งค่าของ Defender
 
 ## collector `driver_service`
 
@@ -144,6 +242,52 @@ driver service ที่ลงทะเบียนไว้ตอนสแก�
 - <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## collector `evtx`
+
+### `evtx` / `defender`
+
+<a id="rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185"></a>
+
+#### Microsoft Defender บันทึกว่าการป้องกันแบบ real-time ถูกปิด
+
+- ชื่อภาษาอังกฤษ: Microsoft Defender recorded that its real-time protection was switched off
+- id: `429f8bc3-3c7d-4924-87f7-7cccefa1a185`
+- ไฟล์: [`rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml`](../rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml)
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `defender`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+log ของ Microsoft Defender มีบันทึกว่าการป้องกันแบบ real-time ซึ่งเป็นส่วนที่สแกนไฟล์ตอนถูกเปิด ถูกปิดไป พร้อมเวลาครั้งแรกและครั้งล่าสุดที่เกิดขึ้น บันทึกนี้ไม่ได้บอกว่าใครปิดหรือปิดเพราะอะไร ถูกเปิดกลับหรือยัง หรือตอนนี้เปิดอยู่หรือไม่ เพราะ log บันทึกการเปลี่ยนแปลง ไม่ได้บันทึกสถานะ บันทึกที่เขียนไว้ก่อนเครื่องถูกส่งมอบ หน้าตาเหมือนบันทึกที่เขียนเมื่อวานทุกอย่าง จึงควรดูเวลาประกอบ
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `channel`: เป็น `Microsoft-Windows-Windows Defender/Operational` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `event_id`: เป็น `5001`
+- `provider`: เป็น `Microsoft-Windows-Windows Defender` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะการปิดที่ยังอยู่ใน log ของ Defender ตามที่เป็นอยู่ตอนนี้ ค่าเริ่มต้นเก็บได้ถึง 16 MiB และเขียนทับบันทึกเก่าสุด และ log ที่ถูกล้างจะไม่มีบันทึกเลย ถ้าไม่มี log ของ Defender อยู่เลย เช่น Defender ถูกถอดออกจากอิมเมจ หรือไฟล์ถูกลบ แถวนี้ก็จะบอกว่าไม่พบเช่นกัน เพราะการตรวจนี้ไม่รู้ว่าเครื่องหนึ่งควรมี log อะไรบ้าง rule เรื่องเซอร์วิสและโฟลเดอร์ platform ของ Defender คือสิ่งที่ตอบคำถามนั้น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้ผลิตเครื่อง ร้านคอม หรืออิมเมจ Windows ปิดการป้องกันแบบ real-time ไว้ก่อนส่งมอบเครื่อง ซึ่งวัดได้บนอิมเมจของ runner ที่ GitHub ให้บริการสองตัว แต่ละตัวมีบันทึกแบบนี้หนึ่งรายการจากก่อนที่จะมีใครใช้งาน
+- เจ้าของเครื่องปิดไว้ชั่วคราวเพื่อติดตั้งหรือรันสิ่งที่ Defender แจ้งเตือน ซึ่งมักเป็น mod เกม เทรนเนอร์ หรือเครื่องมือที่แชร์กันในฟอรัม และเป็นคำแนะนำที่พบบ่อยสำหรับโปรแกรมเหล่านั้นโดยเฉพาะ
+- การติดตั้งแอนตี้ไวรัสตัวอื่น ยังไม่รู้แน่ว่า Defender บันทึกเรื่องนี้ไว้หรือไม่ตอนที่หลีกทางให้ ข้อนี้จึงเป็นความเป็นไปได้ ไม่ใช่สาเหตุที่ยืนยันแล้ว
+- การอัปเดต platform ของ Defender หรือเครื่องมือจัดการเครื่องหรือ group policy ของนายจ้างหรือโรงเรียน
+- การไล่แก้ปัญหาเครื่องช้าหรือเกมกระตุก ซึ่งคำแนะนำในฟอรัมมักเริ่มจากการปิดการสแกนแบบ real-time
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 ### `evtx` / `log-clearing`
 
@@ -1721,6 +1865,196 @@ Windows ถูกสั่งให้ปิดการป้องกัน Sp
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
 
+## collector `usn`
+
+### `usn` / `enhanced-asi`
+
+<a id="rule-1c73241b-b7f1-4f91-81d4-8de53db6d119"></a>
+
+#### change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced
+
+- ชื่อภาษาอังกฤษ: The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder
+- id: `1c73241b-b7f1-4f91-81d4-8de53db6d119`
+- ไฟล์: [`rules/usn/enhanced-asi/files-deleted/rule.yaml`](../rules/usn/enhanced-asi/files-deleted/rule.yaml)
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `enhanced_asi`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal มี record อย่างน้อยหนึ่งรายการของไฟล์ที่ถูกลบโดยตรงในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced แถวนี้บอกจำนวน record และเวลาแรกกับเวลาสุดท้าย และแสดงช่วงที่ journal ครอบคลุม ซึ่งบนเครื่องที่ใช้งานตามปกติอาจสั้นกว่าหนึ่งชั่วโมงมาก ก่อนช่วงนั้นมองไม่เห็นอะไรเลย ถ้า rule นี้ไม่เจออะไร แปลว่าในช่วงนั้นไม่มีอะไรถูกลบที่นั่นเท่านั้น journal ไม่ได้บันทึกว่าโปรแกรมไหนเป็นคนเปลี่ยนไฟล์ ข้อนี้จึงไม่ได้บอกว่าใครทำ และไม่ได้บอกว่ามีการซ่อนอะไร ยังไม่รู้ว่า FiveM for GTA V Enhanced โหลดอะไรจากโฟลเดอร์นี้หรือไม่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `deleted|gte`: ตั้งแต่ `1` ขึ้นไป
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `location`: เป็น `enhanced_asi` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะช่วงที่ change journal ยังเก็บไว้ตอนที่สแกนอ่าน ซึ่งแสดงไว้ข้างแถวนี้ journal มีขนาดคงที่และทิ้ง record เก่าสุดก่อน บนเครื่อง Windows 11 เครื่องหนึ่งเก็บได้ประมาณ 39 นาที
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `other_volume` — ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้เล่นถอดหรือเปลี่ยน mod กราฟิก ReShade, ENB หรือ plugin อื่นที่ติดตั้งไว้เอง
+- FiveM หรือตัวอัปเดตของมันเปลี่ยนหรือลบไฟล์ในโฟลเดอร์ (ยังไม่ได้วัดสำหรับโฟลเดอร์นี้)
+- โปรแกรมทำความสะอาด ปุ่ม "clear FiveM cache" หรือโปรแกรมปรับแต่งเครื่องที่ล้างโฟลเดอร์ของ FiveM
+- แอนตี้ไวรัสกักกันหรือลบไฟล์
+- ติดตั้ง FiveM ใหม่ หรือโฟลเดอร์ถูกลบแล้วสร้างใหม่ record ของโฟลเดอร์เดิมจะไม่ถูกนับเลย จึงอาจทำให้แถวที่ควรมีหายไปได้ด้วย
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+<a id="rule-7996285e-8ccf-4b2d-8fec-339a32b95931"></a>
+
+#### change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced
+
+- ชื่อภาษาอังกฤษ: The change journal holds a rename in FiveM for GTA V Enhanced's asi folder
+- id: `7996285e-8ccf-4b2d-8fec-339a32b95931`
+- ไฟล์: [`rules/usn/enhanced-asi/files-renamed/rule.yaml`](../rules/usn/enhanced-asi/files-renamed/rule.yaml)
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `enhanced_asi`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal มี record อย่างน้อยหนึ่งรายการของไฟล์ที่ถูกเปลี่ยนชื่อโดยตรงในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced ถูกย้ายเข้า หรือถูกย้ายออก การเปลี่ยนชื่อภายในโฟลเดอร์ทิ้ง record ไว้สองรายการ รายการหนึ่งของชื่อเดิมและอีกรายการของชื่อใหม่ แถวนี้บอกจำนวน record และเวลาแรกกับเวลาสุดท้าย และแสดงช่วงที่ journal ครอบคลุม ซึ่งบนเครื่องที่ใช้งานตามปกติอาจสั้นกว่าหนึ่งชั่วโมงมาก ก่อนช่วงนั้นมองไม่เห็นอะไรเลย ถ้า rule นี้ไม่เจออะไร แปลว่าในช่วงนั้นไม่มีอะไรถูกเปลี่ยนชื่อ ย้ายเข้า หรือย้ายออกที่นั่นเท่านั้น journal ไม่ได้บันทึกว่าโปรแกรมไหนเป็นคนเปลี่ยนไฟล์ ข้อนี้จึงไม่ได้บอกว่าใครทำ และไม่ได้บอกว่ามีการซ่อนอะไร ยังไม่รู้ว่า FiveM for GTA V Enhanced โหลดอะไรจากโฟลเดอร์นี้หรือไม่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `location`: เป็น `enhanced_asi` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `renamed|gte`: ตั้งแต่ `1` ขึ้นไป
+
+**ย้อนดูได้**
+
+เฉพาะช่วงที่ change journal ยังเก็บไว้ตอนที่สแกนอ่าน ซึ่งแสดงไว้ข้างแถวนี้ journal มีขนาดคงที่และทิ้ง record เก่าสุดก่อน บนเครื่อง Windows 11 เครื่องหนึ่งเก็บได้ประมาณ 39 นาที
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `other_volume` — ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้เล่นเปลี่ยนชื่อ ย้าย หรือเปลี่ยน mod กราฟิก ReShade, ENB หรือ plugin อื่นที่ติดตั้งไว้เอง
+- การอัปเดตที่เขียนไฟล์ชุดใหม่แล้วสลับเข้าที่ด้วยการเปลี่ยนชื่อ โดย FiveM ตัวอัปเดตของมัน หรือ plugin (ยังไม่ได้วัดสำหรับโฟลเดอร์นี้)
+- ไฟล์ถูกย้ายไปถังขยะ (Recycle Bin) หรือไปโฟลเดอร์อื่นในไดรฟ์เดียวกัน ซึ่ง journal บันทึกเป็นการเปลี่ยนชื่อ (ยังไม่ได้วัดว่าถังขยะแสดงออกมาแบบไหน)
+- แอนตี้ไวรัสกักกันไฟล์
+- ติดตั้ง FiveM ใหม่ หรือโฟลเดอร์ถูกลบแล้วสร้างใหม่ record ของโฟลเดอร์เดิมจะไม่ถูกนับเลย จึงอาจทำให้แถวที่ควรมีหายไปได้ด้วย
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+### `usn` / `plugins`
+
+<a id="rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd"></a>
+
+#### change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ plugin ของ FiveM
+
+- ชื่อภาษาอังกฤษ: The change journal holds a deletion in FiveM's plugin folder
+- id: `91dc8b45-8355-4554-8a6d-e979e4a95ecd`
+- ไฟล์: [`rules/usn/plugins/files-deleted/rule.yaml`](../rules/usn/plugins/files-deleted/rule.yaml)
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `plugins`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal มี record อย่างน้อยหนึ่งรายการของไฟล์ที่ถูกลบโดยตรงในโฟลเดอร์ plugin ของ FiveM for GTA V Legacy แถวนี้บอกจำนวน record และเวลาแรกกับเวลาสุดท้าย และแสดงช่วงที่ journal ครอบคลุม ซึ่งบนเครื่องที่ใช้งานตามปกติอาจสั้นกว่าหนึ่งชั่วโมงมาก ก่อนช่วงนั้นมองไม่เห็นอะไรเลย ถ้า rule นี้ไม่เจออะไร แปลว่าในช่วงนั้นไม่มีอะไรถูกลบที่นั่นเท่านั้น journal ไม่ได้บันทึกว่าโปรแกรมไหนเป็นคนเปลี่ยนไฟล์ ข้อนี้จึงไม่ได้บอกว่าใครทำ และไม่ได้บอกว่ามีการซ่อนอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `deleted|gte`: ตั้งแต่ `1` ขึ้นไป
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `location`: เป็น `plugins` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะช่วงที่ change journal ยังเก็บไว้ตอนที่สแกนอ่าน ซึ่งแสดงไว้ข้างแถวนี้ journal มีขนาดคงที่และทิ้ง record เก่าสุดก่อน บนเครื่อง Windows 11 เครื่องหนึ่งเก็บได้ประมาณ 39 นาที
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `other_volume` — ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้เล่นถอดหรือเปลี่ยน mod กราฟิก ReShade, ENB หรือ plugin อื่นที่ติดตั้งไว้เอง
+- FiveM หรือตัวอัปเดตของมันเปลี่ยนหรือลบไฟล์ในโฟลเดอร์ (ยังไม่ได้วัดสำหรับโฟลเดอร์นี้)
+- โปรแกรมทำความสะอาด ปุ่ม "clear FiveM cache" หรือโปรแกรมปรับแต่งเครื่องที่ล้างโฟลเดอร์ของ FiveM
+- แอนตี้ไวรัสกักกันหรือลบไฟล์
+- ติดตั้ง FiveM ใหม่ หรือโฟลเดอร์ถูกลบแล้วสร้างใหม่ record ของโฟลเดอร์เดิมจะไม่ถูกนับเลย จึงอาจทำให้แถวที่ควรมีหายไปได้ด้วย
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+<a id="rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d"></a>
+
+#### change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ plugin ของ FiveM
+
+- ชื่อภาษาอังกฤษ: The change journal holds a rename in FiveM's plugin folder
+- id: `7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d`
+- ไฟล์: [`rules/usn/plugins/files-renamed/rule.yaml`](../rules/usn/plugins/files-renamed/rule.yaml)
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `plugins`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal มี record อย่างน้อยหนึ่งรายการของไฟล์ที่ถูกเปลี่ยนชื่อโดยตรงในโฟลเดอร์ plugin ของ FiveM for GTA V Legacy ถูกย้ายเข้า หรือถูกย้ายออก การเปลี่ยนชื่อภายในโฟลเดอร์ทิ้ง record ไว้สองรายการ รายการหนึ่งของชื่อเดิมและอีกรายการของชื่อใหม่ แถวนี้บอกจำนวน record และเวลาแรกกับเวลาสุดท้าย และแสดงช่วงที่ journal ครอบคลุม ซึ่งบนเครื่องที่ใช้งานตามปกติอาจสั้นกว่าหนึ่งชั่วโมงมาก ก่อนช่วงนั้นมองไม่เห็นอะไรเลย ถ้า rule นี้ไม่เจออะไร แปลว่าในช่วงนั้นไม่มีอะไรถูกเปลี่ยนชื่อ ย้ายเข้า หรือย้ายออกที่นั่นเท่านั้น journal ไม่ได้บันทึกว่าโปรแกรมไหนเป็นคนเปลี่ยนไฟล์ ข้อนี้จึงไม่ได้บอกว่าใครทำ และไม่ได้บอกว่ามีการซ่อนอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `location`: เป็น `plugins` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `renamed|gte`: ตั้งแต่ `1` ขึ้นไป
+
+**ย้อนดูได้**
+
+เฉพาะช่วงที่ change journal ยังเก็บไว้ตอนที่สแกนอ่าน ซึ่งแสดงไว้ข้างแถวนี้ journal มีขนาดคงที่และทิ้ง record เก่าสุดก่อน บนเครื่อง Windows 11 เครื่องหนึ่งเก็บได้ประมาณ 39 นาที
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `other_volume` — ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้เล่นเปลี่ยนชื่อ ย้าย หรือเปลี่ยน mod กราฟิก ReShade, ENB หรือ plugin อื่นที่ติดตั้งไว้เอง
+- การอัปเดตที่เขียนไฟล์ชุดใหม่แล้วสลับเข้าที่ด้วยการเปลี่ยนชื่อ โดย FiveM ตัวอัปเดตของมัน หรือ plugin (ยังไม่ได้วัดสำหรับโฟลเดอร์นี้)
+- ไฟล์ถูกย้ายไปถังขยะ (Recycle Bin) หรือไปโฟลเดอร์อื่นในไดรฟ์เดียวกัน ซึ่ง journal บันทึกเป็นการเปลี่ยนชื่อ (ยังไม่ได้วัดว่าถังขยะแสดงออกมาแบบไหน)
+- แอนตี้ไวรัสกักกันไฟล์
+- ติดตั้ง FiveM ใหม่ หรือโฟลเดอร์ถูกลบแล้วสร้างใหม่ record ของโฟลเดอร์เดิมจะไม่ถูกนับเลย จึงอาจทำให้แถวที่ควรมีหายไปได้ด้วย
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
 ## timeline selector
 
 timeline selector เขียนแบบเดียวกับ rule แต่ไม่สร้างหลักฐาน สิ่งที่เห็นที่มันเลือกจะเอาเวลาของตัวเองไปวางบน timeline ของรายงาน ทั้งโหมด Self และ SS พร้อมข้อความและเรื่องปกติด้านล่าง มันไม่เคยเป็น เจอ ไม่เจอ หรือ ยังไม่ได้วัด และไม่ถูกนับ (ADR 0051) timeline selector เลือกบันทึกของ Prefetch, BAM และ Program Compatibility Assistant ตามชื่อได้ ซึ่ง rule ทำไม่ได้ (ADR 0034) ชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน และทุกตัวเขียนบอกไว้
@@ -1795,6 +2129,89 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
 
 ### `evtx` / `timeline`
+
+<a id="rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8"></a>
+
+#### เวลาที่ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์
+
+- ชื่อภาษาอังกฤษ: When Code Integrity recorded that Windows refused to load a file
+- id: `51bb1937-7ab2-48db-a2f2-78be82ba2fe8`
+- ไฟล์: [`rules/evtx/timeline/code-integrity-blocked-image/rule.yaml`](../rules/evtx/timeline/code-integrity-blocked-image/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `timeline`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity ยังเก็บบันทึกไว้ว่า Windows ปฏิเสธไม่โหลดโปรแกรม DLL หรือไดรเวอร์ที่ลายเซ็นไม่ตรงตามที่กำหนด เกิดขึ้นเมื่อไร เครื่องมือนี้ไม่ได้อ่านเนื้อในของบันทึกเหล่านั้น เวลาในข้อนี้จึงไม่ได้บอกว่าไฟล์ไหนถูกปฏิเสธ โปรแกรมไหนเป็นคนขอโหลด หรือ policy ไหนเป็นคนปฏิเสธ Windows 11 ปฏิเสธไฟล์บางอย่างเป็นค่าเริ่มต้นอยู่แล้ว และเครื่องปกติเครื่องหนึ่งที่วัดไว้มีบันทึกแบบนี้หลายร้อยรายการ ข้อนี้ไม่ใช่หลักฐานว่ามีการ inject อะไร มีการบล็อกโดยตั้งใจ หรือมีอะไรถูกลบ
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `channel`: เป็น `Microsoft-Windows-CodeIntegrity/Operational` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `event_id`: เป็นค่าใดค่าหนึ่งใน `3033`, `3077`
+- `provider`: เป็น `Microsoft-Windows-CodeIntegrity` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะบันทึกที่ log ของ Code Integrity ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ประมาณ 1 MB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม บนเครื่องปกติเครื่องหนึ่งที่วัดไว้ย้อนหลังได้ประมาณสามสัปดาห์ และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- vulnerable driver blocklist ของ Microsoft ซึ่งเปิดเป็นค่าเริ่มต้นใน Windows 11 ปฏิเสธไดรเวอร์รุ่นเก่าที่โปรแกรมจัดการฮาร์ดแวร์ โปรแกรมคุมไฟ RGB และพัดลม เครื่องมือโอเวอร์คล็อก และ anti-cheat รุ่นเก่าติดตั้งไว้
+- memory integrity, Smart App Control หรือ S mode ปฏิเสธไดรเวอร์หรือโปรแกรมที่ไม่ตรงตามข้อกำหนดของมัน
+- โปรแกรมที่ขอให้ Windows โหลดเฉพาะโค้ดที่ Microsoft เซ็นเข้าไปในตัวมัน (Code Integrity Guard) ปฏิเสธ DLL ที่โปรแกรมอื่นพยายามใส่เข้าไป เช่น overlay โปรแกรมอัดหน้าจอ เครื่องมือด้าน input แอนตี้ไวรัส และซอฟต์แวร์ช่วยการเข้าถึง ยังไม่ได้วัดว่าบนเครื่องหนึ่งมีโปรแกรมไหนทำแบบนี้บ้าง
+- ลายเซ็นที่ถูกเพิกถอนหรือหมดอายุแล้วบนไฟล์ที่เครื่องยังมีอยู่
+- App Control policy ที่นายจ้าง โรงเรียน หรือผู้ผลิตเครื่องติดตั้งไว้
+- การไม่มีเวลาในข้อนี้ไม่ได้แปลว่าไม่เคยมีการปฏิเสธก่อนบันทึกที่เก่าสุดของ log
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/operations/event-id-explanations>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
+
+<a id="rule-63269014-f728-424c-8e18-e36fe79030aa"></a>
+
+#### เวลาที่ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง
+
+- ชื่อภาษาอังกฤษ: When Microsoft Defender recorded a detection
+- id: `63269014-f728-424c-8e18-e36fe79030aa`
+- ไฟล์: [`rules/evtx/timeline/defender-detection/rule.yaml`](../rules/evtx/timeline/defender-detection/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `timeline`
+- เขียนเมื่อ: 2026-09-30
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าครั้งแรกและครั้งล่าสุดที่ log ของ Microsoft Defender ยังเก็บบันทึกไว้ว่าตรวจพบมัลแวร์หรือซอฟต์แวร์ที่อาจไม่พึงประสงค์ หรือจัดการกับสิ่งที่ตรวจพบ เกิดขึ้นเมื่อไร เครื่องมือนี้ไม่ได้อ่านเนื้อในของบันทึกเหล่านั้น เวลาในข้อนี้จึงไม่ได้บอกว่าตรวจพบอะไร ที่ไหน หรือเคยถูกเปิดใช้งานหรือไม่ และ Defender บันทึกกรณีที่ตัวเองตรวจผิดด้วยข้อความเดียวกัน ข้อนี้ไม่ใช่หลักฐานเกี่ยวกับไฟล์นั้นหรือเกี่ยวกับตัวบุคคล
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `channel`: เป็น `Microsoft-Windows-Windows Defender/Operational` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `event_id`: เป็นค่าใดค่าหนึ่งใน `1116`, `1117`
+- `provider`: เป็น `Microsoft-Windows-Windows Defender` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะบันทึกที่ log ของ Defender ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ถึง 16 MiB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- ซอฟต์แวร์ที่อาจไม่พึงประสงค์ซึ่งพ่วงมากับโปรแกรมฟรี
+- เทรนเนอร์เกม เครื่องมือทำ mod โปรแกรมสร้างคีย์ และซอฟต์แวร์แคร็ก ซึ่งแอนตี้ไวรัสจัดเป็นซอฟต์แวร์ไม่พึงประสงค์หรือเครื่องมือแฮ็ก
+- การตรวจผิดกับโปรแกรมใหม่หรือโปรแกรมที่ไม่มีลายเซ็น
+- ไฟล์ที่ดาวน์โหลดมาแต่ไม่เคยเปิด
+- การตรวจพบในไฟล์ที่ Defender ลบทิ้งทันที
+- การไม่มีเวลาในข้อนี้ไม่ได้แปลว่า Defender ไม่เคยตรวจพบอะไรก่อนบันทึกที่เก่าสุดของ log หรือว่าแอนตี้ไวรัสตัวอื่นไม่เคยตรวจพบ
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 <a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
 

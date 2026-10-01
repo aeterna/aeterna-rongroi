@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 46
+      "rule_count": 55
     },
     "platform": "windows",
     "os_build": "26100",
@@ -25,15 +25,80 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed"
     },
-    "scan_tier": "standard"
+    "scan_tier": "standard",
+    "anchors": [
+      {
+        "anchor": "install_date",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ]
   },
   "evidence": [
+    {
+      "rule_id": "72820eaf-1469-4ea7-bb0f-17f145d26dfc",
+      "collector": "autostart",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "d7191cf3-ce56-480b-8501-66a198f83e08",
+      "collector": "defender_exclusion",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Defender's exclusions as they were when the scan ran. An exclusion removed before the scan is not seen."
+    },
     {
       "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
       "collector": "driver_service",
       "strength": "posture",
       "state": "unmeasured",
       "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "429f8bc3-3c7d-4924-87f7-7cccefa1a185",
+      "collector": "evtx",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "source_absent",
       "expected": false
     },
     {
@@ -313,6 +378,38 @@ expression: view
       "strength": "tamper",
       "state": "not_found",
       "retention": "The attribute as it is at the moment of the scan, on the Prefetch files still in the folder. It says nothing about when it was set, or about files that were removed."
+    },
+    {
+      "rule_id": "1c73241b-b7f1-4f91-81d4-8de53db6d119",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "7996285e-8ccf-4b2d-8fec-339a32b95931",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "91dc8b45-8355-4554-8a6d-e979e4a95ecd",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
     }
   ],
   "own_traces": [],
@@ -430,8 +527,8 @@ expression: view
   },
   "listed": {
     "found": 0,
-    "not_found": 10,
-    "unmeasured": 27
+    "not_found": 11,
+    "unmeasured": 33
   },
   "hidden": {
     "not_found": 0,
@@ -489,6 +586,8 @@ expression: view
   "collector_order": [
     "posture",
     "driver_service",
+    "autostart",
+    "defender_exclusion",
     "fivem_dir",
     "fivem_servers",
     "net_config",
@@ -498,5 +597,132 @@ expression: view
     "bam",
     "pca",
     "usn"
-  ]
+  ],
+  "trace_ages": {
+    "anchors": [
+      {
+        "anchor": "boot_time",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "install_date",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ],
+    "rows": [
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_logs",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_crashes",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_logs",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_crashes",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_launcher_crashes",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_server_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "prefetch",
+        "state": "measured",
+        "oldest": "2016-01-12T20:07:03.9810694Z",
+        "days_before": 3641,
+        "count": 1
+      },
+      {
+        "collector": "bam",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "pca",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "usn",
+        "place": "journal",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ]
+  }
 }

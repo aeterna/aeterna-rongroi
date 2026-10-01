@@ -1,0 +1,64 @@
+{
+  "description": "The near misses: a valid signature, a service set to start on demand with no trigger, a file under Program Files, and one under the Windows folder that is never checked",
+  "observations": [
+    {
+      "collector": "autostart",
+      "fields": {
+        "location": "run",
+        "entry": "VendorTray",
+        "hive": "user",
+        "run_once": false,
+        "starts_by_itself": true,
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Vendor\\tray.exe",
+        "path_kind": "user_profile",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "signature": "valid",
+        "signer": "Vendor Ltd",
+        "signer_cert_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "collector": "autostart",
+      "fields": {
+        "location": "service",
+        "service": "VendorSvc",
+        "start": 3,
+        "trigger_start": false,
+        "service_dll": false,
+        "starts_by_itself": false,
+        "path": "C:\\ProgramData\\Vendor\\svc.exe",
+        "path_kind": "program_data",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "autostart",
+      "fields": {
+        "location": "service",
+        "service": "VendorHelper",
+        "start": 2,
+        "trigger_start": false,
+        "service_dll": false,
+        "starts_by_itself": true,
+        "path": "C:\\Program Files\\Vendor\\helper.exe",
+        "path_kind": "program_files",
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "signature": "no_embedded_signature"
+      }
+    },
+    {
+      "collector": "autostart",
+      "fields": {
+        "location": "run",
+        "entry": "SecurityHealth",
+        "hive": "machine",
+        "run_once": false,
+        "starts_by_itself": true,
+        "path": "C:\\Windows\\System32\\SecurityHealthSystray.exe",
+        "path_kind": "windows"
+      }
+    }
+  ],
+  "expect_matches": 0
+}

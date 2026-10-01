@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# The ordinary retention of this source, shown under its trace-age rows (ADR 0061). Checked 2026-09-30.
+id: e15d7a5a-9cd0-481e-9582-8cdaa9764863
+collector: usn
+retention: >-
+  The change journal keeps a size, not a time: past its maximum size the oldest records are
+  truncated. How long that reaches back depends on how busy the drive is — 39 minutes on the one PC
+  measured — and the span is the one this scan read.
+documented: true
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_journal_data_v0
+  - docs/adr/0047-usn-journal-feasibility.md

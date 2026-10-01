@@ -202,6 +202,13 @@ These are counts of what SS mode does not list. §7 says why.
 | The speculative-execution mitigations are switched off | posture | `experimental` | performance advice for an older processor, a tweaking script or pre-modified image, a PC set up this way by the shop that built it |
 | Structured exception handling overwrite protection (SEHOP) is switched off | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
 | The kernel object namespace is not protected as Windows ships it | posture | `experimental` | older software whose instructions ask for it, a tweaking script or pre-modified image, an employer's policy |
+| Microsoft Defender recorded that its real-time protection was switched off | context | `experimental` | **the PC's maker, a shop or a Windows image** switching it off before the PC was handed over (measured on two GitHub-hosted runner images), the owner switching it off for a while to install something Defender flagged, possibly installing another antivirus, a Defender update or an employer's policy, troubleshooting a slow PC |
+| The change journal holds a deletion in FiveM's plugin folder | context | `experimental` | the player removed or replaced a graphics mod, ReShade, an ENB or another plugin, FiveM or its updater (not measured), a clean-up or optimiser tool, antivirus |
+| The change journal holds a rename in FiveM's plugin folder | context | `experimental` | the player renamed, moved or replaced a plugin, an update that swaps a new copy in by renaming (not measured), a file moved to the Recycle Bin, antivirus quarantine |
+| The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder; whether Enhanced loads this folder at all is not known |
+| The change journal holds a rename in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder |
+| A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders | posture | `experimental` | programs installed per user in AppData — launchers, chat and voice apps, cloud sync clients, and above all their updaters and helpers; peripheral, RGB, fan and overclocking utilities; service wrappers and servers from a package manager; management and provisioning agents; open-source and self-built tools; a file signed through a catalog; a Run entry switched off in Task Manager |
+| A Microsoft Defender exclusion covers a FiveM folder | posture | `experimental` | performance and FPS guides that tell players to exclude the game or FiveM folder, game and mod installers and launchers that add their own exclusion, developers and build machines that exclude a whole drive, another security product or an administrator managing Defender |
 
 Four things to know about the thirteen rows above, which are all about **which Windows this is**:
 
@@ -215,6 +222,15 @@ Four things to know about the thirteen rows above, which are all about **which W
   name where Windows shows it, so those rows say which one. KernelOS, Ghost Spectre and images built
   with tiny11builder publish no such name, so what you see instead is which components are missing.
 - **Nothing inside the folders was read.** The folder rows answer one question — is it there.
+
+Three things to know about the Defender row:
+
+- **Read its times.** A record written before the PC was handed over looks exactly like one written
+  yesterday. Both GitHub-hosted runners measured carried one from their image.
+- **It records a change, not a state.** It does not say whether protection is on now, who switched it off,
+  or whether it was switched on again.
+- **Not found says little.** The log rotates, a cleared log holds nothing, and a PC without Defender's log
+  reads not found too.
 
 Three things to know about the two log-clearing rules:
 
@@ -242,7 +258,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, and the last sixteen — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last five — Defender's real-time protection and the four about the change journal — are new after 0.4.0 and are not in a released version yet. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -290,6 +306,40 @@ Two things to know about the hosts-file rule:
   The proxy and the Windows Firewall rules for FiveM are read too, and no rule reads them: an allowed
   FiveM program and a proxy are what ordinary PCs have. SS mode only counts them.
 
+Four things to know about the four change-journal rules (ADR 0047, amendment of 2026-09-30):
+
+- **A count is for a short span, and the row says which.** Windows' change journal keeps a fixed size and
+  drops its oldest records first. On one Windows 11 PC it held 39 minutes. Every row shows the span it
+  covered: "Not found" means nothing within that span, not "never".
+- **The journal does not say who.** A deletion by the player, by FiveM's updater, by an antivirus and by
+  Windows look alike in it. The row says a file left the folder, not what it was — no file name is read.
+- **They need administrator rights.** Without them, the four are part of the scope line's count of checks
+  administrator rights would answer.
+- **"On another drive" is not a failure.** If the player's FiveM folder is on another drive, the program
+  does not read that drive's journal, and says so instead of counting.
+
+Three things to know about the rule on what starts by itself (ADR 0060):
+
+- **Most PCs have ordinary programs that match it.** A launcher's updater in AppData or an RGB utility's
+  helper is set to start by itself and is often not signed the way this checks. On the one Windows 11 PC
+  this project measured it matched one scheduled task, and on a GitHub runner it matched GitHub's own
+  agent ([ADR 0060](adr/0060-what-starts-by-itself.md)). The row gives the file's path, its SHA-256 and
+  where it is registered (`service`, `run` or `task`): ask the player what the program is.
+- **The name of a `Run` value or a scheduled task is not shown.** A task's name can carry the player's
+  account identifier. The service name, the file and whether it starts by itself are shown.
+- **It says what is set to start, not what it runs.** The arguments a program is given are never read, so
+  a Windows program that runs a script (`cmd`, `powershell`, `rundll32`) is shown as that Windows program.
+  Files in the Windows folder are not checked at all. A scan without administrator rights cannot read the
+  task files, and says so once above the evidence.
+
+Two things to know about the Defender-exclusion rule (ADR 0060):
+
+- **Excluding the game from scanning is common advice.** FPS guides tell players to do it, and some
+  launchers do it for them. A whole-drive exclusion covers FiveM too; a developer's PC and a GitHub runner
+  have one. The row shows the exclusion as Defender holds it and whether a policy set it.
+- **It needs administrator rights.** Without them the exclusions cannot be read, and the report says so
+  once above the evidence. Network-address exclusions are only counted, never shown.
+
 The posture rules describe the **machine**, not the person. Each rule's own text says that on
 its own, it is not evidence of cheating.
 
@@ -305,6 +355,9 @@ so they are *unmatched observations*:
 - **Self mode** lists them, for the player.
 - **SS mode** shows only how many there were, except on its timeline.
 
+Two fields are never shown in SS mode, even on a row that matched: a hosts line's address (only its kind)
+and the name of a `Run` value or a scheduled task.
+
 This is deliberate. The consent screen promises what matches a rule, and a timeline it names. A list of every program
 someone ran would show staff what else is on that PC. Replacing the user name in the paths would not
 change that. [ADR 0034](adr/0034-prefetch-bam-and-pca-carry-no-identity.md) explains why there is no
@@ -316,9 +369,29 @@ for programs named `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` 
 `FiveM_b<number>_GTAProcess.exe`, SS mode shows the time Windows recorded, with the name. It is not a
 row and not evidence. A name is all Windows keeps, so a time there says a program **of that name** ran
 then, not that the game did, and a missing time does not say the game never ran. The timeline also
-shows the times of FiveM's log, crash and cache folders, the span each Windows log and the change
-journal could see, and which of those could not be read. Read a time only inside its source's span, and
+shows the times of FiveM's log, crash and cache folders, the first and last time the Code Integrity log
+recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection (ADR 0059), the
+span each Windows log and the change journal could see, and which of those could not be read. Those two
+event times are not rows: this program does not read which file was refused or what was detected, Windows 11
+refuses some drivers by default, and an ordinary PC measured for this held hundreds of refusals and a
+detection. Read a time only inside its source's span, and
 never read the space between two times as something someone removed.
+
+**How far back the traces reach** (ADR 0061) is a section of its own, in both modes, and the consent
+screen names it. For each event log, Prefetch, BAM, the Program Compatibility Assistant, the change journal
+and FiveM's log, crash and cache folders it shows the oldest time still there, how many days before the
+scan that is, and how much the source holds — never a program's or a file's name — with what that source
+ordinarily keeps. Above them are dates of when parts of the PC were set up: `InstallDate` (installed **or
+last feature-upgraded**, not first installed), the earliest installation Windows Setup kept, when the change
+journal, the drive's root and `$Recycle.Bin` were created, and when FiveM's program folders were. Each is
+shown with what ordinarily resets it. A source Windows would not show without administrator rights says
+"not known": it was not read, it is not empty. Nothing in the section is compared for you, and there is no
+"machine age": the dates disagree by years on ordinary PCs.
+
+When Prefetch or BAM was read, holds no entry for the names above and still reaches back before FiveM's
+folders were last written, a **statement** above the timeline puts FiveM's side and those records side by
+side, one line per record, with the ordinary causes of the same result under it. It is not a row and not
+evidence. A record that could not be read is stated as not known, never as "no entry".
 
 Self mode is the player's view, and the player's consent covers SS mode. Asking to see Self mode is
 asking for something the player did not agree to.
@@ -362,6 +435,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 | a posture row | anything about the person |
 | `Windows start` days before the scan | the player avoided restarting, or is hiding anything |
 | `Windows start` minutes before the scan | the player restarted to hide something |
+| sources that reach back only days | someone removed traces — full logs, Windows' own clean-up and a new installation all do this |
+| sources that reach back months or years | nothing was removed |
+| setup dates weeks old | Windows was reinstalled to hide something — a feature upgrade resets `InstallDate` on its own |
+| setup dates years old | the PC was never reset or reinstalled |
+| the FiveM statement | FiveM ran and its records were removed — read the causes under it |
+| no FiveM statement | Windows' records of programs that ran are complete |
 
 Treat the report as one piece of evidence for a person to judge, next to everything else your
 server knows.

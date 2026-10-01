@@ -1,0 +1,18 @@
+{
+  "description": "Defender's detection (1116) and action (1117) groups as the evtx collector emits them, with the provider and channel names it produced from real logs on two GitHub-hosted runners (ADR 0059). The counts and the one-minute span echo the shape measured on an ordinary Windows 11 PC; the times are illustrative. Both groups are selected, and nothing in them says what was detected.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+      "channel": "Microsoft-Windows-Windows Defender/Operational",
+      "provider": "Microsoft-Windows-Windows Defender",
+      "event_id": 1116, "level": 3, "count": 9,
+      "first_seen": "2026-08-30T15:20:04.771Z", "last_seen": "2026-08-30T15:20:51.030Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+      "channel": "Microsoft-Windows-Windows Defender/Operational",
+      "provider": "Microsoft-Windows-Windows Defender",
+      "event_id": 1117, "level": 4, "count": 4,
+      "first_seen": "2026-08-30T15:20:10.402Z", "last_seen": "2026-08-30T15:20:58.866Z" } }
+  ],
+  "expect_matches": 2
+}

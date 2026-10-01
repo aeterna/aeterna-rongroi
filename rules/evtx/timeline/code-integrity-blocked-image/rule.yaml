@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 51bb1937-7ab2-48db-a2f2-78be82ba2fe8
+title: When Code Integrity recorded that Windows refused to load a file
+description: >-
+  Puts on the timeline the first and last time the Code Integrity log still holds a record of Windows
+  refusing to load a program, a DLL or a driver whose signature did not meet what was required of it.
+  This tool does not read what is inside those records, so a time here does not say which file was
+  refused, which program asked for it or which policy refused it. Windows 11 refuses some files by
+  default, and an ordinary PC measured for this held hundreds of these records. It is not evidence
+  that anything was injected, blocked on purpose or removed.
+# A timeline selector (ADR 0051, ADR 0059). Not a rule: an ordinary PC and a runner nobody used both
+# held these records, and a row could not say which file or which policy it was about (ADR 0059 §1).
+# 3089 repeats a refusal 3033 or 3077 already dates, and 3004 and the policy events are not selected.
+status: experimental
+role: timeline
+collector: evtx
+strength: context
+# The three together, never the event id alone (ADR 0031). Provider and channel are single values,
+# so the two ids are not a cross product.
+match:
+  provider: Microsoft-Windows-CodeIntegrity
+  channel: Microsoft-Windows-CodeIntegrity/Operational
+  event_id: [3033, 3077]
+retention: >-
+  Only the records the Code Integrity log still holds. It keeps about 1 MB by default and overwrites
+  its oldest records when it is full — on an ordinary PC measured for this, about three weeks — and a
+  cleared log holds none.
+falsepositives:
+  - Microsoft's vulnerable driver blocklist, on by default on Windows 11, refusing an old driver that
+    hardware utilities, RGB and fan control, overclocking tools and older anti-cheat software install
+  - Memory integrity, Smart App Control or S mode refusing a driver or program that does not meet their
+    requirements
+  - A program that asks Windows to load only Microsoft-signed code into itself (Code Integrity Guard)
+    refusing a DLL that another program tries to place in it — overlays, screen recorders, input tools,
+    antivirus and accessibility software. Which programs on a PC do this is not measured
+  - A signature that was revoked or has expired on a file the PC still has
+  - An App Control policy an employer, a school or a PC maker installed
+  - No time here does not mean nothing was refused before the log's oldest record
+references:
+  - https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/operations/event-id-explanations
+  - https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules
+author: aeterna-rongroi contributors
+date: 2026-09-30
+tags: [evtx, timeline]

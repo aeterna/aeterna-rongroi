@@ -4,23 +4,41 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { codeLinks, reportHeader } from "../api";
+import { codeLinks } from "../api";
 import type { CodeLinks, ReportHeader } from "../types";
 import { CodeLink } from "./CodeLink";
 
+interface Props {
+  /** The header the app already asked for; `null` while that call is in flight. */
+  header: ReportHeader | null;
+  /** The app's call for the header failed, so `header` will stay `null`. */
+  headerFailed: boolean;
+  onBack: () => void;
+}
+
 /** Where this program's code is and how to check that this file came from it (ADR 0045). */
-export function About({ onBack }: { onBack: () => void }) {
+export function About({ header, headerFailed, onBack }: Props) {
   const { t } = useTranslation();
-  const [header, setHeader] = useState<ReportHeader | null>(null);
   const [links, setLinks] = useState<CodeLinks | null>(null);
+  const [linksFailed, setLinksFailed] = useState(false);
 
   useEffect(() => {
-    void reportHeader().then(setHeader);
-    void codeLinks().then(setLinks);
+    void codeLinks()
+      .then(setLinks)
+      .catch(() => setLinksFailed(true));
   }, []);
 
   if (!header || !links) {
-    return null;
+    // A failed call is said, and Back still works; one in flight shows the title only.
+    return (
+      <section className="about" aria-labelledby="about-title">
+        <h2 id="about-title">{t("about.title")}</h2>
+        {(headerFailed || linksFailed) && <p className="note">{t("about.load_failed")}</p>}
+        <button type="button" onClick={onBack}>
+          {t("actions.back")}
+        </button>
+      </section>
+    );
   }
   const { provenance, rules_bundle } = header;
   const repositoryName = links.repository.replace(/^https:\/\/github\.com\//, "");

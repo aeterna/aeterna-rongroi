@@ -224,7 +224,7 @@ fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
     use rongroi_core::model::{EvidenceState, UnmeasuredReason};
 
     for (host, rules) in [
-        ("evtx-access-denied-elevated", 4),
+        ("evtx-access-denied-elevated", 5),
         ("prefetch-access-denied-elevated", 1),
         // `secure-boot-disabled` and `secure-boot-firmware-disagrees`: the fixture denies the
         // registry's Secure Boot key.
@@ -650,4 +650,198 @@ fn the_boot_time_reaches_both_views_and_an_older_report_reads_back_not_attempted
             reason: UnmeasuredReason::NotAttempted
         }
     );
+}
+
+/// `rules/usn/plugins/files-deleted` and `files-renamed` (ADR 0047, amendment of 2026-09-30).
+const USN_PLUGINS_DELETED: &str = "91dc8b45-8355-4554-8a6d-e979e4a95ecd";
+const USN_PLUGINS_RENAMED: &str = "7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d";
+/// `rules/usn/enhanced-asi/files-deleted` and `files-renamed`.
+const USN_ENHANCED_DELETED: &str = "1c73241b-b7f1-4f91-81d4-8de53db6d119";
+const USN_ENHANCED_RENAMED: &str = "7996285e-8ccf-4b2d-8fec-339a32b95931";
+
+/// Every `usn` row that looked carries the journal's span, from the journal's own observation, in both
+/// modes; the Enhanced folder that is not there is an expected `source_absent`, counted in SS mode
+/// (ADR 0047, amendment of 2026-09-30, decisions 3 and 5).
+#[test]
+fn the_change_journal_rules_carry_the_journals_span_in_both_views() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason};
+    use rongroi_core::view::RowBand;
+
+    let report = report_for("usn-journal-read");
+    let state = |rule_id: &str| {
+        report
+            .evidence
+            .iter()
+            .find(|item| item.rule_id == rule_id)
+            .map(|item| item.state.clone())
+            .unwrap()
+    };
+    // The fixture's plugin folder holds a rename, as its old and its new name, and no deletion.
+    assert!(matches!(
+        state(USN_PLUGINS_RENAMED),
+        EvidenceState::Found { .. }
+    ));
+    assert!(matches!(
+        state(USN_PLUGINS_DELETED),
+        EvidenceState::NotFound { .. }
+    ));
+    for rule_id in [USN_ENHANCED_DELETED, USN_ENHANCED_RENAMED] {
+        assert_eq!(
+            state(rule_id),
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::SourceAbsent,
+                expected: true,
+            }
+        );
+    }
+
+    let journal = report
+        .unmatched
+        .iter()
+        .flat_map(|group| &group.observations)
+        .find(|observation| {
+            observation.collector == "usn" && observation.fields["location"] == "journal"
+        })
+        .unwrap();
+    let span = RowBand::Span {
+        from: journal.fields["first_seen"].as_str().unwrap().to_owned(),
+        to: journal.fields["last_seen"].as_str().unwrap().to_owned(),
+    };
+
+    let own = view::for_mode(&report, Mode::SelfCheck);
+    assert_eq!(own.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
+    assert_eq!(own.row_bands.get(USN_PLUGINS_DELETED), Some(&span));
+    assert_eq!(own.row_bands.get(USN_ENHANCED_DELETED), None);
+
+    // SS mode lists the match with its span, and counts the `context` not-found and the expected gap.
+    let ss = view::for_mode(&report, Mode::Ss);
+    assert!(
+        ss.evidence
+            .iter()
+            .any(|row| row.rule_id == USN_PLUGINS_RENAMED)
+    );
+    assert!(
+        ss.evidence
+            .iter()
+            .all(|row| row.rule_id != USN_PLUGINS_DELETED
+                && row.rule_id != USN_ENHANCED_DELETED
+                && row.rule_id != USN_ENHANCED_RENAMED)
+    );
+    assert_eq!(ss.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
+    assert_eq!(ss.row_bands.len(), 1, "{:?}", ss.row_bands);
+}
+
+/// A plugin folder on another volume is `other_volume`, which the rules declare, so SS mode counts it
+/// rather than listing "this could not be read" — and the timeline still says, once, where it was
+/// (ADR 0047, amendment of 2026-09-30, decision 1).
+#[test]
+fn a_plugin_folder_on_another_volume_is_an_expected_reason_not_a_failed_read() {
+    use rongroi_core::model::{EvidenceState, UnmeasuredReason, UnmeasuredSource};
+
+    let report = report_for("usn-folder-on-other-volume");
+    for rule_id in [USN_PLUGINS_DELETED, USN_PLUGINS_RENAMED] {
+        let item = report
+            .evidence
+            .iter()
+            .find(|item| item.rule_id == rule_id)
+            .unwrap();
+        assert_eq!(
+            item.state,
+            EvidenceState::Unmeasured {
+                reason: UnmeasuredReason::OtherVolume,
+                expected: true,
+            },
+            "{rule_id}"
+        );
+    }
+    let ss = view::for_mode(&report, Mode::Ss);
+    assert!(
+        ss.evidence
+            .iter()
+            .all(|row| row.rule_id != USN_PLUGINS_DELETED && row.rule_id != USN_PLUGINS_RENAMED),
+        "{:?}",
+        ss.evidence
+    );
+    assert!(ss.row_bands.is_empty(), "{:?}", ss.row_bands);
+    assert!(ss.timeline.unmeasured.contains(&UnmeasuredSource {
+        collector: "usn".to_owned(),
+        place: Some("plugins".to_owned()),
+        reason: UnmeasuredReason::OtherVolume,
+    }));
+}
+
+/// What the trace-ages section and the statement are built from and show, as one document per view.
+fn trace_ages_of(report: &rongroi_core::model::Report, mode: Mode) -> serde_json::Value {
+    let view = view::for_mode(report, mode);
+    serde_json::json!({
+        "anchors": view.header.anchors,
+        "trace_ages": view.trace_ages,
+        "cross_source": view.cross_source,
+    })
+}
+
+/// A PC read with administrator rights: every anchor dated, each source's oldest time and count, the
+/// logs the bundle reads first and the rest folded, and the cross-source statement — Prefetch reaches
+/// back before `FiveM`'s logs were last written and holds no `FiveM` name, BAM was refused, and PCA holds
+/// one (ADR 0061).
+#[test]
+fn trace_ages_elevated_ss_view() {
+    let view = view::for_mode(&report_for("trace-ages-elevated"), Mode::Ss);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+#[test]
+fn trace_ages_elevated_self_and_ss_sections_agree() {
+    let report = report_for("trace-ages-elevated");
+    let own = trace_ages_of(&report, Mode::SelfCheck);
+    assert_eq!(own, trace_ages_of(&report, Mode::Ss));
+    insta::assert_json_snapshot!(own);
+}
+
+/// The same kind of PC without administrator rights: Prefetch, BAM, the Security log and the change
+/// journal are "not read without administrator rights", never empty, and no statement is made
+/// (ADR 0061, owner decisions 1 and 7).
+#[test]
+fn trace_ages_limited_ss_view() {
+    use rongroi_core::model::{AnchorKind, AnchorState, UnmeasuredReason};
+    use rongroi_core::view::TraceAgeState;
+
+    let report = report_for("trace-ages-limited");
+    let view = view::for_mode(&report, Mode::Ss);
+    let not_admin = TraceAgeState::Unmeasured {
+        reason: UnmeasuredReason::NotAdmin,
+    };
+    for (collector, key) in [
+        ("prefetch", None),
+        ("bam", None),
+        ("usn", Some("journal")),
+        ("evtx", Some("Security.evtx")),
+    ] {
+        let row = view
+            .trace_ages
+            .rows
+            .iter()
+            .find(|row| {
+                row.collector == collector
+                    && (key.is_none()
+                        || row.place.as_deref() == key
+                        || row.subject.as_deref() == key)
+            })
+            .unwrap();
+        assert_eq!(row.state, not_admin, "{collector}");
+    }
+    assert!(view.cross_source.is_empty(), "{:?}", view.cross_source);
+    let journal = report
+        .header
+        .anchors
+        .iter()
+        .find(|anchor| anchor.anchor == AnchorKind::UsnJournalCreated)
+        .unwrap();
+    assert_eq!(
+        journal.state,
+        AnchorState::Unmeasured {
+            reason: UnmeasuredReason::NotAdmin
+        }
+    );
+    insta::assert_json_snapshot!(trace_ages_of(&report, Mode::Ss));
 }

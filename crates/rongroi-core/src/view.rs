@@ -4,21 +4,24 @@
 
 //! What a Self or SS view may show. Privacy is decided here, not in the UI (AGENTS.md hard rule 5).
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
 use crate::model::{
-    BootTime, Evidence, EvidenceState, Mode, Observation, OwnTraceEntry, Report, ReportHeader,
-    SensitiveKind, Strength, UnmatchedGroup, UnmeasuredReason, UnmeasuredSource,
+    AgeCount, AgeRows, AnchorState, BootTime, Evidence, EvidenceState, Mode, Observation,
+    OwnTraceEntry, Report, ReportHeader, SensitiveKind, Strength, UnmatchedGroup, UnmeasuredReason,
+    UnmeasuredSource,
 };
 
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 11] = [
+pub const COLLECTOR_ORDER: [&str; 13] = [
     "posture",
     "driver_service",
+    "autostart",
+    "defender_exclusion",
     "fivem_dir",
     "fivem_servers",
     "net_config",
@@ -30,12 +33,15 @@ pub const COLLECTOR_ORDER: [&str; 11] = [
     "usn",
 ];
 
-/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054).
+/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054, ADR 0060).
 ///
 /// A hosts line's address can name the player's own server; its kind, which `net_config` emits
 /// beside it as `address_kind`, is what separates a blocklist from a redirect and is what SS mode
-/// shows in its place (owner decision 2).
-pub const SS_WITHHELD_FIELDS: [(&str, &str); 1] = [("net_config", "address")];
+/// shows in its place (ADR 0054, owner decision 2). A scheduled task's path can carry an account SID,
+/// and a `Run` value's name is whatever the program chose, so `autostart`'s `entry` is withheld; the
+/// file it starts, its `path`, is shown and redacted like every path (ADR 0060, owner decision 3).
+pub const SS_WITHHELD_FIELDS: [(&str, &str); 2] =
+    [("net_config", "address"), ("autostart", "entry")];
 
 /// What SS mode shows in place of a server identity the player did not agree to show (ADR 0052).
 pub const SERVER_IDENTITY_PLACEHOLDER: &str = "%SERVER_IDENTITY%";
@@ -176,6 +182,43 @@ pub struct ReportView {
     /// [`COLLECTOR_ORDER`], so the desktop groups rows in the order the core orders the timeline.
     #[serde(default)]
     pub collector_order: Vec<String>,
+    /// The span each listed `found` or `not_found` row's count is for, by rule id: the coverage band
+    /// of the place its collector's coverage names — for `usn`, the journal (ADR 0047, amendment of
+    /// 2026-09-30, decision 3). Built here so the CLI and the desktop cannot disagree, in both modes.
+    /// Additive; the report schema stays at 1.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub row_bands: BTreeMap<String, RowBand>,
+    /// How far back each source reaches on this PC, beside when parts of it were set up (ADR 0061).
+    /// The same in both modes: a trace age names no program and no file. Additive; the report schema
+    /// stays at 1.
+    #[serde(default)]
+    pub trace_ages: TraceAges,
+    /// `FiveM`'s side beside Windows' records of programs that ran, when the readable sources reach
+    /// back to `FiveM`'s last write (ADR 0061); at most one. Not evidence and never counted. Additive.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cross_source: Vec<CrossSourceStatement>,
+}
+
+/// The span one row's count is for (ADR 0047, amendment of 2026-09-30, decision 3).
+///
+/// A count the change journal gives is a count for the span it still held when the scan read it — on
+/// one Windows 11 PC, 39 minutes — and nothing older. Shown without that span, "nothing deleted" reads
+/// as "nothing was ever deleted". A `found` row carries it beside its own place's first and last time,
+/// which are that place's records and not the span; a `not_found` row carries it as "nothing within
+/// this span". An `unmeasured` row has none: when the read did not finish the span is not what the
+/// counts cover, and when it never started there is none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum RowBand {
+    /// The oldest and newest record the source held.
+    Span {
+        /// The oldest time the source holds.
+        from: String,
+        /// The newest.
+        to: String,
+    },
+    /// The source was read and held no record, so there is no span, rather than a missing one.
+    NoSpan,
 }
 
 /// Where a timeline entry came from (ADR 0051).
@@ -364,6 +407,9 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             hidden: HiddenCounts::default(),
             timeline: timeline_of(report, mode),
             collector_order: collector_order(),
+            row_bands: row_bands(report, &report.evidence),
+            trace_ages: trace_ages_of(report, mode),
+            cross_source: cross_source_of(report),
         },
         Mode::Ss => {
             let machine_root = report
@@ -398,6 +444,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 .map(|group| group.observations.len())
                 .sum();
             let listed = listed_counts(&evidence);
+            let row_bands = row_bands(report, &evidence);
             ReportView {
                 mode,
                 header: shown_header(report),
@@ -413,8 +460,797 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 hidden,
                 timeline: timeline_of(report, mode),
                 collector_order: collector_order(),
+                row_bands,
+                trace_ages: trace_ages_of(report, mode),
+                cross_source: cross_source_of(report),
             }
         }
+    }
+}
+
+/// How far back each source reaches on this PC, beside when parts of this PC were set up (ADR 0061).
+///
+/// Nothing here is sorted by age, coloured, compared, summed or named "short": rows follow
+/// [`COLLECTOR_ORDER`], anchors first, and a reviewer compares them. A source that was not read is a
+/// row with its reason in place of the time and the count — never a zero.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceAges {
+    /// When Windows last started, then the header's anchors, each with its days before the scan.
+    pub anchors: Vec<AnchorAge>,
+    /// One per source, or per place or log of one.
+    pub rows: Vec<TraceAge>,
+    /// The logs the bundle does not read, folded into one line (ADR 0061, owner decision 3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folded_logs: Option<FoldedLogs>,
+}
+
+/// One anchor as the trace-ages section shows it (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnchorAge {
+    /// `boot_time`, or the anchor's [`crate::model::AnchorKind`] identifier.
+    pub anchor: String,
+    /// Its date and days before the scan, or why there is none.
+    #[serde(flatten)]
+    pub state: AnchorAgeState,
+}
+
+/// An anchor's date, or why there is none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum AnchorAgeState {
+    /// Read.
+    Measured {
+        /// The UTC date; for `boot_time`, the header's time to the second (ADR 0039).
+        on: String,
+        /// Whole days between it and the scan.
+        days_before: i64,
+        /// What was read, as the header names it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
+        /// How many earlier installations Windows Setup kept, for that anchor.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kept: Option<u32>,
+    },
+    /// Not read.
+    Unmeasured {
+        /// Why.
+        reason: UnmeasuredReason,
+    },
+}
+
+/// How far back one source reaches (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceAge {
+    /// The collector.
+    pub collector: String,
+    /// The place, for a collector with a row per place: `fivem_dir`'s folder, `usn`'s journal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// The log's file name, for `evtx`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    /// What it holds, or why it was not read.
+    #[serde(flatten)]
+    pub state: TraceAgeState,
+}
+
+/// What one source holds, or why it was not read (ADR 0061).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum TraceAgeState {
+    /// Read.
+    Measured {
+        /// The oldest time it still holds, as the report holds it; absent when it holds none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        oldest: Option<String>,
+        /// Whole days between the oldest time and the scan.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        days_before: Option<i64>,
+        /// How much it holds.
+        count: u64,
+        /// Shown beside it and never compared: a log's size and maximum, a journal's size.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        extra: BTreeMap<String, serde_json::Value>,
+    },
+    /// Not read: `not_admin` is "not known", never "empty".
+    Unmeasured {
+        /// Why.
+        reason: UnmeasuredReason,
+    },
+}
+
+/// The logs the bundle does not read, as one line: how many there are, how many hold records, and
+/// how many could not be read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FoldedLogs {
+    /// The collector, `evtx`.
+    pub collector: String,
+    /// How many logs.
+    pub logs: u64,
+    /// How many of them hold at least one record.
+    pub with_records: u64,
+    /// How many of them could not be read.
+    pub not_read: u64,
+}
+
+/// `FiveM`'s side beside Windows' records of programs that ran (ADR 0061, section 3).
+///
+/// A set of facts from different collectors printed together — not evidence: no state, no rule, no
+/// strength, never counted. It is built only when Prefetch or BAM was read, held no entry for the
+/// names `FiveM`'s timeline selectors list, and still reaches back further than `FiveM`'s last write;
+/// the ordinary causes of the same result are always printed with it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrossSourceStatement {
+    /// `FiveM`'s side.
+    pub fivem: FivemSide,
+    /// Prefetch, BAM and PCA, each always, in that order.
+    pub sources: Vec<SourceLine>,
+}
+
+/// What `FiveM`'s own folders say: a presence, a count and times, never a path or a name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FivemSide {
+    /// The editions whose `FiveM.exe` is present: `legacy`, `enhanced`.
+    pub editions: Vec<String>,
+    /// The UTC date `FiveM`'s log, crash and cache folders were last written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folders_written: Option<String>,
+    /// Whole days between that write and the scan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folders_days_before: Option<i64>,
+    /// How many Enhanced server cache folders there are.
+    pub server_folders: u64,
+    /// The UTC date the latest of them was written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub servers_written: Option<String>,
+}
+
+/// One of Windows' records of programs that ran, in one of the ADR's line forms.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceLine {
+    /// `prefetch`, `bam` or `pca`.
+    pub collector: String,
+    /// Its line.
+    #[serde(flatten)]
+    pub line: SourceLineKind,
+}
+
+/// The line forms of ADR 0061 section 3. A source that was not read is never folded into "no entry".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "line", rename_all = "snake_case")]
+pub enum SourceLineKind {
+    /// Read, and `FiveM`'s selectors selected something: how many entries, and the latest date.
+    Selected {
+        /// Entries selected.
+        entries: u64,
+        /// The UTC date of the latest.
+        latest: String,
+    },
+    /// Read, nothing selected, and it reaches back further than `FiveM`'s last write.
+    NoEntry {
+        /// Entries it holds.
+        entries: u64,
+        /// The UTC date of the oldest.
+        oldest: String,
+        /// Whole days between the oldest and the scan.
+        days_before: i64,
+    },
+    /// Read, nothing selected, and it holds nothing as old as `FiveM`'s last write, so it could not
+    /// show it.
+    CouldNotShow {
+        /// Entries it holds.
+        entries: u64,
+    },
+    /// Not read: whether it holds an entry is not known.
+    NotRead {
+        /// Why.
+        reason: UnmeasuredReason,
+    },
+    /// Prefetch is switched off on this PC, so it keeps no such record.
+    SwitchedOff,
+}
+
+/// The timeline selectors that select `FiveM`'s and GTA V's executables by name on Windows' records of
+/// programs that ran (ADR 0051 section 4, first row): two per collector. Their ids are never reused,
+/// and `the_fivem_selectors_are_in_the_embedded_bundle` binds this list to the rules tree.
+pub const FIVEM_SELECTORS: [(&str, &str); 6] = [
+    ("prefetch", "a81a1693-2982-4004-8f40-186c2b90a6a2"),
+    ("prefetch", "d377e008-0a08-4d6e-adf2-f6cbc8b978db"),
+    ("bam", "19dc7372-391e-4874-9c94-92ee6170f2df"),
+    ("bam", "bf213176-ed26-4c02-935e-99925abc7db7"),
+    ("pca", "6487719d-15cf-422c-8b8a-858647091fd1"),
+    ("pca", "eaf79187-e067-43ed-9afe-bffe65e6b2e5"),
+];
+
+/// The three records the statement compares `FiveM`'s side with, in the order it prints them.
+const RECORDS_OF_RUNS: [&str; 3] = ["prefetch", "bam", "pca"];
+/// `fivem_dir`'s places of `FiveM.exe` and the server cache (ADR 0036, ADR 0053).
+const FIVEM_EXE_PLACES: [(&str, &str); 2] =
+    [("legacy_exe", "legacy"), ("enhanced_exe", "enhanced")];
+/// `fivem_dir`'s Enhanced server cache place.
+const SERVER_CACHE_PLACE: &str = "enhanced_server_cache";
+
+/// The trace ages `mode` may show (ADR 0061). The same in both modes apart from redaction: an age is a
+/// fact about a source, like a coverage band, computed over every observation of it.
+pub fn trace_ages(report: &Report, mode: Mode) -> TraceAges {
+    trace_ages_of(report, mode)
+}
+
+/// The cross-source statement, when its conditions hold (ADR 0061, section 3). The same in both modes:
+/// it holds no path, no file name, no user name and no server name.
+pub fn cross_source(report: &Report, _mode: Mode) -> Vec<CrossSourceStatement> {
+    cross_source_of(report)
+}
+
+/// Every observation of `collector` a trace age is read from — what a rule matched and what none did —
+/// each once.
+fn observations_of<'r>(report: &'r Report, collector: &str) -> Vec<&'r Observation> {
+    let mut seen: HashSet<String> = HashSet::new();
+    band_sources(report)
+        .filter(|observation| observation.collector == collector)
+        .filter(|observation| seen.insert(serde_json::to_string(observation).unwrap_or_default()))
+        .collect()
+}
+
+fn scan_time(report: &Report) -> Option<jiff::Timestamp> {
+    report.header.generated_at.parse().ok()
+}
+
+/// Whole days from `earlier` to `later`, rounded down.
+fn days_between(later: jiff::Timestamp, earlier: jiff::Timestamp) -> i64 {
+    (later.as_second() - earlier.as_second()).div_euclid(86_400)
+}
+
+fn utc_date(time: jiff::Timestamp) -> String {
+    time.to_zoned(jiff::tz::TimeZone::UTC).date().to_string()
+}
+
+fn trace_ages_of(report: &Report, mode: Mode) -> TraceAges {
+    let machine_root = match mode {
+        Mode::SelfCheck => None,
+        Mode::Ss => report
+            .header
+            .profiles_directory
+            .as_deref()
+            .and_then(MachineRoot::parse),
+    };
+    let redact = |text: String| match mode {
+        Mode::SelfCheck => text,
+        Mode::Ss => redact_with(&text, machine_root.as_ref()),
+    };
+    let mut collectors: Vec<&String> = report.age_fields.keys().collect();
+    collectors.sort_by_key(|id| collector_rank(Some(id)));
+    let mut rows = Vec::new();
+    let mut folded_logs = None;
+    for collector in collectors {
+        let (mut collector_rows, folded) = age_rows(report, collector);
+        for row in &mut collector_rows {
+            row.subject = row.subject.take().map(&redact);
+        }
+        rows.extend(collector_rows);
+        folded_logs = folded_logs.or(folded);
+    }
+    TraceAges {
+        anchors: anchor_ages(report),
+        rows,
+        folded_logs,
+    }
+}
+
+fn anchor_ages(report: &Report) -> Vec<AnchorAge> {
+    let scan = scan_time(report);
+    let scan_date = scan.map(|scan| scan.to_zoned(jiff::tz::TimeZone::UTC).date());
+    let mut anchors = vec![AnchorAge {
+        anchor: "boot_time".to_owned(),
+        state: match &report.header.boot_time {
+            BootTime::Measured {
+                booted_at,
+                seconds_since_boot,
+            } => AnchorAgeState::Measured {
+                on: booted_at.clone(),
+                days_before: i64::try_from(seconds_since_boot / 86_400).unwrap_or(i64::MAX),
+                source: None,
+                kept: None,
+            },
+            BootTime::Unmeasured { reason } => AnchorAgeState::Unmeasured { reason: *reason },
+        },
+    }];
+    for anchor in &report.header.anchors {
+        let state = match &anchor.state {
+            AnchorState::Measured { on, source, kept } => {
+                let days = on
+                    .parse::<jiff::civil::Date>()
+                    .ok()
+                    .zip(scan_date)
+                    .and_then(|(on, scan)| on.until(scan).ok())
+                    .map(|span| i64::from(span.get_days()));
+                match days {
+                    Some(days_before) => AnchorAgeState::Measured {
+                        on: on.clone(),
+                        days_before,
+                        source: Some(source.clone()),
+                        kept: *kept,
+                    },
+                    // A date the report cannot put a day count on is not shown as one.
+                    None => AnchorAgeState::Unmeasured {
+                        reason: UnmeasuredReason::ReadFailed,
+                    },
+                }
+            }
+            AnchorState::Unmeasured { reason } => AnchorAgeState::Unmeasured { reason: *reason },
+        };
+        anchors.push(AnchorAge {
+            anchor: anchor.anchor.as_str().to_owned(),
+            state,
+        });
+    }
+    anchors
+}
+
+/// Why a log was not read, from the `read` word `evtx` gives it (`collectors::failure`), in the
+/// vocabulary every other row uses. A refusal to a scan without administrator rights is `not_admin`,
+/// as the collectors decide it.
+fn reason_of_read(read: &str, elevated: Option<bool>) -> UnmeasuredReason {
+    match read {
+        "access_denied" if elevated == Some(false) => UnmeasuredReason::NotAdmin,
+        "access_denied" => UnmeasuredReason::AccessDenied,
+        "budget_exhausted" => UnmeasuredReason::BudgetSpent,
+        "not_attempted" | "parse_unavailable" => UnmeasuredReason::NotAttempted,
+        _ => UnmeasuredReason::ReadFailed,
+    }
+}
+
+/// The source's own reason it was not read, for the whole collector or one place of it.
+fn unmeasured_reason(
+    report: &Report,
+    collector: &str,
+    place: Option<&str>,
+) -> Option<UnmeasuredReason> {
+    report
+        .unmeasured_sources
+        .iter()
+        .find(|source| source.collector == collector && source.place.as_deref() == place)
+        .map(|source| source.reason)
+}
+
+/// The rows of one collector, and for a collector with a row per value the values folded away.
+fn age_rows(report: &Report, collector: &str) -> (Vec<TraceAge>, Option<FoldedLogs>) {
+    let Some(declared) = report.age_fields.get(collector) else {
+        return (Vec::new(), None);
+    };
+    let source = AgeSource {
+        report,
+        collector,
+        declared,
+        observations: observations_of(report, collector),
+        whole: unmeasured_reason(report, collector, None),
+        scan: scan_time(report),
+    };
+    match &declared.rows {
+        AgeRows::One => {
+            let state = match source.whole {
+                Some(reason) => TraceAgeState::Unmeasured { reason },
+                None => source.measure(&source.observations, None),
+            };
+            (vec![source.row(None, None, state)], None)
+        }
+        AgeRows::PerPlace => (source.per_place(), None),
+        AgeRows::PerValue { field } => source.per_value(field),
+    }
+}
+
+/// One collector's observations and what it declared about their age.
+struct AgeSource<'r> {
+    report: &'r Report,
+    collector: &'r str,
+    declared: &'r crate::model::AgeFields,
+    observations: Vec<&'r Observation>,
+    /// Why the whole collector was not read, when it was not.
+    whole: Option<UnmeasuredReason>,
+    scan: Option<jiff::Timestamp>,
+}
+
+impl AgeSource<'_> {
+    fn row(
+        &self,
+        place: Option<String>,
+        subject: Option<String>,
+        state: TraceAgeState,
+    ) -> TraceAge {
+        TraceAge {
+            collector: self.collector.to_owned(),
+            place,
+            subject,
+            state,
+        }
+    }
+
+    /// The collector's own declaration, over `observations`.
+    fn measure(&self, observations: &[&Observation], place: Option<&str>) -> TraceAgeState {
+        let declared = self.declared;
+        match place.and_then(|place| declared.by_place.iter().find(|by| by.place == place)) {
+            Some(by) => measure(
+                observations,
+                &by.oldest,
+                &by.count,
+                &declared.extra,
+                by.without.as_deref(),
+                self.scan,
+            ),
+            None => measure(
+                observations,
+                &declared.oldest,
+                &declared.count,
+                &declared.extra,
+                None,
+                self.scan,
+            ),
+        }
+    }
+
+    /// A row per declared place. A place with no observation, or whose folder is absent, is
+    /// `source_absent`; one that could not be read carries its reason.
+    fn per_place(&self) -> Vec<TraceAge> {
+        self.declared
+            .places
+            .iter()
+            .map(|place| {
+                let reason = self
+                    .whole
+                    .or_else(|| unmeasured_reason(self.report, self.collector, Some(place)));
+                let here: Vec<&Observation> = self
+                    .observations
+                    .iter()
+                    .copied()
+                    .filter(|observation| {
+                        place_of(self.report, observation).as_deref() == Some(place)
+                    })
+                    .collect();
+                let absent = here.iter().all(|observation| {
+                    observation
+                        .fields
+                        .get("folder")
+                        .and_then(serde_json::Value::as_str)
+                        == Some("absent")
+                });
+                let state = match reason {
+                    Some(reason) => TraceAgeState::Unmeasured { reason },
+                    None if here.is_empty() || absent => TraceAgeState::Unmeasured {
+                        reason: UnmeasuredReason::SourceAbsent,
+                    },
+                    None => self.measure(&here, Some(place)),
+                };
+                self.row(Some(place.clone()), None, state)
+            })
+            .collect()
+    }
+
+    /// A row per value of `field` among the values listed first, and the rest folded.
+    fn per_value(&self, field: &str) -> (Vec<TraceAge>, Option<FoldedLogs>) {
+        let mut groups: BTreeMap<String, Vec<&Observation>> = BTreeMap::new();
+        for observation in &self.observations {
+            if let Some(value) = observation
+                .fields
+                .get(field)
+                .and_then(serde_json::Value::as_str)
+            {
+                groups
+                    .entry(value.to_owned())
+                    .or_default()
+                    .push(observation);
+            }
+        }
+        if groups.is_empty()
+            && let Some(reason) = self.whole
+        {
+            return (
+                vec![self.row(None, None, TraceAgeState::Unmeasured { reason })],
+                None,
+            );
+        }
+        let mut rows = Vec::new();
+        for first in &self.declared.first {
+            let state = match groups.get(first) {
+                Some(group) => self.state_of(group),
+                None => TraceAgeState::Unmeasured {
+                    reason: self.whole.unwrap_or(UnmeasuredReason::SourceAbsent),
+                },
+            };
+            rows.push(self.row(None, Some(first.clone()), state));
+        }
+        let mut folded = FoldedLogs {
+            collector: self.collector.to_owned(),
+            logs: 0,
+            with_records: 0,
+            not_read: 0,
+        };
+        for (value, group) in &groups {
+            if self.declared.first.contains(value) {
+                continue;
+            }
+            folded.logs += 1;
+            match self.state_of(group) {
+                TraceAgeState::Measured { count, .. } if count > 0 => folded.with_records += 1,
+                TraceAgeState::Measured { .. } => {}
+                TraceAgeState::Unmeasured { .. } => folded.not_read += 1,
+            }
+        }
+        (rows, (folded.logs > 0).then_some(folded))
+    }
+
+    /// One value's observations: measured when one carries the counted field — a log's account —
+    /// and otherwise the reason its `read` word gives.
+    fn state_of(&self, group: &[&Observation]) -> TraceAgeState {
+        let counted = group.iter().any(|observation| match &self.declared.count {
+            AgeCount::Field { field } => observation.fields.contains_key(field),
+            AgeCount::Observations => true,
+        });
+        if counted {
+            return self.measure(group, None);
+        }
+        let read = group
+            .iter()
+            .find_map(|observation| {
+                observation
+                    .fields
+                    .get("read")
+                    .and_then(serde_json::Value::as_str)
+            })
+            .unwrap_or_default();
+        TraceAgeState::Unmeasured {
+            reason: reason_of_read(read, self.report.header.elevated),
+        }
+    }
+}
+
+/// What a row's observations hold: the oldest of `oldest` over them, the count, and `extra` beside
+/// them — a time as the latest among them, anything else as the first. `without` keeps only the
+/// observations that lack that field.
+fn measure(
+    observations: &[&Observation],
+    oldest: &[String],
+    count: &AgeCount,
+    extra: &[String],
+    without: Option<&str>,
+    scan: Option<jiff::Timestamp>,
+) -> TraceAgeState {
+    let kept: Vec<&Observation> = observations
+        .iter()
+        .copied()
+        .filter(|observation| without.is_none_or(|field| !observation.fields.contains_key(field)))
+        .collect();
+    let oldest_time = kept
+        .iter()
+        .flat_map(|observation| {
+            oldest
+                .iter()
+                .filter_map(|field| time_of(observation, field))
+        })
+        .filter_map(|text| {
+            text.parse::<jiff::Timestamp>()
+                .ok()
+                .map(|time| (time, text))
+        })
+        .min_by_key(|(time, _)| *time);
+    let count = match count {
+        AgeCount::Observations => kept
+            .iter()
+            .filter(|observation| {
+                oldest
+                    .iter()
+                    .any(|field| time_of(observation, field).is_some())
+            })
+            .count() as u64,
+        AgeCount::Field { field } => kept
+            .iter()
+            .filter_map(|observation| {
+                observation
+                    .fields
+                    .get(field)
+                    .and_then(serde_json::Value::as_u64)
+            })
+            .sum(),
+    };
+    let mut beside = BTreeMap::new();
+    for field in extra {
+        let values: Vec<&serde_json::Value> = observations
+            .iter()
+            .filter_map(|observation| observation.fields.get(field))
+            .collect();
+        let latest = values
+            .iter()
+            .filter_map(|value| value.as_str())
+            .filter_map(|text| {
+                text.parse::<jiff::Timestamp>()
+                    .ok()
+                    .map(|time| (time, text))
+            })
+            .max_by_key(|(time, _)| *time);
+        if let Some((_, text)) = latest {
+            beside.insert(field.clone(), serde_json::Value::from(text));
+        } else if let Some(value) = values.first() {
+            beside.insert(field.clone(), (*value).clone());
+        }
+    }
+    TraceAgeState::Measured {
+        oldest: oldest_time.map(|(_, text)| text.to_owned()),
+        days_before: oldest_time
+            .zip(scan)
+            .map(|((time, _), scan)| days_between(scan, time)),
+        count,
+        extra: beside,
+    }
+}
+
+fn cross_source_of(report: &Report) -> Vec<CrossSourceStatement> {
+    let Some(scan) = scan_time(report) else {
+        return Vec::new();
+    };
+    // Condition 3: the bundle holds FiveM's selectors on every one of the three records. Without
+    // them "selected nothing" cannot be said of any, and nothing is shown.
+    let held = FIVEM_SELECTORS.iter().all(|(collector, id)| {
+        report
+            .timeline_selectors
+            .get(*collector)
+            .is_some_and(|ids| ids.iter().any(|held| held == id))
+    });
+    if !held {
+        return Vec::new();
+    }
+    let Some(fivem) = fivem_side(report, scan) else {
+        return Vec::new();
+    };
+    let Some(t) = fivem.1 else {
+        return Vec::new();
+    };
+    let sources: Vec<SourceLine> = RECORDS_OF_RUNS
+        .iter()
+        .map(|collector| SourceLine {
+            collector: (*collector).to_owned(),
+            line: source_line(report, collector, t, scan),
+        })
+        .collect();
+    // Condition 2: Prefetch or BAM was read, selected nothing, and reaches back further than T. PCA
+    // alone never makes the statement: it records launches from File Explorer only.
+    let reaches_back = sources.iter().any(|source| {
+        source.collector != "pca" && matches!(source.line, SourceLineKind::NoEntry { .. })
+    });
+    if !reaches_back {
+        return Vec::new();
+    }
+    vec![CrossSourceStatement {
+        fivem: fivem.0,
+        sources,
+    }]
+}
+
+/// `FiveM`'s side, and T — the later of the folders' last write and the latest server cache folder's —
+/// when `FiveM`'s side was read and is present (condition 1).
+fn fivem_side(
+    report: &Report,
+    scan: jiff::Timestamp,
+) -> Option<(FivemSide, Option<jiff::Timestamp>)> {
+    let observations = observations_of(report, "fivem_dir");
+    let location = |observation: &Observation| {
+        observation
+            .fields
+            .get("location")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    };
+    let editions: Vec<String> = FIVEM_EXE_PLACES
+        .iter()
+        .filter(|(place, _)| {
+            observations.iter().any(|observation| {
+                location(observation).as_deref() == Some(place)
+                    && observation.fields.contains_key("path")
+            })
+        })
+        .map(|(_, edition)| (*edition).to_owned())
+        .collect();
+    let activity: Vec<String> = report
+        .age_fields
+        .get("fivem_dir")
+        .map(|declared| declared.places.clone())
+        .unwrap_or_default();
+    let latest = |field: &str, keep: &dyn Fn(&Observation) -> bool| {
+        observations
+            .iter()
+            .filter(|observation| keep(observation))
+            .filter_map(|observation| time_of(observation, field))
+            .filter_map(|text| text.parse::<jiff::Timestamp>().ok())
+            .max()
+    };
+    let folders = latest("latest_modified_at", &|observation| {
+        location(observation).is_some_and(|place| activity.contains(&place))
+    });
+    let is_server = |observation: &Observation| {
+        location(observation).as_deref() == Some(SERVER_CACHE_PLACE)
+            && !observation.fields.contains_key("folder")
+    };
+    let server_folders = observations
+        .iter()
+        .filter(|observation| is_server(observation))
+        .count() as u64;
+    let servers = latest("modified_at", &is_server);
+    if editions.is_empty() && server_folders == 0 {
+        return None;
+    }
+    let t = folders.into_iter().chain(servers).max();
+    Some((
+        FivemSide {
+            editions,
+            folders_written: folders.map(utc_date),
+            folders_days_before: folders.map(|time| days_between(scan, time)),
+            server_folders,
+            servers_written: servers.map(utc_date),
+        },
+        t,
+    ))
+}
+
+/// One record's line (ADR 0061 section 3).
+fn source_line(
+    report: &Report,
+    collector: &str,
+    t: jiff::Timestamp,
+    scan: jiff::Timestamp,
+) -> SourceLineKind {
+    if let Some(reason) = unmeasured_reason(report, collector, None) {
+        return match reason {
+            UnmeasuredReason::ServiceDisabled => SourceLineKind::SwitchedOff,
+            // Read, or looked for, and holding nothing: it holds nothing as old as T either.
+            UnmeasuredReason::SourceEmpty
+            | UnmeasuredReason::SourceAbsent
+            | UnmeasuredReason::NotOnThisOs => SourceLineKind::CouldNotShow { entries: 0 },
+            reason => SourceLineKind::NotRead { reason },
+        };
+    }
+    let ids: Vec<&str> = FIVEM_SELECTORS
+        .iter()
+        .filter(|(on, _)| *on == collector)
+        .map(|(_, id)| *id)
+        .collect();
+    let mut seen: HashSet<String> = HashSet::new();
+    let selected: Vec<&Observation> = report
+        .timeline_selections
+        .iter()
+        .filter(|selection| ids.contains(&selection.selector_id.as_str()))
+        .flat_map(|selection| &selection.observations)
+        .filter(|observation| seen.insert(serde_json::to_string(observation).unwrap_or_default()))
+        .collect();
+    if !selected.is_empty() {
+        let latest = selected
+            .iter()
+            .filter_map(|observation| time_of(observation, "last_run"))
+            .filter_map(|text| text.parse::<jiff::Timestamp>().ok())
+            .max();
+        return SourceLineKind::Selected {
+            entries: selected.len() as u64,
+            latest: latest.map(utc_date).unwrap_or_default(),
+        };
+    }
+    let (rows, _) = age_rows(report, collector);
+    match rows.into_iter().next().map(|row| row.state) {
+        Some(TraceAgeState::Measured {
+            oldest: Some(oldest),
+            count,
+            ..
+        }) => match oldest.parse::<jiff::Timestamp>() {
+            Ok(oldest) if oldest < t => SourceLineKind::NoEntry {
+                entries: count,
+                oldest: utc_date(oldest),
+                days_before: days_between(scan, oldest),
+            },
+            _ => SourceLineKind::CouldNotShow { entries: count },
+        },
+        Some(TraceAgeState::Measured { count, .. }) => {
+            SourceLineKind::CouldNotShow { entries: count }
+        }
+        Some(TraceAgeState::Unmeasured { reason }) => SourceLineKind::NotRead { reason },
+        None => SourceLineKind::NotRead {
+            reason: UnmeasuredReason::CollectorUnavailable,
+        },
     }
 }
 
@@ -544,20 +1380,7 @@ fn routes(report: &Report, mode: Mode) -> Vec<(&Observation, EntrySource)> {
 /// The span each source could see, from every observation that carries its coverage fields — in both
 /// modes, because a span is a fact about the source rather than about a program or a file.
 fn bands(report: &Report, redact: impl Fn(String) -> String) -> Vec<CoverageBand> {
-    let observations = report
-        .evidence
-        .iter()
-        .filter_map(|item| match &item.state {
-            EvidenceState::Found { observations } => Some(observations.iter()),
-            _ => None,
-        })
-        .flatten()
-        .chain(
-            report
-                .unmatched
-                .iter()
-                .flat_map(|group| &group.observations),
-        );
+    let observations = band_sources(report);
     let mut seen: HashSet<String> = HashSet::new();
     let mut bands = Vec::new();
     for observation in observations {
@@ -593,6 +1416,62 @@ fn bands(report: &Report, redact: impl Fn(String) -> String) -> Vec<CoverageBand
         )
     });
     bands
+}
+
+/// Every observation a band can be read from: what a rule matched, and what no rule matched. The same
+/// set in both modes, because a span is a fact about the source rather than about a program or a file.
+fn band_sources(report: &Report) -> impl Iterator<Item = &Observation> {
+    report
+        .evidence
+        .iter()
+        .filter_map(|item| match &item.state {
+            EvidenceState::Found { observations } => Some(observations.iter()),
+            _ => None,
+        })
+        .flatten()
+        .chain(
+            report
+                .unmatched
+                .iter()
+                .flat_map(|group| &group.observations),
+        )
+}
+
+/// The span each `found` or `not_found` row in `evidence` is for, when its collector's coverage names
+/// one place (ADR 0047, amendment of 2026-09-30, decision 3). A collector whose coverage names no
+/// place — `evtx`, a band per log — gets none, and neither does a row whose collector's place was not
+/// observed at all.
+fn row_bands(report: &Report, evidence: &[Evidence]) -> BTreeMap<String, RowBand> {
+    let mut row_bands = BTreeMap::new();
+    for item in evidence {
+        if matches!(item.state, EvidenceState::Unmeasured { .. }) {
+            continue;
+        }
+        let Some(coverage) = report.coverage_fields.get(&item.collector) else {
+            continue;
+        };
+        let Some(wanted) = coverage.place.as_deref() else {
+            continue;
+        };
+        let Some(source) = band_sources(report).find(|observation| {
+            observation.collector == item.collector
+                && place_of(report, observation).as_deref() == Some(wanted)
+        }) else {
+            continue;
+        };
+        let band = match (
+            time_of(source, &coverage.from),
+            time_of(source, &coverage.to),
+        ) {
+            (Some(from), Some(to)) => RowBand::Span {
+                from: from.to_owned(),
+                to: to.to_owned(),
+            },
+            _ => RowBand::NoSpan,
+        };
+        row_bands.insert(item.rule_id.clone(), band);
+    }
+    row_bands
 }
 
 /// The scan's own times: when it ran, and when Windows last started when that was measured.
@@ -1259,6 +2138,7 @@ mod tests {
             boot_time: crate::model::BootTime::default(),
             profiles_directory: None,
             scan_tier: crate::model::ScanTier::Standard,
+            anchors: Vec::new(),
         }
     }
 
@@ -1392,6 +2272,8 @@ mod tests {
             coverage_fields: BTreeMap::new(),
             unmeasured_sources: Vec::new(),
             sensitive_fields: BTreeMap::new(),
+            age_fields: BTreeMap::new(),
+            timeline_selectors: BTreeMap::new(),
         }
     }
 
@@ -1440,6 +2322,45 @@ mod tests {
         assert!(fields(&ss, 1).contains_key("address"));
         let own = for_mode(&report, Mode::SelfCheck);
         assert_eq!(fields(&own, 0)["address"], "192.0.2.10");
+    }
+
+    /// A scheduled task's path or a `Run` value's name never reaches an SS view; the service's name,
+    /// where the entry is registered and the file it starts do, the file with the profile redacted
+    /// (ADR 0060, owner decision 3).
+    #[test]
+    fn ss_view_withholds_an_autostart_entry_and_keeps_its_file() {
+        let mut report = report();
+        report.evidence = vec![Evidence {
+            rule_id: "autostart".to_owned(),
+            collector: "autostart".to_owned(),
+            strength: Strength::Posture,
+            state: EvidenceState::Found {
+                observations: vec![Observation {
+                    collector: "autostart".to_owned(),
+                    fields: BTreeMap::from([
+                        ("location".to_owned(), serde_json::Value::from("task")),
+                        (
+                            "entry".to_owned(),
+                            serde_json::Value::from(r"\Updater-S-1-5-21-1-2-3-1001"),
+                        ),
+                        (
+                            "path".to_owned(),
+                            serde_json::Value::from(r"C:\Users\alex\AppData\Local\x.exe"),
+                        ),
+                    ]),
+                }],
+            },
+        }];
+        let fields = |view: &ReportView| match &view.evidence[0].state {
+            EvidenceState::Found { observations } => observations[0].fields.clone(),
+            state => panic!("expected a match, got {state:?}"),
+        };
+        let ss = fields(&for_mode(&report, Mode::Ss));
+        assert!(!ss.contains_key("entry"), "{ss:?}");
+        assert_eq!(ss["location"], "task");
+        assert_eq!(ss["path"], r"%USERPROFILE%\AppData\Local\x.exe");
+        let own = fields(&for_mode(&report, Mode::SelfCheck));
+        assert_eq!(own["entry"], r"\Updater-S-1-5-21-1-2-3-1001");
     }
 
     #[test]
@@ -1637,6 +2558,7 @@ mod tests {
             R::BudgetSpent,
             R::ReadFailed,
             R::CollectorUnavailable,
+            R::OtherVolume,
         ] {
             let scope = reason.is_scope_statement();
             let listed = reason.is_always_listed();
@@ -1941,6 +2863,115 @@ mod tests {
         assert_eq!(usn[0].from, "2025-12-01T00:00:00Z");
     }
 
+    /// A report with the change journal's own observation, unmatched, and three `usn` rows: one
+    /// found, one not found and one unmeasured, all `context`.
+    fn journal_report(journal_times: bool) -> Report {
+        let mut report = timed_report();
+        let mut journal = vec![("location", "journal")];
+        if journal_times {
+            journal.push(("first_seen", "2025-12-31T23:21:00Z"));
+            journal.push(("last_seen", "2026-01-01T00:00:00Z"));
+        }
+        report.unmatched.push(UnmatchedGroup {
+            collector: "usn".to_owned(),
+            observations: vec![observed("usn", &journal)],
+        });
+        report
+            .discriminators
+            .insert("usn".to_owned(), "location".to_owned());
+        report.coverage_fields.insert(
+            "usn".to_owned(),
+            crate::model::CoverageFields {
+                from: "first_seen".to_owned(),
+                to: "last_seen".to_owned(),
+                place: Some("journal".to_owned()),
+            },
+        );
+        let row = |rule_id: &str, state| Evidence {
+            rule_id: rule_id.to_owned(),
+            collector: "usn".to_owned(),
+            strength: Strength::Context,
+            state,
+        };
+        report.evidence.extend([
+            row(
+                "deleted",
+                EvidenceState::Found {
+                    observations: vec![observed(
+                        "usn",
+                        &[
+                            ("location", "plugins"),
+                            ("first_seen", "2025-12-31T23:40:00Z"),
+                            ("last_seen", "2025-12-31T23:41:00Z"),
+                        ],
+                    )],
+                },
+            ),
+            row(
+                "renamed",
+                EvidenceState::NotFound {
+                    retention: "Only the span the change journal still held.".to_owned(),
+                },
+            ),
+            row(
+                "elsewhere",
+                EvidenceState::Unmeasured {
+                    reason: UnmeasuredReason::OtherVolume,
+                    expected: true,
+                },
+            ),
+        ]);
+        report
+    }
+
+    /// Every `usn` row that looked carries the journal's span, in both modes; one that could not
+    /// look carries none, and a collector whose coverage names no place (`evtx`) is left alone
+    /// (ADR 0047, amendment of 2026-09-30, decision 3).
+    #[test]
+    fn each_row_of_a_collector_whose_coverage_names_a_place_carries_that_places_span() {
+        let report = journal_report(true);
+        let span = RowBand::Span {
+            from: "2025-12-31T23:21:00Z".to_owned(),
+            to: "2026-01-01T00:00:00Z".to_owned(),
+        };
+
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert_eq!(
+            own.row_bands,
+            BTreeMap::from([
+                ("deleted".to_owned(), span.clone()),
+                ("renamed".to_owned(), span.clone()),
+            ])
+        );
+
+        // SS mode lists the match and counts the rest: `context` not found, and an expected reason.
+        let ss = for_mode(&report, Mode::Ss);
+        assert_eq!(ss.row_bands, BTreeMap::from([("deleted".to_owned(), span)]));
+        assert!(ss.evidence.iter().all(|item| item.rule_id != "renamed"));
+    }
+
+    /// A journal read in full that held no record has no span, and the row says so rather than
+    /// showing nothing.
+    #[test]
+    fn a_source_that_held_no_record_gives_its_rows_no_span_rather_than_none() {
+        let own = for_mode(&journal_report(false), Mode::SelfCheck);
+        assert_eq!(own.row_bands.get("renamed"), Some(&RowBand::NoSpan));
+        assert_eq!(own.row_bands.get("deleted"), Some(&RowBand::NoSpan));
+        assert_eq!(own.row_bands.get("elsewhere"), None);
+    }
+
+    /// A report whose collector's place was never observed — `usn` refused, say — gives no band, and
+    /// a view without one serializes as it did before the field existed.
+    #[test]
+    fn without_the_places_observation_there_is_no_row_band() {
+        let mut report = journal_report(true);
+        report.unmatched.retain(|group| group.collector != "usn");
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert!(own.row_bands.is_empty(), "{:?}", own.row_bands);
+        let json = serde_json::to_string(&own).unwrap();
+        assert!(!json.contains("row_bands"), "{json}");
+    }
+
     #[test]
     fn both_views_carry_the_collector_order() {
         for mode in [Mode::SelfCheck, Mode::Ss] {
@@ -1948,6 +2979,676 @@ mod tests {
                 for_mode(&report(), mode).collector_order,
                 COLLECTOR_ORDER.map(str::to_owned).to_vec()
             );
+        }
+    }
+
+    fn number_observation(collector: &str, pairs: &[(&str, serde_json::Value)]) -> Observation {
+        Observation {
+            collector: collector.to_owned(),
+            fields: pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), v.clone()))
+                .collect(),
+        }
+    }
+
+    fn age(
+        oldest: &[&str],
+        count: AgeCount,
+        rows: AgeRows,
+        places: &[&str],
+        extra: &[&str],
+    ) -> crate::model::AgeFields {
+        let owned = |names: &[&str]| names.iter().map(|name| (*name).to_owned()).collect();
+        crate::model::AgeFields {
+            oldest: owned(oldest),
+            count,
+            rows,
+            places: owned(places),
+            extra: owned(extra),
+            first: Vec::new(),
+            by_place: Vec::new(),
+        }
+    }
+
+    /// A report as `scan::run` declares it, with Prefetch read, BAM not read without administrator
+    /// rights, two event logs read and one refused, the journal, and `FiveM`'s Legacy install whose logs
+    /// were last written on 2026-01-09. The scan ran on 2026-01-10.
+    /// What `scan::run` declares for the six collectors ADR 0061 names.
+    fn aged_fields() -> BTreeMap<String, crate::model::AgeFields> {
+        let field = |name: &str| AgeCount::Field {
+            field: name.to_owned(),
+        };
+        let mut evtx = age(
+            &["oldest_record_time"],
+            field("entries"),
+            AgeRows::PerValue {
+                field: "log".to_owned(),
+            },
+            &[],
+            &["size_bytes", "max_size_bytes"],
+        );
+        evtx.first = vec!["Security.evtx".to_owned(), "System.evtx".to_owned()];
+        let mut fivem = age(
+            &["earliest_created_at", "earliest_modified_at"],
+            field("files"),
+            AgeRows::PerPlace,
+            &["legacy_logs", "enhanced_server_cache"],
+            &["latest_modified_at"],
+        );
+        fivem.by_place = vec![crate::model::AgePlace {
+            place: "enhanced_server_cache".to_owned(),
+            oldest: vec!["created_at".to_owned(), "modified_at".to_owned()],
+            count: AgeCount::Observations,
+            without: Some("folder".to_owned()),
+        }];
+        BTreeMap::from([
+            (
+                "prefetch".to_owned(),
+                age(
+                    &["last_run"],
+                    field("entries"),
+                    AgeRows::One,
+                    &[],
+                    &["enable_prefetcher"],
+                ),
+            ),
+            (
+                "bam".to_owned(),
+                age(&["last_run"], field("entries"), AgeRows::One, &[], &[]),
+            ),
+            (
+                "pca".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Observations,
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+            (
+                "usn".to_owned(),
+                age(
+                    &["first_seen"],
+                    field("records"),
+                    AgeRows::PerPlace,
+                    &["journal"],
+                    &["last_seen", "trimmed"],
+                ),
+            ),
+            ("evtx".to_owned(), evtx),
+            ("fivem_dir".to_owned(), fivem),
+        ])
+    }
+
+    /// What the collectors saw on that PC, none of it matched by a rule.
+    /// Two event logs read, one refused, and one empty.
+    fn aged_logs() -> Vec<Observation> {
+        use serde_json::json;
+        vec![
+            number_observation(
+                "evtx",
+                &[
+                    ("log", json!("System.evtx")),
+                    ("entries", json!(40)),
+                    ("size_bytes", json!(1_048_576)),
+                    ("max_size_bytes", json!(1_052_672)),
+                    ("oldest_record_time", json!("2026-01-01T00:00:00Z")),
+                ],
+            ),
+            number_observation(
+                "evtx",
+                &[
+                    ("log", json!("Security.evtx")),
+                    ("read", json!("access_denied")),
+                ],
+            ),
+            number_observation(
+                "evtx",
+                &[("log", json!("Other.evtx")), ("entries", json!(0))],
+            ),
+            number_observation(
+                "evtx",
+                &[("log", json!("Busy.evtx")), ("entries", json!(3))],
+            ),
+        ]
+    }
+
+    /// `FiveM` Legacy with a log folder; Enhanced's server cache absent.
+    fn aged_fivem() -> Vec<Observation> {
+        use serde_json::json;
+        vec![
+            number_observation(
+                "fivem_dir",
+                &[
+                    ("location", json!("legacy_exe")),
+                    (
+                        "path",
+                        json!(format!(r"C:\Users\{USER}\AppData\Local\FiveM\FiveM.exe")),
+                    ),
+                ],
+            ),
+            number_observation(
+                "fivem_dir",
+                &[
+                    ("location", json!("legacy_logs")),
+                    ("folder", json!("listed")),
+                    ("files", json!(3)),
+                    ("earliest_created_at", json!("2025-12-20T00:00:00Z")),
+                    ("earliest_modified_at", json!("2025-12-21T00:00:00Z")),
+                    ("latest_modified_at", json!("2026-01-09T10:00:00Z")),
+                ],
+            ),
+            number_observation(
+                "fivem_dir",
+                &[
+                    ("location", json!("enhanced_server_cache")),
+                    ("folder", json!("absent")),
+                ],
+            ),
+        ]
+    }
+
+    fn aged_unmatched() -> Vec<UnmatchedGroup> {
+        use serde_json::json;
+        let prefetch = vec![
+            number_observation(
+                "prefetch",
+                &[
+                    ("name", json!("a.exe")),
+                    ("last_run", json!("2025-12-01T08:00:00Z")),
+                ],
+            ),
+            number_observation(
+                "prefetch",
+                &[
+                    ("name", json!("b.exe")),
+                    ("last_run", json!("2026-01-05T00:00:00Z")),
+                ],
+            ),
+            number_observation("prefetch", &[("entries", json!(2)), ("files", json!(2))]),
+            number_observation(
+                "prefetch",
+                &[("folder", json!("listed")), ("enable_prefetcher", json!(3))],
+            ),
+        ];
+        let pca = vec![number_observation(
+            "pca",
+            &[
+                ("name", json!("c.exe")),
+                ("last_run", json!("2026-01-10T00:00:00Z")),
+            ],
+        )];
+        let evtx = aged_logs();
+        let fivem = aged_fivem();
+        let usn = vec![number_observation(
+            "usn",
+            &[
+                ("location", json!("journal")),
+                ("records", json!(900)),
+                ("first_seen", json!("2026-01-10T11:21:00Z")),
+                ("last_seen", json!("2026-01-10T12:00:00Z")),
+                ("trimmed", json!(true)),
+            ],
+        )];
+        [
+            ("prefetch", prefetch),
+            ("pca", pca),
+            ("evtx", evtx),
+            ("usn", usn),
+            ("fivem_dir", fivem),
+        ]
+        .into_iter()
+        .map(|(collector, observations)| UnmatchedGroup {
+            collector: collector.to_owned(),
+            observations,
+        })
+        .collect()
+    }
+
+    fn aged_report() -> Report {
+        let mut report = report();
+        report.header.generated_at = "2026-01-10T12:00:00Z".to_owned();
+        report.header.elevated = Some(false);
+        report.evidence = Vec::new();
+        report.own_traces = Vec::new();
+        report.age_fields = aged_fields();
+        report.discriminators = BTreeMap::from([
+            ("usn".to_owned(), "location".to_owned()),
+            ("fivem_dir".to_owned(), "location".to_owned()),
+        ]);
+        report.unmatched = aged_unmatched();
+        report.unmeasured_sources = vec![
+            UnmeasuredSource {
+                collector: "bam".to_owned(),
+                place: None,
+                reason: UnmeasuredReason::NotAdmin,
+            },
+            // What a refused log gaps for the whole run: the rows keep each log's own answer.
+            UnmeasuredSource {
+                collector: "evtx".to_owned(),
+                place: None,
+                reason: UnmeasuredReason::NotAdmin,
+            },
+        ];
+        report.timeline_selectors =
+            FIVEM_SELECTORS
+                .iter()
+                .fold(BTreeMap::new(), |mut held, (collector, id)| {
+                    held.entry((*collector).to_owned())
+                        .or_insert_with(Vec::new)
+                        .push((*id).to_owned());
+                    held
+                });
+        report
+    }
+
+    fn state_of_row<'a>(
+        ages: &'a TraceAges,
+        collector: &str,
+        key: Option<&str>,
+    ) -> &'a TraceAgeState {
+        &ages
+            .rows
+            .iter()
+            .find(|row| {
+                row.collector == collector
+                    && (key.is_none()
+                        || row.place.as_deref() == key
+                        || row.subject.as_deref() == key)
+            })
+            .unwrap_or_else(|| panic!("no row for {collector} {key:?}: {:?}", ages.rows))
+            .state
+    }
+
+    /// Each source's row: in the collector order, the oldest time with its whole days before the
+    /// scan, the count, what is shown beside it; a source not read without administrator rights is
+    /// that reason and not a zero; the logs the bundle reads come first and the rest fold (ADR 0061).
+    #[test]
+    fn trace_ages_state_each_sources_oldest_time_count_and_reason() {
+        let ages = trace_ages(&aged_report(), Mode::SelfCheck);
+        let order: Vec<(&str, Option<&str>)> = ages
+            .rows
+            .iter()
+            .map(|row| {
+                (
+                    row.collector.as_str(),
+                    row.place.as_deref().or(row.subject.as_deref()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                ("fivem_dir", Some("legacy_logs")),
+                ("fivem_dir", Some("enhanced_server_cache")),
+                ("evtx", Some("Security.evtx")),
+                ("evtx", Some("System.evtx")),
+                ("prefetch", None),
+                ("bam", None),
+                ("pca", None),
+                ("usn", Some("journal")),
+            ]
+        );
+        assert_eq!(
+            state_of_row(&ages, "prefetch", None),
+            &TraceAgeState::Measured {
+                oldest: Some("2025-12-01T08:00:00Z".to_owned()),
+                days_before: Some(40),
+                count: 2,
+                extra: BTreeMap::from([("enable_prefetcher".to_owned(), serde_json::json!(3))]),
+            }
+        );
+        assert_eq!(
+            state_of_row(&ages, "bam", None),
+            &TraceAgeState::Unmeasured {
+                reason: UnmeasuredReason::NotAdmin
+            }
+        );
+        assert_eq!(
+            state_of_row(&ages, "evtx", Some("Security.evtx")),
+            &TraceAgeState::Unmeasured {
+                reason: UnmeasuredReason::NotAdmin
+            }
+        );
+        let TraceAgeState::Measured {
+            count,
+            extra,
+            days_before,
+            ..
+        } = state_of_row(&ages, "evtx", Some("System.evtx"))
+        else {
+            panic!("System.evtx was read");
+        };
+        assert_eq!((*count, *days_before), (40, Some(9)));
+        assert_eq!(extra["max_size_bytes"], serde_json::json!(1_052_672));
+        assert_eq!(
+            ages.folded_logs,
+            Some(FoldedLogs {
+                collector: "evtx".to_owned(),
+                logs: 2,
+                with_records: 1,
+                not_read: 0,
+            })
+        );
+        assert_eq!(
+            state_of_row(&ages, "fivem_dir", Some("enhanced_server_cache")),
+            &TraceAgeState::Unmeasured {
+                reason: UnmeasuredReason::SourceAbsent
+            }
+        );
+        let TraceAgeState::Measured { oldest, count, .. } =
+            state_of_row(&ages, "fivem_dir", Some("legacy_logs"))
+        else {
+            panic!("the log folder was read");
+        };
+        assert_eq!(
+            (oldest.as_deref(), *count),
+            (Some("2025-12-20T00:00:00Z"), 3)
+        );
+        let TraceAgeState::Measured {
+            days_before, extra, ..
+        } = state_of_row(&ages, "usn", Some("journal"))
+        else {
+            panic!("the journal was read");
+        };
+        assert_eq!(*days_before, Some(0));
+        assert_eq!(extra["trimmed"], serde_json::json!(true));
+        // SS mode shows the same section: an age names no program and no file.
+        assert_eq!(for_mode(&aged_report(), Mode::Ss).trace_ages, ages);
+    }
+
+    /// Enhanced's server cache is counted and dated by its server folders, not by the folder that
+    /// holds them.
+    #[test]
+    fn the_server_cache_row_counts_server_folders() {
+        use serde_json::json;
+        let mut report = aged_report();
+        let group = report
+            .unmatched
+            .iter_mut()
+            .find(|group| group.collector == "fivem_dir")
+            .unwrap();
+        group
+            .observations
+            .retain(|observation| observation.fields["location"] != json!("enhanced_server_cache"));
+        group.observations.extend([
+            number_observation(
+                "fivem_dir",
+                &[
+                    ("location", json!("enhanced_server_cache")),
+                    ("folder", json!("listed")),
+                    ("files", json!(0)),
+                    ("created_at", json!("2020-01-01T00:00:00Z")),
+                ],
+            ),
+            number_observation(
+                "fivem_dir",
+                &[
+                    ("location", json!("enhanced_server_cache")),
+                    ("created_at", json!("2025-12-25T00:00:00Z")),
+                    ("modified_at", json!("2026-01-02T00:00:00Z")),
+                ],
+            ),
+            number_observation(
+                "fivem_dir",
+                &[
+                    ("location", json!("enhanced_server_cache")),
+                    ("created_at", json!("2025-12-28T00:00:00Z")),
+                    ("modified_at", json!("2026-01-03T00:00:00Z")),
+                ],
+            ),
+        ]);
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        let TraceAgeState::Measured { oldest, count, .. } =
+            state_of_row(&ages, "fivem_dir", Some("enhanced_server_cache"))
+        else {
+            panic!("the server cache was read");
+        };
+        assert_eq!(
+            (oldest.as_deref(), *count),
+            (Some("2025-12-25T00:00:00Z"), 2)
+        );
+    }
+
+    /// When Windows last started first, then each header anchor, with whole days before the scan's
+    /// UTC date; an unmeasured anchor keeps its reason (ADR 0061).
+    #[test]
+    fn anchors_are_boot_time_then_the_header_anchors_in_days() {
+        use crate::model::{Anchor, AnchorKind};
+        let mut report = aged_report();
+        report.header.boot_time = BootTime::Measured {
+            booted_at: "2026-01-07T00:00:00Z".to_owned(),
+            seconds_since_boot: 302_400,
+        };
+        report.header.anchors = vec![
+            Anchor {
+                anchor: AnchorKind::InstallDate,
+                state: AnchorState::Measured {
+                    on: "2025-11-11".to_owned(),
+                    source: "HKLM".to_owned(),
+                    kept: None,
+                },
+            },
+            Anchor {
+                anchor: AnchorKind::UsnJournalCreated,
+                state: AnchorState::Unmeasured {
+                    reason: UnmeasuredReason::NotAdmin,
+                },
+            },
+        ];
+        let ages = trace_ages(&report, Mode::Ss);
+        assert_eq!(
+            ages.anchors,
+            vec![
+                AnchorAge {
+                    anchor: "boot_time".to_owned(),
+                    state: AnchorAgeState::Measured {
+                        on: "2026-01-07T00:00:00Z".to_owned(),
+                        days_before: 3,
+                        source: None,
+                        kept: None,
+                    },
+                },
+                AnchorAge {
+                    anchor: "install_date".to_owned(),
+                    state: AnchorAgeState::Measured {
+                        on: "2025-11-11".to_owned(),
+                        days_before: 60,
+                        source: Some("HKLM".to_owned()),
+                        kept: None,
+                    },
+                },
+                AnchorAge {
+                    anchor: "usn_journal_created".to_owned(),
+                    state: AnchorAgeState::Unmeasured {
+                        reason: UnmeasuredReason::NotAdmin,
+                    },
+                },
+            ]
+        );
+    }
+
+    fn prefetch_group(report: &mut Report) -> &mut Vec<Observation> {
+        &mut report
+            .unmatched
+            .iter_mut()
+            .find(|group| group.collector == "prefetch")
+            .unwrap()
+            .observations
+    }
+
+    fn line_of(statement: &CrossSourceStatement, collector: &str) -> SourceLineKind {
+        statement
+            .sources
+            .iter()
+            .find(|source| source.collector == collector)
+            .unwrap()
+            .line
+            .clone()
+    }
+
+    /// Prefetch was read, holds no `FiveM` name, and reaches back before `FiveM`'s logs were last written:
+    /// the statement is shown, BAM is "not read" rather than "no entry", and PCA, which holds nothing as
+    /// old, could not show it (ADR 0061 section 3).
+    #[test]
+    fn the_statement_shows_when_a_readable_source_reaches_back_to_fivems_last_write() {
+        let report = aged_report();
+        let statements = cross_source(&report, Mode::SelfCheck);
+        let [statement] = statements.as_slice() else {
+            panic!("{statements:?}");
+        };
+        assert_eq!(statement.fivem.editions, vec!["legacy".to_owned()]);
+        assert_eq!(
+            statement.fivem.folders_written.as_deref(),
+            Some("2026-01-09")
+        );
+        assert_eq!(statement.fivem.folders_days_before, Some(1));
+        assert_eq!(
+            line_of(statement, "prefetch"),
+            SourceLineKind::NoEntry {
+                entries: 2,
+                oldest: "2025-12-01".to_owned(),
+                days_before: 40,
+            }
+        );
+        assert_eq!(
+            line_of(statement, "bam"),
+            SourceLineKind::NotRead {
+                reason: UnmeasuredReason::NotAdmin
+            }
+        );
+        assert_eq!(
+            line_of(statement, "pca"),
+            SourceLineKind::CouldNotShow { entries: 1 }
+        );
+        // In SS mode too: it holds no path and no name.
+        let ss = for_mode(&report, Mode::Ss);
+        assert_eq!(ss.cross_source, statements);
+        let json = serde_json::to_string(&ss.cross_source).unwrap();
+        assert!(!json.contains(USER), "{json}");
+    }
+
+    /// A `FiveM` name selected in Prefetch: its line says so, and with BAM not read no source is left to
+    /// make the statement.
+    #[test]
+    fn no_statement_when_the_readable_source_holds_a_fivem_entry() {
+        let mut report = aged_report();
+        let selected = observed(
+            "prefetch",
+            &[("name", "FiveM.exe"), ("last_run", "2026-01-08T00:00:00Z")],
+        );
+        report.timeline_selections = vec![crate::model::TimelineSelection {
+            selector_id: FIVEM_SELECTORS[0].1.to_owned(),
+            collector: "prefetch".to_owned(),
+            observations: vec![selected],
+        }];
+        assert_eq!(cross_source(&report, Mode::SelfCheck), vec![]);
+        assert_eq!(
+            source_line(
+                &report,
+                "prefetch",
+                "2026-01-09T10:00:00Z".parse().unwrap(),
+                scan_time(&report).unwrap()
+            ),
+            SourceLineKind::Selected {
+                entries: 1,
+                latest: "2026-01-08".to_owned(),
+            }
+        );
+    }
+
+    /// Each condition that is not met leaves no statement: Prefetch reaching back less far than
+    /// `FiveM`'s last write, Prefetch switched off, PCA alone, no `FiveM`, and no `FiveM` selector in the
+    /// bundle.
+    #[test]
+    fn no_statement_when_any_condition_fails() {
+        use serde_json::json;
+
+        // Prefetch's oldest is after FiveM's last write: it could not show it.
+        let mut later = aged_report();
+        for observation in prefetch_group(&mut later) {
+            if observation.fields.contains_key("last_run") {
+                observation
+                    .fields
+                    .insert("last_run".to_owned(), json!("2026-01-09T11:00:00Z"));
+            }
+        }
+        assert_eq!(cross_source(&later, Mode::SelfCheck), vec![]);
+        assert_eq!(
+            source_line(
+                &later,
+                "prefetch",
+                "2026-01-09T10:00:00Z".parse().unwrap(),
+                scan_time(&later).unwrap()
+            ),
+            SourceLineKind::CouldNotShow { entries: 2 }
+        );
+
+        // Prefetch switched off.
+        let mut off = aged_report();
+        off.unmeasured_sources.push(UnmeasuredSource {
+            collector: "prefetch".to_owned(),
+            place: None,
+            reason: UnmeasuredReason::ServiceDisabled,
+        });
+        assert_eq!(cross_source(&off, Mode::SelfCheck), vec![]);
+        assert_eq!(
+            source_line(
+                &off,
+                "prefetch",
+                "2026-01-09T10:00:00Z".parse().unwrap(),
+                scan_time(&off).unwrap()
+            ),
+            SourceLineKind::SwitchedOff
+        );
+
+        // Only PCA reaches back: never a statement on its own.
+        let mut pca_only = later.clone();
+        let pca = pca_only
+            .unmatched
+            .iter_mut()
+            .find(|group| group.collector == "pca")
+            .unwrap();
+        pca.observations = vec![observed(
+            "pca",
+            &[("name", "c.exe"), ("last_run", "2025-06-01T00:00:00Z")],
+        )];
+        assert_eq!(cross_source(&pca_only, Mode::SelfCheck), vec![]);
+
+        // No FiveM.exe and no server cache folder.
+        let mut no_fivem = aged_report();
+        let fivem = no_fivem
+            .unmatched
+            .iter_mut()
+            .find(|group| group.collector == "fivem_dir")
+            .unwrap();
+        fivem
+            .observations
+            .retain(|observation| observation.fields["location"] != json!("legacy_exe"));
+        assert_eq!(cross_source(&no_fivem, Mode::SelfCheck), vec![]);
+
+        // A bundle without FiveM's selectors on BAM.
+        let mut no_selectors = aged_report();
+        no_selectors.timeline_selectors.remove("bam");
+        assert_eq!(cross_source(&no_selectors, Mode::SelfCheck), vec![]);
+    }
+
+    /// The selectors the statement names are the ones the rules tree holds, on the collectors it says.
+    #[test]
+    fn the_fivem_selectors_are_in_the_embedded_bundle() {
+        let bundle = crate::bundle::Bundle::embedded().unwrap();
+        for (collector, id) in FIVEM_SELECTORS {
+            let rule = bundle
+                .rules()
+                .iter()
+                .map(|sourced| &sourced.rule)
+                .find(|rule| rule.id == id)
+                .unwrap_or_else(|| panic!("{id} is not in the bundle"));
+            assert!(rule.is_timeline_selector(), "{id}");
+            assert_eq!(rule.collector, collector, "{id}");
+            assert!(rule.match_fields().any(|field| field == "name"), "{id}");
         }
     }
 }

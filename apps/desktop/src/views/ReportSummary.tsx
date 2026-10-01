@@ -39,6 +39,7 @@ export function ReportSummary({ listed, filter, onFilter }: Props) {
               <span className={`mark mark-${state}`} aria-hidden="true" />
               {count}
             </span>
+            {/* Read as one name, "7 found — …"; the grid lays the two spans out whatever is between. */}{" "}
             <span className="label">{t(`summary.${state}`)}</span>
           </button>
         ))}

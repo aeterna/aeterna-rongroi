@@ -17,6 +17,8 @@ const row = (rule_id: string, collector: string, state: Evidence["state"]): Evid
 const ORDER = [
   "posture",
   "driver_service",
+  "autostart",
+  "defender_exclusion",
   "fivem_dir",
   "net_config",
   "process",

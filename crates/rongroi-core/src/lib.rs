@@ -8,6 +8,7 @@
 //! [`engine::evaluate`] turns runs and the embedded [`bundle::Bundle`] into a [`model::Report`],
 //! and [`view::for_mode`] decides what a Self or SS view may show.
 
+pub mod ages;
 pub mod bundle;
 pub mod engine;
 pub mod model;

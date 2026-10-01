@@ -37,4 +37,5 @@ pub mod evtx;
 pub mod filetime;
 pub mod pca;
 pub mod prefetch;
+pub mod task;
 pub mod usn;

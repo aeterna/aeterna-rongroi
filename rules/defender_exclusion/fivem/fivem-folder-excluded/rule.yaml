@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: d7191cf3-ce56-480b-8501-66a198f83e08
+title: A Microsoft Defender exclusion covers a FiveM folder
+description: >-
+  Microsoft Defender is told not to scan a folder or a program that is one of FiveM's folders, a folder
+  above one — a whole drive included — or something inside one. FiveM's folders are FiveM for GTA V
+  Legacy's and Enhanced's under the Windows account's local and roaming AppData, whether or not they
+  exist on this PC. The row shows the exclusion as Defender holds it and whether it was set in Defender's
+  own settings or by a policy. An exclusion with a wildcard is not compared, and the game's own folder is
+  not compared yet. This says Defender was told not to scan where FiveM keeps its files; it does not say
+  what was put there, who set the exclusion or when.
+status: experimental
+collector: defender_exclusion
+strength: posture
+match:
+  covers_fivem: true
+retention: >-
+  Defender's exclusions as they were when the scan ran. An exclusion removed before the scan is not seen.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Performance and FPS guides that tell players to exclude the game or FiveM folder from scanning to reduce stutter
+  - Game and mod installers and launchers that add their own exclusion
+  - Developers and build machines that exclude a whole drive for build speed, as a GitHub-hosted runner image excludes its C and D drives
+  - Another security product, or an administrator, managing Defender's settings
+author: aeterna-rongroi contributors
+date: 2026-09-30
+tags: [defender_exclusion, posture]

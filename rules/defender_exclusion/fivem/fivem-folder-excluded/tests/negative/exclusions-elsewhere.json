@@ -1,0 +1,10 @@
+{
+  "description": "Exclusions for another drive, a build folder, a file type and a wildcard path, none of which covers a FiveM folder",
+  "observations": [
+    { "collector": "defender_exclusion", "fields": { "kind": "path", "set_by": "settings", "exclusion": "D:\\", "covers_fivem": false } },
+    { "collector": "defender_exclusion", "fields": { "kind": "process", "set_by": "settings", "exclusion": "C:\\Tools\\build.exe", "covers_fivem": false } },
+    { "collector": "defender_exclusion", "fields": { "kind": "extension", "set_by": "settings", "exclusion": ".iso" } },
+    { "collector": "defender_exclusion", "fields": { "kind": "path", "set_by": "settings", "exclusion": "C:\\Users\\*\\Videos" } }
+  ],
+  "expect_matches": 0
+}

@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 46 |
-| SHA-256 | `84440190c7aa8b2e193c8703ccc8d1446ff46207239587380ae9cc863d110add` |
+| Rules | 55 |
+| SHA-256 | `1189336b89f6ee78d45c5d5603e40ab87361ebd0c6da986fb9d56b530b96e3ee` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -41,9 +41,14 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 ## Contents
 
+- `autostart`
+  - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
+- `defender_exclusion`
+  - [A Microsoft Defender exclusion covers a FiveM folder](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
   - [A registered driver is on LOLDrivers' list of vulnerable drivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
+  - [Microsoft Defender recorded that its real-time protection was switched off](#rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185) — `context` · `experimental`
   - [An event log file was cleared](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [The Security log records that it was cleared](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
   - [An event log file is marked read-only](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
@@ -87,11 +92,18 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+- `usn`
+  - [The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
+  - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
+  - [The change journal holds a deletion in FiveM's plugin folder](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
+  - [The change journal holds a rename in FiveM's plugin folder](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
 - Timeline selectors
   - `bam`
     - [When BAM recorded a program named like FiveM's game process](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
     - [When BAM recorded a program named like FiveM or GTA V](#rule-19dc7372-391e-4874-9c94-92ee6170f2df) — `context` · `experimental`
   - `evtx`
+    - [When Code Integrity recorded that Windows refused to load a file](#rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8) — `context` · `experimental`
+    - [When Microsoft Defender recorded a detection](#rule-63269014-f728-424c-8e18-e36fe79030aa) — `context` · `experimental`
     - [A Windows event log's oldest and newest record](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
   - `fivem_dir`
     - [When FiveM's log, crash and cache folders were written](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
@@ -103,6 +115,90 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [When Prefetch recorded a program named like FiveM or GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
   - `usn`
     - [When the change journal recorded changes in a watched folder](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+
+## Collector `autostart`
+
+### `autostart` / `outside-windows`
+
+<a id="rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc"></a>
+
+#### A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders
+
+- Id: `72820eaf-1469-4ea7-bb0f-17f145d26dfc`
+- File: [`rules/autostart/outside-windows/no-valid-embedded-signature/rule.yaml`](../rules/autostart/outside-windows/no-valid-embedded-signature/rule.yaml)
+- Collector: `autostart`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `autostart`, `posture`
+- Written: 2026-09-30
+
+**About this check**
+
+Windows is set to start this program by itself — as a service that starts with the PC or on a trigger, a Run or RunOnce value at sign-in, or an enabled scheduled task with a trigger — and its file is outside the Windows folder and Program Files, and carries no embedded signature Windows trusts: either none at all, or one that does not verify. The row shows where the entry is registered, the file's path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads here as having no embedded signature, because this program does not read catalogs. Files under the Windows folder are not checked at all, and a program that starts from inside Program Files is not shown by this rule. Arguments are never read, so this does not say what the program is given to run. This says a program is set to start without being asked; it does not say what the program does, who installed it, or that it ever ran.
+
+**Matches when all of these hold for one observation**
+
+- `path_kind`: is one of `program_data`, `user_profile`, `other` (text, ASCII case ignored)
+- `signature`: is one of `no_embedded_signature`, `invalid` (text, ASCII case ignored)
+- `starts_by_itself`: is `true`
+
+**Look-back**
+
+The services, Run and RunOnce values and scheduled tasks registered when the scan ran. An entry that was removed before the scan is not seen, and a file that has changed since is read as it is now.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- Programs installed per user into AppData — launchers, chat and voice apps, cloud sync clients — and above all their updaters and helpers
+- Peripheral, RGB, fan and overclocking utilities
+- Service wrappers and servers installed from a package manager, such as NSSM from Chocolatey or an Apache web server
+- Management and provisioning agents, such as a GitHub-hosted runner's own agent
+- Open-source and self-built tools, which are often not signed
+- A file signed through a Windows catalog, which this check does not read
+- A Run entry switched off in Task Manager, which this program cannot tell from one that is on
+
+## Collector `defender_exclusion`
+
+### `defender_exclusion` / `fivem`
+
+<a id="rule-d7191cf3-ce56-480b-8501-66a198f83e08"></a>
+
+#### A Microsoft Defender exclusion covers a FiveM folder
+
+- Id: `d7191cf3-ce56-480b-8501-66a198f83e08`
+- File: [`rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml`](../rules/defender_exclusion/fivem/fivem-folder-excluded/rule.yaml)
+- Collector: `defender_exclusion`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `defender_exclusion`, `posture`
+- Written: 2026-09-30
+
+**About this check**
+
+Microsoft Defender is told not to scan a folder or a program that is one of FiveM's folders, a folder above one — a whole drive included — or something inside one. FiveM's folders are FiveM for GTA V Legacy's and Enhanced's under the Windows account's local and roaming AppData, whether or not they exist on this PC. The row shows the exclusion as Defender holds it and whether it was set in Defender's own settings or by a policy. An exclusion with a wildcard is not compared, and the game's own folder is not compared yet. This says Defender was told not to scan where FiveM keeps its files; it does not say what was put there, who set the exclusion or when.
+
+**Matches when all of these hold for one observation**
+
+- `covers_fivem`: is `true`
+
+**Look-back**
+
+Defender's exclusions as they were when the scan ran. An exclusion removed before the scan is not seen.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Performance and FPS guides that tell players to exclude the game or FiveM folder from scanning to reduce stutter
+- Game and mod installers and launchers that add their own exclusion
+- Developers and build machines that exclude a whole drive for build speed, as a GitHub-hosted runner image excludes its C and D drives
+- Another security product, or an administrator, managing Defender's settings
 
 ## Collector `driver_service`
 
@@ -147,6 +243,51 @@ The driver services registered when the scan ran. A driver that was registered a
 - <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
 
 ## Collector `evtx`
+
+### `evtx` / `defender`
+
+<a id="rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185"></a>
+
+#### Microsoft Defender recorded that its real-time protection was switched off
+
+- Id: `429f8bc3-3c7d-4924-87f7-7cccefa1a185`
+- File: [`rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml`](../rules/evtx/defender/defender-real-time-protection-turned-off/rule.yaml)
+- Collector: `evtx`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `defender`
+- Written: 2026-09-30
+
+**About this check**
+
+Microsoft Defender's log holds a record that its real-time protection — the part that scans files as they are opened — was switched off, with the first and last time it happened. It does not say who switched it off or why, whether it was switched on again, or whether it is on now: a log records a change, not a state. A record written before the PC was handed over looks exactly like one written yesterday, so read the times.
+
+**Matches when all of these hold for one observation**
+
+- `channel`: is `Microsoft-Windows-Windows Defender/Operational` (text, ASCII case ignored)
+- `event_id`: is `5001`
+- `provider`: is `Microsoft-Windows-Windows Defender` (text, ASCII case ignored)
+
+**Look-back**
+
+Only switches still in the Defender log as it stands. It holds up to 16 MiB by default and overwrites its oldest records, and a cleared log holds none. If the Defender log is not there at all — Defender removed from the image, or the file deleted — this row also says not found, because this check does not know which logs a PC should have; the rules on Defender's service and platform folder answer that.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+
+**Ordinary things that also produce this**
+
+- The PC's maker, a shop or a Windows image turning real-time protection off before the PC was handed over — measured on two GitHub-hosted runner images, each of which carried one such record from before anyone used it
+- The owner switching it off for a while to install or run something Defender flagged, often a game mod, a trainer or a tool shared on a forum, which is common advice for exactly those programs
+- Installing another antivirus product. Whether Defender records this when it steps aside is not established, so this is a possibility, not a known cause
+- A Defender platform update, or a management tool or group policy of an employer or school
+- Troubleshooting a slow PC or a game that stutters, which forum advice often starts by disabling real-time scanning
+
+**References**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 ### `evtx` / `log-clearing`
 
@@ -1688,6 +1829,192 @@ The attribute as it is at the moment of the scan, on the Prefetch files still in
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
 
+## Collector `usn`
+
+### `usn` / `enhanced-asi`
+
+<a id="rule-1c73241b-b7f1-4f91-81d4-8de53db6d119"></a>
+
+#### The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder
+
+- Id: `1c73241b-b7f1-4f91-81d4-8de53db6d119`
+- File: [`rules/usn/enhanced-asi/files-deleted/rule.yaml`](../rules/usn/enhanced-asi/files-deleted/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `enhanced_asi`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file deleted directly inside FiveM for GTA V Enhanced's asi folder. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was deleted there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden. Whether FiveM for GTA V Enhanced loads anything from this folder is not established.
+
+**Matches when all of these hold for one observation**
+
+- `deleted|gte`: is at least `1`
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `enhanced_asi` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player removed or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- FiveM or its updater replaced or removed a file in the folder (not measured for this folder)
+- A clean-up, "clear FiveM cache" or optimiser tool that empties FiveM's folders
+- Antivirus software quarantining or removing a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+<a id="rule-7996285e-8ccf-4b2d-8fec-339a32b95931"></a>
+
+#### The change journal holds a rename in FiveM for GTA V Enhanced's asi folder
+
+- Id: `7996285e-8ccf-4b2d-8fec-339a32b95931`
+- File: [`rules/usn/enhanced-asi/files-renamed/rule.yaml`](../rules/usn/enhanced-asi/files-renamed/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `enhanced_asi`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file renamed directly inside FiveM for GTA V Enhanced's asi folder, moved into it or moved out of it. A rename inside the folder leaves two records, one for the old name and one for the new. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was renamed, moved in or moved out there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden. Whether FiveM for GTA V Enhanced loads anything from this folder is not established.
+
+**Matches when all of these hold for one observation**
+
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `enhanced_asi` (text, ASCII case ignored)
+- `renamed|gte`: is at least `1`
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player renamed, moved or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- An update that writes a new copy of a file and swaps it in by renaming, by FiveM, its updater or a plugin (not measured for this folder)
+- A file moved to the Recycle Bin or to another folder on the same drive, which the journal records as a rename (how the Recycle Bin shows was not measured)
+- Antivirus software quarantining a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+### `usn` / `plugins`
+
+<a id="rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd"></a>
+
+#### The change journal holds a deletion in FiveM's plugin folder
+
+- Id: `91dc8b45-8355-4554-8a6d-e979e4a95ecd`
+- File: [`rules/usn/plugins/files-deleted/rule.yaml`](../rules/usn/plugins/files-deleted/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `plugins`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file deleted directly inside FiveM for GTA V Legacy's plugin folder. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was deleted there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `deleted|gte`: is at least `1`
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `plugins` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player removed or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- FiveM or its updater replaced or removed a file in the folder (not measured for this folder)
+- A clean-up, "clear FiveM cache" or optimiser tool that empties FiveM's folders
+- Antivirus software quarantining or removing a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+<a id="rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d"></a>
+
+#### The change journal holds a rename in FiveM's plugin folder
+
+- Id: `7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d`
+- File: [`rules/usn/plugins/files-renamed/rule.yaml`](../rules/usn/plugins/files-renamed/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `plugins`
+- Written: 2026-09-30
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file renamed directly inside FiveM for GTA V Legacy's plugin folder, moved into it or moved out of it. A rename inside the folder leaves two records, one for the old name and one for the new. The row gives how many records, and the first and last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was renamed, moved in or moved out there within that span. The journal does not record which program changed a file, so this does not say who did it, or that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `plugins` (text, ASCII case ignored)
+- `renamed|gte`: is at least `1`
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player renamed, moved or replaced a graphics mod, ReShade, an ENB or another plugin they had installed
+- An update that writes a new copy of a file and swaps it in by renaming, by FiveM, its updater or a plugin (not measured for this folder)
+- A file moved to the Recycle Bin or to another folder on the same drive, which the journal records as a rename (how the Recycle Bin shows was not measured)
+- Antivirus software quarantining a file
+- FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not counted at all, so this can also remove a row that would otherwise be here
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+- <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
 ## Timeline selectors
 
 A timeline selector is written like a rule and produces no evidence: the observations it matches put their times on the report's timeline, in Self and SS mode, each with the text and the ordinary causes below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not (ADR 0034): a name says nothing about which program it was, and each one says so.
@@ -1760,6 +2087,87 @@ Only what BAM still holds. Windows removes BAM entries older than seven days whe
 - Windows keeping the record after the program's files were removed
 
 ### `evtx` / `timeline`
+
+<a id="rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8"></a>
+
+#### When Code Integrity recorded that Windows refused to load a file
+
+- Id: `51bb1937-7ab2-48db-a2f2-78be82ba2fe8`
+- File: [`rules/evtx/timeline/code-integrity-blocked-image/rule.yaml`](../rules/evtx/timeline/code-integrity-blocked-image/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `evtx`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `timeline`
+- Written: 2026-09-30
+
+**About this check**
+
+Puts on the timeline the first and last time the Code Integrity log still holds a record of Windows refusing to load a program, a DLL or a driver whose signature did not meet what was required of it. This tool does not read what is inside those records, so a time here does not say which file was refused, which program asked for it or which policy refused it. Windows 11 refuses some files by default, and an ordinary PC measured for this held hundreds of these records. It is not evidence that anything was injected, blocked on purpose or removed.
+
+**Matches when all of these hold for one observation**
+
+- `channel`: is `Microsoft-Windows-CodeIntegrity/Operational` (text, ASCII case ignored)
+- `event_id`: is one of `3033`, `3077`
+- `provider`: is `Microsoft-Windows-CodeIntegrity` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the records the Code Integrity log still holds. It keeps about 1 MB by default and overwrites its oldest records when it is full — on an ordinary PC measured for this, about three weeks — and a cleared log holds none.
+
+**Ordinary things behind these times**
+
+- Microsoft's vulnerable driver blocklist, on by default on Windows 11, refusing an old driver that hardware utilities, RGB and fan control, overclocking tools and older anti-cheat software install
+- Memory integrity, Smart App Control or S mode refusing a driver or program that does not meet their requirements
+- A program that asks Windows to load only Microsoft-signed code into itself (Code Integrity Guard) refusing a DLL that another program tries to place in it — overlays, screen recorders, input tools, antivirus and accessibility software. Which programs on a PC do this is not measured
+- A signature that was revoked or has expired on a file the PC still has
+- An App Control policy an employer, a school or a PC maker installed
+- No time here does not mean nothing was refused before the log's oldest record
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/operations/event-id-explanations>
+- <https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules>
+
+<a id="rule-63269014-f728-424c-8e18-e36fe79030aa"></a>
+
+#### When Microsoft Defender recorded a detection
+
+- Id: `63269014-f728-424c-8e18-e36fe79030aa`
+- File: [`rules/evtx/timeline/defender-detection/rule.yaml`](../rules/evtx/timeline/defender-detection/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `evtx`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `timeline`
+- Written: 2026-09-30
+
+**About this check**
+
+Puts on the timeline the first and last time Microsoft Defender's log still holds a record that it detected malware or potentially unwanted software, or acted on something it detected. This tool does not read what is inside those records, so a time here does not say what was detected, where, or whether it was ever run, and Defender records its own mistakes in the same words. It is not evidence about the file or about the person.
+
+**Matches when all of these hold for one observation**
+
+- `channel`: is `Microsoft-Windows-Windows Defender/Operational` (text, ASCII case ignored)
+- `event_id`: is one of `1116`, `1117`
+- `provider`: is `Microsoft-Windows-Windows Defender` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the records Defender's log still holds. It keeps up to 16 MiB by default and overwrites its oldest records when it is full, and a cleared log holds none.
+
+**Ordinary things behind these times**
+
+- Potentially unwanted software bundled with free programs
+- Game trainers, mod tools, key generators and cracked software, which antivirus products flag as unwanted software or hacking tools
+- A false positive on a new or unsigned program
+- A file that was downloaded and never run
+- A detection in a file Defender removed at once
+- No time here does not mean Defender detected nothing before the log's oldest record, or that another antivirus did not
+
+**References**
+
+- <https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus>
 
 <a id="rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1"></a>
 

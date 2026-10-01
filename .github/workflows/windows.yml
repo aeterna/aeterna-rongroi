@@ -533,6 +533,36 @@ jobs:
           } catch {
             Write-Output "Get-NetFirewallRule PersistentStore: $($_.Exception.Message)"
           }
+          # ADR 0060. The collector's own reading of this runner: every program service, Run and RunOnce
+          # value and scheduled task action, with the file each names and, outside the Windows folder, its
+          # hash and signature, which the baseline reproduces. A runner image's services and tasks belong to
+          # no person, and no argument is ever read. The runner is elevated, so the task files are read.
+          $autostart = @(@($report.unmatched | Where-Object { $_.collector -eq 'autostart' } | ForEach-Object { $_.observations }) +
+            @($report.evidence | Where-Object { $_.collector -eq 'autostart' -and $_.state -eq 'found' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ })
+          $autostartServices = @($autostart | Where-Object { $_.fields.location -eq 'service' })
+          $autostartRun = @($autostart | Where-Object { $_.fields.location -eq 'run' })
+          $autostartTasks = @($autostart | Where-Object { $_.fields.location -eq 'task' })
+          if ($autostartServices.Count -eq 0) { throw 'autostart read no program service on the runner' }
+          if ($autostartTasks.Count -eq 0) { throw 'autostart read no scheduled task on the elevated runner' }
+          $autostartHashed = @($autostart | Where-Object { $_.fields.sha256 })
+          Write-Output "autostart count: $($autostartServices.Count) services, $($autostartRun.Count) run values, $($autostartTasks.Count) task actions, $($autostartHashed.Count) hashed"
+          $autostart | ForEach-Object { Write-Output "autostart: $($_.fields | ConvertTo-Json -Compress)" }
+          # ADR 0060, section 9. The collector's reading of this runner's Defender exclusions — the image's
+          # own, which belong to no person — and PowerShell's own list beside it. No IP address is read.
+          $exclusions = @(@($report.unmatched | Where-Object { $_.collector -eq 'defender_exclusion' } | ForEach-Object { $_.observations }) +
+            @($report.evidence | Where-Object { $_.collector -eq 'defender_exclusion' -and $_.state -eq 'found' } | ForEach-Object { $_.observations }) |
+            Where-Object { $_ })
+          $exclusionRow = @($report.evidence | Where-Object { $_.collector -eq 'defender_exclusion' })
+          if ($exclusionRow.Count -eq 0) { throw 'no defender_exclusion rule row on the runner' }
+          if ($exclusionRow[0].state -eq 'unmeasured') { throw "defender_exclusion was not measured on the elevated runner: $($exclusionRow[0].reason)" }
+          Write-Output "defender_exclusion count: $($exclusions.Count)"
+          $exclusions | ForEach-Object { Write-Output "defender_exclusion: $($_.fields | ConvertTo-Json -Compress)" }
+          try {
+            Write-Output "Get-MpPreference ExclusionPath: $((Get-MpPreference -ErrorAction Stop).ExclusionPath -join ' | ')"
+          } catch {
+            Write-Output "Get-MpPreference: $($_.Exception.Message)"
+          }
           # ADR 0052. `--full` asks on standard error before anything is read, and only `yes` starts a full
           # scan: `no` gives the standard scan, whose `full` collectors are `not_consented`, and `yes` gives a
           # full scan that calls them. The runner has no FiveM for GTA V Enhanced, so its server cache

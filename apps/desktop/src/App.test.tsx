@@ -8,10 +8,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
 import type { ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
+import { COPIED_FOR_MS } from "./views/CodeLink";
 
 // Vitest runs with apps/desktop as the working directory.
 const SNAPSHOTS = resolve(process.cwd(), "../../crates/rongroi-collectors/tests/snapshots");
@@ -56,6 +57,9 @@ let linksOverride: { repository: string; code: string; commit: string | null } |
 // Carried fix (b): a `code_links` call that never resolves, so `links` stays `null` — the same shape
 // the UI sees while the call is still in flight or after it failed.
 let linksNeverResolve = false;
+/** An IPC call Rust refused, for the pages that must say so rather than stay blank. */
+let headerFails = false;
+let linksFail = false;
 let clipboardWrites: string[] = [];
 const REPOSITORY = "https://github.com/aeterna/aeterna-rongroi";
 const COMMIT = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
@@ -74,6 +78,8 @@ beforeEach(async () => {
   headerOverride = null;
   linksOverride = null;
   linksNeverResolve = false;
+  headerFails = false;
+  linksFail = false;
   clipboardWrites = [];
   await i18n.changeLanguage("en");
   mockIPC((cmd, args) => {
@@ -81,6 +87,9 @@ beforeEach(async () => {
     const payload = (args ?? {}) as Record<string, unknown>;
     switch (cmd) {
       case "report_header":
+        if (headerFails) {
+          throw new Error("refused");
+        }
         return headerOverride ?? selfView.header;
       case "report_view":
         return viewOverride ?? (payload.mode === "ss" ? ssView : selfView);
@@ -101,9 +110,23 @@ beforeEach(async () => {
             },
           },
         };
+      case "age_texts":
+        return {
+          prefetch: {
+            retention:
+              payload.lang === "th"
+                ? "Windows ลบไฟล์ Prefetch เอง"
+                : "Windows removes Prefetch files itself.",
+            documented: false,
+            references: ["docs/adr/0030-the-words-for-what-was-not-measured.md"],
+          },
+        };
       case "code_links":
         if (linksNeverResolve) {
           return new Promise(() => {});
+        }
+        if (linksFail) {
+          throw new Error("refused");
         }
         return linksOverride ?? { repository: REPOSITORY, code: REPOSITORY, commit: null };
       case "relaunch_full":
@@ -164,6 +187,75 @@ describe("App", () => {
 
   // ADR 0051: the SS view shows its timeline, with what it never says above it, and the scan's own
   // time as an anchor.
+  // ADR 0061: the SS view shows how far back each source reaches, beside the anchors; a source not
+  // read without administrator rights is "not known", never "empty"; the statement is shown with
+  // every record's line and its ordinary causes in full.
+  it("shows the trace ages and the cross-source statement in SS mode", async () => {
+    viewOverride = snapshot("trace_ages_elevated_ss_view");
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(await screen.findByText("How far back the traces reach")).toBeTruthy();
+    expect(screen.getByText(/beside when parts of this PC were set up/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Windows installed or last feature-upgraded \(InstallDate\): 2025-10-21, 72 days before this scan/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/Earliest installation date Windows Setup kept \(2 kept/)).toBeTruthy();
+    expect(screen.getByText(/1 other logs: 1 hold records, 0 not read/)).toBeTruthy();
+    expect(
+      screen.getByText(/Windows removes Prefetch files itself\. \(not documented/),
+    ).toBeTruthy();
+    expect(screen.getByText("a clock that was changed")).toBeTruthy();
+
+    expect(
+      screen.getByText("FiveM on this PC, beside Windows' records of programs that ran"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /no entry for FiveM\.exe, GTA5\.exe, GTA5_Enhanced\.exe, PlayGTAV\.exe or FiveM_b…_GTAProcess\.exe\. It holds 1 entries; the oldest is from 2016-01-12/,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "not read — Windows refused to open this. Whether it holds an entry is not known.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/This is not evidence of anything/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "a clock that was changed, so that times from different sources are not on the same clock",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says a source not read without administrator rights is not known, in Thai too", async () => {
+    const view = snapshot("trace_ages_elevated_ss_view");
+    const ages = view.trace_ages;
+    if (!ages) {
+      throw new Error("the snapshot has no trace ages");
+    }
+    viewOverride = {
+      ...view,
+      cross_source: [],
+      trace_ages: {
+        ...ages,
+        rows: ages.rows.map((row) =>
+          row.collector === "prefetch"
+            ? { collector: "prefetch", state: "unmeasured", reason: "not_admin" }
+            : row,
+        ),
+      },
+    };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(await screen.findByText("ร่องรอยย้อนกลับไปได้ไกลแค่ไหน")).toBeTruthy();
+    expect(screen.getByText("อ่านไม่ได้เพราะไม่มีสิทธิ์ผู้ดูแลระบบ — ไม่รู้")).toBeTruthy();
+    expect(screen.queryByText("FiveM ในเครื่องนี้ เทียบกับบันทึกของ Windows ว่าโปรแกรมใดเคยรัน")).toBeNull();
+  });
+
   it("shows the timeline in SS mode with its note and the scan time", async () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
@@ -302,6 +394,15 @@ describe("App", () => {
     viewOverride = {
       ...selfView,
       header: { ...selfView.header, boot_time: { state: "unmeasured", reason: "not_windows" } },
+      // The trace ages read the same header in Rust, so their boot-time anchor says the same.
+      trace_ages: selfView.trace_ages && {
+        ...selfView.trace_ages,
+        anchors: selfView.trace_ages.anchors.map((anchor) =>
+          anchor.anchor === "boot_time"
+            ? { anchor: "boot_time", state: "unmeasured", reason: "not_windows" }
+            : anchor,
+        ),
+      },
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
@@ -500,7 +601,7 @@ describe("App", () => {
     expect(statements[0]?.textContent).toContain("not a finding about this PC");
   });
 
-  // Each of the twelve reasons reaches a reader as a sentence, never as its identifier: a row
+  // Each of the fourteen reasons reaches a reader as a sentence, never as its identifier: a row
   // reading `source_empty` is a row that says nothing to the person it is about (ADR 0030).
   it.each([
     ["not_on_this_os", "this version of Windows does not keep this record"],
@@ -511,6 +612,7 @@ describe("App", () => {
     ["partial", "part of this was read and part of it was not"],
     ["budget_spent", "this program stopped reading before it finished"],
     ["not_consented", "only a full scan reads this, and this was the standard scan"],
+    ["other_volume", "this is on another drive, and this program reads only the system drive"],
   ])("shows %s as a sentence a non-expert reads", async (reason, sentence) => {
     const first = selfView.evidence[0];
     if (!first) {
@@ -528,13 +630,46 @@ describe("App", () => {
           expected: false,
         },
       ],
-      // The row is what this test reads; the timeline states its own unmeasured sources.
+      // The row is what this test reads; the timeline and the trace ages state their own
+      // unmeasured sources.
       timeline: { ...selfView.timeline, unmeasured: [] },
+      trace_ages: undefined,
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
     fireEvent.click(await screen.findByText(/^Check: /));
     expect(await screen.findByText(new RegExp(sentence))).toBeTruthy();
+  });
+
+  // A count the change journal gives is for the span it still held; the row says that span, and a
+  // source that held no record says there was none (ADR 0047, amendment of 2026-09-30).
+  it.each([
+    [
+      { state: "span", from: "2026-09-30T10:24:00Z", to: "2026-09-30T11:03:00Z" },
+      /held only 2026-09-30T10:24:00Z to 2026-09-30T11:03:00Z/,
+    ],
+    [{ state: "no_span" }, /so there is no span/],
+  ] as const)("shows the span a row's count is for (%o)", async (band, sentence) => {
+    const first = selfView.evidence[0];
+    if (!first) {
+      throw new Error("the self-view snapshot has no evidence");
+    }
+    viewOverride = {
+      ...selfView,
+      evidence: [
+        {
+          rule_id: first.rule_id,
+          collector: first.collector,
+          strength: first.strength,
+          state: "found",
+          observations: [],
+        },
+      ],
+      row_bands: { [first.rule_id]: band },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText(sentence)).toBeTruthy();
   });
 
   // The third scope statement: which scan the player chose is one fact about the scan (ADR 0052).
@@ -647,10 +782,16 @@ describe("App", () => {
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     const buttons = Array.from(summary.querySelectorAll("button"));
     expect(buttons.map((b) => b.textContent)).toEqual([
-      `${selfView.listed.found}found — each one lists ordinary things that also produce it`,
-      `${selfView.listed.not_found}not found — each row says how far back it can see`,
-      `${selfView.listed.unmeasured}not measured — each row says why`,
+      `${selfView.listed.found} found — each one lists ordinary things that also produce it`,
+      `${selfView.listed.not_found} not found — each row says how far back it can see`,
+      `${selfView.listed.unmeasured} not measured — each row says why`,
     ]);
+    // A screen reader reads the count and its words apart, not "1found".
+    expect(
+      screen.getByRole("button", {
+        name: `${selfView.listed.found} found — each one lists ordinary things that also produce it`,
+      }),
+    ).toBeTruthy();
     expect(summary.textContent).toContain("This report cannot prove that a PC is clean.");
   });
 
@@ -666,6 +807,51 @@ describe("App", () => {
     expect(screen.queryByText(/— show what was checked$/)).toBeNull();
     fireEvent.click(screen.getByText("Show every state"));
     expect(found.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  // A count of 0 is a button like the others; choosing it must not leave an empty page.
+  it("says so when the chosen state has no row", async () => {
+    viewOverride = {
+      ...selfView,
+      evidence: selfView.evidence.filter((item) => item.state !== "unmeasured"),
+      listed: { ...selfView.listed, unmeasured: 0 },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const summary = await screen.findByRole("region", { name: "What this scan lists" });
+    expect(screen.queryByText("No row in this scan is in this state.")).toBeNull();
+    fireEvent.click(summary.querySelectorAll("button")[2] as HTMLElement);
+    expect(screen.getByText("No row in this scan is in this state.")).toBeTruthy();
+    // It is about the filter, not the report: the report's own empty sentence stays away.
+    expect(screen.queryByText("No evidence to show.")).toBeNull();
+    fireEvent.click(screen.getByText("Show every state"));
+    expect(screen.queryByText("No row in this scan is in this state.")).toBeNull();
+  });
+
+  // Two copies of one program running are two identical observations (ADR 0010).
+  it("lists two identical observations twice, without a repeated key", async () => {
+    const twin = {
+      collector: "process",
+      fields: { name: "FiveM.exe", path: "C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.exe" },
+    };
+    viewOverride = {
+      ...selfView,
+      unmatched: [{ collector: "process", observations: [twin, twin] }],
+    };
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      render(<App />);
+      fireEvent.click(await screen.findByText("Check my own PC"));
+      const section = await screen.findByRole("region", { name: "Unmatched observations" });
+      expect(section.querySelectorAll("li").length).toBeGreaterThanOrEqual(2);
+      expect(section.textContent?.split("name=FiveM.exe").length).toBe(3);
+      const keyWarnings = errors.mock.calls.filter((call) =>
+        call.some((part) => String(part).includes("same key")),
+      );
+      expect(keyWarnings).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it("groups rows under a plain name for their collector", async () => {
@@ -837,6 +1023,58 @@ describe("App", () => {
     expect(screen.getByText(/^Hidden in SS mode:/)).toBeTruthy();
     expect(screen.queryByText("You may refuse.")).toBeNull();
     expect(screen.queryByText("What do you want to do?")).toBeNull();
+  });
+
+  // The header is the app's: About & code does not ask Rust for it a second time.
+  it("asks for the header once, whether or not About & code is opened", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    await screen.findByText(REPOSITORY);
+    expect(calls.filter((cmd) => cmd === "report_header")).toEqual(["report_header"]);
+  });
+
+  it("says on About & code that its details could not be read, and still goes back", async () => {
+    linksFail = true;
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    expect(
+      await screen.findByText("What this page shows could not be read from the program."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText("Back"));
+    expect(await screen.findByText("Check my own PC")).toBeTruthy();
+  });
+
+  it("says on About & code that its details could not be read when the header was refused", async () => {
+    headerFails = true;
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    expect(
+      await screen.findByText("What this page shows could not be read from the program."),
+    ).toBeTruthy();
+  });
+
+  it("offers to copy again after saying Copied", async () => {
+    stubClipboard("ok");
+    render(<App />);
+    fireEvent.click(await screen.findByText("About & code"));
+    await screen.findByText(REPOSITORY);
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getAllByText("Copy link")[0] as HTMLElement);
+      });
+      expect(screen.getByText("Copied")).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(COPIED_FOR_MS - 1);
+      });
+      expect(screen.getByText("Copied")).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.queryByText("Copied")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("says a refused copy and leaves the text to select", async () => {

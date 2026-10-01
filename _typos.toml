@@ -34,3 +34,6 @@ amd64fre = "amd64fre"
 NDProxy = "NDProxy"
 SerCx = "SerCx"
 SerCx2 = "SerCx2"
+# Windows task folder names in baseline-elevated-win11's scheduled tasks (ADR 0060), read from a GitHub-hosted runner: data, not prose.
+UPnP = "UPnP"
+UPnPHostConfig = "UPnPHostConfig"

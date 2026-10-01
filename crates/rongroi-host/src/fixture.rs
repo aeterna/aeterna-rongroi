@@ -10,11 +10,11 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DirEntryInfo,
-    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
-    FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistryData, RegistrySource,
-    SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
-    UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
+    AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
+    DirEntryInfo, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
+    FirmwareSecureBoot, FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistryData,
+    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
+    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -73,6 +73,24 @@ struct HostFile {
     /// which the accessors report as `Unsupported`.
     #[serde(default)]
     usn_journal: Option<FixtureUsnJournal>,
+    /// The SID of the account the scan runs as (ADR 0060). Absent means the fixture never modelled
+    /// it, which the accessor reports as `Unsupported`. A fixture's SID is invented, never a real one.
+    #[serde(default)]
+    account_sid: Option<String>,
+    /// The creation and last-write times of drive roots, keyed `C:` (ADR 0061). A drive root has no
+    /// parent listing to carry them, so they are written here; a drive not named here is not there.
+    #[serde(default)]
+    drive_roots: BTreeMap<String, FixtureTimes>,
+}
+
+/// One entry's own times, written as a listing writes them: RFC 3339 in whole seconds (ADR 0061).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureTimes {
+    #[serde(default)]
+    created: Option<String>,
+    #[serde(default)]
+    modified: Option<String>,
 }
 
 /// What a fixture says the Event Log service states about one channel (ADR 0042). A fixture with no
@@ -396,6 +414,12 @@ fn normalise_path(path: &str) -> String {
     path.trim_end_matches(['\\', '/']).to_ascii_lowercase()
 }
 
+/// Whether a normalised path is a drive root, `c:`.
+fn is_drive_root(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+}
+
 /// Splits a normalised path into its parent directory and the last segment.
 fn split_parent(path: &str) -> (&str, &str) {
     path.rfind(['\\', '/'])
@@ -560,6 +584,10 @@ struct FixtureUsnJournal {
     other_volume_folders: Vec<String>,
     #[serde(default)]
     records: Vec<FixtureUsnRecords>,
+    /// The journal's `UsnJournalID`, which the host turns into the date it gives when read as a
+    /// `FILETIME` and never hands over itself (ADR 0061). Absent: an identifier that gives no date.
+    #[serde(default)]
+    journal_id: Option<u64>,
 }
 
 fn default_usn_volume() -> char {
@@ -851,6 +879,7 @@ fn resolve_usn_journal(
             next_usn: usn,
             lowest_valid_usn: 0,
             maximum_size: described.maximum_size,
+            created_on: described.journal_id.and_then(crate::journal_created_on),
         },
         end: match described.ends {
             FixtureUsnEnd::Complete => UsnReadEnd::Complete,
@@ -880,6 +909,9 @@ pub struct FixtureHost {
     /// Keyed by the lower-cased channel name, like every other name this host compares.
     event_log_channels: Option<BTreeMap<String, StoredChannel>>,
     usn_journal: Option<StoredUsnJournal>,
+    account_sid: Option<String>,
+    /// Keyed by the lower-cased drive, `c:`.
+    drive_roots: BTreeMap<String, EntryTimes>,
 }
 
 impl FixtureHost {
@@ -927,6 +959,21 @@ impl FixtureHost {
             .into_iter()
             .map(|(name, value)| (name.to_ascii_lowercase(), value))
             .collect();
+        let mut drive_roots = BTreeMap::new();
+        for (drive, times) in file.drive_roots {
+            let key = normalise_path(&drive);
+            if !is_drive_root(&key) {
+                return Err(FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!("drive_roots: `{drive}` is not a drive such as `C:`"),
+                });
+            }
+            let times = EntryTimes {
+                created: listed_time_of(times.created.as_deref(), &drive, origin)?,
+                modified: listed_time_of(times.modified.as_deref(), &drive, origin)?,
+            };
+            drive_roots.insert(key, times);
+        }
         let mut filesystem = BTreeMap::new();
         for (dir, files) in file.filesystem {
             let mut entries = Vec::with_capacity(files.len());
@@ -952,6 +999,8 @@ impl FixtureHost {
             firmware: file.firmware,
             processes: file.processes,
             milliseconds_since_boot: file.milliseconds_since_boot,
+            account_sid: file.account_sid,
+            drive_roots,
             event_log_channels: file
                 .event_log_channels
                 .map(|channels| {
@@ -1239,6 +1288,30 @@ impl FilesystemSource for FixtureHost {
             ))
         })
     }
+
+    /// A drive root's times from `drive_roots:`; any other entry's from its parent's listing, as
+    /// `list_dir` reports them. A path the fixture denies is refused; its parent being denied is not
+    /// a refusal, because a live host does not list the parent to answer (ADR 0061).
+    fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError> {
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        if self.is_denied(&normalised) {
+            return Err(SourceError::AccessDenied);
+        }
+        if is_drive_root(&normalised) {
+            return Ok(self.drive_roots.get(&normalised).copied());
+        }
+        let (dir, name) = split_parent(&normalised);
+        Ok(self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+                .map(|file| EntryTimes {
+                    created: file.created,
+                    modified: file.modified,
+                })
+        }))
+    }
 }
 
 impl EventLogConfigSource for FixtureHost {
@@ -1268,6 +1341,14 @@ impl EventLogConfigSource for FixtureHost {
 impl EnvironmentSource for FixtureHost {
     fn env_var(&self, name: &str) -> Option<String> {
         self.env.get(&name.to_ascii_lowercase()).cloned()
+    }
+}
+
+impl AccountSource for FixtureHost {
+    fn account_sid(&self) -> Result<String, SourceError> {
+        self.account_sid.clone().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe its account".to_owned())
+        })
     }
 }
 
@@ -2091,6 +2172,73 @@ processes:
                 DirEntryInfo::named("silent.log", true),
             ]))
         );
+    }
+
+    /// A path's own times are what its parent's listing says, a drive root's are what `drive_roots:`
+    /// says, and a denied path is refused while a denied parent is not (ADR 0061).
+    #[test]
+    fn times_come_from_the_parents_listing_or_the_drive_roots() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\ndrive_roots:\n  'C:':\n    created: 2019-01-02T03:04:05Z\naccess_denied:\n  - 'C:\\Locked'\n  - 'C:\\Hidden'\nfilesystem:\n  'C:\\':\n    - name: $Recycle.Bin\n      directory: true\n      created: 2019-01-03T00:00:00Z\n      modified: 2020-01-01T00:00:00Z\n    - name: Locked\n      directory: true\n  'C:\\Hidden':\n    - name: inner\n      directory: true\n      created: 2021-01-01T00:00:00Z\n",
+            "inline",
+        )
+        .unwrap();
+        let at = |text: &str| Some(text.parse::<jiff::Timestamp>().unwrap());
+        assert_eq!(
+            host.times(r"C:\"),
+            Ok(Some(EntryTimes {
+                created: at("2019-01-02T03:04:05Z"),
+                modified: None,
+            }))
+        );
+        assert_eq!(
+            host.times(r"c:\$RECYCLE.BIN"),
+            Ok(Some(EntryTimes {
+                created: at("2019-01-03T00:00:00Z"),
+                modified: at("2020-01-01T00:00:00Z"),
+            }))
+        );
+        assert_eq!(host.times(r"C:\Locked"), Err(SourceError::AccessDenied));
+        assert_eq!(
+            host.times(r"C:\Hidden\inner"),
+            Ok(Some(EntryTimes {
+                created: at("2021-01-01T00:00:00Z"),
+                modified: None,
+            }))
+        );
+        assert_eq!(host.times(r"C:\absent"), Ok(None));
+        assert_eq!(host.times(r"D:\"), Ok(None));
+        assert!(
+            FixtureHost::from_yaml_str(
+                "platform: windows\ndrive_roots:\n  'C:\\Windows': {}\n",
+                "inline"
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("is not a drive")
+        );
+    }
+
+    /// The journal identifier becomes a date inside the host and nothing else does (ADR 0061).
+    #[test]
+    fn a_journal_identifier_is_handed_over_as_its_date_only() {
+        let read = |yaml: &str| {
+            let host = FixtureHost::from_yaml_str(yaml, "inline").unwrap();
+            host.read_usn_journal('C', &mut |_| std::ops::ControlFlow::Continue(()))
+                .unwrap()
+                .unwrap()
+                .state
+                .created_on
+        };
+        assert_eq!(
+            read("platform: windows\nusn_journal:\n  journal_id: 132223104000000000\n"),
+            Some(jiff::civil::date(2020, 1, 1))
+        );
+        assert_eq!(
+            read("platform: windows\nusn_journal:\n  journal_id: 7\n"),
+            None
+        );
+        assert_eq!(read("platform: windows\nusn_journal: {}\n"), None);
     }
 
     #[test]

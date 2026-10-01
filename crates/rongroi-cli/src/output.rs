@@ -11,7 +11,7 @@ use rongroi_core::bundle::Bundle;
 use rongroi_core::model::{
     BootTime, EvidenceState, Mode, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
 };
-use rongroi_core::view::{EntrySource, ReportView, Timeline};
+use rongroi_core::view::{EntrySource, ReportView, RowBand, Timeline};
 
 /// Output language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -196,6 +196,23 @@ fn text_timeline(lang: Lang, key: &str) -> &'static str {
         (Lang::Th, "selectors") => "ความหมายของเวลาที่ถูกเลือกมาแสดง",
         (Lang::En, "selector_causes") => "Ordinary things behind these times",
         (Lang::Th, "selector_causes") => "เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้",
+        // The span a row's count is for, beside the row (ADR 0047, amendment of 2026-09-30).
+        (Lang::En, "row_band_found") => {
+            "The source held only {from} to {to} when it was read; what is counted here is from that span."
+        }
+        (Lang::Th, "row_band_found") => "ตอนที่อ่าน แหล่งนี้มีข้อมูลแค่ช่วง {from} ถึง {to} สิ่งที่นับได้ที่นี่มาจากช่วงนี้",
+        (Lang::En, "row_band_not_found") => {
+            "Nothing within this span: {from} to {to}, what the source held when it was read. Nothing \
+             before it was seen."
+        }
+        (Lang::Th, "row_band_not_found") => {
+            "ไม่มีอะไรในช่วงนี้: {from} ถึง {to} ซึ่งเป็นช่วงที่แหล่งนี้มีข้อมูลตอนที่อ่าน ก่อนหน้านั้นมองไม่เห็นเลย"
+        }
+        (Lang::En, "row_band_none") => {
+            "The source held no record when it was read, so there is no span in which anything could \
+             be seen."
+        }
+        (Lang::Th, "row_band_none") => "ตอนที่อ่าน แหล่งนี้ไม่มี record เลย จึงไม่มีช่วงที่จะเห็นอะไรได้",
         _ => "",
     }
 }
@@ -236,11 +253,11 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
 ///
 /// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
 /// name the thing that was not seen and never the person, and say it about the record or about this
-/// program rather than about the machine's owner. The same twelve strings are in
+/// program rather than about the machine's owner. The same fourteen strings are in
 /// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
 /// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
 /// `check-locales` there.
-fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
+pub(crate) fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
     match (lang, reason) {
         (Lang::En, UnmeasuredReason::NotWindows) => "not running on Windows",
         (Lang::Th, UnmeasuredReason::NotWindows) => "ไม่ได้รันบน Windows",
@@ -284,6 +301,13 @@ fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
         (Lang::Th, UnmeasuredReason::NotConsented) => {
             "ส่วนนี้อ่านเฉพาะการสแกนแบบ Full และครั้งนี้เป็นการสแกนแบบมาตรฐาน"
         }
+        // One drive's journal is read, by design, so nothing failed (ADR 0047, amendment of 2026-09-30).
+        (Lang::En, UnmeasuredReason::OtherVolume) => {
+            "this is on another drive, and this program reads only the system drive's change journal"
+        }
+        (Lang::Th, UnmeasuredReason::OtherVolume) => {
+            "ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น"
+        }
     }
 }
 
@@ -305,11 +329,14 @@ pub fn consent(lang: Lang) -> String {
             \x20 - whether a Prefetch or event log file is marked read-only\n\
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
+            \x20 - what Windows starts by itself: each program service's name and start setting, each Run and RunOnce value's name, and each scheduled task's name, whether it is on and what starts it, with the file each one starts — where it is and, outside the Windows folder, its SHA-256 and signature (Authenticode); never the arguments a program is given\n\
+            \x20 - Microsoft Defender's exclusions: each folder, program and file type Defender is told not to scan, and how many network addresses it is told to skip, never the addresses\n\
             \x20 - the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are\n\
             \x20 - what Windows says this installation is — the edition, the build, the registered organisation and the manufacturer, model and support link Settings shows, never the registered owner's name — and how each of the services Windows ships with (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) is set to start, or that its key is not there\n\
             \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
+            \x20 - when parts of this PC were set up, as dates and never times: when this Windows installation was installed or last feature-upgraded, the earliest installation date Windows Setup kept and how many it kept, when the Windows drive's change journal, its root folder and its $Recycle.Bin were created, and when FiveM's program folders were created; these dates can match two reports of this PC\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; and the oldest and newest change the journal holds for each folder above. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
@@ -323,11 +350,14 @@ pub fn consent(lang: Lang) -> String {
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
+            \x20 - สิ่งที่ Windows เริ่มเอง: ชื่อและการตั้งค่าการเริ่มทำงานของ service แต่ละตัว ชื่อค่าใน Run และ RunOnce แต่ละค่า และชื่อ scheduled task แต่ละตัว ว่าเปิดอยู่หรือไม่และอะไรทำให้มันเริ่ม พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง และถ้าอยู่นอกโฟลเดอร์ Windows ก็ SHA-256 กับลายเซ็น (Authenticode) โดยไม่อ่าน argument ที่โปรแกรมได้รับเลย\n\
+            \x20 - exclusion ของ Microsoft Defender: โฟลเดอร์ โปรแกรม และชนิดไฟล์แต่ละรายการที่ Defender ถูกสั่งไม่ให้สแกน และจำนวน address ของเครือข่ายที่ถูกยกเว้น โดยไม่อ่านตัว address\n\
             \x20 - การตั้งค่าที่กำหนดว่า traffic ของเครือข่ายไปที่ไหน โดยไม่อ่านบันทึกว่าเคยไปที่ไหน: บรรทัดในไฟล์ hosts ที่กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com พร้อม address นั้น (บรรทัดอื่นแค่นับจำนวน) proxy เปิดอยู่หรือไม่ และตั้ง proxy server หรือสคริปต์ตั้งค่า proxy ไว้หรือไม่ โดยไม่อ่าน address ของมัน และ rule ของ Windows Firewall สำหรับโปรแกรมในโฟลเดอร์ของ FiveM พร้อมจำนวน rule ทั้งหมด\n\
             \x20 - สิ่งที่ Windows บอกว่าตัวเองเป็นอะไร — edition, build, ชื่อองค์กรที่จดทะเบียนไว้ และชื่อผู้ผลิต รุ่นเครื่อง กับลิงก์ฝ่ายสนับสนุนที่ Settings แสดง โดยไม่อ่านชื่อเจ้าของที่จดทะเบียนไว้ — และเซอร์วิสที่ Windows มีมาให้แต่ละตัว (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) ถูกตั้งให้เริ่มทำงานแบบไหน หรือไม่มีคีย์ของมันอยู่\n\
             \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
+            \x20 - ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร เป็นวันที่ ไม่ใช่เวลา: Windows ชุดนี้ติดตั้งหรืออัปเกรด feature ครั้งล่าสุดเมื่อไร วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้และเก็บไว้กี่รายการ change journal ของไดรฟ์ Windows, root ของไดรฟ์ และ $Recycle.Bin ถูกสร้างเมื่อไร และโฟลเดอร์โปรแกรมของ FiveM ถูกสร้างเมื่อไร วันที่เหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
@@ -503,7 +533,13 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
 
     out.push_str(&evidence_section(view, bundle, lang));
 
+    // Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3).
+    out.push_str(&crate::trace_ages::statement(&view.cross_source, lang));
+
     out.push_str(&timeline_section(&view.timeline, bundle, lang));
+
+    // Beside the timeline, in both modes: how far back each source reaches (ADR 0061).
+    out.push_str(&crate::trace_ages::section(&view.trace_ages, bundle, lang));
 
     // Both sections come after the evidence and clearly apart from it, in this order.
     out.push_str(&own_traces_section(view, lang));
@@ -618,6 +654,9 @@ fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         if !detail.is_empty() {
             let _ = writeln!(out, "    {detail}");
         }
+        if let Some(band) = view.row_bands.get(&evidence.rule_id) {
+            let _ = writeln!(out, "    {}", row_band_line(band, &evidence.state, lang));
+        }
         // What the rule means and what it does not prove, beside every state; what legitimately
         // produces the same evidence, beside a match only. Both are mandatory in every rule and
         // neither reached a screen before (ADR 0027).
@@ -641,6 +680,21 @@ fn evidence_section(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
         }
     }
     out
+}
+
+/// The span a row's count is for, in the words its state needs (ADR 0047, amendment of 2026-09-30).
+fn row_band_line(band: &RowBand, state: &EvidenceState, lang: Lang) -> String {
+    match band {
+        RowBand::Span { from, to } => {
+            let key = if matches!(state, EvidenceState::NotFound { .. }) {
+                "row_band_not_found"
+            } else {
+                "row_band_found"
+            };
+            text(lang, key).replace("{from}", from).replace("{to}", to)
+        }
+        RowBand::NoSpan => text(lang, "row_band_none").to_owned(),
+    }
 }
 
 /// The timeline: its note, the spans the sources could show, what could not be read, the times, and
@@ -846,6 +900,7 @@ mod tests {
             },
             profiles_directory: None,
             scan_tier: rongroi_core::model::ScanTier::Standard,
+            anchors: Vec::new(),
         };
         let evidence = Evidence {
             rule_id: rule.id.clone(),
@@ -874,6 +929,8 @@ mod tests {
                 coverage_fields: std::collections::BTreeMap::new(),
                 unmeasured_sources: Vec::new(),
                 sensitive_fields: std::collections::BTreeMap::new(),
+                age_fields: std::collections::BTreeMap::new(),
+                timeline_selectors: std::collections::BTreeMap::new(),
             },
             bundle,
         )
@@ -1044,7 +1101,12 @@ mod tests {
     #[test]
     fn consent_names_every_kind_of_source() {
         let named: &[(&str, &[&str])] = &[
+            (
+                "autostart",
+                &["Run", "RunOnce", "scheduled task", "SHA-256"],
+            ),
             ("bam", &["BAM"]),
+            ("defender_exclusion", &["Microsoft Defender", "exclusion"]),
             ("driver_service", &["driver"]),
             ("evtx", &["event log"]),
             (
@@ -1136,6 +1198,37 @@ mod tests {
                 assert!(question.contains(words), "{words} missing from {question}");
             }
             for word in named.iter().flat_map(|(_, words)| words.iter()) {
+                assert!(question.contains(word), "{word} missing from {question}");
+            }
+        }
+    }
+
+    #[test]
+    fn consent_names_the_trace_ages_the_anchors_and_the_statement() {
+        // ADR 0061 decision 8: the anchor dates, the per-source counts and oldest times, and the
+        // statement are named in the change that shows them.
+        for (lang, words) in [
+            (
+                Lang::En,
+                [
+                    "installed or last feature-upgraded",
+                    "$Recycle.Bin",
+                    "how far back each of these records reaches",
+                    "one statement",
+                ],
+            ),
+            (
+                Lang::Th,
+                [
+                    "ติดตั้งหรืออัปเกรด feature ครั้งล่าสุด",
+                    "$Recycle.Bin",
+                    "ย้อนกลับไปได้ไกลแค่ไหน",
+                    "ข้อความหนึ่งข้อ",
+                ],
+            ),
+        ] {
+            let question = consent(lang);
+            for word in words {
                 assert!(question.contains(word), "{word} missing from {question}");
             }
         }
@@ -1285,6 +1378,52 @@ mod tests {
         for cause in &rule.falsepositives {
             assert!(!text.contains(cause), "{text}");
         }
+    }
+
+    /// A row whose count is for a span says the span beside it, in the words its state needs, in
+    /// both languages; a source that held no record says there was no span (ADR 0047, amendment of
+    /// 2026-09-30, decision 3).
+    #[test]
+    fn a_row_with_a_band_says_the_span_its_count_is_for() {
+        let (mut report, bundle) = report(false);
+        let rule = subject(&bundle).clone();
+        let band = RowBand::Span {
+            from: "2026-09-30T10:24:00Z".to_owned(),
+            to: "2026-09-30T11:03:00Z".to_owned(),
+        };
+        let found = {
+            let mut view = view::for_mode(&report, Mode::SelfCheck);
+            view.row_bands.insert(rule.id.clone(), band.clone());
+            render(&view, &bundle, Lang::En)
+        };
+        assert!(
+            found.contains(
+                "The source held only 2026-09-30T10:24:00Z to 2026-09-30T11:03:00Z when it was read"
+            ),
+            "{found}"
+        );
+
+        report.evidence[0].state = EvidenceState::NotFound {
+            retention: rule.retention.clone(),
+        };
+        let mut view = view::for_mode(&report, Mode::SelfCheck);
+        view.row_bands.insert(rule.id.clone(), band);
+        let english = render(&view, &bundle, Lang::En);
+        assert!(
+            english
+                .contains("Nothing within this span: 2026-09-30T10:24:00Z to 2026-09-30T11:03:00Z"),
+            "{english}"
+        );
+        let thai = render(&view, &bundle, Lang::Th);
+        assert!(
+            thai.contains("ไม่มีอะไรในช่วงนี้: 2026-09-30T10:24:00Z"),
+            "{thai}"
+        );
+
+        view.row_bands.insert(rule.id.clone(), RowBand::NoSpan);
+        let none = render(&view, &bundle, Lang::En);
+        assert!(none.contains("so there is no span"), "{none}");
+        assert!(!none.contains("Nothing within this span"), "{none}");
     }
 
     /// Two rules that could not be measured for want of administrator rights are one fact about the

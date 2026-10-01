@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { withKeys } from "../keys";
 import type { RuleText, Timeline as TimelineData, TimelineEntry } from "../types";
 
 interface Props {
@@ -88,7 +89,7 @@ export function Timeline({ timeline, texts }: Props) {
       <details open={shown.length <= 50}>
         <summary className="muted">{t("timeline.count", { count: shown.length })}</summary>
         <ol className="entries">
-          {keyed(shown).map(([key, entry]) => (
+          {withKeys(shown, (entry) => JSON.stringify(entry)).map(([key, entry]) => (
             <li key={key}>
               <code>{entry.at}</code> <Entry entry={entry} texts={texts} />
             </li>
@@ -122,17 +123,6 @@ export function Timeline({ timeline, texts }: Props) {
       )}
     </section>
   );
-}
-
-/** Each entry with a key made of what it says, and a count for the rare two that say the same. */
-function keyed(entries: TimelineEntry[]): [string, TimelineEntry][] {
-  const seen = new Map<string, number>();
-  return entries.map((entry) => {
-    const base = JSON.stringify(entry);
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    return [`${base}#${count}`, entry];
-  });
 }
 
 function Entry({ entry, texts }: { entry: TimelineEntry; texts: Record<string, RuleText> }) {

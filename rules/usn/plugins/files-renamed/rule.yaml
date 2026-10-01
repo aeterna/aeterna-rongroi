@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d
+title: The change journal holds a rename in FiveM's plugin folder
+description: >-
+  The NTFS change journal holds at least one record of a file renamed directly inside FiveM for GTA V
+  Legacy's plugin folder, moved into it or moved out of it. A rename inside the folder leaves two
+  records, one for the old name and one for the new. The row gives how many records, and the first and
+  last time. It shows the span the journal covered: on an ordinary PC in use that can be well under an
+  hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was
+  renamed, moved in or moved out there within that span. The journal does not record which program
+  changed a file, so this does not say who did it, or that anything was hidden.
+status: experimental
+collector: usn
+# ADR 0047, amendment of 2026-09-30: `context`, so a `not_found` is counted in SS mode, never listed.
+strength: context
+match:
+  location: plugins
+  folder: identified
+  renamed|gte: 1
+retention: >-
+  Only the span the change journal still held when the scan read it, shown beside this row. The journal
+  keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+# `not_admin` is a scope statement and never a row; `access_denied` is not declared, because the folder
+# is in the player's own profile and a denial there is unexpected (ADR 0047, amendment of 2026-09-30).
+unmeasured_when: [not_windows, source_absent, other_volume]
+falsepositives:
+  - The player renamed, moved or replaced a graphics mod, ReShade, an ENB or another plugin they had
+    installed
+  - An update that writes a new copy of a file and swaps it in by renaming, by FiveM, its updater or a
+    plugin (not measured for this folder)
+  - A file moved to the Recycle Bin or to another folder on the same drive, which the journal records as
+    a rename (how the Recycle Bin shows was not measured)
+  - Antivirus software quarantining a file
+  - FiveM reinstalled, or its folder deleted and made again. Records about the old folder are not
+    counted at all, so this can also remove a row that would otherwise be here
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records
+  - https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3
+author: aeterna-rongroi contributors
+date: 2026-09-30
+tags: [usn, plugins]

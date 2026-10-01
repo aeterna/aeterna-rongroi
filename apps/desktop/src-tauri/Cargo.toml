@@ -29,6 +29,10 @@ serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2.11.5", features = [] }
 
+[dev-dependencies]
+# `FixtureHost`, for the tests that remove profile folders left by earlier runs.
+rongroi-host = { workspace = true, features = ["fixture"] }
+
 [target.'cfg(windows)'.dependencies]
 rongroi-host-windows.workspace = true
 

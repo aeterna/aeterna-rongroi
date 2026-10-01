@@ -20,7 +20,8 @@ export type UnmeasuredReason =
   | "budget_spent"
   | "read_failed"
   | "collector_unavailable"
-  | "not_consented";
+  | "not_consented"
+  | "other_volume";
 
 export type Strength = "execution" | "presence" | "tamper" | "posture" | "context";
 
@@ -69,6 +70,95 @@ export interface ReportHeader {
   profiles_directory?: string;
   /** Which scan the player chose before it started; absent from an older report, which was standard (ADR 0052). */
   scan_tier?: ScanTier;
+  /** Dated facts about when parts of this PC were set up, UTC dates only (ADR 0061). */
+  anchors?: Anchor[];
+}
+
+/** Which anchor: a dated fact about when part of this PC was set up (ADR 0061). */
+export type AnchorKind =
+  | "install_date"
+  | "setup_earliest_install"
+  | "usn_journal_created"
+  | "system_drive_root_created"
+  | "recycle_bin_created"
+  | "fivem_legacy_program_folder_created"
+  | "fivem_legacy_app_folder_created"
+  | "fivem_enhanced_program_folder_created";
+
+/** An anchor's UTC date and what was read, or why there is none. */
+export type Anchor = { anchor: AnchorKind } & (
+  | { state: "measured"; on: string; source: string; kept?: number }
+  | { state: "unmeasured"; reason: UnmeasuredReason }
+);
+
+/** An anchor as the trace-ages section shows it: `boot_time` first, then the header's, in days. */
+export type AnchorAge = { anchor: "boot_time" | AnchorKind } & (
+  | { state: "measured"; on: string; days_before: number; source?: string; kept?: number }
+  | { state: "unmeasured"; reason: UnmeasuredReason }
+);
+
+/**
+ * How far back one source reaches (ADR 0061): its oldest time and how much it holds, or why it was
+ * not read. `not_admin` is "not known", never "empty".
+ */
+export type TraceAge = { collector: string; place?: string; subject?: string } & (
+  | {
+      state: "measured";
+      oldest?: string;
+      days_before?: number;
+      count: number;
+      extra?: Record<string, unknown>;
+    }
+  | { state: "unmeasured"; reason: UnmeasuredReason }
+);
+
+/** The logs the bundle does not read, as one line. */
+export interface FoldedLogs {
+  collector: string;
+  logs: number;
+  with_records: number;
+  not_read: number;
+}
+
+/** The trace-ages section, built in Rust for each mode (ADR 0061). Nothing in it is compared. */
+export interface TraceAges {
+  anchors: AnchorAge[];
+  rows: TraceAge[];
+  folded_logs?: FoldedLogs;
+}
+
+/** FiveM's side of the cross-source statement: a presence, a count and dates, never a name. */
+export interface FivemSide {
+  editions: string[];
+  folders_written?: string;
+  folders_days_before?: number;
+  server_folders: number;
+  servers_written?: string;
+}
+
+/** One of Windows' records of programs that ran, in one of ADR 0061's line forms. */
+export type SourceLine = { collector: string } & (
+  | { line: "selected"; entries: number; latest: string }
+  | { line: "no_entry"; entries: number; oldest: string; days_before: number }
+  | { line: "could_not_show"; entries: number }
+  | { line: "not_read"; reason: UnmeasuredReason }
+  | { line: "switched_off" }
+);
+
+/**
+ * FiveM's side beside Prefetch, BAM and PCA (ADR 0061 section 3). Not evidence and never counted;
+ * built in Rust only when its conditions hold, and always shown with its ordinary causes.
+ */
+export interface CrossSourceStatement {
+  fivem: FivemSide;
+  sources: SourceLine[];
+}
+
+/** A source's ordinary retention, from `rules/ages/<collector>.yaml`, translated (ADR 0061). */
+export interface AgeText {
+  retention: string;
+  documented: boolean;
+  references: string[];
 }
 
 /** How much a scan reads, chosen before it starts (ADR 0052). */
@@ -149,6 +239,13 @@ export interface Timeline {
   unmeasured: UnmeasuredSource[];
 }
 
+/**
+ * The span one row's count is for: the coverage band of the place its collector's coverage names —
+ * for `usn`, the change journal (ADR 0047, amendment of 2026-09-30). `no_span` when the source was
+ * read and held no record. Built in Rust, in both modes.
+ */
+export type RowBand = { state: "span"; from: string; to: string } | { state: "no_span" };
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
@@ -167,6 +264,12 @@ export interface ReportView {
   timeline: Timeline;
   /** The order collector groups appear in, from the core (ADR 0051). */
   collector_order: string[];
+  /** By rule id, for a `found` or `not_found` row whose count is for a span; absent when none is. */
+  row_bands?: Record<string, RowBand>;
+  /** How far back each source reaches, beside the anchors; the same in both modes (ADR 0061). */
+  trace_ages?: TraceAges;
+  /** At most one cross-source statement; absent when its conditions do not hold (ADR 0061). */
+  cross_source?: CrossSourceStatement[];
   hidden: {
     not_found: number;
     unmeasured_expected: number;

@@ -1,0 +1,27 @@
+{
+  "description": "What sits beside a refusal and must not be selected. 3089 (signature information, one per signature of a refused file) repeats a refusal 3033 or 3077 already dates; 3004 and 3023 are other Code Integrity records measured on the same PC; all three differ only in the event id. The last group is the same id from another provider on another channel: an event id means something only with its provider and channel (ADR 0031). That provider and channel are illustrative, not measured, and the counts and times here are illustrative unless the text above says they were measured.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+      "channel": "Microsoft-Windows-CodeIntegrity/Operational",
+      "provider": "Microsoft-Windows-CodeIntegrity",
+      "event_id": 3089, "level": 4, "count": 511,
+      "first_seen": "2026-09-09T10:12:03.004Z", "last_seen": "2026-09-29T21:40:55.318Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+      "channel": "Microsoft-Windows-CodeIntegrity/Operational",
+      "provider": "Microsoft-Windows-CodeIntegrity",
+      "event_id": 3004, "level": 2, "count": 1,
+      "first_seen": "2026-09-12T07:30:00.000Z", "last_seen": "2026-09-12T07:30:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+      "channel": "Microsoft-Windows-CodeIntegrity/Operational",
+      "provider": "Microsoft-Windows-CodeIntegrity",
+      "event_id": 3023, "level": 2, "count": 17,
+      "first_seen": "2026-09-10T08:01:17.552Z", "last_seen": "2026-09-28T08:02:40.119Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Application.evtx", "channel": "Application", "provider": "ExampleVendor-Updater",
+      "event_id": 3033, "level": 4, "count": 5,
+      "first_seen": "2026-08-01T12:00:00.000Z", "last_seen": "2026-09-01T12:00:00.000Z" } }
+  ]
+}
