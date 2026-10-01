@@ -1,6 +1,6 @@
 # ADR 0062 — FiveM's own folders, beside its last session
 
-- Status: proposed
+- Status: accepted — the owner decided the nine questions below on 2026-10-01
 - Date: 2026-10-01
 
 ## Context
@@ -378,10 +378,11 @@ purpose boundary; a finding of that kind goes to a private report under `SECURIT
 - **The roaming storage folder's name**, which the probe masked.
 - **Steam and Epic launches**, and a FiveM installed outside the default folders.
 
-## Before shipping: more sessions to measure
+## Before any code: more sessions to measure
 
-A second read-only probe of the same kind, on the same PC, elevated, and once with the limited token for the
-anchors, printing ages and counts only:
+This is a precondition of the implementation, kept by the owner with the decisions below. A second read-only
+probe of the same kind, on the same PC, elevated, and once with the limited token for the anchors, printing
+ages and counts only:
 
 1. **A second day.** One Legacy and one Enhanced session on another day, read during play, right after, and
    the next day before FiveM is opened again — the owner's "newest log is from yesterday" shape on an ordinary
@@ -397,38 +398,40 @@ anchors, printing ages and counts only:
 6. **The roaming storage folder's name**, printed as a fixed name only if it is FiveM's own and the same on
    another install.
 
-The margin (section 3) is set from what these show; the code does not ship until they are recorded here.
+The results are recorded in this ADR, as an amendment, before the change that builds it is opened. The margin
+(section 3) is confirmed or changed from what they show, and any decision they contradict goes back to the owner.
 
-## Owner decisions
+## Owner decisions (2026-10-01)
 
-1. **A second statement kind beside ADR 0061's**, `cross_source` returning one session statement per edition,
-   amending ADR 0061 section 3's "exactly one". *Recommended*: yes; the alternative, a new view section, would
-   duplicate the line forms, the reasons and the causes ADR 0061 already reviewed.
-2. **`process` gains `started_at`** through `GetProcessTimes` on the handle it already opens. *Recommended*:
-   yes. It is the only anchor a scan without administrator rights has, and the case the owner described is a
-   player who may still be in game.
-3. **Which edition**: `fivem_edition` derived inside `process`, `bam` and `prefetch` from the path each already
-   reads, never emitting a path. *Recommended*: yes for `process` and `bam` in the first change; for
-   `prefetch` only after measurement 5 shows the string table names the folder, and until then Prefetch's
-   `FiveM.exe` anchors only a PC with one edition installed.
-4. **The margin**: ten minutes either side. *Recommended*: ten minutes, revisited after the plan above; one
-   minute is within the gaps measured (two minutes), and an hour would hide the owner's own "a minute ago"
-   case less than it hides noise.
-5. **When the statement is shown**: whenever an edition has a session anchor, whether or not any line is
-   "before". *Recommended*: always, for the reason in "Alternatives weighed". The other option is to show it
-   only when a line is "before", "not there" or "no file".
-6. **Legacy's resource cache index**: `index_created_at`, `index_modified_at`, and one listing of `db` for its
-   count and latest times, amending ADR 0053. *Recommended*: yes; the folder's own times come from a listing
-   already made, and the owner's second example needs them.
-7. **More places** — `data\cache\servers`, `%APPDATA%\CitizenFX`, Enhanced's roaming storage folder.
-   *Recommended*: not in this change; reconsider after the plan above names the storage folder and shows
-   whether either edition's logs alone fall short.
-8. **How old a session may be**: the latest session of each edition, whatever its age, with its age printed.
-   *Recommended*: yes; a limit would hide the "newest log is from yesterday" case on a PC scanned a day later.
-   The other option is a limit such as 24 hours.
-9. **SS mode**: the statement in both modes, with the anchors' times at the timeline's precision and every
-   source as a duration. *Recommended*: yes; the consent question and `PRIVACY.md` name process start times,
+1. Session statements are a second kind of cross-source statement: `view::cross_source` returns ADR 0061's
+   statement and at most one session statement per edition, told apart by `CrossSourceStatement.kind`. ADR
+   0061 section 3's "exactly one statement" is amended accordingly in the change that builds this.
+2. `process` gains `started_at`, the process's creation time from `GetProcessTimes` on the handle it already
+   opens with `PROCESS_QUERY_LIMITED_INFORMATION`; a time that cannot be read omits the field.
+3. `fivem_edition` (`legacy` or `enhanced`) is derived inside `process` and `bam` from the path each already
+   reads, never emitting a path. `prefetch` gains it only after measurement 5 shows that a `.pf` file's string
+   table names FiveM's program folder; until then a Prefetch `FiveM.exe` is an anchor only when one edition's
+   `FiveM.exe` is present, and `FiveM_b…_GTAProcess.exe` is Legacy's by name.
+4. The margin is ten minutes either side of the session's start and end, shown in the text, and confirmed or
+   changed by the measurements before any code.
+5. The statement is shown whenever an edition has a session anchor, whether or not any of its lines is
+   "before", "not there" or "no file".
+6. `fivem_dir`'s `legacy_server_cache` gains `index_created_at`, `index_modified_at`, `index_files`,
+   `index_latest_created_at` and `index_latest_modified_at`, from the listing it already makes and one listing
+   of the fixed `db` subfolder, with no file name; ADR 0053 section 1 is amended in the change that builds it.
+   The trace ages row shows the index's creation date beside the oldest cache file's.
+7. No new place in this change: `data\cache\servers`, `%APPDATA%\CitizenFX` and Enhanced's roaming storage
+   folder are not read. They are reconsidered after the measurements name the storage folder.
+8. Each edition's latest session is used whatever its age, and its age is printed; there is no time limit.
+9. The statement is shown in both modes, with the anchors' times at the timeline's precision and every source
+   as a duration from the start or the end. The consent question and `PRIVACY.md` name process start times,
    the edition word and the index times in the change that ships them.
+
+With these decisions the owner kept the measurements under "Before any code" as a precondition: they are
+recorded here before the implementation is opened.
+
+The points under "What is unverified" stay open until those measurements, or the change that builds this,
+say which they settled.
 
 ## Consequences
 
@@ -446,4 +449,4 @@ The margin (section 3) is set from what these show; the code does not ship until
 - Consent text, `PRIVACY.md`, `docs/architecture.md`, both screenshare guides ("what not to conclude" gains a
   session statement's causes) and the glossary (**session**, **session statement**, `fivem_edition`) change
   with the code.
-- ADR 0053 and ADR 0061 are amended in the change that builds this, if decisions 1 and 6 are taken.
+- ADR 0053 and ADR 0061 are amended in the change that builds this (decisions 1 and 6).

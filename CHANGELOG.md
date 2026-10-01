@@ -6,14 +6,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
-- ADR 0062, proposed: FiveM's own folders beside its last session. A second kind of cross-source statement,
-  one per edition, would put each of FiveM's log, cache and resource-cache places beside the session it
-  belongs to — its start from a running FiveM process or Prefetch, its end from BAM — never beside the scan's
-  own time, with the ordinary causes always printed and a record that was not read stated as "not known".
-  It would need a process start time (`GetProcessTimes`), an edition word derived inside `process`, `bam`
-  and `prefetch` without emitting a path, and Legacy's resource cache index times. The ADR records a
-  read-only measurement of one Legacy and one Enhanced session on a Windows 11 PC, what is not measured, the
-  sessions to measure before any code, and nine owner decisions. Nothing is built.
+- ADR 0062 (accepted 2026-10-01, not implemented yet): FiveM's own folders beside its last session. A second
+  kind of cross-source statement, one per edition, will put each of FiveM's log, cache and resource-cache
+  places beside the session it belongs to — its start from a running FiveM process or Prefetch, its end from
+  BAM — never beside the scan's own time, with the ordinary causes always printed and a record that was not
+  read stated as "not known". It needs a process start time (`GetProcessTimes`), an edition word derived
+  inside `process` and `bam` (and `prefetch` once measured) without emitting a path, and Legacy's resource
+  cache index times. The ADR records a read-only measurement of one Legacy and one Enhanced session on a
+  Windows 11 PC, what is not measured, and the nine decisions the owner took; the further sessions it lists
+  are measured before any code.
 
 ## [0.5.0] - 2026-10-01
 
