@@ -61,14 +61,14 @@ Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
 
 ## สถานะ
 
-**รุ่นล่าสุด: [0.6.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.02-0.6.0)** ออกวันที่ 2 ตุลาคม 2026 —
+**รุ่นล่าสุด: [0.7.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.03-0.7.0)** ออกวันที่ 3 ตุลาคม 2026 —
 ยังเป็นรุ่นทดลอง (pre-release) มี rule 44 ตัว เกือบทั้งหมดยังเป็น `experimental` คือยังไม่ได้ลองกับเครื่องจริง
-มากพอ อ่านผลทุกข้ออย่างระมัดระวัง
+มากพอ อ่านผลทุกข้ออย่างระมัดระวัง · 0.7.0 เปลี่ยนหน้าตาของหน้าต่างเป็นธีมท้องฟ้าสว่าง การตรวจยังเหมือน 0.6.0
 รุ่นก่อนหน้า: [CHANGELOG.md](CHANGELOG.md)
 
 | ตรวจอะไร (ภาษาคน) | รายละเอียดทางเทคนิค |
 |---|---|
-| **ตัว FiveM เอง** — ไฟล์ของ FiveM เป็นของแท้ที่มีลายเซ็นไหม และมีไฟล์เสริมอะไรอยู่ในโฟลเดอร์ · **ใหม่ใน 0.6.0:** เล่น FiveM ครั้งล่าสุดเมื่อไร เทียบกับเวลาที่โฟลเดอร์ถูกเขียนล่าสุด | ทั้ง Legacy และ GTA V Enhanced · ตรวจลายเซ็น Authenticode แบบ offline · โฟลเดอร์ `plugins` และ `asi` ของ Enhanced · โฟลเดอร์ cache ต่อเซิร์ฟของ Enhanced (เฉพาะ full scan และผู้เล่นยินยอม) · เซสชันล่าสุดของแต่ละ edition จากเวลาเริ่ม process, Prefetch และ BAM ([ADR 0062](docs/adr/0062-fivem-s-folders-beside-its-last-session.md)) |
+| **ตัว FiveM เอง** — ไฟล์ของ FiveM เป็นของแท้ที่มีลายเซ็นไหม และมีไฟล์เสริมอะไรอยู่ในโฟลเดอร์ · **ตั้งแต่ 0.6.0:** เล่น FiveM ครั้งล่าสุดเมื่อไร เทียบกับเวลาที่โฟลเดอร์ถูกเขียนล่าสุด | ทั้ง Legacy และ GTA V Enhanced · ตรวจลายเซ็น Authenticode แบบ offline · โฟลเดอร์ `plugins` และ `asi` ของ Enhanced · โฟลเดอร์ cache ต่อเซิร์ฟของ Enhanced (เฉพาะ full scan และผู้เล่นยินยอม) · เซสชันล่าสุดของแต่ละ edition จากเวลาเริ่ม process, Prefetch และ BAM ([ADR 0062](docs/adr/0062-fivem-s-folders-beside-its-last-session.md)) |
 | **โปรแกรมที่เคยรัน** — สิ่งที่ Windows จำได้ว่าเพิ่งเปิดอะไรไป | Prefetch, BAM, PCA, process ที่รันอยู่ · โหมดตรวจเครื่องตัวเองแสดงเป็นรายการ โหมด SS แสดงแค่จำนวน · ไม่มี rule ตัดสินจากสิ่งที่สามแหล่งนี้บันทึก เพราะระบุโปรแกรมได้แค่ด้วยชื่อไฟล์ ([ADR 0034](docs/adr/0034-prefetch-bam-and-pca-carry-no-identity.md)) |
 | **ร่องรอยว่ามีการลบบันทึก** — log ของ Windows ถูกล้างหรือถูกปิดกั้น | event log ถูกล้าง · ไฟล์ event log หรือ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว หรือไม่ใช่ไฟล์ที่ Windows เขียนลงไป |
 | **การป้องกันถูกปิด** — แอนตี้ไวรัสและการตั้งค่าความปลอดภัยของ Windows | Microsoft Defender ถูกปิดการป้องกันแบบ real-time, service ถูกปิด, รายการยกเว้น (เฉพาะสิทธิ์ผู้ดูแลระบบ) · Secure Boot, TPM, memory integrity (HVCI), test signing, สวิตช์ป้องกัน exploit, การบันทึกของ PowerShell |
