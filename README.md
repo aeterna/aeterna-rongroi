@@ -7,6 +7,9 @@
 on a Windows PC and for machine settings that make cheating easier, then shows you the evidence.
 It never tells you a PC is "clean".
 
+People also call this a **FiveM PC check**, a **screenshare (SS) tool** or a **cheat scanner**. A player can run it
+to check their own PC, or server staff can watch it over a screenshare, with the player's consent.
+
 *rongroi* (ร่องรอย) is Thai for "traces". · อ่านภาษาไทย: [README.th.md](README.th.md)
 
 ## What it is — and what it is not
