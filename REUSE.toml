@@ -84,3 +84,11 @@ path = ["apps/desktop/src/assets/fonts/Anuphan-Variable.woff2", "site/fonts/Anup
 precedence = "override"
 SPDX-FileCopyrightText = "2019 The Anuphan Project Authors (https://github.com/cadsondemak/Anuphan)"
 SPDX-License-Identifier = "OFL-1.1"
+
+# Mali (Cadson Demak), the rounded typeface of headings and buttons in the desktop window and on the
+# landing page: the WOFF2 files of github.com/cadsondemak/Mali at commit 7e11de1, unchanged.
+[[annotations]]
+path = ["apps/desktop/src/assets/fonts/Mali-*.woff2", "site/fonts/Mali-*.woff2"]
+precedence = "override"
+SPDX-FileCopyrightText = "2018 The Mali Project Authors (https://github.com/cadsondemak/Mali)"
+SPDX-License-Identifier = "OFL-1.1"
