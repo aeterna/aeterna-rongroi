@@ -8,6 +8,13 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
+mod session;
+
+pub use session::{
+    AnchorName, Comparison, Duration, DurationUnit, IndexBeside, LineState, Relation, SessionEnd,
+    SessionLine, SessionStart, SessionState, SessionStatement,
+};
+
 use crate::model::{
     AgeCount, AgeRows, AnchorState, BootTime, Evidence, EvidenceState, Mode, Observation,
     OwnTraceEntry, Report, ReportHeader, SensitiveKind, Strength, UnmatchedGroup, UnmeasuredReason,
@@ -194,7 +201,8 @@ pub struct ReportView {
     #[serde(default)]
     pub trace_ages: TraceAges,
     /// `FiveM`'s side beside Windows' records of programs that ran, when the readable sources reach
-    /// back to `FiveM`'s last write (ADR 0061); at most one. Not evidence and never counted. Additive.
+    /// back to `FiveM`'s last write (ADR 0061), at most one; then each edition's last session beside its
+    /// own folders (ADR 0062), at most one per edition. Not evidence and never counted. Additive.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cross_source: Vec<CrossSourceStatement>,
 }
@@ -532,6 +540,10 @@ pub struct TraceAge {
     /// What it holds, or why it was not read.
     #[serde(flatten)]
     pub state: TraceAgeState,
+    /// For Legacy's resource cache, per launch mode: its index folder's creation date beside the oldest
+    /// cache file's, shown and never compared (ADR 0062 section 4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub index_beside: Vec<IndexBeside>,
 }
 
 /// What one source holds, or why it was not read (ADR 0061).
@@ -573,14 +585,25 @@ pub struct FoldedLogs {
     pub not_read: u64,
 }
 
+/// Facts from different collectors printed together (ADR 0061 section 3, amended by ADR 0062 section 1)
+/// — not evidence: no state, no rule, no strength, never counted. There is at most one of the first
+/// kind and at most one session statement per edition; `kind` tells them apart.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CrossSourceStatement {
+    /// `FiveM`'s folders beside Prefetch, BAM and PCA (ADR 0061).
+    FivemAndRecords(RecordsStatement),
+    /// One edition's last session beside its own folders (ADR 0062).
+    Session(SessionStatement),
+}
+
 /// `FiveM`'s side beside Windows' records of programs that ran (ADR 0061, section 3).
 ///
-/// A set of facts from different collectors printed together — not evidence: no state, no rule, no
-/// strength, never counted. It is built only when Prefetch or BAM was read, held no entry for the
-/// names `FiveM`'s timeline selectors list, and still reaches back further than `FiveM`'s last write;
-/// the ordinary causes of the same result are always printed with it.
+/// It is built only when Prefetch or BAM was read, held no entry for the names `FiveM`'s timeline
+/// selectors list, and still reaches back further than `FiveM`'s last write; the ordinary causes of the
+/// same result are always printed with it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CrossSourceStatement {
+pub struct RecordsStatement {
     /// `FiveM`'s side.
     pub fivem: FivemSide,
     /// Prefetch, BAM and PCA, each always, in that order.
@@ -676,8 +699,9 @@ pub fn trace_ages(report: &Report, mode: Mode) -> TraceAges {
     trace_ages_of(report, mode)
 }
 
-/// The cross-source statement, when its conditions hold (ADR 0061, section 3). The same in both modes:
-/// it holds no path, no file name, no user name and no server name.
+/// The cross-source statements: ADR 0061's, when its conditions hold, and one session statement per
+/// edition (ADR 0062). The same in both modes: they hold no path, no file name, no user name and no
+/// server name.
 pub fn cross_source(report: &Report, _mode: Mode) -> Vec<CrossSourceStatement> {
     cross_source_of(report)
 }
@@ -726,6 +750,12 @@ fn trace_ages_of(report: &Report, mode: Mode) -> TraceAges {
         let (mut collector_rows, folded) = age_rows(report, collector);
         for row in &mut collector_rows {
             row.subject = row.subject.take().map(&redact);
+            if row.collector == "fivem_dir"
+                && row.place.as_deref() == Some(session::LEGACY_SERVER_CACHE)
+                && matches!(row.state, TraceAgeState::Measured { .. })
+            {
+                row.index_beside = session::index_beside(report);
+            }
         }
         rows.extend(collector_rows);
         folded_logs = folded_logs.or(folded);
@@ -862,6 +892,7 @@ impl AgeSource<'_> {
             place,
             subject,
             state,
+            index_beside: Vec::new(),
         }
     }
 
@@ -1082,7 +1113,19 @@ fn measure(
     }
 }
 
+/// ADR 0061's statement, when its conditions hold, then one session statement per edition that has one
+/// (ADR 0062).
 fn cross_source_of(report: &Report) -> Vec<CrossSourceStatement> {
+    let mut statements = records_statement(report);
+    statements.extend(
+        session::sessions(report)
+            .into_iter()
+            .map(CrossSourceStatement::Session),
+    );
+    statements
+}
+
+fn records_statement(report: &Report) -> Vec<CrossSourceStatement> {
     let Some(scan) = scan_time(report) else {
         return Vec::new();
     };
@@ -1118,10 +1161,10 @@ fn cross_source_of(report: &Report) -> Vec<CrossSourceStatement> {
     if !reaches_back {
         return Vec::new();
     }
-    vec![CrossSourceStatement {
+    vec![CrossSourceStatement::FivemAndRecords(RecordsStatement {
         fivem: fivem.0,
         sources,
-    }]
+    })]
 }
 
 /// `FiveM`'s side, and T — the later of the folders' last write and the latest server cache folder's —
@@ -3479,7 +3522,18 @@ mod tests {
             .observations
     }
 
-    fn line_of(statement: &CrossSourceStatement, collector: &str) -> SourceLineKind {
+    /// ADR 0061's statements among the cross-source statements, leaving out the session statements.
+    fn records(report: &Report) -> Vec<RecordsStatement> {
+        cross_source(report, Mode::SelfCheck)
+            .into_iter()
+            .filter_map(|statement| match statement {
+                CrossSourceStatement::FivemAndRecords(statement) => Some(statement),
+                CrossSourceStatement::Session(_) => None,
+            })
+            .collect()
+    }
+
+    fn line_of(statement: &RecordsStatement, collector: &str) -> SourceLineKind {
         statement
             .sources
             .iter()
@@ -3496,7 +3550,8 @@ mod tests {
     fn the_statement_shows_when_a_readable_source_reaches_back_to_fivems_last_write() {
         let report = aged_report();
         let statements = cross_source(&report, Mode::SelfCheck);
-        let [statement] = statements.as_slice() else {
+        let records = records(&report);
+        let [statement] = records.as_slice() else {
             panic!("{statements:?}");
         };
         assert_eq!(statement.fivem.editions, vec!["legacy".to_owned()]);
@@ -3544,7 +3599,7 @@ mod tests {
             collector: "prefetch".to_owned(),
             observations: vec![selected],
         }];
-        assert_eq!(cross_source(&report, Mode::SelfCheck), vec![]);
+        assert_eq!(records(&report), vec![]);
         assert_eq!(
             source_line(
                 &report,
@@ -3575,7 +3630,7 @@ mod tests {
                     .insert("last_run".to_owned(), json!("2026-01-09T11:00:00Z"));
             }
         }
-        assert_eq!(cross_source(&later, Mode::SelfCheck), vec![]);
+        assert_eq!(records(&later), vec![]);
         assert_eq!(
             source_line(
                 &later,
@@ -3593,7 +3648,7 @@ mod tests {
             place: None,
             reason: UnmeasuredReason::ServiceDisabled,
         });
-        assert_eq!(cross_source(&off, Mode::SelfCheck), vec![]);
+        assert_eq!(records(&off), vec![]);
         assert_eq!(
             source_line(
                 &off,
@@ -3615,7 +3670,7 @@ mod tests {
             "pca",
             &[("name", "c.exe"), ("last_run", "2025-06-01T00:00:00Z")],
         )];
-        assert_eq!(cross_source(&pca_only, Mode::SelfCheck), vec![]);
+        assert_eq!(records(&pca_only), vec![]);
 
         // No FiveM.exe and no server cache folder.
         let mut no_fivem = aged_report();
@@ -3627,12 +3682,12 @@ mod tests {
         fivem
             .observations
             .retain(|observation| observation.fields["location"] != json!("legacy_exe"));
-        assert_eq!(cross_source(&no_fivem, Mode::SelfCheck), vec![]);
+        assert_eq!(records(&no_fivem), vec![]);
 
         // A bundle without FiveM's selectors on BAM.
         let mut no_selectors = aged_report();
         no_selectors.timeline_selectors.remove("bam");
-        assert_eq!(cross_source(&no_selectors, Mode::SelfCheck), vec![]);
+        assert_eq!(records(&no_selectors), vec![]);
     }
 
     /// The selectors the statement names are the ones the rules tree holds, on the collectors it says.
@@ -3650,5 +3705,570 @@ mod tests {
             assert_eq!(rule.collector, collector, "{id}");
             assert!(rule.match_fields().any(|field| field == "name"), "{id}");
         }
+    }
+
+    // ---- ADR 0062: the session statement ----
+
+    fn session_report(
+        observations: Vec<Observation>,
+        unread: &[(&str, UnmeasuredReason)],
+    ) -> Report {
+        let mut report = report();
+        report.header.generated_at = "2026-01-10T12:00:00Z".to_owned();
+        report.evidence = Vec::new();
+        report.own_traces = Vec::new();
+        report.discriminators = BTreeMap::from([("fivem_dir".to_owned(), "location".to_owned())]);
+        let mut groups: BTreeMap<String, Vec<Observation>> = BTreeMap::new();
+        for observation in observations {
+            groups
+                .entry(observation.collector.clone())
+                .or_default()
+                .push(observation);
+        }
+        report.unmatched = groups
+            .into_iter()
+            .map(|(collector, observations)| UnmatchedGroup {
+                collector,
+                observations,
+            })
+            .collect();
+        report.unmeasured_sources = unread
+            .iter()
+            .map(|(collector, reason)| UnmeasuredSource {
+                collector: (*collector).to_owned(),
+                place: None,
+                reason: *reason,
+            })
+            .collect();
+        report
+    }
+
+    fn run(collector: &str, name: &str, edition: &str, field: &str, at: &str) -> Observation {
+        observed(
+            collector,
+            &[("name", name), ("fivem_edition", edition), (field, at)],
+        )
+    }
+
+    fn folder(location: &str, pairs: &[(&str, serde_json::Value)]) -> Observation {
+        let mut fields = vec![
+            ("location", serde_json::json!(location)),
+            ("folder", serde_json::json!("listed")),
+        ];
+        fields.extend(pairs.iter().cloned());
+        number_observation("fivem_dir", &fields)
+    }
+
+    fn sessions_of(report: &Report) -> Vec<SessionStatement> {
+        cross_source(report, Mode::SelfCheck)
+            .into_iter()
+            .filter_map(|statement| match statement {
+                CrossSourceStatement::Session(session) => Some(session),
+                CrossSourceStatement::FivemAndRecords(_) => None,
+            })
+            .collect()
+    }
+
+    fn known(
+        statement: &SessionStatement,
+    ) -> (
+        &SessionStart,
+        &SessionEnd,
+        Option<Duration>,
+        &[SessionLine],
+        &[String],
+    ) {
+        match &statement.state {
+            SessionState::Known {
+                start,
+                end,
+                before_scan,
+                lines,
+                causes,
+            } => (start, end, *before_scan, lines, causes),
+            SessionState::NotKnown { .. } => panic!("{statement:?}"),
+        }
+    }
+
+    fn minutes(amount: i64) -> Duration {
+        Duration {
+            amount,
+            unit: DurationUnit::Minutes,
+        }
+    }
+
+    fn compared(relation: Relation, duration: Duration) -> Comparison {
+        Comparison { relation, duration }
+    }
+
+    fn line(lines: &[SessionLine], source: &str, variant: Option<&str>) -> LineState {
+        lines
+            .iter()
+            .find(|line| line.source == source && line.variant.as_deref() == variant)
+            .unwrap_or_else(|| panic!("{source} {variant:?} in {lines:?}"))
+            .state
+            .clone()
+    }
+
+    /// A Legacy session read elevated: Prefetch's `FiveM.exe` gives the start, BAM's the end, and each
+    /// source is compared with the start only; the index of each launch mode takes its own form, and a
+    /// `db` that could not be listed reads "not read: the folder could not be listed" (decision 2ก).
+    #[test]
+    fn a_legacy_session_compares_each_source_with_its_start() {
+        let report = session_report(legacy_session(), &[]);
+        let sessions = sessions_of(&report);
+        let [legacy] = sessions.as_slice() else {
+            panic!("{sessions:?}");
+        };
+        legacy_session_reads_as_read(legacy);
+    }
+
+    /// The records and folders of [`a_legacy_session_compares_each_source_with_its_start`].
+    fn legacy_session() -> Vec<Observation> {
+        use serde_json::json;
+        vec![
+            run(
+                "prefetch",
+                "fivem.exe",
+                "legacy",
+                "last_run",
+                "2026-01-10T10:00:00Z",
+            ),
+            // GTA V's own executable is never an anchor, even with an edition.
+            run(
+                "prefetch",
+                "gta5.exe",
+                "legacy",
+                "last_run",
+                "2026-01-10T11:00:00Z",
+            ),
+            run(
+                "bam",
+                "FiveM.exe",
+                "legacy",
+                "last_run",
+                "2026-01-10T10:30:00Z",
+            ),
+            folder(
+                "legacy_logs",
+                &[
+                    ("files", json!(3)),
+                    ("latest_created_at", json!("2026-01-10T10:00:30Z")),
+                    ("latest_modified_at", json!("2026-01-10T10:25:00Z")),
+                ],
+            ),
+            folder(
+                "legacy_cache",
+                &[
+                    ("files", json!(9)),
+                    ("latest_modified_at", json!("2026-01-09T09:00:00Z")),
+                ],
+            ),
+            folder(
+                "legacy_server_cache",
+                &[
+                    ("variant", json!("default")),
+                    ("files", json!(4)),
+                    ("earliest_created_at", json!("2025-10-01T00:00:00Z")),
+                    ("index_created_at", json!("2025-12-20T00:00:00Z")),
+                    ("index_files", json!(2)),
+                    ("index_latest_modified_at", json!("2026-01-10T10:01:00Z")),
+                ],
+            ),
+            folder(
+                "legacy_server_cache",
+                &[
+                    ("variant", json!("priv")),
+                    ("files", json!(1)),
+                    ("index_created_at", json!("2025-12-21T00:00:00Z")),
+                    ("index_modified_at", json!("2026-01-10T10:01:00Z")),
+                ],
+            ),
+            folder(
+                "legacy_server_cache",
+                &[
+                    ("variant", json!("fxdk")),
+                    ("files", json!(0)),
+                    ("index_created_at", json!("2025-12-22T00:00:00Z")),
+                    ("index_files", json!(0)),
+                ],
+            ),
+        ]
+    }
+
+    fn legacy_session_reads_as_read(legacy: &SessionStatement) {
+        assert_eq!(legacy.edition, "legacy");
+        let (start, end, before_scan, lines, causes) = known(legacy);
+        assert_eq!(
+            *start,
+            SessionStart::Prefetch {
+                at: "2026-01-10T10:00:00Z".to_owned(),
+                name: AnchorName::FivemExe
+            }
+        );
+        assert_eq!(
+            *end,
+            SessionEnd::Bam {
+                at: "2026-01-10T10:30:00Z".to_owned()
+            }
+        );
+        assert_eq!(
+            before_scan,
+            Some(Duration {
+                amount: 1,
+                unit: DurationUnit::Hours
+            })
+        );
+        assert_eq!(
+            line(lines, "legacy_logs", None),
+            LineState::Compared {
+                created: Some(compared(Relation::AfterStart, minutes(0))),
+                written: compared(Relation::AfterStart, minutes(25)),
+            }
+        );
+        assert_eq!(
+            line(lines, "legacy_cache", None),
+            LineState::Compared {
+                created: None,
+                written: compared(
+                    Relation::BeforeStart,
+                    Duration {
+                        amount: 25,
+                        unit: DurationUnit::Hours
+                    }
+                ),
+            }
+        );
+        legacy_index_lines_read_as_read(lines, causes);
+    }
+
+    fn legacy_index_lines_read_as_read(lines: &[SessionLine], causes: &[String]) {
+        assert_eq!(
+            line(lines, "legacy_resource_index", Some("default")),
+            LineState::Compared {
+                created: None,
+                written: compared(Relation::AfterStart, minutes(1)),
+            }
+        );
+        assert_eq!(
+            line(lines, "legacy_resource_index", Some("priv")),
+            LineState::NotListed
+        );
+        assert_eq!(
+            line(lines, "legacy_resource_index", Some("fxdk")),
+            LineState::NoFile
+        );
+        // A launch source: no join line, no join causes, no end cause.
+        assert!(lines.iter().all(|line| !line.join));
+        assert_eq!(causes[0], "standing_still");
+        assert!(
+            !causes
+                .iter()
+                .any(|cause| cause == "no_join" || cause == "ended_abruptly")
+        );
+    }
+
+    /// The margin is ten minutes before the start: nine minutes before reads "after" with nothing to
+    /// count, eleven reads "before".
+    #[test]
+    fn the_margin_is_ten_minutes_before_the_start() {
+        let start: jiff::Timestamp = "2026-01-10T10:00:00Z".parse().unwrap();
+        let at = |text: &str| text.parse::<jiff::Timestamp>().unwrap();
+        assert_eq!(
+            session::against_start(at("2026-01-10T09:51:00Z"), start),
+            compared(Relation::AfterStart, minutes(0))
+        );
+        assert_eq!(
+            session::against_start(at("2026-01-10T09:49:00Z"), start),
+            compared(Relation::BeforeStart, minutes(11))
+        );
+        assert_eq!(
+            Duration::of_seconds(3 * 86_400 + 5),
+            Duration {
+                amount: 3,
+                unit: DurationUnit::Days
+            }
+        );
+    }
+
+    /// An Enhanced session: its log folder is a launch source compared with the start, and its latest
+    /// write with the end too; the per-server cache is one join line from the newer of its two times.
+    /// The causes carry the join pair and the end cause; `GTA5_Enhanced.exe` is never an anchor.
+    #[test]
+    fn an_enhanced_session_compares_its_logs_with_the_end_too() {
+        use serde_json::json;
+        let mut observations = vec![
+            run(
+                "prefetch",
+                "FiveM.exe",
+                "enhanced",
+                "last_run",
+                "2026-01-10T09:00:00Z",
+            ),
+            run(
+                "prefetch",
+                "GTA5_Enhanced.exe",
+                "enhanced",
+                "last_run",
+                "2026-01-10T09:02:00Z",
+            ),
+            run(
+                "bam",
+                "FiveM.exe",
+                "enhanced",
+                "last_run",
+                "2026-01-10T10:00:00Z",
+            ),
+            run(
+                "bam",
+                "GTA5_Enhanced.exe",
+                "enhanced",
+                "last_run",
+                "2026-01-10T11:00:00Z",
+            ),
+            folder(
+                "enhanced_logs",
+                &[
+                    ("files", json!(33)),
+                    ("latest_created_at", json!("2026-01-10T09:00:04Z")),
+                    ("latest_modified_at", json!("2026-01-10T09:30:00Z")),
+                ],
+            ),
+            folder(
+                "enhanced_server_cache",
+                &[
+                    ("files", json!(0)),
+                    ("latest_modified_at", json!("2025-12-01T00:00:00Z")),
+                ],
+            ),
+        ];
+        observations.push(number_observation(
+            "fivem_dir",
+            &[
+                ("location", json!("enhanced_server_cache")),
+                ("modified_at", json!("2026-01-10T09:05:00Z")),
+            ],
+        ));
+        let report = session_report(observations, &[]);
+        let sessions = sessions_of(&report);
+        let [enhanced] = sessions.as_slice() else {
+            panic!("{sessions:?}");
+        };
+        assert_eq!(enhanced.edition, "enhanced");
+        let (start, end, _, lines, causes) = known(enhanced);
+        assert!(matches!(start, SessionStart::Prefetch { at, .. } if at == "2026-01-10T09:00:00Z"));
+        assert_eq!(
+            *end,
+            SessionEnd::Bam {
+                at: "2026-01-10T10:00:00Z".to_owned()
+            }
+        );
+        assert_eq!(
+            line(lines, "enhanced_logs", None),
+            LineState::Compared {
+                created: Some(compared(Relation::AfterStart, minutes(0))),
+                written: compared(Relation::BeforeEnd, minutes(30)),
+            }
+        );
+        let server = lines
+            .iter()
+            .find(|line| line.source == "enhanced_server_cache")
+            .unwrap();
+        assert!(server.join);
+        assert_eq!(
+            server.state,
+            LineState::Compared {
+                created: None,
+                written: compared(Relation::AfterStart, minutes(5)),
+            }
+        );
+        assert_eq!(
+            causes[..4],
+            ["standing_still", "no_join", "all_cached", "ended_abruptly"].map(str::to_owned)
+        );
+    }
+
+    /// A BAM time earlier than the start is not this run's end: "not recorded", and the age is from the
+    /// start. A source not there and a place not read keep their own lines.
+    #[test]
+    fn a_bam_time_before_the_start_is_not_the_end() {
+        use serde_json::json;
+        let mut report = session_report(
+            vec![
+                run(
+                    "prefetch",
+                    "FiveM.exe",
+                    "legacy",
+                    "last_run",
+                    "2026-01-10T10:00:00Z",
+                ),
+                run(
+                    "bam",
+                    "FiveM_b3095_GTAProcess.exe",
+                    "legacy",
+                    "last_run",
+                    "2026-01-09T10:00:00Z",
+                ),
+                folder("legacy_logs", &[("files", json!(0))]),
+            ],
+            &[],
+        );
+        report.unmeasured_sources.push(UnmeasuredSource {
+            collector: "fivem_dir".to_owned(),
+            place: Some("legacy_cache".to_owned()),
+            reason: UnmeasuredReason::AccessDenied,
+        });
+        let sessions = sessions_of(&report);
+        let (_, end, before_scan, lines, _) = known(&sessions[0]);
+        assert_eq!(*end, SessionEnd::NotRecorded);
+        assert_eq!(
+            before_scan,
+            Some(Duration {
+                amount: 2,
+                unit: DurationUnit::Hours
+            })
+        );
+        assert_eq!(line(lines, "legacy_logs", None), LineState::NoFile);
+        assert_eq!(
+            line(lines, "legacy_cache", None),
+            LineState::NotRead {
+                reason: UnmeasuredReason::AccessDenied
+            }
+        );
+        assert_eq!(
+            line(lines, "legacy_resource_index", None),
+            LineState::NotThere
+        );
+    }
+
+    /// Under a limited token: a running Legacy client gives the start and "still running"; Enhanced,
+    /// present and not running, is "not known" — never compared with the scan's time. Nothing running
+    /// and nothing present: no statement.
+    #[test]
+    fn a_limited_scan_uses_the_running_process_and_says_not_known_otherwise() {
+        let unread = [
+            ("prefetch", UnmeasuredReason::NotAdmin),
+            ("bam", UnmeasuredReason::NotAdmin),
+        ];
+        let observations = vec![
+            run(
+                "process",
+                "FiveM.exe",
+                "legacy",
+                "started_at",
+                "2026-01-10T11:40:00Z",
+            ),
+            run(
+                "process",
+                "FiveM_b3095_GTAProcess.exe",
+                "legacy",
+                "started_at",
+                "2026-01-10T11:41:00Z",
+            ),
+            observed(
+                "fivem_dir",
+                &[
+                    ("location", "enhanced_exe"),
+                    (
+                        "path",
+                        r"C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe",
+                    ),
+                ],
+            ),
+        ];
+        let report = session_report(observations.clone(), &unread);
+        let sessions = sessions_of(&report);
+        let [legacy, enhanced] = sessions.as_slice() else {
+            panic!("{sessions:?}");
+        };
+        let (start, end, before_scan, lines, _) = known(legacy);
+        assert_eq!(
+            *start,
+            SessionStart::Process {
+                at: "2026-01-10T11:40:00Z".to_owned(),
+                name: AnchorName::FivemExe
+            }
+        );
+        assert_eq!(*end, SessionEnd::StillRunning);
+        assert_eq!(before_scan, None);
+        assert_eq!(line(lines, "legacy_logs", None), LineState::NotThere);
+        assert_eq!(
+            enhanced.state,
+            SessionState::NotKnown {
+                prefetch: UnmeasuredReason::NotAdmin,
+                bam: UnmeasuredReason::NotAdmin
+            }
+        );
+        let ss = serde_json::to_string(&for_mode(&report, Mode::Ss).cross_source).unwrap();
+        assert!(!ss.contains(USER), "{ss}");
+
+        let nothing = session_report(observations[2..].to_vec(), &unread);
+        assert_eq!(sessions_of(&nothing).len(), 1);
+        let absent = session_report(Vec::new(), &unread);
+        assert_eq!(sessions_of(&absent), vec![]);
+    }
+
+    /// Prefetch switched off with BAM read: the start says so, Legacy has nothing to compare, and
+    /// Enhanced's log folder is compared with the end alone. Read, with nothing of an edition: no
+    /// statement for it.
+    #[test]
+    fn prefetch_switched_off_leaves_the_end_comparison() {
+        use serde_json::json;
+        let report = session_report(
+            vec![
+                // A stale record of a switched-off Prefetch is not this run's start.
+                run(
+                    "prefetch",
+                    "FiveM.exe",
+                    "enhanced",
+                    "last_run",
+                    "2025-06-01T00:00:00Z",
+                ),
+                run(
+                    "bam",
+                    "FiveM.exe",
+                    "enhanced",
+                    "last_run",
+                    "2026-01-10T10:00:00Z",
+                ),
+                folder(
+                    "enhanced_logs",
+                    &[
+                        ("files", json!(2)),
+                        ("latest_created_at", json!("2026-01-10T09:00:00Z")),
+                        ("latest_modified_at", json!("2026-01-10T09:59:00Z")),
+                    ],
+                ),
+            ],
+            &[("prefetch", UnmeasuredReason::ServiceDisabled)],
+        );
+        let sessions = sessions_of(&report);
+        let [enhanced] = sessions.as_slice() else {
+            panic!("{sessions:?}");
+        };
+        let (start, _, _, lines, causes) = known(enhanced);
+        assert_eq!(*start, SessionStart::SwitchedOff);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert_eq!(
+            line(lines, "enhanced_logs", None),
+            LineState::Compared {
+                created: None,
+                written: compared(Relation::NearEnd, minutes(1)),
+            }
+        );
+        assert!(causes.iter().any(|cause| cause == "ended_abruptly"));
+        assert!(!causes.iter().any(|cause| cause == "no_join"));
+
+        let nothing = session_report(
+            vec![run(
+                "prefetch",
+                "other.exe",
+                "legacy",
+                "last_run",
+                "2026-01-10T10:00:00Z",
+            )],
+            &[],
+        );
+        assert_eq!(sessions_of(&nothing), vec![]);
     }
 }

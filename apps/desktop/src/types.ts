@@ -101,7 +101,12 @@ export type AnchorAge = { anchor: "boot_time" | AnchorKind } & (
  * How far back one source reaches (ADR 0061): its oldest time and how much it holds, or why it was
  * not read. `not_admin` is "not known", never "empty".
  */
-export type TraceAge = { collector: string; place?: string; subject?: string } & (
+export type TraceAge = {
+  collector: string;
+  place?: string;
+  subject?: string;
+  index_beside?: IndexBeside[];
+} & (
   | {
       state: "measured";
       oldest?: string;
@@ -149,9 +154,72 @@ export type SourceLine = { collector: string } & (
  * FiveM's side beside Prefetch, BAM and PCA (ADR 0061 section 3). Not evidence and never counted;
  * built in Rust only when its conditions hold, and always shown with its ordinary causes.
  */
-export interface CrossSourceStatement {
+export interface RecordsStatement {
   fivem: FivemSide;
   sources: SourceLine[];
+}
+
+/** A duration as the core rounds it: minutes under an hour, hours under two days, then days. */
+export interface Duration {
+  amount: number;
+  unit: "minutes" | "hours" | "days";
+}
+
+/** Which anchor name a session's time came from (ADR 0062 section 2). */
+export type AnchorName = "fivem_exe" | "gta_process";
+
+/** Where a session's start came from, or why there is none. */
+export type SessionStart =
+  | { from: "process" | "prefetch"; at: string; name: AnchorName }
+  | { from: "switched_off" | "not_recorded" }
+  | { from: "not_read"; reason: UnmeasuredReason };
+
+/** Where a session's end came from, or why there is none. */
+export type SessionEnd =
+  | { from: "still_running" | "not_recorded" }
+  | { from: "bam"; at: string }
+  | { from: "not_read"; reason: UnmeasuredReason };
+
+/** One time compared with the session. */
+export interface Comparison {
+  relation: "before_start" | "after_start" | "before_end" | "near_end" | "after_end";
+  duration: Duration;
+}
+
+/** One source of an edition in one of ADR 0062's line forms. */
+export type SessionLine = {
+  source: string;
+  variant?: string;
+  join?: boolean;
+} & (
+  | { line: "compared"; created?: Comparison; written: Comparison }
+  | { line: "not_there" | "no_file" | "not_listed" }
+  | { line: "not_read"; reason: UnmeasuredReason }
+);
+
+/** One edition's last session beside its own folders (ADR 0062). Not evidence and never counted. */
+export type SessionStatement = { edition: "legacy" | "enhanced" } & (
+  | {
+      session: "known";
+      start: SessionStart;
+      end: SessionEnd;
+      before_scan?: Duration;
+      lines: SessionLine[];
+      causes: string[];
+    }
+  | { session: "not_known"; prefetch: UnmeasuredReason; bam: UnmeasuredReason }
+);
+
+/** The cross-source statements, told apart by `kind` (ADR 0061, amended by ADR 0062 section 1). */
+export type CrossSourceStatement =
+  | ({ kind: "fivem_and_records" } & RecordsStatement)
+  | ({ kind: "session" } & SessionStatement);
+
+/** One Legacy launch mode's index beside its oldest cache file (ADR 0062 section 4). */
+export interface IndexBeside {
+  variant: string;
+  index_created_on: string;
+  oldest_file_created_on?: string;
 }
 
 /** A source's ordinary retention, from `rules/ages/<collector>.yaml`, translated (ADR 0061). */

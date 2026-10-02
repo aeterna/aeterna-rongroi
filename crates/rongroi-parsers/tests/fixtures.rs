@@ -315,7 +315,7 @@ fn the_synthetic_prefetch_fixtures_hold_what_their_names_say() {
         );
         seen += 1;
     }
-    assert_eq!(seen, 3);
+    assert_eq!(seen, 5);
 }
 
 /// `fuzz_filetime` seeds from the BAM directory, because a BAM value's first eight bytes are exactly

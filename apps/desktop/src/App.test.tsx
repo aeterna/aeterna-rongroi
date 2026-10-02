@@ -230,6 +230,62 @@ describe("App", () => {
     ).toBeTruthy();
   });
 
+  // ADR 0062: each edition's last session beside its own folders, in both languages, from the
+  // synthetic hosts' snapshots — the session line, each line form, the join line, the margin, the
+  // causes in full, and "not known".
+  it("shows each edition's session statement in SS mode", async () => {
+    const statements = snapshot(
+      "session_elevated_statements",
+    ) as unknown as ReportView["cross_source"];
+    viewOverride = { ...snapshot("trace_ages_elevated_ss_view"), cross_source: statements };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(
+      await screen.findByText("FiveM for GTA V Legacy: its last session, beside its own folders"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "began 2025-12-31T20:00:00Z (Prefetch, FiveM.exe); ended 2025-12-31T21:30:00Z (BAM); 2 hours before this scan",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("last written 36 hours before the session began")).toBeTruthy();
+    expect(screen.getByText("Resource cache index (priv)")).toBeTruthy();
+    expect(screen.getByText("not read: the folder could not be listed")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "last created 1 minute after the session began; the folder's latest log write was 40 minutes before the session ended",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("(written when a server is joined)")).toBeTruthy();
+    expect(
+      screen.getAllByText(
+        "A time more than 10 minutes before the session began is shown as before it; any later time as after it.",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getByText(
+        "FiveM ended by Task Manager, a crash or a shutdown, which may skip the write it makes when it closes",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says when FiveM last ran is not known, in Thai", async () => {
+    const statements = snapshot(
+      "session_limited_running_statements",
+    ) as unknown as ReportView["cross_source"];
+    viewOverride = { ...snapshot("trace_ages_elevated_ss_view"), cross_source: statements };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(
+      await screen.findByText("ยังรันอยู่ตั้งแต่ 2025-12-31T23:40:00Z (process ที่กำลังรัน, FiveM.exe)"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/^ไม่รู้ว่า FiveM รันครั้งล่าสุดเมื่อไร เพราะอ่าน Prefetch และ BAM ไม่ได้ \(/),
+    ).toBeTruthy();
+  });
+
   it("says a source not read without administrator rights is not known, in Thai too", async () => {
     const view = snapshot("trace_ages_elevated_ss_view");
     const ages = view.trace_ages;

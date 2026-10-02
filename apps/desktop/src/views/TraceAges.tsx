@@ -2,23 +2,31 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-// The trace-ages section and the cross-source statement (ADR 0061). What they hold, and when the
-// statement exists at all, is decided in `rongroi-core::view`; this file only words them. Nothing
-// here sorts, colours or compares a row.
+// The trace-ages section and the cross-source statements (ADR 0061, ADR 0062). What they hold, and
+// when a statement exists at all, is decided in `rongroi-core::view`; this file only words them.
+// Nothing here sorts, colours or compares a row.
 
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import type {
   AgeText,
   AnchorAge,
+  AnchorName,
+  Comparison,
   CrossSourceStatement,
+  Duration,
+  RecordsStatement,
+  SessionEnd,
+  SessionLine,
+  SessionStart,
+  SessionStatement,
   SourceLine,
   TraceAge,
   TraceAges as TraceAgesData,
   UnmeasuredReason,
 } from "../types";
 
-/** The ordinary causes under the section, in ADR 0061's order. */
+/** The ordinary causes under the section, in ADR 0061's order, then ADR 0062 section 7's four. */
 const CAUSES = [
   "reinstall",
   "cleanup",
@@ -27,6 +35,10 @@ const CAUSES = [
   "fivem_reinstalled",
   "moved",
   "clock",
+  "index_rebuilt",
+  "clear_cache",
+  "copied_cache",
+  "reinstall_kept_cache",
 ] as const;
 
 /** The ordinary causes under the statement, in ADR 0061's order. */
@@ -167,6 +179,21 @@ function RowLine({ row }: { row: TraceAge }) {
     <>
       {prefix}
       {parts.join(", ")}
+      {(row.index_beside ?? []).map((beside) => (
+        <span key={beside.variant} className="muted">
+          <br />
+          {beside.oldest_file_created_on
+            ? t("trace_ages.index_beside", {
+                variant: beside.variant,
+                index: beside.index_created_on,
+                oldest: beside.oldest_file_created_on,
+              })
+            : t("trace_ages.index_beside_no_file", {
+                variant: beside.variant,
+                index: beside.index_created_on,
+              })}
+        </span>
+      ))}
     </>
   );
 }
@@ -176,60 +203,65 @@ function RowLine({ row }: { row: TraceAge }) {
  * that was not read is never folded into "no entry", and the causes are always printed in full.
  */
 export function CrossSource({ statements }: { statements: CrossSourceStatement[] }) {
-  const { t } = useTranslation("report");
   return (
     <>
-      {statements.map((statement) => {
-        const { fivem } = statement;
-        const first = [
-          fivem.editions.length > 0
-            ? t("cross_source.present", {
-                editions: fivem.editions
-                  .map((edition) => t(`cross_source.edition.${edition}`))
-                  .join(", "),
-              })
-            : t("cross_source.absent"),
-          fivem.folders_written && fivem.folders_days_before !== undefined
-            ? t("cross_source.folders_written", {
-                date: fivem.folders_written,
-                days: days(t, fivem.folders_days_before),
-              })
-            : null,
-          fivem.server_folders > 0 && fivem.servers_written
-            ? t("cross_source.servers", {
-                count: fivem.server_folders,
-                date: fivem.servers_written,
-              })
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" ");
-        // The names once, on the first line that needs them; "those names" after.
-        const firstNoEntry = statement.sources.findIndex((source) => source.line === "no_entry");
-        return (
-          <section
-            key={JSON.stringify(statement)}
-            className="cross-source"
-            aria-labelledby="cross-source-title"
-          >
-            <h3 id="cross-source-title">{t("cross_source.title")}</h3>
-            <dl className="facts">
-              <dt>{t("cross_source.fivem")}</dt>
-              <dd>{first}</dd>
-              {statement.sources.map((source, index) => (
-                <SourceRow key={source.collector} source={source} named={index === firstNoEntry} />
-              ))}
-            </dl>
-            <p className="muted">{t("cross_source.causes_intro")}</p>
-            <ul>
-              {STATEMENT_CAUSES.map((cause) => (
-                <li key={cause}>{t(`cross_source.causes.${cause}`)}</li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+      {statements.map((statement) =>
+        statement.kind === "session" ? (
+          <Session key={JSON.stringify(statement)} statement={statement} />
+        ) : (
+          <Records key={JSON.stringify(statement)} statement={statement} />
+        ),
+      )}
     </>
+  );
+}
+
+/** ADR 0061's statement: FiveM's side, one line per record, and the causes in full. */
+function Records({ statement }: { statement: RecordsStatement }) {
+  const { t } = useTranslation("report");
+  const { fivem } = statement;
+  const first = [
+    fivem.editions.length > 0
+      ? t("cross_source.present", {
+          editions: fivem.editions
+            .map((edition) => t(`cross_source.edition.${edition}`))
+            .join(", "),
+        })
+      : t("cross_source.absent"),
+    fivem.folders_written && fivem.folders_days_before !== undefined
+      ? t("cross_source.folders_written", {
+          date: fivem.folders_written,
+          days: days(t, fivem.folders_days_before),
+        })
+      : null,
+    fivem.server_folders > 0 && fivem.servers_written
+      ? t("cross_source.servers", {
+          count: fivem.server_folders,
+          date: fivem.servers_written,
+        })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  // The names once, on the first line that needs them; "those names" after.
+  const firstNoEntry = statement.sources.findIndex((source) => source.line === "no_entry");
+  return (
+    <section className="cross-source" aria-labelledby="cross-source-title">
+      <h3 id="cross-source-title">{t("cross_source.title")}</h3>
+      <dl className="facts">
+        <dt>{t("cross_source.fivem")}</dt>
+        <dd>{first}</dd>
+        {statement.sources.map((source, index) => (
+          <SourceRow key={source.collector} source={source} named={index === firstNoEntry} />
+        ))}
+      </dl>
+      <p className="muted">{t("cross_source.causes_intro")}</p>
+      <ul>
+        {STATEMENT_CAUSES.map((cause) => (
+          <li key={cause}>{t(`cross_source.causes.${cause}`)}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -264,6 +296,146 @@ function SourceRow({ source, named }: { source: SourceLine; named: boolean }) {
     <>
       <dt>{t(`cross_source.source.${source.collector}`)}</dt>
       <dd>{line}</dd>
+    </>
+  );
+}
+
+/** "less than a minute", "1 hour", "25 hours". */
+function duration(t: TFunction, value: Duration): string {
+  if (value.unit === "minutes" && value.amount === 0) {
+    return t("session.duration.less_than_a_minute");
+  }
+  return t(`session.duration.${value.unit}`, { count: value.amount });
+}
+
+function anchorName(t: TFunction, name: AnchorName): string {
+  return t(`session.anchor_name.${name}`);
+}
+
+function startText(t: TFunction, start: SessionStart): string {
+  switch (start.from) {
+    case "process":
+    case "prefetch":
+      return t(`session.start.${start.from}`, { at: start.at, name: anchorName(t, start.name) });
+    case "not_read":
+      return t("session.start.not_read", { reason: t(`reason.${start.reason}`) });
+    default:
+      return t(`session.start.${start.from}`);
+  }
+}
+
+function endText(t: TFunction, start: SessionStart, end: SessionEnd): string | null {
+  switch (end.from) {
+    case "still_running":
+      // "Still running since T" already says it.
+      return start.from === "process" ? null : t("session.end.still_running");
+    case "bam":
+      return t("session.end.bam", { at: end.at });
+    case "not_read":
+      return t("session.end.not_read", { reason: t(`reason.${end.reason}`) });
+    default:
+      return t("session.end.not_recorded");
+  }
+}
+
+function comparisonText(t: TFunction, group: string, value: Comparison): string {
+  return t(`session.${group}.${value.relation}`, { duration: duration(t, value.duration) });
+}
+
+function lineText(t: TFunction, line: SessionLine): string {
+  switch (line.line) {
+    case "compared": {
+      // Enhanced's log folder names what it compares: the folder's latest log write (ADR 0062).
+      const group = line.source === "enhanced_logs" ? "latest_log_write" : "written";
+      return [
+        line.created ? comparisonText(t, "created", line.created) : null,
+        comparisonText(t, group, line.written),
+      ]
+        .filter(Boolean)
+        .join("; ");
+    }
+    case "not_read":
+      return t("session.not_read", { reason: t(`reason.${line.reason}`) });
+    default:
+      return t(`session.${line.line}`);
+  }
+}
+
+/**
+ * One edition's session statement (ADR 0062, as amended): the session's start and end with where each
+ * came from, each source's line, the margin, and the ordinary causes in full — or that when FiveM last
+ * ran is not known. Never compared with the scan's own time.
+ */
+function Session({ statement }: { statement: SessionStatement }) {
+  const { t } = useTranslation("report");
+  const title = t("session.title", { edition: t(`session.edition.${statement.edition}`) });
+  const id = `session-title-${statement.edition}`;
+  if (statement.session === "not_known") {
+    const reason =
+      statement.prefetch === statement.bam
+        ? t(`reason.${statement.prefetch}`)
+        : `${t(`reason.${statement.prefetch}`)}; ${t(`reason.${statement.bam}`)}`;
+    return (
+      <section className="cross-source" aria-labelledby={id}>
+        <h3 id={id}>{title}</h3>
+        <p>{t("session.not_known", { reason })}</p>
+      </section>
+    );
+  }
+  const session = [
+    startText(t, statement.start),
+    endText(t, statement.start, statement.end),
+    statement.before_scan
+      ? t("session.before_scan", { duration: duration(t, statement.before_scan) })
+      : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+  const startRecorded = statement.start.from === "process" || statement.start.from === "prefetch";
+  return (
+    <section className="cross-source" aria-labelledby={id}>
+      <h3 id={id}>{title}</h3>
+      <dl className="facts">
+        <dt>{t("session.session")}</dt>
+        <dd>{session}</dd>
+        {statement.lines.map((line) => {
+          const source = t(`session.source.${line.source}`);
+          const label = line.variant
+            ? t("session.variant", { source, variant: line.variant })
+            : source;
+          return (
+            <SessionRow key={`${line.source}:${line.variant ?? ""}`} label={label} line={line} />
+          );
+        })}
+      </dl>
+      {startRecorded && <p className="muted">{t("session.margin")}</p>}
+      {statement.causes.includes("ended_abruptly") && (
+        <p className="muted">{t("session.margin_end")}</p>
+      )}
+      <p className="muted">{t("session.causes_intro")}</p>
+      <ul>
+        {statement.causes.map((cause) => (
+          <li key={cause}>{t(`session.causes.${cause}`)}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SessionRow({ label, line }: { label: string; line: SessionLine }) {
+  const { t } = useTranslation("report");
+  return (
+    <>
+      <dt>{label}</dt>
+      <dd>
+        {lineText(t, line)}
+        {line.join && (
+          <>
+            <br />
+            <span className="muted">{t("session.join")}</span>
+          </>
+        )}
+      </dd>
     </>
   );
 }

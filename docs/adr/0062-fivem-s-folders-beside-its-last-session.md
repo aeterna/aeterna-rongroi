@@ -5,6 +5,9 @@
 - Amended: 2026-10-02, accepted: the sessions listed under "Before any code" were measured ("Amendment
   (2026-10-02, accepted): the measured sessions, and what they change"); the owner decided its seven
   questions on 2026-10-02, and they amend owner decisions 3, 4 and 7
+- Implemented: the reads in three changes (`started_at` #130, `fivem_edition` #132, the resource cache index
+  #131), and the session statement in the change that also records the owner decisions taken while building
+  it ("As built")
 
 ## Context
 
@@ -641,3 +644,92 @@ say which they settled.
   session statement's causes) and the glossary (**session**, **session statement**, `fivem_edition`) change
   with the code.
 - ADR 0053 and ADR 0061 are amended in the change that builds this (decisions 1 and 6).
+
+## As built
+
+### Owner decisions taken while building the statement (2026-10-02)
+
+Four questions came up while the session statement was built; the owner decided each on 2026-10-02.
+
+- **2ก. A `db` that could not be listed.** Its index folder's own times are there and `index_files` is not
+  (ADR 0053's amendment for this ADR). Its line is the fixed form "not read: the folder could not be
+  listed" / "อ่านไม่ได้: เปิดดูรายการในโฟลเดอร์ไม่ได้", with no per-reason field: the collector records that
+  the listing failed, not why.
+- **9. Enhanced's logs are the whole log folder, as one launch source.** `enhanced_logs` is one
+  folder-activity observation (ADR 0053): its latest creation and last-write times are over every file in
+  the folder, so the launcher log cannot be told apart from the game and browser logs in what the report
+  holds. The measurements behind the amendment showed the launcher log is **created anew at every launch**,
+  2 to 6 seconds after the client's start in every Enhanced session, the session without a join included.
+  So:
+  - the folder's `latest_created_at` is compared with the start as a **launch source** — no game-start line
+    form, no join causes. The game-start source of the amendment's change 5, with its line form "(written when
+    the game starts, not when FiveM opens)" and its first cause, is **not built**: it waits for a separate
+    amendment of ADR 0053 that tells the game and browser logs apart from the launcher log;
+  - the folder's `latest_modified_at` is the one end comparison (the amendment's change 2), "before the end"
+    when earlier than BAM's end by more than ten minutes, with the cause *FiveM ended by Task Manager, a
+    crash or a shutdown, which may skip the write it makes when it closes*. Its line names it **the
+    folder's latest log write**, not the launcher log. **Limitation:** a game or browser log written at the
+    end would hide a launcher log that was not written then.
+- **10. Enhanced's per-server cache is one line**, by the newer of the latest server folder's `modified_at`
+  and the place's own `latest_modified_at`, as a join source with its line form and its two join causes.
+- **11. The anchor names** are those section 2 lists, confirmed: `FiveM.exe` for both editions and
+  `FiveM_b…_GTAProcess.exe` for Legacy, each counted only with the edition's `fivem_edition`. Not
+  `GTA5_Enhanced.exe`, although its Prefetch entry is below Enhanced's folder (the amendment), and not
+  FiveM's other processes (`fivem-cef-subprocess.exe`, the browser, dump server, launcher and service
+  processes). The same names anchor a running process, Prefetch's start and BAM's end.
+
+### Choices the text leaves open
+
+The change took these, each the one that shows less or says more plainly what was not recorded:
+
+- **Shape.** `CrossSourceStatement` is a tagged enum: `kind: fivem_and_records` is ADR 0061's statement
+  (`view::RecordsStatement`), `kind: session` a `view::SessionStatement` with its edition, its start and end
+  (`SessionStart`, `SessionEnd`, each saying which record and which name it came from, or why there is none),
+  a line per source (`SessionLine`, with `LineState`) and its causes as locale keys, in the order printed.
+  "Not known" is its own state with Prefetch's and BAM's reasons. The view builds it in
+  `rongroi_core::view::session`; the CLI and the desktop only word it.
+- **Times and durations.** Anchor times are shown as the report holds them, RFC 3339 to the second — the
+  precision the timeline shows them at. A source is a duration from the start (or the end): whole minutes
+  under an hour, whole hours under two days, whole days after that, rounded down; under a minute reads "less
+  than a minute". A time less than ten minutes before the start is "after the start" with nothing to count,
+  as the margin line says. The session's age is from its end, or from its start when its end is not
+  recorded; a running session has none.
+- **The start.** A running process of the edition whose creation time could not be read leaves the start to
+  Prefetch, with the end "still running". A Prefetch that is switched off (`service_disabled`) gives no start,
+  even from records it still holds: Windows is not writing them. A Prefetch read with no run of the
+  edition's names while BAM holds one gives the fixed start form "Prefetch holds no run of this edition, so
+  when this run began is not recorded" — a form section 7 does not list, for a case section 5 does not.
+- **Reasons.** A record that is `source_empty`, `source_absent` or `not_on_this_os` was read and held
+  nothing; any other reason — `partial` included — is "not read" when no run of the edition was found. Runs
+  found in a partly read record are used.
+- **Section 5's rows.** With neither record read and nothing running, "not known" appears only for an edition
+  whose `FiveM.exe` is present, without the margin line or the causes, since nothing is compared. When one
+  record was read and held nothing of the edition and the other was not read, nothing is attributed and no
+  statement is made.
+- **With no start** (Prefetch switched off, not read, or holding nothing of the edition), only the end
+  comparison is made: Legacy has no line, Enhanced only its log folder's. Its latest log write is "before the
+  end" beyond the margin; otherwise, since "at the end" was dropped and there is no start to be after, it
+  reads "within 10 minutes of the session's end", or "N after the session ended" when later than the end by
+  more than the margin. These two forms exist for this case alone. The margin line about the start is shown
+  only when a start was recorded; a second line says the end margin when the end comparison was made.
+- **With a start and an end**, Enhanced's latest log write is "before the start" when it is, else "before
+  the end" when earlier than the end by more than the margin, else "after the start".
+- **Places.** A place `fivem_dir` could not read takes its reason; a place absent, or with no observation,
+  is "not there"; a folder listed with no file and no time is "no file". Each Legacy launch mode that exists
+  gets an index line — no `db` is "not there", `index_files: 0` "no file", a `db` not listed decision 2ก's
+  form — and with no launch mode at all there is one "not there" line.
+- **Causes.** Every statement opens with the amendment's first cause (a player standing still); a statement
+  with a join line adds the two join causes; one whose end comparison was made adds its cause; then section
+  7's list, less the join cause it opened with. "FiveM opened and closed before the game started, or updating
+  itself" stays in that list: it is section 7's general cause, not the dropped game-start line's.
+- **Section 4.** Under the trace ages row of `legacy_server_cache`, each launch mode whose index folder has a
+  creation time shows that date beside its folder's `earliest_created_at` as a date ("no cache file has a
+  creation time" when there is none), and the section's causes gain the four section 7 lists.
+- **Fixtures.** Synthetic hosts, none a measured PC: `session-elevated` (both editions read elevated, each
+  line form of an elevated read, an index created months after its oldest cache file, a `db` that cannot be
+  listed, an empty `db`), `session-limited-running` (a limited token while Legacy runs; Enhanced "not
+  known"), `session-not-known` (nothing running) and `session-prefetch-off` (`EnablePrefetcher` 0, BAM read).
+  Their Prefetch and BAM bytes are synthetic files in `fixtures/parsers/`, made from the existing synthetic
+  ones with the run times changed.
+
+Not measured by this change: the statement on a PC. The points still open under the amendment stay open.

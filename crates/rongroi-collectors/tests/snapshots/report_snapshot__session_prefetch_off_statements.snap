@@ -1,0 +1,47 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: "sessions_of(\"session-prefetch-off\")"
+---
+[
+  {
+    "kind": "session",
+    "edition": "enhanced",
+    "session": "known",
+    "start": {
+      "from": "switched_off"
+    },
+    "end": {
+      "from": "bam",
+      "at": "2025-12-31T22:00:00Z"
+    },
+    "before_scan": {
+      "amount": 2,
+      "unit": "hours"
+    },
+    "lines": [
+      {
+        "source": "enhanced_logs",
+        "line": "compared",
+        "written": {
+          "relation": "before_end",
+          "duration": {
+            "amount": 13,
+            "unit": "hours"
+          }
+        }
+      }
+    ],
+    "causes": [
+      "standing_still",
+      "ended_abruptly",
+      "removes_logs",
+      "other_folder",
+      "other_account",
+      "opened_closed",
+      "launchers",
+      "prefetch_off",
+      "clock",
+      "cleanup"
+    ]
+  }
+]

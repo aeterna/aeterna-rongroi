@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A scan without administrator rights while FiveM for GTA V Legacy runs (ADR 0062 section 5): Prefetch and
+# BAM are refused, as ADR 0061 measured under a limited token, and the running client and its game process
+# give the session's start and "still running". Enhanced's FiveM.exe is present and nothing of it runs, so
+# its statement is "not known". Every name and time is invented. Not a measured PC.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+access_denied:
+  - 'C:\Windows\Prefetch'
+  - 'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings'
+processes:
+  - pid: 4
+    name: System
+  - pid: 5120
+    name: FiveM.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe'
+    started_at: '2025-12-31T23:40:00Z'
+  - pid: 6230
+    name: FiveM_b3095_GTAProcess.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\cache\subprocess\FiveM_b3095_GTAProcess.exe'
+    started_at: '2025-12-31T23:41:10Z'
+filesystem:
+  'C:\Windows\Prefetch': []
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.exe
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced':
+    - name: FiveM.exe
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\logs':
+    - name: CitizenFX_log_a.log
+      size: 2048
+      created: 2025-12-31T23:40:02Z
+      modified: 2025-12-31T23:58:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\cache':
+    - name: cache_file
+      size: 4096
+      created: 2025-06-01T08:05:00Z
+      modified: 2025-12-31T23:57:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache':
+    - name: cache_0001
+      size: 4096
+      created: 2025-10-01T09:01:00Z
+      modified: 2025-10-01T09:01:00Z
+    - name: db
+      directory: true
+      created: 2025-10-01T09:01:30Z
+      modified: 2025-12-31T23:40:40Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache\db':
+    - name: index_a
+      size: 300
+      created: 2025-10-01T09:01:30Z
+      modified: 2025-12-31T23:40:40Z

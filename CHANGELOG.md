@@ -6,14 +6,31 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The **session statement** (ADR 0062, as amended on 2026-10-02): for each FiveM edition, its last session
+  beside its own folders, in both modes, above the timeline, in the CLI and the desktop, English and Thai.
+  The start is the earliest `started_at` of a running `FiveM.exe` (or Legacy's `FiveM_b…_GTAProcess.exe`) of
+  that edition, else Prefetch's latest run of those names; the end is "still running" or BAM's latest, when not
+  earlier than the start. Each source is compared with the start only — "before" beyond ten minutes, "after"
+  otherwise, as minutes, hours or days: Legacy's logs, its `data\cache` and its resource cache index per launch
+  mode (a launch source), Enhanced's whole log folder (a launch source, and its latest log write also against
+  the end, owner decision 9 of 2026-10-02) and Enhanced's per-server cache (a join source, owner decision 10).
+  A place not read keeps its reason; a `db` that could not be listed reads "not read: the folder could not be
+  listed" (decision 2ก). Without Prefetch and BAM and with nothing running, it says when FiveM last ran is not
+  known — never a comparison with the scan's time. Its ordinary causes are always printed, first a player
+  standing still. Not evidence, never counted, nothing stored between scans. `CrossSourceStatement` gains
+  `kind` (`fivem_and_records`, `session`), amending ADR 0061 section 3; `REPORT_SCHEMA_VERSION` stays 1.
+- The trace ages row of Legacy's resource cache shows each launch mode's index folder creation date beside its
+  oldest cache file's, never compared, and the section's causes gain four (ADR 0062 section 4).
+- Synthetic fixture hosts `session-elevated`, `session-limited-running`, `session-not-known` and
+  `session-prefetch-off`, with two Prefetch and three BAM synthetic files in `fixtures/parsers/`.
 - `fivem_dir`: each Legacy resource cache observation (`legacy_server_cache`, per launch mode) carries its
   index, the fixed `db` subfolder — `index_created_at` and `index_modified_at`, the folder's own times from the
   listing the collector already made, and `index_files`, `index_latest_created_at` and
   `index_latest_modified_at` from one listing of `db`, never a file name (ADR 0062 section 6, amending ADR 0053
   section 1). An index that is not there carries no index field; one that cannot be listed keeps its own times
   and carries no count, without a gap, as an unreadable Enhanced server folder does; an empty one has
-  `index_files: 0`. `unconfirmed` is not read. New fields only; no rule reads them, and the trace ages view does
-  not show them yet.
+  `index_files: 0`. `unconfirmed` is not read. New fields only; no rule reads them; the session statement and
+  the trace ages row show them (above).
 - `fivem_edition` (`legacy` or `enhanced`) on `process`, `bam` and `prefetch` observations (ADR 0062,
   section 6): which of FiveM's two program folders — `%LOCALAPPDATA%\FiveM\` or
   `%LOCALAPPDATA%\FiveM for GTAV Enhanced\`, below a profile — the path each collector already reads is
@@ -32,7 +49,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
   reads it. Fixture hosts gain an optional `started_at` per process.
 
 ### Changed
-- ADR 0062 (accepted 2026-10-01, not implemented yet): FiveM's own folders beside its last session. A second
+- The SS consent question (CLI and desktop, both languages) and `PRIVACY.md` name process start times, the
+  edition word on processes, Prefetch and BAM, Legacy's resource cache index times and the session statement
+  (ADR 0062 owner decision 9 of 2026-10-01). `docs/architecture.md`, both screenshare guides ("what not to
+  conclude") and the glossary (**session**, **session statement**) follow; ADR 0062 records "As built" and
+  the owner decisions taken while building it, and ADR 0061 its amendment.
+- ADR 0062 (accepted 2026-10-01, implemented by the entries above): FiveM's own folders beside its last session. A second
   kind of cross-source statement, one per edition, will put each of FiveM's log, cache and resource-cache
   places beside the session it belongs to — its start from a running FiveM process or Prefetch, its end from
   BAM — never beside the scan's own time, with the ordinary causes always printed and a record that was not

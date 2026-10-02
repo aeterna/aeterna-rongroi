@@ -138,7 +138,7 @@ collector is `full`: `fivem_servers` (ADR 0055).
 | Unmatched observations | shown | **not** shown — counted in `hidden.unmatched`, because a raw listing of what a collector saw is what this mode promises not to show (ADR 0014) |
 | Row band | beside each `found` and `not_found` row of a collector whose coverage names one place — `usn`, the journal — the span that place's source held, or that it held no record (`view::ReportView::row_bands`) | the same, for the rows it lists (ADR 0047, amendment of 2026-09-30) |
 | Trace ages | how far back each source reaches — oldest time, days before the scan, count, ordinary retention, or why it was not read — beside the anchors | the same: a trace age names no program and no file (ADR 0061) |
-| Cross-source statement | FiveM's side beside Prefetch, BAM and PCA, when its conditions hold, with its ordinary causes | the same, above the timeline (ADR 0061) |
+| Cross-source statements | FiveM's side beside Prefetch, BAM and PCA, when its conditions hold, with its ordinary causes (ADR 0061); and one session statement per FiveM edition — its last session's start and end beside how long before or after the start each of its folders was written, or "not known" — with its ordinary causes (ADR 0062) | the same, above the timeline |
 | Timeline | every timestamp field of every observation except one declared `off_timeline` (`process`'s `started_at`, ADR 0062), the anchors, the coverage bands and the unmeasured sources | the times of the evidence it lists, what timeline selectors selected, the anchors, the coverage bands and the unmeasured sources; subjects and places redacted as rows are (ADR 0051) |
 | Paths | as read | `<profile root>\<name>` → `%USERPROFILE%`, in evidence and own traces alike. A profile root is `Users`, `Documents and Settings` or its short name on any drive, or the machine's `ProfilesDirectory` on its own drive, after `X:` or an administrative share `X$` (ADR 0049) |
 | `profiles_directory` (header) | carried | **dropped** — read by the scan only so that SS mode can redact under it (ADR 0049) |
@@ -180,6 +180,20 @@ side from `fivem_dir` beside Prefetch, BAM and PCA through the FiveM timeline se
 (`view::FIVEM_SELECTORS`, and `Report.timeline_selectors` for which the bundle held), shown only when
 Prefetch or BAM was read, selected nothing and reaches back before FiveM's last write. Nothing is sorted,
 compared, summed or coloured, and the statement is never evidence or counted.
+
+**Session statements (ADR 0062).** `view::cross_source` also returns at most one **session statement**
+per FiveM edition, told apart from ADR 0061's by `CrossSourceStatement`'s `kind` (`view::session`). Its
+anchors are records the collectors already make, attributed to an edition by the `fivem_edition` word
+`process`, `prefetch` and `bam` derive inside the collector: the earliest `started_at` of a running
+`FiveM.exe` or Legacy `FiveM_b…_GTAProcess.exe` of that edition gives the start and "still running";
+otherwise the latest Prefetch `last_run` of those names gives the start and the latest BAM `last_run` the
+end. `GTA5_Enhanced.exe` and FiveM's other processes are not anchors. Each of the edition's `fivem_dir`
+places is compared with the start only — "before" beyond a ten-minute margin, "after" otherwise, as a
+duration — and Enhanced's whole log folder also with the end; Legacy's resource cache index is a launch
+source and Enhanced's per-server cache a join source. A place not read keeps its reason, and neither record
+read with nothing running is "not known", never a comparison with the scan's time. Nothing is stored between
+scans. The trace ages row of Legacy's resource cache carries each launch mode's index creation date beside
+its oldest cache file's (`TraceAge::index_beside`), never compared.
 
 ## Rules bundle
 

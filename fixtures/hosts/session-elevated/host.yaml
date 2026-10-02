@@ -1,0 +1,121 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# Both FiveM editions' last sessions, read with administrator rights, for the session statement (ADR 0062):
+# Prefetch gives each edition's start and BAM its end, and every line form of a session read elevated
+# appears once. Legacy: logs written after the start, its data\cache last written before it, the default
+# resource cache's index written after it — and created months after the oldest cache file beside it —,
+# the priv index that cannot be listed, the fxdk index empty. Enhanced: its log folder last written more than
+# ten minutes before the end, and no per-server cache folder. Every name, size and time is invented; the
+# Prefetch and BAM bytes are the synthetic files in fixtures/parsers/. No process of FiveM's is running.
+# Not a measured PC.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+access_denied:
+  - 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-priv\db'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    Version: 1
+    SequenceNumber: 9
+    '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe':
+      from: '../../parsers/bam/filetime-2025-12-31T21-30-00Z.bin'
+    '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe':
+      from: '../../parsers/bam/filetime-2025-12-31T11-00-00Z.bin'
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: FIVEM.EXE-1A2B3C4D.pf
+      from: '../../parsers/prefetch/v31-raw-FIVEM.EXE-session-legacy.pf'
+      read_only: false
+    - name: FIVEM.EXE-5E6F7A8B.pf
+      from: '../../parsers/prefetch/v31-raw-FIVEM.EXE-session-enhanced.pf'
+      read_only: false
+  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.app
+      directory: true
+      created: 2025-06-01T08:01:00Z
+    - name: FiveM.exe
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced':
+    - name: FiveM.exe
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\logs':
+    - name: CitizenFX_log_a.log
+      size: 2048
+      created: 2025-12-31T20:00:05Z
+      modified: 2025-12-31T21:20:00Z
+    - name: CitizenFX_log_b.log
+      size: 1024
+      created: 2025-12-30T08:00:00Z
+      modified: 2025-12-30T08:30:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\cache':
+    - name: cache_file
+      size: 4096
+      created: 2025-06-01T08:05:00Z
+      modified: 2025-12-30T08:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data':
+    - name: cache
+      directory: true
+      created: 2025-06-01T08:05:00Z
+      modified: 2025-12-30T08:00:00Z
+    - name: server-cache
+      directory: true
+      created: 2025-10-01T09:00:00Z
+      modified: 2025-12-31T20:00:40Z
+    - name: server-cache-priv
+      directory: true
+      created: 2025-10-01T09:00:00Z
+      modified: 2025-12-20T09:00:00Z
+    - name: server-cache-fxdk
+      directory: true
+      created: 2025-11-01T09:00:00Z
+      modified: 2025-11-01T09:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache':
+    - name: cache_0001
+      size: 4096
+      created: 2025-10-01T09:01:00Z
+      modified: 2025-10-01T09:01:00Z
+    - name: cache_0002
+      size: 2048
+      created: 2025-12-10T18:05:00Z
+      modified: 2025-12-10T18:05:00Z
+    - name: db
+      directory: true
+      created: 2025-12-20T21:00:00Z
+      modified: 2025-12-31T20:00:40Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache\db':
+    - name: index_a
+      size: 300
+      created: 2025-12-20T21:00:00Z
+      modified: 2025-12-31T20:00:40Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-priv':
+    - name: cache_0003
+      size: 512
+      created: 2025-10-02T09:00:00Z
+      modified: 2025-10-02T09:00:00Z
+    - name: db
+      directory: true
+      created: 2025-10-02T09:00:00Z
+      modified: 2025-12-20T09:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-fxdk':
+    - name: db
+      directory: true
+      created: 2025-11-01T09:00:00Z
+      modified: 2025-11-01T09:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-fxdk\db': []
+  'C:\Users\fixtureuser\AppData\Roaming\FiveM for GTAV Enhanced\logs':
+    - name: launcher_a.log
+      size: 900
+      created: 2025-12-31T10:00:04Z
+      modified: 2025-12-31T10:20:00Z
+    - name: game_a.log
+      size: 4000
+      created: 2025-12-31T10:01:30Z
+      modified: 2025-12-31T10:02:00Z
