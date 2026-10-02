@@ -589,6 +589,8 @@ The owner accepted the seven recommendations above:
    condition, measured).
 7. `data\cache\servers` and `userdata` are not read in this change; they are left for a separate amendment of
    ADR 0053 (amends owner decision 7).
+8. `started_at` is not a timeline time: it is read for the session statement only (asked when the field was
+   built, 2026-10-02).
 
 ## Owner decisions (2026-10-01)
 

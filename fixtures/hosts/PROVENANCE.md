@@ -22,7 +22,7 @@ none contains a real person's user name, host name, SID or files.
 | `fivem-dir-not-installed` | Windows 11 with neither FiveM edition: `%LOCALAPPDATA%` and `%APPDATA%` are set and neither plugin folder exists | `fivem_dir` collector tests |
 | `fivem-dir-empty-plugins` | Windows 11, FiveM installed with an empty plugin folder | `fivem_dir` collector tests |
 | `fivem-dir-access-denied` | Windows 11, FiveM's plugin folder present but unreadable | `fivem_dir` collector tests |
-| `process-own-trace` | Windows 11 running three processes: one whose image path cannot be resolved, one ordinary program, and aeterna-rongroi itself | `process` collector tests, report snapshots |
+| `process-own-trace` | Windows 11 running three processes: one whose image path and creation time cannot be read, one ordinary program, and aeterna-rongroi itself, the last two with synthetic creation times (ADR 0062) | `process` collector tests, report snapshots |
 | `pca-files-present` | Windows 11 with all three PCA files present and readable, their bytes taken from `fixtures/parsers/` | `pca` collector tests, report snapshots |
 | `pca-not-present` | **Windows 10 22H2 (build 19045)**, which predates `C:\Windows\appcompat\pca` entirely — the folder arrived in Windows 11 22H2, build 22621. Still a large share of gaming PCs, and on every one of them the artifact's absence carries no information | `pca` collector tests |
 | `pca-folder-absent` | Windows 11 24H2 — a build that does keep the files — with no `appcompat\pca` folder at all | `pca` collector tests |

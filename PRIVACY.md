@@ -44,7 +44,8 @@ watching — its path with your user name replaced, its hash, its signature and 
 consent question names them before anything is read.
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
-is on disk. It does not read what a program is doing, what is in its memory, or what you typed into it.
+is on disk and when that process started (ADR 0062). It does not read what a program is doing, what is in
+its memory, or what you typed into it.
 
 Of a driver registered with Windows it reads the name of its driver service, when Windows is set to start
 it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
@@ -286,7 +287,8 @@ Both modes show the times the report holds in one list, oldest first, with the s
 the change journal could see, and the sources whose times could not be read (ADR 0051). The list never
 calls anything a gap or a cleaning: an order of recorded times is not an order of events.
 
-In Self mode the list holds every time the scan read. In SS mode it holds the times of the evidence SS mode
+In Self mode the list holds every time the scan read, except when each running process started, which is
+read only to place FiveM's folders beside its session (ADR 0062) and is never on the list. In SS mode it holds the times of the evidence SS mode
 shows, when this scan ran and when Windows last started, and these, which SS mode did not show before
 ADR 0051:
 
@@ -381,7 +383,8 @@ before anyone else does.
 aeterna-rongroi is running while it scans, so it is in the list of running programs it reads. The report
 keeps what it saw of **itself** in a separate "own traces" section instead of deleting it, and shows that
 section in both modes: it is not evidence about your PC, and hiding it would tell you less about what the
-tool did, not more. Paths in it are redacted in SS mode like any other.
+tool did, not more. That includes when the tool's own process started. Paths in it are redacted in SS mode
+like any other.
 
 ### What a collector saw that no rule matched
 

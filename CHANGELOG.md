@@ -23,6 +23,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   collector emits a path it did not emit before — BAM's device paths and Prefetch's string table stay
   withheld. New field only: no new reason, and `REPORT_SCHEMA_VERSION` stays 1. Three synthetic,
   uncompressed SCCA version 31 files in `fixtures/parsers/prefetch/` seed `fuzz_prefetch` as well.
+- `process` emits `started_at`, each running process's creation time in whole seconds, read through
+  `GetProcessTimes` on the handle it already opens for the path with `PROCESS_QUERY_LIMITED_INFORMATION`
+  (ADR 0062, owner decision 2). A time that cannot be read omits the field, as an unread path does
+  (ADR 0010). Under the limited token, the ADR 0062 amendment measured the time and the path read for all
+  six of FiveM's processes of the same account. It is read for ADR 0062's session statement only: it is
+  not a timeline time in either mode (owner decision 8, 2026-10-02; `Field::off_timeline`), and no rule
+  reads it. Fixture hosts gain an optional `started_at` per process.
 
 ### Changed
 - ADR 0062 (accepted 2026-10-01, not implemented yet): FiveM's own folders beside its last session. A second

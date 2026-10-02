@@ -309,6 +309,24 @@ fn process_own_trace_self_view() {
     let view = view::for_mode(&report, Mode::SelfCheck);
     let evidence = serde_json::to_string(&view.evidence).unwrap();
     assert!(!evidence.contains("aeterna-rongroi"), "{evidence}");
+    // `started_at` is read for ADR 0062's session statement only (owner decision 8, 2026-10-02):
+    // the processes carry it, and neither mode's timeline holds it.
+    assert!(
+        serde_json::to_string(&report.unmatched)
+            .unwrap()
+            .contains("started_at")
+    );
+    for mode in [Mode::SelfCheck, Mode::Ss] {
+        let timeline = view::timeline(&report, mode);
+        assert!(
+            timeline
+                .entries
+                .iter()
+                .all(|entry| entry.collector.as_deref() != Some("process")),
+            "{mode:?}: {:?}",
+            timeline.entries
+        );
+    }
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 

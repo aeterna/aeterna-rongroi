@@ -416,6 +416,10 @@ pub struct ProcessRecord {
     pub name: String,
     /// Full path of the image file, when it could be resolved.
     pub path: Option<String>,
+    /// When the process was created, in whole seconds (see [`process_started_at`]), when Windows
+    /// gave a time for it (ADR 0062). `None` is a time that could not be read, as a `None` path is a
+    /// path that could not be — never a stand-in value.
+    pub started_at: Option<jiff::Timestamp>,
 }
 
 /// Read-only access to the list of running processes (ADR 0010).
@@ -424,8 +428,28 @@ pub trait ProcessSource {
     ///
     /// A process whose image path cannot be resolved — a protected process, or one that exited
     /// between the list being taken and the query — is still returned, with `path` as `None`.
-    /// Dropping it would understate what is running.
+    /// Dropping it would understate what is running. The same holds for a process whose creation
+    /// time cannot be read: it is returned with `started_at` as `None` (ADR 0062).
     fn running_processes(&self) -> Result<Vec<ProcessRecord>, SourceError>;
+}
+
+/// A process's creation time as `GetProcessTimes` reports it, a `FILETIME`, as a timestamp in whole
+/// seconds (ADR 0062).
+///
+/// The sub-second part is dropped as [`listed_time`] drops it: a person compares a process's start
+/// with other times by minutes, not by fractions of a second. `None` is a value that names no start —
+/// zero, the `FILETIME` epoch, which no running process was created at — or one outside the range a
+/// [`jiff::Timestamp`] represents.
+pub fn process_started_at(creation: u64) -> Option<jiff::Timestamp> {
+    if creation == 0 {
+        return None;
+    }
+    // 1601-01-01 to 1970-01-01, in seconds: `UNIX_EPOCH_AS_FILETIME` in whole seconds.
+    let filetime_epoch = std::time::UNIX_EPOCH.checked_sub(std::time::Duration::from_secs(
+        UNIX_EPOCH_AS_FILETIME / 10_000_000,
+    ))?;
+    let since = std::time::Duration::from_secs(creation / 10_000_000);
+    listed_time(filetime_epoch.checked_add(since)?)
 }
 
 /// Read-only access to how long the running Windows kernel has been counting since it started
@@ -908,6 +932,41 @@ mod tests {
         assert_eq!(
             journal_created_on(125_911_584_000_000_000),
             Some(jiff::civil::date(2000, 1, 1))
+        );
+    }
+
+    /// A `FILETIME` of 2020-01-01T00:00:00Z plus a fraction of a second: the second it falls in.
+    #[test]
+    fn a_process_creation_time_keeps_whole_seconds() {
+        let new_year = 132_223_104_000_000_000_u64;
+        assert_eq!(
+            process_started_at(new_year),
+            Some(at("2020-01-01T00:00:00Z"))
+        );
+        assert_eq!(
+            process_started_at(new_year + 9_999_999),
+            Some(at("2020-01-01T00:00:00Z"))
+        );
+        assert_eq!(
+            process_started_at(new_year + 10_000_000),
+            Some(at("2020-01-01T00:00:01Z"))
+        );
+        assert_eq!(
+            process_started_at(UNIX_EPOCH_AS_FILETIME),
+            Some(at("1970-01-01T00:00:00Z"))
+        );
+    }
+
+    /// Zero names no start, and a value past the year 9999 names none this program can represent:
+    /// both are "not read", never a wrong instant, and nothing panics.
+    #[test]
+    fn a_process_creation_time_that_names_no_start_gives_none() {
+        assert_eq!(process_started_at(0), None);
+        assert_eq!(process_started_at(u64::MAX), None);
+        assert_eq!(
+            process_started_at(1),
+            Some(at("1601-01-01T00:00:00Z")),
+            "a non-zero value before 1970 is still an instant"
         );
     }
 
