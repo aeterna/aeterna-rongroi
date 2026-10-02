@@ -190,3 +190,27 @@ of the window.
   `cargo xtask check-rules` refuses a rule without one.
 - The M3 collectors (vulnerable drivers, USN journal) land in this layout: their hashes, signers and
   journal fields go in layer 3, not in the row.
+
+## Amendment (2026-10-02) — the window's look: bright sky instead of dark and gold
+
+Owner decision of 2026-10-02. Section 7 kept "the dark and gold look of the window". The owner chose a
+bright look instead, for the window and the landing page alike: a light sky-blue ground with soft clouds,
+translucent white panels, rounded corners and pill buttons, and a rounded typeface for headings. The
+reference the owner pointed to is the Aniimo website; only its general style is followed — none of its
+artwork, logo or typeface is used.
+
+What does not change, from section 7 and elsewhere:
+
+- A state is never shown by colour alone: `found` is a filled square, `not_found` an open circle,
+  `unmeasured` a dashed circle with a dashed row border, and every row says its state in words.
+  `not_found` stays grey, never green.
+- The start screen's choices and the consent text, the administrator-restart offer, the unofficial-build
+  banner, the order of the sections, and SS mode's filter and redaction.
+- Nothing is loaded from another host. The typefaces are bundled with the program: Mali (headings,
+  buttons, counts) and Anuphan (running text), both by Cadson Demak under OFL-1.1.
+
+Text keeps at least WCAG AA contrast (4.5:1) against the panel it sits on, the state colours included;
+the translucent panels are opaque enough that the clouds behind them never lower it.
+
+Checked on 2026-10-02 in a browser at the window's 960×760 size, through Vite with the IPC mocked by the
+repository's report snapshots, in English and Thai. Not yet checked in WebView2 on Windows.
