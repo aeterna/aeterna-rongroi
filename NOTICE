@@ -10,6 +10,9 @@ Commons Attribution-ShareAlike 4.0 International license. See LICENSES/CC-BY-SA-
 vendored third-party data: rules/driver_service/vulnerable-driver/loldrivers-listed/loldrivers-vulnerable-drivers.csv
 is LOLDrivers data under Apache-2.0, per its own REUSE.toml annotation and the PROVENANCE.md beside it.
 
+The Anuphan typeface (apps/desktop/src/assets/fonts/, site/fonts/) is Copyright 2019 The Anuphan Project
+Authors (https://github.com/cadsondemak/Anuphan), under the SIL Open Font License 1.1. See LICENSES/OFL-1.1.txt.
+
 Per-file licensing is declared with SPDX headers and REUSE.toml (https://reuse.software).
 
 -------------------------------------------------------------------------------------------------------
