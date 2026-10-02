@@ -5,6 +5,39 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-03
+
+The checks are those of 0.6.0: no collector, rule, report field or text changed. This release changes how the
+window looks, and adds a landing page.
+
+### Changed
+- **The desktop window's look** (ADR 0045, amendment of 2026-10-02, owner decision): a bright sky — a light blue
+  ground with soft clouds, translucent white panels, rounded corners and pill buttons — in place of dark and gold.
+  Styles only; no markup, text or behaviour changed. What section 7 fixed still holds: every state is shown by
+  shape as well as colour (found a filled square, not found a grey open circle, never green, not measured a
+  dashed circle), and the start-screen choices and the consent text are unchanged. Every text colour measures
+  WCAG AA or better against its panel.
+- Two typefaces are bundled with the program, so the window no longer depends on the fonts a PC has and still
+  loads nothing from another host: Mali for headings, buttons and counts, Anuphan for running text, both by
+  Cadson Demak under OFL-1.1 (`LICENSES/OFL-1.1.txt`, `REUSE.toml`, `NOTICE`).
+- Consent: the agree and refuse buttons stay at the bottom of the window while the list is read, side by side
+  and the same width. The scan's facts are a two-column table headed by the mode; found rows carry an edge as
+  well as their square; the full-scan and administrator buttons are sized to their text.
+- Checked in WebView2 155 on a Windows 11 PC (build 26220) without administrator rights; recorded in the
+  ADR 0045 amendment.
+- README: the Status section shows the latest release only, in plain words beside the technical detail, and
+  names the tool the way people search for it, in English and Thai. Both screenshare guides cover this release.
+- CI: the Windows job runs the script block logging measurement on a pull request only when a crate,
+  `rules/posture/`, the toolchain, `Cargo.toml`/`Cargo.lock` or the workflow changed; every push to `dev` and
+  `main` still runs it. The required check `rust (windows)` keeps its name.
+
+### Added
+- A landing page in `site/`, Thai at the root and English under `en/`, published to GitHub Pages by
+  `.github/workflows/pages.yml` from `dev`. Static HTML and CSS only: no script, no tracker, no cookie, nothing
+  loaded from another host. It carries a Google Search Console ownership tag, a token that loads and sends
+  nothing. GOVERNANCE "How to release" step 1 now names the versions shown on the page, in the README's Status
+  section and in the screenshare guides.
+
 ## [0.6.0] - 2026-10-02
 
 ### Added

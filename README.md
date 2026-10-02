@@ -68,14 +68,15 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 ## Status
 
-**Latest release: [0.6.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.02-0.6.0)**, 2 October 2026 —
+**Latest release: [0.7.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.03-0.7.0)**, 3 October 2026 —
 a pre-release. It has 44 rules, and almost all of them are still `experimental`: they have not yet been
-checked against enough real PCs, so read every result with care.
+checked against enough real PCs, so read every result with care. 0.7.0 gives the window a bright sky look;
+its checks are those of 0.6.0.
 Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 
 | What it looks at, in plain words | Technical detail |
 |---|---|
-| **FiveM itself** — whether FiveM's files are the real, signed ones, and what add-on files sit in its folders. **New in 0.6.0:** when FiveM was last played, beside when its folders were last written | Legacy and GTA V Enhanced editions; Authenticode signatures checked offline; `plugins` and Enhanced's `asi` folder; Enhanced's per-server cache folders (full scan only, with consent); last session per edition from process start, Prefetch and BAM ([ADR 0062](docs/adr/0062-fivem-s-folders-beside-its-last-session.md)) |
+| **FiveM itself** — whether FiveM's files are the real, signed ones, and what add-on files sit in its folders. **Since 0.6.0:** when FiveM was last played, beside when its folders were last written | Legacy and GTA V Enhanced editions; Authenticode signatures checked offline; `plugins` and Enhanced's `asi` folder; Enhanced's per-server cache folders (full scan only, with consent); last session per edition from process start, Prefetch and BAM ([ADR 0062](docs/adr/0062-fivem-s-folders-beside-its-last-session.md)) |
 | **Programs that ran** — what Windows remembers running recently | Prefetch, BAM, PCA, running processes. Listed in self mode, counted in SS mode. No rule judges what they record, because they name a program only by its file name ([ADR 0034](docs/adr/0034-prefetch-bam-and-pca-carry-no-identity.md)) |
 | **Signs that records were wiped** — Windows' own logs cleared or blocked | An event log cleared; an event log or Prefetch file set read-only, or not the file Windows writes to |
 | **Protection switched off** — antivirus and Windows security settings | Microsoft Defender's real-time protection switched off, its service disabled, its exclusions (administrator only); Secure Boot, TPM, memory integrity (HVCI), test signing, exploit mitigations, PowerShell logging |
