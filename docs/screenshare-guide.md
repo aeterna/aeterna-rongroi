@@ -1,6 +1,6 @@
 # Screenshare guide
 
-For server staff checking a player's PC over a screenshare (an SS, also called a PC check), and for the player. It covers
+For server staff checking a player's PC over a screenshare, and for the player. It covers
 aeterna-rongroi **0.5.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
 > ⚠️ **Pre-alpha.** Forty-four rules ship in 0.5.0, and forty-two of them are `experimental`. Do not ban anyone
