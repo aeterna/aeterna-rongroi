@@ -1,9 +1,9 @@
 # Screenshare guide
 
 For server staff checking a player's PC over a screenshare, and for the player. It covers
-aeterna-rongroi **0.5.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
+aeterna-rongroi **0.6.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
-> ⚠️ **Pre-alpha.** Forty-four rules ship in 0.5.0, and forty-two of them are `experimental`. Do not ban anyone
+> ⚠️ **Pre-alpha.** Forty-four rules ship in 0.6.0, and forty-two of them are `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
 
 ## 1. What it can and cannot show
@@ -23,9 +23,9 @@ never does.
 
 1. The player downloads it from the project's GitHub **Releases** page. Send the player the page,
    not a copy of the file.
-   - `aeterna-rongroi-cli-0.5.0-windows-x64.exe` is the command-line version. It does not use
+   - `aeterna-rongroi-cli-0.6.0-windows-x64.exe` is the command-line version. It does not use
      WebView2.
-   - `aeterna-rongroi-0.5.0-windows-x64.exe` is the version with a window.
+   - `aeterna-rongroi-0.6.0-windows-x64.exe` is the version with a window.
 2. Do not open it from the browser. Windows SmartScreen will warn, because releases are not
    code-signed yet, and the hash check comes first.
 3. Before running it, the player opens PowerShell in the download folder and runs:
@@ -71,7 +71,7 @@ read-only, and the one about an event log file that is not the file Windows writ
 - **CLI:** open **PowerShell as administrator** and run the scan in that window (§4).
   `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
   until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
-  full-scan work touched that code, or for 0.5.0 — but the report from
+  full-scan work touched that code, or for 0.5.0 and 0.6.0 — but the report from
   `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
   use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
   (measured on a real Windows 11 machine).
@@ -91,7 +91,7 @@ change the results. The consent screen decides what is shown.
 **CLI:**
 
 ```powershell
-.\aeterna-rongroi-cli-0.5.0-windows-x64.exe scan --mode ss
+.\aeterna-rongroi-cli-0.6.0-windows-x64.exe scan --mode ss
 ```
 
 Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
@@ -106,7 +106,7 @@ Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player**
 ### The header
 
 ```
-aeterna-rongroi 0.5.0
+aeterna-rongroi 0.6.0
 official build
 mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
 exe sha256: <hash>
@@ -258,7 +258,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 adds no rules. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -415,12 +415,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 
 ## 9. Keeping a record
 
-- **The window version has no export or save button** in 0.5.0 either: nothing in its source writes a
+- **The window version has no export or save button** in 0.6.0 either: nothing in its source writes a
   file.
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
   ```powershell
-  .\aeterna-rongroi-cli-0.5.0-windows-x64.exe scan --mode ss --json > report.json
+  .\aeterna-rongroi-cli-0.6.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
   The consent question stays on screen, the player answers it there, and the file holds only the JSON.
