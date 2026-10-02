@@ -190,7 +190,6 @@ export interface Comparison {
 export type SessionLine = {
   source: string;
   variant?: string;
-  join?: boolean;
 } & (
   | { line: "compared"; created?: Comparison; written: Comparison }
   | { line: "not_there" | "no_file" | "not_listed" }
@@ -220,6 +219,7 @@ export interface IndexBeside {
   variant: string;
   index_created_on: string;
   oldest_file_created_on?: string;
+  cache_files: number;
 }
 
 /** A source's ordinary retention, from `rules/ages/<collector>.yaml`, translated (ADR 0061). */

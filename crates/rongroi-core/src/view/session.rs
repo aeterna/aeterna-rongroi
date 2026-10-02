@@ -33,7 +33,6 @@ const LEGACY_CACHE: &str = "legacy_cache";
 /// Legacy's resource caches, one per launch mode (`variant`).
 pub(super) const LEGACY_SERVER_CACHE: &str = "legacy_server_cache";
 const ENHANCED_LOGS: &str = "enhanced_logs";
-const ENHANCED_SERVER_CACHE: &str = "enhanced_server_cache";
 /// The launch modes of Legacy's resource cache, in the order they are shown.
 const VARIANTS: [&str; 3] = ["default", "priv", "fxdk"];
 
@@ -185,16 +184,11 @@ impl Duration {
 /// One source of the edition, in one of the ADR's line forms.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionLine {
-    /// `legacy_logs`, `legacy_cache`, `legacy_resource_index`, `enhanced_logs` or
-    /// `enhanced_server_cache`.
+    /// `legacy_logs`, `legacy_cache`, `legacy_resource_index` or `enhanced_logs`.
     pub source: String,
     /// The launch mode, for Legacy's resource cache index.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variant: Option<String>,
-    /// Whether it is written only when a server is joined; its line then carries "(written when a
-    /// server is joined)" and the statement the two join causes.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub join: bool,
     /// What it says.
     #[serde(flatten)]
     pub state: LineState,
@@ -263,15 +257,18 @@ pub struct IndexBeside {
     /// The UTC date the oldest cache file was created; absent when the cache holds no file with a time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oldest_file_created_on: Option<String>,
+    /// How many cache files the launch mode's folder holds, so that "holds no cache file" is told apart
+    /// from files the listing gave no time for.
+    #[serde(default)]
+    pub cache_files: u64,
 }
 
 /// The ordinary causes printed first, before the general list (ADR 0062 amendment, change 1).
 const FIRST_CAUSE: &str = "standing_still";
-/// The two causes a join source's line carries (ADR 0062 section 3).
-const JOIN_CAUSES: [&str; 2] = ["no_join", "all_cached"];
 /// The cause the end comparison carries (ADR 0062 amendment, change 2).
 const END_CAUSE: &str = "ended_abruptly";
-/// The general list, in section 7's order, less the join cause it opens with.
+/// The general list, in section 7's order, less the join cause it opens with: no source compared is
+/// written only on joining a server (ADR 0062 owner decision 12 of 2026-10-02).
 const GENERAL_CAUSES: [&str; 8] = [
     "removes_logs",
     "other_folder",
@@ -331,8 +328,11 @@ fn anchors(
         .filter(|observation| text(observation, EDITION_FIELD) == Some(edition))
         .filter_map(|observation| {
             let name = anchor_name(text(observation, "name")?, edition)?;
-            let at = time_of(observation, field)?;
-            Some((at.parse().ok()?, at.to_owned(), name))
+            let time: jiff::Timestamp = time_of(observation, field)?.parse().ok()?;
+            // To the second, as the timeline shows FiveM's selectors (ADR 0051); Prefetch and BAM keep
+            // 100-nanosecond fractions the statement does not print.
+            let time = jiff::Timestamp::from_second(time.as_second()).ok()?;
+            Some((time, time.to_string(), name))
         })
         .collect()
 }
@@ -476,9 +476,6 @@ fn known(report: &Report, edition: &str, anchors: Anchors) -> SessionState {
         _ => enhanced_lines(report, start_time, end_time),
     };
     let mut causes = vec![FIRST_CAUSE.to_owned()];
-    if lines.iter().any(|line| line.join) {
-        causes.extend(JOIN_CAUSES.iter().map(|cause| (*cause).to_owned()));
-    }
     // The end comparison was made: Enhanced's log folder was compared and the end is BAM's.
     let end_compared = end_time.is_some()
         && lines.iter().any(|line| {
@@ -628,7 +625,6 @@ fn folder_line(
     SessionLine {
         source: source.to_owned(),
         variant: None,
-        join: false,
         state,
     }
 }
@@ -647,7 +643,6 @@ fn legacy_lines(report: &Report, start: Option<jiff::Timestamp>) -> Vec<SessionL
     let index_line = |variant: Option<String>, state| SessionLine {
         source: "legacy_resource_index".to_owned(),
         variant,
-        join: false,
         state,
     };
     match place_observations(report, LEGACY_SERVER_CACHE) {
@@ -694,10 +689,10 @@ fn index_state(observation: &Observation, start: jiff::Timestamp) -> LineState {
     }
 }
 
-/// Enhanced's lines: its log folder, a launch source compared with the start and its latest write with
-/// the end too (owner decision 1 of 2026-10-02, recorded in ADR 0062's "As built"); and its per-server
-/// cache, a join source by the newer of its latest server folder's write and the place's own latest
-/// write (owner decision 2). With no start, only the log folder's end comparison.
+/// Enhanced's line: its log folder, a launch source compared with the start, and its latest write with
+/// the end too (owner decision 9 of 2026-10-02, in ADR 0062's "As built"). With no start, only the end
+/// comparison. Its per-server cache is not compared (owner decision 12): the times read of a server folder
+/// change only when an entry is added or removed, not when a join rewrites the files inside it.
 fn enhanced_lines(
     report: &Report,
     start: Option<jiff::Timestamp>,
@@ -732,45 +727,9 @@ fn enhanced_lines(
         lines.push(SessionLine {
             source: ENHANCED_LOGS.to_owned(),
             variant: None,
-            join: false,
             state,
         });
     }
-    let Some(start) = start else {
-        return lines;
-    };
-    let state = match place_observations(report, ENHANCED_SERVER_CACHE) {
-        Err(state) => state,
-        Ok(found) => {
-            let observation = found[0];
-            folder_state(observation).unwrap_or_else(|| {
-                let servers = observations_of(report, "fivem_dir")
-                    .into_iter()
-                    .filter(|server| {
-                        text(server, "location") == Some(ENHANCED_SERVER_CACHE)
-                            && !server.fields.contains_key("folder")
-                    })
-                    .filter_map(|server| timestamp(server, "modified_at"));
-                let latest = timestamp(observation, "latest_modified_at")
-                    .into_iter()
-                    .chain(servers)
-                    .max();
-                match latest {
-                    Some(written) => LineState::Compared {
-                        created: None,
-                        written: against_start(written, start),
-                    },
-                    None => LineState::NoFile,
-                }
-            })
-        }
-    };
-    lines.push(SessionLine {
-        source: ENHANCED_SERVER_CACHE.to_owned(),
-        variant: None,
-        join: true,
-        state,
-    });
     lines
 }
 
@@ -794,6 +753,7 @@ pub(super) fn index_beside(report: &Report) -> Vec<IndexBeside> {
                 variant: (*variant).to_owned(),
                 index_created_on: utc_date(timestamp(observation, "index_created_at")?),
                 oldest_file_created_on: timestamp(observation, "earliest_created_at").map(utc_date),
+                cache_files: files(observation).unwrap_or(0),
             })
         })
         .collect()

@@ -205,6 +205,14 @@ fn index_beside(out: &mut String, words: &Words, row: &TraceAge) {
                     ("oldest", oldest),
                 ],
             ),
+            // The folder holds no cache file, as against files the listing gave no time for.
+            None if beside.cache_files == 0 => words.get(
+                "trace_ages.index_beside_empty",
+                &[
+                    ("variant", &beside.variant),
+                    ("index", &beside.index_created_on),
+                ],
+            ),
             None => words.get(
                 "trace_ages.index_beside_no_file",
                 &[
@@ -562,9 +570,6 @@ fn session_statement(out: &mut String, words: &Words, statement: &SessionStateme
             for line in lines {
                 let (label, text) = session_source_line(words, line);
                 let _ = writeln!(out, "    {label}: {text}");
-                if line.join {
-                    let _ = writeln!(out, "          {}", words.get("session.join", &[]));
-                }
             }
             // The margin is said where it was applied: against a recorded start, and against the end.
             if matches!(
@@ -597,6 +602,7 @@ mod tests {
         let mut keys: Vec<String> = [
             "trace_ages.index_beside",
             "trace_ages.index_beside_no_file",
+            "trace_ages.index_beside_empty",
             "session.title",
             "session.session",
             "session.start.process",
@@ -617,7 +623,6 @@ mod tests {
             "session.duration.days_one",
             "session.duration.days_other",
             "session.variant",
-            "session.join",
             "session.not_there",
             "session.no_file",
             "session.not_listed",
@@ -635,8 +640,6 @@ mod tests {
         .to_vec();
         for cause in [
             "standing_still",
-            "no_join",
-            "all_cached",
             "ended_abruptly",
             "removes_logs",
             "other_folder",
@@ -654,7 +657,6 @@ mod tests {
             "legacy_cache",
             "legacy_resource_index",
             "enhanced_logs",
-            "enhanced_server_cache",
         ] {
             keys.push(format!("session.source.{source}"));
         }
@@ -809,7 +811,7 @@ mod tests {
     }
 
     /// The session statement as a screenshare viewer reads it, in both languages, from the synthetic
-    /// hosts (ADR 0062 section 7, as amended): each line form, the join line, the margin, the end
+    /// hosts (ADR 0062 section 7, as amended): each line form, the margin, the end
     /// comparison with its cause, "still running", "not known" and Prefetch switched off — and the
     /// index beside its oldest file under the trace ages row. No path, file, user or server name.
     #[test]
@@ -828,9 +830,9 @@ mod tests {
             "      - a player standing still, or playing on with nothing new to write: FiveM writes its folders when something happens, not on a clock",
             "FiveM for GTA V Enhanced: its last session, beside its own folders",
             "    Logs: last created 1 minute after the session began; the folder's latest log write was 40 minutes before the session ended",
-            "    Server cache: the folder is not there\n          (written when a server is joined)",
-            "      - the game played without joining a server\n      - joining a server whose files were all cached already\n      - FiveM ended by Task Manager, a crash or a shutdown",
+            "      - a player standing still, or playing on with nothing new to write: FiveM writes its folders when something happens, not on a clock\n      - FiveM ended by Task Manager, a crash or a shutdown",
             "      Resource cache index (default): index folder created 2025-12-20; oldest cache file created 2025-10-01",
+            "      Resource cache index (fxdk): index folder created 2025-11-01; the cache holds no cache file",
             "      - FiveM rebuilding or replacing its resource cache index (whether and when it does is not established)",
         ] {
             assert!(
@@ -838,18 +840,25 @@ mod tests {
                 "missing {expected:?} in\n{elevated}"
             );
         }
-        // Legacy's statement is a launch source's: no join line and no end cause.
+        // The per-server cache is not compared (owner decision 12 of 2026-10-02), so no statement has
+        // a join line or a join cause; Legacy's has no end cause; no time carries a fraction.
+        for absent in [
+            "Server cache:",
+            "written when a server is joined",
+            "without joining a server",
+        ] {
+            assert!(!elevated.contains(absent), "{absent} in\n{elevated}");
+        }
         let legacy = &elevated[elevated
             .find("FiveM for GTA V Legacy: its last session")
             .unwrap()
             ..elevated
                 .find("FiveM for GTA V Enhanced: its last session")
                 .unwrap()];
-        assert!(
-            !legacy.contains("written when a server is joined"),
-            "{legacy}"
-        );
         assert!(!legacy.contains("Task Manager"), "{legacy}");
+        // BAM's time carries a fraction of a second in the report (the timeline shows it); the
+        // statement prints it to the second.
+        assert!(!legacy.contains(".2231407"), "{legacy}");
         for withheld in [
             "fixtureuser",
             "CitizenFX_log",
@@ -867,7 +876,7 @@ mod tests {
             "    Cache: เขียนล่าสุด 36 ชั่วโมง ก่อนเซสชันเริ่ม",
             "    ดัชนีของ resource cache (priv): อ่านไม่ได้: เปิดดูรายการในโฟลเดอร์ไม่ได้",
             "    Log: สร้างไฟล์ล่าสุด 1 นาที หลังเซสชันเริ่ม; log ในโฟลเดอร์ถูกเขียนล่าสุด 40 นาที ก่อนเซสชันจบ",
-            "          (ถูกเขียนเมื่อเข้าเซิร์ฟเวอร์)",
+            "      ดัชนีของ resource cache (fxdk): โฟลเดอร์ดัชนีสร้างเมื่อ 2025-11-01 cache นี้ไม่มีไฟล์ cache",
             "เวลาที่อยู่ก่อนเซสชันเริ่มเกิน 10 นาทีแสดงเป็นก่อนเซสชันเริ่ม เวลาหลังจากนั้นแสดงเป็นหลังเซสชันเริ่ม",
             "      - ผู้เล่นยืนนิ่ง หรือเล่นต่อโดยไม่มีอะไรใหม่ให้เขียน: FiveM เขียนโฟลเดอร์ของตัวเองเมื่อมีเหตุการณ์ ไม่ได้เขียนตามเวลา",
         ] {

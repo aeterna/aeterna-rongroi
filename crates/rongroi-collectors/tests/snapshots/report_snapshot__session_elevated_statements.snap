@@ -120,17 +120,10 @@ expression: "sessions_of(\"session-elevated\")"
             "unit": "minutes"
           }
         }
-      },
-      {
-        "source": "enhanced_server_cache",
-        "join": true,
-        "line": "not_there"
       }
     ],
     "causes": [
       "standing_still",
-      "no_join",
-      "all_cached",
       "ended_abruptly",
       "removes_logs",
       "other_folder",

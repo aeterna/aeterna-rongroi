@@ -3958,14 +3958,9 @@ mod tests {
             line(lines, "legacy_resource_index", Some("fxdk")),
             LineState::NoFile
         );
-        // A launch source: no join line, no join causes, no end cause.
-        assert!(lines.iter().all(|line| !line.join));
+        // A launch source: no end cause.
         assert_eq!(causes[0], "standing_still");
-        assert!(
-            !causes
-                .iter()
-                .any(|cause| cause == "no_join" || cause == "ended_abruptly")
-        );
+        assert!(!causes.iter().any(|cause| cause == "ended_abruptly"));
     }
 
     /// The margin is ten minutes before the start: nine minutes before reads "after" with nothing to
@@ -3992,8 +3987,9 @@ mod tests {
     }
 
     /// An Enhanced session: its log folder is a launch source compared with the start, and its latest
-    /// write with the end too; the per-server cache is one join line from the newer of its two times.
-    /// The causes carry the join pair and the end cause; `GTA5_Enhanced.exe` is never an anchor.
+    /// write with the end too. Its per-server cache is not compared (owner decision 12), so there is no
+    /// join line and no join cause; the end cause follows the first. `GTA5_Enhanced.exe` is never an
+    /// anchor, and the 100-nanosecond fractions Prefetch and BAM keep are not printed.
     #[test]
     fn an_enhanced_session_compares_its_logs_with_the_end_too() {
         use serde_json::json;
@@ -4003,7 +3999,7 @@ mod tests {
                 "FiveM.exe",
                 "enhanced",
                 "last_run",
-                "2026-01-10T09:00:00Z",
+                "2026-01-10T09:00:00.2231407Z",
             ),
             run(
                 "prefetch",
@@ -4017,7 +4013,7 @@ mod tests {
                 "FiveM.exe",
                 "enhanced",
                 "last_run",
-                "2026-01-10T10:00:00Z",
+                "2026-01-10T10:00:00.9999999Z",
             ),
             run(
                 "bam",
@@ -4070,21 +4066,10 @@ mod tests {
                 written: compared(Relation::BeforeEnd, minutes(30)),
             }
         );
-        let server = lines
-            .iter()
-            .find(|line| line.source == "enhanced_server_cache")
-            .unwrap();
-        assert!(server.join);
+        assert_eq!(lines.len(), 1, "{lines:?}");
         assert_eq!(
-            server.state,
-            LineState::Compared {
-                created: None,
-                written: compared(Relation::AfterStart, minutes(5)),
-            }
-        );
-        assert_eq!(
-            causes[..4],
-            ["standing_still", "no_join", "all_cached", "ended_abruptly"].map(str::to_owned)
+            causes[..2],
+            ["standing_still", "ended_abruptly"].map(str::to_owned)
         );
     }
 
@@ -4257,7 +4242,6 @@ mod tests {
             }
         );
         assert!(causes.iter().any(|cause| cause == "ended_abruptly"));
-        assert!(!causes.iter().any(|cause| cause == "no_join"));
 
         let nothing = session_report(
             vec![run(

@@ -649,7 +649,9 @@ say which they settled.
 
 ### Owner decisions taken while building the statement (2026-10-02)
 
-Four questions came up while the session statement was built; the owner decided each on 2026-10-02.
+Five questions came up while the session statement was built; the owner decided each on 2026-10-02. The
+fifth, decision 12, followed a run of the change on the Windows 11 PC (build 26220), elevated and with the
+limited token, and replaces decision 10.
 
 - **2ก. A `db` that could not be listed.** Its index folder's own times are there and `index_files` is not
   (ADR 0053's amendment for this ADR). Its line is the fixed form "not read: the folder could not be
@@ -672,11 +674,21 @@ Four questions came up while the session statement was built; the owner decided 
     end would hide a launcher log that was not written then.
 - **10. Enhanced's per-server cache is one line**, by the newer of the latest server folder's `modified_at`
   and the place's own `latest_modified_at`, as a join source with its line form and its two join causes.
+  *Replaced by decision 12.*
 - **11. The anchor names** are those section 2 lists, confirmed: `FiveM.exe` for both editions and
   `FiveM_b…_GTAProcess.exe` for Legacy, each counted only with the edition's `fivem_edition`. Not
   `GTA5_Enhanced.exe`, although its Prefetch entry is below Enhanced's folder (the amendment), and not
   FiveM's other processes (`fivem-cef-subprocess.exe`, the browser, dump server, launcher and service
   processes). The same names anchor a running process, Prefetch's start and BAM's end.
+- **12. Enhanced's per-server cache is not compared with the session** in this change; it is treated as
+  Legacy's resource cache files are (section 3's table: not compared). Measured on the PC: what the
+  collector reads of the cache is each server folder's own times and the place's top-level files, and a
+  server folder's own times change only when an entry is added to it or removed from it. A join of a server
+  already cached rewrote 177 files inside its folder and added none, and the statement printed "Server cache:
+  last written 21 hours before the session began" for a session that had joined. Comparing it needs the
+  times of the files inside each server folder — a read this program does not make, for a separate amendment
+  of ADR 0053. With it go the join line form "(written when a server is joined)" and the two join causes:
+  no source compared now is written only on joining, Legacy's index being a launch source.
 
 ### Choices the text leaves open
 
@@ -688,8 +700,9 @@ The change took these, each the one that shows less or says more plainly what wa
   a line per source (`SessionLine`, with `LineState`) and its causes as locale keys, in the order printed.
   "Not known" is its own state with Prefetch's and BAM's reasons. The view builds it in
   `rongroi_core::view::session`; the CLI and the desktop only word it.
-- **Times and durations.** Anchor times are shown as the report holds them, RFC 3339 to the second — the
-  precision the timeline shows them at. A source is a duration from the start (or the end): whole minutes
+- **Times and durations.** Anchor times are shown in RFC 3339, truncated to the whole second as section 7
+  asks: Prefetch and BAM keep 100-nanosecond fractions ("2026-10-02T02:10:07.2231407Z" on the PC), which the
+  statement does not print. `session-elevated`'s BAM time carries such a fraction. A source is a duration from the start (or the end): whole minutes
   under an hour, whole hours under two days, whole days after that, rounded down; under a minute reads "less
   than a minute". A time less than ten minutes before the start is "after the start" with nothing to count,
   as the margin line says. The session's age is from its end, or from its start when its end is not
@@ -718,18 +731,29 @@ The change took these, each the one that shows less or says more plainly what wa
   is "not there"; a folder listed with no file and no time is "no file". Each Legacy launch mode that exists
   gets an index line — no `db` is "not there", `index_files: 0` "no file", a `db` not listed decision 2ก's
   form — and with no launch mode at all there is one "not there" line.
-- **Causes.** Every statement opens with the amendment's first cause (a player standing still); a statement
-  with a join line adds the two join causes; one whose end comparison was made adds its cause; then section
-  7's list, less the join cause it opened with. "FiveM opened and closed before the game started, or updating
+- **A launch mode that is not there gets no line**, although section 5 gives an absent place with an anchor
+  the line "not there". A launch-mode cache exists only once FiveM was started in that mode, and most PCs never
+  start the `priv` or `fxdk` mode (the `fxdk` cache was absent on the PC the change ran on). `fivem_dir` does
+  not report an absent launch mode (ADR 0053), so "not there" for it would be a line on almost every PC that
+  says only that the mode was never used. The place as a whole keeps the section 5 line when no launch mode is
+  there.
+- **Causes.** Every statement opens with the amendment's first cause (a player standing still); one whose
+  end comparison was made adds its cause; then section 7's list, less the join cause it opened with, since no
+  source compared is a join source (decision 12). "FiveM opened and closed before the game started, or updating
   itself" stays in that list: it is section 7's general cause, not the dropped game-start line's.
 - **Section 4.** Under the trace ages row of `legacy_server_cache`, each launch mode whose index folder has a
-  creation time shows that date beside its folder's `earliest_created_at` as a date ("no cache file has a
-  creation time" when there is none), and the section's causes gain the four section 7 lists.
+  creation time shows that date beside its folder's `earliest_created_at` as a date; when the folder holds no
+  cache file it says so ("holds no cache file"), and "no cache file has a creation time" is kept for files the
+  listing gave no time for. The section's causes gain the four section 7 lists.
 - **Fixtures.** Synthetic hosts, none a measured PC: `session-elevated` (both editions read elevated, each
   line form of an elevated read, an index created months after its oldest cache file, a `db` that cannot be
-  listed, an empty `db`), `session-limited-running` (a limited token while Legacy runs; Enhanced "not
+  listed, an empty `db` in a launch mode with no cache file, a BAM time with a fraction of a second), `session-limited-running` (a limited token while Legacy runs; Enhanced "not
   known"), `session-not-known` (nothing running) and `session-prefetch-off` (`EnablePrefetcher` 0, BAM read).
   Their Prefetch and BAM bytes are synthetic files in `fixtures/parsers/`, made from the existing synthetic
   ones with the run times changed.
 
-Not measured by this change: the statement on a PC. The points still open under the amendment stay open.
+Checked on the Windows 11 PC (build 26220) at #133's first head, elevated and with the limited token, SS mode,
+English and Thai: the anchors and Legacy's lines matched the measured sessions, and with the limited token and
+nothing running both editions read "not known". What it found — the per-server cache line, fractions of a
+second, the empty launch mode's index line — is fixed above (decision 12, "Times and durations", "Section
+4"). The points still open under the amendment stay open.

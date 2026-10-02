@@ -190,7 +190,8 @@ otherwise the latest Prefetch `last_run` of those names gives the start and the 
 end. `GTA5_Enhanced.exe` and FiveM's other processes are not anchors. Each of the edition's `fivem_dir`
 places is compared with the start only — "before" beyond a ten-minute margin, "after" otherwise, as a
 duration — and Enhanced's whole log folder also with the end; Legacy's resource cache index is a launch
-source and Enhanced's per-server cache a join source. A place not read keeps its reason, and neither record
+source, and Enhanced's per-server cache is not compared (its server folders' own times change only when an
+entry is added or removed). Anchor times are printed to the second. A place not read keeps its reason, and neither record
 read with nothing running is "not known", never a comparison with the scan's time. Nothing is stored between
 scans. The trace ages row of Legacy's resource cache carries each launch mode's index creation date beside
 its oldest cache file's (`TraceAge::index_beside`), never compared.

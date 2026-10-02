@@ -33,7 +33,7 @@ parallel set of sample bytes to keep in step.
 | `bam/longer-than-documented.bin` | Longer than 24 bytes, as a newer Windows build might write |
 | `bam/filetime-out-of-range.bin` | `FILETIME` `u64::MAX`: the value that once panicked inside jiff (ADR 0013) |
 | `bam/truncated.bin` | Seven bytes — one short of a timestamp, so a `Truncated` error |
-| `bam/filetime-2025-12-31T21-30-00Z.bin`, `bam/filetime-2025-12-31T11-00-00Z.bin`, `bam/filetime-2025-12-31T22-00-00Z.bin` | `documented-24-byte-value.bin` with its `FILETIME` set to the time in the name, so that the session statement's fixture hosts have BAM ends to compare with (ADR 0062) |
+| `bam/filetime-2025-12-31T21-30-00.2231407Z.bin`, `bam/filetime-2025-12-31T11-00-00Z.bin`, `bam/filetime-2025-12-31T22-00-00Z.bin` | `documented-24-byte-value.bin` with its `FILETIME` set to the time in the name — the first with a fraction of a second, as Windows writes them — so that the session statement's fixture hosts have BAM ends to compare with (ADR 0062) |
 | `pca-app-launch/normal.txt` | Three ordinary CRLF records |
 | `pca-app-launch/cp1252-path.txt` | A path with `é` as the single CP-1252 byte Windows stores, not UTF-8 |
 | `pca-app-launch/malformed-lines.txt` | Good lines, a line with no delimiter, an impossible date, an empty path and a blank line |

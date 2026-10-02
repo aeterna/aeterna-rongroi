@@ -224,7 +224,8 @@
       "reinstall_kept_cache": "ติดตั้งใหม่โดยเก็บ cache ไว้"
     },
     "index_beside": "ดัชนีของ resource cache ({{variant}}): โฟลเดอร์ดัชนีสร้างเมื่อ {{index}} ไฟล์ cache ที่เก่าที่สุดสร้างเมื่อ {{oldest}}",
-    "index_beside_no_file": "ดัชนีของ resource cache ({{variant}}): โฟลเดอร์ดัชนีสร้างเมื่อ {{index}} ไม่มีไฟล์ cache ที่มีเวลาสร้าง"
+    "index_beside_no_file": "ดัชนีของ resource cache ({{variant}}): โฟลเดอร์ดัชนีสร้างเมื่อ {{index}} ไม่มีไฟล์ cache ที่มีเวลาสร้าง",
+    "index_beside_empty": "ดัชนีของ resource cache ({{variant}}): โฟลเดอร์ดัชนีสร้างเมื่อ {{index}} cache นี้ไม่มีไฟล์ cache"
   },
   "cross_source": {
     "title": "FiveM ในเครื่องนี้ เทียบกับบันทึกของ Windows ว่าโปรแกรมใดเคยรัน",
@@ -298,8 +299,7 @@
       "legacy_logs": "Log",
       "legacy_cache": "Cache",
       "legacy_resource_index": "ดัชนีของ resource cache",
-      "enhanced_logs": "Log",
-      "enhanced_server_cache": "Cache ของเซิร์ฟเวอร์"
+      "enhanced_logs": "Log"
     },
     "variant": "{{source}} ({{variant}})",
     "created": {
@@ -317,7 +317,6 @@
       "near_end": "log ในโฟลเดอร์ถูกเขียนล่าสุดห่างจากตอนเซสชันจบไม่เกิน 10 นาที",
       "after_end": "log ในโฟลเดอร์ถูกเขียนล่าสุด {{duration}} หลังเซสชันจบ"
     },
-    "join": "(ถูกเขียนเมื่อเข้าเซิร์ฟเวอร์)",
     "not_there": "ไม่มีโฟลเดอร์นี้",
     "no_file": "โฟลเดอร์นี้ไม่มีไฟล์",
     "not_listed": "อ่านไม่ได้: เปิดดูรายการในโฟลเดอร์ไม่ได้",
@@ -328,8 +327,6 @@
     "causes_intro": "ข้อมูลนี้ไม่ใช่หลักฐานของสิ่งใด ผลแบบเดียวกันเกิดได้จาก:",
     "causes": {
       "standing_still": "ผู้เล่นยืนนิ่ง หรือเล่นต่อโดยไม่มีอะไรใหม่ให้เขียน: FiveM เขียนโฟลเดอร์ของตัวเองเมื่อมีเหตุการณ์ ไม่ได้เขียนตามเวลา",
-      "no_join": "เล่นเกมโดยไม่ได้เข้าเซิร์ฟเวอร์",
-      "all_cached": "เข้าเซิร์ฟเวอร์ที่ไฟล์ถูก cache ไว้ครบแล้ว",
       "ended_abruptly": "FiveM ถูกปิดด้วย Task Manager, crash หรือการปิดเครื่อง ซึ่งอาจข้ามการเขียนที่ FiveM ทำตอนปิดตัว",
       "removes_logs": "FiveM ลบ log เก่าของตัวเอง หรือใช้ \"clear cache\" ของ FiveM เอง",
       "other_folder": "ติดตั้ง FiveM ไว้หรือย้ายไปไว้ในโฟลเดอร์อื่นที่โปรแกรมนี้ไม่ได้อ่าน หรือติดตั้งใหม่",

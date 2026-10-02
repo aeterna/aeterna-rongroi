@@ -932,7 +932,7 @@ fn the_index_is_shown_beside_its_oldest_cache_file() {
         .iter()
         .find(|row| row.place.as_deref() == Some("legacy_server_cache"))
         .unwrap();
-    let beside: Vec<(&str, &str, Option<&str>)> = row
+    let beside: Vec<(&str, &str, Option<&str>, u64)> = row
         .index_beside
         .iter()
         .map(|beside| {
@@ -940,15 +940,17 @@ fn the_index_is_shown_beside_its_oldest_cache_file() {
                 beside.variant.as_str(),
                 beside.index_created_on.as_str(),
                 beside.oldest_file_created_on.as_deref(),
+                beside.cache_files,
             )
         })
         .collect();
+    // fxdk holds no cache file: "holds no cache file", not "no cache file has a creation time".
     assert_eq!(
         beside,
         [
-            ("default", "2025-12-20", Some("2025-10-01")),
-            ("priv", "2025-10-02", Some("2025-10-02")),
-            ("fxdk", "2025-11-01", None),
+            ("default", "2025-12-20", Some("2025-10-01"), 2),
+            ("priv", "2025-10-02", Some("2025-10-02"), 1),
+            ("fxdk", "2025-11-01", None, 0),
         ]
     );
 }

@@ -224,7 +224,8 @@
       "reinstall_kept_cache": "a reinstall that kept the cache"
     },
     "index_beside": "Resource cache index ({{variant}}): index folder created {{index}}; oldest cache file created {{oldest}}",
-    "index_beside_no_file": "Resource cache index ({{variant}}): index folder created {{index}}; no cache file has a creation time"
+    "index_beside_no_file": "Resource cache index ({{variant}}): index folder created {{index}}; no cache file has a creation time",
+    "index_beside_empty": "Resource cache index ({{variant}}): index folder created {{index}}; the cache holds no cache file"
   },
   "cross_source": {
     "title": "FiveM on this PC, beside Windows' records of programs that ran",
@@ -298,8 +299,7 @@
       "legacy_logs": "Logs",
       "legacy_cache": "Cache",
       "legacy_resource_index": "Resource cache index",
-      "enhanced_logs": "Logs",
-      "enhanced_server_cache": "Server cache"
+      "enhanced_logs": "Logs"
     },
     "variant": "{{source}} ({{variant}})",
     "created": {
@@ -317,7 +317,6 @@
       "near_end": "the folder's latest log write was within 10 minutes of the session's end",
       "after_end": "the folder's latest log write was {{duration}} after the session ended"
     },
-    "join": "(written when a server is joined)",
     "not_there": "the folder is not there",
     "no_file": "the folder holds no file",
     "not_listed": "not read: the folder could not be listed",
@@ -328,8 +327,6 @@
     "causes_intro": "This is not evidence of anything. The same result follows from:",
     "causes": {
       "standing_still": "a player standing still, or playing on with nothing new to write: FiveM writes its folders when something happens, not on a clock",
-      "no_join": "the game played without joining a server",
-      "all_cached": "joining a server whose files were all cached already",
       "ended_abruptly": "FiveM ended by Task Manager, a crash or a shutdown, which may skip the write it makes when it closes",
       "removes_logs": "FiveM removing its own older logs, or its own \"clear cache\"",
       "other_folder": "FiveM installed in, or moved to, a folder other than the one this program reads, or reinstalled",

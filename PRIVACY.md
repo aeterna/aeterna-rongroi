@@ -342,8 +342,8 @@ with the ordinary things that produce the same result, and it names no path, fil
 
 For each FiveM edition, both modes also show **one session statement** (ADR 0062): when that edition's last
 session began and ended — from a FiveM process running now (its start time), else from Prefetch and BAM —
-to the second, and, for each of that edition's log and cache folders and Legacy's resource cache index, how
-long before or after that start it was last written, as minutes, hours or days. It is shown whatever the
+to the second, and, for Legacy's logs, cache and resource cache index and Enhanced's logs, how long before or
+after that start each was last written, as minutes, hours or days. It is shown whatever the
 session's age; nothing is compared with the scan's own time, and nothing is kept between scans. Without
 administrator rights and with nothing of FiveM's running, it says when FiveM last ran is not known. **It is
 not evidence and not a finding**: it is always shown with the ordinary things that produce the same result,

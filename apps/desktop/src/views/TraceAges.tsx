@@ -188,10 +188,13 @@ function RowLine({ row }: { row: TraceAge }) {
                 index: beside.index_created_on,
                 oldest: beside.oldest_file_created_on,
               })
-            : t("trace_ages.index_beside_no_file", {
-                variant: beside.variant,
-                index: beside.index_created_on,
-              })}
+            : t(
+                // The folder holds no cache file, as against files the listing gave no time for.
+                beside.cache_files === 0
+                  ? "trace_ages.index_beside_empty"
+                  : "trace_ages.index_beside_no_file",
+                { variant: beside.variant, index: beside.index_created_on },
+              )}
         </span>
       ))}
     </>
@@ -427,15 +430,7 @@ function SessionRow({ label, line }: { label: string; line: SessionLine }) {
   return (
     <>
       <dt>{label}</dt>
-      <dd>
-        {lineText(t, line)}
-        {line.join && (
-          <>
-            <br />
-            <span className="muted">{t("session.join")}</span>
-          </>
-        )}
-      </dd>
+      <dd>{lineText(t, line)}</dd>
     </>
   );
 }

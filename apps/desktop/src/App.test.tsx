@@ -257,7 +257,9 @@ describe("App", () => {
         "last created 1 minute after the session began; the folder's latest log write was 40 minutes before the session ended",
       ),
     ).toBeTruthy();
-    expect(screen.getByText("(written when a server is joined)")).toBeTruthy();
+    // The per-server cache is not compared (owner decision 12 of 2026-10-02).
+    expect(screen.queryByText("(written when a server is joined)")).toBeNull();
+    expect(screen.queryByText("Server cache")).toBeNull();
     expect(
       screen.getAllByText(
         "A time more than 10 minutes before the session began is shown as before it; any later time as after it.",

@@ -13,14 +13,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
   earlier than the start. Each source is compared with the start only — "before" beyond ten minutes, "after"
   otherwise, as minutes, hours or days: Legacy's logs, its `data\cache` and its resource cache index per launch
   mode (a launch source), Enhanced's whole log folder (a launch source, and its latest log write also against
-  the end, owner decision 9 of 2026-10-02) and Enhanced's per-server cache (a join source, owner decision 10).
+  the end, owner decision 9 of 2026-10-02). Enhanced's per-server cache is not compared (owner decision 12):
+  the server folder times the report holds change only when an entry is added or removed. Anchor times are
+  printed to the second.
   A place not read keeps its reason; a `db` that could not be listed reads "not read: the folder could not be
   listed" (decision 2ก). Without Prefetch and BAM and with nothing running, it says when FiveM last ran is not
   known — never a comparison with the scan's time. Its ordinary causes are always printed, first a player
   standing still. Not evidence, never counted, nothing stored between scans. `CrossSourceStatement` gains
   `kind` (`fivem_and_records`, `session`), amending ADR 0061 section 3; `REPORT_SCHEMA_VERSION` stays 1.
 - The trace ages row of Legacy's resource cache shows each launch mode's index folder creation date beside its
-  oldest cache file's, never compared, and the section's causes gain four (ADR 0062 section 4).
+  oldest cache file's, never compared — or that the cache holds no cache file — and the section's causes gain
+  four (ADR 0062 section 4).
 - Synthetic fixture hosts `session-elevated`, `session-limited-running`, `session-not-known` and
   `session-prefetch-off`, with two Prefetch and three BAM synthetic files in `fixtures/parsers/`.
 - `fivem_dir`: each Legacy resource cache observation (`legacy_server_cache`, per launch mode) carries its

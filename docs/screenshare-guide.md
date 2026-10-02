@@ -395,7 +395,8 @@ evidence. A record that could not be read is stated as not known, never as "no e
 
 For each FiveM edition, a **session statement** (ADR 0062) puts its last session beside its own folders.
 The session's start comes from a FiveM process running now, or else from Prefetch; its end from BAM, or
-"still running". Each of the edition's folders is shown as a time before or after that start — "before"
+"still running". Each folder it compares — Legacy's logs, cache and resource cache index, Enhanced's logs —
+is shown as a time before or after that start — "before"
 only when more than 10 minutes before it — and Enhanced's log folder also against the end. Nothing is
 compared with the scan's own time: after a long session, or one days ago, old folders are ordinary.
 Without administrator rights and with nothing of FiveM's running, the statement says when FiveM last ran
@@ -452,7 +453,7 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 | setup dates years old | the PC was never reset or reinstalled |
 | the FiveM statement | FiveM ran and its records were removed — read the causes under it |
 | no FiveM statement | Windows' records of programs that ran are complete |
-| a FiveM folder written "before the session began" | the player cleared or changed FiveM's folders — a player standing still, a session without joining a server, a server already cached, another Windows account or folder, an update, Prefetch switched off and a changed clock all produce it: read the causes under the statement |
+| a FiveM folder written "before the session began" | the player cleared or changed FiveM's folders — a player standing still, another Windows account or folder, an update, Prefetch switched off and a changed clock all produce it: read the causes under the statement |
 | Enhanced's latest log write "before the session ended" | the player closed FiveM to hide something — Task Manager, a crash or a shutdown may skip the write FiveM makes when it closes |
 | "when FiveM last ran is not known" | FiveM ran, or did not — Prefetch and BAM were not read |
 | a resource cache index created later than its oldest cache file | the cache was tampered with — FiveM rebuilding its index, its own "clear cache", a copied or restored cache and a reinstall that kept the cache all do this |

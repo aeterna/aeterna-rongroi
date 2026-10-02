@@ -6,8 +6,10 @@
 # appears once. Legacy: logs written after the start, its data\cache last written before it, the default
 # resource cache's index written after it — and created months after the oldest cache file beside it —,
 # the priv index that cannot be listed, the fxdk index empty. Enhanced: its log folder last written more than
-# ten minutes before the end, and no per-server cache folder. Every name, size and time is invented; the
-# Prefetch and BAM bytes are the synthetic files in fixtures/parsers/. No process of FiveM's is running.
+# ten minutes before the end (its per-server cache is not compared, owner decision 12 of 2026-10-02).
+# Legacy's BAM time carries a fraction of a second, which the statement does not print. Every name, size
+# and time is invented; the Prefetch and BAM bytes are the synthetic files in fixtures/parsers/. No process
+# of FiveM's is running.
 # Not a measured PC.
 platform: windows
 os_build: "26100"
@@ -23,7 +25,7 @@ registry:
     Version: 1
     SequenceNumber: 9
     '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe':
-      from: '../../parsers/bam/filetime-2025-12-31T21-30-00Z.bin'
+      from: '../../parsers/bam/filetime-2025-12-31T21-30-00.2231407Z.bin'
     '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe':
       from: '../../parsers/bam/filetime-2025-12-31T11-00-00Z.bin'
 filesystem:
