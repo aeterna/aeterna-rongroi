@@ -33,6 +33,7 @@ none contains a real person's user name, host name, SID or files.
 | `pca-utf16-file` | Windows 11 whose launch dictionary is UTF-16 with a byte order mark — not a PCA text file at all | `pca` collector tests |
 | `pca-unredactable-path` | Windows 11 whose launch dictionary holds one drive-rooted path, one UNC path and one device path; only the first is a shape SS-mode redaction can reach | `pca` collector tests |
 | `prefetch-files-present` | Windows 11 with a readable Prefetch folder holding one `.pf` file, whose bytes are the vendored Windows 10 corpus file and which is not read-only, plus the `ReadyBoot` directory and a non-`.pf` file that a real folder also has | `prefetch` collector tests, report snapshots |
+| `prefetch-fivem-editions` | Windows 11 whose Prefetch folder holds a `.pf` file for each FiveM edition's `FiveM.exe` and one for `PlayGTAV.exe`, whose bytes are the synthetic version-31 files in `fixtures/parsers/prefetch/`: the executable's own string-table entry is below Legacy's folder, below Enhanced's, and below neither (ADR 0062) | `prefetch` collector tests |
 | `prefetch-not-present` | Windows with no Prefetch folder at all and no `EnablePrefetcher` value to explain it | `prefetch` collector tests |
 | `prefetch-folder-empty` | Windows 11 whose Prefetch folder is there, is readable and holds no `.pf` file, with `EnablePrefetcher` at Windows' default of 3. The state a "delete Prefetch for FPS" tip, a one-click optimiser or natural eviction at the 1024-file cap leaves — all ordinary on a gaming PC and none of them a statement about what ran | `prefetch` collector tests |
 | `prefetch-service-disabled` | Windows 11 with `EnablePrefetcher` at 2 — boot only. Windows writes no application-launch record at all and keeps whatever was written before the switch changed, so the folder is **not** empty and still answers nothing about what ran | `prefetch` collector tests |
@@ -45,6 +46,7 @@ none contains a real person's user name, host name, SID or files.
 | `bam-entries-present` | Windows 11 whose BAM state holds one account with two executables in it, their value bytes taken from `fixtures/parsers/bam/`, beside the account key's own `Version` and `SequenceNumber` with measured numbers (below) | `bam` collector tests, report snapshots |
 | `bam-account-metadata` | Windows 11, build 26220, two accounts whose keys both hold `Version` and `SequenceNumber` as `REG_DWORD` with measured numbers (below), one of them beside a record and the other holding nothing else — the two shapes an account key was measured in | `bam` collector tests |
 | `bam-device-paths` | The same with the value name spelled as a device path, the form no SS-mode redaction can reach | `bam` collector tests |
+| `bam-fivem-editions` | One account whose records are below FiveM's two program folders — device paths and one drive-letter path — beside a look-alike folder and a program elsewhere, so that `fivem_edition` can be asserted and the device paths asserted withheld (ADR 0062) | `bam` collector tests |
 | `bam-two-accounts` | Two accounts with BAM records, so that the report's count of them can be asserted and their SIDs asserted absent | `bam` collector tests |
 | `bam-not-present` | A Windows machine with no BAM state at all: the service is not there, or this build never had it | `bam` collector tests |
 | `bam-empty` | The BAM key present and holding no account — a machine whose execution history was cleared | `bam` collector tests |
@@ -242,7 +244,8 @@ full there deliberately, so that a test asserting no part of one reaches an obse
 assert against.
 They are there so that a test can assert a name never reaches an observation.
 
-**One set of bytes carries a real account name**: the `prefetch-*` hosts and
+**One set of bytes carries a real account name**: the `prefetch-*` hosts other than
+`prefetch-fivem-editions` (whose synthetic files carry the invented `alex`) and
 `baseline-elevated-win11`, which point at
 `fixtures/prefetch/win10-compressed-v30-CMD.EXE-D269B812.pf`, inherit that file's string table,
 which holds the upstream author's one-letter account name and his machine's volume serial numbers

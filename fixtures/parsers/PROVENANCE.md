@@ -18,6 +18,7 @@ parallel set of sample bytes to keep in step.
 | `bam/` | `bam::parse_value` | `crates/rongroi-parsers/src/bam.rs`, `tests/fixtures.rs` | `fuzz_bam`, and `fuzz_filetime` — a BAM value's first eight bytes are the `FILETIME` |
 | `pca-app-launch/` | `pca::parse_app_launch_dic` | `crates/rongroi-parsers/src/pca.rs`, `tests/fixtures.rs` | `fuzz_pca_app_launch` |
 | `pca-general/` | `pca::parse_general_db` | `tests/fixtures.rs` | `fuzz_pca_general` |
+| `prefetch/` | `prefetch::parse` | `tests/fixtures.rs`, and the `prefetch` collector through `fixtures/hosts/prefetch-fivem-editions` | `fuzz_prefetch`, beside the vendored corpus in `fixtures/prefetch/` |
 | `task/` | `task::parse_task` | `crates/rongroi-parsers/src/task.rs`, `tests/fixtures.rs` | `fuzz_task` |
 | `usn/` | `usn::parse_buffer` | `crates/rongroi-parsers/src/usn.rs`, `tests/fixtures.rs` | `fuzz_usn` |
 
@@ -40,6 +41,9 @@ parallel set of sample bytes to keep in step.
 | `pca-general/normal.txt` | Two ordinary `\|`-delimited records |
 | `pca-general/field-count-varies.txt` | One line with more fields than any write-up describes and one with fewer |
 | `pca-general/malformed-lines.txt` | A good line and a line with no delimiter at all |
+| `prefetch/v31-raw-FIVEM.EXE-legacy.pf` | An uncompressed SCCA version 31 payload named `FIVEM.EXE`, with two run times, a run count of 12, one invented volume (`\VOLUME{01d00000000000000-0000abcd}`, serial `0000abcd`) and a string table of two entries: `NTDLL.DLL` under `\WINDOWS\SYSTEM32\`, and the executable's own entry below `\USERS\ALEX\APPDATA\LOCAL\FIVEM\FIVEM.APP\`, the folder the measurement of ADR 0062's amendment found Legacy's entry below. The file below that folder is invented. Written from the layout `prefetch-core` reads (header, `FileInformation` at 84 with the count at +124, volume records of 96 bytes), not captured and not compressed, so it exercises no decompression |
+| `prefetch/v31-raw-FIVEM.EXE-enhanced.pf` | The same shape with one run time, its own entry below `\USERS\ALEX\APPDATA\LOCAL\FIVEM FOR GTAV ENHANCED\` |
+| `prefetch/v31-raw-PLAYGTAV.EXE-neither.pf` | The same shape named `PLAYGTAV.EXE`, its own entry below `\PROGRAM FILES\`, and a second entry, an invented `EXAMPLE.DLL`, below Enhanced's folder: a file whose own entry is below neither folder although another entry is |
 | `task/logon-exec-utf16le.xml` | A task file as the Task Scheduler's own format describes it, written by hand: UTF-16 little-endian with a byte-order mark and CRLF lines, a logon and a calendar trigger, an invented account SID as the principal, and one `Exec` action whose command uses `%LOCALAPPDATA%` and which has an `Arguments` element the parser must never return. Not captured from a machine (ADR 0060) |
 | `task/boot-exec-utf8.xml` | A boot-triggered task in UTF-8 with no byte-order mark, running as `S-1-5-18`, with a quoted command |
 | `task/disabled-com-handler-utf16le.xml` | A disabled task whose one action is a COM handler, with a WNF state-change trigger |

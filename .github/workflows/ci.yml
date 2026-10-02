@@ -154,7 +154,7 @@ jobs:
             -- -max_total_time=30 -timeout=10
           cargo +nightly fuzz run fuzz_filetime fuzz/corpus/fuzz_filetime fixtures/parsers/bam \
             -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch \
+          cargo +nightly fuzz run fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch fixtures/parsers/prefetch \
             -- -max_total_time=30 -timeout=10
           cargo +nightly fuzz run fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx \
             -- -max_total_time=30 -timeout=10

@@ -471,6 +471,7 @@ expression: view
         {
           "collector": "process",
           "fields": {
+            "fivem_edition": "legacy",
             "name": "FiveM.exe",
             "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe"
           }

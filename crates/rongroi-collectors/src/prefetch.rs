@@ -31,6 +31,11 @@
 //! What is left — the program's name, how many times it ran and when it last ran — is what a rule
 //! could use and is what this collector emits.
 //!
+//! One word is read **from** the string table without any of it being emitted: `fivem_edition`
+//! (`legacy` or `enhanced`), when the executable's own entry — the entry whose last segment is the
+//! program's name — is below one of `FiveM`'s two program folders (ADR 0062, owner decision 6 of
+//! 2026-10-02; `crate::fivem_edition`). It is omitted for every other file.
+//!
 //! # The configuration, beside the records
 //!
 //! Since ADR 0037 each run that could look also says two things about Prefetch's own setup, as one
@@ -49,7 +54,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::prefetch::{self, PrefetchRecord};
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Age, AgeCount, AgeRows, Collector, Field};
+use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -95,10 +100,11 @@ const REASONS: [UnmeasuredReason; 8] = [
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
 /// the comment on [`Prefetch::collect`].
-const FIELDS: [Field; 16] = [
+const FIELDS: [Field; 17] = [
     Field::number("enable_prefetcher"),
     Field::number("entries"),
     Field::number("files"),
+    Field::text(fivem_edition::FIELD),
     Field::text("folder"),
     Field::boolean("intact"),
     Field::timestamp("last_run"),
@@ -120,7 +126,8 @@ const FIELDS: [Field; 16] = [
 /// all describe a folder this collector **did** read, so gapping `files`, `entries`, `rejected` or
 /// `intact` — which were measured — would claim it had not. The reasons that describe a folder
 /// nothing was read from keep gapping every field (ADR 0030).
-const RECORD_FIELDS: [&str; 6] = [
+const RECORD_FIELDS: [&str; 7] = [
+    fivem_edition::FIELD,
     "last_run",
     "name",
     "path",
@@ -424,6 +431,14 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
         fields.insert("name".to_owned(), serde_json::Value::from(name));
     }
     fields.insert("path".to_owned(), serde_json::Value::from(path));
+    // From the executable's own entry in the string table, which is not emitted: one word, never a
+    // path.
+    if let Some(edition) = fivem_edition::of_prefetch(&record.executable, &record.loaded_files) {
+        fields.insert(
+            fivem_edition::FIELD.to_owned(),
+            serde_json::Value::from(edition.as_str()),
+        );
+    }
     fields.insert(
         "run_count".to_owned(),
         serde_json::Value::from(record.run_count),
@@ -704,6 +719,70 @@ mod tests {
     }
 
     /// The one observation that says how Prefetch is set up.
+    /// Each edition's `FiveM.exe` has its own Prefetch file, and the edition comes from the
+    /// executable's own entry in each one's string table. `PlayGTAV.exe`'s own entry is below neither
+    /// folder, so it has no edition although another of its entries is below one. Only the word
+    /// leaves the string table (ADR 0062, owner decision 6 of 2026-10-02).
+    #[test]
+    fn a_prefetch_file_says_which_edition_from_the_executables_own_entry() {
+        let run = Prefetch.collect(&fixture("prefetch-fivem-editions"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+
+        let records: Vec<(Option<&str>, Option<&str>, Option<&str>)> = executions(observations)
+            .iter()
+            .map(|record| {
+                (
+                    text(record, "path"),
+                    text(record, "name"),
+                    text(record, "fivem_edition"),
+                )
+            })
+            .collect();
+        assert_eq!(
+            records,
+            [
+                (
+                    Some(format!(r"{PREFETCH_DIR}\FIVEM.EXE-1A2B3C4D.pf").as_str()),
+                    Some("fivem.exe"),
+                    Some("legacy")
+                ),
+                (
+                    Some(format!(r"{PREFETCH_DIR}\FIVEM.EXE-5E6F7A8B.pf").as_str()),
+                    Some("fivem.exe"),
+                    Some("enhanced")
+                ),
+                (
+                    Some(format!(r"{PREFETCH_DIR}\PLAYGTAV.EXE-0C1D2E3F.pf").as_str()),
+                    Some("playgtav.exe"),
+                    None
+                ),
+            ]
+        );
+        assert_eq!(
+            field(executions(observations)[0], "scca_version"),
+            Some(&31_u64.into())
+        );
+
+        let json = serde_json::to_string(&observations).unwrap().to_uppercase();
+        for leaked in [
+            "VOLUME{",
+            "\\USERS\\",
+            "ALEX",
+            "APPDATA",
+            "FIVEM.APP",
+            "FOR GTAV",
+            "ROCKSTAR",
+            "EXAMPLE.DLL",
+            "NTDLL",
+        ] {
+            assert!(
+                !json.contains(leaked),
+                "{leaked} reached an observation: {json}"
+            );
+        }
+    }
+
     fn configuration_of(observations: &[Observation]) -> &Observation {
         observations
             .iter()

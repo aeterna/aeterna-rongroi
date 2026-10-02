@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A Prefetch folder holding one `.pf` file for each edition's `FiveM.exe` — two files of the same name,
+# as each edition's client has its own (ADR 0062, amendment of 2026-10-02) — and one for `PlayGTAV.exe`,
+# whose own entry is below neither of FiveM's folders while another entry is. The bytes are the
+# synthetic, uncompressed version-31 files in fixtures/parsers/prefetch/; their string tables carry
+# the invented account `alex` and an invented volume, which the collector must not emit.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+filesystem:
+  'C:\Windows\Prefetch':
+    - name: FIVEM.EXE-1A2B3C4D.pf
+      from: '../../parsers/prefetch/v31-raw-FIVEM.EXE-legacy.pf'
+      read_only: false
+    - name: FIVEM.EXE-5E6F7A8B.pf
+      from: '../../parsers/prefetch/v31-raw-FIVEM.EXE-enhanced.pf'
+      read_only: false
+    - name: PLAYGTAV.EXE-0C1D2E3F.pf
+      from: '../../parsers/prefetch/v31-raw-PLAYGTAV.EXE-neither.pf'
+      read_only: false

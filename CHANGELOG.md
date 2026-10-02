@@ -14,6 +14,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
   and carries no count, without a gap, as an unreadable Enhanced server folder does; an empty one has
   `index_files: 0`. `unconfirmed` is not read. New fields only; no rule reads them, and the trace ages view does
   not show them yet.
+- `fivem_edition` (`legacy` or `enhanced`) on `process`, `bam` and `prefetch` observations (ADR 0062,
+  section 6): which of FiveM's two program folders — `%LOCALAPPDATA%\FiveM\` or
+  `%LOCALAPPDATA%\FiveM for GTAV Enhanced\`, below a profile — the path each collector already reads is
+  below. `process` reads it from the image path, `bam` from the value name in any spelling, device paths
+  included, and `prefetch` from the executable's own entry in the `.pf` file's string table. One shared
+  match, `rongroi_collectors::fivem_edition`; the field is omitted for a path below neither folder, and no
+  collector emits a path it did not emit before — BAM's device paths and Prefetch's string table stay
+  withheld. New field only: no new reason, and `REPORT_SCHEMA_VERSION` stays 1. Three synthetic,
+  uncompressed SCCA version 31 files in `fixtures/parsers/prefetch/` seed `fuzz_prefetch` as well.
 
 ### Changed
 - ADR 0062 (accepted 2026-10-01, not implemented yet): FiveM's own folders beside its last session. A second
