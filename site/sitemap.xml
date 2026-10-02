@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://aeterna.github.io/aeterna-rongroi/</loc>
+    <xhtml:link rel="alternate" hreflang="th" href="https://aeterna.github.io/aeterna-rongroi/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://aeterna.github.io/aeterna-rongroi/en/"/>
+  </url>
+  <url>
+    <loc>https://aeterna.github.io/aeterna-rongroi/en/</loc>
+    <xhtml:link rel="alternate" hreflang="th" href="https://aeterna.github.io/aeterna-rongroi/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://aeterna.github.io/aeterna-rongroi/en/"/>
+  </url>
+</urlset>

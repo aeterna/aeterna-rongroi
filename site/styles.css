@@ -1,0 +1,118 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+/* The landing page's only stylesheet. System fonts only: the page loads nothing from another host. */
+
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --text: #1b1d1f;
+  --muted: #5b6168;
+  --line: #dfe1e4;
+  --accent: #1f6f5c;
+  --accent-text: #ffffff;
+  --warn-bg: #fff6e0;
+  --warn-line: #e3b341;
+  --code-bg: #eef0f2;
+  --found: #b42318;
+  --notfound: #1f6f5c;
+  --unmeasured: #6b5b00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121416;
+    --surface: #1a1d20;
+    --text: #e8eaed;
+    --muted: #a3a9b0;
+    --line: #2c3136;
+    --accent: #4fb89a;
+    --accent-text: #0d1512;
+    --warn-bg: #2a2412;
+    --warn-line: #a9862a;
+    --code-bg: #23272b;
+    --found: #f08a80;
+    --notfound: #4fb89a;
+    --unmeasured: #d9c25b;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", "Leelawadee UI", "Thonburi", "Noto Sans Thai", "Noto Sans", sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+
+header.top {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+header.top .wrap {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 56px;
+}
+.brand { font-weight: 700; color: var(--text); text-decoration: none; }
+.brand small { font-weight: 400; color: var(--muted); }
+nav.lang a { color: var(--muted); text-decoration: none; }
+nav.lang a[aria-current="page"] { color: var(--text); font-weight: 600; }
+
+a { color: var(--accent); }
+
+.hero { padding: 48px 0 24px; }
+.hero h1 { font-size: clamp(1.7rem, 4.5vw, 2.5rem); line-height: 1.25; margin: 0 0 12px; }
+.hero p.lead { font-size: 1.12rem; color: var(--muted); margin: 0 0 24px; max-width: 46em; }
+
+.buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;
+  border: 1px solid var(--accent);
+}
+.btn.primary { background: var(--accent); color: var(--accent-text); }
+.btn.secondary { color: var(--accent); background: transparent; }
+
+.warn {
+  background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 8px;
+  padding: 12px 16px; margin: 24px 0;
+}
+
+section { padding: 24px 0; }
+section h2 { font-size: 1.45rem; margin: 0 0 12px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.card h3 { margin: 0 0 6px; font-size: 1.08rem; }
+.card p { margin: 0; color: var(--muted); }
+
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+td small { color: var(--muted); }
+
+.state-found { color: var(--found); font-weight: 700; }
+.state-notfound { color: var(--notfound); font-weight: 700; }
+.state-unmeasured { color: var(--unmeasured); font-weight: 700; }
+
+ol.steps { padding-left: 1.4em; }
+ol.steps li { margin-bottom: 10px; }
+
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 12px; border-radius: 8px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
+summary { cursor: pointer; font-weight: 600; }
+details p { margin: 8px 0 0; color: var(--muted); }
+
+footer { border-top: 1px solid var(--line); margin-top: 32px; padding: 24px 0 40px; color: var(--muted); font-size: 0.95rem; }
+footer p { margin: 4px 0; }
