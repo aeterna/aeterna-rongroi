@@ -34,7 +34,9 @@ settings if you have not seen that yourself.
 
 1. Open a pull request `chore(release): X.Y.Z` against `dev`. It renames `## [Unreleased]` in `CHANGELOG.md` to
    `## [X.Y.Z] - YYYY-MM-DD` and sets version `X.Y.Z` in `Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
-   and `apps/desktop/package.json`. Squash-merge it when CI is green.
+   and `apps/desktop/package.json`, and the version shown on the landing page (`site/index.html`,
+   `site/en/index.html`), in the README's Status section (both languages) and in both screenshare guides.
+   Squash-merge it when CI is green.
 2. Open a pull request from `dev` to `main`, also titled `chore(release): X.Y.Z`, and merge it with a **merge
    commit** when CI is green.
 3. Tag that merge commit on `main` with the date from the changelog heading and push the tag:

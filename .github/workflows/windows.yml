@@ -32,6 +32,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Two deep so a pull request's merge commit has its base (`HEAD^1`) for the scope step below.
+          fetch-depth: 2
+      # The script block logging measurement launches PowerShell four times and scans the whole machine
+      # for each of its 37 policy cases: about 15–18 of this job's 25–29 minutes. On a pull request it
+      # runs only when something it measures could have changed — any crate, the posture rules, the
+      # toolchain, the lockfile or this workflow. Every push to dev and main runs it.
+      - name: Which measurements this pull request needs
+        id: scope
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          policy=true
+          if [ "$EVENT" = pull_request ]; then
+            # Captured first: `git diff | grep -q` under pipefail reads a match as a failed pipeline.
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            if ! grep -q -E '^(crates/|rules/posture/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/windows\.yml$)' <<<"$changed"; then
+              policy=false
+            fi
+          fi
+          echo "policy=$policy" >> "$GITHUB_OUTPUT"
+          echo "Script block logging measurement runs: $policy"
       - name: Install the toolchain pinned in rust-toolchain.toml
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -635,6 +658,7 @@ jobs:
       # did. The runner is thrown away, which is the only reason writing policy keys is acceptable here, and
       # every key is put back as it was found. It runs before the Event Log service is suspended below.
       - name: What PowerShell does with a script block logging policy
+        if: steps.scope.outputs.policy == 'true'
         shell: pwsh
         timeout-minutes: 20
         run: |
