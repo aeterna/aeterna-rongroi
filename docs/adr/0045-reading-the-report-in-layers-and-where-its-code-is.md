@@ -213,4 +213,9 @@ Text keeps at least WCAG AA contrast (4.5:1) against the panel it sits on, the s
 the translucent panels are opaque enough that the clouds behind them never lower it.
 
 Checked on 2026-10-02 in a browser at the window's 960×760 size, through Vite with the IPC mocked by the
-repository's report snapshots, in English and Thai. Not yet checked in WebView2 on Windows.
+repository's report snapshots, in English and Thai. Checked the same day in WebView2 155 on a Windows 11 PC
+(build 26220), with an unofficial build from this branch running without administrator rights, driven
+through the DevTools port on 127.0.0.1 and captured from the page alone: both typefaces load (Mali only in
+the two weights the window uses), `backdrop-filter` applies, nothing scrolls sideways at 960×760, the
+consent answers stay at the bottom of the window while the list scrolls, and no console errors. The two
+answers were 260 and 210 pixels wide, sized by their labels; they now share one width.
