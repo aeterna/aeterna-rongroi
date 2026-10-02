@@ -2,6 +2,9 @@
 
 - Status: accepted — the owner decided the nine questions below on 2026-10-01
 - Date: 2026-10-01
+- Amended: 2026-10-02, accepted: the sessions listed under "Before any code" were measured ("Amendment
+  (2026-10-02, accepted): the measured sessions, and what they change"); the owner decided its seven
+  questions on 2026-10-02, and they amend owner decisions 3, 4 and 7
 
 ## Context
 
@@ -400,6 +403,192 @@ ages and counts only:
 
 The results are recorded in this ADR, as an amendment, before the change that builds it is opened. The margin
 (section 3) is confirmed or changed from what they show, and any decision they contradict goes back to the owner.
+
+## Amendment (2026-10-02, accepted): the measured sessions, and what they change
+
+The measurements listed under "Before any code" were taken on 2026-10-01 and 2026-10-02, on the same PC, with
+the same kind of read-only probe: elevated, printing counts, sizes, ages and masked name shapes only, its
+output kept out of the repository. Two smaller read-only probes added one reading each: process start times
+under the limited token, and the executable's own entry in the string table of FiveM's Prefetch files, of
+which they printed only which of the two program folders it was below. Every file the probes put on the PC
+was removed after each run.
+
+This amendment records what they showed, and the changes that follow. One of them reverses part of owner
+decision 4, so it went back to the owner with the others. The owner accepted all seven on 2026-10-02
+("Owner decisions (2026-10-02)" at the end); where they differ from the decisions of 2026-10-01, they
+prevail. With them the precondition under "Before any code" is met, and the change that builds this ADR may
+be opened.
+
+### The sessions
+
+| # | Day | Edition | What the owner did | From the client's start to BAM's end |
+|---|---|---|---|---|
+| 1 | 1 | Legacy | opened FiveM, reached the server list, closed it | under 2 min |
+| 2 | 1 | Enhanced | the same | about 3 min |
+| 3 | 1 | Legacy | joined the server of the first measurement, stood still | 5 min |
+| 4 | 1 | Legacy | joined the same server again, moved about | 8.5 min |
+| 5 | 1 | Enhanced | joined a server, moved about | 10 min |
+| 6 | 1 | Enhanced | joined the same server again, stood still for an hour, quit from the game's menu | 73 min |
+| 7 | 2 | both | nothing: read 15 to 17 hours after sessions 4 and 6, before FiveM was opened | — |
+| 8 | 2 | Legacy | joined the same server, moved about | 4.7 min |
+| 9 | 2 | Enhanced | joined the same server, moved about | 11 min |
+
+Sessions 1 to 6 and 8 to 9 were each read right after the client closed, and 1, 2, 3, 6, 8 and 9 also while
+FiveM ran (session 6 every ten minutes). Opening FiveM without updating it, and closing it while it updates,
+were not measured: FiveM did not update on either day.
+
+### What they showed
+
+**The anchors.**
+
+- Prefetch held each run's start and BAM its end in every session, including the two that joined no server.
+  After a session, BAM's time was 6 to 25 seconds before the probe; Prefetch's was written within 11 seconds of
+  the client's start.
+- **Each edition's `FiveM.exe` has its own Prefetch file**, and in each the executable's own entry in the string
+  table is below that edition's program folder (`%LOCALAPPDATA%\FiveM\FiveM.app\` or
+  `%LOCALAPPDATA%\FiveM for GTAV Enhanced\`). The same holds for `FiveM_b…_GTAProcess.exe` (Legacy, three
+  files), FiveM's browser, dump server, launcher and service processes (Legacy), `fivem-cef-subprocess.exe` and
+  `GTA5_Enhanced.exe` (Enhanced). All fifteen files were the compressed format of Windows 10 and 11 (version
+  31). `PlayGTAV.exe`'s entry is below neither folder. This is measurement 5's Prefetch half.
+- **Under the limited token**, `GetProcessTimes` (through .NET's `Process.StartTime`) and the image path read
+  for all six of FiveM's processes running in session 6: two `FiveM.exe`, `GTA5_Enhanced.exe` and three
+  `fivem-cef-subprocess.exe`. Listing the Prefetch folder was refused. This is measurement 5's other half.
+- `GTA5_Enhanced.exe`'s Prefetch file was rewritten in sessions 6 and 9. Why it was not in the first Enhanced
+  session stays unexplained.
+
+**FiveM writes when something happens, not on a clock.** This is the finding that changes the design.
+
+| Source | Session | Last write, before BAM's end |
+|---|---|---|
+| Legacy logs | 1 (no join) | 52 s |
+| | 3 (standing still) | **3.7 min** |
+| | 4 (moving) | 24 s |
+| | 8 (moving) | **3.1 min** |
+| Enhanced game and browser logs | 5 (moving) | 7 s |
+| | 6 (standing still, an hour) | **69 min**: written at the game's start and never again, not at the quit either |
+| | 9 (moving) | 3 s |
+| Enhanced launcher log | 2, 5, 6, 9, and the first Enhanced session | 1 to 9 s, in all five |
+| Enhanced `userdata` (below) | 6 | written through the first half hour, then nothing until the quit |
+
+The ADR's margin rests on "the longest gap measured between a record and a write it should match was two
+minutes". Sessions 3 and 8 exceed it with Legacy's logs, which are compared with the start only, and
+session 6 exceeds it by an hour with Enhanced's game logs, which section 3 compares with the end. A player who
+stands still in game, or plays on without anything to log, leaves sources as old as the session is long.
+**Every source of a session was written at or after its start, in every session measured.** Only Enhanced's
+launcher log was written at every end.
+
+**What opening FiveM writes without joining a server** (sessions 1 and 2).
+
+- Legacy: its logs, `data\cache`, and **the resource cache index (`db`)**, about 40 seconds after the start.
+  Not `data\cache\servers`, and no resource cache file.
+- Enhanced: the launcher log and `userdata`. **Not the game or browser logs**, which are created when the
+  game starts, not when FiveM opens, and not the per-server cache.
+
+So Legacy's index is not a join source, as section 3 assumed; and Enhanced's game logs belong to the game's
+start, which can be minutes after the client's (1 and 3 minutes in sessions 6 and 9).
+
+**A server already cached** (sessions 3, 6, 8, 9).
+
+- Legacy: no new resource cache file in sessions 3 and 8; one in session 4, while moving about. A resource
+  cache file is written only when something new is downloaded, as section 3 says. `data\cache\servers` was
+  written on every join, cached or not.
+- Enhanced: the per-server cache was written on every join; on the second day, 177 files rewritten and none
+  added.
+
+**Overnight** (session 7). No source of either edition was written. Every source's age matched its own
+edition's last session, and Prefetch and BAM were as old as those sessions. "The newest log is from
+yesterday" is the ordinary picture when the anchors are from yesterday too.
+
+**The roaming storage folder** (measurement 6) is `userdata`: `%APPDATA%\FiveM for GTAV Enhanced\userdata`
+(about 560 files) and `%APPDATA%\FiveM for GTAV Enhanced\gta5enhanced\userdata` (about 430). It is a folder
+FiveM creates, not a name a user chooses. That it is the same on another install is **not measured**: there is
+one PC.
+
+**Smaller points.** Legacy's log folder held 2 files after the first launch, then 3, 4, 5 and 6 over the next four: no
+further log was removed. Playing one edition again touched none of the other edition's sources.
+
+### The changes
+
+1. **Compare every source with the session's start only** (amends section 3 and owner decision 4). A source is
+   "before the start" when its time is earlier than the start by more than the margin; otherwise it is "after
+   the start", with its duration. "Before the end" is dropped for every source but one.
+2. **Keep one end comparison: Enhanced's launcher log**, "before the end" when its last write is earlier than
+   BAM's end by more than the margin. It was written at the end of all five Enhanced sessions measured. Its
+   line adds a cause in its own words: *FiveM ended by Task Manager, a crash or a shutdown, which may skip the
+   write it makes when it closes* (not measured).
+3. **The margin stays ten minutes**, now against the start: no source of a session was written before its
+   start, and Prefetch's time came within 11 seconds of the client's.
+4. **Legacy's resource cache index is a launch source**, compared with the start without the join causes
+   (amends section 3's table).
+5. **Enhanced's game and browser logs are a game-start source**: compared with the start, with a fixed line
+   form "(written when the game starts, not when FiveM opens)" and, as their first cause, *FiveM opened and
+   closed before the game started*. The client stays the anchor (section 2: not GTA V's executables).
+6. **`prefetch` gains `fivem_edition`** from the executable's own entry in the string table, as owner decision
+   3 provided once measured. A Prefetch file whose entry is below neither folder has no edition.
+7. **No new place in this change** (owner decision 7 reconsidered): `data\cache\servers` and `userdata` are
+   left for a separate amendment of ADR 0053. Both were measured to move with a session — the first on every
+   join, the second at launch and at the quit — and both would be new places under ADR 0053's terms.
+
+Section 7's text changes with 1 and 5. The margin line becomes:
+
+```text
+A time more than 10 minutes before the session began is shown as before it; any later time as after it.
+เวลาที่อยู่ก่อนเซสชันเริ่มเกิน 10 นาทีแสดงเป็นก่อนเซสชันเริ่ม เวลาหลังจากนั้นแสดงเป็นหลังเซสชันเริ่ม
+```
+
+and every list of causes gains, first: *a player standing still, or playing on with nothing new to write:
+FiveM writes its folders when something happens, not on a clock* /
+*ผู้เล่นยืนนิ่ง หรือเล่นต่อโดยไม่มีอะไรใหม่ให้เขียน: FiveM เขียนโฟลเดอร์ของตัวเองเมื่อมีเหตุการณ์ ไม่ได้เขียนตามเวลา*.
+The line forms "at the start" and "at the end" are dropped; "before the end" remains for the launcher log.
+
+### What the measurements settle under "What is unverified"
+
+| Point | Now |
+|---|---|
+| One session per edition | nine sessions over two days, one PC |
+| What a BAM time means | the end, after every session measured; still not documented by Microsoft |
+| `GTA5_Enhanced.exe`'s Prefetch | rewritten in two later sessions; the first stays unexplained |
+| A `.pf` file's string table names FiveM's folder | yes, for every FiveM executable, both editions |
+| When Legacy writes its index | at launch, without joining |
+| Legacy's logs at exit | not written at exit: 24 s to 3.7 min before BAM's end |
+| How many logs each edition keeps | Legacy removed one at the first launch and none in the next four |
+| `GetProcessTimes` under a limited token | reads, for FiveM's processes of the same account; another account's or an elevated process's is not measured |
+| The roaming storage folder's name | `userdata`, on one install |
+
+Still open: a PC without the other edition installed; an update during a session; Steam and Epic launches;
+FiveM outside the default folders; whether Legacy's index folder is ever recreated while its cache files stay;
+a session ended by Task Manager or a crash.
+
+### Owner questions
+
+1. Compare every source with the start only (change 1)? *Recommended: yes.* The measured alternative is a
+   margin long enough for an hour standing still, which hides a log from the morning behind a session of the
+   afternoon.
+2. Keep the end comparison for Enhanced's launcher log (change 2)? *Recommended: yes*, with its own cause.
+   The alternative drops every end comparison and leaves BAM only as the session's printed end.
+3. Keep the margin at ten minutes, against the start (change 3)? *Recommended: yes.*
+4. Treat Legacy's index as a launch source (change 4)? *Recommended: yes*; the measurement leaves no
+   other reading.
+5. Enhanced's game logs as a game-start source, with their own line form and first cause (change 5)?
+   *Recommended: yes.*
+6. `prefetch` gains `fivem_edition` (change 6)? *Recommended: yes*; owner decision 3 already provided for it.
+7. Leave `data\cache\servers` and `userdata` for a separate ADR 0053 amendment (change 7)? *Recommended: yes*,
+   to keep the first change to the collectors and the view this ADR already names.
+
+### Owner decisions (2026-10-02)
+
+The owner accepted the seven recommendations above:
+
+1. Every source is compared with the session's start only; "before the end" is dropped (amends owner decision 4).
+2. One end comparison is kept: Enhanced's launcher log, with its own cause for a session ended by Task Manager,
+   a crash or a shutdown.
+3. The margin stays ten minutes, now against the start (amends owner decision 4).
+4. Legacy's resource cache index is a launch source, compared with the start without the join causes.
+5. Enhanced's game and browser logs are a game-start source, with their own line form and first cause.
+6. `prefetch` gains `fivem_edition` from the executable's own entry in the string table (owner decision 3's
+   condition, measured).
+7. `data\cache\servers` and `userdata` are not read in this change; they are left for a separate amendment of
+   ADR 0053 (amends owner decision 7).
 
 ## Owner decisions (2026-10-01)
 
