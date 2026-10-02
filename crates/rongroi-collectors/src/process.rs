@@ -4,8 +4,8 @@
 
 //! What is running on the machine at scan time.
 //!
-//! Each process is reported by name and, when it can be resolved, by the path of its image. Nothing
-//! is hashed and no process memory is read (ADR 0010). No rule reads this collector, so the list is
+//! Each process is reported by name and, when each can be read, by the path of its image and the time
+//! it was created (ADR 0062). Nothing is hashed and no process memory is read (ADR 0010). No rule reads this collector, so the list is
 //! shown in Self mode and read by a person.
 //!
 //! aeterna-rongroi's own process is in this list while it scans. The engine moves that observation
@@ -37,10 +37,13 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// so it is an `Unmeasured` run rather than a gap, and an unresolved image path omits `path` on that
 /// one process without saying anything about the rest (ADR 0010). `fivem_edition` is omitted on the
 /// same terms, and on every process whose path is below neither of `FiveM`'s program folders (ADR 0062).
-const FIELDS: [Field; 3] = [
+/// An unread creation time omits `started_at` the same way (ADR 0062). `started_at` is read for
+/// ADR 0062's session statement only and is not a timeline time (owner decision 8, 2026-10-02).
+const FIELDS: [Field; 4] = [
     Field::text(fivem_edition::FIELD),
     Field::text("name"),
     Field::text("path"),
+    Field::timestamp("started_at").off_timeline(),
 ];
 
 /// The `process` collector.
@@ -105,6 +108,12 @@ fn observation(process: &ProcessRecord) -> Observation {
                 serde_json::Value::from(edition.as_str()),
             );
         }
+    }
+    if let Some(at) = process.started_at {
+        fields.insert(
+            "started_at".to_owned(),
+            serde_json::Value::from(at.to_string()),
+        );
     }
     Observation {
         collector: ID.to_owned(),
@@ -186,6 +195,38 @@ mod tests {
         assert_eq!(field(system, "name"), Some("System"));
         assert_eq!(system.fields.get("path"), None);
         // One unresolved path is not a gap: `gaps` is about the whole run.
+        let CollectorRun::Measured { gaps, .. } = &run else {
+            panic!("expected a measured run");
+        };
+        assert!(gaps.is_empty(), "{gaps:?}");
+    }
+
+    /// The creation time the host read reaches the observation as RFC 3339 text (ADR 0062).
+    #[test]
+    fn a_process_carries_the_time_it_was_created() {
+        let run = Process.collect(&fixture("process-own-trace"));
+        let observations = measured(&run);
+        assert_eq!(
+            field(&observations[1], "started_at"),
+            Some("2026-09-10T18:04:12Z")
+        );
+    }
+
+    /// A time that could not be read omits that one field, as an unread path does: the process is
+    /// still listed with what was read, and the run has no gap (ADR 0010, ADR 0062).
+    #[test]
+    fn a_process_without_a_start_time_omits_only_that_field() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nprocesses:\n  - pid: 1204\n    name: FiveM.exe\n    path: 'C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe'\n",
+            "inline",
+        )
+        .unwrap();
+        let run = Process.collect(&host);
+        let observations = measured(&run);
+        assert_eq!(observations.len(), 1);
+        assert_eq!(field(&observations[0], "name"), Some("FiveM.exe"));
+        assert!(field(&observations[0], "path").is_some());
+        assert_eq!(observations[0].fields.get("started_at"), None);
         let CollectorRun::Measured { gaps, .. } = &run else {
             panic!("expected a measured run");
         };

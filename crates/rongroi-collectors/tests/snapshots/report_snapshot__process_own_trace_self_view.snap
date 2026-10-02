@@ -422,7 +422,8 @@ expression: view
         "collector": "process",
         "fields": {
           "name": "aeterna-rongroi.exe",
-          "path": "C:\\Users\\fixtureuser\\Downloads\\aeterna-rongroi.exe"
+          "path": "C:\\Users\\fixtureuser\\Downloads\\aeterna-rongroi.exe",
+          "started_at": "2026-09-10T19:30:05Z"
         }
       }
     }
@@ -473,7 +474,8 @@ expression: view
           "fields": {
             "fivem_edition": "legacy",
             "name": "FiveM.exe",
-            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe"
+            "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+            "started_at": "2026-09-10T18:04:12Z"
           }
         }
       ]

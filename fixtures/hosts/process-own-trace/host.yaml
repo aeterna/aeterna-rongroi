@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Synthetic fixture host — see ../PROVENANCE.md.
-# Windows 11 with a short process list: a process whose image path cannot be resolved, an ordinary
-# program, and aeterna-rongroi itself, which is always running while it scans. Nothing else is
+# Windows 11 with a short process list: a process whose image path and creation time cannot be read,
+# an ordinary program, and aeterna-rongroi itself, which is always running while it scans. The
+# creation times are synthetic. Nothing else is
 # modelled, so the posture rules come out `unmeasured` — an honest description of a fixture that does
 # not describe those settings.
 platform: windows
@@ -14,6 +15,8 @@ processes:
   - pid: 1204
     name: FiveM.exe
     path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe'
+    started_at: '2026-09-10T18:04:12Z'
   - pid: 7331
     name: aeterna-rongroi.exe
     path: 'C:\Users\fixtureuser\Downloads\aeterna-rongroi.exe'
+    started_at: '2026-09-10T19:30:05Z'
