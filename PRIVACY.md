@@ -3,7 +3,7 @@
 ## What the tool reads
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
-FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders, the list of running processes, the drivers
+FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders and of Legacy's resource cache index, the list of running processes with when each started, the drivers
 registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
@@ -36,6 +36,9 @@ keeps per server, it reads when it was created and last changed and how many ent
 no file name and no folder name there**, and opens no file: a log's or a crash dump's name can carry a date,
 and a server folder's name identifies the server. The times are what Windows recorded, which programs set as
 they copy and extract files; they are specific enough to match two reports of the same PC (ADR 0050).
+Of each of FiveM for GTA V Legacy's resource caches it also reads its **index**, the `db` folder inside it:
+the folder's own creation and last-write times, how many files it holds, and the latest creation and
+last-write time among them — no file name (ADR 0062).
 SS mode shows these times on its [timeline](#the-timeline) (ADR 0051).
 
 **Since ADR 0036 rules read these files, so SS mode shows them.** Each file in a plugin folder, and
@@ -44,8 +47,10 @@ watching — its path with your user name replaced, its hash, its signature and 
 consent question names them before anything is read.
 
 Of a running process it reads the name of the program and, when Windows will say, where that program
-is on disk and when that process started (ADR 0062). It does not read what a program is doing, what is in
-its memory, or what you typed into it.
+is on disk and when that process started (ADR 0062). When that place is below one of FiveM's two program
+folders it also records which one — one word, `legacy` or `enhanced` — and nothing more of the path. The
+start time is read only for the session statement [below](#how-far-back-the-traces-reach) and is never on
+the timeline. It does not read what a program is doing, what is in its memory, or what you typed into it.
 
 Of a driver registered with Windows it reads the name of its driver service, when Windows is set to start
 it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
@@ -123,7 +128,9 @@ last ran. **A Prefetch file also lists every file that program loaded — normal
 some of them inside your own folders — and the disks it touched, including a serial number that
 identifies your PC. None of that is reported, in either mode.** Replacing your user name inside those
 paths would not help: the list itself is a description of what is on your PC, and this check has no use
-for it. The report says so, rather than leaving you to notice it is missing.
+for it. The report says so, rather than leaving you to notice it is missing. The program's own entry in
+that list is read for one word only: when it is below one of FiveM's two program folders, which one —
+`legacy` or `enhanced` — and the entry itself is not reported (ADR 0062).
 
 Of Windows' Background Activity Moderator it reads which programs ran and when. That record is kept
 **per user account**, and the account is named by a SID — an identifier of the account *and* of the
@@ -131,7 +138,9 @@ Windows installation it belongs to. **No part of that SID is reported**, hashed 
 says how many accounts had records and nothing else about them. The path of a program is reported only
 when it starts with a drive letter, because that is a shape SS mode knows how to redact. A path
 written any other way can carry your account name with nothing to replace it, so it is withheld rather
-than shown — and the report says it was withheld, rather than leaving you to notice it is missing.
+than shown — and the report says it was withheld, rather than leaving you to notice it is missing. When
+the path is below one of FiveM's two program folders, the record also carries which one — `legacy` or
+`enhanced` — whether the path is shown or withheld (ADR 0062).
 Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
 wrote them, the event number, the severity and the first and last time one was written — and, of each log
 itself, how far back it still reaches: the time and the record number of the oldest and the newest event
@@ -279,6 +288,7 @@ or allow remote access.
 | When Windows last started | shown | shown, as one time at the top of the report |
 | When parts of this PC were set up (dates) | shown | shown — [below](#how-far-back-the-traces-reach) |
 | How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |
+| Each FiveM edition's last session beside its folders | shown | shown — [below](#how-far-back-the-traces-reach) |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
 
 ### The timeline
@@ -329,6 +339,16 @@ Enhanced server cache folders there are, and for each of Prefetch, BAM and the P
 Assistant whether it holds those names, how many entries it holds and its oldest date — or that it was not
 read, and so whether it holds one is not known. **It is not evidence and not a finding**: it is always shown
 with the ordinary things that produce the same result, and it names no path, file, user or server.
+
+For each FiveM edition, both modes also show **one session statement** (ADR 0062): when that edition's last
+session began and ended — from a FiveM process running now (its start time), else from Prefetch and BAM —
+to the second, and, for Legacy's logs, cache and resource cache index and Enhanced's logs, how long before or
+after that start each was last written, as minutes, hours or days. It is shown whatever the
+session's age; nothing is compared with the scan's own time, and nothing is kept between scans. Without
+administrator rights and with nothing of FiveM's running, it says when FiveM last ran is not known. **It is
+not evidence and not a finding**: it is always shown with the ordinary things that produce the same result,
+and it names no path, file, user or server. Under Legacy's resource cache in the section above, each launch
+mode's index folder creation date is shown beside its oldest cache file's.
 
 A source the scan could not read — for example Prefetch, BAM or the change journal without administrator
 rights — is shown as **not known**, never as empty.

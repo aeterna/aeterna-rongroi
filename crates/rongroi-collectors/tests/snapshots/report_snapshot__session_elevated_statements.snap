@@ -1,0 +1,138 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: "sessions_of(\"session-elevated\")"
+---
+[
+  {
+    "kind": "session",
+    "edition": "legacy",
+    "session": "known",
+    "start": {
+      "from": "prefetch",
+      "at": "2025-12-31T20:00:00Z",
+      "name": "fivem_exe"
+    },
+    "end": {
+      "from": "bam",
+      "at": "2025-12-31T21:30:00Z"
+    },
+    "before_scan": {
+      "amount": 2,
+      "unit": "hours"
+    },
+    "lines": [
+      {
+        "source": "legacy_logs",
+        "line": "compared",
+        "created": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 0,
+            "unit": "minutes"
+          }
+        },
+        "written": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 1,
+            "unit": "hours"
+          }
+        }
+      },
+      {
+        "source": "legacy_cache",
+        "line": "compared",
+        "written": {
+          "relation": "before_start",
+          "duration": {
+            "amount": 36,
+            "unit": "hours"
+          }
+        }
+      },
+      {
+        "source": "legacy_resource_index",
+        "variant": "default",
+        "line": "compared",
+        "written": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 0,
+            "unit": "minutes"
+          }
+        }
+      },
+      {
+        "source": "legacy_resource_index",
+        "variant": "priv",
+        "line": "not_listed"
+      },
+      {
+        "source": "legacy_resource_index",
+        "variant": "fxdk",
+        "line": "no_file"
+      }
+    ],
+    "causes": [
+      "standing_still",
+      "removes_logs",
+      "other_folder",
+      "other_account",
+      "opened_closed",
+      "launchers",
+      "prefetch_off",
+      "clock",
+      "cleanup"
+    ]
+  },
+  {
+    "kind": "session",
+    "edition": "enhanced",
+    "session": "known",
+    "start": {
+      "from": "prefetch",
+      "at": "2025-12-31T10:00:00Z",
+      "name": "fivem_exe"
+    },
+    "end": {
+      "from": "bam",
+      "at": "2025-12-31T11:00:00Z"
+    },
+    "before_scan": {
+      "amount": 13,
+      "unit": "hours"
+    },
+    "lines": [
+      {
+        "source": "enhanced_logs",
+        "line": "compared",
+        "created": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 1,
+            "unit": "minutes"
+          }
+        },
+        "written": {
+          "relation": "before_end",
+          "duration": {
+            "amount": 40,
+            "unit": "minutes"
+          }
+        }
+      }
+    ],
+    "causes": [
+      "standing_still",
+      "ended_abruptly",
+      "removes_logs",
+      "other_folder",
+      "other_account",
+      "opened_closed",
+      "launchers",
+      "prefetch_off",
+      "clock",
+      "cleanup"
+    ]
+  }
+]

@@ -1,0 +1,13 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: "sessions_of(\"session-not-known\")"
+---
+[
+  {
+    "kind": "session",
+    "edition": "legacy",
+    "session": "not_known",
+    "prefetch": "not_admin",
+    "bam": "not_admin"
+  }
+]

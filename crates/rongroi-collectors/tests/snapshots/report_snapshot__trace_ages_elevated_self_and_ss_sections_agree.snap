@@ -243,6 +243,7 @@ expression: own
   },
   "cross_source": [
     {
+      "kind": "fivem_and_records",
       "fivem": {
         "editions": [
           "legacy"

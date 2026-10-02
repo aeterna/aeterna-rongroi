@@ -5,6 +5,8 @@
 - Amended: 2026-09-30, with a read-only measurement on a Windows 11 PC ("Measured on a Windows 11 PC
   (2026-09-30)"); the anchor table and the owner decisions follow it
 - Implemented: in one change with ADR 0047's `journal_created_on` amendment ("As built")
+- Amended: 2026-10-02, by ADR 0062 (its owner decision 1 of 2026-10-01): section 3's "exactly one statement"
+  becomes one of each kind, and one session statement per edition ("Amendment by ADR 0062")
 
 ## Context
 
@@ -180,7 +182,8 @@ counted in `ListedCounts` or `HiddenCounts`, and nothing in the engine changes. 
 the core, where fixtures and tests can contradict it, as ADR 0028 and ADR 0034 require of a fact about more
 than one observation.
 
-**There is exactly one statement.** It compares two groups of sources:
+**There is exactly one statement** of this kind (amended by ADR 0062: one of each kind, and one session
+statement per edition — "Amendment by ADR 0062", below). It compares two groups of sources:
 
 - **FiveM's side**, from `fivem_dir`: whether either edition's `FiveM.exe` is present, the latest
   `latest_modified_at` over FiveM's log, crash and cache folders (ADR 0053), and how many Enhanced server
@@ -565,3 +568,22 @@ English and Thai, once elevated and once with the account's limited token (a sch
 - **Thai** rendered correctly in the console.
 - **Open.** The PCA row read "part of this was read and part of it was not" in both runs, the same file the
   probe could not take a time from. Whether that is this build's PCA format or this PC's file is not known.
+
+## Amendment by ADR 0062 (2026-10-02)
+
+ADR 0062's owner decision 1 (2026-10-01) amends section 3 in the change that builds it.
+
+- **What changes.** Section 3 said there is exactly one statement. `view::cross_source` now returns at most
+  one statement of this ADR's kind and, besides it, at most one **session statement** per FiveM edition
+  (ADR 0062): that edition's last session beside its own folders. `CrossSourceStatement` gains `kind` —
+  `fivem_and_records` for this ADR's statement, `session` for ADR 0062's — and this ADR's statement keeps
+  its shape as `view::RecordsStatement`. In the report's JSON the change is one added field, `kind`, on this
+  ADR's statement; `REPORT_SCHEMA_VERSION` stays at 1.
+- **What does not change.** This ADR's statement keeps its conditions, its line forms and its causes. Both
+  kinds are facts printed together and never evidence: no state, no rule, never counted in `ListedCounts` or
+  `HiddenCounts`, the same in both modes, above the timeline, with their causes printed in full. The session
+  statement reuses this ADR's machinery: a source that was not read takes its reason, never "nothing", and
+  its words are fixed strings in the locale files that `check-locales` checks.
+- **The trace ages section** gains, under the row of Legacy's resource cache, each launch mode's index
+  folder creation date beside its oldest cache file's, never compared, and four causes in its list (ADR 0062
+  section 4).

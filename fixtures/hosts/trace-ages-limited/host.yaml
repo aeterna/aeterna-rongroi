@@ -3,8 +3,9 @@
 # Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 # Synthetic (fixtures/hosts/PROVENANCE.md): the same kind of PC scanned without administrator rights,
 # refused what a limited token was refused on the Windows 11 PC ADR 0061 measured — Prefetch, BAM, the
-# Security log and the change journal — so those trace ages are "not known", and no cross-source
-# statement is made. Every date and count is invented.
+# Security log and the change journal — so those trace ages are "not known", no ADR 0061 statement is
+# made, and Legacy's session statement says when FiveM last ran is not known (ADR 0062). Every date and
+# count is invented.
 platform: windows
 os_build: "26100"
 elevated: false
