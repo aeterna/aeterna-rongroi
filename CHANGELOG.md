@@ -5,6 +5,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `fivem_dir`: each Legacy resource cache observation (`legacy_server_cache`, per launch mode) carries its
+  index, the fixed `db` subfolder — `index_created_at` and `index_modified_at`, the folder's own times from the
+  listing the collector already made, and `index_files`, `index_latest_created_at` and
+  `index_latest_modified_at` from one listing of `db`, never a file name (ADR 0062 section 6, amending ADR 0053
+  section 1). An index that is not there carries no index field; one that cannot be listed keeps its own times
+  and carries no count, without a gap, as an unreadable Enhanced server folder does; an empty one has
+  `index_files: 0`. `unconfirmed` is not read. New fields only; no rule reads them, and the trace ages view does
+  not show them yet.
+
 ### Changed
 - ADR 0062 (accepted 2026-10-01, not implemented yet): FiveM's own folders beside its last session. A second
   kind of cross-source statement, one per edition, will put each of FiveM's log, cache and resource-cache
