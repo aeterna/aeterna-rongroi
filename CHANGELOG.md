@@ -5,6 +5,75 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-02
+
+### Added
+- The **session statement** (ADR 0062, as amended on 2026-10-02): for each FiveM edition, its last session
+  beside its own folders, in both modes, above the timeline, in the CLI and the desktop, English and Thai.
+  The start is the earliest `started_at` of a running `FiveM.exe` (or Legacy's `FiveM_b…_GTAProcess.exe`) of
+  that edition, else Prefetch's latest run of those names; the end is "still running" or BAM's latest, when not
+  earlier than the start. Each source is compared with the start only — "before" beyond ten minutes, "after"
+  otherwise, as minutes, hours or days: Legacy's logs, its `data\cache` and its resource cache index per launch
+  mode (a launch source), Enhanced's whole log folder (a launch source, and its latest log write also against
+  the end, owner decision 9 of 2026-10-02). Enhanced's per-server cache is not compared (owner decision 12):
+  the server folder times the report holds change only when an entry is added or removed. Anchor times are
+  printed to the second.
+  A place not read keeps its reason; a `db` that could not be listed reads "not read: the folder could not be
+  listed" (decision 2ก). Without Prefetch and BAM and with nothing running, it says when FiveM last ran is not
+  known — never a comparison with the scan's time. Its ordinary causes are always printed, first a player
+  standing still. Not evidence, never counted, nothing stored between scans. `CrossSourceStatement` gains
+  `kind` (`fivem_and_records`, `session`), amending ADR 0061 section 3; `REPORT_SCHEMA_VERSION` stays 1.
+- The trace ages row of Legacy's resource cache shows each launch mode's index folder creation date beside its
+  oldest cache file's, never compared — or that the cache holds no cache file — and the section's causes gain
+  four (ADR 0062 section 4).
+- Synthetic fixture hosts `session-elevated`, `session-limited-running`, `session-not-known` and
+  `session-prefetch-off`, with two Prefetch and three BAM synthetic files in `fixtures/parsers/`.
+- `fivem_dir`: each Legacy resource cache observation (`legacy_server_cache`, per launch mode) carries its
+  index, the fixed `db` subfolder — `index_created_at` and `index_modified_at`, the folder's own times from the
+  listing the collector already made, and `index_files`, `index_latest_created_at` and
+  `index_latest_modified_at` from one listing of `db`, never a file name (ADR 0062 section 6, amending ADR 0053
+  section 1). An index that is not there carries no index field; one that cannot be listed keeps its own times
+  and carries no count, without a gap, as an unreadable Enhanced server folder does; an empty one has
+  `index_files: 0`. `unconfirmed` is not read. New fields only; no rule reads them; the session statement and
+  the trace ages row show them (above).
+- `fivem_edition` (`legacy` or `enhanced`) on `process`, `bam` and `prefetch` observations (ADR 0062,
+  section 6): which of FiveM's two program folders — `%LOCALAPPDATA%\FiveM\` or
+  `%LOCALAPPDATA%\FiveM for GTAV Enhanced\`, below a profile — the path each collector already reads is
+  below. `process` reads it from the image path, `bam` from the value name in any spelling, device paths
+  included, and `prefetch` from the executable's own entry in the `.pf` file's string table. One shared
+  match, `rongroi_collectors::fivem_edition`; the field is omitted for a path below neither folder, and no
+  collector emits a path it did not emit before — BAM's device paths and Prefetch's string table stay
+  withheld. New field only: no new reason, and `REPORT_SCHEMA_VERSION` stays 1. Three synthetic,
+  uncompressed SCCA version 31 files in `fixtures/parsers/prefetch/` seed `fuzz_prefetch` as well.
+- `process` emits `started_at`, each running process's creation time in whole seconds, read through
+  `GetProcessTimes` on the handle it already opens for the path with `PROCESS_QUERY_LIMITED_INFORMATION`
+  (ADR 0062, owner decision 2). A time that cannot be read omits the field, as an unread path does
+  (ADR 0010). Under the limited token, the ADR 0062 amendment measured the time and the path read for all
+  six of FiveM's processes of the same account. It is read for ADR 0062's session statement only: it is
+  not a timeline time in either mode (owner decision 8, 2026-10-02; `Field::off_timeline`), and no rule
+  reads it. Fixture hosts gain an optional `started_at` per process.
+
+### Changed
+- The SS consent question (CLI and desktop, both languages) and `PRIVACY.md` name process start times, the
+  edition word on processes, Prefetch and BAM, Legacy's resource cache index times and the session statement
+  (ADR 0062 owner decision 9 of 2026-10-01). `docs/architecture.md`, both screenshare guides ("what not to
+  conclude") and the glossary (**session**, **session statement**) follow; ADR 0062 records "As built" and
+  the owner decisions taken while building it, and ADR 0061 its amendment.
+- ADR 0062 (accepted 2026-10-01, implemented by the entries above): FiveM's own folders beside its last session.
+  A second kind of cross-source statement, one per edition, puts FiveM's log, cache and resource-cache index
+  places beside the session they belong to — its start from a running FiveM process or Prefetch, its end from
+  BAM — never beside the scan's own time, with the ordinary causes always printed and a record that was not
+  read stated as "not known". The ADR records a read-only measurement on a Windows 11 PC and the owner's
+  decisions.
+- ADR 0062 amendment (accepted 2026-10-02): nine further sessions over two days on the same PC showed that
+  FiveM writes its folders when something happens, not on a clock — standing still in game left Legacy's logs
+  3.7 minutes and Enhanced's game logs 69 minutes older than the session's end, while every source was written
+  at or after the session's start. Every source is therefore compared with the start only, and `prefetch`
+  gained the edition word. Decisions taken while building it (ADR 0062 "As built"): Enhanced's logs are one
+  source, the whole folder, with one end comparison on its latest write; Enhanced's per-server cache is not
+  compared, because a server folder's own times do not move when its files are rewritten; process start times
+  are not timeline times.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added

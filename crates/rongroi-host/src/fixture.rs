@@ -212,7 +212,8 @@ enum FixtureFirmwareSecureBoot {
 }
 
 /// One process a fixture describes. An absent `path` describes a process whose image path cannot be
-/// resolved, which a collector reports by omitting that one field — never by dropping the process.
+/// resolved, and an absent `started_at` one whose creation time cannot be read (ADR 0062); a collector
+/// reports either by omitting that one field — never by dropping the process.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureProcess {
@@ -220,6 +221,40 @@ struct FixtureProcess {
     name: String,
     #[serde(default)]
     path: Option<String>,
+    #[serde(default)]
+    started_at: Option<String>,
+}
+
+/// Turns one described process into the record a live host returns, parsing `started_at` now so that
+/// a fixture with a time no machine reports fails to load rather than failing a collector later.
+/// The live host reports a creation time in whole seconds ([`crate::process_started_at`]), so a time
+/// with a fraction of a second describes something no machine returns.
+fn process_record(process: FixtureProcess, origin: &str) -> Result<ProcessRecord, FixtureError> {
+    let started_at = match process.started_at.as_deref() {
+        None => None,
+        Some(text) => {
+            let fail = |message: String| FixtureError::Parse {
+                path: origin.to_owned(),
+                message,
+            };
+            let name = &process.name;
+            let instant: jiff::Timestamp = text.parse().map_err(|error: jiff::Error| {
+                fail(format!("process `{name}` started_at `{text}`: {error}"))
+            })?;
+            if instant.subsec_nanosecond() != 0 {
+                return Err(fail(format!(
+                    "process `{name}` started_at `{text}` has a fraction of a second; a live host reports whole seconds"
+                )));
+            }
+            Some(instant)
+        }
+    };
+    Ok(ProcessRecord {
+        pid: process.pid,
+        name: process.name,
+        path: process.path,
+        started_at,
+    })
 }
 
 /// One registry value as the YAML writes it. A number is a `REG_DWORD`, a string is a `REG_SZ`, a map
@@ -904,7 +939,7 @@ pub struct FixtureHost {
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
     firmware: Option<FixtureFirmware>,
-    processes: Option<Vec<FixtureProcess>>,
+    processes: Option<Vec<ProcessRecord>>,
     milliseconds_since_boot: Option<u64>,
     /// Keyed by the lower-cased channel name, like every other name this host compares.
     event_log_channels: Option<BTreeMap<String, StoredChannel>>,
@@ -997,7 +1032,15 @@ impl FixtureHost {
             code_integrity: file.code_integrity,
             tpm: file.tpm,
             firmware: file.firmware,
-            processes: file.processes,
+            processes: file
+                .processes
+                .map(|described| {
+                    described
+                        .into_iter()
+                        .map(|process| process_record(process, origin))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?,
             milliseconds_since_boot: file.milliseconds_since_boot,
             account_sid: file.account_sid,
             drive_roots,
@@ -1494,14 +1537,7 @@ impl ProcessSource for FixtureHost {
                 "this fixture host does not describe running processes".to_owned(),
             )
         })?;
-        Ok(described
-            .iter()
-            .map(|process| ProcessRecord {
-                pid: process.pid,
-                name: process.name.clone(),
-                path: process.path.clone(),
-            })
-            .collect())
+        Ok(described.clone())
     }
 }
 
@@ -1643,6 +1679,7 @@ processes:
   - pid: 1200
     name: FiveM.exe
     path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe'
+    started_at: '2026-09-10T18:04:12Z'
 "#;
 
     const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -2345,14 +2382,31 @@ processes:
                     pid: 4,
                     name: "System".to_owned(),
                     path: None,
+                    started_at: None,
                 },
                 ProcessRecord {
                     pid: 1200,
                     name: "FiveM.exe".to_owned(),
                     path: Some(r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe".to_owned()),
+                    started_at: Some("2026-09-10T18:04:12Z".parse().unwrap()),
                 },
             ])
         );
+    }
+
+    /// A live host reports a creation time in whole seconds, and a time that is not one at all is a
+    /// mistake in the fixture: both fail to load rather than reaching a collector (ADR 0062).
+    #[test]
+    fn a_process_start_time_no_live_host_reports_does_not_load() {
+        for refused in ["'2026-09-10T18:04:12.5Z'", "'yesterday'", "'2026-09-10'"] {
+            let yaml = format!(
+                "platform: windows\nprocesses:\n  - pid: 1200\n    name: FiveM.exe\n    started_at: {refused}\n"
+            );
+            assert!(
+                FixtureHost::from_yaml_str(&yaml, "inline").is_err(),
+                "{refused} loaded"
+            );
+        }
     }
 
     /// Writing the block with nothing in it is a deliberate statement, unlike leaving it out.

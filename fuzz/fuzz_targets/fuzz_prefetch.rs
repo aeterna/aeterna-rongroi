@@ -11,7 +11,8 @@
 //! first is that the crate is pure and `forbid(unsafe_code)`, so a defect in it is a wrong parse
 //! rather than memory corruption; the second is that a fuzz target would be pointed at it.
 //!
-//! Seeds: `fixtures/prefetch/`, the same files the L0 tests read (ADR 0016).
+//! Seeds: `fixtures/prefetch/` and `fixtures/parsers/prefetch/`, the same files the L0 tests read
+//! (ADR 0016).
 
 #![no_main]
 

@@ -405,7 +405,7 @@ fn declare_times(
         let timestamps: Vec<&'static str> = collector
             .fields()
             .iter()
-            .filter(|field| field.kind == crate::FieldKind::Timestamp)
+            .filter(|field| field.kind == crate::FieldKind::Timestamp && field.on_timeline)
             .map(|field| field.name)
             .collect();
         if timestamps.is_empty() {
@@ -564,7 +564,7 @@ mod tests {
             let declared = collector
                 .fields()
                 .iter()
-                .any(|field| field.kind == crate::FieldKind::Timestamp);
+                .any(|field| field.kind == crate::FieldKind::Timestamp && field.on_timeline);
             assert_eq!(
                 report.timestamp_fields.contains_key(collector.id()),
                 declared,
@@ -588,6 +588,10 @@ mod tests {
             Some("journal")
         );
         assert!(!report.timestamp_fields.contains_key("posture"));
+        // `started_at` is read for ADR 0062's session statement only, never as a timeline time
+        // (owner decision 8, 2026-10-02): `process` declares no timeline field, so none of its
+        // times is an entry and an unread process list is not an unmeasured timeline source.
+        assert!(!report.timestamp_fields.contains_key("process"));
     }
 
     fn context(tier: ScanTier) -> ScanContext {

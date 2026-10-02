@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# An elevated scan of a PC whose Prefetch is switched off (`EnablePrefetcher` 0) while BAM is read (ADR 0062
+# section 5): Enhanced's session has an end and no recorded start, so only its log folder's end comparison is
+# made, and its latest log write is more than ten minutes before that end. Every name and time is invented;
+# the BAM bytes are the synthetic file in fixtures/parsers/bam/. Not a measured PC.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters':
+    EnablePrefetcher: 0
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-1723019388-1114836358-2137285072-1001':
+    Version: 1
+    SequenceNumber: 9
+    '\Device\HarddiskVolume3\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe':
+      from: '../../parsers/bam/filetime-2025-12-31T22-00-00Z.bin'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced':
+    - name: FiveM.exe
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+      signature: { state: no_embedded_signature }
+  'C:\Users\fixtureuser\AppData\Roaming\FiveM for GTAV Enhanced\logs':
+    - name: launcher_a.log
+      size: 900
+      created: 2025-12-31T08:00:04Z
+      modified: 2025-12-31T09:00:00Z

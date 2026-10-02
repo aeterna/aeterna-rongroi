@@ -112,7 +112,7 @@ Two things about it are deliberate and are not a gap to be closed later (ADR 001
   deep bug takes hours; run one locally when changing a parser.
 
 Seeds are the fixtures the L0 tests already read — `fixtures/parsers/<artifact>/`, plus `fixtures/prefetch/`
-for `fuzz_prefetch` and `fixtures/evtx/` for `fuzz_evtx`, which sit apart because those files are vendored
+for `fuzz_prefetch` (beside its synthetic `fixtures/parsers/prefetch/`) and `fixtures/evtx/` for `fuzz_evtx`, which sit apart because those files are vendored
 under their own licences (ADR 0015, ADR 0018) — so a fixture added for a parser test is a fuzz seed too, and
 there is no second set of sample bytes to keep in step.
 `crates/rongroi-parsers/tests/fixtures.rs` is what holds the two ends together: it fails if a seed directory

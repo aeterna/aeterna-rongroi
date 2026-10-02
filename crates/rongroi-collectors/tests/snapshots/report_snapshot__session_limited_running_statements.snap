@@ -1,0 +1,80 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: "sessions_of(\"session-limited-running\")"
+---
+[
+  {
+    "kind": "session",
+    "edition": "legacy",
+    "session": "known",
+    "start": {
+      "from": "process",
+      "at": "2025-12-31T23:40:00Z",
+      "name": "fivem_exe"
+    },
+    "end": {
+      "from": "still_running"
+    },
+    "lines": [
+      {
+        "source": "legacy_logs",
+        "line": "compared",
+        "created": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 0,
+            "unit": "minutes"
+          }
+        },
+        "written": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 18,
+            "unit": "minutes"
+          }
+        }
+      },
+      {
+        "source": "legacy_cache",
+        "line": "compared",
+        "written": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 17,
+            "unit": "minutes"
+          }
+        }
+      },
+      {
+        "source": "legacy_resource_index",
+        "variant": "default",
+        "line": "compared",
+        "written": {
+          "relation": "after_start",
+          "duration": {
+            "amount": 0,
+            "unit": "minutes"
+          }
+        }
+      }
+    ],
+    "causes": [
+      "standing_still",
+      "removes_logs",
+      "other_folder",
+      "other_account",
+      "opened_closed",
+      "launchers",
+      "prefetch_off",
+      "clock",
+      "cleanup"
+    ]
+  },
+  {
+    "kind": "session",
+    "edition": "enhanced",
+    "session": "not_known",
+    "prefetch": "not_admin",
+    "bam": "not_admin"
+  }
+]

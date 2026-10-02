@@ -12,6 +12,7 @@ pub mod driver_service;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
+pub mod fivem_edition;
 pub mod fivem_servers;
 pub mod install_marker;
 pub mod net_config;
@@ -68,6 +69,9 @@ pub struct Field {
     /// The kind of sensitive value it carries, which SS mode hides unless the player agreed to show
     /// that kind, or `None` (ADR 0052).
     pub sensitive: Option<SensitiveKind>,
+    /// Whether a timestamp field's values are timeline times (ADR 0051). `true` for every timestamp
+    /// field unless it was declared [`Self::off_timeline`]; meaningless for the other kinds.
+    pub on_timeline: bool,
 }
 
 impl Field {
@@ -77,6 +81,7 @@ impl Field {
             name,
             kind: FieldKind::Text,
             sensitive: None,
+            on_timeline: false,
         }
     }
 
@@ -86,6 +91,7 @@ impl Field {
             name,
             kind: FieldKind::Number,
             sensitive: None,
+            on_timeline: false,
         }
     }
 
@@ -95,6 +101,7 @@ impl Field {
             name,
             kind: FieldKind::Bool,
             sensitive: None,
+            on_timeline: false,
         }
     }
 
@@ -114,6 +121,18 @@ impl Field {
             name,
             kind: FieldKind::Timestamp,
             sensitive: None,
+            on_timeline: true,
+        }
+    }
+
+    /// This timestamp field, kept off the timeline: its values are read for one named purpose and
+    /// are not timeline times (ADR 0062 owner decision 8, `process`'s `started_at`, read for the
+    /// session statement only). The field is still a timestamp to `check-rules`.
+    #[must_use]
+    pub const fn off_timeline(self) -> Self {
+        Self {
+            on_timeline: false,
+            ..self
         }
     }
 }

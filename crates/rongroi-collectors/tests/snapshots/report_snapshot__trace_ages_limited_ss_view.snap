@@ -216,5 +216,13 @@ expression: "trace_ages_of(&report, Mode::Ss)"
       }
     ]
   },
-  "cross_source": []
+  "cross_source": [
+    {
+      "kind": "session",
+      "edition": "legacy",
+      "session": "not_known",
+      "prefetch": "not_admin",
+      "bam": "not_admin"
+    }
+  ]
 }

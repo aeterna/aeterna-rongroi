@@ -322,9 +322,9 @@ pub fn consent(lang: Lang) -> String {
         Lang::En => "SS mode — screenshare check\n\
             This program will read, on this PC:\n\
             \x20 - security settings such as Secure Boot (as Windows and as the firmware report it), memory integrity, and the PowerShell logging policies of this PC and of the Windows account running the scan, and whether the speculative-execution mitigations, SEHOP and the kernel object-namespace protection are switched off\n\
-            \x20 - the programs running now, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
-            \x20 - for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, never a file or folder name; these times can match two reports of this PC\n\
-            \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on\n\
+            \x20 - the programs running now and when each started, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
+            \x20 - for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, and for Legacy's resource cache, its index folder's own times, how many files it holds and the latest of their times, never a file or folder name; these times can match two reports of this PC\n\
+            \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on, and for a running program or one of these records whose file is below FiveM's program folder, which edition's it was (Legacy or Enhanced), never the path\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
             \x20 - whether a Prefetch or event log file is marked read-only\n\
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders and FiveM's plugin folders, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
@@ -336,16 +336,16 @@ pub fn consent(lang: Lang) -> String {
             \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
             \x20 - when parts of this PC were set up, as dates and never times: when this Windows installation was installed or last feature-upgraded, the earliest installation date Windows Setup kept and how many it kept, when the Windows drive's change journal, its root folder and its $Recycle.Bin were created, and when FiveM's program folders were created; these dates can match two reports of this PC\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
         Lang::Th => "โหมด SS — ตรวจระหว่างแชร์หน้าจอ\n\
             โปรแกรมจะอ่านข้อมูลเหล่านี้บนเครื่องนี้:\n\
             \x20 - การตั้งค่าความปลอดภัย เช่น Secure Boot (ทั้งตามที่ Windows และเฟิร์มแวร์รายงาน) memory integrity และนโยบายการบันทึกของ PowerShell ทั้งของเครื่องและของบัญชี Windows ที่ใช้รันการสแกน และการป้องกัน speculative execution, SEHOP กับ object namespace ของเคอร์เนล ถูกปิดไว้หรือไม่\n\
-            \x20 - โปรแกรมที่กำลังรันอยู่ ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
-            \x20 - โฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced: จำนวนไฟล์และโฟลเดอร์ย่อย ขนาดรวม และเวลาของไฟล์ที่เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced เวลาที่สร้างกับเวลาที่แก้ไขล่าสุด และจำนวนรายการข้างใน โดยไม่เก็บชื่อไฟล์หรือชื่อโฟลเดอร์ เวลาเหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
-            \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่\n\
+            \x20 - โปรแกรมที่กำลังรันอยู่และเวลาที่แต่ละตัวเริ่ม ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
+            \x20 - โฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced: จำนวนไฟล์และโฟลเดอร์ย่อย ขนาดรวม และเวลาของไฟล์ที่เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced เวลาที่สร้างกับเวลาที่แก้ไขล่าสุด และจำนวนรายการข้างใน และสำหรับ resource cache ของ Legacy เวลาของโฟลเดอร์ดัชนีเอง จำนวนไฟล์ในนั้น และเวลาล่าสุดของไฟล์เหล่านั้น โดยไม่เก็บชื่อไฟล์หรือชื่อโฟลเดอร์ เวลาเหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
+            \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่ และสำหรับโปรแกรมที่กำลังรันหรือบันทึกเหล่านี้ที่ไฟล์อยู่ใต้โฟลเดอร์โปรแกรมของ FiveM ว่าเป็นของ edition ไหน (Legacy หรือ Enhanced) โดยไม่แสดง path\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
@@ -357,7 +357,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
             \x20 - ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร เป็นวันที่ ไม่ใช่เวลา: Windows ชุดนี้ติดตั้งหรืออัปเกรด feature ครั้งล่าสุดเมื่อไร วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้และเก็บไว้กี่รายการ change journal ของไดรฟ์ Windows, root ของไดรฟ์ และ $Recycle.Bin ถูกสร้างเมื่อไร และโฟลเดอร์โปรแกรมของ FiveM ถูกสร้างเมื่อไร วันที่เหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
@@ -1224,6 +1224,37 @@ mod tests {
                     "$Recycle.Bin",
                     "ย้อนกลับไปได้ไกลแค่ไหน",
                     "ข้อความหนึ่งข้อ",
+                ],
+            ),
+        ] {
+            let question = consent(lang);
+            for word in words {
+                assert!(question.contains(word), "{word} missing from {question}");
+            }
+        }
+    }
+
+    #[test]
+    fn consent_names_the_session_reads_and_the_session_statement() {
+        // ADR 0062 owner decision 9: process start times, the edition word and the index times are
+        // named in the change that ships the session statement, and so is the statement.
+        for (lang, words) in [
+            (
+                Lang::En,
+                [
+                    "when each started",
+                    "which edition's it was (Legacy or Enhanced), never the path",
+                    "its index folder's own times",
+                    "puts its last session",
+                ],
+            ),
+            (
+                Lang::Th,
+                [
+                    "เวลาที่แต่ละตัวเริ่ม",
+                    "ว่าเป็นของ edition ไหน (Legacy หรือ Enhanced) โดยไม่แสดง path",
+                    "เวลาของโฟลเดอร์ดัชนีเอง",
+                    "วางเซสชันล่าสุด",
                 ],
             ),
         ] {

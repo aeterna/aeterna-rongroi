@@ -4,8 +4,8 @@
 
 //! What is running on this machine, read through the `ToolHelp` process snapshot (ADR 0010).
 //!
-//! Name and path only: no image is hashed, no process memory is read, and every handle is closed as
-//! soon as the one query that needs it has answered.
+//! Name, path and creation time only (ADR 0062): no image is hashed, no process memory is read, and
+//! every handle is closed as soon as the queries that need it have answered.
 
 /// Largest image path this reads, in UTF-16 code units, including the terminating NUL. Windows' own
 /// limit for an extended-length path is 32 767 characters.
@@ -88,10 +88,12 @@ fn walk_snapshot(
 
     let mut processes = Vec::new();
     loop {
+        let (path, creation) = path_and_creation(entry.th32ProcessID);
         processes.push(rongroi_host::ProcessRecord {
             pid: entry.th32ProcessID,
             name: wide_to_string(&entry.szExeFile),
-            path: image_path(entry.th32ProcessID),
+            path,
+            started_at: creation.and_then(rongroi_host::process_started_at),
         });
         // SAFETY: as for `Process32FirstW` above. Windows reports the end of the list as an error,
         // which is an ordinary end of the walk and not a failure to look.
@@ -101,32 +103,79 @@ fn walk_snapshot(
     }
 }
 
-/// The full path of one process's image, or `None` when Windows will not name it.
+/// The full path of one process's image and its creation time as a raw `FILETIME`, each `None` when
+/// Windows will not say.
 ///
 /// A protected process and a process that exited between the snapshot and this call answer the same
-/// way: nothing is known about its path. The caller still lists the process, without the field
-/// (ADR 0010).
+/// way: nothing is known about it. The caller still lists the process, without the field (ADR 0010).
+/// Both come from the one handle, so the time asks for no access the path did not (ADR 0062).
 #[cfg(windows)]
 #[allow(unsafe_code)]
-fn image_path(pid: u32) -> Option<String> {
+fn path_and_creation(pid: u32) -> (Option<String>, Option<u64>) {
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{
-        OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
-        QueryFullProcessImageNameW,
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+
+    // SAFETY: `PROCESS_QUERY_LIMITED_INFORMATION` is the smallest access right that lets a process
+    // be asked for its own identity — no memory of it is read and nothing about it is changed —
+    // `false` does not inherit the handle, and the handle is closed before this function returns.
+    let Ok(handle) = (unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }) else {
+        return (None, None);
     };
+
+    let path = image_path(handle);
+    let creation = creation_time(handle);
+
+    // SAFETY: `handle` came from the successful `OpenProcess` above and is not used again.
+    let _ = unsafe { CloseHandle(handle) };
+
+    (path, creation)
+}
+
+/// When the process behind `handle` was created, as the `FILETIME` `GetProcessTimes` reports, which a
+/// handle with `PROCESS_QUERY_LIMITED_INFORMATION` may ask (ADR 0062). `None` when Windows does not
+/// answer; the caller turns the value into a time ([`rongroi_host::process_started_at`]).
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn creation_time(handle: windows::Win32::Foundation::HANDLE) -> Option<u64> {
+    use windows::Win32::Foundation::FILETIME;
+    use windows::Win32::System::Threading::GetProcessTimes;
+
+    let mut creation = FILETIME::default();
+    let mut exit = FILETIME::default();
+    let mut kernel = FILETIME::default();
+    let mut user = FILETIME::default();
+    // SAFETY: each pointer is to a `FILETIME` that lives on this stack frame for the whole call, and
+    // `handle` is open with `PROCESS_QUERY_LIMITED_INFORMATION`, which the call requires. It only
+    // reads times Windows keeps for the process. Only the creation time is used; the other three
+    // are filled because the call requires somewhere to put them.
+    unsafe {
+        GetProcessTimes(
+            handle,
+            &raw mut creation,
+            &raw mut exit,
+            &raw mut kernel,
+            &raw mut user,
+        )
+    }
+    .ok()?;
+    Some((u64::from(creation.dwHighDateTime) << 32) | u64::from(creation.dwLowDateTime))
+}
+
+/// The full path of the image of the process behind `handle`, or `None` when Windows will not name
+/// it.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn image_path(handle: windows::Win32::Foundation::HANDLE) -> Option<String> {
+    use windows::Win32::System::Threading::{PROCESS_NAME_WIN32, QueryFullProcessImageNameW};
     use windows::core::PWSTR;
 
     let mut buffer = vec![0_u16; MAX_IMAGE_PATH_UNITS];
     let mut length = u32::try_from(buffer.len()).ok()?;
 
-    // SAFETY: `PROCESS_QUERY_LIMITED_INFORMATION` is the smallest access right that lets a process
-    // be asked for its own identity — no memory of it is read and nothing about it is changed —
-    // `false` does not inherit the handle, and the handle is closed before this function returns.
-    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
-
     // SAFETY: `buffer` holds `length` writable UTF-16 units and outlives the call, `length` is a
-    // valid in/out pointer holding that count, and `handle` is the process opened just above. The
-    // call only reads the image path Windows already keeps for that process.
+    // valid in/out pointer holding that count, and `handle` is a process opened by the caller with
+    // `PROCESS_QUERY_LIMITED_INFORMATION`. The call only reads the image path Windows already keeps
+    // for that process.
     let queried = unsafe {
         QueryFullProcessImageNameW(
             handle,
@@ -135,9 +184,6 @@ fn image_path(pid: u32) -> Option<String> {
             &raw mut length,
         )
     };
-
-    // SAFETY: `handle` came from the successful `OpenProcess` above and is not used again.
-    let _ = unsafe { CloseHandle(handle) };
 
     queried.ok()?;
     // On success Windows sets `length` to the number of units it wrote, not counting the NUL.

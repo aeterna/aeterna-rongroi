@@ -309,6 +309,24 @@ fn process_own_trace_self_view() {
     let view = view::for_mode(&report, Mode::SelfCheck);
     let evidence = serde_json::to_string(&view.evidence).unwrap();
     assert!(!evidence.contains("aeterna-rongroi"), "{evidence}");
+    // `started_at` is read for ADR 0062's session statement only (owner decision 8, 2026-10-02):
+    // the processes carry it, and neither mode's timeline holds it.
+    assert!(
+        serde_json::to_string(&report.unmatched)
+            .unwrap()
+            .contains("started_at")
+    );
+    for mode in [Mode::SelfCheck, Mode::Ss] {
+        let timeline = view::timeline(&report, mode);
+        assert!(
+            timeline
+                .entries
+                .iter()
+                .all(|entry| entry.collector.as_deref() != Some("process")),
+            "{mode:?}: {:?}",
+            timeline.entries
+        );
+    }
     insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
 }
 
@@ -799,8 +817,9 @@ fn trace_ages_elevated_self_and_ss_sections_agree() {
 }
 
 /// The same kind of PC without administrator rights: Prefetch, BAM, the Security log and the change
-/// journal are "not read without administrator rights", never empty, and no statement is made
-/// (ADR 0061, owner decisions 1 and 7).
+/// journal are "not read without administrator rights", never empty, and no ADR 0061 statement is made
+/// (ADR 0061, owner decisions 1 and 7); the session statement says when `FiveM` last ran is not known
+/// (ADR 0062).
 #[test]
 fn trace_ages_limited_ss_view() {
     use rongroi_core::model::{AnchorKind, AnchorState, UnmeasuredReason};
@@ -830,7 +849,20 @@ fn trace_ages_limited_ss_view() {
             .unwrap();
         assert_eq!(row.state, not_admin, "{collector}");
     }
-    assert!(view.cross_source.is_empty(), "{:?}", view.cross_source);
+    // No ADR 0061 statement; Legacy's FiveM.exe is present, nothing runs and neither Prefetch nor BAM
+    // was read, so its session is "not known" (ADR 0062 section 5) — never compared with the scan.
+    assert_eq!(
+        view.cross_source,
+        vec![view::CrossSourceStatement::Session(
+            view::SessionStatement {
+                edition: "legacy".to_owned(),
+                state: view::SessionState::NotKnown {
+                    prefetch: UnmeasuredReason::NotAdmin,
+                    bam: UnmeasuredReason::NotAdmin,
+                },
+            }
+        )]
+    );
     let journal = report
         .header
         .anchors
@@ -844,4 +876,81 @@ fn trace_ages_limited_ss_view() {
         }
     );
     insta::assert_json_snapshot!(trace_ages_of(&report, Mode::Ss));
+}
+
+/// The session statements of one synthetic host, the same in both modes, with no user name in them
+/// (ADR 0062).
+fn sessions_of(host: &str) -> serde_json::Value {
+    let report = report_for(host);
+    let own = trace_ages_of(&report, Mode::SelfCheck);
+    assert_eq!(own, trace_ages_of(&report, Mode::Ss), "{host}");
+    let statements = own["cross_source"].clone();
+    assert!(
+        !statements.to_string().contains("fixtureuser"),
+        "{statements}"
+    );
+    statements
+}
+
+/// Both editions' last sessions read with administrator rights: Prefetch's start, BAM's end, and every
+/// line form of an elevated read — after and before the start, the index that cannot be listed, the
+/// empty index, the folder not there, Enhanced's log folder before the end, the join line (ADR 0062).
+#[test]
+fn session_elevated_statements() {
+    insta::assert_json_snapshot!(sessions_of("session-elevated"));
+}
+
+/// Without administrator rights while Legacy runs: the running client's start and "still running";
+/// Enhanced, present and not running, "not known" (ADR 0062 section 5).
+#[test]
+fn session_limited_running_statements() {
+    insta::assert_json_snapshot!(sessions_of("session-limited-running"));
+}
+
+/// Without administrator rights and nothing running: "not known", for the edition whose FiveM.exe is
+/// present only.
+#[test]
+fn session_not_known_statements() {
+    insta::assert_json_snapshot!(sessions_of("session-not-known"));
+}
+
+/// Prefetch switched off and BAM read: no recorded start, and the end comparison alone.
+#[test]
+fn session_prefetch_off_statements() {
+    insta::assert_json_snapshot!(sessions_of("session-prefetch-off"));
+}
+
+/// The index beside its oldest cache file, per launch mode, under the trace ages row of Legacy's
+/// resource cache — two dates, never compared (ADR 0062 section 4).
+#[test]
+fn the_index_is_shown_beside_its_oldest_cache_file() {
+    let report = report_for("session-elevated");
+    let view = view::for_mode(&report, Mode::Ss);
+    let row = view
+        .trace_ages
+        .rows
+        .iter()
+        .find(|row| row.place.as_deref() == Some("legacy_server_cache"))
+        .unwrap();
+    let beside: Vec<(&str, &str, Option<&str>, u64)> = row
+        .index_beside
+        .iter()
+        .map(|beside| {
+            (
+                beside.variant.as_str(),
+                beside.index_created_on.as_str(),
+                beside.oldest_file_created_on.as_deref(),
+                beside.cache_files,
+            )
+        })
+        .collect();
+    // fxdk holds no cache file: "holds no cache file", not "no cache file has a creation time".
+    assert_eq!(
+        beside,
+        [
+            ("default", "2025-12-20", Some("2025-10-01"), 2),
+            ("priv", "2025-10-02", Some("2025-10-02"), 1),
+            ("fxdk", "2025-11-01", None, 0),
+        ]
+    );
 }

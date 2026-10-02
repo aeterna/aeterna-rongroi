@@ -217,8 +217,15 @@
       "prefetch_off": "Prefetch switched off by an older SSD guide",
       "fivem_reinstalled": "FiveM reinstalled",
       "moved": "a drive or profile moved",
-      "clock": "a clock that was changed"
-    }
+      "clock": "a clock that was changed",
+      "index_rebuilt": "FiveM rebuilding or replacing its resource cache index (whether and when it does is not established)",
+      "clear_cache": "FiveM's own \"clear cache\"",
+      "copied_cache": "cache files copied from another PC or restored from a backup",
+      "reinstall_kept_cache": "a reinstall that kept the cache"
+    },
+    "index_beside": "Resource cache index ({{variant}}): index folder created {{index}}; oldest cache file created {{oldest}}",
+    "index_beside_no_file": "Resource cache index ({{variant}}): index folder created {{index}}; no cache file has a creation time",
+    "index_beside_empty": "Resource cache index ({{variant}}): index folder created {{index}}; the cache holds no cache file"
   },
   "cross_source": {
     "title": "FiveM on this PC, beside Windows' records of programs that ran",
@@ -252,6 +259,83 @@
       "other_name": "FiveM started under a name these records do not list, or in a way Windows does not record here",
       "windows_removes": "Windows removing its own records: Prefetch files are replaced, BAM entries expire, PCA records only launches from File Explorer",
       "clock": "a clock that was changed, so that times from different sources are not on the same clock"
+    }
+  },
+  "session": {
+    "title": "FiveM for GTA V {{edition}}: its last session, beside its own folders",
+    "edition": {
+      "legacy": "Legacy",
+      "enhanced": "Enhanced"
+    },
+    "session": "Session",
+    "anchor_name": {
+      "fivem_exe": "FiveM.exe",
+      "gta_process": "FiveM_b…_GTAProcess.exe"
+    },
+    "start": {
+      "process": "still running since {{at}} (a running process, {{name}})",
+      "prefetch": "began {{at}} (Prefetch, {{name}})",
+      "switched_off": "Prefetch is switched off on this PC, so when this run began is not recorded",
+      "not_read": "when this run began is not known: Prefetch was not read ({{reason}})",
+      "not_recorded": "Prefetch holds no run of this edition, so when this run began is not recorded"
+    },
+    "end": {
+      "still_running": "still running",
+      "bam": "ended {{at}} (BAM)",
+      "not_recorded": "the end of this run is not recorded",
+      "not_read": "when it ended is not known: BAM was not read ({{reason}})"
+    },
+    "before_scan": "{{duration}} before this scan",
+    "duration": {
+      "less_than_a_minute": "less than a minute",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days"
+    },
+    "source": {
+      "legacy_logs": "Logs",
+      "legacy_cache": "Cache",
+      "legacy_resource_index": "Resource cache index",
+      "enhanced_logs": "Logs"
+    },
+    "variant": "{{source}} ({{variant}})",
+    "created": {
+      "after_start": "last created {{duration}} after the session began",
+      "before_start": "last created {{duration}} before the session began"
+    },
+    "written": {
+      "after_start": "last written {{duration}} after the session began",
+      "before_start": "last written {{duration}} before the session began"
+    },
+    "latest_log_write": {
+      "after_start": "the folder's latest log write was {{duration}} after the session began",
+      "before_start": "the folder's latest log write was {{duration}} before the session began",
+      "before_end": "the folder's latest log write was {{duration}} before the session ended",
+      "near_end": "the folder's latest log write was within 10 minutes of the session's end",
+      "after_end": "the folder's latest log write was {{duration}} after the session ended"
+    },
+    "not_there": "the folder is not there",
+    "no_file": "the folder holds no file",
+    "not_listed": "not read: the folder could not be listed",
+    "not_read": "not read: {{reason}}",
+    "margin": "A time more than 10 minutes before the session began is shown as before it; any later time as after it.",
+    "margin_end": "The folder's latest log write is also shown as before the end when it is more than 10 minutes before the session ended.",
+    "not_known": "When FiveM last ran is not known: Prefetch and BAM were not read ({{reason}}).",
+    "causes_intro": "This is not evidence of anything. The same result follows from:",
+    "causes": {
+      "standing_still": "a player standing still, or playing on with nothing new to write: FiveM writes its folders when something happens, not on a clock",
+      "ended_abruptly": "FiveM ended by Task Manager, a crash or a shutdown, which may skip the write it makes when it closes",
+      "removes_logs": "FiveM removing its own older logs, or its own \"clear cache\"",
+      "other_folder": "FiveM installed in, or moved to, a folder other than the one this program reads, or reinstalled",
+      "other_account": "FiveM started by another Windows account on this PC: its folders are that account's",
+      "opened_closed": "FiveM opened and closed before the game started, or updating itself",
+      "launchers": "GTA V installed through Steam, Epic or the Rockstar launcher, which start the game in different ways",
+      "prefetch_off": "Prefetch switched off, as some older SSD and performance guides advise",
+      "clock": "a clock that was changed, so that times from different sources are not on the same clock",
+      "cleanup": "disk-cleaning software, or a profile moved or restored from a backup"
     }
   }
 }
