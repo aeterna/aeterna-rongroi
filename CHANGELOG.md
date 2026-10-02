@@ -15,6 +15,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   cache index times. The ADR records a read-only measurement of one Legacy and one Enhanced session on a
   Windows 11 PC, what is not measured, and the nine decisions the owner took; the further sessions it lists
   are measured before any code.
+- ADR 0062 amendment (proposed 2026-10-02): the further sessions were measured — nine over two days on the
+  same PC. FiveM writes its folders when something happens, not on a clock: standing still in game left
+  Legacy's logs 3.7 minutes and Enhanced's game logs 69 minutes older than the session's end, while every
+  source was written at or after the session's start. The amendment proposes comparing every source with the
+  start only, keeping one end comparison (Enhanced's launcher log, written at every quit measured), treating
+  Legacy's resource cache index as a launch source and Enhanced's game logs as a game-start source, and giving
+  `prefetch` the edition word, now that each edition's `FiveM.exe` was measured to have its own Prefetch file
+  naming its program folder. Seven questions go back to the owner; no code until they are decided.
 
 ## [0.5.0] - 2026-10-01
 
