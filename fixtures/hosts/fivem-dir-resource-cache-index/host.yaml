@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# FiveM for GTA V Legacy with all three launch-mode resource caches, each with a `db` index folder
+# (ADR 0062, amending ADR 0053). The default cache's index holds three files with times, one file the
+# listing gave no times for and a subfolder; its `unconfirmed` folder holds a file, which is never read.
+# The `priv` cache's index cannot be listed. The `fxdk` cache's index is empty. Every name, size and time
+# is invented.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+access_denied:
+  - 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-priv\db'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data':
+    - name: server-cache
+      directory: true
+      created: 2026-03-02T09:00:00Z
+      modified: 2026-09-20T18:00:00Z
+    - name: server-cache-priv
+      directory: true
+      created: 2026-03-02T09:00:00Z
+      modified: 2026-09-20T18:00:00Z
+    - name: server-cache-fxdk
+      directory: true
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache':
+    - name: cache_0001
+      size: 4096
+      created: 2026-03-02T09:01:00Z
+      modified: 2026-03-02T09:01:00Z
+    - name: cache_0002
+      size: 2048
+      created: 2026-09-20T18:05:00Z
+      modified: 2026-09-20T18:05:00Z
+    - name: db
+      directory: true
+      created: 2026-03-02T09:01:30Z
+      modified: 2026-09-21T17:40:00Z
+    - name: unconfirmed
+      directory: true
+      created: 2026-03-02T09:01:30Z
+      modified: 2026-03-02T09:01:30Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache\db':
+    - name: index-a
+      size: 300
+      created: 2026-03-02T09:01:30Z
+      modified: 2026-09-21T17:40:00Z
+    - name: index-b
+      size: 200
+      created: 2026-09-21T17:39:00Z
+      modified: 2026-09-21T17:39:40Z
+    - name: index-c
+      size: 100
+      created: 2026-05-14T08:00:00Z
+      modified: 2026-05-14T08:00:00Z
+    - name: index-untimed
+    - name: nested
+      directory: true
+      created: 2026-09-30T00:00:00Z
+      modified: 2026-09-30T00:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache\unconfirmed':
+    - name: pending-file
+      size: 10
+      created: 2026-09-29T00:00:00Z
+      modified: 2026-09-29T00:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-priv':
+    - name: db
+      directory: true
+      created: 2026-03-03T10:00:00Z
+      modified: 2026-09-21T17:41:00Z
+    - name: unconfirmed
+      directory: true
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-fxdk':
+    - name: DB
+      directory: true
+      created: 2026-04-04T11:00:00Z
+      modified: 2026-04-04T11:00:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-fxdk\DB': []

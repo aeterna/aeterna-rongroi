@@ -2,6 +2,9 @@
 
 - Status: accepted — the owner asked for the implementation on 2026-09-17
 - Date: 2026-09-17
+- Amended: 2026-10-02, by ADR 0062 (owner decision 6 of 2026-10-01): each `legacy_server_cache` observation
+  gains its resource cache index, the `db` subfolder ("Amendment for ADR 0062: the resource cache index");
+  section 1's "nothing below it" still holds for every other subfolder
 
 ## Context
 
@@ -73,6 +76,9 @@ it — reports:
 A file whose size or time the listing did not provide is left out of that sum or that bound, and the
 observation carries `files_without_times` with how many were left out, so a bound is never read as covering
 files it did not see. An empty folder has `files: 0` and no bounds.
+
+Since ADR 0062, a `legacy_server_cache` observation also carries its index, from one listing of its `db`
+subfolder ("Amendment for ADR 0062: the resource cache index", below).
 
 No file name, path or hash is emitted for these places. A crash dump's, a log's or a cache file's name says
 nothing a reviewer needs that the count and the times do not, and some carry dates or hashes that match one
@@ -166,3 +172,36 @@ file name. They also say that these times can match two reports of the same PC (
   goes from 3 to 10.
 - The consent question (CLI and desktop, both languages), `PRIVACY.md`, `docs/architecture.md` and the
   glossary name the new reads.
+
+## Amendment for ADR 0062: the resource cache index (2026-10-02, accepted with ADR 0062)
+
+ADR 0062's owner decision 6 (2026-10-01) amends section 1 in the change that builds it. Section 1 listed each
+Legacy resource cache and nothing below it, so its `db` and `unconfirmed` subfolders were counted in `folders`
+and nothing else.
+
+- **What is added.** Each `legacy_server_cache` observation, one per launch mode (`variant`), gains five
+  fields about its index, the fixed `db` subfolder:
+
+  | Field | Kind | Value |
+  |---|---|---|
+  | `index_created_at`, `index_modified_at` | timestamp | `db`'s own times, from the listing of the cache the collector already makes |
+  | `index_files` | number | the files directly in `db` |
+  | `index_latest_created_at`, `index_latest_modified_at` | timestamp | the latest creation and last-write time among those files |
+
+  The last three come from **one listing of `db`** and nothing below it: a named place, not recursion
+  (ADR 0009). A subfolder of `db` is neither counted nor listed. No file name is emitted, and no file is
+  opened. A file whose time the listing did not provide is counted and left out of the bound it lacks.
+- **Why.** Measured on a Windows 11 PC (ADR 0062): Legacy's resource cache index and its oldest cache file
+  were created in the same minute; the index's files are rewritten at each launch — about 40 seconds after
+  it, without joining a server — while the `db` folder's own creation time is not. ADR 0062 compares the
+  index with the session's start, and shows its creation date beside the oldest cache file's.
+- **`db` not there**: no index field. **`db` there and empty**: `index_files: 0` and no bounds, as an empty
+  folder has none. **`db` that cannot be listed**: it keeps `index_created_at` and `index_modified_at` and
+  carries none of the other three. That is one item left out, **not a gap**, as an Enhanced server folder
+  that cannot be listed keeps its times and carries no `entries` ("Implementation", above): the cache itself
+  was listed, its folder activity stands, and a gap for `location: legacy_server_cache` would be a gap for all
+  three launch modes and for the cache's own row in the trace ages and on the timeline. No reason is added.
+- **`unconfirmed` is not read.** It held no file in either session ADR 0062 measured.
+- **What still holds.** No rule reads these fields (ADR 0062 section 8). They are timestamps, so the timeline
+  places them under the folder-activity selector, as it places the cache's own times. The consent question and
+  `PRIVACY.md` name the index times in the change that ships ADR 0062's view (its owner decision 9).

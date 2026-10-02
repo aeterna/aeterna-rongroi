@@ -28,6 +28,11 @@
 //! last changed and how many entries it holds, and not its name, which identifies a server (ADR 0053).
 //! These times are what the file system recorded; programs set them as they copy and extract files,
 //! and a small or recent folder is also what a new install or a cleared cache leaves.
+//!
+//! Of each Legacy resource cache it also reports the **index**, the fixed `db` subfolder: its own times
+//! from the listing of the cache, and from one listing of `db` — a named place, not recursion
+//! (ADR 0009) — how many files it holds and the latest of their times, never a file name (ADR 0062,
+//! amending ADR 0053). `unconfirmed`, beside it, is not read.
 
 use std::collections::BTreeMap;
 
@@ -117,6 +122,9 @@ enum Reads {
     /// Enhanced's server cache: folder activity, and one observation per server folder inside it with
     /// its times and entry count, never its name (ADR 0053).
     FolderActivityAndServers,
+    /// A Legacy resource cache: folder activity, with its index's times and file count added to the
+    /// same observation (ADR 0062, amending ADR 0053).
+    FolderActivityAndIndex,
 }
 
 /// One folder this collector looks in.
@@ -189,21 +197,21 @@ const LOCATIONS: [Location; 14] = [
         name: LEGACY_SERVER_CACHE_LOCATION,
         base: LOCAL_APP_DATA,
         relative: r"FiveM\FiveM.app\data\server-cache",
-        reads: Reads::FolderActivity,
+        reads: Reads::FolderActivityAndIndex,
         variant: Some("default"),
     },
     Location {
         name: LEGACY_SERVER_CACHE_LOCATION,
         base: LOCAL_APP_DATA,
         relative: r"FiveM\FiveM.app\data\server-cache-priv",
-        reads: Reads::FolderActivity,
+        reads: Reads::FolderActivityAndIndex,
         variant: Some("priv"),
     },
     Location {
         name: LEGACY_SERVER_CACHE_LOCATION,
         base: LOCAL_APP_DATA,
         relative: r"FiveM\FiveM.app\data\server-cache-fxdk",
-        reads: Reads::FolderActivity,
+        reads: Reads::FolderActivityAndIndex,
         variant: Some("fxdk"),
     },
     Location {
@@ -255,7 +263,9 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// - **a folder** (`location`, `folder`, `variant` for a place that has one, and — when it was listed —
 ///   `files`; a log, crash or cache folder also carries its folder activity: `folders`, `size_bytes`,
 ///   `files_without_times`, the four `earliest_*`/`latest_*` bounds and its own `created_at` and
-///   `modified_at`, each only when the listing provided it);
+///   `modified_at`, each only when the listing provided it; a Legacy resource cache also carries its
+///   index's `index_created_at`, `index_modified_at`, `index_files`, `index_latest_created_at` and
+///   `index_latest_modified_at`, each only when it could be read — ADR 0062);
 /// - **a file** (`location`, `path`, and whichever of `sha256`, `signature`, `signer` and
 ///   `signer_cert_sha256` could be read). A program folder produces only this kind, for `FiveM.exe`
 ///   (ADR 0036), which also carries `program_folder_created_at` — the program folder's own creation
@@ -264,7 +274,7 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// - **a server cache folder** (`location: enhanced_server_cache`, `created_at`, `modified_at` and
 ///   `entries`, each when it could be read) — told apart from its parent's folder observation by having
 ///   no `folder` field (ADR 0053).
-const FIELDS: [Field; 21] = [
+const FIELDS: [Field; 26] = [
     Field::timestamp("app_folder_created_at"),
     Field::timestamp("created_at"),
     Field::timestamp("earliest_created_at"),
@@ -274,6 +284,11 @@ const FIELDS: [Field; 21] = [
     Field::number("files_without_times"),
     Field::text("folder"),
     Field::number("folders"),
+    Field::timestamp("index_created_at"),
+    Field::number("index_files"),
+    Field::timestamp("index_latest_created_at"),
+    Field::timestamp("index_latest_modified_at"),
+    Field::timestamp("index_modified_at"),
     Field::timestamp("latest_created_at"),
     Field::timestamp("latest_modified_at"),
     Field::text("location"),
@@ -406,7 +421,12 @@ impl Collector for FivemDir {
                 }
                 // A launch-mode cache that is not there is the ordinary case for all but one mode, so it
                 // is not reported; a place with no variant says it is absent, as a plugin folder does.
-                (Ok(None), Reads::FolderActivity | Reads::FolderActivityAndServers) => {
+                (
+                    Ok(None),
+                    Reads::FolderActivity
+                    | Reads::FolderActivityAndServers
+                    | Reads::FolderActivityAndIndex,
+                ) => {
                     if location.variant.is_none() {
                         observations.push(folder_observation(location, FOLDER_ABSENT, None));
                     }
@@ -417,6 +437,13 @@ impl Collector for FivemDir {
                 (Ok(Some((folder, entries))), Reads::FolderActivityAndServers) => {
                     observations.push(activity_observation(host, location, &folder, &entries));
                     observations.extend(server_observations(host, location, &folder, &entries));
+                }
+                (Ok(Some((folder, entries))), Reads::FolderActivityAndIndex) => {
+                    let mut observation = activity_observation(host, location, &folder, &entries);
+                    observation
+                        .fields
+                        .extend(index_fields(host, &folder, &entries));
+                    observations.push(observation);
                 }
                 (Err(reason), reads) => {
                     // A program folder carries no folder observation, so the gap is what says it could
@@ -620,6 +647,68 @@ fn install_times(
         && let Some(time) = created(&format!(r"{folder}\{APP_FOLDER_NAME}"))
     {
         fields.insert("app_folder_created_at".to_owned(), time_value(time));
+    }
+    fields
+}
+
+/// The resource cache index's folder, inside each Legacy launch-mode cache (ADR 0053, ADR 0062).
+const INDEX_FOLDER_NAME: &str = "db";
+
+/// What one Legacy resource cache's index holds (ADR 0062 section 6, amending ADR 0053 section 1).
+///
+/// `index_created_at` and `index_modified_at` are the `db` folder's own times from the listing of the
+/// cache the collector already made; `index_files` and the latest creation and last-write times among
+/// its files come from one listing of `db`, and nothing below it — a named place, not recursion
+/// (ADR 0009). No file name is emitted. On the PC measured the index's files were rewritten at each
+/// launch and the folder's own creation time was not (ADR 0062).
+///
+/// - `db` is not there: no index field.
+/// - `db` cannot be listed: it keeps its own times and carries no count and no bounds — one item, not
+///   a gap in the run, as an Enhanced server folder that cannot be listed is (ADR 0053).
+/// - `db` holds no file: `index_files: 0` and no bounds, as an empty folder has none.
+///
+/// A file whose time the listing did not provide is counted and left out of the bound it lacks.
+fn index_fields(
+    host: &dyn Host,
+    folder: &str,
+    entries: &[DirEntryInfo],
+) -> BTreeMap<String, serde_json::Value> {
+    let mut fields = BTreeMap::new();
+    let Some(index) = entries
+        .iter()
+        .find(|entry| !entry.is_file && entry.name.eq_ignore_ascii_case(INDEX_FOLDER_NAME))
+    else {
+        return fields;
+    };
+    for (name, value) in [
+        ("index_created_at", index.created),
+        ("index_modified_at", index.modified),
+    ] {
+        if let Some(value) = value {
+            fields.insert(name.to_owned(), time_value(value));
+        }
+    }
+    let Ok(Some(inside)) = host.list_dir(&format!(r"{folder}\{}", index.name)) else {
+        return fields;
+    };
+    let files: Vec<&DirEntryInfo> = inside.iter().filter(|entry| entry.is_file).collect();
+    fields.insert(
+        "index_files".to_owned(),
+        serde_json::Value::from(files.len()),
+    );
+    for (name, value) in [
+        (
+            "index_latest_created_at",
+            files.iter().filter_map(|file| file.created).max(),
+        ),
+        (
+            "index_latest_modified_at",
+            files.iter().filter_map(|file| file.modified).max(),
+        ),
+    ] {
+        if let Some(value) = value {
+            fields.insert(name.to_owned(), time_value(value));
+        }
     }
     fields
 }
@@ -1427,6 +1516,151 @@ mod tests {
             folder(observations, PLUGINS_LOCATION),
             ("listed".to_owned(), Some(0))
         );
+    }
+
+    /// The index fields of one observation, as `(name, value)` for those it carries.
+    fn index_of(observation: &Observation) -> Vec<(&str, String)> {
+        observation
+            .fields
+            .iter()
+            .filter(|(name, _)| name.starts_with("index_"))
+            .map(|(name, value)| (name.as_str(), value.to_string().replace('"', "")))
+            .collect()
+    }
+
+    /// Each launch mode's resource cache carries its index (ADR 0062): the `db` folder's own times from
+    /// the cache's listing, and from one listing of `db` its file count and the latest file times —
+    /// a subfolder of `db` is not counted and not listed, an untimed file is counted and left out of the
+    /// bounds, and no name from `db` or `unconfirmed` reaches the report.
+    #[test]
+    fn each_resource_cache_carries_its_index_and_no_name() {
+        let run = FivemDir.collect(&fixture("fivem-dir-resource-cache-index"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert!(unread_places(&run).is_empty());
+        let default = activity(observations, LEGACY_SERVER_CACHE_LOCATION, Some("default"));
+        assert_eq!(
+            index_of(default),
+            [
+                ("index_created_at", "2026-03-02T09:01:30Z".to_owned()),
+                ("index_files", "4".to_owned()),
+                ("index_latest_created_at", "2026-09-21T17:39:00Z".to_owned()),
+                (
+                    "index_latest_modified_at",
+                    "2026-09-21T17:40:00Z".to_owned()
+                ),
+                ("index_modified_at", "2026-09-21T17:40:00Z".to_owned()),
+            ]
+        );
+        // The cache's own activity is unchanged: `db` and `unconfirmed` are two of its folders.
+        assert_eq!(number(default, "files"), Some(2));
+        assert_eq!(number(default, "folders"), Some(2));
+        assert_eq!(
+            field(default, "earliest_created_at"),
+            Some("2026-03-02T09:01:00Z")
+        );
+        assert_eq!(field(default, "created_at"), Some("2026-03-02T09:00:00Z"));
+        let text = serde_json::to_string(observations).unwrap();
+        for name in [
+            "index-a",
+            "index-untimed",
+            "nested",
+            "pending-file",
+            "cache_0001",
+            r"\db",
+        ] {
+            assert!(!text.contains(name), "{name} reached the report");
+        }
+        assert!(!text.contains("2026-09-30"), "a subfolder of db was read");
+        assert!(!text.contains("2026-09-29"), "unconfirmed was read");
+    }
+
+    /// An index that cannot be listed keeps its own times and carries no count and no bounds; it is not
+    /// a gap, and the cache it is in is still listed — as an unreadable Enhanced server folder is
+    /// (ADR 0053). An empty index has a count of 0 and no bounds.
+    #[test]
+    fn an_unreadable_index_is_not_a_gap_and_an_empty_one_has_no_bounds() {
+        let run = FivemDir.collect(&fixture("fivem-dir-resource-cache-index"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert!(unread_places(&run).is_empty());
+        let private = activity(observations, LEGACY_SERVER_CACHE_LOCATION, Some("priv"));
+        assert_eq!(field(private, "folder"), Some("listed"));
+        assert_eq!(
+            index_of(private),
+            [
+                ("index_created_at", "2026-03-03T10:00:00Z".to_owned()),
+                ("index_modified_at", "2026-09-21T17:41:00Z".to_owned()),
+            ]
+        );
+        let fxdk = activity(observations, LEGACY_SERVER_CACHE_LOCATION, Some("fxdk"));
+        assert_eq!(
+            index_of(fxdk),
+            [
+                ("index_created_at", "2026-04-04T11:00:00Z".to_owned()),
+                ("index_files", "0".to_owned()),
+                ("index_modified_at", "2026-04-04T11:00:00Z".to_owned()),
+            ]
+        );
+    }
+
+    /// A resource cache with no `db` folder carries no index field; a `db` that is a file is not one.
+    #[test]
+    fn a_cache_without_an_index_folder_carries_no_index_field() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache':
+    - name: cache_0001
+      size: 10
+      created: 2026-03-02T09:01:00Z
+      modified: 2026-03-02T09:01:00Z
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache-priv':
+    - name: db
+      size: 10
+      created: 2026-03-02T09:01:00Z
+      modified: 2026-03-02T09:01:00Z
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, _) = measured(&run);
+        for variant in ["default", "priv"] {
+            let cache = activity(observations, LEGACY_SERVER_CACHE_LOCATION, Some(variant));
+            assert_eq!(field(cache, "folder"), Some("listed"), "{variant}");
+            assert!(index_of(cache).is_empty(), "{variant}: {cache:?}");
+        }
+    }
+
+    /// A cache that cannot be listed is a gap for its place in every field, the index's included.
+    #[test]
+    fn an_unreadable_cache_is_a_gap_in_its_index_fields_too() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+access_denied:
+  - 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\server-cache'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': []
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, _) = measured(&run);
+        assert_eq!(
+            unread_places(&run),
+            [(
+                LEGACY_SERVER_CACHE_LOCATION.to_owned(),
+                UnmeasuredReason::AccessDenied
+            )]
+        );
+        let cache = activity(observations, LEGACY_SERVER_CACHE_LOCATION, Some("default"));
+        assert_eq!(field(cache, "folder"), Some("unreadable"));
+        assert!(index_of(cache).is_empty());
     }
 
     #[test]
