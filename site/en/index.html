@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
+<!-- The English landing page. No script, no tracker, nothing loaded from another host. Update the version on each release. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free offline FiveM PC check &amp; screenshare tool | aeterna-rongroi</title>
+<meta name="description" content="A free, open-source, offline FiveM PC check and screenshare (SS) tool. It shows the traces cheats leave on a Windows PC as evidence, and never calls a PC clean.">
+<link rel="canonical" href="https://aeterna.github.io/aeterna-rongroi/en/">
+<link rel="alternate" hreflang="th" href="https://aeterna.github.io/aeterna-rongroi/">
+<link rel="alternate" hreflang="en" href="https://aeterna.github.io/aeterna-rongroi/en/">
+<link rel="alternate" hreflang="x-default" href="https://aeterna.github.io/aeterna-rongroi/en/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Free offline FiveM PC check &amp; screenshare tool">
+<meta property="og:description" content="Open source and free. Runs on the player's own PC, shows evidence, and leaves the decision to a person.">
+<meta property="og:url" content="https://aeterna.github.io/aeterna-rongroi/en/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="th_TH">
+<meta name="theme-color" content="#a9d8ff">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "aeterna-rongroi",
+  "alternateName": "FiveM PC check",
+  "description": "An offline, open-source PC check for FiveM communities. It shows the traces cheats leave on a Windows PC as evidence and never gives a clean verdict.",
+  "applicationCategory": "SecurityApplication",
+  "operatingSystem": "Windows (x64)",
+  "softwareVersion": "0.6.0",
+  "inLanguage": ["en", "th"],
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "url": "https://aeterna.github.io/aeterna-rongroi/en/",
+  "downloadUrl": "https://github.com/aeterna/aeterna-rongroi/releases",
+  "codeRepository": "https://github.com/aeterna/aeterna-rongroi",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">aeterna-rongroi<small>traces</small></a>
+    <nav class="lang" aria-label="Language"><a href="../" hreflang="th" lang="th">ไทย</a><a href="./" aria-current="page">English</a></nav>
+  </div>
+  <div class="ruler" aria-hidden="true"></div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div>
+      <p class="eyebrow">FIVEM PC CHECK · OPEN SOURCE · OFFLINE</p>
+      <h1>A <em>FiveM PC check</em><br>that shows evidence, not verdicts</h1>
+      <p class="lead">aeterna-rongroi looks for the traces cheats leave on a Windows PC, and for settings that make cheating easier, then shows them as evidence.
+        A player can check their own PC, or server staff can watch over a screenshare (SS) with the player's consent. <strong>It never tells you a PC is "clean".</strong></p>
+      <div class="buttons">
+        <a class="btn primary" href="https://github.com/aeterna/aeterna-rongroi/releases">Download · 0.6.0</a>
+        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.md">Screenshare guide</a>
+        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi">Source</a>
+      </div>
+    </div>
+    <figure class="specimen" aria-label="An example of the program's summary; the numbers are illustrative">
+      <div class="specimen-head"><strong>What this scan lists</strong><span>EXAMPLE</span></div>
+      <div class="tally">
+        <div class="t-found"><b><span class="mark mark-found"></span>5</b><span>found</span></div>
+        <div class="t-not-found"><b><span class="mark mark-not-found"></span>12</b><span>not found</span></div>
+        <div class="t-unmeasured"><b><span class="mark mark-unmeasured"></span>3</b><span>not measured</span></div>
+      </div>
+      <div class="specimen-row"><span class="mark mark-found"></span><span>Check: Secure Boot is turned off</span><span class="pill">Found</span><small>Many ordinary PCs run with it off, so on its own this describes the machine — not evidence of cheating.</small></div>
+      <p class="note">Evidence only. This report cannot prove that a PC is clean.</p>
+    </figure>
+  </div>
+
+  <p class="note">⚠️ <strong>Pre-alpha.</strong> Most rules have not yet been checked against enough real PCs. Do not ban anyone because of what this tool shows, or clear anyone because of it.</p>
+
+  <section>
+    <h2>How it differs from other PC checkers</h2>
+    <ul class="ledger">
+      <li><h3>Sends nothing anywhere</h3><p>The program's code has no network access, and CI fails the build if someone adds it. No screenshots, no browser history, no remote access.</p></li>
+      <li><h3>Open to inspection</h3><p>Every rule and every check is on GitHub. Anyone can read what it looks for, and which ordinary things produce the same result.</p></li>
+      <li><h3>Evidence, not a verdict</h3><p>No score, no pass or fail. A person decides, with the report as one piece of evidence.</p></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Every result is one of three</h2>
+    <div class="states">
+      <div class="state found"><span class="mark mark-found" aria-hidden="true"></span><strong>Found</strong><span>A trace was found. The evidence is shown, with where it came from.</span></div>
+      <div class="state not-found"><span class="mark mark-not-found" aria-hidden="true"></span><strong>Not found</strong><span>Nothing was found, and the report says how far back that source can see — for example, "this log only keeps the last few days".</span></div>
+      <div class="state unmeasured"><span class="mark mark-unmeasured" aria-hidden="true"></span><strong>Not measured</strong><span>The check could not run, with the reason — for example, "needs administrator rights".</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What 0.6.0 checks</h2>
+    <div class="table-scroll"><table>
+      <thead><tr><th>What</th><th>In plain words</th></tr></thead>
+      <tbody>
+        <tr><td>FiveM itself</td><td>Whether FiveM's files are the real, signed ones, what add-on files sit in its folders, and when FiveM was last played beside when its folders were last written<span class="new">NEW</span><small>Both Legacy and GTA V Enhanced</small></td></tr>
+        <tr><td>Programs that ran</td><td>What Windows remembers running recently<small>Prefetch, BAM, PCA · context only: no rule judges a program by its file name</small></td></tr>
+        <tr><td>Wiped records</td><td>Windows' own logs cleared, or set so they cannot record</td></tr>
+        <tr><td>Protection switched off</td><td>Microsoft Defender switched off, Secure Boot, TPM, memory integrity and other Windows security settings</td></tr>
+        <tr><td>Risky drivers</td><td>Drivers with known security holes, which a cheat can abuse to get deep into Windows<small>Compared with 1,847 LOLDrivers entries</small></td></tr>
+        <tr><td>Deleted or renamed files</td><td>In FiveM's add-on folders</td></tr>
+        <tr><td>Modified Windows</td><td>Windows versions that come with protections removed, such as Atlas or ReviOS<small>A person may run whatever Windows they like; this row only says which one it is</small></td></tr>
+        <tr><td>Other settings</td><td>Unsigned programs that start by themselves, and a hosts file that redirects FiveM or Rockstar</td></tr>
+        <tr><td>How far back it can see</td><td>So that "not found" is never read as "never happened"</td></tr>
+      </tbody>
+    </table></div>
+    <p>Every rule in detail: the <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/rules-reference.md">rule reference</a></p>
+  </section>
+
+  <section>
+    <h2>A screenshare in five steps</h2>
+    <ol class="steps">
+      <li><strong>The player downloads it</strong>from the <a href="https://github.com/aeterna/aeterna-rongroi/releases">Releases page</a>. Send the link, never the file.</li>
+      <li><strong>Check that it is the real file</strong>In PowerShell, in the download folder, run <code>Get-FileHash .\aeterna-rongroi-*-windows-x64.exe</code> and compare it with <code>SHA256SUMS</code> on the release page. If it does not match, stop.</li>
+      <li><strong>Open SS mode</strong>Click "Screenshare check (SS mode)". The player agrees, or refuses; if they refuse, nothing is read.</li>
+      <li><strong>Check the header</strong>It must say official build. If it says UNOFFICIAL BUILD, do not rely on the result.</li>
+      <li><strong>Read the results row by row</strong>together with the ordinary causes of each.</li>
+    </ol>
+    <p>The full steps and how to read every row: the <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.md">screenshare guide</a></p>
+  </section>
+
+  <section>
+    <h2>What not to conclude</h2>
+    <div class="table-scroll"><table>
+      <thead><tr><th>The report shows</th><th>It does not mean</th></tr></thead>
+      <tbody>
+        <tr><td>A "found" row</td><td>The player cheated</td></tr>
+        <tr><td>No "found" row at all</td><td>The PC is clean</td></tr>
+        <tr><td>"Not measured"</td><td>The player is hiding something</td></tr>
+        <tr><td>A machine-setting row</td><td>Anything about the person</td></tr>
+      </tbody>
+    </table></div>
+    <p class="blind"><strong>It cannot see:</strong> cheats running on a second PC (DMA), menus hidden from screen capture, or a Windows modified to fool the programs running on it.</p>
+  </section>
+
+  <section>
+    <h2>Questions</h2>
+    <details><summary>Is it free?</summary><p>Yes. It is open source under GPL-3.0-or-later; the rules are CC-BY-SA-4.0.</p></details>
+    <details><summary>Does it send anything from my PC?</summary><p>The program's own code sends nothing. The window version uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The command-line (CLI) version does not use WebView2. Details: <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md">PRIVACY.md</a></p></details>
+    <details><summary>Why does Windows warn when I open it?</summary><p>Releases are not code-signed yet. Always check the hash first (step 2), and do not turn SmartScreen off for the whole PC.</p></details>
+    <details><summary>Does it need administrator rights?</summary><p>No. It scans without them, but some checks then read "not measured", and the report says how many.</p></details>
+    <details><summary>Does it catch every cheat?</summary><p>No. It shows the traces left on the PC. Cheats on a second PC (DMA) and menus hidden from screen capture are out of its sight.</p></details>
+    <details><summary>Can it tell me a PC is clean?</summary><p>No, and it never will. Finding nothing does not mean there is nothing.</p></details>
+    <details><summary>Which Windows does it run on?</summary><p>64-bit Windows (x64). The measurements recorded in the project were made on Windows 11.</p></details>
+    <details><summary>I found a way around a check. Where do I report it?</summary><p>Privately, as <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/SECURITY.md">SECURITY.md</a> describes. Please do not post it publicly.</p></details>
+    <p>More questions: <a href="https://github.com/aeterna/aeterna-rongroi/discussions">GitHub Discussions</a></p>
+  </section>
+</main>
+
+<footer>
+  <div class="ruler" aria-hidden="true"></div>
+  <div class="wrap">
+    <p><em>rongroi</em> (ร่องรอย) is Thai for "traces" · Code GPL-3.0-or-later · Rules CC-BY-SA-4.0 · Anuphan and Mali typefaces (OFL-1.1)</p>
+    <p>This page has no tracker, no cookie, and loads nothing from another site.</p>
+    <p><a href="https://github.com/aeterna/aeterna-rongroi">GitHub</a> · <a href="https://github.com/aeterna/aeterna-rongroi/releases">Releases</a> · <a href="https://github.com/aeterna/aeterna-rongroi/discussions">Discussions</a> · <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md">Privacy</a></p>
+  </div>
+</footer>
+</body>
+</html>
