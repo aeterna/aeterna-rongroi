@@ -906,10 +906,16 @@ details summary {
 }
 
 .consent .actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 280px));
   position: sticky;
   bottom: 0;
   padding: 16px 0 18px;
   background: linear-gradient(transparent, var(--ground) 35%);
+}
+
+.consent .actions button {
+  min-width: 0;
 }
 
 footer {
