@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-02
+
 ### Added
 - The **session statement** (ADR 0062, as amended on 2026-10-02): for each FiveM edition, its last session
   beside its own folders, in both modes, above the timeline, in the CLI and the desktop, English and Thai.
@@ -57,23 +59,20 @@ and the project uses [Semantic Versioning](https://semver.org/).
   (ADR 0062 owner decision 9 of 2026-10-01). `docs/architecture.md`, both screenshare guides ("what not to
   conclude") and the glossary (**session**, **session statement**) follow; ADR 0062 records "As built" and
   the owner decisions taken while building it, and ADR 0061 its amendment.
-- ADR 0062 (accepted 2026-10-01, implemented by the entries above): FiveM's own folders beside its last session. A second
-  kind of cross-source statement, one per edition, will put each of FiveM's log, cache and resource-cache
-  places beside the session it belongs to — its start from a running FiveM process or Prefetch, its end from
+- ADR 0062 (accepted 2026-10-01, implemented by the entries above): FiveM's own folders beside its last session.
+  A second kind of cross-source statement, one per edition, puts FiveM's log, cache and resource-cache index
+  places beside the session they belong to — its start from a running FiveM process or Prefetch, its end from
   BAM — never beside the scan's own time, with the ordinary causes always printed and a record that was not
-  read stated as "not known". It needs a process start time (`GetProcessTimes`), an edition word derived
-  inside `process` and `bam` (and `prefetch` once measured) without emitting a path, and Legacy's resource
-  cache index times. The ADR records a read-only measurement of one Legacy and one Enhanced session on a
-  Windows 11 PC, what is not measured, and the nine decisions the owner took; the further sessions it lists
-  are measured before any code.
-- ADR 0062 amendment (accepted 2026-10-02): the further sessions were measured — nine over two days on the
-  same PC. FiveM writes its folders when something happens, not on a clock: standing still in game left
-  Legacy's logs 3.7 minutes and Enhanced's game logs 69 minutes older than the session's end, while every
-  source was written at or after the session's start. The amendment proposes comparing every source with the
-  start only, keeping one end comparison (Enhanced's launcher log, written at every quit measured), treating
-  Legacy's resource cache index as a launch source and Enhanced's game logs as a game-start source, and giving
-  `prefetch` the edition word, now that each edition's `FiveM.exe` was measured to have its own Prefetch file
-  naming its program folder. The owner accepted all seven recommendations; the code may now be opened.
+  read stated as "not known". The ADR records a read-only measurement on a Windows 11 PC and the owner's
+  decisions.
+- ADR 0062 amendment (accepted 2026-10-02): nine further sessions over two days on the same PC showed that
+  FiveM writes its folders when something happens, not on a clock — standing still in game left Legacy's logs
+  3.7 minutes and Enhanced's game logs 69 minutes older than the session's end, while every source was written
+  at or after the session's start. Every source is therefore compared with the start only, and `prefetch`
+  gained the edition word. Decisions taken while building it (ADR 0062 "As built"): Enhanced's logs are one
+  source, the whole folder, with one end comparison on its latest write; Enhanced's per-server cache is not
+  compared, because a server folder's own times do not move when its files are rewritten; process start times
+  are not timeline times.
 
 ## [0.5.0] - 2026-10-01
 
