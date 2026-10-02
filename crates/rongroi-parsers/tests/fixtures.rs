@@ -13,10 +13,17 @@
 
 use std::path::{Path, PathBuf};
 
-use rongroi_parsers::{bam, evtx, filetime, pca, task, usn};
+use rongroi_parsers::{bam, evtx, filetime, pca, prefetch, task, usn};
 
 /// The directories that are both an L0 fixture set and a fuzz seed corpus.
-const SEEDED_DIRECTORIES: [&str; 5] = ["bam", "pca-app-launch", "pca-general", "task", "usn"];
+const SEEDED_DIRECTORIES: [&str; 6] = [
+    "bam",
+    "pca-app-launch",
+    "pca-general",
+    "prefetch",
+    "task",
+    "usn",
+];
 
 /// `fuzz_prefetch`'s seed corpus, which is the one that does not live under `fixtures/parsers/`:
 /// those files are vendored from a third-party corpus under its own licence and `REUSE.toml`
@@ -266,6 +273,49 @@ fn the_task_fixtures_hold_what_their_names_say() {
         (com.enabled, com.exec_commands.len(), com.com_handlers),
         (Some(false), 0, 1)
     );
+}
+
+/// The synthetic Prefetch files are uncompressed version 31 — the version Windows 11 writes, which the
+/// vendored corpus in `fixtures/prefetch/` has no file of — and each holds the executable's own entry
+/// in its string table where its name says (ADR 0062).
+#[test]
+fn the_synthetic_prefetch_fixtures_hold_what_their_names_say() {
+    let mut seen = 0;
+    for (name, bytes) in fixtures_in("prefetch") {
+        let record = prefetch::parse(&bytes);
+        assert!(record.is_ok(), "{name}: {record:?}");
+        let Ok(record) = record else { continue };
+        assert_eq!(record.scca_version, 31, "{name}");
+        assert!(
+            !bytes.starts_with(b"MAM"),
+            "{name} is meant to be uncompressed"
+        );
+        assert!(
+            name.contains(&record.executable),
+            "{name}: {}",
+            record.executable
+        );
+        let own: Vec<&String> = record
+            .loaded_files
+            .iter()
+            .filter(|entry| entry.ends_with(&format!(r"\{}", record.executable)))
+            .collect();
+        assert_eq!(own.len(), 1, "{name}: {:?}", record.loaded_files);
+        let below = if name.ends_with("-legacy.pf") {
+            r"\APPDATA\LOCAL\FIVEM\FIVEM.APP\"
+        } else if name.ends_with("-enhanced.pf") {
+            r"\APPDATA\LOCAL\FIVEM FOR GTAV ENHANCED\"
+        } else {
+            r"\PROGRAM FILES\"
+        };
+        assert!(own[0].contains(below), "{name}: {}", own[0]);
+        assert!(
+            !record.last_runs.is_empty() && record.run_count > 0,
+            "{name}"
+        );
+        seen += 1;
+    }
+    assert_eq!(seen, 3);
 }
 
 /// `fuzz_filetime` seeds from the BAM directory, because a BAM value's first eight bytes are exactly

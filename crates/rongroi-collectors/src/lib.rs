@@ -12,6 +12,7 @@ pub mod driver_service;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
+pub mod fivem_edition;
 pub mod fivem_servers;
 pub mod install_marker;
 pub mod net_config;

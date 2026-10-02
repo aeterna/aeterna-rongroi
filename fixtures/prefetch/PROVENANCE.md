@@ -78,7 +78,9 @@ as content a collector must redact through `rongroi_core::view` before it reache
 **There is no Windows 11 (SCCA v31) file in it**, so v31 — a version this parser accepts — is not
 exercised by any fixture. The corpus predates Windows 11. When a v31 file can be obtained from a
 machine whose owner can consent, it still may not be committed here unless it is free of user profile
-paths; the alternative is a synthetic payload built in a test.
+paths; the alternative is a synthetic payload built in a test. Three synthetic, **uncompressed** v31
+payloads now sit in `fixtures/parsers/prefetch/` (ADR 0062): they exercise the v31 layout and a string
+table, and no v31 decompression.
 
 Adding a fixture generated from a real Windows install means recording here, as
 `fixtures/hosts/PROVENANCE.md` requires: the generator, the Windows build, that networking was

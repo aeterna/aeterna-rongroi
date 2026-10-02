@@ -30,6 +30,10 @@
 //!   to spell paths in the `\Device\HarddiskVolumeN\…` form — unverified, see ADR 0023 — and such a
 //!   path carries `\Users\<account>\` with no drive letter in front of it, so it would reach an SS
 //!   viewer unredacted while the code around it says paths are redacted.
+//! - **Which of `FiveM`'s editions a path is below is emitted, and the path is not.** `fivem_edition`
+//!   (`legacy` or `enhanced`) is read from the value name in whatever form BAM spelled it, device path
+//!   included, by `crate::fivem_edition`; it is one word, and it is omitted for a path below neither of
+//!   `FiveM`'s program folders (ADR 0062).
 //! - **The undecoded tail of a value is never emitted**, under any name. `rongroi_parsers::bam`
 //!   keeps bytes 12.. verbatim and gives them no meaning; naming them here would put a guess into
 //!   evidence a server admin is asked to trust (ADR 0013). How many bytes the value held is
@@ -45,7 +49,7 @@ use rongroi_parsers::error::ParseError;
 
 use crate::failure::{read_failure, reason_for};
 use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
-use crate::{Age, AgeCount, AgeRows, Collector, Field};
+use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition};
 
 /// The key holding one subkey per user account that BAM has recorded anything for.
 pub const USER_SETTINGS_KEY: &str =
@@ -93,8 +97,9 @@ const REASONS: [UnmeasuredReason; 7] = [
 ///
 /// A key it could not enumerate is a gap in all of them. One value it could not read or decode is
 /// not: see the comment on [`Bam::collect`].
-const FIELDS: [Field; 14] = [
+const FIELDS: [Field; 15] = [
     Field::number("entries"),
+    Field::text(fivem_edition::FIELD),
     Field::boolean("intact"),
     Field::timestamp("last_run"),
     Field::number("metadata_values"),
@@ -115,7 +120,8 @@ const FIELDS: [Field; 14] = [
 /// The subset a content-level reason gaps: `source_empty` and `partial` both describe a key this
 /// collector **did** enumerate, so gapping `users`, `values`, `entries`, `rejected` or `intact` —
 /// which were measured — would claim it had not (ADR 0030).
-const RECORD_FIELDS: [&str; 6] = [
+const RECORD_FIELDS: [&str; 7] = [
+    fivem_edition::FIELD,
     "last_run",
     "moderation_state",
     "name",
@@ -333,6 +339,13 @@ fn execution(path: &str, value_bytes: usize, entry: &BamEntry) -> Observation {
         fields.insert("name".to_owned(), serde_json::Value::from(name));
     }
     insert_path(&mut fields, path);
+    // From the value name, which `insert_path` may have just withheld: one word, never the path.
+    if let Some(edition) = fivem_edition::of_path(path) {
+        fields.insert(
+            fivem_edition::FIELD.to_owned(),
+            serde_json::Value::from(edition.as_str()),
+        );
+    }
     // The instant BAM stored, as it stored it. A `FILETIME` of zero is 1601-01-01 and reaches the
     // report as that: whether it means "never ran" is a judgement for a rule, and a collector that
     // turned it into an absence would take that judgement away (ADR 0013).
@@ -585,6 +598,65 @@ mod tests {
         assert_eq!(text(records[0], "name"), Some("tool.exe"));
         assert_eq!(field(records[0], "path"), None);
         assert_eq!(text(records[0], "path_withheld"), Some(UNREDACTABLE_FORM));
+    }
+
+    /// The edition is read from the value name in either spelling, and only the word reaches the
+    /// observation: a device path stays withheld, and no segment of it — not the account, not the
+    /// folder — is emitted beside the word (ADR 0062).
+    #[test]
+    fn a_record_below_one_of_fivems_folders_says_which_edition_and_no_more() {
+        let run = Bam.collect(&fixture("bam-fivem-editions"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+
+        let mut records: Vec<(Option<&str>, Option<&str>, Option<&str>)> = executions(observations)
+            .iter()
+            .map(|record| {
+                (
+                    text(record, "name"),
+                    text(record, "fivem_edition"),
+                    text(record, "path"),
+                )
+            })
+            .collect();
+        records.sort_unstable();
+        assert_eq!(
+            records,
+            [
+                (Some("fivem.exe"), None, None),
+                (Some("fivem.exe"), Some("enhanced"), None),
+                (Some("fivem.exe"), Some("legacy"), None),
+                (
+                    Some("fivem.exe"),
+                    Some("legacy"),
+                    Some(r"C:\Users\deviceuser\AppData\Local\FiveM\FiveM.exe")
+                ),
+                (Some("fivem_b2802_gtaprocess.exe"), Some("legacy"), None),
+                (Some("notepad.exe"), None, None),
+            ]
+        );
+
+        // The withheld device paths stay withheld: no part of one is in the report.
+        let device_records: Vec<&Observation> = executions(observations)
+            .into_iter()
+            .filter(|record| record.fields.contains_key("path_withheld"))
+            .collect();
+        assert_eq!(device_records.len(), 5, "{device_records:?}");
+        let json = serde_json::to_string(&device_records)
+            .unwrap()
+            .to_uppercase();
+        for leaked in [
+            "HARDDISKVOLUME",
+            "DEVICEUSER",
+            "APPDATA",
+            "FIVEM2",
+            "ENHANCED\\",
+        ] {
+            assert!(
+                !json.contains(leaked),
+                "{leaked} reached an observation: {json}"
+            );
+        }
     }
 
     /// **Every account key measured on Windows 11 holds `Version` and `SequenceNumber`, two

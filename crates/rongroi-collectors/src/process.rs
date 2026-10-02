@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform, ProcessRecord, SourceError};
 
-use crate::{Collector, Field};
+use crate::{Collector, Field, fivem_edition};
 
 const ID: &str = "process";
 
@@ -35,8 +35,13 @@ const REASONS: [UnmeasuredReason; 3] = [
 ///
 /// The list is never a `gaps` key here: a process list that could not be read is the whole reading,
 /// so it is an `Unmeasured` run rather than a gap, and an unresolved image path omits `path` on that
-/// one process without saying anything about the rest (ADR 0010).
-const FIELDS: [Field; 2] = [Field::text("name"), Field::text("path")];
+/// one process without saying anything about the rest (ADR 0010). `fivem_edition` is omitted on the
+/// same terms, and on every process whose path is below neither of `FiveM`'s program folders (ADR 0062).
+const FIELDS: [Field; 3] = [
+    Field::text(fivem_edition::FIELD),
+    Field::text("name"),
+    Field::text("path"),
+];
 
 /// The `process` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -93,6 +98,13 @@ fn observation(process: &ProcessRecord) -> Observation {
     );
     if let Some(path) = process.path.as_ref().filter(|path| !path.is_empty()) {
         fields.insert("path".to_owned(), serde_json::Value::from(path.clone()));
+        // From the path this observation already carries, so it says nothing the path does not.
+        if let Some(edition) = fivem_edition::of_path(path) {
+            fields.insert(
+                fivem_edition::FIELD.to_owned(),
+                serde_json::Value::from(edition.as_str()),
+            );
+        }
     }
     Observation {
         collector: ID.to_owned(),
@@ -202,6 +214,43 @@ mod tests {
                 collector: "process".to_owned(),
                 reason: UnmeasuredReason::ReadFailed,
             }
+        );
+    }
+
+    /// The edition comes from the path the observation already carries: each of `FiveM`'s program
+    /// folders gives its word, and a path below neither, or no path at all, gives none (ADR 0062).
+    #[test]
+    fn a_process_below_one_of_fivems_folders_says_which_edition() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+processes:
+  - pid: 1
+    name: FiveM.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe'
+  - pid: 2
+    name: FiveM_b2802_GTAProcess.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\data\cache\subprocess\FiveM_b2802_GTAProcess.exe'
+  - pid: 3
+    name: FiveM.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM for GTAV Enhanced\FiveM.exe'
+  - pid: 4
+    name: FiveM.exe
+    path: 'C:\Users\fixtureuser\AppData\Local\FiveM2\FiveM.exe'
+  - pid: 5
+    name: FiveM.exe
+",
+            "inline",
+        )
+        .unwrap();
+        let run = Process.collect(&host);
+        let editions: Vec<Option<&str>> = measured(&run)
+            .iter()
+            .map(|observation| field(observation, "fivem_edition"))
+            .collect();
+        assert_eq!(
+            editions,
+            [Some("legacy"), Some("legacy"), Some("enhanced"), None, None]
         );
     }
 
