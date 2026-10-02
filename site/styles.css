@@ -1,38 +1,68 @@
 /* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
-/* The landing page's only stylesheet. It shares the desktop window's look (ADR 0045 §7): dark and gold,
-   Anuphan bundled beside the page, and states shown by shape — found a filled square, not found a grey
-   open circle (never green), not measured a dashed circle. Nothing is loaded from another host. */
+/* The landing page's only stylesheet. It shares the desktop window's bright sky look (ADR 0045, amendment
+   of 2026-10-02): a light blue sky with clouds, translucent white panels, rounded corners, pill buttons,
+   Mali for headings and Anuphan for text, both bundled beside the page. States are shown by shape — found a
+   filled square, not found a grey open circle (never green), not measured a dashed circle. Every text
+   colour keeps WCAG AA against its panel. Nothing is loaded from another host. */
 
 @font-face {
   font-family: "Anuphan";
   src: url("fonts/Anuphan-Variable.woff2") format("woff2");
   font-weight: 100 700;
-  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mali";
+  src: url("fonts/Mali-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mali";
+  src: url("fonts/Mali-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mali";
+  src: url("fonts/Mali-Bold.woff2") format("woff2");
+  font-weight: 700;
   font-display: swap;
 }
 
 :root {
-  color-scheme: dark;
-  --ground: #101012;
-  --surface: #17171a;
-  --raised: #1f1f23;
-  --line: #2b2b30;
-  --line-strong: #3a3a40;
-  --text: #ece8df;
-  --muted: #a8a399;
-  --gold: #c9a227;
-  --gold-soft: #c9a2271f;
-  --found: #e0a43a;
-  --found-ground: #241c10;
-  --found-line: #4a3818;
-  --not-found: #8d8a84;
-  --unmeasured: #8fa0bf;
-  --unmeasured-ground: #171b23;
-  --unmeasured-line: #34405a;
+  color-scheme: light;
+  --sky-top: #a9d8ff;
+  --sky-mid: #d6ecff;
+  --ground: #f3f9ff;
+  --surface: #ffffffe6;
+  --surface-solid: #ffffff;
+  --raised: #eef5fd;
+  --line: #d5e3f1;
+  --line-strong: #b4cbe3;
+  --text: #1d2a44;
+  --muted: #4f5d77;
+  --blue: #0869b0;
+  --blue-soft: #e3f1fc;
+  --violet: #6a4fe0;
+  --navy: #1d2a44;
+  --found: #a64b00;
+  --found-ground: #fff3e3;
+  --found-line: #f2c68f;
+  --found-mark: #e6820e;
+  --not-found: #636b7a;
+  --unmeasured: #4655b8;
+  --unmeasured-ground: #f0f2ff;
+  --unmeasured-line: #b8c0ef;
+  --display: "Mali", "Anuphan", "Leelawadee UI", system-ui, sans-serif;
   --mono: "Cascadia Mono", Consolas, ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --radius: 10px;
+  --radius: 22px;
+  --shadow: 0 14px 36px -18px #2a5d9a66;
 }
 
 * {
@@ -46,35 +76,39 @@ html {
 
 body {
   margin: 0;
-  background: var(--ground);
   color: var(--text);
   font-family: "Anuphan", "Segoe UI", "Leelawadee UI", "Noto Sans Thai", system-ui, sans-serif;
   font-size: 17px;
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
+  background: linear-gradient(180deg, var(--sky-top) 0, var(--sky-mid) 560px, var(--ground) 1100px);
+  overflow-x: hidden;
 }
 
 a {
-  color: var(--gold);
+  color: var(--blue);
   text-underline-offset: 3px;
 }
 
 a:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 3px solid #0869b066;
   outline-offset: 3px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .wrap {
-  max-width: 1040px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
-/* Header with the ruler line the desktop window has: ticks every 8px, a gold one every 40px. */
+/* Header: a floating glass bar. */
 header.top {
-  position: relative;
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+  padding: 12px 20px 0;
 }
 
 header.top .wrap {
@@ -82,81 +116,126 @@ header.top .wrap {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 64px;
+  min-height: 56px;
+  background: #ffffffbf;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  padding: 0 10px 0 22px;
+  max-width: 1040px;
 }
 
 .ruler {
-  height: 8px;
-  background:
-    linear-gradient(var(--line-strong), var(--line-strong)) bottom / 100% 1px no-repeat,
-    repeating-linear-gradient(90deg, var(--gold) 0 1px, transparent 1px 40px) bottom / 100% 8px
-    no-repeat,
-    repeating-linear-gradient(90deg, var(--line-strong) 0 1px, transparent 1px 8px) bottom / 100% 4px
-    no-repeat;
+  display: none;
 }
 
 .brand {
+  white-space: nowrap;
+  font-family: var(--display);
   font-weight: 700;
-  color: var(--gold);
   text-decoration: none;
-  font-size: 1.15rem;
-  letter-spacing: 0.01em;
+  font-size: 1.2rem;
+  color: var(--blue);
 }
 
 .brand small {
-  font-weight: 400;
+  font-family: "Anuphan", sans-serif;
+  font-weight: 500;
   color: var(--muted);
-  font-size: 0.8em;
-  margin-left: 6px;
+  font-size: 0.72em;
+  margin-left: 8px;
 }
 
 nav.lang {
   display: flex;
   gap: 4px;
+  font-family: var(--display);
   font-size: 0.95rem;
+  font-weight: 600;
 }
 
 nav.lang a {
-  color: var(--muted);
+  color: var(--navy);
   text-decoration: none;
-  padding: 4px 10px;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid transparent;
 }
 
 nav.lang a[aria-current="page"] {
-  color: var(--text);
-  border-color: var(--line-strong);
+  color: #ffffff;
+  background: var(--navy);
 }
 
-/* Hero: the claim on the left, the program's own summary on the right. */
+/* Sky stage behind the hero: clouds drawn with gradients. */
 .hero {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 48px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 44px;
   align-items: center;
-  padding: 64px 0 40px;
+  padding: 72px 0 56px;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  top: -120px;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 260px 70px at 8% 78%, #ffffffe6, transparent 70%),
+    radial-gradient(ellipse 380px 90px at 22% 88%, #ffffffcc, transparent 70%),
+    radial-gradient(ellipse 320px 80px at 78% 18%, #ffffffd9, transparent 70%),
+    radial-gradient(ellipse 460px 110px at 92% 30%, #ffffffb3, transparent 70%),
+    radial-gradient(ellipse 520px 120px at 60% 100%, #ffffffcc, transparent 70%);
+  pointer-events: none;
 }
 
 .eyebrow {
-  font-family: var(--mono);
-  font-size: 0.82rem;
-  letter-spacing: 0.12em;
-  color: var(--gold);
-  margin: 0 0 14px;
+  display: inline-block;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  color: var(--blue);
+  background: #ffffffcc;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  padding: 4px 14px;
+  margin: 0 0 18px;
 }
 
+/* The headline: rounded, with a white outline, and the key phrase in a gradient — as the reference site
+   sets its titles. */
 .hero h1 {
-  font-size: clamp(2rem, 5vw, 3.2rem);
-  line-height: 1.15;
+  font-family: var(--display);
+  font-size: clamp(2rem, 4.6vw, 3.1rem);
+  line-height: 1.22;
   margin: 0 0 18px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  color: var(--navy);
+  text-shadow:
+    0 2px 0 #ffffff,
+    0 -2px 0 #ffffff,
+    2px 0 0 #ffffff,
+    -2px 0 0 #ffffff,
+    0 10px 24px #2a5d9a40;
 }
 
 .hero h1 em {
   font-style: normal;
-  color: var(--gold);
+  white-space: nowrap;
+  background: linear-gradient(90deg, #0869b0, #6a4fe0 70%, #a33d8f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 0 #ffffff) drop-shadow(0 -2px 0 #ffffff) drop-shadow(2px 0 0 #ffffff)
+    drop-shadow(-2px 0 0 #ffffff);
 }
 
 .lead {
@@ -164,10 +243,13 @@ nav.lang a[aria-current="page"] {
   color: var(--muted);
   margin: 0 0 28px;
   max-width: 34em;
+  background: #ffffffa6;
+  border-radius: 18px;
+  padding: 14px 18px;
 }
 
 .lead strong {
-  color: var(--text);
+  color: var(--navy);
 }
 
 .buttons {
@@ -180,45 +262,51 @@ nav.lang a[aria-current="page"] {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 20px;
-  border-radius: 8px;
+  padding: 12px 24px;
+  border-radius: 999px;
   text-decoration: none;
-  font-weight: 650;
-  border: 1px solid var(--gold);
+  font-family: var(--display);
+  font-weight: 700;
+  border: 2px solid transparent;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
 }
 
 .btn.primary {
-  background: var(--gold);
-  color: #17140a;
-}
-
-.btn.primary:hover {
-  background: #d9b33a;
+  background: linear-gradient(180deg, #1f80cf, #0869b0);
+  color: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 0 10px 22px -10px #0869b0b3;
 }
 
 .btn.secondary {
-  color: var(--text);
-  border-color: var(--line-strong);
-  background: var(--surface);
+  color: var(--navy);
+  background: #ffffffd9;
+  border-color: #ffffff;
+  box-shadow: var(--shadow);
 }
 
 .btn.secondary:hover {
-  border-color: var(--gold);
+  background: #ffffff;
 }
 
 /* The report summary as the program draws it. Illustrative numbers, labelled as an example. */
 .specimen {
   margin: 0;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 20px;
+  border: 2px solid #ffffff;
+  border-radius: 28px;
+  padding: 22px;
   display: grid;
   gap: 14px;
-  box-shadow: 0 30px 60px -30px #000000cc;
+  box-shadow: 0 30px 60px -28px #2a5d9a80;
+  transform: rotate(1.2deg);
 }
 
 .specimen-head {
@@ -229,14 +317,18 @@ nav.lang a[aria-current="page"] {
 }
 
 .specimen-head strong {
-  font-size: 1.05rem;
+  font-family: var(--display);
+  font-size: 1.08rem;
 }
 
 .specimen-head span {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--muted);
-  letter-spacing: 0.08em;
+  font-family: var(--display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 999px;
+  padding: 2px 10px;
 }
 
 .tally {
@@ -246,9 +338,9 @@ nav.lang a[aria-current="page"] {
 }
 
 .tally div {
-  background: var(--ground);
+  background: var(--surface-solid);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 16px;
   padding: 10px 12px;
 }
 
@@ -256,15 +348,16 @@ nav.lang a[aria-current="page"] {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 1.7rem;
+  font-family: var(--display);
+  font-size: 1.8rem;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
-.tally span {
+.tally span:not(.mark) {
   display: block;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   line-height: 1.4;
 }
 
@@ -291,10 +384,10 @@ nav.lang a[aria-current="page"] {
   align-items: start;
   border: 1px solid var(--found-line);
   background: var(--found-ground);
-  box-shadow: inset 3px 0 0 var(--found);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 0.9rem;
+  box-shadow: inset 4px 0 0 var(--found-mark);
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 0.92rem;
 }
 
 .specimen-row .mark {
@@ -304,6 +397,7 @@ nav.lang a[aria-current="page"] {
 .specimen-row .pill {
   color: var(--found);
   border-color: var(--found-line);
+  background: var(--surface-solid);
 }
 
 .specimen-row small {
@@ -320,8 +414,8 @@ nav.lang a[aria-current="page"] {
 }
 
 .mark-found {
-  background: var(--found);
-  border-radius: 2px;
+  background: var(--found-mark);
+  border-radius: 3px;
 }
 
 .mark-not-found {
@@ -335,41 +429,48 @@ nav.lang a[aria-current="page"] {
 }
 
 .pill {
+  font-family: var(--display);
+  font-weight: 600;
   font-size: 0.78rem;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 0 8px;
+  padding: 0 10px;
   white-space: nowrap;
   color: var(--muted);
 }
 
 .note {
-  border-left: 3px solid var(--gold);
-  background: var(--gold-soft);
-  border-radius: 0 8px 8px 0;
-  padding: 12px 16px;
+  border: 1px solid #cfe5f8;
+  border-left: 5px solid var(--blue);
+  background: var(--blue-soft);
+  border-radius: 16px;
+  padding: 12px 18px;
   margin: 8px 0 24px;
 }
 
-/* Sections: a short gold rule before each heading, like a group in the report. */
+/* Sections: a rounded title with a gradient dot, like a chapter of the reference site. */
 section {
-  padding: 40px 0 8px;
+  padding: 48px 0 8px;
 }
 
 section h2 {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 1.55rem;
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 3.4vw, 2rem);
   line-height: 1.3;
-  margin: 0 0 18px;
+  margin: 0 0 22px;
+  color: var(--navy);
 }
 
 section h2::before {
   content: "";
-  width: 18px;
-  height: 2px;
-  background: var(--gold);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue), var(--violet));
+  box-shadow: 0 0 0 4px #ffffff;
   flex: none;
 }
 
@@ -377,39 +478,44 @@ section > p {
   max-width: 46em;
 }
 
-/* Three promises as a ruled ledger, numbered. */
+/* Three promises as glass cards, numbered. */
 .ledger {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--line-strong);
+  gap: 16px;
+  counter-reset: promise;
 }
 
 .ledger li {
-  padding: 18px 20px 6px 0;
   counter-increment: promise;
-}
-
-.ledger li + li {
-  padding-left: 20px;
-  border-left: 1px solid var(--line);
+  background: var(--surface);
+  border: 2px solid #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
 }
 
 .ledger li::before {
   content: "0" counter(promise);
-  display: block;
-  font-family: var(--mono);
-  color: var(--gold);
-  font-size: 0.8rem;
-  letter-spacing: 0.1em;
-  margin-bottom: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  font-family: var(--display);
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--blue), var(--violet));
+  margin-bottom: 12px;
 }
 
 .ledger h3 {
+  font-family: var(--display);
   margin: 0 0 6px;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
 }
 
 .ledger p {
@@ -421,7 +527,7 @@ section > p {
 /* The three results, each with its own mark. */
 .states {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .state {
@@ -429,10 +535,11 @@ section > p {
   grid-template-columns: 22px 9em 1fr;
   gap: 12px;
   align-items: baseline;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  border: 2px solid #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px;
   background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
 .state .mark {
@@ -440,13 +547,14 @@ section > p {
 }
 
 .state strong {
-  font-weight: 650;
+  font-family: var(--display);
+  font-weight: 700;
 }
 
 .state.found {
   border-color: var(--found-line);
   background: var(--found-ground);
-  box-shadow: inset 3px 0 0 var(--found);
+  box-shadow: inset 5px 0 0 var(--found-mark);
 }
 
 .state.found strong {
@@ -454,7 +562,8 @@ section > p {
 }
 
 .state.not-found {
-  background: transparent;
+  background: #ffffffb3;
+  box-shadow: none;
 }
 
 .state.not-found strong {
@@ -462,9 +571,9 @@ section > p {
 }
 
 .state.unmeasured {
-  border-style: dashed;
-  border-color: var(--unmeasured-line);
+  border: 2px dashed var(--unmeasured-line);
   background: var(--unmeasured-ground);
+  box-shadow: none;
 }
 
 .state.unmeasured strong {
@@ -475,11 +584,13 @@ section > p {
   color: var(--muted);
 }
 
-/* Two-column ledgers: what is checked, and what not to conclude. */
+/* Two-column tables on white panels. */
 .table-scroll {
   overflow-x: auto;
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 2px solid #ffffff;
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 table {
@@ -491,7 +602,7 @@ th,
 td {
   text-align: left;
   vertical-align: top;
-  padding: 12px 16px;
+  padding: 13px 18px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -500,16 +611,18 @@ tbody tr:last-child td {
 }
 
 thead th {
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-weight: 600;
-  background: var(--raised);
+  font-family: var(--display);
+  font-size: 0.9rem;
+  color: var(--blue);
+  font-weight: 700;
+  background: var(--blue-soft);
 }
 
 tbody td:first-child {
-  background: var(--surface);
   width: 30%;
-  font-weight: 600;
+  font-family: var(--display);
+  font-weight: 700;
+  color: var(--navy);
 }
 
 td small {
@@ -520,30 +633,29 @@ td small {
 }
 
 .new {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  color: var(--ground);
-  background: var(--gold);
-  border-radius: 4px;
-  padding: 1px 6px;
-  margin-left: 6px;
+  font-family: var(--display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: #a64b00;
+  border-radius: 999px;
+  padding: 1px 9px;
+  margin-left: 8px;
   vertical-align: 2px;
 }
 
-/* Steps along a trace line. */
+/* Steps along a dotted path. */
 ol.steps {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0;
   counter-reset: step;
 }
 
 ol.steps li {
   position: relative;
-  padding: 0 0 22px 56px;
+  padding: 0 0 24px 64px;
   counter-increment: step;
 }
 
@@ -552,25 +664,28 @@ ol.steps li::before {
   position: absolute;
   left: 0;
   top: 0;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--gold);
+  width: 44px;
+  height: 44px;
+  border: 3px solid #ffffff;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: var(--gold);
+  color: #ffffff;
+  font-family: var(--display);
   font-weight: 700;
-  background: var(--ground);
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, var(--blue), var(--violet));
+  box-shadow: var(--shadow);
 }
 
 ol.steps li::after {
   content: "";
   position: absolute;
-  left: 18px;
-  top: 38px;
-  bottom: 2px;
-  width: 1px;
-  background: repeating-linear-gradient(var(--line-strong) 0 4px, transparent 4px 8px);
+  left: 21px;
+  top: 48px;
+  bottom: 4px;
+  width: 3px;
+  background: radial-gradient(circle, #9cc6ea 1.5px, transparent 2px) center top / 3px 9px repeat-y;
 }
 
 ol.steps li:last-child::after {
@@ -579,41 +694,45 @@ ol.steps li:last-child::after {
 
 ol.steps strong {
   display: block;
-  font-size: 1.05rem;
-  padding-top: 4px;
+  font-family: var(--display);
+  font-size: 1.1rem;
+  padding-top: 6px;
+  color: var(--navy);
 }
 
 code {
   font-family: var(--mono);
   font-size: 0.86em;
-  background: var(--raised);
+  background: var(--surface-solid);
   border: 1px solid var(--line);
-  padding: 1px 6px;
-  border-radius: 4px;
+  padding: 1px 7px;
+  border-radius: 8px;
   overflow-wrap: anywhere;
 }
 
 .blind {
-  border: 1px dashed var(--unmeasured-line);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  border: 2px dashed var(--unmeasured-line);
+  border-radius: 18px;
+  padding: 14px 18px;
   margin-top: 16px;
   background: var(--unmeasured-ground);
 }
 
-/* Questions. */
+/* Questions: white panels that open. */
 details {
-  border-bottom: 1px solid var(--line);
-  padding: 14px 0;
-}
-
-details:first-of-type {
-  border-top: 1px solid var(--line);
+  background: var(--surface);
+  border: 2px solid #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 8px 20px -14px #2a5d9a59;
+  padding: 14px 20px;
+  margin-bottom: 10px;
 }
 
 summary {
   cursor: pointer;
-  font-weight: 600;
+  font-family: var(--display);
+  font-weight: 700;
+  color: var(--navy);
   list-style: none;
   display: flex;
   justify-content: space-between;
@@ -626,9 +745,15 @@ summary::-webkit-details-marker {
 
 summary::after {
   content: "+";
-  color: var(--gold);
-  font-weight: 400;
-  font-size: 1.3em;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 1.1em;
   line-height: 1;
 }
 
@@ -637,40 +762,63 @@ details[open] summary::after {
 }
 
 details p {
-  margin: 10px 0 0;
+  margin: 10px 0 2px;
   color: var(--muted);
   max-width: 46em;
 }
 
 footer {
-  margin-top: 48px;
-  padding: 28px 0 48px;
-  color: var(--muted);
+  margin-top: 64px;
+  padding: 32px 0 48px;
+  color: #d8e2f2;
   font-size: 0.92rem;
+  background: var(--navy);
+}
+
+footer a {
+  color: #9fd2ff;
 }
 
 footer p {
   margin: 4px 0;
 }
 
-/* One entrance for the hero, staggered; nothing else moves. */
+/* One entrance for the hero, staggered, and a slow float on the sample; nothing else moves. */
 @media (prefers-reduced-motion: no-preference) {
   .hero > * {
-    animation: rise 500ms ease-out both;
+    animation: rise 520ms ease-out both;
   }
 
-  .hero > :nth-child(2) {
-    animation-delay: 120ms;
+  .hero > .specimen {
+    animation:
+      rise-tilted 520ms ease-out 120ms both,
+      float 6s ease-in-out 700ms infinite;
   }
 
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(12px);
+    }
+  }
+
+  @keyframes rise-tilted {
+    from {
+      opacity: 0;
+      transform: translateY(12px) rotate(1.2deg);
     }
     to {
-      opacity: 1;
-      transform: none;
+      transform: rotate(1.2deg);
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: rotate(1.2deg);
+    }
+    50% {
+      transform: translateY(-6px) rotate(1.2deg);
     }
   }
 }
@@ -679,18 +827,11 @@ footer p {
   .hero {
     grid-template-columns: 1fr;
     gap: 32px;
-    padding-top: 40px;
+    padding-top: 48px;
   }
 
   .ledger {
     grid-template-columns: 1fr;
-  }
-
-  .ledger li,
-  .ledger li + li {
-    padding: 16px 0 8px;
-    border-left: 0;
-    border-bottom: 1px solid var(--line);
   }
 
   .state {
@@ -707,6 +848,18 @@ footer p {
 }
 
 @media (max-width: 420px) {
+  .brand small {
+    display: none;
+  }
+
+  header.top {
+    padding: 10px 12px 0;
+  }
+
+  header.top .wrap {
+    padding: 0 6px 0 16px;
+  }
+
   .tally b {
     font-size: 1.35rem;
   }
@@ -714,5 +867,9 @@ footer p {
   th,
   td {
     padding: 10px 12px;
+  }
+
+  ol.steps li {
+    padding-left: 56px;
   }
 }
