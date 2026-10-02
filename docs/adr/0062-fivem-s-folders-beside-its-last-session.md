@@ -2,8 +2,9 @@
 
 - Status: accepted — the owner decided the nine questions below on 2026-10-01
 - Date: 2026-10-01
-- Amended: 2026-10-02, proposed: the sessions listed under "Before any code" were measured ("Amendment
-  (2026-10-02, proposed): the measured sessions, and what they change"); seven questions for the owner
+- Amended: 2026-10-02, accepted: the sessions listed under "Before any code" were measured ("Amendment
+  (2026-10-02, accepted): the measured sessions, and what they change"); the owner decided its seven
+  questions on 2026-10-02, and they amend owner decisions 3, 4 and 7
 
 ## Context
 
@@ -403,7 +404,7 @@ ages and counts only:
 The results are recorded in this ADR, as an amendment, before the change that builds it is opened. The margin
 (section 3) is confirmed or changed from what they show, and any decision they contradict goes back to the owner.
 
-## Amendment (2026-10-02, proposed): the measured sessions, and what they change
+## Amendment (2026-10-02, accepted): the measured sessions, and what they change
 
 The measurements listed under "Before any code" were taken on 2026-10-01 and 2026-10-02, on the same PC, with
 the same kind of read-only probe: elevated, printing counts, sizes, ages and masked name shapes only, its
@@ -412,9 +413,11 @@ under the limited token, and the executable's own entry in the string table of F
 which they printed only which of the two program folders it was below. Every file the probes put on the PC
 was removed after each run.
 
-This amendment records what they showed, and proposes the changes that follow. One of them reverses part of
-owner decision 4, so it goes back to the owner with the others (the questions at the end). Until the owner
-decides, the decisions above stand and no code is opened.
+This amendment records what they showed, and the changes that follow. One of them reverses part of owner
+decision 4, so it went back to the owner with the others. The owner accepted all seven on 2026-10-02
+("Owner decisions (2026-10-02)" at the end); where they differ from the decisions of 2026-10-01, they
+prevail. With them the precondition under "Before any code" is met, and the change that builds this ADR may
+be opened.
 
 ### The sessions
 
@@ -504,7 +507,7 @@ one PC.
 **Smaller points.** Legacy's log folder held 2 files after the first launch, then 3, 4, 5 and 6 over the next four: no
 further log was removed. Playing one edition again touched none of the other edition's sources.
 
-### The changes proposed
+### The changes
 
 1. **Compare every source with the session's start only** (amends section 3 and owner decision 4). A source is
    "before the start" when its time is earlier than the start by more than the margin; otherwise it is "after
@@ -571,6 +574,21 @@ a session ended by Task Manager or a crash.
 6. `prefetch` gains `fivem_edition` (change 6)? *Recommended: yes*; owner decision 3 already provided for it.
 7. Leave `data\cache\servers` and `userdata` for a separate ADR 0053 amendment (change 7)? *Recommended: yes*,
    to keep the first change to the collectors and the view this ADR already names.
+
+### Owner decisions (2026-10-02)
+
+The owner accepted the seven recommendations above:
+
+1. Every source is compared with the session's start only; "before the end" is dropped (amends owner decision 4).
+2. One end comparison is kept: Enhanced's launcher log, with its own cause for a session ended by Task Manager,
+   a crash or a shutdown.
+3. The margin stays ten minutes, now against the start (amends owner decision 4).
+4. Legacy's resource cache index is a launch source, compared with the start without the join causes.
+5. Enhanced's game and browser logs are a game-start source, with their own line form and first cause.
+6. `prefetch` gains `fivem_edition` from the executable's own entry in the string table (owner decision 3's
+   condition, measured).
+7. `data\cache\servers` and `userdata` are not read in this change; they are left for a separate amendment of
+   ADR 0053 (amends owner decision 7).
 
 ## Owner decisions (2026-10-01)
 
