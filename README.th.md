@@ -46,13 +46,13 @@ Read in English: [README.md](README.md)
 
 ## ตรวจว่าไฟล์ที่โหลดมาเป็นของจริง
 
-ตอนนี้ release ยังไม่ได้เซ็นโค้ด Windows SmartScreen จะขึ้นเตือนตอนเปิด ให้เปิด PowerShell ในโฟลเดอร์ที่โหลดมา:
+ตอนนี้ release ยังไม่ได้เซ็นโค้ด Windows SmartScreen จะขึ้นเตือนตอนเปิด ให้เปิด Command Prompt (`cmd`) ในโฟลเดอร์ที่โหลดมา แล้วรันโดยใส่ชื่อไฟล์เต็ม:
 
-```powershell
-Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
+```bat
+certutil -hashfile aeterna-rongroi-0.7.0-windows-x64.exe SHA256
 ```
 
-คำสั่งนี้แสดง hash ของไฟล์ aeterna-rongroi ทุกไฟล์ในโฟลเดอร์ ให้เทียบแต่ละค่ากับบรรทัดที่มีชื่อไฟล์เดียวกันใน `SHA256SUMS` ในหน้า release บน GitHub (ตัวพิมพ์เล็กหรือใหญ่ไม่มีผล) ไฟล์ของเวอร์ชันเก่าที่อยู่ในโฟลเดอร์เดียวกันจะไม่มีในรายการนั้น · build ที่ไม่ได้มาจากระบบ release ทางการ
+`dir /b aeterna-rongroi-*-windows-x64.exe` แสดงชื่อไฟล์ `certutil` รับทีละไฟล์ ให้เทียบค่ากับบรรทัดที่มีชื่อไฟล์เดียวกันใน `SHA256SUMS` ในหน้า release บน GitHub (ตัวพิมพ์เล็กหรือใหญ่ไม่มีผล) ระหว่าง SS ให้ใช้ Command Prompt แทน PowerShell เพราะ PowerShell เก็บบันทึกของตัวเองไว้บนเครื่อง และคำสั่งที่พิมพ์ลงไปจะเพิ่มเวลาของคอลเข้าไปในบันทึกนั้น ([คู่มือ SS ข้อ 2](docs/screenshare-guide.th.md#2-โหลดไฟล์ตัวจริง)) · build ที่ไม่ได้มาจากระบบ release ทางการ
 จะขึ้นป้าย **UNOFFICIAL BUILD** ในหน้าต่าง ในหัว CLI และในทุกรายงาน ถ้าเห็นป้ายนี้หรือ hash ไม่ตรง
 อย่าเชื่อผลตรวจนั้น
 

@@ -119,7 +119,7 @@
     <h2>SS ผู้เล่นใน 5 ขั้น</h2>
     <ol class="steps">
       <li><strong>ให้ผู้เล่นโหลดเอง</strong>จาก<a href="https://github.com/aeterna/aeterna-rongroi/releases">หน้า Releases</a> ส่งลิงก์ให้ อย่าส่งไฟล์ให้เอง</li>
-      <li><strong>เช็คว่าเป็นไฟล์ของจริง</strong>เปิด PowerShell ในโฟลเดอร์ที่โหลดมา แล้วรัน <code>Get-FileHash .\aeterna-rongroi-*-windows-x64.exe</code> เทียบกับไฟล์ <code>SHA256SUMS</code> ในหน้า release ถ้าไม่ตรงให้หยุด</li>
+      <li><strong>เช็คว่าเป็นไฟล์ของจริง</strong>เปิด Command Prompt (<code>cmd</code>) ในโฟลเดอร์ที่โหลดมา แล้วรัน <code>certutil -hashfile &lt;ชื่อไฟล์&gt; SHA256</code> เทียบกับไฟล์ <code>SHA256SUMS</code> ในหน้า release ถ้าไม่ตรงให้หยุด</li>
       <li><strong>เปิดโหมด SS</strong>กด "ตรวจระหว่างแชร์หน้าจอ (โหมด SS)" แล้วผู้เล่นเป็นคนกดยินยอมเอง ผู้เล่นปฏิเสธได้ และถ้าปฏิเสธ โปรแกรมจะไม่อ่านอะไรเลย</li>
       <li><strong>ดูหัวรายงาน</strong>ต้องขึ้นว่า build ทางการ ถ้าขึ้น UNOFFICIAL BUILD ผลใช้ไม่ได้</li>
       <li><strong>อ่านผลทีละแถว</strong>และอ่านเรื่องปกติที่ทำให้เกิดผลแบบเดียวกันด้วย</li>
