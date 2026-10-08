@@ -1,7 +1,8 @@
 # ADR 0064 — Which kinds of words PowerShell's commands held, never the commands
 
 - Status: accepted — the owner decided the seven questions below on 2026-10-08, each as recommended;
-  "Before any code" items 1 and 3 measured on 2026-10-08 ("Measured before code"), item 2 (a runner) open
+  "Before any code" measured on 2026-10-08 ("Measured before code"): items 1 and 3 on the development PC,
+  item 2 on a GitHub-hosted runner
 - Date: 2026-10-08
 
 ## Context
@@ -192,6 +193,34 @@ What it changes:
   through `Get-WinEvent`, which renders every message; the collector reads the `.evtx` file the `evtx`
   collector already parses, so these are an upper bound for the logs, not the budget. The budget is set
   after the parser exists.
+
+### On a GitHub-hosted runner (2026-10-08)
+
+Item 2: the same probe, from a throwaway branch deleted afterwards, workflow run
+[`37764960415`](https://github.com/aeterna/aeterna-rongroi/actions/runs/37764960415), image `win25-vs2026`
+`20260925.250.1`, Windows Server 2025 build 26100, the runner's own token. PSReadLine 2.0.0. The run itself
+started Windows PowerShell once, which is counted.
+
+| Source | Examined | Any kind | By kind |
+|---|---|---|---|
+| history | **no file** — nobody types into a runner | — | — |
+| 4104 level 3 (log 1 006 records, 15 MiB) | 464 records (369 parts of longer blocks) | 73 | `native_interop` 55 · `remote_download` 16 (2 distinct host names, 13 of 16 with a URL) · `invoke_expression` 1 · `execution_policy_bypass` 1 · **`download_then_execute` 0** |
+| 400 (log 3 882 records) | 388 starts | 375 | **`encoded_command` 290** (580 of 580 decoded) · `execution_policy_bypass` 87 |
+
+What it adds to the PC's reading:
+
+- **Flagged blocks that download, and blocks that declare native calls, are ordinary on a machine that
+  installs software by script** — the image's own provisioning. Neither kind gets a rule (section 5 already
+  gives `native_interop` none); `remote_download` alone gets none either.
+- **`download_then_execute` was 0 in every log of both machines**, and 3 in the PC's history, all from
+  installing software. It is the only kind with a rule on a log source; the runner gives it a baseline that
+  confronts it without firing.
+- **`encoded_command` is most of the runner's starts** (75 %) — Actions encodes its steps. It stays context.
+- **The runner has `PowerShellCore/Operational`** (480 records): PowerShell 7 installed by the image's
+  installer registers its provider. That answers half of ADR 0063's "Whether an MSI install of PowerShell 7
+  registers its provider" for one image; the PC's MSIX package did not.
+- The baseline host this collector needs is built from this run's counts, with its PROVENANCE row, in the
+  change that adds the collector. No text from the runner is in it: the probe printed none.
 
 ## Alternatives weighed
 

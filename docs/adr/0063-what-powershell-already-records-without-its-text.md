@@ -177,7 +177,9 @@ The selector reads fields `evtx` declares. `usn` gains one place and no field. N
 - **Which words Windows PowerShell 5.1 flags.** Measured for six cases; the list is PowerShell 7's.
   `FromBase64String` inside an encoded command was not flagged in the one sample, although it is on
   PowerShell 7's list.
-- **Whether an MSI install of PowerShell 7 registers its provider.**
+- **Whether an MSI install of PowerShell 7 registers its provider.** Partly answered on 2026-10-08 (ADR 0064,
+  runner): a GitHub-hosted runner image, which installs PowerShell 7 with its installer, has
+  `PowerShellCore/Operational` with 480 records. A player's MSI install is still not measured.
 - **What the change journal records when the history file is cleared or replaced on a PC.** Inferred from
   PSReadLine's source and from what the journal records for any deletion; not observed on that file.
 - **Whether a script the loader fetched over the network is flagged as one fetched from a file.** The

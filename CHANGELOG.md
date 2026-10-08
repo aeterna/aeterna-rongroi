@@ -22,7 +22,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   that classifies PowerShell's history, its flagged script blocks and its start command lines into a fixed list of
   kinds and keeps no text but a download host behind its own question. It asks the owner first whether this
   project reads what a person typed at all, which three standing texts forbid today; the owner answered yes, under
-  its conditions. Counts of each kind on the development PC are recorded; a runner baseline is still open.
+  its conditions. Counts of each kind are recorded on the development PC and on a GitHub-hosted runner (run
+  37764960415), whose PowerShell 7 log exists, unlike the PC's MSIX install.
 - ADR 0063 accepted: what PowerShell already records, without reading what it says — a timeline selector for the
   script blocks PowerShell itself flags (event 4104, level 3) and a sixth folder for the change journal, the one
   PowerShell keeps its command history in, with two `context` rules; nothing for PowerShell 7 or event 400 yet.
