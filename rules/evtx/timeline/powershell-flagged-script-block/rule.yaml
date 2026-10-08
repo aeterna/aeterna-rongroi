@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 5bd03528-fcfe-4e57-8a7f-3a2ec815a7af
+title: When PowerShell recorded a script block it considers suspicious
+description: >-
+  Puts on the timeline the first and last time Windows PowerShell's operational log still holds a script
+  block that PowerShell itself flagged as suspicious. PowerShell does this even when script block logging
+  is not switched on, for any script containing one of a fixed list of words — among them the ones a
+  script uses to call into Windows, read or write another program's memory, or decode text — and
+  ordinary scripts contain them too. This tool does not read the block, so a time here does not say what
+  the script was, who ran it, or whether it did anything. It is not evidence about the person.
+# A timeline selector (ADR 0051, ADR 0063). Not a rule: the one PC measured held 369 of these in the
+# 1.29 days its full log reached back, and a Windows Forms dialog is flagged (ADR 0063 §1).
+status: experimental
+role: timeline
+collector: evtx
+strength: context
+# The provider, channel and event id together, and the level that marks "suspicious" (ADR 0031, ADR 0063).
+match:
+  provider: Microsoft-Windows-PowerShell
+  channel: Microsoft-Windows-PowerShell/Operational
+  event_id: 4104
+  level: 3
+retention: >-
+  Only the blocks the log still holds. It keeps 15 MiB by default and overwrites its oldest records when it
+  is full; on one Windows 11 PC that was about a day and a half. A cleared log holds none.
+falsepositives:
+  - Scripts that show a window or a dialog, install software, or manage Windows, which use the same words
+  - Administration, development and game tools that run PowerShell in the background
+  - A script that only contains one of the words as text, such as Bypass
+  - No time here does not mean no script ran. PowerShell records nothing this way when a policy turns
+    script block logging off, and PowerShell 7 records it in another log, which on one PC measured did not
+    exist; scripts run before the log's oldest record are not seen
+references:
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows
+  - https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/runtime/CompiledScriptBlock.cs
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [evtx, timeline, powershell]

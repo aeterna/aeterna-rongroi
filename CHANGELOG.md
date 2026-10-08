@@ -5,6 +5,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **PowerShell, without reading what it says** (ADR 0063):
+  - a timeline selector puts on the timeline the first and last time Windows PowerShell's operational log holds a
+    script block PowerShell itself flagged as suspicious (event 4104, level 3) — never the script's text. Not a rule:
+    the one PC measured held 369 such blocks in a day and a half, and a Windows Forms dialog is flagged;
+  - the change journal counts a sixth folder, `psreadline` (`%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine`,
+    where PowerShell keeps the history of commands typed into its window), the first that no other collector reads
+    (ADR 0047, amendment for ADR 0063); two `context`, `experimental` rules read its deletions and renames, since
+    PowerShell itself never deletes or renames the file. The folder's times join the journal's timeline selector;
+  - consent text (CLI and desktop, both languages), PRIVACY.md, both screenshare guides and `docs/architecture.md`
+    name them; three `rules/unconfronted.csv` rows, because no baseline carries a PowerShell log or the folder.
+
 ### Changed
 - ADR 0063 accepted: what PowerShell already records, without reading what it says — a timeline selector for the
   script blocks PowerShell itself flags (event 4104, level 3) and a sixth folder for the change journal, the one
@@ -15,7 +27,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Command Prompt, and the "downloaded from the internet" mark is removed from the file's Properties instead of with
   `Unblock-File`. PowerShell keeps its own records on the PC and Windows records when it last ran, so a check typed
   into it during a screenshare puts the call's own time over what was there. `certutil`'s output and `.\` in
-  Command Prompt were checked on a Windows 11 PC (build 26220); the CLI itself was not re-run from Command Prompt.
+  Command Prompt were checked on a Windows 11 PC (build 26220), and the 0.7.0 CLI was run from Command Prompt
+  there: hash, version, SS scan in Thai and `--json > report.json` (UTF-8, the consent question on standard error).
 - Screenshare guides: a section on comparing the report with what a server recorded — one clock (the report is
   UTC), a row near a server's flag is a question and not proof, whether the session statement fits the time the
   player connected, and which rows to read first for what a server saw. The program still reads nothing from a

@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 55
+      "rule_count": 58
     },
     "platform": "windows",
     "os_build": "26100",
@@ -413,6 +413,22 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "926b3863-8f4f-4d18-aab6-26b77934466e",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "8a39617a-30d6-4fc0-9b20-cb4f899985d5",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
     }
   ],
   "own_traces": [],
@@ -516,7 +532,7 @@ expression: view
   "listed": {
     "found": 0,
     "not_found": 8,
-    "unmeasured": 36
+    "unmeasured": 38
   },
   "hidden": {
     "not_found": 0,

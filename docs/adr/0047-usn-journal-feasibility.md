@@ -9,6 +9,8 @@
 - Amended: 2026-09-30, by ADR 0061 (owner decision 6): the journal observation gains
   `journal_created_on` ("Amendment for ADR 0061: `journal_created_on`"); "Not `UsnJournalID`" still holds
   for the identifier itself
+- Amended: 2026-10-08, accepted with ADR 0063: a sixth watched folder, PSReadLine's history folder — the
+  first one no other collector reads ("Amendment for ADR 0063")
 
 ## Context
 
@@ -816,3 +818,22 @@ ADR 0061's owner decision 6 amends this ADR's "Not `UsnJournalID`" in the change
   the anchor is `not_admin`.
 - **What still holds.** No identifier, USN or file reference number is reported, and no rule reads
   `journal_created_on`: it is context for the trace-ages section's anchors (ADR 0061).
+
+## Amendment for ADR 0063: a folder no other collector reads (2026-10-08, accepted with ADR 0063)
+
+The table under "Folders this program already reads, by reference number" chose the watched folders as the
+ones other collectors read. ADR 0063 adds a sixth that none reads: `%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine`,
+`location: psreadline`, where PowerShell's line editor keeps the history of commands typed into its window.
+
+| Folder | Read today by |
+|---|---|
+| `%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine` | no collector — counted by `usn` alone (ADR 0063) |
+
+What does not change: the counts, the fields, the attribution by identifier and its limits, and what is
+reported — counts and the first and last time, never a name. What changes is the scope sentence above: the
+journal is no longer counted only for places the report already describes. ADR 0063 section 2 gives the
+reason (a deletion there is not something PowerShell does itself) and owner decision 2 accepted the
+departure. Its two rules are `context` and `experimental`, as the plugin folders' are, and the existing
+timeline selector on `folder: identified` now also puts this folder's times on the timeline, which the
+consent text, PRIVACY.md and the selector's own text say.
+

@@ -1,0 +1,32 @@
+{
+  "description": "Synthetic: the history folder with appends and one deletion and no rename.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "journal",
+        "records": 376781,
+        "records_version_2": 0,
+        "records_version_3": 376781,
+        "trimmed": true,
+        "maximum_size": 33554432,
+        "first_seen": "2026-10-08T07:02:00Z",
+        "last_seen": "2026-10-08T07:41:00Z"
+      }
+    },
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "psreadline",
+        "folder": "identified",
+        "records": 4,
+        "created": 0,
+        "deleted": 1,
+        "renamed": 0,
+        "data_changed": 3,
+        "first_seen": "2026-10-08T07:20:00Z",
+        "last_seen": "2026-10-08T07:25:00Z"
+      }
+    }
+  ]
+}

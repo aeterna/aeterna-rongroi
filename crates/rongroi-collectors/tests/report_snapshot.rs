@@ -676,6 +676,9 @@ const USN_PLUGINS_RENAMED: &str = "7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d";
 /// `rules/usn/enhanced-asi/files-deleted` and `files-renamed`.
 const USN_ENHANCED_DELETED: &str = "1c73241b-b7f1-4f91-81d4-8de53db6d119";
 const USN_ENHANCED_RENAMED: &str = "7996285e-8ccf-4b2d-8fec-339a32b95931";
+/// `rules/usn/psreadline/files-deleted` and `files-renamed` (ADR 0063).
+const USN_PSREADLINE_DELETED: &str = "926b3863-8f4f-4d18-aab6-26b77934466e";
+const USN_PSREADLINE_RENAMED: &str = "8a39617a-30d6-4fc0-9b20-cb4f899985d5";
 
 /// Every `usn` row that looked carries the journal's span, from the journal's own observation, in both
 /// modes; the Enhanced folder that is not there is an expected `source_absent`, counted in SS mode
@@ -701,6 +704,15 @@ fn the_change_journal_rules_carry_the_journals_span_in_both_views() {
     ));
     assert!(matches!(
         state(USN_PLUGINS_DELETED),
+        EvidenceState::NotFound { .. }
+    ));
+    // PowerShell's history folder holds appends and one deletion, and no rename (ADR 0063).
+    assert!(matches!(
+        state(USN_PSREADLINE_DELETED),
+        EvidenceState::Found { .. }
+    ));
+    assert!(matches!(
+        state(USN_PSREADLINE_RENAMED),
         EvidenceState::NotFound { .. }
     ));
     for rule_id in [USN_ENHANCED_DELETED, USN_ENHANCED_RENAMED] {
@@ -729,6 +741,7 @@ fn the_change_journal_rules_carry_the_journals_span_in_both_views() {
     let own = view::for_mode(&report, Mode::SelfCheck);
     assert_eq!(own.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
     assert_eq!(own.row_bands.get(USN_PLUGINS_DELETED), Some(&span));
+    assert_eq!(own.row_bands.get(USN_PSREADLINE_DELETED), Some(&span));
     assert_eq!(own.row_bands.get(USN_ENHANCED_DELETED), None);
 
     // SS mode lists the match with its span, and counts the `context` not-found and the expected gap.
@@ -741,12 +754,19 @@ fn the_change_journal_rules_carry_the_journals_span_in_both_views() {
     assert!(
         ss.evidence
             .iter()
+            .any(|row| row.rule_id == USN_PSREADLINE_DELETED)
+    );
+    assert!(
+        ss.evidence
+            .iter()
             .all(|row| row.rule_id != USN_PLUGINS_DELETED
                 && row.rule_id != USN_ENHANCED_DELETED
-                && row.rule_id != USN_ENHANCED_RENAMED)
+                && row.rule_id != USN_ENHANCED_RENAMED
+                && row.rule_id != USN_PSREADLINE_RENAMED)
     );
     assert_eq!(ss.row_bands.get(USN_PLUGINS_RENAMED), Some(&span));
-    assert_eq!(ss.row_bands.len(), 1, "{:?}", ss.row_bands);
+    assert_eq!(ss.row_bands.get(USN_PSREADLINE_DELETED), Some(&span));
+    assert_eq!(ss.row_bands.len(), 2, "{:?}", ss.row_bands);
 }
 
 /// A plugin folder on another volume is `other_volume`, which the rules declare, so SS mode counts it

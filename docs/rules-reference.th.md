@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 55 |
-| SHA-256 | `1189336b89f6ee78d45c5d5603e40ab87361ebd0c6da986fb9d56b530b96e3ee` |
+| จำนวน rule | 58 |
+| SHA-256 | `2ff1b788381dc4abb00033952eea918bb0e1f00ad722e994237ce07d7be3ef21` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -93,6 +93,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
   - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ plugin ของ FiveM](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ plugin ของ FiveM](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
+  - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ประวัติคำสั่งของ PowerShell](#rule-926b3863-8f4f-4d18-aab6-26b77934466e) — `context` · `experimental`
+  - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ประวัติคำสั่งของ PowerShell](#rule-8a39617a-30d6-4fc0-9b20-cb4f899985d5) — `context` · `experimental`
 - timeline selector
   - `bam`
     - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
@@ -101,6 +103,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
     - [เวลาที่ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์](#rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8) — `context` · `experimental`
     - [เวลาที่ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง](#rule-63269014-f728-424c-8e18-e36fe79030aa) — `context` · `experimental`
     - [record เก่าสุดและใหม่สุดของ event log ของ Windows](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
+    - [เวลาที่ PowerShell บันทึก script block ที่ตัวมันเองถือว่าน่าสงสัย](#rule-5bd03528-fcfe-4e57-8a7f-3a2ec815a7af) — `context` · `experimental`
   - `fivem_dir`
     - [เวลาที่โฟลเดอร์ log, crash และ cache ของ FiveM ถูกเขียน](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
   - `pca`
@@ -2055,6 +2058,98 @@ NTFS change journal มี record อย่างน้อยหนึ่งร�
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
 - <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
 
+### `usn` / `psreadline`
+
+<a id="rule-926b3863-8f4f-4d18-aab6-26b77934466e"></a>
+
+#### change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ประวัติคำสั่งของ PowerShell
+
+- ชื่อภาษาอังกฤษ: The change journal holds a deletion in PowerShell's command history folder
+- id: `926b3863-8f4f-4d18-aab6-26b77934466e`
+- ไฟล์: [`rules/usn/psreadline/files-deleted/rule.yaml`](../rules/usn/psreadline/files-deleted/rule.yaml)
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `psreadline`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal มี record อย่างน้อยหนึ่งรายการของไฟล์ที่ถูกลบโดยตรงในโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่งที่พิมพ์ในหน้าต่างของมัน PowerShell เพิ่มข้อมูลต่อท้ายไฟล์นั้นและเขียนทับใหม่ แต่ไม่ลบมัน การลบที่นั่นจึงเป็นฝีมือของคนหรือโปรแกรมอื่น แถวนี้บอกจำนวน record และเวลาแรกกับเวลาสุดท้าย ไม่บอกชื่อไฟล์หรือสิ่งที่อยู่ในไฟล์ และแสดงช่วงที่ journal ครอบคลุม ซึ่งบนเครื่องที่ใช้งานตามปกติอาจสั้นกว่าหนึ่งชั่วโมงมาก ก่อนช่วงนั้นมองไม่เห็นอะไรเลย และการลบทั้งโฟลเดอร์ (ไม่ใช่ไฟล์ข้างใน) จะไม่ถูกนับ ถ้า rule นี้ไม่เจออะไร แปลว่าในช่วงนั้นไม่มีอะไรถูกลบที่นั่นเท่านั้น journal ไม่ได้บันทึกว่าโปรแกรมไหนเป็นคนลบไฟล์ ข้อนี้จึงไม่ได้บอกว่าใครทำ และไม่ได้บอกว่ามีการซ่อนอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `deleted|gte`: ตั้งแต่ `1` ขึ้นไป
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `location`: เป็น `psreadline` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะช่วงที่ change journal ยังเก็บไว้ตอนที่สแกนอ่าน ซึ่งแสดงไว้ข้างแถวนี้ journal มีขนาดคงที่และทิ้ง record เก่าสุดก่อน บนเครื่อง Windows 11 เครื่องหนึ่งเก็บได้ประมาณ 39 นาที
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `other_volume` — ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้เล่นล้างประวัติ PowerShell ของตัวเอง ซึ่งลบไฟล์นั้น
+- โปรแกรมรักษาความเป็นส่วนตัว ทำความสะอาด หรือปรับแต่งเครื่องที่ล้างประวัติคำสั่ง
+- การรีเซ็ต profile ของ Windows หรือโปรแกรมสำรองข้อมูลหรือ sync ที่กู้โฟลเดอร์คืน
+- แอนตี้ไวรัสลบไฟล์ออกจากโฟลเดอร์
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline>
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
+<a id="rule-8a39617a-30d6-4fc0-9b20-cb4f899985d5"></a>
+
+#### change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ประวัติคำสั่งของ PowerShell
+
+- ชื่อภาษาอังกฤษ: The change journal holds a rename in PowerShell's command history folder
+- id: `8a39617a-30d6-4fc0-9b20-cb4f899985d5`
+- ไฟล์: [`rules/usn/psreadline/files-renamed/rule.yaml`](../rules/usn/psreadline/files-renamed/rule.yaml)
+- collector: `usn`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `psreadline`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal มี record อย่างน้อยหนึ่งรายการของไฟล์ที่ถูกเปลี่ยนชื่อโดยตรงในโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่งที่พิมพ์ในหน้าต่างของมัน ถูกย้ายเข้า หรือถูกย้ายออก การเปลี่ยนชื่อภายในโฟลเดอร์ทิ้ง record ไว้สองรายการ รายการหนึ่งของชื่อเดิมและอีกรายการของชื่อใหม่ PowerShell เพิ่มข้อมูลต่อท้ายไฟล์ประวัติและเขียนทับใหม่ แต่ไม่เปลี่ยนชื่อมัน แถวนี้บอกจำนวน record และเวลาแรกกับเวลาสุดท้าย ไม่บอกชื่อไฟล์หรือสิ่งที่อยู่ในไฟล์ และแสดงช่วงที่ journal ครอบคลุม ซึ่งบนเครื่องที่ใช้งานตามปกติอาจสั้นกว่าหนึ่งชั่วโมงมาก ก่อนช่วงนั้นมองไม่เห็นอะไรเลย ถ้า rule นี้ไม่เจออะไร แปลว่าในช่วงนั้นไม่มีอะไรถูกเปลี่ยนชื่อ ย้ายเข้า หรือย้ายออกที่นั่นเท่านั้น journal ไม่ได้บันทึกว่าโปรแกรมไหนเป็นคนเปลี่ยนชื่อไฟล์ ข้อนี้จึงไม่ได้บอกว่าใครทำ และไม่ได้บอกว่ามีการซ่อนอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `location`: เป็น `psreadline` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `renamed|gte`: ตั้งแต่ `1` ขึ้นไป
+
+**ย้อนดูได้**
+
+เฉพาะช่วงที่ change journal ยังเก็บไว้ตอนที่สแกนอ่าน ซึ่งแสดงไว้ข้างแถวนี้ journal มีขนาดคงที่และทิ้ง record เก่าสุดก่อน บนเครื่อง Windows 11 เครื่องหนึ่งเก็บได้ประมาณ 39 นาที
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `other_volume` — ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้เล่นย้ายไฟล์ประวัติไปเก็บหรือส่งต่อ หรือย้ายกลับมา
+- ไฟล์ถูกย้ายไปถังขยะ (Recycle Bin) ซึ่ง journal บันทึกเป็นการเปลี่ยนชื่อ (ยังไม่ได้วัดว่าถังขยะแสดงออกมาแบบไหน)
+- โปรแกรมแก้ไขข้อความที่บันทึกด้วยการเขียนไฟล์ชุดใหม่แล้วเปลี่ยนชื่อทับไฟล์เดิม
+- โปรแกรมสำรองข้อมูล sync หรือทำความสะอาดที่เขียนไฟล์ทับ
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline>
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
 ## timeline selector
 
 timeline selector เขียนแบบเดียวกับ rule แต่ไม่สร้างหลักฐาน สิ่งที่เห็นที่มันเลือกจะเอาเวลาของตัวเองไปวางบน timeline ของรายงาน ทั้งโหมด Self และ SS พร้อมข้อความและเรื่องปกติด้านล่าง มันไม่เคยเป็น เจอ ไม่เจอ หรือ ยังไม่ได้วัด และไม่ถูกนับ (ADR 0051) timeline selector เลือกบันทึกของ Prefetch, BAM และ Program Compatibility Assistant ตามชื่อได้ ซึ่ง rule ทำไม่ได้ (ADR 0034) ชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน และทุกตัวเขียนบอกไว้
@@ -2244,6 +2339,47 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - log ที่เต็มขนาดที่ตั้งไว้แล้วเขียนทับ record เก่าสุด ซึ่ง log ที่มีการเขียนบ่อยเป็นแบบนี้ได้ภายในไม่กี่วัน
 - ติดตั้ง Windows ใหม่ หรือรีเซ็ตเครื่อง
 - log ที่ถูกล้างโดยผู้ดูแลระบบ ตัวติดตั้งโปรแกรม หรือเครื่องมือบำรุงรักษา
+
+<a id="rule-5bd03528-fcfe-4e57-8a7f-3a2ec815a7af"></a>
+
+#### เวลาที่ PowerShell บันทึก script block ที่ตัวมันเองถือว่าน่าสงสัย
+
+- ชื่อภาษาอังกฤษ: When PowerShell recorded a script block it considers suspicious
+- id: `5bd03528-fcfe-4e57-8a7f-3a2ec815a7af`
+- ไฟล์: [`rules/evtx/timeline/powershell-flagged-script-block/rule.yaml`](../rules/evtx/timeline/powershell-flagged-script-block/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `evtx`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `evtx`, `timeline`, `powershell`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าครั้งแรกและครั้งล่าสุดที่ operational log ของ Windows PowerShell ยังเก็บ script block ที่ PowerShell เองตั้งธงว่าน่าสงสัยไว้ เกิดขึ้นเมื่อไร PowerShell ทำแบบนี้แม้ไม่ได้เปิดการบันทึก script block กับ script ใดก็ตามที่มีคำในรายการคงที่ ชุดหนึ่ง — ในนั้นมีคำที่ script ใช้เรียกเข้า Windows อ่านหรือเขียน memory ของโปรแกรมอื่น หรือถอดรหัสข้อความ — และ script ปกติก็มีคำเหล่านี้ เครื่องมือนี้ไม่ได้อ่านเนื้อใน block เวลาในข้อนี้จึงไม่ได้บอกว่าเป็น script อะไร ใครรัน หรือได้ทำอะไรไปหรือไม่ ข้อนี้ไม่ใช่หลักฐานเกี่ยวกับตัวบุคคล
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `channel`: เป็น `Microsoft-Windows-PowerShell/Operational` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `event_id`: เป็น `4104`
+- `level`: เป็น `3`
+- `provider`: เป็น `Microsoft-Windows-PowerShell` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะ block ที่ log ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ 15 MiB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม บนเครื่อง Windows 11 เครื่องหนึ่งย้อนได้ประมาณวันครึ่ง และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- script ที่แสดงหน้าต่างหรือกล่องข้อความ ติดตั้งโปรแกรม หรือจัดการ Windows ซึ่งใช้คำเดียวกัน
+- เครื่องมือดูแลระบบ เครื่องมือพัฒนาโปรแกรม และเครื่องมือของเกมที่รัน PowerShell อยู่เบื้องหลัง
+- script ที่แค่มีคำใดคำหนึ่งอยู่ในข้อความ เช่น Bypass
+- การไม่มีเวลาในข้อนี้ไม่ได้แปลว่าไม่มี script ถูกรัน PowerShell ไม่บันทึกแบบนี้เลยเมื่อมีนโยบายปิดการบันทึก script block และ PowerShell 7 บันทึกลง log อีกตัวหนึ่ง ซึ่งบนเครื่องหนึ่งที่วัดไม่มี log นั้นอยู่ script ที่รันก่อนบันทึกเก่าสุดของ log จะมองไม่เห็น
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows>
+- <https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/runtime/CompiledScriptBlock.cs>
 
 ### `fivem_dir` / `timeline`
 
@@ -2436,7 +2572,7 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 
 **เกี่ยวกับการตรวจนี้**
 
-แสดงบน timeline ว่าการเปลี่ยนแปลงที่เก่าสุดและใหม่สุดที่ NTFS change journal ยังเก็บไว้ของแต่ละโฟลเดอร์ที่โปรแกรมนี้เฝ้าดู (Prefetch, โฟลเดอร์ event log, โฟลเดอร์ Program Compatibility Assistant และโฟลเดอร์ plugin ของ FiveM) เกิดขึ้นเมื่อไร journal นับการเปลี่ยนแปลงโดยไม่บอกว่าโปรแกรมไหนเป็นคนทำ เวลาในข้อนี้จึงเป็นเวลาที่มีไฟล์ในโฟลเดอร์นั้นถูกสร้าง แก้ไข เปลี่ยนชื่อ หรือลบ โดยใครก็ได้ รวมถึง Windows และ FiveM ข้อนี้ไม่ใช่หลักฐานว่ามีการลบสิ่งใด
+แสดงบน timeline ว่าการเปลี่ยนแปลงที่เก่าสุดและใหม่สุดที่ NTFS change journal ยังเก็บไว้ของแต่ละโฟลเดอร์ที่โปรแกรมนี้เฝ้าดู (Prefetch, โฟลเดอร์ event log, โฟลเดอร์ Program Compatibility Assistant, โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง) เกิดขึ้นเมื่อไร journal นับการเปลี่ยนแปลงโดยไม่บอกว่าโปรแกรมไหนเป็นคนทำ เวลาในข้อนี้จึงเป็นเวลาที่มีไฟล์ในโฟลเดอร์นั้นถูกสร้าง แก้ไข เปลี่ยนชื่อ หรือลบ โดยใครก็ได้ รวมถึง Windows และ FiveM ในโฟลเดอร์ของ PowerShell การเปลี่ยนแปลงมักเป็นการพิมพ์คำสั่งในหน้าต่าง PowerShell โดยไม่บอกว่าเป็นคำสั่งอะไร ข้อนี้ไม่ใช่หลักฐานว่ามีการลบสิ่งใด
 
 **ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
 
@@ -2450,5 +2586,6 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 
 - Windows เขียนและลบไฟล์ Prefetch, event log และบันทึกความเข้ากันได้ตามการใช้งานปกติ
 - FiveM ตัวอัปเดตของมัน และ plugin ที่ผู้เล่นติดตั้งหรือถอดออก เปลี่ยนไฟล์ในโฟลเดอร์ plugin
+- PowerShell เพิ่มคำสั่งที่พิมพ์ในหน้าต่างลงในไฟล์ประวัติทีละคำสั่ง
 - โปรแกรมทำความสะอาดดิสก์ สำรองข้อมูล แอนตี้ไวรัส และโปรแกรมปรับแต่งเครื่อง
 - โฟลเดอร์ที่ไม่มีการเปลี่ยนแปลงในช่วงที่ journal ครอบคลุมจะไม่มีเวลาในข้อนี้ ซึ่งไม่ได้แปลว่าก่อนหน้านั้นไม่มีอะไรเปลี่ยน

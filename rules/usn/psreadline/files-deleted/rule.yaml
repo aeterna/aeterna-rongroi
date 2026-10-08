@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 926b3863-8f4f-4d18-aab6-26b77934466e
+title: The change journal holds a deletion in PowerShell's command history folder
+description: >-
+  The NTFS change journal holds at least one record of a file deleted directly inside the folder where
+  PowerShell keeps the history of commands typed into its window. PowerShell adds to that file and rewrites
+  it, and does not delete it, so a deletion there was made by a person or by another program. The row gives
+  how many records, and the first and last time, never a file name or anything the file held. It shows the
+  span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that
+  span is seen, and a deleted folder, rather than a file in it, is not counted. If this rule finds nothing,
+  it means only that nothing was deleted there within that span. The journal does not record which program
+  deleted a file, so this does not say who did it, or that anything was hidden.
+status: experimental
+collector: usn
+# ADR 0063 §2: `context`, as the plugin folders' rules are, so a `not_found` is counted in SS mode.
+strength: context
+match:
+  location: psreadline
+  folder: identified
+  deleted|gte: 1
+retention: >-
+  Only the span the change journal still held when the scan read it, shown beside this row. The journal
+  keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+# `not_admin` is a scope statement and never a row; `access_denied` is not declared, because the folder
+# is in the player's own profile and a denial there is unexpected (ADR 0047, amendment of 2026-09-30).
+# `source_absent`: the folder exists only where someone has typed into a PowerShell window (ADR 0063 §2).
+unmeasured_when: [not_windows, source_absent, other_volume]
+falsepositives:
+  - The player clearing their own PowerShell history, which deletes the file
+  - A privacy, clean-up or optimiser tool that clears command histories
+  - A Windows profile reset, or a backup or sync tool restoring the folder
+  - Antivirus software removing a file from the folder
+references:
+  - https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [usn, psreadline]
