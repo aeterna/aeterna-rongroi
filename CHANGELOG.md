@@ -5,6 +5,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Screenshare guides (Thai and English), README and the landing page: the download check uses Command Prompt and
+  `certutil -hashfile <file> SHA256` instead of PowerShell's `Get-FileHash`, the CLI is run from an administrator
+  Command Prompt, and the "downloaded from the internet" mark is removed from the file's Properties instead of with
+  `Unblock-File`. PowerShell keeps its own records on the PC and Windows records when it last ran, so a check typed
+  into it during a screenshare puts the call's own time over what was there. `certutil`'s output and `.\` in
+  Command Prompt were checked on a Windows 11 PC (build 26220); the CLI itself was not re-run from Command Prompt.
+- Screenshare guides: a section on comparing the report with what a server recorded — one clock (the report is
+  UTC), a row near a server's flag is a question and not proof, whether the session statement fits the time the
+  player connected, and which rows to read first for what a server saw. The program still reads nothing from a
+  server and sends nothing to one.
+
 ## [0.7.0] - 2026-10-03
 
 The checks are those of 0.6.0: no collector, rule, report field or text changed. This release changes how the

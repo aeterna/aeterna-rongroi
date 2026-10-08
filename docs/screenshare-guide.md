@@ -28,16 +28,27 @@ never does.
    - `aeterna-rongroi-0.7.0-windows-x64.exe` is the version with a window.
 2. Do not open it from the browser. Windows SmartScreen will warn, because releases are not
    code-signed yet, and the hash check comes first.
-3. Before running it, the player opens PowerShell in the download folder and runs:
+3. Before running it, the player opens **Command Prompt** (`cmd`) in the download folder — type `cmd` in
+   File Explorer's address bar and press Enter — and runs, with the exact file name:
 
-   ```powershell
-   Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
+   ```bat
+   dir /b aeterna-rongroi-*-windows-x64.exe
+   certutil -hashfile aeterna-rongroi-0.7.0-windows-x64.exe SHA256
    ```
 
-   Compare the hash with the line for the same file name in `SHA256SUMS` on the release page. Upper
-   or lower case does not matter.
-4. Only when the hash matches: `Unblock-File .\<file name>` removes the "downloaded from the internet"
-   mark from that one file. If SmartScreen still shows **Windows protected your PC**, click **More
+   The first line lists the file names; `certutil` takes one file at a time and no `*`. Compare the hash
+   with the line for the same file name in `SHA256SUMS` on the release page. Upper or lower case does not
+   matter.
+
+   **Use Command Prompt, not PowerShell, during a screenshare.** PowerShell keeps its own records on the
+   PC — a history of typed commands and its event logs — and Windows records when PowerShell last ran
+   (Prefetch, BAM and PCA, whose latest time is the one this program reads). A check typed into
+   PowerShell during the call puts the call's own time into those records, over the time that was
+   there before. Command Prompt keeps no history file. `certutil` is part of Windows; its output is lower case, without spaces (checked on
+   Windows 11 build 26220).
+4. Only when the hash matches: right-click the file → **Properties** → tick **Unblock** → **OK**. That
+   removes the "downloaded from the internet" mark from that one file; the box is only there while the
+   file carries the mark. If SmartScreen still shows **Windows protected your PC**, click **More
    info**, check the app name, and click **Run anyway**. The publisher shows as unknown until
    releases are signed. Do not turn SmartScreen off for the whole PC.
 5. When it runs, the header must say **official build**. If it says **UNOFFICIAL BUILD**, or the
@@ -68,7 +79,9 @@ read-only, and the one about an event log file that is not the file Windows writ
 - **Window version:** on the start screen, click **Scan as administrator** and accept the Windows
   prompt. The program closes, starts again with those rights and scans from the beginning. The
   button only appears when the current scan ran without administrator rights.
-- **CLI:** open **PowerShell as administrator** and run the scan in that window (§4).
+- **CLI:** open **Command Prompt as administrator** (Start → type `cmd` → **Run as administrator**), go to
+  the download folder with `cd /d "<folder>"`, and run the scan in that window (§4). Command Prompt rather
+  than PowerShell, for the reason in §2.
   `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
   until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
   full-scan work touched that code, or for 0.5.0, 0.6.0 and 0.7.0 — but the report from
@@ -88,9 +101,9 @@ a timeline of the times its consent screen names, and it replaces the player's u
 SS view**. The window version scans when it starts, **before** its window opens, so the window cannot
 change the results. The consent screen decides what is shown.
 
-**CLI:**
+**CLI** (in the Command Prompt from §3):
 
-```powershell
+```bat
 .\aeterna-rongroi-cli-0.7.0-windows-x64.exe scan --mode ss
 ```
 
@@ -160,6 +173,33 @@ Hidden in SS mode: NOT FOUND <n> · NOT MEASURED (expected here) <n> · NOT MEAS
 ```
 
 These are counts of what SS mode does not list. §7 says why.
+
+### Beside what your server recorded
+
+Some servers record signals of their own — a combat check, a report from another player, a time a
+player connected. aeterna-rongroi does not read them and sends nothing to your server. Copy what you
+need by hand, and compare it with the report yourself.
+
+- **Use one clock.** Times in the report are UTC. If your server shows local time, convert it first
+  (Thailand is UTC+7).
+- **A row near the time your server flagged is something to ask about, not proof.** A row days away
+  from it is ordinary. Every row still needs its *ordinary things that also produce this*.
+- **Is this the PC they played on?** The **session statement** (§7) gives the start of FiveM's
+  **last** session on this PC. If your server says the player connected at a time, and they are still
+  connected during the call, that session should have started before they connected. A last session
+  that started after the connection, or that ended days before it, or no session at all, is a reason to
+  ask whether this is the PC they played on — not proof that it is not. Ordinary causes: a second PC
+  they use for the same account, another Windows account on this PC, FiveM started again since the
+  connection, Prefetch switched off, a changed clock.
+- **Which rows to read first** depends on what your server saw. As a starting point, not a rule:
+
+  | What your server saw | Rows that can carry related traces |
+  |---|---|
+  | Changed numbers in the game: reach, damage, health | FiveM plugin and `.asi` folders and their change-journal rows, `FiveM.exe`'s signature, drivers, what starts by itself, Defender's exclusions and detections |
+  | Aim that looks automatic | the same, and the timeline of programs Prefetch, BAM and PCA recorded |
+  | Something only a cheat menu sends | FiveM plugin and `.asi` folders, their change-journal rows, `FiveM.exe`'s signature |
+
+  None of these rows sees a cheat that runs on a second PC or a DMA device (§1).
 
 ## 6. The rules, and what else produces them
 
@@ -419,12 +459,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   file.
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
-  ```powershell
+  ```bat
   .\aeterna-rongroi-cli-0.7.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
   The consent question stays on screen, the player answers it there, and the file holds only the JSON.
-  Run it from an administrator PowerShell (§3), not with `--elevate`.
+  Run it from an administrator Command Prompt (§3), not with `--elevate`.
 
   **With 0.2.0** the consent question goes to the same output as the JSON: with `>`, the player does not
   see it, the program waits with nothing on screen, and the question ends up at the top of the file. With
