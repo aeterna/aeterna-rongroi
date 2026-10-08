@@ -6,6 +6,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `rongroi-parsers::evtx::powershell_text` (ADR 0064, second of three changes; ADR 0018 amended): reads the payload
+  of exactly two kinds of record — a script block Windows PowerShell flagged (4104 level 3, its parts joined by
+  `ScriptBlockId`) and the command line Windows PowerShell started with (400 `HostApplication`) — and classifies
+  each where it is read, returning kinds, a time and at most a download host, never the text. `records` is
+  unchanged. Tested on rendered records (parts out of order, a word split across parts, a missing part, the
+  collisions, three renderings of a 400, a leak test) and, by an ignored test that prints counts only, on the
+  development PC's two logs: 135 blocks and 1 546 starts in under a quarter of a second each. `fuzz_evtx` calls it.
 - `rongroi-parsers::powershell_text` (ADR 0064, first of three changes): classifies a PowerShell history file, a
   script block's text or a command line into the fixed list of kinds as booleans — after undoing escapes, joined
   literals and up to two levels of encoded command — plus the host of the first download URL, reduced to a plain name
