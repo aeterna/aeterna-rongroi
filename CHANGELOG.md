@@ -18,10 +18,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
     name them; three `rules/unconfronted.csv` rows, because no baseline carries a PowerShell log or the folder.
 
 ### Changed
-- ADR 0064 proposed: which kinds of words PowerShell's commands held, never the commands — a `full` collector
+- ADR 0064 accepted: which kinds of words PowerShell's commands held, never the commands — a `full` collector
   that classifies PowerShell's history, its flagged script blocks and its start command lines into a fixed list of
   kinds and keeps no text but a download host behind its own question. It asks the owner first whether this
-  project reads what a person typed at all, which three standing texts forbid today. Nothing is measured yet.
+  project reads what a person typed at all, which three standing texts forbid today; the owner answered yes, under
+  its conditions. Counts of each kind on the development PC are recorded; a runner baseline is still open.
 - ADR 0063 accepted: what PowerShell already records, without reading what it says — a timeline selector for the
   script blocks PowerShell itself flags (event 4104, level 3) and a sixth folder for the change journal, the one
   PowerShell keeps its command history in, with two `context` rules; nothing for PowerShell 7 or event 400 yet.

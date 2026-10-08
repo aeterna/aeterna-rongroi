@@ -1,6 +1,7 @@
 # ADR 0064 — Which kinds of words PowerShell's commands held, never the commands
 
-- Status: proposed — the owner's questions below are open; "Before any code" has not been measured
+- Status: accepted — the owner decided the seven questions below on 2026-10-08, each as recommended;
+  "Before any code" items 1 and 3 measured on 2026-10-08 ("Measured before code"), item 2 (a runner) open
 - Date: 2026-10-08
 
 ## Context
@@ -52,7 +53,7 @@ because people type them — and a 400 command line is exactly "the arguments a 
 question this ADR puts first is not how to read these sources but **whether this project reads them at all**
 (owner question 1). Everything after it is the design that would make the answer "yes" as narrow as possible.
 
-## Decision (proposed)
+## Decision
 
 ### 1. A `full` collector, `powershell_text`, that keeps no text
 
@@ -64,7 +65,10 @@ own size cap:
 - the text of every 4104 record at level 3 in `Microsoft-Windows-PowerShell/Operational`;
 - `HostApplication` of every 400 record in `Windows PowerShell`.
 
-Each line, block or command line is held in memory only long enough to be classified, and then dropped. **No
+A 4104 block longer than one record is split across records that share a `ScriptBlockId` (`MessageNumber`
+of `MessageTotal`); the parser joins the parts of one block before classifying it, so a word split at a part
+boundary is still read — on the PC measured, 324 of 367 flagged records were parts of a longer block. Each
+line, block or command line is held in memory only long enough to be classified, and then dropped. **No
 substring of it reaches an observation**, with one exception, the host in section 4. The parser that
 classifies lives in `rongroi-parsers` (pure, fuzzed, ADR 0013, ADR 0016); the collector never sees text it
 did not hand straight to it.
@@ -160,6 +164,35 @@ Measured on the development PC with a read-only probe that prints counts only, r
 
 The outcome is an amendment to this ADR before the change that adds the collector.
 
+## Measured before code (2026-10-08, the development PC)
+
+Items 1 and 3 of "Before any code", by a read-only probe that approximates section 2's kinds with PowerShell
+regular expressions and prints counts only (`.claude/probes/`, not in the repository). It left out what this
+project's own earlier probes wrote: 0 history lines, 9 flagged blocks, 19 starts. Windows 11 build 26220,
+elevated, the account that owns the history.
+
+| Source | Examined | Any kind | By kind |
+|---|---|---|---|
+| history (1 file, 86 KB) | 2 347 lines | 13 | `execution_policy_bypass` 10 · `remote_download` 5 · `invoke_expression` 4 · **`download_then_execute` 3** (the newest 1 493 commands from the end) · 1 distinct host name, 4 of 5 downloads with a URL |
+| 4104 level 3 | 367 records, 123 blocks | **0** | — |
+| 400 | 1 517 starts | 1 333 | **`execution_policy_bypass` 1 293** · `encoded_command` 40 (80 of 80 decoded) |
+
+What it changes:
+
+- **`execution_policy_bypass` and `encoded_command` cannot be rules**, which section 5 already says: on this PC
+  85 % of PowerShell's starts carry `-ExecutionPolicy Bypass` — tools and scheduled tasks start it that way —
+  and 40 starts are encoded. They stay context.
+- **`download_then_execute` is found on the owner's own PC**, in three old history lines, from installing
+  software. The history rule's `falsepositives` leads with installers that are installed with one line
+  (`… | iex`), and its description says the row shows how many commands ago, not when.
+- **No flagged block on this PC holds any kind.** What PowerShell flags here is ordinary: 125 of the 379
+  records hold the word `Properties`, which is on its list. A block that holds a kind is therefore not
+  common, on this PC; one PC is not a population.
+- **Time:** reading and classifying the history took 1.5 s, the flagged blocks 8.5 s and the 400 records 41 s —
+  through `Get-WinEvent`, which renders every message; the collector reads the `.evtx` file the `evtx`
+  collector already parses, so these are an upper bound for the logs, not the budget. The budget is set
+  after the parser exists.
+
 ## Alternatives weighed
 
 | Alternative | Why not |
@@ -181,7 +214,10 @@ The outcome is an amendment to this ADR before the change that adds the collecto
   That limit is written into every rule's description.
 - **PSReadLine versions other than 2.0.0**, whose filter may differ.
 
-## Owner questions
+## Owner decisions (2026-10-08)
+
+The owner answered "as recommended" to all seven, question 1 included: this project reads what a person typed,
+under the conditions above and nowhere else.
 
 1. **Whether this project reads what a person typed at all**, under the conditions in this ADR, which means
    amending three texts: `crates/rongroi-collectors/AGENTS.md` ("credentials, tokens or unrelated personal
