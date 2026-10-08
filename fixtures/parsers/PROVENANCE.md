@@ -18,6 +18,7 @@ parallel set of sample bytes to keep in step.
 | `bam/` | `bam::parse_value` | `crates/rongroi-parsers/src/bam.rs`, `tests/fixtures.rs` | `fuzz_bam`, and `fuzz_filetime` — a BAM value's first eight bytes are the `FILETIME` |
 | `pca-app-launch/` | `pca::parse_app_launch_dic` | `crates/rongroi-parsers/src/pca.rs`, `tests/fixtures.rs` | `fuzz_pca_app_launch` |
 | `pca-general/` | `pca::parse_general_db` | `tests/fixtures.rs` | `fuzz_pca_general` |
+| `powershell-text/` | `powershell_text::parse_history`, `powershell_text::classify` | `crates/rongroi-parsers/src/powershell_text.rs`, `tests/fixtures.rs` | `fuzz_powershell_text` |
 | `prefetch/` | `prefetch::parse` | `tests/fixtures.rs`, and the `prefetch` collector through `fixtures/hosts/prefetch-fivem-editions` | `fuzz_prefetch`, beside the vendored corpus in `fixtures/prefetch/` |
 | `task/` | `task::parse_task` | `crates/rongroi-parsers/src/task.rs`, `tests/fixtures.rs` | `fuzz_task` |
 | `usn/` | `usn::parse_buffer` | `crates/rongroi-parsers/src/usn.rs`, `tests/fixtures.rs` | `fuzz_usn` |
@@ -46,6 +47,10 @@ parallel set of sample bytes to keep in step.
 | `prefetch/v31-raw-FIVEM.EXE-enhanced.pf` | The same shape with one run time, its own entry below `\USERS\ALEX\APPDATA\LOCAL\FIVEM FOR GTAV ENHANCED\` |
 | `prefetch/v31-raw-PLAYGTAV.EXE-neither.pf` | The same shape named `PLAYGTAV.EXE`, its own entry below `\PROGRAM FILES\`, and a second entry, an invented `EXAMPLE.DLL`, below Enhanced's folder: a file whose own entry is below neither folder although another entry is |
 | `prefetch/v31-raw-FIVEM.EXE-session-legacy.pf`, `prefetch/v31-raw-FIVEM.EXE-session-enhanced.pf` | `v31-raw-FIVEM.EXE-legacy.pf` and `-enhanced.pf` with one run time each, 2025-12-31T20:00:00Z and 2025-12-31T10:00:00Z, and the other seven cleared: the starts the session statement's fixture hosts compare with (ADR 0062) |
+| `powershell-text/history-mixed-crlf.txt` | A PSReadLine history file written by hand: UTF-8 with CRLF lines (no byte-order mark: `check-unicode` refuses one in a text file, and the parser's own test covers it), ordinary commands, a download-then-execute line to a reserved `.invalid` name, a Defender switch and `Clear-History` (ADR 0064). No line was typed on a real machine |
+| `powershell-text/history-lf-no-bom.txt` | The same format with LF lines and no byte-order mark; one download-then-execute line to a private address |
+| `powershell-text/command-line-encoded.txt` | A Windows PowerShell command line as event 400's `HostApplication` carries one: a hidden window and an `-enc` argument whose UTF-16LE base64 decodes to a download-then-execute line to a `.invalid` name |
+| `powershell-text/not-utf8.bin` | Two lines that are not UTF-8, read with replacement characters |
 | `task/logon-exec-utf16le.xml` | A task file as the Task Scheduler's own format describes it, written by hand: UTF-16 little-endian with a byte-order mark and CRLF lines, a logon and a calendar trigger, an invented account SID as the principal, and one `Exec` action whose command uses `%LOCALAPPDATA%` and which has an `Arguments` element the parser must never return. Not captured from a machine (ADR 0060) |
 | `task/boot-exec-utf8.xml` | A boot-triggered task in UTF-8 with no byte-order mark, running as `S-1-5-18`, with a quoted command |
 | `task/disabled-com-handler-utf16le.xml` | A disabled task whose one action is a COM handler, with a WNF state-change trigger |
