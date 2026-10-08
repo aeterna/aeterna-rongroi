@@ -397,16 +397,17 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
-    // Twelve not-measured rules are hidden: the firmware reading needs administrator rights, which this
+    // Eighteen not-measured rules are hidden: the firmware reading needs administrator rights, which this
     // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038);
-    // the full-scan rule, because this was a standard scan, which every rule expects (ADR 0052); the
+    // the seven full-scan rules, because this was a standard scan, which every rule expects (ADR 0052,
+    // ADR 0055, ADR 0064); the
     // seven `os_image` rules, because this fixture describes no `CurrentVersion` key for them to read
     // (ADR 0056); and three `install_marker` rules, because the fixture sets no environment variable
     // for the folders they name (ADR 0057). The one unmatched observation is `install_marker`'s
     // registry marker, which needs no environment variable and answered `present: false`.
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 12 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
+        "Hidden in SS mode: 1 not found · 18 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -784,7 +785,11 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByText("I agree — show the SS view"));
     await screen.findByText("Found");
-    expect(seen).toContainEqual({ server_identity: true, account_identifier: false });
+    expect(seen).toContainEqual({
+      server_identity: true,
+      account_identifier: false,
+      download_host: false,
+    });
   });
 
   it("offers no server-name choice after a standard scan", async () => {

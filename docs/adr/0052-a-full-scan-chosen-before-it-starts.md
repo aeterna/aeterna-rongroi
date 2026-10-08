@@ -3,6 +3,8 @@
 - Status: accepted — the owner decided the four questions below on 2026-09-17; implemented on 2026-09-18
   with its first `full` collector (ADR 0055)
 - Date: 2026-09-16
+- Amended: 2026-10-08, by ADR 0064: section 5 names `powershell_text` as the one `full` collector that
+  reads what a person typed, and section 6's table gains its row
 
 ## Context
 
@@ -93,6 +95,14 @@ scan reads more; it does not read differently. No `full` collector may read a br
 messenger's storage or any store that holds a credential or a token, whatever the player agrees to
 (`crates/rongroi-collectors/AGENTS.md`).
 
+*Amended 2026-10-08 by ADR 0064.* One `full` collector reads text a person typed, which can hold a
+credential: `powershell_text` reads PowerShell's history and two kinds of PowerShell event. It is the one
+exception to the sentence above, and it is narrow by construction: each text is classified into a fixed
+list of kinds in `rongroi-parsers` and dropped, and only the kinds, counts and times reach an observation,
+with a download's host as the one piece of text, behind its own SS-mode question. A store whose purpose is
+to hold credentials — a browser's password store, a credential manager — stays out of reach whatever the
+player agrees to.
+
 ### 6. Initial assignments, for the ADRs that add the sources
 
 | Source (proposed) | Tier | Sensitive field |
@@ -103,6 +113,7 @@ messenger's storage or any store that holds a credential or a token, whatever th
 | Endpoints and plugin names in FiveM's logs — **parked** by ADR 0058 on 2026-09-30: the logs measured named no joined server | full | server identity (endpoints) |
 | Module lists in FiveM's crash dumps | full | — (paths redacted as today) |
 | Counts of Rockstar, Social Club and Steam profiles | full | — |
+| Which kinds of words PowerShell's history, flagged script blocks and engine starts held (ADR 0064) | full | download host |
 
 ## Alternatives weighed
 

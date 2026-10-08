@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 58
+      "rule_count": 65
     },
     "platform": "windows",
     "os_build": "26100",
@@ -300,7 +300,7 @@ expression: view
   "scope": {
     "not_admin": 0,
     "not_attempted": 0,
-    "not_consented": 1
+    "not_consented": 7
   },
   "listed": {
     "found": 2,
@@ -309,7 +309,7 @@ expression: view
   },
   "hidden": {
     "not_found": 5,
-    "unmeasured_expected": 14,
+    "unmeasured_expected": 20,
     "unmeasured_unexpected": 0,
     "unmatched": 11
   },
@@ -360,6 +360,7 @@ expression: view
     "net_config",
     "process",
     "evtx",
+    "powershell_text",
     "prefetch",
     "bam",
     "pca",

@@ -24,7 +24,7 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 13] = [
+pub const COLLECTOR_ORDER: [&str; 14] = [
     "posture",
     "driver_service",
     "autostart",
@@ -34,6 +34,7 @@ pub const COLLECTOR_ORDER: [&str; 13] = [
     "net_config",
     "process",
     "evtx",
+    "powershell_text",
     "prefetch",
     "bam",
     "pca",
@@ -54,12 +55,15 @@ pub const SS_WITHHELD_FIELDS: [(&str, &str); 2] =
 pub const SERVER_IDENTITY_PLACEHOLDER: &str = "%SERVER_IDENTITY%";
 /// What SS mode shows in place of an account identifier the player did not agree to show (ADR 0052).
 pub const ACCOUNT_IDENTIFIER_PLACEHOLDER: &str = "%ACCOUNT_IDENTIFIER%";
+/// What SS mode shows in place of a download host the player did not agree to show (ADR 0064).
+pub const DOWNLOAD_HOST_PLACEHOLDER: &str = "%DOWNLOAD_HOST%";
 
 /// The placeholder for one kind of sensitive value.
 pub fn placeholder(kind: SensitiveKind) -> &'static str {
     match kind {
         SensitiveKind::ServerIdentity => SERVER_IDENTITY_PLACEHOLDER,
         SensitiveKind::AccountIdentifier => ACCOUNT_IDENTIFIER_PLACEHOLDER,
+        SensitiveKind::DownloadHost => DOWNLOAD_HOST_PLACEHOLDER,
     }
 }
 
@@ -73,6 +77,9 @@ pub struct SsOptions {
     /// Show account identifiers.
     #[serde(default)]
     pub account_identifier: bool,
+    /// Show the host a PowerShell command downloaded from (ADR 0064).
+    #[serde(default)]
+    pub download_host: bool,
 }
 
 impl SsOptions {
@@ -81,6 +88,7 @@ impl SsOptions {
         match kind {
             SensitiveKind::ServerIdentity => self.server_identity,
             SensitiveKind::AccountIdentifier => self.account_identifier,
+            SensitiveKind::DownloadHost => self.download_host,
         }
     }
 }

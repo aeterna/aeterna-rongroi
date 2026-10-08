@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: b97cb4c6-9dac-47f4-a974-ce17f07d6fc5
+title: A command in the PowerShell history told Microsoft Defender to look away
+description: >-
+  In the history of commands typed into a PowerShell window on the account running this scan, at least one command added an exclusion to Microsoft Defender or switched one of its protections off. The report also says what Defender is told not to scan now, when the scan has administrator rights. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+# ADR 0064 section 5. `experimental`: the kinds come from one development PC and one runner.
+status: experimental
+collector: powershell_text
+strength: tamper
+match:
+  source: history
+  defender_tamper: true
+retention: >-
+  Only the lines PowerShell's history file still holds. It keeps the newest 4096 commands by default and writes no time for a line, so the row says how many commands ago, not when. PowerShell leaves out of the file every line holding the words password, token, key or secret.
+# `not_admin` and `not_consented` are scope statements; `source_absent` is a PC with no such history or log.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - Developers and IT staff excluding build folders or tools to speed Defender up
+  - Game, emulator or mod guides that tell players to exclude a folder
+  - Turning protection off to install a program Defender flagged by mistake
+  - A missing row does not mean Defender was never changed, since its own settings and log say more
+references:
+  - https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [powershell_text]

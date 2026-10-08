@@ -71,7 +71,8 @@ Of **what Windows starts by itself** it reads three places (ADR 0060):
 
 **It never reads the arguments a program is given** — not even whether there were any: a command line is
 read only to find where the program's file ends, because arguments are where a token, a password or an
-address is passed to a program. Of a task it also never reads who made it, its description, its working
+address is passed to a program. (The one place this program reads any command, PowerShell's, is a full
+scan's, and it keeps only what kinds of words it held — [below](#a-full-scan-reads-more-and-only-if-you-agree-before-it-starts).) Of a task it also never reads who made it, its description, its working
 folder or the account it runs as into the report; the account is compared with the one running this
 scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file **outside the Windows
 folder** it reads a SHA-256 and what Windows says about its embedded signature, as for FiveM's files;
@@ -243,6 +244,18 @@ What a full scan reads today:
   joined, with when each was created and last changed (ADR 0055). What the name is made from is not
   known. It stays the same for that server on this PC, so it can match two reports of this PC; whether
   another PC gets the same name is not known. Nothing inside those folders is read.
+- **Which kinds of words your PowerShell commands held** (ADR 0064): the history of commands typed into a
+  PowerShell window on the account running the scan, the scripts PowerShell itself flagged as suspicious in
+  its log, and the command lines Windows PowerShell was started with, as its own log keeps them. **This is
+  the one place this program reads what you typed.** Each command is read only to sort its words into a
+  fixed list — downloads from the internet, runs text as a command, an encoded command, a bypassed
+  execution policy, a hidden window, calls into Windows itself, a change to Microsoft Defender, a cleared
+  log or history, a FiveM or GTA V process name — and then dropped. The report keeps which kinds, how many,
+  how many commands ago (the history has no times) or when (the logs do), and **no text of any command**,
+  with one exception: when a command downloads something, the name of the website, never the rest of the
+  address. A website that is an address is kept as its kind only — loopback, private, public or
+  unspecified. PowerShell itself leaves out of its history every line holding the words password, token,
+  key or secret.
 
 A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
 reads a browser's history, a messenger's storage, or anything that holds a password or a token.
@@ -290,7 +303,7 @@ or allow remote access.
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
 | A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
 | The name of a `Run` value or a scheduled task | shown | **not shown** |
-| What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, a separate choice that is off until you turn it on |
+| What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, and **a website's name as `%DOWNLOAD_HOST%`** unless you agree to show website names — two separate choices, each off until you turn it on |
 | When Windows last started | shown | shown, as one time at the top of the report |
 | When parts of this PC were set up (dates) | shown | shown — [below](#how-far-back-the-traces-reach) |
 | How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |

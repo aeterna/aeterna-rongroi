@@ -123,6 +123,9 @@ export function Report({ mode, options, onBack }: Props) {
       {mode === "ss" && header.scan_tier === "full" && !options?.server_identity && (
         <p className="muted">{t("header.server_identity_hidden")}</p>
       )}
+      {mode === "ss" && header.scan_tier === "full" && !options?.download_host && (
+        <p className="muted">{t("header.download_host_hidden")}</p>
+      )}
 
       <div className="toolbar">
         {filter ? (

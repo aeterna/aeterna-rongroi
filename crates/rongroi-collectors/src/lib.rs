@@ -20,6 +20,7 @@ pub mod os_image;
 pub mod paths;
 pub mod pca;
 pub mod posture;
+pub mod powershell_text;
 pub mod prefetch;
 pub mod process;
 pub mod scan;
@@ -303,6 +304,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(os_image::OsImage),
         Box::new(pca::Pca),
         Box::new(posture::Posture),
+        Box::new(powershell_text::PowershellText),
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
         Box::new(usn::Usn::default()),

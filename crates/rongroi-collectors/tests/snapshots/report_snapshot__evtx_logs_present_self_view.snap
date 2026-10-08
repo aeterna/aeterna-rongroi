@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 58
+      "rule_count": 65
     },
     "platform": "windows",
     "os_build": "26100",
@@ -407,6 +407,54 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "1fd8ec4a-f6d1-4496-aac5-54ed276717f7",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
+      "rule_id": "45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb",
+      "collector": "powershell_text",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
+      "rule_id": "a5b02d12-4999-4cd6-87cc-c7823aee66b9",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
+      "rule_id": "b97cb4c6-9dac-47f4-a974-ce17f07d6fc5",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
+      "rule_id": "2b4a3f03-e520-44d4-ad91-77f5d7857d71",
+      "collector": "powershell_text",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
+      "rule_id": "8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
       "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
       "collector": "prefetch",
       "strength": "tamper",
@@ -644,12 +692,12 @@ expression: view
   "scope": {
     "not_admin": 0,
     "not_attempted": 0,
-    "not_consented": 1
+    "not_consented": 7
   },
   "listed": {
     "found": 1,
     "not_found": 14,
-    "unmeasured": 31
+    "unmeasured": 37
   },
   "hidden": {
     "not_found": 0,
@@ -883,6 +931,7 @@ expression: view
     "net_config",
     "process",
     "evtx",
+    "powershell_text",
     "prefetch",
     "bam",
     "pca",

@@ -18,7 +18,8 @@
     "scan_tier": "การสแกน",
     "tier_standard": "แบบมาตรฐาน",
     "tier_full": "แบบ Full",
-    "server_identity_hidden": "ชื่อเซิร์ฟเวอร์แสดงเป็น %SERVER_IDENTITY% เพราะผู้เล่นไม่ได้ยินยอมให้แสดง"
+    "server_identity_hidden": "ชื่อเซิร์ฟเวอร์แสดงเป็น %SERVER_IDENTITY% เพราะผู้เล่นไม่ได้ยินยอมให้แสดง",
+    "download_host_hidden": "ชื่อเว็บไซต์แสดงเป็น %DOWNLOAD_HOST% เพราะผู้เล่นไม่ได้ยินยอมให้แสดง"
   },
   "state": {
     "found": "เจอ",
@@ -87,6 +88,7 @@
   },
   "collector": {
     "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
+    "powershell_text": "คำสั่ง PowerShell เป็นชนิดของคำ",
     "driver_service": "ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows",
     "autostart": "โปรแกรมที่เริ่มทำงานเอง (service, Run, scheduled task)",
     "defender_exclusion": "exclusion ของ Microsoft Defender",

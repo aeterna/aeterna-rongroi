@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: a5b02d12-4999-4cd6-87cc-c7823aee66b9
+title: A command in a Windows PowerShell start cleared a log, the history or Prefetch
+description: >-
+  In the command lines Windows PowerShell was started with, as its own log keeps them, at least one command cleared PowerShell's history, cleared or removed an event log, or deleted the history file or files under Prefetch. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+# ADR 0064 section 5. `experimental`: the kinds come from one development PC and one runner.
+status: experimental
+collector: powershell_text
+strength: tamper
+match:
+  source: engine_start
+  trace_cleanup: true
+retention: >-
+  Only the starts the Windows PowerShell log still holds. It keeps 15 MiB by default and overwrites its oldest records when full; on one Windows 11 PC that was about six days. A cleared log holds none.
+# `not_admin` and `not_consented` are scope statements; `source_absent` is a PC with no such history or log.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - Clean-up and optimiser scripts that clear logs and Prefetch in one click, which are common among players
+  - A person clearing their own command history
+  - Administrators resetting a log while testing
+  - A missing row does not mean nothing was cleared, because other tools leave no line here
+references:
+  - https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [powershell_text]

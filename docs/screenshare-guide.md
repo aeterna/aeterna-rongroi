@@ -251,6 +251,12 @@ need by hand, and compare it with the report yourself.
 | The change journal holds a rename in PowerShell's command history folder | context | `experimental` | the player moving the file, the Recycle Bin, an editor that saves by renaming, a backup or sync tool |
 | A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders | posture | `experimental` | programs installed per user in AppData — launchers, chat and voice apps, cloud sync clients, and above all their updaters and helpers; peripheral, RGB, fan and overclocking utilities; service wrappers and servers from a package manager; management and provisioning agents; open-source and self-built tools; a file signed through a catalog; a Run entry switched off in Task Manager |
 | A Microsoft Defender exclusion covers a FiveM folder | posture | `experimental` | performance and FPS guides that tell players to exclude the game or FiveM folder, game and mod installers and launchers that add their own exclusion, developers and build machines that exclude a whole drive, another security product or an administrator managing Defender |
+| **Full scan:** a command in the PowerShell history downloaded something and ran it | presence | `experimental` | installers and package managers installed with one line of this shape — the development PC measured held three, all from installing software; scripts that set up developer tools, terminals or Windows tweaks; a command that failed or was cancelled, which the history keeps either way |
+| **Full scan:** a command in the PowerShell history told Microsoft Defender to look away | tamper | `experimental` | developers and IT staff excluding build folders or tools, game, emulator or mod guides that tell players to exclude a folder, turning protection off to install a program Defender flagged by mistake |
+| **Full scan:** a command in the PowerShell history cleared a log, the history or Prefetch | tamper | `experimental` | clean-up and optimiser scripts that clear logs and Prefetch in one click, a person clearing their own command history, an administrator resetting a log while testing |
+| **Full scan:** a command in a Windows PowerShell start downloaded something and ran it | presence | `experimental` | the same as the history row, and a program or scheduled task that starts PowerShell this way to update itself |
+| **Full scan:** a command in a Windows PowerShell start told Microsoft Defender to look away | tamper | `experimental` | the same as the history row |
+| **Full scan:** a command in a Windows PowerShell start cleared a log, the history or Prefetch | tamper | `experimental` | the same as the history row |
 
 Four things to know about the thirteen rows above, which are all about **which Windows this is**:
 
@@ -338,6 +344,24 @@ Three things to know about a full scan (ADR 0052, ADR 0055):
 - **Its absence says nothing.** A player who never used GTA V Enhanced, reinstalled it, or deleted the
   folder has none.
 
+Four things to know about the full scan's PowerShell rows (ADR 0064):
+
+- **They say what kind of words a command held, never the command.** This program reads each command only
+  to sort its words into kinds and keeps no text of it, so a row cannot say what was downloaded, what ran
+  or whether it worked. The one piece of text kept is the website's name, shown as `%DOWNLOAD_HOST%` unless
+  the player also agreed to show website names; a website that is an address is shown as its kind only.
+- **Ordinary PCs match them.** Many installers are one line that downloads a script and runs it — the
+  development PC measured held three such lines in its history, all from installing software. Ask the
+  player what they installed before reading anything into the row.
+- **The history has no times.** A history row says how many commands ago the newest such line was typed,
+  and it holds only the account running the scan. The Windows PowerShell rows have times, inside the
+  span its log still holds — about six days on the one PC measured.
+- **A missing row says nothing.** PowerShell leaves out of its history every line holding the words
+  password, token, key or secret; a command built with other tricks than PowerShell's ordinary escapes is
+  not recognised; and a cleared history or log holds nothing. That is also why the guide asks you to use
+  Command Prompt, not PowerShell, during the call: a check typed into PowerShell adds a line to the
+  history this scan reads.
+
 Two things to know about the hosts-file rule:
 
 - **The kind of address is what to read.** `loopback` or `unspecified` sends the name nowhere, which is
@@ -418,7 +442,8 @@ then, not that the game did, and a missing time does not say the game never ran.
 shows the times of FiveM's log, crash and cache folders, the first and last time the Code Integrity log
 recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection (ADR 0059), the
 first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as
-suspicious (ADR 0063), the span each Windows log and the change journal could see, and which of those could
+suspicious (ADR 0063), in a full scan the first and last time either PowerShell log recorded a command
+that downloaded something and ran it (ADR 0064), the span each Windows log and the change journal could see, and which of those could
 not be read. Those event times are not rows: this program does not read which file was refused, what was
 detected or what a script said, Windows 11 refuses some drivers by default, an ordinary PC measured for this
 held hundreds of refusals and a detection, and PowerShell flags ordinary scripts too — the development PC

@@ -33,13 +33,21 @@ const FULL_TEXT: &str = "A full scan reads more than the standard scan:\n\n\
 - the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server this PC \
 joined — with when it was created and last changed. What the name is made from is not known; it \
 stays the same for that server on this PC, so it can match two reports of this PC.\n\n\
-Nothing is read differently and nothing is sent anywhere. In SS mode a server's name is shown only \
-if you agree to that separately.\n\nYes: full scan. No: standard scan.\n\n\
+- the words in PowerShell's commands, kept only as kinds — whether a command downloaded something and \
+ran it, told Microsoft Defender to look away, cleared a log or history, or named FiveM — from the \
+history of commands typed into a PowerShell window, the scripts Windows PowerShell flagged as \
+suspicious, and the command lines it was started with. No command is kept or shown; the one thing \
+kept is the name of a website a command downloaded from.\n\n\
+Nothing is sent anywhere. In SS mode a server's name and a website's name are each shown only if \
+you agree to that separately.\n\nYes: full scan. No: standard scan.\n\n\
 การสแกนแบบ Full อ่านมากกว่าการสแกนแบบมาตรฐาน:\n\n\
 - ชื่อโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ที่ FiveM for GTA V Enhanced เก็บไว้ หนึ่งโฟลเดอร์ต่อหนึ่งเซิร์ฟเวอร์ที่เครื่องนี้เคยเข้า \
 พร้อมเวลาที่สร้างกับเวลาที่แก้ไขล่าสุด ยังไม่รู้ว่าชื่อนี้คำนวณมาจากอะไร แต่ชื่อของเซิร์ฟเวอร์เดิมบนเครื่องนี้จะเหมือนเดิม \
 จึงจับคู่รายงานสองฉบับจากเครื่องนี้ได้\n\n\
-ไม่ได้อ่านสิ่งใดต่างไปจากเดิม และไม่ส่งอะไรออกไปไหน ในโหมด SS ชื่อเซิร์ฟเวอร์จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง\n\n\
+- คำในคำสั่ง PowerShell โดยเก็บไว้แค่เป็นชนิด — คำสั่งนั้นดาวน์โหลดแล้วรันอะไรหรือไม่ สั่งให้ Microsoft Defender มองข้ามบางอย่างหรือไม่ \
+ล้าง log หรือประวัติหรือไม่ หรือพูดถึง FiveM หรือไม่ — จากประวัติคำสั่งที่พิมพ์ในหน้าต่าง PowerShell, script ที่ Windows PowerShell \
+ตั้งธงว่าน่าสงสัย และ command line ที่ใช้เปิดมัน ไม่เก็บและไม่แสดงคำสั่งใด ๆ สิ่งเดียวที่เก็บคือชื่อเว็บไซต์ที่คำสั่งดาวน์โหลดมา\n\n\
+ไม่ส่งอะไรออกไปไหน ในโหมด SS ชื่อเซิร์ฟเวอร์และชื่อเว็บไซต์จะแสดงก็ต่อเมื่อคุณยินยอมแยกทีละข้อ\n\n\
 Yes: สแกนแบบ Full  No: สแกนแบบมาตรฐาน";
 
 /// The scan this copy runs: full only when it was started with `--full` **and** the person answered

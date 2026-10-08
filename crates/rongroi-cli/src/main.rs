@@ -142,6 +142,7 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
                 match kind {
                     SensitiveKind::ServerIdentity => options.server_identity = true,
                     SensitiveKind::AccountIdentifier => options.account_identifier = true,
+                    SensitiveKind::DownloadHost => options.download_host = true,
                 }
             }
         }

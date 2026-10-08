@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 58 |
-| SHA-256 | `2ff1b788381dc4abb00033952eea918bb0e1f00ad722e994237ce07d7be3ef21` |
+| จำนวน rule | 65 |
+| SHA-256 | `ee196a80db8c620ef6b5f415810b6a13f513e538935e7f23db6002f1c0ef885c` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -86,6 +86,13 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [object namespace ของเคอร์เนลไม่ได้ถูกป้องกันแบบที่ Windows ตั้งมา](#rule-a4af8cdc-a009-42ee-8368-7f35e93051fe) — `posture` · `experimental`
   - [ปิดการป้องกัน speculative execution ไว้](#rule-d2f86e75-7692-468e-88a2-52eb1e24dc30) — `posture` · `experimental`
   - [เครื่องนี้ไม่มี TPM](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
+- `powershell_text`
+  - [คำสั่งในการเปิด Windows PowerShellสั่งให้ Microsoft Defender มองข้ามบางอย่าง](#rule-1fd8ec4a-f6d1-4496-aac5-54ed276717f7) — `tamper` · `experimental`
+  - [คำสั่งในการเปิด Windows PowerShellดาวน์โหลดบางอย่างแล้วรัน](#rule-45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb) — `presence` · `experimental`
+  - [คำสั่งในการเปิด Windows PowerShellล้าง log ประวัติ หรือ Prefetch](#rule-a5b02d12-4999-4cd6-87cc-c7823aee66b9) — `tamper` · `experimental`
+  - [คำสั่งในประวัติ PowerShellสั่งให้ Microsoft Defender มองข้ามบางอย่าง](#rule-b97cb4c6-9dac-47f4-a974-ce17f07d6fc5) — `tamper` · `experimental`
+  - [คำสั่งในประวัติ PowerShellดาวน์โหลดบางอย่างแล้วรัน](#rule-2b4a3f03-e520-44d4-ad91-77f5d7857d71) — `presence` · `experimental`
+  - [คำสั่งในประวัติ PowerShellล้าง log ประวัติ หรือ Prefetch](#rule-8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d) — `tamper` · `experimental`
 - `prefetch`
   - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
 - `usn`
@@ -109,6 +116,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - `pca`
     - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
     - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `powershell_text`
+    - [เวลาที่ log ของ PowerShell บันทึกคำสั่งที่ดาวน์โหลดบางอย่างแล้วรัน](#rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec) — `context` · `experimental`
   - `prefetch`
     - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db) — `context` · `experimental`
     - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
@@ -1818,6 +1827,264 @@ Windows ถูกสั่งให้ปิดการป้องกัน Sp
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/tpm/trusted-platform-module-overview>
 
+## collector `powershell_text`
+
+### `powershell_text` / `engine-start`
+
+<a id="rule-1fd8ec4a-f6d1-4496-aac5-54ed276717f7"></a>
+
+#### คำสั่งในการเปิด Windows PowerShellสั่งให้ Microsoft Defender มองข้ามบางอย่าง
+
+- ชื่อภาษาอังกฤษ: A command in a Windows PowerShell start told Microsoft Defender to look away
+- id: `1fd8ec4a-f6d1-4496-aac5-54ed276717f7`
+- ไฟล์: [`rules/powershell_text/engine-start/defender-tamper/rule.yaml`](../rules/powershell_text/engine-start/defender-tamper/rule.yaml)
+- collector: `powershell_text`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `powershell_text`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+ในcommand line ที่ใช้เปิด Windows PowerShell ตามที่ log ของมันเก็บไว้ มีคำสั่งอย่างน้อยหนึ่งคำสั่งที่เพิ่มรายการยกเว้นให้ Microsoft Defender หรือปิดการป้องกันบางอย่างของมัน รายงานยังบอกด้วยว่าตอนนี้ Defender ถูกตั้งไม่ให้สแกนอะไร เมื่อการสแกนมีสิทธิ์ผู้ดูแลระบบ เครื่องมือนี้อ่านคำสั่งเพียงเพื่อจัดคำเป็นชนิด และไม่เก็บข้อความใดไว้ แถวนี้จึงบอกได้แค่ว่ามีคำชนิดไหน ไม่ได้บอกว่าเป็นคำสั่งอะไร รันอะไร หรือทำงานสำเร็จหรือไม่ คำที่ถูกประกอบขึ้นด้วยวิธีอื่นนอกจาก escape ปกติของ PowerShell จะไม่ถูกจับ การไม่มีแถวจึงไม่ได้บอกอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `defender_tamper`: เป็น `true`
+- `source`: เป็น `engine_start` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะการเปิดที่ log ของ Windows PowerShell ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ 15 MiB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม บนเครื่อง Windows 11 เครื่องหนึ่งย้อนได้ประมาณหกวัน และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- นักพัฒนาและฝ่าย IT ที่ยกเว้นโฟลเดอร์ build หรือเครื่องมือเพื่อให้ Defender ทำงานเร็วขึ้น
+- คู่มือของเกม emulator หรือ mod ที่บอกให้ยกเว้นโฟลเดอร์
+- การปิดการป้องกันเพื่อติดตั้งโปรแกรมที่ Defender ตรวจผิด
+- การไม่มีแถวไม่ได้แปลว่า Defender ไม่เคยถูกเปลี่ยน เพราะการตั้งค่าและ log ของมันเองบอกได้มากกว่า
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb"></a>
+
+#### คำสั่งในการเปิด Windows PowerShellดาวน์โหลดบางอย่างแล้วรัน
+
+- ชื่อภาษาอังกฤษ: A command in a Windows PowerShell start downloaded something and ran it
+- id: `45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb`
+- ไฟล์: [`rules/powershell_text/engine-start/download-then-execute/rule.yaml`](../rules/powershell_text/engine-start/download-then-execute/rule.yaml)
+- collector: `powershell_text`
+- strength: `presence` — มีไฟล์อยู่
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `powershell_text`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+ในcommand line ที่ใช้เปิด Windows PowerShell ตามที่ log ของมันเก็บไว้ มีคำสั่งอย่างน้อยหนึ่งคำสั่งที่มีทั้งคำที่ดาวน์โหลดจากอินเทอร์เน็ตและคำที่สั่งให้รันข้อความเป็นคำสั่ง ซึ่งเป็นรูปแบบของบรรทัดที่ดึง script มารันโดยไม่บันทึกลงไฟล์ แถวนี้บอกจำนวนและเวลาครั้งแรกกับครั้งล่าสุด และชื่อเว็บไซต์เฉพาะเมื่อผู้เล่นยินยอมให้แสดง เครื่องมือนี้อ่านคำสั่งเพียงเพื่อจัดคำเป็นชนิด และไม่เก็บข้อความใดไว้ แถวนี้จึงบอกได้แค่ว่ามีคำชนิดไหน ไม่ได้บอกว่าเป็นคำสั่งอะไร รันอะไร หรือทำงานสำเร็จหรือไม่ คำที่ถูกประกอบขึ้นด้วยวิธีอื่นนอกจาก escape ปกติของ PowerShell จะไม่ถูกจับ การไม่มีแถวจึงไม่ได้บอกอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `download_then_execute`: เป็น `true`
+- `source`: เป็น `engine_start` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะการเปิดที่ log ของ Windows PowerShell ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ 15 MiB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม บนเครื่อง Windows 11 เครื่องหนึ่งย้อนได้ประมาณหกวัน และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ตัวติดตั้งและ package manager ที่ติดตั้งด้วยบรรทัดเดียวแบบนี้ — ประวัติของเครื่องพัฒนาที่วัดไว้มีสามบรรทัด ทั้งหมดมาจากการติดตั้งโปรแกรม
+- script ที่อัปเดตหรือตั้งค่าเครื่องมือพัฒนา terminal หรือการปรับแต่ง Windows ด้วยวิธีเดียวกัน
+- โปรแกรมหรือ scheduled task ที่เปิด PowerShell แบบนี้เพื่ออัปเดตตัวเอง
+- การไม่มีแถวไม่ได้แปลว่าไม่เคยรันอะไร เพราะวิธีอื่นในการรัน script ไม่ได้ถูกอ่าน
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-a5b02d12-4999-4cd6-87cc-c7823aee66b9"></a>
+
+#### คำสั่งในการเปิด Windows PowerShellล้าง log ประวัติ หรือ Prefetch
+
+- ชื่อภาษาอังกฤษ: A command in a Windows PowerShell start cleared a log, the history or Prefetch
+- id: `a5b02d12-4999-4cd6-87cc-c7823aee66b9`
+- ไฟล์: [`rules/powershell_text/engine-start/trace-cleanup/rule.yaml`](../rules/powershell_text/engine-start/trace-cleanup/rule.yaml)
+- collector: `powershell_text`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `powershell_text`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+ในcommand line ที่ใช้เปิด Windows PowerShell ตามที่ log ของมันเก็บไว้ มีคำสั่งอย่างน้อยหนึ่งคำสั่งที่ล้างประวัติของ PowerShell ล้างหรือลบ event log หรือลบไฟล์ประวัติหรือไฟล์ใน Prefetch เครื่องมือนี้อ่านคำสั่งเพียงเพื่อจัดคำเป็นชนิด และไม่เก็บข้อความใดไว้ แถวนี้จึงบอกได้แค่ว่ามีคำชนิดไหน ไม่ได้บอกว่าเป็นคำสั่งอะไร รันอะไร หรือทำงานสำเร็จหรือไม่ คำที่ถูกประกอบขึ้นด้วยวิธีอื่นนอกจาก escape ปกติของ PowerShell จะไม่ถูกจับ การไม่มีแถวจึงไม่ได้บอกอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `source`: เป็น `engine_start` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `trace_cleanup`: เป็น `true`
+
+**ย้อนดูได้**
+
+เฉพาะการเปิดที่ log ของ Windows PowerShell ยังเก็บอยู่ ค่าเริ่มต้นเก็บได้ 15 MiB และเขียนทับบันทึกเก่าสุดเมื่อเต็ม บนเครื่อง Windows 11 เครื่องหนึ่งย้อนได้ประมาณหกวัน และ log ที่ถูกล้างจะไม่มีบันทึกเลย
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- script ทำความสะอาดและเพิ่มความเร็วเครื่องที่ล้าง log และ Prefetch ในคลิกเดียว ซึ่งพบบ่อยในกลุ่มผู้เล่น
+- คนที่ล้างประวัติคำสั่งของตัวเอง
+- ผู้ดูแลระบบที่รีเซ็ต log ระหว่างทดสอบ
+- การไม่มีแถวไม่ได้แปลว่าไม่มีอะไรถูกล้าง เพราะเครื่องมืออื่นไม่ทิ้งบรรทัดไว้ที่นี่
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+### `powershell_text` / `history`
+
+<a id="rule-b97cb4c6-9dac-47f4-a974-ce17f07d6fc5"></a>
+
+#### คำสั่งในประวัติ PowerShellสั่งให้ Microsoft Defender มองข้ามบางอย่าง
+
+- ชื่อภาษาอังกฤษ: A command in the PowerShell history told Microsoft Defender to look away
+- id: `b97cb4c6-9dac-47f4-a974-ce17f07d6fc5`
+- ไฟล์: [`rules/powershell_text/history/defender-tamper/rule.yaml`](../rules/powershell_text/history/defender-tamper/rule.yaml)
+- collector: `powershell_text`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `powershell_text`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+ในประวัติคำสั่งที่พิมพ์ในหน้าต่าง PowerShell ของบัญชีที่รันการสแกนนี้ มีคำสั่งอย่างน้อยหนึ่งคำสั่งที่เพิ่มรายการยกเว้นให้ Microsoft Defender หรือปิดการป้องกันบางอย่างของมัน รายงานยังบอกด้วยว่าตอนนี้ Defender ถูกตั้งไม่ให้สแกนอะไร เมื่อการสแกนมีสิทธิ์ผู้ดูแลระบบ เครื่องมือนี้อ่านคำสั่งเพียงเพื่อจัดคำเป็นชนิด และไม่เก็บข้อความใดไว้ แถวนี้จึงบอกได้แค่ว่ามีคำชนิดไหน ไม่ได้บอกว่าเป็นคำสั่งอะไร รันอะไร หรือทำงานสำเร็จหรือไม่ คำที่ถูกประกอบขึ้นด้วยวิธีอื่นนอกจาก escape ปกติของ PowerShell จะไม่ถูกจับ การไม่มีแถวจึงไม่ได้บอกอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `defender_tamper`: เป็น `true`
+- `source`: เป็น `history` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะบรรทัดที่ไฟล์ประวัติของ PowerShell ยังเก็บอยู่ ค่าเริ่มต้นเก็บคำสั่งล่าสุด 4096 คำสั่ง และไม่บันทึกเวลาของแต่ละบรรทัด แถวนี้จึงบอกว่ากี่คำสั่งที่แล้ว ไม่ได้บอกว่าเมื่อไร PowerShell ไม่เขียนบรรทัดที่มีคำว่า password, token, key หรือ secret ลงไฟล์เลย
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- นักพัฒนาและฝ่าย IT ที่ยกเว้นโฟลเดอร์ build หรือเครื่องมือเพื่อให้ Defender ทำงานเร็วขึ้น
+- คู่มือของเกม emulator หรือ mod ที่บอกให้ยกเว้นโฟลเดอร์
+- การปิดการป้องกันเพื่อติดตั้งโปรแกรมที่ Defender ตรวจผิด
+- การไม่มีแถวไม่ได้แปลว่า Defender ไม่เคยถูกเปลี่ยน เพราะการตั้งค่าและ log ของมันเองบอกได้มากกว่า
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-2b4a3f03-e520-44d4-ad91-77f5d7857d71"></a>
+
+#### คำสั่งในประวัติ PowerShellดาวน์โหลดบางอย่างแล้วรัน
+
+- ชื่อภาษาอังกฤษ: A command in the PowerShell history downloaded something and ran it
+- id: `2b4a3f03-e520-44d4-ad91-77f5d7857d71`
+- ไฟล์: [`rules/powershell_text/history/download-then-execute/rule.yaml`](../rules/powershell_text/history/download-then-execute/rule.yaml)
+- collector: `powershell_text`
+- strength: `presence` — มีไฟล์อยู่
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `powershell_text`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+ในประวัติคำสั่งที่พิมพ์ในหน้าต่าง PowerShell ของบัญชีที่รันการสแกนนี้ มีคำสั่งอย่างน้อยหนึ่งคำสั่งที่มีทั้งคำที่ดาวน์โหลดจากอินเทอร์เน็ตและคำที่สั่งให้รันข้อความเป็นคำสั่ง ซึ่งเป็นรูปแบบของบรรทัดที่ดึง script มารันโดยไม่บันทึกลงไฟล์ แถวนี้บอกจำนวนและว่าครั้งล่าสุดคือกี่คำสั่งที่แล้ว และชื่อเว็บไซต์เฉพาะเมื่อผู้เล่นยินยอมให้แสดง เครื่องมือนี้อ่านคำสั่งเพียงเพื่อจัดคำเป็นชนิด และไม่เก็บข้อความใดไว้ แถวนี้จึงบอกได้แค่ว่ามีคำชนิดไหน ไม่ได้บอกว่าเป็นคำสั่งอะไร รันอะไร หรือทำงานสำเร็จหรือไม่ คำที่ถูกประกอบขึ้นด้วยวิธีอื่นนอกจาก escape ปกติของ PowerShell จะไม่ถูกจับ การไม่มีแถวจึงไม่ได้บอกอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `download_then_execute`: เป็น `true`
+- `source`: เป็น `history` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะบรรทัดที่ไฟล์ประวัติของ PowerShell ยังเก็บอยู่ ค่าเริ่มต้นเก็บคำสั่งล่าสุด 4096 คำสั่ง และไม่บันทึกเวลาของแต่ละบรรทัด แถวนี้จึงบอกว่ากี่คำสั่งที่แล้ว ไม่ได้บอกว่าเมื่อไร PowerShell ไม่เขียนบรรทัดที่มีคำว่า password, token, key หรือ secret ลงไฟล์เลย
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ตัวติดตั้งและ package manager ที่ติดตั้งด้วยบรรทัดเดียวแบบนี้ — ประวัติของเครื่องพัฒนาที่วัดไว้มีสามบรรทัด ทั้งหมดมาจากการติดตั้งโปรแกรม
+- script ที่อัปเดตหรือตั้งค่าเครื่องมือพัฒนา terminal หรือการปรับแต่ง Windows ด้วยวิธีเดียวกัน
+- คำสั่งที่พิมพ์แล้วผิดพลาดหรือถูกยกเลิก ซึ่งประวัติเก็บไว้ทั้งสองแบบ
+- การไม่มีแถวไม่ได้แปลว่าไม่เคยรันอะไร เพราะวิธีอื่นในการรัน script ไม่ได้ถูกอ่าน
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d"></a>
+
+#### คำสั่งในประวัติ PowerShellล้าง log ประวัติ หรือ Prefetch
+
+- ชื่อภาษาอังกฤษ: A command in the PowerShell history cleared a log, the history or Prefetch
+- id: `8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d`
+- ไฟล์: [`rules/powershell_text/history/trace-cleanup/rule.yaml`](../rules/powershell_text/history/trace-cleanup/rule.yaml)
+- collector: `powershell_text`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `powershell_text`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+ในประวัติคำสั่งที่พิมพ์ในหน้าต่าง PowerShell ของบัญชีที่รันการสแกนนี้ มีคำสั่งอย่างน้อยหนึ่งคำสั่งที่ล้างประวัติของ PowerShell ล้างหรือลบ event log หรือลบไฟล์ประวัติหรือไฟล์ใน Prefetch เครื่องมือนี้อ่านคำสั่งเพียงเพื่อจัดคำเป็นชนิด และไม่เก็บข้อความใดไว้ แถวนี้จึงบอกได้แค่ว่ามีคำชนิดไหน ไม่ได้บอกว่าเป็นคำสั่งอะไร รันอะไร หรือทำงานสำเร็จหรือไม่ คำที่ถูกประกอบขึ้นด้วยวิธีอื่นนอกจาก escape ปกติของ PowerShell จะไม่ถูกจับ การไม่มีแถวจึงไม่ได้บอกอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `source`: เป็น `history` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `trace_cleanup`: เป็น `true`
+
+**ย้อนดูได้**
+
+เฉพาะบรรทัดที่ไฟล์ประวัติของ PowerShell ยังเก็บอยู่ ค่าเริ่มต้นเก็บคำสั่งล่าสุด 4096 คำสั่ง และไม่บันทึกเวลาของแต่ละบรรทัด แถวนี้จึงบอกว่ากี่คำสั่งที่แล้ว ไม่ได้บอกว่าเมื่อไร PowerShell ไม่เขียนบรรทัดที่มีคำว่า password, token, key หรือ secret ลงไฟล์เลย
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- script ทำความสะอาดและเพิ่มความเร็วเครื่องที่ล้าง log และ Prefetch ในคลิกเดียว ซึ่งพบบ่อยในกลุ่มผู้เล่น
+- คนที่ล้างประวัติคำสั่งของตัวเอง
+- ผู้ดูแลระบบที่รีเซ็ต log ระหว่างทดสอบ
+- การไม่มีแถวไม่ได้แปลว่าไม่มีอะไรถูกล้าง เพราะเครื่องมืออื่นไม่ทิ้งบรรทัดไว้ที่นี่
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
 ## collector `prefetch`
 
 ### `prefetch` / `file-attributes`
@@ -2484,6 +2751,44 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
 - Windows ไม่ได้เขียนบันทึก — ไฟล์เหล่านี้มีเฉพาะใน Windows 11 22H2 ขึ้นไป
 - Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `powershell_text` / `timeline`
+
+<a id="rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec"></a>
+
+#### เวลาที่ log ของ PowerShell บันทึกคำสั่งที่ดาวน์โหลดบางอย่างแล้วรัน
+
+- ชื่อภาษาอังกฤษ: When PowerShell's logs recorded a command that downloaded something and ran it
+- id: `bc3c9769-c57e-4c01-9f0d-8a71152102ec`
+- ไฟล์: [`rules/powershell_text/timeline/download-then-execute-times/rule.yaml`](../rules/powershell_text/timeline/download-then-execute-times/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `powershell_text`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `powershell_text`
+- เขียนเมื่อ: 2026-10-08
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่าครั้งแรกและครั้งล่าสุดที่ script block ที่ถูกตั้งธงหรือการเปิด Windows PowerShell มีทั้งคำที่ดาวน์โหลดและคำที่สั่งให้รันข้อความเป็นคำสั่ง เกิดขึ้นเมื่อไร ประวัติคำสั่งไม่มีเวลาจึงไม่อยู่บน timeline เครื่องมือนี้อ่านคำสั่งเพียงเพื่อจัดคำเป็นชนิด และไม่เก็บข้อความใดไว้ แถวนี้จึงบอกได้แค่ว่ามีคำชนิดไหน ไม่ได้บอกว่าเป็นคำสั่งอะไร รันอะไร หรือทำงานสำเร็จหรือไม่ คำที่ถูกประกอบขึ้นด้วยวิธีอื่นนอกจาก escape ปกติของ PowerShell จะไม่ถูกจับ การไม่มีแถวจึงไม่ได้บอกอะไร
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `download_then_execute`: เป็น `true`
+- `first_seen|exists`: มีฟิลด์นี้
+
+**ย้อนดูได้**
+
+เฉพาะบันทึกที่ log สองตัวของ Windows PowerShell ยังเก็บอยู่ แต่ละตัวเก็บได้ 15 MiB โดยค่าเริ่มต้นและเขียนทับบันทึกเก่าสุดเมื่อเต็ม
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- ตัวติดตั้งและ script อัปเดตที่ดาวน์โหลดแล้วรันในบรรทัดเดียว
+- การไม่มีเวลาไม่ได้แปลว่าไม่มีอะไรถูกรัน และเวลาก่อนบันทึกเก่าสุดของ log มองไม่เห็น
+
+**แหล่งอ้างอิง**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
 
 ### `prefetch` / `timeline`
 
