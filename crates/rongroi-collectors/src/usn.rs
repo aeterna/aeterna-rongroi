@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! The system volume's NTFS change journal, counted for the folders other collectors read (ADR 0047).
+//! The system volume's NTFS change journal, counted for the folders other collectors read (ADR 0047),
+//! and for the folder `PowerShell`'s line editor keeps its command history in (ADR 0063).
 //!
 //! The journal records every file created, changed, renamed or deleted on a volume, by name. This
 //! collector reads it to the end and keeps, of each record, only whether its parent folder is one of
-//! five this program already reads — Prefetch, the Event Log folder, the Program Compatibility
-//! Assistant folder and `FiveM`'s two plugin folders — and why the record was written. **No file name
+//! six — Prefetch, the Event Log folder, the Program Compatibility Assistant folder and `FiveM`'s two
+//! plugin folders, which this program already reads, and `PSReadLine`'s history folder, which it does
+//! not — and why the record was written. **No file name
 //! reaches this module**: `rongroi_parsers::usn` never reads one. No journal identifier, USN or file
 //! reference number reaches an observation either, because each identifies one machine or one file
 //! across two reports (ADR 0021).
@@ -15,8 +17,10 @@
 //! Records are counted, never listed. A count of deletions is not evidence of cleaning: Prefetch keeps
 //! a bounded number of files and removes the rest itself, and a player removes a `ReShade` preset. The
 //! only rules on this collector read the deletions and renames in `FiveM`'s two plugin folders, as
-//! `context` (ADR 0047, amendment of 2026-09-30); no rule reads the Prefetch, Event Log or Program
-//! Compatibility Assistant counts.
+//! `context` (ADR 0047, amendment of 2026-09-30), and in `PSReadLine`'s history folder, also as
+//! `context` (ADR 0063); no rule reads the Prefetch, Event Log or Program Compatibility Assistant counts.
+//! `PSReadLine` appends to its history file and rewrites it, and never deletes or renames it, so a
+//! deletion there was made by someone or something else (ADR 0063, from `PSReadLine`'s source).
 //!
 //! A version 3 record is attributed to a folder by its 128-bit identifier, which ADR 0047 measured on a
 //! GitHub-hosted runner. A version 2 record is attributed by the folder's 64-bit index, which was not
@@ -56,6 +60,10 @@ pub const PREFETCH_LOCATION: &str = "prefetch";
 pub const WINEVT_LOGS_LOCATION: &str = "winevt_logs";
 /// Value of `location` for `%WinDir%\appcompat\pca`.
 pub const APPCOMPAT_PCA_LOCATION: &str = "appcompat_pca";
+/// The `location` of `PSReadLine`'s history folder under the roaming profile (ADR 0063).
+pub const PSREADLINE_LOCATION: &str = "psreadline";
+/// Where `PSReadLine` keeps `ConsoleHost_history.txt`, under `%APPDATA%` (ADR 0063).
+pub const PSREADLINE_RELATIVE_PATH: &str = r"Microsoft\Windows\PowerShell\PSReadLine";
 
 /// `folder` when the folder's identifiers were read and its records counted.
 pub const FOLDER_IDENTIFIED: &str = "identified";
@@ -118,7 +126,7 @@ struct Place {
     relative: &'static str,
 }
 
-const PLACES: [Place; 5] = [
+const PLACES: [Place; 6] = [
     Place {
         location: PREFETCH_LOCATION,
         base: prefetch::SYSTEM_ROOT,
@@ -143,6 +151,12 @@ const PLACES: [Place; 5] = [
         location: fivem_dir::ENHANCED_ASI_LOCATION,
         base: fivem_dir::ROAMING_APP_DATA,
         relative: fivem_dir::ENHANCED_ASI_RELATIVE_PATH,
+    },
+    // The one watched folder no other collector reads: ADR 0063, amending ADR 0047's scope.
+    Place {
+        location: PSREADLINE_LOCATION,
+        base: fivem_dir::ROAMING_APP_DATA,
+        relative: PSREADLINE_RELATIVE_PATH,
     },
 ];
 
@@ -630,8 +644,8 @@ mod tests {
         assert!(gaps.is_empty());
 
         let journal = at(observations, JOURNAL_LOCATION);
-        assert_eq!(journal.fields["records"], 710);
-        assert_eq!(journal.fields["records_version_3"], 710);
+        assert_eq!(journal.fields["records"], 714);
+        assert_eq!(journal.fields["records_version_3"], 714);
         assert_eq!(journal.fields["records_version_2"], 0);
         assert_eq!(journal.fields["trimmed"], true);
         assert_eq!(journal.fields["maximum_size"], 33_554_432);
@@ -658,6 +672,16 @@ mod tests {
             at(observations, fivem_dir::PLUGINS_LOCATION).fields["renamed"],
             2
         );
+
+        // PSReadLine's history folder (ADR 0063): its appends are changes, its deletion a deletion.
+        let psreadline = at(observations, PSREADLINE_LOCATION);
+        assert_eq!(psreadline.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(psreadline.fields["records"], 4);
+        assert_eq!(psreadline.fields["deleted"], 1);
+        assert_eq!(psreadline.fields["renamed"], 0);
+        assert_eq!(psreadline.fields["data_changed"], 3);
+        assert_eq!(psreadline.fields["first_seen"], "2026-09-14T11:00:00Z");
+        assert_eq!(psreadline.fields["last_seen"], "2026-09-14T11:05:00Z");
 
         let enhanced = at(observations, fivem_dir::ENHANCED_ASI_LOCATION);
         assert_eq!(enhanced.fields["folder"], FOLDER_ABSENT);
@@ -917,11 +941,15 @@ mod tests {
         let (observations, gaps, discriminator_gaps) = measured(&run);
         assert!(gaps.is_empty());
         // Enhanced is not installed on this baseline, so its plugin folder is absent, as on the
-        // runner — the one discriminator gap this reading has.
-        assert_eq!(discriminator_gaps.len(), 1);
+        // runner. PSReadLine's history folder was not watched when the runner was read (ADR 0063 came
+        // later) and the baseline describes none, so it is absent too: the two discriminator gaps.
+        let absent: Vec<&str> = discriminator_gaps
+            .iter()
+            .filter_map(|gap| gap.value.as_str())
+            .collect();
         assert_eq!(
-            discriminator_gaps[0].value,
-            fivem_dir::ENHANCED_ASI_LOCATION
+            absent,
+            [fivem_dir::ENHANCED_ASI_LOCATION, PSREADLINE_LOCATION]
         );
 
         let journal = at(observations, JOURNAL_LOCATION);

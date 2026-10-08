@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Synthetic fixture host — see ../PROVENANCE.md.
 #
-# An elevated Windows 11 scan whose system volume journal holds records under three watched folders and
-# one nobody watches. FiveM is installed for Legacy only; Enhanced's folder is not there.
+# An elevated Windows 11 scan whose system volume journal holds records under four watched folders —
+# PSReadLine's history folder among them (ADR 0063) — and one nobody watches. FiveM is installed for Legacy only; Enhanced's folder is not there.
 platform: windows
 os_build: "26100"
 elevated: true
@@ -20,6 +20,7 @@ usn_journal:
     'C:\Windows\System32\winevt\Logs': 2
     'C:\Windows\appcompat\pca': 3
     'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': 4
+    'C:\Users\fixtureuser\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine': 5
   records:
     - parent: 'C:\Windows\Prefetch'
       reasons: [file_create, data_extend, close]
@@ -40,6 +41,14 @@ usn_journal:
     - parent: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins'
       reasons: [rename_new_name, close]
       first: '2026-09-14T10:00:01Z'
+    - parent: 'C:\Users\fixtureuser\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine'
+      reasons: [data_extend, close]
+      count: 3
+      first: '2026-09-14T11:00:00Z'
+      last: '2026-09-14T11:02:00Z'
+    - parent: 'C:\Users\fixtureuser\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine'
+      reasons: [file_delete, close]
+      first: '2026-09-14T11:05:00Z'
     - reasons: [data_overwrite, close]
       count: 5
       first: '2026-09-11T12:00:00Z'

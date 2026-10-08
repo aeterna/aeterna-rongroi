@@ -1,0 +1,12 @@
+{
+  "description": "PowerShell's operational log as the evtx collector groups it: the flagged blocks (4104, level 3) as one group, with the provider, channel and level measured on a Windows 11 PC (ADR 0063). The count and the span echo that PC's 369 records over about a day and a half; the times are illustrative. One group is selected, and nothing in it says what any script was.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-PowerShell%4Operational.evtx",
+      "channel": "Microsoft-Windows-PowerShell/Operational",
+      "provider": "Microsoft-Windows-PowerShell",
+      "event_id": 4104, "level": 3, "count": 369,
+      "first_seen": "2026-10-07T00:52:00.000Z", "last_seen": "2026-10-08T07:41:00.000Z" } }
+  ],
+  "expect_matches": 1
+}

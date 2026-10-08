@@ -2,6 +2,7 @@
 
 - Status: accepted — the owner decided the six questions below on 2026-10-08, each as recommended
 - Date: 2026-10-08
+- Implemented: the selector, the `psreadline` place and its two rules, in the change that adds "As built"
 
 ## Context
 
@@ -216,3 +217,27 @@ The owner answered "as recommended" to all six:
 - `rules/unconfronted.csv`: one row for the selector (no baseline carries a PowerShell operational log) and
   two for the `usn` rules (no baseline describes the PSReadLine folder), each with what would end it.
 - No change to the rule format, the engine or either schema version.
+
+## As built (2026-10-08)
+
+- `rules/evtx/timeline/powershell-flagged-script-block/`, `rules/usn/psreadline/files-deleted/` and
+  `files-renamed/`, with the fixtures section "Consequences" names; `usn`'s `PLACES` gains `psreadline`
+  (`PSREADLINE_LOCATION`, `PSREADLINE_RELATIVE_PATH`); the journal's timeline selector names the folder in its
+  text; ADR 0047 carries the amendment.
+- `fixtures/hosts/usn-journal-read` gains the folder with three appends and one deletion, so the collector's
+  test and the report test assert its counts, its row and its row band in both views.
+- **Owner decision 6, met:** one elevated scan with a release-profile build of this change (not an official
+  build — the change was not merged yet) on the Windows 11 PC (build 26220), 2026-10-08:
+
+  | What | Read |
+  |---|---|
+  | the 4104 level 3 group | `Microsoft-Windows-PowerShell`, 373 records, first 2026-10-07T00:23:42Z, last 2026-10-08T07:15:17Z |
+  | the selector on the SS timeline | two entries, `first_seen` and `last_seen`, with its title, in English and in Thai |
+  | `psreadline` | `identified`, 0 records in the span |
+  | the journal's span | 2026-10-08T07:20:46Z to 07:56:40Z, about 36 minutes, 343 462 records |
+  | the two `psreadline` rules | `not_found` |
+  | trace ages | `Microsoft-Windows-PowerShell%4Operational.evtx` among the first rows |
+
+  The newest flagged block was this project's own probe, run on that PC that morning; the PC is the
+  development machine, as section "Measured" says. The folder and the files were removed afterwards.
+

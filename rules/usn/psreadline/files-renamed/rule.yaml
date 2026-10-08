@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 8a39617a-30d6-4fc0-9b20-cb4f899985d5
+title: The change journal holds a rename in PowerShell's command history folder
+description: >-
+  The NTFS change journal holds at least one record of a file renamed directly inside the folder where
+  PowerShell keeps the history of commands typed into its window, moved into it or moved out of it. A
+  rename inside the folder leaves two records, one for the old name and one for the new. PowerShell adds to
+  its history file and rewrites it, and does not rename it. The row gives how many records, and the first
+  and last time, never a file name or anything the file held. It shows the span the journal covered: on an
+  ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds
+  nothing, it means only that nothing was renamed, moved in or moved out there within that span. The journal
+  does not record which program renamed a file, so this does not say who did it, or that anything was hidden.
+status: experimental
+collector: usn
+# ADR 0063 §2: `context`, as the plugin folders' rules are, so a `not_found` is counted in SS mode.
+strength: context
+match:
+  location: psreadline
+  folder: identified
+  renamed|gte: 1
+retention: >-
+  Only the span the change journal still held when the scan read it, shown beside this row. The journal
+  keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+# `not_admin` is a scope statement and never a row; `access_denied` is not declared, because the folder
+# is in the player's own profile and a denial there is unexpected (ADR 0047, amendment of 2026-09-30).
+# `source_absent`: the folder exists only where someone has typed into a PowerShell window (ADR 0063 §2).
+unmeasured_when: [not_windows, source_absent, other_volume]
+falsepositives:
+  - The player moving their history file to keep or share it, or moving one back
+  - A file moved to the Recycle Bin, which the journal records as a rename (how the Recycle Bin shows was
+    not measured)
+  - A text editor that saves by writing a new copy and renaming it over the old one
+  - A backup, sync or clean-up tool replacing the file
+references:
+  - https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [usn, psreadline]

@@ -247,6 +247,8 @@ need by hand, and compare it with the report yourself.
 | The change journal holds a rename in FiveM's plugin folder | context | `experimental` | the player renamed, moved or replaced a plugin, an update that swaps a new copy in by renaming (not measured), a file moved to the Recycle Bin, antivirus quarantine |
 | The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder; whether Enhanced loads this folder at all is not known |
 | The change journal holds a rename in FiveM for GTA V Enhanced's asi folder | context | `experimental` | the same as for Legacy's plugin folder |
+| The change journal holds a deletion in PowerShell's command history folder | context | `experimental` | the player clearing their own PowerShell history, a privacy or clean-up tool, a profile reset or restore, antivirus. PowerShell itself does not delete the file (ADR 0063) |
+| The change journal holds a rename in PowerShell's command history folder | context | `experimental` | the player moving the file, the Recycle Bin, an editor that saves by renaming, a backup or sync tool |
 | A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders | posture | `experimental` | programs installed per user in AppData — launchers, chat and voice apps, cloud sync clients, and above all their updaters and helpers; peripheral, RGB, fan and overclocking utilities; service wrappers and servers from a package manager; management and provisioning agents; open-source and self-built tools; a file signed through a catalog; a Run entry switched off in Task Manager |
 | A Microsoft Defender exclusion covers a FiveM folder | posture | `experimental` | performance and FPS guides that tell players to exclude the game or FiveM folder, game and mod installers and launchers that add their own exclusion, developers and build machines that exclude a whole drive, another security product or an administrator managing Defender |
 
@@ -346,17 +348,21 @@ Two things to know about the hosts-file rule:
   The proxy and the Windows Firewall rules for FiveM are read too, and no rule reads them: an allowed
   FiveM program and a proxy are what ordinary PCs have. SS mode only counts them.
 
-Four things to know about the four change-journal rules (ADR 0047, amendment of 2026-09-30):
+Five things to know about the six change-journal rules (ADR 0047, amendment of 2026-09-30; ADR 0063):
 
 - **A count is for a short span, and the row says which.** Windows' change journal keeps a fixed size and
   drops its oldest records first. On one Windows 11 PC it held 39 minutes. Every row shows the span it
   covered: "Not found" means nothing within that span, not "never".
 - **The journal does not say who.** A deletion by the player, by FiveM's updater, by an antivirus and by
   Windows look alike in it. The row says a file left the folder, not what it was — no file name is read.
-- **They need administrator rights.** Without them, the four are part of the scope line's count of checks
+- **They need administrator rights.** Without them, the six are part of the scope line's count of checks
   administrator rights would answer.
 - **"On another drive" is not a failure.** If the player's FiveM folder is on another drive, the program
   does not read that drive's journal, and says so instead of counting.
+- **PowerShell's history folder is the one place no other part of the report reads** (ADR 0063). PowerShell
+  adds each command typed into its window to a file there and never deletes or renames the file itself, so
+  a deletion is a person or another program — clearing one's own history is the ordinary one. The row never
+  says what the file held. A PC where nobody ever typed into a PowerShell window has no such folder.
 
 Three things to know about the rule on what starts by itself (ADR 0060):
 
@@ -411,10 +417,12 @@ row and not evidence. A name is all Windows keeps, so a time there says a progra
 then, not that the game did, and a missing time does not say the game never ran. The timeline also
 shows the times of FiveM's log, crash and cache folders, the first and last time the Code Integrity log
 recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection (ADR 0059), the
-span each Windows log and the change journal could see, and which of those could not be read. Those two
-event times are not rows: this program does not read which file was refused or what was detected, Windows 11
-refuses some drivers by default, and an ordinary PC measured for this held hundreds of refusals and a
-detection. Read a time only inside its source's span, and
+first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as
+suspicious (ADR 0063), the span each Windows log and the change journal could see, and which of those could
+not be read. Those event times are not rows: this program does not read which file was refused, what was
+detected or what a script said, Windows 11 refuses some drivers by default, an ordinary PC measured for this
+held hundreds of refusals and a detection, and PowerShell flags ordinary scripts too — the development PC
+measured held 369 flagged blocks in a day and a half. Read a time only inside its source's span, and
 never read the space between two times as something someone removed.
 
 **How far back the traces reach** (ADR 0061) is a section of its own, in both modes, and the consent

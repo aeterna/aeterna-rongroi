@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 55 |
-| SHA-256 | `1189336b89f6ee78d45c5d5603e40ab87361ebd0c6da986fb9d56b530b96e3ee` |
+| Rules | 58 |
+| SHA-256 | `2ff1b788381dc4abb00033952eea918bb0e1f00ad722e994237ce07d7be3ef21` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -97,6 +97,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
   - [The change journal holds a deletion in FiveM's plugin folder](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
   - [The change journal holds a rename in FiveM's plugin folder](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
+  - [The change journal holds a deletion in PowerShell's command history folder](#rule-926b3863-8f4f-4d18-aab6-26b77934466e) — `context` · `experimental`
+  - [The change journal holds a rename in PowerShell's command history folder](#rule-8a39617a-30d6-4fc0-9b20-cb4f899985d5) — `context` · `experimental`
 - Timeline selectors
   - `bam`
     - [When BAM recorded a program named like FiveM's game process](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
@@ -105,6 +107,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [When Code Integrity recorded that Windows refused to load a file](#rule-51bb1937-7ab2-48db-a2f2-78be82ba2fe8) — `context` · `experimental`
     - [When Microsoft Defender recorded a detection](#rule-63269014-f728-424c-8e18-e36fe79030aa) — `context` · `experimental`
     - [A Windows event log's oldest and newest record](#rule-87b47713-1ed3-415e-bc07-9cd0b953d7c1) — `context` · `test`
+    - [When PowerShell recorded a script block it considers suspicious](#rule-5bd03528-fcfe-4e57-8a7f-3a2ec815a7af) — `context` · `experimental`
   - `fivem_dir`
     - [When FiveM's log, crash and cache folders were written](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
   - `pca`
@@ -2015,6 +2018,96 @@ Only the span the change journal still held when the scan read it, shown beside 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
 - <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
 
+### `usn` / `psreadline`
+
+<a id="rule-926b3863-8f4f-4d18-aab6-26b77934466e"></a>
+
+#### The change journal holds a deletion in PowerShell's command history folder
+
+- Id: `926b3863-8f4f-4d18-aab6-26b77934466e`
+- File: [`rules/usn/psreadline/files-deleted/rule.yaml`](../rules/usn/psreadline/files-deleted/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `psreadline`
+- Written: 2026-10-08
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file deleted directly inside the folder where PowerShell keeps the history of commands typed into its window. PowerShell adds to that file and rewrites it, and does not delete it, so a deletion there was made by a person or by another program. The row gives how many records, and the first and last time, never a file name or anything the file held. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen, and a deleted folder, rather than a file in it, is not counted. If this rule finds nothing, it means only that nothing was deleted there within that span. The journal does not record which program deleted a file, so this does not say who did it, or that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `deleted|gte`: is at least `1`
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `psreadline` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player clearing their own PowerShell history, which deletes the file
+- A privacy, clean-up or optimiser tool that clears command histories
+- A Windows profile reset, or a backup or sync tool restoring the folder
+- Antivirus software removing a file from the folder
+
+**References**
+
+- <https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline>
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
+<a id="rule-8a39617a-30d6-4fc0-9b20-cb4f899985d5"></a>
+
+#### The change journal holds a rename in PowerShell's command history folder
+
+- Id: `8a39617a-30d6-4fc0-9b20-cb4f899985d5`
+- File: [`rules/usn/psreadline/files-renamed/rule.yaml`](../rules/usn/psreadline/files-renamed/rule.yaml)
+- Collector: `usn`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usn`, `psreadline`
+- Written: 2026-10-08
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file renamed directly inside the folder where PowerShell keeps the history of commands typed into its window, moved into it or moved out of it. A rename inside the folder leaves two records, one for the old name and one for the new. PowerShell adds to its history file and rewrites it, and does not rename it. The row gives how many records, and the first and last time, never a file name or anything the file held. It shows the span the journal covered: on an ordinary PC in use that can be well under an hour. Nothing before that span is seen. If this rule finds nothing, it means only that nothing was renamed, moved in or moved out there within that span. The journal does not record which program renamed a file, so this does not say who did it, or that anything was hidden.
+
+**Matches when all of these hold for one observation**
+
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `psreadline` (text, ASCII case ignored)
+- `renamed|gte`: is at least `1`
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first; on one Windows 11 PC it held about 39 minutes.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- The player moving their history file to keep or share it, or moving one back
+- A file moved to the Recycle Bin, which the journal records as a rename (how the Recycle Bin shows was not measured)
+- A text editor that saves by writing a new copy and renaming it over the old one
+- A backup, sync or clean-up tool replacing the file
+
+**References**
+
+- <https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline>
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
 ## Timeline selectors
 
 A timeline selector is written like a rule and produces no evidence: the observations it matches put their times on the report's timeline, in Self and SS mode, each with the text and the ordinary causes below. It is never Found, Not found or Not measured, and never counted (ADR 0051). A timeline selector may choose Prefetch, BAM and Program Compatibility Assistant records by name, which a rule may not (ADR 0034): a name says nothing about which program it was, and each one says so.
@@ -2199,6 +2292,46 @@ The log files as they are at the moment of the scan. Each log has a size limit a
 - A log that reached its size limit and overwrote its oldest records, which busy logs do within days
 - A new Windows installation, or a reset
 - A log cleared by an administrator, by an installer or by a maintenance tool
+
+<a id="rule-5bd03528-fcfe-4e57-8a7f-3a2ec815a7af"></a>
+
+#### When PowerShell recorded a script block it considers suspicious
+
+- Id: `5bd03528-fcfe-4e57-8a7f-3a2ec815a7af`
+- File: [`rules/evtx/timeline/powershell-flagged-script-block/rule.yaml`](../rules/evtx/timeline/powershell-flagged-script-block/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `evtx`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `evtx`, `timeline`, `powershell`
+- Written: 2026-10-08
+
+**About this check**
+
+Puts on the timeline the first and last time Windows PowerShell's operational log still holds a script block that PowerShell itself flagged as suspicious. PowerShell does this even when script block logging is not switched on, for any script containing one of a fixed list of words — among them the ones a script uses to call into Windows, read or write another program's memory, or decode text — and ordinary scripts contain them too. This tool does not read the block, so a time here does not say what the script was, who ran it, or whether it did anything. It is not evidence about the person.
+
+**Matches when all of these hold for one observation**
+
+- `channel`: is `Microsoft-Windows-PowerShell/Operational` (text, ASCII case ignored)
+- `event_id`: is `4104`
+- `level`: is `3`
+- `provider`: is `Microsoft-Windows-PowerShell` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the blocks the log still holds. It keeps 15 MiB by default and overwrites its oldest records when it is full; on one Windows 11 PC that was about a day and a half. A cleared log holds none.
+
+**Ordinary things behind these times**
+
+- Scripts that show a window or a dialog, install software, or manage Windows, which use the same words
+- Administration, development and game tools that run PowerShell in the background
+- A script that only contains one of the words as text, such as Bypass
+- No time here does not mean no script ran. PowerShell records nothing this way when a policy turns script block logging off, and PowerShell 7 records it in another log, which on one PC measured did not exist; scripts run before the log's oldest record are not seen
+
+**References**
+
+- <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows>
+- <https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/runtime/CompiledScriptBlock.cs>
 
 ### `fivem_dir` / `timeline`
 
@@ -2385,7 +2518,7 @@ Only the Prefetch files still in the folder, and only the most recent run each o
 
 **About this check**
 
-Puts on the timeline the oldest and newest change the NTFS change journal still holds for each folder this program watches: Prefetch, the event log folder, the Program Compatibility Assistant folder and FiveM's plugin folders. The journal counts changes without saying which program made them, so a time here is when a file in that folder was created, changed, renamed or deleted, by anyone, including Windows and FiveM. It is not evidence that anything was removed.
+Puts on the timeline the oldest and newest change the NTFS change journal still holds for each folder this program watches: Prefetch, the event log folder, the Program Compatibility Assistant folder, FiveM's plugin folders and the folder PowerShell keeps its command history in. The journal counts changes without saying which program made them, so a time here is when a file in that folder was created, changed, renamed or deleted, by anyone, including Windows and FiveM; in PowerShell's folder a change is usually a command typed into a PowerShell window, never which command. It is not evidence that anything was removed.
 
 **Matches when all of these hold for one observation**
 
@@ -2399,5 +2532,6 @@ Only the records the journal still holds. The journal has a fixed size and drops
 
 - Windows writing and removing Prefetch files, event logs and compatibility records in ordinary use
 - FiveM, its updater and plugins installed or removed by the player changing files in the plugin folders
+- PowerShell adding each command typed into its window to its history file
 - Disk clean-up, backup, antivirus and optimisation tools
 - A folder with no change in the journal's span has no time here, which does not mean nothing changed before it
