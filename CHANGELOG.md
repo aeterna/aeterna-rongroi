@@ -6,6 +6,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `rongroi-parsers::powershell_text` (ADR 0064, first of three changes): classifies a PowerShell history file, a
+  script block's text or a command line into the fixed list of kinds as booleans — after undoing escapes, joined
+  literals and up to two levels of encoded command — plus the host of the first download URL, reduced to a plain name
+  or an address's kind. It keeps no other text; its tests assert that a password, a token, a path, a port and a query
+  do not survive. A fuzz target, `fuzz_powershell_text`, seeded from four synthetic fixtures in
+  `fixtures/parsers/powershell-text/`, joins the CI smoke run. Nothing calls it yet.
 - **PowerShell, without reading what it says** (ADR 0063):
   - a timeline selector puts on the timeline the first and last time Windows PowerShell's operational log holds a
     script block PowerShell itself flagged as suspicious (event 4104, level 3) — never the script's text. Not a rule:
