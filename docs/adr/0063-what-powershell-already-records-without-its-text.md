@@ -1,6 +1,6 @@
 # ADR 0063 — What PowerShell already records, without reading what it says
 
-- Status: proposed — the owner's questions below are open
+- Status: accepted — the owner decided the six questions below on 2026-10-08, each as recommended
 - Date: 2026-10-08
 
 ## Context
@@ -183,7 +183,9 @@ The selector reads fields `evtx` declares. `usn` gains one place and no field. N
   probe used `file:///`. What PowerShell logs is the block's text, which does not depend on where it came
   from — that is reasoning, not a measurement.
 
-## Owner questions
+## Owner decisions (2026-10-08)
+
+The owner answered "as recommended" to all six:
 
 1. **The 4104 selector instead of a rule** (section 1). Recommended.
 2. **The sixth watched folder and its two rules** (section 2), `context`, `experimental` — including that it is

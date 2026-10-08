@@ -6,10 +6,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
-- ADR 0063 proposed: what PowerShell already records, without reading what it says — a timeline selector for the
+- ADR 0063 accepted: what PowerShell already records, without reading what it says — a timeline selector for the
   script blocks PowerShell itself flags (event 4104, level 3) and a sixth folder for the change journal, the one
   PowerShell keeps its command history in, with two `context` rules; nothing for PowerShell 7 or event 400 yet.
-  Measured on a Windows 11 PC; the owner's questions are open.
+  Measured on a Windows 11 PC; the owner decided its six questions as recommended on 2026-10-08.
 - Screenshare guides (Thai and English), README and the landing page: the download check uses Command Prompt and
   `certutil -hashfile <file> SHA256` instead of PowerShell's `Get-FileHash`, the CLI is run from an administrator
   Command Prompt, and the "downloaded from the internet" mark is removed from the file's Properties instead of with
