@@ -245,6 +245,15 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
             "ให้คนที่ดูอยู่เห็นตัวระบุบัญชีที่การสแกนนี้อ่านมาหรือไม่ ถ้าไม่ แต่ละค่าจะแสดงเป็น \
              %ACCOUNT_IDENTIFIER% [y/N] "
         }
+        (Lang::En, "download_host_question") => {
+            "Show the person watching the name of each website a PowerShell command downloaded from? \
+             Only the name is read, never the rest of the address or the command. If not, each name is \
+             shown as %DOWNLOAD_HOST%. [y/N] "
+        }
+        (Lang::Th, "download_host_question") => {
+            "ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell ดาวน์โหลดจากมาหรือไม่ อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง \
+             ถ้าไม่ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST% [y/N] "
+        }
         _ => "",
     }
 }
@@ -365,20 +374,30 @@ pub fn consent(lang: Lang) -> String {
 }
 
 /// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055).
-fn full_reads(lang: Lang) -> &'static str {
+fn full_reads(lang: Lang) -> [&'static str; 2] {
     match lang {
-        Lang::En => {
+        Lang::En => [
             "the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server \
              this PC joined — with when it was created and last changed. What the name is made from is \
              not known; it stays the same for that server on this PC, so it can match two reports of \
-             this PC"
-        }
-        Lang::Th => {
+             this PC",
+            "the words in PowerShell's commands, kept only as kinds — whether a command downloaded \
+             something and ran it, told Microsoft Defender to look away, cleared a log or history, or \
+             named FiveM — from the history of commands typed into a PowerShell window, the scripts \
+             Windows PowerShell flagged as suspicious, and the command lines it was started with, with \
+             how many and when. No command is kept or shown; the one thing kept is the name of a website \
+             a command downloaded from, which SS mode shows only if you agree to that separately",
+        ],
+        Lang::Th => [
             "ชื่อโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ที่ FiveM for GTA V Enhanced เก็บไว้ \
              หนึ่งโฟลเดอร์ต่อหนึ่งเซิร์ฟเวอร์ที่เครื่องนี้เคยเข้า พร้อมเวลาที่สร้างกับเวลาที่แก้ไขล่าสุด \
              ยังไม่รู้ว่าชื่อนี้คำนวณมาจากอะไร แต่ชื่อของเซิร์ฟเวอร์เดิมบนเครื่องนี้จะเหมือนเดิม \
-             จึงจับคู่รายงานสองฉบับจากเครื่องนี้ได้"
-        }
+             จึงจับคู่รายงานสองฉบับจากเครื่องนี้ได้",
+            "คำในคำสั่ง PowerShell โดยเก็บไว้แค่เป็นชนิด — คำสั่งนั้นดาวน์โหลดแล้วรันอะไรหรือไม่ สั่งให้ Microsoft Defender \
+             มองข้ามบางอย่างหรือไม่ ล้าง log หรือประวัติหรือไม่ หรือพูดถึง FiveM หรือไม่ — จากประวัติคำสั่งที่พิมพ์ในหน้าต่าง \
+             PowerShell, script ที่ Windows PowerShell ตั้งธงว่าน่าสงสัย และ command line ที่ใช้เปิดมัน พร้อมจำนวนและเวลา \
+             ไม่เก็บและไม่แสดงคำสั่งใด ๆ สิ่งเดียวที่เก็บคือชื่อเว็บไซต์ที่คำสั่งดาวน์โหลดมา ซึ่งโหมด SS จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง",
+        ],
     }
 }
 
@@ -386,17 +405,17 @@ fn full_reads(lang: Lang) -> &'static str {
 pub fn full_question(lang: Lang) -> String {
     match lang {
         Lang::En => format!(
-            "Full scan — this reads more than the standard scan:\n  - {}\nNothing is read \
-             differently and nothing is sent anywhere. In SS mode a server's name is shown only if \
-             you agree to that separately.\nType yes for the full scan; anything else starts the \
+            "Full scan — this reads more than the standard scan:\n  - {}\nNothing is sent \
+             anywhere. In SS mode a server's name and a website's name are each shown only if you \
+             agree to that separately.\nType yes for the full scan; anything else starts the \
              standard scan: ",
-            full_reads(lang)
+            full_reads(lang).join("\n  - ")
         ),
         Lang::Th => format!(
-            "การสแกนแบบ Full — อ่านมากกว่าการสแกนแบบมาตรฐาน:\n  - {}\nไม่ได้อ่านสิ่งใดต่างไปจากเดิม \
-             และไม่ส่งอะไรออกไปไหน ในโหมด SS ชื่อเซิร์ฟเวอร์จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง\n\
+            "การสแกนแบบ Full — อ่านมากกว่าการสแกนแบบมาตรฐาน:\n  - {}\nไม่ส่งอะไรออกไปไหน \
+             ในโหมด SS ชื่อเซิร์ฟเวอร์และชื่อเว็บไซต์จะแสดงก็ต่อเมื่อคุณยินยอมแยกทีละข้อ\n\
              พิมพ์ yes เพื่อสแกนแบบ Full พิมพ์อย่างอื่นจะเป็นการสแกนแบบมาตรฐาน: ",
-            full_reads(lang)
+            full_reads(lang).join("\n  - ")
         ),
     }
 }
@@ -411,6 +430,7 @@ pub fn sensitive_question(lang: Lang, kind: SensitiveKind) -> &'static str {
     match kind {
         SensitiveKind::ServerIdentity => scan_text(lang, "server_identity_question"),
         SensitiveKind::AccountIdentifier => scan_text(lang, "account_identifier_question"),
+        SensitiveKind::DownloadHost => scan_text(lang, "download_host_question"),
     }
 }
 
@@ -425,11 +445,16 @@ pub fn consent_for(lang: Lang, tier: ScanTier) -> String {
         Lang::En => ("  - when Windows last started", "(full scan) "),
         Lang::Th => ("  - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด", "(สแกนแบบ Full) "),
     };
-    question.replacen(
-        marker,
-        &format!("  - {label}{}\n{marker}", full_reads(lang)),
-        1,
-    )
+    let items = full_reads(lang)
+        .iter()
+        .fold(String::new(), |mut items, item| {
+            items.push_str("  - ");
+            items.push_str(label);
+            items.push_str(item);
+            items.push('\n');
+            items
+        });
+    question.replacen(marker, &format!("{items}{marker}"), 1)
 }
 
 /// Line shown before an elevated copy waits for Enter, so its window does not close on the report.
@@ -1139,6 +1164,10 @@ mod tests {
                 "posture",
                 &["Secure Boot", "memory integrity", "PowerShell"],
             ),
+            (
+                "powershell_text",
+                &["PowerShell", "Microsoft Defender", "SS"],
+            ),
             ("prefetch", &["Prefetch"]),
             ("process", &[]),
             ("usn", &["change journal"]),
@@ -1200,6 +1229,39 @@ mod tests {
             for word in named.iter().flat_map(|(_, words)| words.iter()) {
                 assert!(question.contains(word), "{word} missing from {question}");
             }
+        }
+    }
+
+    /// A full scan's two questions name what ADR 0064's collector reads, that no command is kept, and the
+    /// separate answer for a website's name; the standard scan's question names none of it.
+    #[test]
+    fn a_full_scan_names_powershell_text_and_the_website_question() {
+        for (lang, words) in [
+            (
+                Lang::En,
+                [
+                    "PowerShell's commands",
+                    "No command is kept or shown",
+                    "a website's name",
+                ],
+            ),
+            (
+                Lang::Th,
+                ["คำในคำสั่ง PowerShell", "ไม่เก็บและไม่แสดงคำสั่งใด ๆ", "ชื่อเว็บไซต์"],
+            ),
+        ] {
+            let full = format!(
+                "{}{}",
+                consent_for(lang, ScanTier::Full),
+                full_question(lang)
+            );
+            for word in words {
+                assert!(full.contains(word), "{word} missing from {full}");
+            }
+            assert!(!consent(lang).contains(words[0]));
+            assert!(
+                sensitive_question(lang, SensitiveKind::DownloadHost).contains("%DOWNLOAD_HOST%")
+            );
         }
     }
 

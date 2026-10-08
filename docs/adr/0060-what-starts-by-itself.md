@@ -3,6 +3,8 @@
 - Status: accepted — the owner decided the nine questions below on 2026-09-30
 - Date: 2026-09-30
 - Amended: 2026-09-30, with a measurement on a Windows 11 PC ("Measured on a Windows 11 PC (2026-09-30)")
+- Amended: 2026-10-08, by ADR 0064: section 4 holds for this collector; a full scan's `powershell_text`
+  is the one place a program's arguments are read, and only into kinds of words
 
 ## Context
 
@@ -295,6 +297,12 @@ so. For a task, `Command` is a program alone, so the quoted-path reading applies
 Arguments are where secrets live: a token, a password or an address passed to a program at start. The
 collector reads a command line only to find where the program's path ends, and **nothing after it reaches
 an observation**, not even whether there was anything. Task `Arguments` elements are not read.
+
+*Amended 2026-10-08 by ADR 0064.* This section is unchanged for `autostart`. A full scan's
+`powershell_text` reads the command lines Windows PowerShell was started with, as its own log keeps them,
+and sorts their words into a fixed list of kinds; no substring reaches an observation except a download's
+host, behind its own SS-mode question. It is the one exception, and it reads no task's or service's
+arguments.
 
 This has a cost, weighed in owner decision 4. Dropping arguments means the report describes the
 program that starts, not what that program is given to run. When that program is one Windows ships for

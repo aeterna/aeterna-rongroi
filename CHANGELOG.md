@@ -6,6 +6,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **A full scan reads which kinds of words PowerShell's commands held, never the commands** (ADR 0064, third of
+  three changes): a `full` collector, `powershell_text`, reads the account's PSReadLine history, the script blocks
+  Windows PowerShell flagged and the command lines it was started with, hands each text to the parsers and keeps
+  kinds, counts and times — how many commands ago for the history, which has no times. Six `experimental` rules,
+  per source (history, Windows PowerShell start): downloaded something and ran it (`presence`), told Microsoft
+  Defender to look away and cleared a log, the history or Prefetch (`tamper`); a timeline selector for the logs'
+  download-then-execute times. A download's host is the one text kept: a new sensitive kind, `download_host`, shown
+  in SS mode as `%DOWNLOAD_HOST%` unless the player agrees to its own question (CLI and desktop, both languages);
+  an address is kept as its kind only. The full-scan question names PowerShell. Amended: the collectors'
+  `AGENTS.md`, ADR 0052 §5 and §6, ADR 0060 §4 and PRIVACY.md, each naming this collector as the one exception;
+  `docs/architecture.md`, the glossary and both screenshare guides describe it.
 - `rongroi-parsers::evtx::powershell_text` (ADR 0064, second of three changes; ADR 0018 amended): reads the payload
   of exactly two kinds of record — a script block Windows PowerShell flagged (4104 level 3, its parts joined by
   `ScriptBlockId`) and the command line Windows PowerShell started with (400 `HostApplication`) — and classifies

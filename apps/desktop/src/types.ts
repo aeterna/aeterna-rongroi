@@ -236,6 +236,8 @@ export type ScanTier = "standard" | "full";
 export interface SsOptions {
   server_identity: boolean;
   account_identifier: boolean;
+  /** The name of a website a PowerShell command downloaded from (ADR 0064). */
+  download_host: boolean;
 }
 
 /**

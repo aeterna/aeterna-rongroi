@@ -2,7 +2,7 @@
 
 - Status: accepted — the owner decided the seven questions below on 2026-10-08, each as recommended;
   "Before any code" measured on 2026-10-08 ("Measured before code"): items 1 and 3 on the development PC,
-  item 2 on a GitHub-hosted runner
+  item 2 on a GitHub-hosted runner; implemented on 2026-10-08 in three changes ("As built")
 - Date: 2026-10-08
 
 ## Context
@@ -263,6 +263,58 @@ under the conditions above and nowhere else.
    Recommended.
 7. "Before any code" measured on the development PC (counts only) and on a runner before the code change.
    Recommended.
+
+## As built (2026-10-08)
+
+Three changes: the classifier (`rongroi-parsers::powershell_text`), the two log payloads
+(`rongroi-parsers::evtx::powershell_text`, ADR 0018 amended), and the collector with its rules, sensitive kind
+and texts. Where the build differs from the decision above, and why:
+
+1. **Rules are per source, not `any/`.** Section 5 named `powershell_text/any/defender-tamper` and
+   `…/any/trace-cleanup`. A rule without `source` in its `match` is one rule over three places: when any one
+   source is absent, as the Windows PowerShell log is on a PC whose log was cleared, the rule is `unmeasured`
+   for the places that were read too, or it says `not_found` for a place nobody read (ADR 0044). They are
+   `history/…` and `engine-start/…` instead, six rules in all. There is no `script-block/…` rule: on both
+   machines measured no flagged block held a download, a Defender change or a clean-up, and a flagged block
+   is already on the timeline (ADR 0063).
+2. **The selector asks for `download_then_execute`, not any kind.** Section 5's "any kind true" would put
+   every flagged block on the timeline twice — once by ADR 0063's selector, once here — and the 369 blocks in
+   a day and a half measured are nearly all ordinary. It matches `download_then_execute: true` with a
+   `first_seen`, which only the two logs' groups carry.
+3. **A group is `(source, kinds, host)`.** Section 3 said one observation per source and combination of
+   kinds; two downloads from different websites would then share one `download_host`. The host is part of
+   the key, so each website has its own row. A log group counts only entries with at least one kind true;
+   the `read` observation's `examined` says how many were looked at.
+4. **The `read` observation.** One per source and, for the history, per file: `read` (`ok`, `absent`,
+   `access_denied`, `too_large`, `failed`), and `lines` and `lossy_lines` for a history file, `examined` and `rejected`
+   for a log. The file's size and last-write time were not added: the change journal and the listing already
+   give the folder's times (ADR 0063), and a size says nothing a line count does not. `budget_spent` and
+   `partial` are not reported: the files are read whole, up to `rongroi_host::MAX_FILE_BYTES` like every file
+   this program reads, and a larger one is `too_large`.
+5. **Another administrator's history.** Section 6 said a scan elevated with another administrator's
+   password would say so by comparing accounts. The collector reads `%APPDATA%` of the process, which is that
+   administrator's, and does not compare; the rules' `falsepositives` and the screenshare guide say the
+   history is the account running the scan. Comparing accounts is a later change if a screenshare shows it
+   matters.
+6. **No baseline.** The Consequences below asked for a `baseline-*` host from the runner measurement. The
+   runner's history is what a workflow typed into it, and its logs carry its own scripts; neither is an
+   ordinary player's PC, and fixtures/hosts/PROVENANCE.md forbids describing one nobody measured. The seven
+   rules have `rules/unconfronted.csv` rows saying what would end them.
+7. **The history file's word.** `file` is `console_host`, `visual_studio_code` or `other`, never the file's
+   name, which a host program chooses and could carry anything.
+
+Tests: the collector's six (a leak test asserting that a password and a path in an editor's history reach no
+observation, the denied and absent shapes, per-source gaps), two L3 snapshots on `powershell-text-present` at
+the full tier (the leak test over the whole report, and `%DOWNLOAD_HOST%` hidden by default and shown when
+agreed), the CLI's consent text, and the desktop's consent switch.
+
+A release build ran a full scan, elevated, on the development PC (build 26220) the same day, counts only: the
+history's 2 347 lines gave 3 download-then-execute lines, the newest 1 493 commands ago and all from installing
+software, as measured before code; the operational log's 411 flagged records and the classic log's 1 546
+starts were read with none rejected. Both download-then-execute rules, the history's and the Windows
+PowerShell start's, were `found` — the latter from the ADR 0063 probe's two starts — the four tamper rules `not_found`, and the selector
+put one flagged block on the timeline, the probe's own test text. In SS mode without the website question
+every `download_host` was `%DOWNLOAD_HOST%`.
 
 ## Consequences (if accepted)
 

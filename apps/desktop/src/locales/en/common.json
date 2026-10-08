@@ -20,7 +20,7 @@
     "standard_done": "This was a standard scan.",
     "full_done": "This was a full scan: you agreed in the Windows dialog before it read anything.",
     "full_button": "Full scan",
-    "full_hint": "Reads more than the standard scan: the name of each server cache folder FiveM for GTA V Enhanced keeps. This closes the program and starts it again; before it reads anything, a Windows dialog lists what a full scan reads and asks you. No there gives you the standard scan.",
+    "full_hint": "Reads more than the standard scan: the name of each server cache folder FiveM for GTA V Enhanced keeps, and the kinds of words in PowerShell's commands, never the commands. This closes the program and starts it again; before it reads anything, a Windows dialog lists what a full scan reads and asks you. No there gives you the standard scan.",
     "full_failed": "Windows did not start the program again. Nothing changed."
   },
   "consent": {
@@ -32,8 +32,9 @@
     "refuse_ok": "You may refuse.",
     "agree": "I agree — show the SS view",
     "refuse": "I refuse",
-    "full_reads": "A full scan also read the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server this PC joined — with when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so it can match two reports of this PC.",
-    "server_identity": "Also show which servers these are (the folder names). Off: each name is shown as %SERVER_IDENTITY%."
+    "full_reads": "A full scan also read the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server this PC joined — with when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so it can match two reports of this PC. It also read the words in PowerShell's commands, kept only as kinds — whether a command downloaded something and ran it, told Microsoft Defender to look away, cleared a log or history, or named FiveM — from the history of commands typed into a PowerShell window, the scripts Windows PowerShell flagged as suspicious, and the command lines it was started with. No command was kept; the one thing kept is the name of a website a command downloaded from.",
+    "server_identity": "Also show which servers these are (the folder names). Off: each name is shown as %SERVER_IDENTITY%.",
+    "download_host": "Also show the name of each website a PowerShell command downloaded from. Off: each name is shown as %DOWNLOAD_HOST%."
   },
   "declined": {
     "title": "Nothing was shown",

@@ -974,3 +974,47 @@ fn the_index_is_shown_beside_its_oldest_cache_file() {
         ]
     );
 }
+
+/// ADR 0064: the full tier reads the words in PowerShell commands, never the commands. The history's
+/// download-then-execute rule is `found` from the console's history; what the editor's history held —
+/// a password and a folder under the user's profile — reaches no part of the report, in either mode,
+/// because the collector keeps kinds and counts, not text. The Windows PowerShell log is not on this
+/// host, so its rules are `unmeasured` with `source_absent`, never `not_found`.
+#[test]
+fn powershell_text_present_full_self_view() {
+    let report = report_at(
+        "powershell-text-present",
+        SelfIdentity::default(),
+        ScanTier::Full,
+    );
+    let everything = serde_json::to_string(&report).unwrap();
+    for typed in ["correct horse", "private-project", "$pw"] {
+        assert!(!everything.contains(typed), "{typed} reached the report");
+    }
+    let view = view::for_mode(&report, Mode::SelfCheck);
+    insta::assert_json_snapshot!(view, { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}
+
+/// SS mode shows a website's name only when the player agreed to it (ADR 0064): by default it is the
+/// placeholder, and the agreed view shows the name.
+#[test]
+fn powershell_text_present_full_ss_view() {
+    let report = report_at(
+        "powershell-text-present",
+        SelfIdentity::default(),
+        ScanTier::Full,
+    );
+    let hidden = serde_json::to_string(&view::for_mode(&report, Mode::Ss)).unwrap();
+    assert!(hidden.contains(view::DOWNLOAD_HOST_PLACEHOLDER), "{hidden}");
+    assert!(!hidden.contains(".invalid"), "{hidden}");
+    let shown = view::for_mode_with(
+        &report,
+        Mode::Ss,
+        view::SsOptions {
+            download_host: true,
+            ..view::SsOptions::default()
+        },
+    );
+    assert!(serde_json::to_string(&shown).unwrap().contains(".invalid"));
+    insta::assert_json_snapshot!(view::for_mode(&report, Mode::Ss), { ".header.rules_bundle.sha256" => "[bundle sha256]" });
+}

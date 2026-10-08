@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 58 |
-| SHA-256 | `2ff1b788381dc4abb00033952eea918bb0e1f00ad722e994237ce07d7be3ef21` |
+| Rules | 65 |
+| SHA-256 | `ee196a80db8c620ef6b5f415810b6a13f513e538935e7f23db6002f1c0ef885c` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -90,6 +90,13 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [The kernel object namespace is not protected as Windows ships it](#rule-a4af8cdc-a009-42ee-8368-7f35e93051fe) — `posture` · `experimental`
   - [The speculative-execution mitigations are switched off](#rule-d2f86e75-7692-468e-88a2-52eb1e24dc30) — `posture` · `experimental`
   - [No TPM is present](#rule-66d513b5-fe61-415a-9385-9d01f85c3ef5) — `context` · `experimental`
+- `powershell_text`
+  - [A command in a Windows PowerShell start told Microsoft Defender to look away](#rule-1fd8ec4a-f6d1-4496-aac5-54ed276717f7) — `tamper` · `experimental`
+  - [A command in a Windows PowerShell start downloaded something and ran it](#rule-45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb) — `presence` · `experimental`
+  - [A command in a Windows PowerShell start cleared a log, the history or Prefetch](#rule-a5b02d12-4999-4cd6-87cc-c7823aee66b9) — `tamper` · `experimental`
+  - [A command in the PowerShell history told Microsoft Defender to look away](#rule-b97cb4c6-9dac-47f4-a974-ce17f07d6fc5) — `tamper` · `experimental`
+  - [A command in the PowerShell history downloaded something and ran it](#rule-2b4a3f03-e520-44d4-ad91-77f5d7857d71) — `presence` · `experimental`
+  - [A command in the PowerShell history cleared a log, the history or Prefetch](#rule-8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d) — `tamper` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
 - `usn`
@@ -113,6 +120,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - `pca`
     - [When Program Compatibility Assistant recorded a program named like FiveM's game process](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
     - [When Program Compatibility Assistant recorded a program named like FiveM or GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `powershell_text`
+    - [When PowerShell's logs recorded a command that downloaded something and ran it](#rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec) — `context` · `experimental`
   - `prefetch`
     - [When Prefetch recorded a program named like FiveM's game process](#rule-d377e008-0a08-4d6e-adf2-f6cbc8b978db) — `context` · `experimental`
     - [When Prefetch recorded a program named like FiveM or GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
@@ -1783,6 +1792,258 @@ Current hardware state only. It says nothing about earlier hardware or firmware 
 
 - <https://learn.microsoft.com/en-us/windows/security/hardware-security/tpm/trusted-platform-module-overview>
 
+## Collector `powershell_text`
+
+### `powershell_text` / `engine-start`
+
+<a id="rule-1fd8ec4a-f6d1-4496-aac5-54ed276717f7"></a>
+
+#### A command in a Windows PowerShell start told Microsoft Defender to look away
+
+- Id: `1fd8ec4a-f6d1-4496-aac5-54ed276717f7`
+- File: [`rules/powershell_text/engine-start/defender-tamper/rule.yaml`](../rules/powershell_text/engine-start/defender-tamper/rule.yaml)
+- Collector: `powershell_text`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `powershell_text`
+- Written: 2026-10-08
+
+**About this check**
+
+In the command lines Windows PowerShell was started with, as its own log keeps them, at least one command added an exclusion to Microsoft Defender or switched one of its protections off. The report also says what Defender is told not to scan now, when the scan has administrator rights. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+
+**Matches when all of these hold for one observation**
+
+- `defender_tamper`: is `true`
+- `source`: is `engine_start` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the starts the Windows PowerShell log still holds. It keeps 15 MiB by default and overwrites its oldest records when full; on one Windows 11 PC that was about six days. A cleared log holds none.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Developers and IT staff excluding build folders or tools to speed Defender up
+- Game, emulator or mod guides that tell players to exclude a folder
+- Turning protection off to install a program Defender flagged by mistake
+- A missing row does not mean Defender was never changed, since its own settings and log say more
+
+**References**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb"></a>
+
+#### A command in a Windows PowerShell start downloaded something and ran it
+
+- Id: `45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb`
+- File: [`rules/powershell_text/engine-start/download-then-execute/rule.yaml`](../rules/powershell_text/engine-start/download-then-execute/rule.yaml)
+- Collector: `powershell_text`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `powershell_text`
+- Written: 2026-10-08
+
+**About this check**
+
+In the command lines Windows PowerShell was started with, as its own log keeps them, at least one command held both a word that downloads from the internet and a word that runs text as a command, the shape of a line that fetches a script and runs it without saving it. The row gives how many and the first and last time, and the website's name only if the player agreed to show it. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+
+**Matches when all of these hold for one observation**
+
+- `download_then_execute`: is `true`
+- `source`: is `engine_start` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the starts the Windows PowerShell log still holds. It keeps 15 MiB by default and overwrites its oldest records when full; on one Windows 11 PC that was about six days. A cleared log holds none.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Installers and package managers that are installed with one line of this shape — the measured development PC's history held three, all from installing software
+- Scripts that update or set up developer tools, terminals or Windows tweaks the same way
+- A program or a scheduled task that starts PowerShell this way to update itself
+- A missing row does not mean nothing was run, because other ways of running a script are not read
+
+**References**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-a5b02d12-4999-4cd6-87cc-c7823aee66b9"></a>
+
+#### A command in a Windows PowerShell start cleared a log, the history or Prefetch
+
+- Id: `a5b02d12-4999-4cd6-87cc-c7823aee66b9`
+- File: [`rules/powershell_text/engine-start/trace-cleanup/rule.yaml`](../rules/powershell_text/engine-start/trace-cleanup/rule.yaml)
+- Collector: `powershell_text`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `powershell_text`
+- Written: 2026-10-08
+
+**About this check**
+
+In the command lines Windows PowerShell was started with, as its own log keeps them, at least one command cleared PowerShell's history, cleared or removed an event log, or deleted the history file or files under Prefetch. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+
+**Matches when all of these hold for one observation**
+
+- `source`: is `engine_start` (text, ASCII case ignored)
+- `trace_cleanup`: is `true`
+
+**Look-back**
+
+Only the starts the Windows PowerShell log still holds. It keeps 15 MiB by default and overwrites its oldest records when full; on one Windows 11 PC that was about six days. A cleared log holds none.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Clean-up and optimiser scripts that clear logs and Prefetch in one click, which are common among players
+- A person clearing their own command history
+- Administrators resetting a log while testing
+- A missing row does not mean nothing was cleared, because other tools leave no line here
+
+**References**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+### `powershell_text` / `history`
+
+<a id="rule-b97cb4c6-9dac-47f4-a974-ce17f07d6fc5"></a>
+
+#### A command in the PowerShell history told Microsoft Defender to look away
+
+- Id: `b97cb4c6-9dac-47f4-a974-ce17f07d6fc5`
+- File: [`rules/powershell_text/history/defender-tamper/rule.yaml`](../rules/powershell_text/history/defender-tamper/rule.yaml)
+- Collector: `powershell_text`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `powershell_text`
+- Written: 2026-10-08
+
+**About this check**
+
+In the history of commands typed into a PowerShell window on the account running this scan, at least one command added an exclusion to Microsoft Defender or switched one of its protections off. The report also says what Defender is told not to scan now, when the scan has administrator rights. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+
+**Matches when all of these hold for one observation**
+
+- `defender_tamper`: is `true`
+- `source`: is `history` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the lines PowerShell's history file still holds. It keeps the newest 4096 commands by default and writes no time for a line, so the row says how many commands ago, not when. PowerShell leaves out of the file every line holding the words password, token, key or secret.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Developers and IT staff excluding build folders or tools to speed Defender up
+- Game, emulator or mod guides that tell players to exclude a folder
+- Turning protection off to install a program Defender flagged by mistake
+- A missing row does not mean Defender was never changed, since its own settings and log say more
+
+**References**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-2b4a3f03-e520-44d4-ad91-77f5d7857d71"></a>
+
+#### A command in the PowerShell history downloaded something and ran it
+
+- Id: `2b4a3f03-e520-44d4-ad91-77f5d7857d71`
+- File: [`rules/powershell_text/history/download-then-execute/rule.yaml`](../rules/powershell_text/history/download-then-execute/rule.yaml)
+- Collector: `powershell_text`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `powershell_text`
+- Written: 2026-10-08
+
+**About this check**
+
+In the history of commands typed into a PowerShell window on the account running this scan, at least one command held both a word that downloads from the internet and a word that runs text as a command, the shape of a line that fetches a script and runs it without saving it. The row gives how many and how many commands ago the newest was, and the website's name only if the player agreed to show it. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+
+**Matches when all of these hold for one observation**
+
+- `download_then_execute`: is `true`
+- `source`: is `history` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the lines PowerShell's history file still holds. It keeps the newest 4096 commands by default and writes no time for a line, so the row says how many commands ago, not when. PowerShell leaves out of the file every line holding the words password, token, key or secret.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Installers and package managers that are installed with one line of this shape — the measured development PC's history held three, all from installing software
+- Scripts that update or set up developer tools, terminals or Windows tweaks the same way
+- A command that was typed and failed, or was cancelled, which the history keeps either way
+- A missing row does not mean nothing was run, because other ways of running a script are not read
+
+**References**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
+<a id="rule-8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d"></a>
+
+#### A command in the PowerShell history cleared a log, the history or Prefetch
+
+- Id: `8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d`
+- File: [`rules/powershell_text/history/trace-cleanup/rule.yaml`](../rules/powershell_text/history/trace-cleanup/rule.yaml)
+- Collector: `powershell_text`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `powershell_text`
+- Written: 2026-10-08
+
+**About this check**
+
+In the history of commands typed into a PowerShell window on the account running this scan, at least one command cleared PowerShell's history, cleared or removed an event log, or deleted the history file or files under Prefetch. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+
+**Matches when all of these hold for one observation**
+
+- `source`: is `history` (text, ASCII case ignored)
+- `trace_cleanup`: is `true`
+
+**Look-back**
+
+Only the lines PowerShell's history file still holds. It keeps the newest 4096 commands by default and writes no time for a line, so the row says how many commands ago, not when. PowerShell leaves out of the file every line holding the words password, token, key or secret.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Clean-up and optimiser scripts that clear logs and Prefetch in one click, which are common among players
+- A person clearing their own command history
+- Administrators resetting a log while testing
+- A missing row does not mean nothing was cleared, because other tools leave no line here
+
+**References**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
+
 ## Collector `prefetch`
 
 ### `prefetch` / `file-attributes`
@@ -2433,6 +2694,43 @@ Only what the Program Compatibility Assistant files still hold. Windows keeps th
 - A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
 - Windows not writing a record — these files exist only on Windows 11 22H2 and later
 - Windows keeping the record after the program's files were removed
+
+### `powershell_text` / `timeline`
+
+<a id="rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec"></a>
+
+#### When PowerShell's logs recorded a command that downloaded something and ran it
+
+- Id: `bc3c9769-c57e-4c01-9f0d-8a71152102ec`
+- File: [`rules/powershell_text/timeline/download-then-execute-times/rule.yaml`](../rules/powershell_text/timeline/download-then-execute-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `powershell_text`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `powershell_text`
+- Written: 2026-10-08
+
+**About this check**
+
+Puts on the timeline the first and last time a flagged script block or a Windows PowerShell start held both a word that downloads and a word that runs text as a command. The history has no times and is not on the timeline. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+
+**Matches when all of these hold for one observation**
+
+- `download_then_execute`: is `true`
+- `first_seen|exists`: the field is present
+
+**Look-back**
+
+Only the records the two Windows PowerShell logs still hold; each keeps 15 MiB by default and overwrites its oldest records when full.
+
+**Ordinary things behind these times**
+
+- Installers and update scripts that download and run in one line
+- A missing time does not mean nothing ran, and no time before a log's oldest record is seen
+
+**References**
+
+- <https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md>
 
 ### `prefetch` / `timeline`
 

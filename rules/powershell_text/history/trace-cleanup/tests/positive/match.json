@@ -1,0 +1,26 @@
+{
+  "description": "Synthetic: one history group with a clean-up command.",
+  "observations": [
+    {
+      "collector": "powershell_text",
+      "fields": {
+        "invoke_expression": false,
+        "remote_download": false,
+        "download_then_execute": false,
+        "encoded_command": false,
+        "decoded": false,
+        "execution_policy_bypass": false,
+        "hidden_window": false,
+        "native_interop": false,
+        "defender_tamper": false,
+        "trace_cleanup": true,
+        "game_process": false,
+        "source": "history",
+        "count": 1,
+        "file": "console_host",
+        "newest_from_end": 12
+      }
+    }
+  ],
+  "expect_matches": 1
+}

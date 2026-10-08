@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 2b4a3f03-e520-44d4-ad91-77f5d7857d71
+title: A command in the PowerShell history downloaded something and ran it
+description: >-
+  In the history of commands typed into a PowerShell window on the account running this scan, at least one command held both a word that downloads from the internet and a word that runs text as a command, the shape of a line that fetches a script and runs it without saving it. The row gives how many and how many commands ago the newest was, and the website's name only if the player agreed to show it. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+# ADR 0064 section 5. `experimental`: the kinds come from one development PC and one runner.
+status: experimental
+collector: powershell_text
+strength: presence
+match:
+  source: history
+  download_then_execute: true
+retention: >-
+  Only the lines PowerShell's history file still holds. It keeps the newest 4096 commands by default and writes no time for a line, so the row says how many commands ago, not when. PowerShell leaves out of the file every line holding the words password, token, key or secret.
+# `not_admin` and `not_consented` are scope statements; `source_absent` is a PC with no such history or log.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - Installers and package managers that are installed with one line of this shape — the measured development PC's history held three, all from installing software
+  - Scripts that update or set up developer tools, terminals or Windows tweaks the same way
+  - A command that was typed and failed, or was cancelled, which the history keeps either way
+  - A missing row does not mean nothing was run, because other ways of running a script are not read
+references:
+  - https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [powershell_text]
