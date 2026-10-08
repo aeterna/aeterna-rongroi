@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-09-12
+- Amended: 2026-10-08, by ADR 0064: `powershell_text` reads the payload of two kinds of event, and only
+  a full scan calls it ("Amendment for ADR 0064")
 
 ## Context
 
@@ -381,3 +383,18 @@ duplicates a known-good chunk and breaks its signature in four lines.
 - Nothing consumes this parser yet. The collector that reads `%SystemRoot%\System32\winevt\Logs` —
   which needs an elevated token for the `Security` channel and reports `Unmeasured` without one — and
   the rules that read the result are later PRs. No report changes.
+
+## Amendment for ADR 0064: two payloads, classified where they are read (2026-10-08)
+
+`records` is unchanged: it keeps a record's identity and no payload, and every collector that reads it, the
+standard `evtx` collector included, sees no more than before. A second function, `powershell_text`, reads the
+payload of exactly two kinds of record — `ScriptBlockText` of 4104 at level 3 from `Microsoft-Windows-PowerShell`
+on its operational channel, and `HostApplication` of 400 from `PowerShell` on `Windows PowerShell` — each
+recognised by provider, channel and id together (ADR 0031). It joins a script block's parts by
+`ScriptBlockId`, hands the text to `powershell_text::classify` inside the parsers crate, and returns kinds, a
+time and at most a download host. The text, the block's id, its path and the record's `Computer` field do not
+leave the function; a test asserts it over records that carry each. Only ADR 0064's `full` collector calls it.
+
+Measured on 2026-10-08 on the development PC, over the two logs exported with `wevtutil epl`: 413 flagged
+records joined into 135 blocks, all complete, and 1 546 starts, 0 rejected, in 0.23 s and 0.24 s.
+

