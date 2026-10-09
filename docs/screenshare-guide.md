@@ -354,7 +354,9 @@ Four things to know about the full scan's PowerShell rows (ADR 0064):
   development PC measured held three such lines in its history, all from installing software. Ask the
   player what they installed before reading anything into the row.
 - **The history has no times.** A history row says how many commands ago the newest such line was typed,
-  and it holds only the account running the scan. The Windows PowerShell rows have times, inside the
+  and it holds only the account running the scan. `account: other` means that is not the account signed in
+  at the keyboard — usually because the scan was restarted with another administrator's password — so the
+  history is that administrator's, not the player's. The Windows PowerShell rows have times, inside the
   span its log still holds — about six days on the one PC measured.
 - **A missing row says nothing.** PowerShell leaves out of its history every line holding the words
   password, token, key or secret; a command built with other tricks than PowerShell's ordinary escapes is

@@ -21,6 +21,7 @@ falsepositives:
   - A person clearing their own command history
   - Administrators resetting a log while testing
   - A missing row does not mean nothing was cleared, because other tools leave no line here
+  - "A scan restarted with another administrator's password, which reads that administrator's history, not the person's at the keyboard; each row then says `account: other`"
 references:
   - https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md
 author: aeterna-rongroi contributors

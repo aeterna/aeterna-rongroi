@@ -6,6 +6,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `powershell_text`'s history observations say whose history it is (ADR 0064, amended 2026-10-09): `account` is
+  `same` or `other` as the scanning account equals the one Windows' sign-in screen last signed in
+  (`LastLoggedOnUserSID`), or `unknown`; neither SID is reported. Measured on a runner with a second local
+  administrator in the runner's session. The three history rules' `falsepositives` and both screenshare guides
+  say what `other` means.
 - **A full scan reads which kinds of words PowerShell's commands held, never the commands** (ADR 0064, third of
   three changes): a `full` collector, `powershell_text`, reads the account's PSReadLine history, the script blocks
   Windows PowerShell flagged and the command lines it was started with, hands each text to the parsers and keeps

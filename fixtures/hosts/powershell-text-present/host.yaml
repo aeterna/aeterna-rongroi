@@ -6,10 +6,12 @@
 # `.invalid` name among ordinary commands) and an editor's history written inline, which holds a
 # password and a path that the collector's tests assert reach no observation. The operational log is the
 # one vendored Event Log sample under the PowerShell log's name: it parses, and holds no PowerShell
-# record. The classic Windows PowerShell log is not there.
+# record. The classic Windows PowerShell log is not there. The account running the scan is the one the
+# sign-in screen last signed in, so the history is the signed-in account's (`account: same`).
 platform: windows
 os_build: "26100"
 elevated: true
+account_sid: S-1-5-21-1000000000-2000000000-3000000000-1001
 env:
   SystemRoot: 'C:\Windows'
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
@@ -24,3 +26,6 @@ filesystem:
   'C:\Windows\System32\winevt\Logs':
     - name: Microsoft-Windows-PowerShell%4Operational.evtx
       from: '../../evtx/languagepacksetup-operational.evtx'
+registry:
+  'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI':
+    LastLoggedOnUserSID: 'S-1-5-21-1000000000-2000000000-3000000000-1001'

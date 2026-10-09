@@ -245,6 +245,7 @@ expression: "view::for_mode(&report, Mode::Ss)"
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "count": 1,
             "decoded": false,
             "defender_tamper": true,
@@ -273,6 +274,7 @@ expression: "view::for_mode(&report, Mode::Ss)"
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "count": 1,
             "decoded": false,
             "defender_tamper": false,
@@ -302,6 +304,7 @@ expression: "view::for_mode(&report, Mode::Ss)"
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "count": 1,
             "decoded": false,
             "defender_tamper": false,
