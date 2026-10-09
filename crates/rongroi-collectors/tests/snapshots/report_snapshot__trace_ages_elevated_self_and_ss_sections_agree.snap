@@ -179,6 +179,12 @@ expression: own
       },
       {
         "collector": "evtx",
+        "subject": "Microsoft-Windows-PowerShell%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
         "subject": "Microsoft-Windows-Windows Defender%4Operational.evtx",
         "state": "unmeasured",
         "reason": "source_absent"

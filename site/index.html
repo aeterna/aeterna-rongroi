@@ -32,7 +32,7 @@
   "description": "โปรแกรมตรวจเครื่อง (PC check) สำหรับชุมชน FiveM แบบ open-source ทำงาน offline แสดงร่องรอยที่โปรโกงทิ้งไว้เป็นหลักฐาน ไม่ตัดสินว่าเครื่องสะอาด",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Windows (x64)",
-  "softwareVersion": "0.7.0",
+  "softwareVersion": "0.8.0",
   "inLanguage": ["th", "en"],
   "license": "https://www.gnu.org/licenses/gpl-3.0.html",
   "url": "https://aeterna.github.io/aeterna-rongroi/",
@@ -59,7 +59,7 @@
       <p class="lead">aeterna-rongroi มองหาร่องรอยที่โปรโกงทิ้งไว้บนเครื่อง Windows และการตั้งค่าที่เปิดทางให้โกงได้ง่าย แล้วแสดงเป็นหลักฐานให้คนดู
         ใช้เช็คเครื่องตัวเอง หรือให้แอดมินดูระหว่างแชร์หน้าจอ (SS) โดยผู้เล่นยินยอม <strong>ไม่มีวันบอกว่าเครื่อง "สะอาด"</strong></p>
       <div class="buttons">
-        <a class="btn primary" href="https://github.com/aeterna/aeterna-rongroi/releases">ดาวน์โหลด · รุ่น 0.7.0</a>
+        <a class="btn primary" href="https://github.com/aeterna/aeterna-rongroi/releases">ดาวน์โหลด · รุ่น 0.8.0</a>
         <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.th.md">คู่มือ SS</a>
         <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi">ดูโค้ด</a>
       </div>
@@ -97,7 +97,7 @@
   </section>
 
   <section>
-    <h2>รุ่น 0.7.0 ตรวจอะไรบ้าง</h2>
+    <h2>รุ่น 0.8.0 ตรวจอะไรบ้าง</h2>
     <div class="table-scroll"><table>
       <thead><tr><th>ตรวจอะไร</th><th>อธิบาย</th></tr></thead>
       <tbody>
@@ -109,6 +109,7 @@
         <tr><td>ไฟล์ที่ถูกลบหรือเปลี่ยนชื่อ</td><td>ในโฟลเดอร์ไฟล์เสริมของ FiveM</td></tr>
         <tr><td>Windows ที่ถูกดัดแปลง</td><td>Windows ที่ถูกตัดระบบป้องกันออกมาก่อน เช่น Atlas, ReviOS<small>เจ้าของเครื่องมีสิทธิ์ใช้ Windows แบบไหนก็ได้ แถวนี้บอกแค่ว่าเป็นแบบไหน</small></td></tr>
         <tr><td>การตั้งค่าอื่นๆ</td><td>โปรแกรมไม่มีลายเซ็นที่เปิดเองตอนเปิดเครื่อง และไฟล์ hosts ที่เปลี่ยนเส้นทางของ FiveM หรือ Rockstar</td></tr>
+        <tr><td>PowerShell</td><td>คำสั่งดาวน์โหลดบางอย่างแล้วรันไหม สั่งให้ Microsoft Defender มองข้ามไหม หรือล้าง log ไหม — เก็บเป็นชนิดของคำ ไม่เก็บตัวคำสั่ง<span class="new">ใหม่</span><small>เฉพาะการสแกนแบบ Full เมื่อผู้เล่นยินยอม</small></td></tr>
         <tr><td>ย้อนดูได้ไกลแค่ไหน</td><td>เพื่อไม่ให้ "ไม่เจอ" ถูกเข้าใจว่า "ไม่เคยเกิดขึ้น"</td></tr>
       </tbody>
     </table></div>
@@ -119,7 +120,7 @@
     <h2>SS ผู้เล่นใน 5 ขั้น</h2>
     <ol class="steps">
       <li><strong>ให้ผู้เล่นโหลดเอง</strong>จาก<a href="https://github.com/aeterna/aeterna-rongroi/releases">หน้า Releases</a> ส่งลิงก์ให้ อย่าส่งไฟล์ให้เอง</li>
-      <li><strong>เช็คว่าเป็นไฟล์ของจริง</strong>เปิด PowerShell ในโฟลเดอร์ที่โหลดมา แล้วรัน <code>Get-FileHash .\aeterna-rongroi-*-windows-x64.exe</code> เทียบกับไฟล์ <code>SHA256SUMS</code> ในหน้า release ถ้าไม่ตรงให้หยุด</li>
+      <li><strong>เช็คว่าเป็นไฟล์ของจริง</strong>เปิด Command Prompt (<code>cmd</code>) ในโฟลเดอร์ที่โหลดมา แล้วรัน <code>certutil -hashfile &lt;ชื่อไฟล์&gt; SHA256</code> เทียบกับไฟล์ <code>SHA256SUMS</code> ในหน้า release ถ้าไม่ตรงให้หยุด</li>
       <li><strong>เปิดโหมด SS</strong>กด "ตรวจระหว่างแชร์หน้าจอ (โหมด SS)" แล้วผู้เล่นเป็นคนกดยินยอมเอง ผู้เล่นปฏิเสธได้ และถ้าปฏิเสธ โปรแกรมจะไม่อ่านอะไรเลย</li>
       <li><strong>ดูหัวรายงาน</strong>ต้องขึ้นว่า build ทางการ ถ้าขึ้น UNOFFICIAL BUILD ผลใช้ไม่ได้</li>
       <li><strong>อ่านผลทีละแถว</strong>และอ่านเรื่องปกติที่ทำให้เกิดผลแบบเดียวกันด้วย</li>

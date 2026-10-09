@@ -51,15 +51,17 @@ Details: [PRIVACY.md](PRIVACY.md).
 ## Verifying a download
 
 Releases are not code-signed yet, so Windows SmartScreen will warn when you run them. To check that you
-have the real file, open PowerShell in the download folder:
+have the real file, open Command Prompt (`cmd`) in the download folder and run, with the exact file name:
 
-```powershell
-Get-FileHash .\aeterna-rongroi-*-windows-x64.exe
+```bat
+certutil -hashfile aeterna-rongroi-0.8.0-windows-x64.exe SHA256
 ```
 
-This prints the hash of each aeterna-rongroi executable in the folder. Compare each hash with the line for the
-same file name in `SHA256SUMS` on the GitHub release page; upper or lower case does not matter. Files from older
-versions in the folder are not listed there. Builds that did not come from the official
+`dir /b aeterna-rongroi-*-windows-x64.exe` lists the file names; `certutil` takes one file at a time. Compare
+the hash with the line for the same file name in `SHA256SUMS` on the GitHub release page; upper or lower case
+does not matter. During a screenshare, use Command Prompt rather than PowerShell: PowerShell keeps its own
+records on the PC, and a check typed into it adds the call's own time to them
+([screenshare guide §2](docs/screenshare-guide.md#2-get-the-real-file)). Builds that did not come from the official
 release pipeline show **UNOFFICIAL BUILD** in the window, in the CLI header and in every report.
 If you see that banner, or the hash does not match, do not rely on the result.
 
@@ -68,10 +70,10 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 ## Status
 
-**Latest release: [0.7.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.03-0.7.0)**, 3 October 2026 —
-a pre-release. It has 44 rules, and almost all of them are still `experimental`: they have not yet been
-checked against enough real PCs, so read every result with care. 0.7.0 gives the window a bright sky look;
-its checks are those of 0.6.0.
+**Latest release: [0.8.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.09-0.8.0)**, 9 October 2026 —
+a pre-release. It has 52 rules, and almost all of them are still `experimental`: they have not yet been
+checked against enough real PCs, so read every result with care. 0.8.0 adds PowerShell: what it flagged and
+whether its history was deleted, and, in a full scan, which kinds of words its commands held — never the commands.
 Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 
 | What it looks at, in plain words | Technical detail |
@@ -84,6 +86,7 @@ Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 | **Deleted or renamed files** — in FiveM's add-on folders | The NTFS change journal (USN) for FiveM's `plugins` and `asi` folders, with the time span it covers |
 | **Modified Windows** — Windows versions that come with protections removed | Atlas, ReviOS and similar builds, from install markers and what Windows reports about itself; the services such builds turn off |
 | **Other settings** — things that start by themselves, and network redirects | Unsigned programs that start by themselves outside Windows and Program Files; a FiveM or Rockstar name in the hosts file |
+| **PowerShell** — **new in 0.8.0:** whether a command downloaded something and ran it, told Microsoft Defender to look away, or cleared a log; kept as kinds of words, never the command | Full scan only, with consent: the PSReadLine history of the account scanning, the script blocks Windows PowerShell flagged and the command lines it started with; a download's website shown in SS mode only if the player agrees. Every scan: the times of flagged script blocks on the timeline, and deletions in the history folder from the change journal |
 | **How far back it can see** — so "not found" is never mistaken for "never happened" | The oldest time each source still holds, beside what it ordinarily keeps |
 
 Not planned for now: Amcache ([ADR 0041](docs/adr/0041-amcache-feasibility.md)).

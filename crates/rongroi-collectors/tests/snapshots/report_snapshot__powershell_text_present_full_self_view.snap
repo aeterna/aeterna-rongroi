@@ -1,0 +1,1220 @@
+---
+source: crates/rongroi-collectors/tests/report_snapshot.rs
+expression: view
+---
+{
+  "mode": "self",
+  "header": {
+    "schema_version": 1,
+    "provenance": {
+      "official": false,
+      "version": "0.0.0-test",
+      "commit": null,
+      "exe_sha256": null
+    },
+    "rules_bundle": {
+      "schema_version": 4,
+      "sha256": "[bundle sha256]",
+      "rule_count": 65
+    },
+    "platform": "windows",
+    "os_build": "26100",
+    "elevated": true,
+    "generated_at": "2026-01-01T00:00:00Z",
+    "boot_time": {
+      "state": "unmeasured",
+      "reason": "read_failed"
+    },
+    "scan_tier": "full",
+    "anchors": [
+      {
+        "anchor": "install_date",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "rule_id": "72820eaf-1469-4ea7-bb0f-17f145d26dfc",
+      "collector": "autostart",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "d7191cf3-ce56-480b-8501-66a198f83e08",
+      "collector": "defender_exclusion",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Defender's exclusions as they were when the scan ran. An exclusion removed before the scan is not seen."
+    },
+    {
+      "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
+      "collector": "driver_service",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "429f8bc3-3c7d-4924-87f7-7cccefa1a185",
+      "collector": "evtx",
+      "strength": "context",
+      "state": "not_found",
+      "retention": "Only switches still in the Defender log as it stands. It holds up to 16 MiB by default and overwrites its oldest records, and a cleared log holds none. If the Defender log is not there at all — Defender removed from the image, or the file deleted — this row also says not found, because this check does not know which logs a PC should have; the rules on Defender's service and platform folder answer that."
+    },
+    {
+      "rule_id": "f4c99b57-02c8-4e53-82d0-dba8bdc13dda",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "not_found",
+      "retention": "Only clearings still recorded in the System log as it stands today. The log holds a limited window and overwrites its oldest records, and clearing the System log removes these records along with everything else — so nothing found here does not mean no log was ever cleared."
+    },
+    {
+      "rule_id": "ff967b28-984b-4de0-b361-58367ae0c2d5",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "not_found",
+      "retention": "Only clearings still recorded in the Security log as it stands today. The log holds a limited window and overwrites its oldest records, and a later clearing removes the record of an earlier one — so nothing found here does not mean no log was ever cleared."
+    },
+    {
+      "rule_id": "9b318bfa-805d-4edd-81f1-602b57639a69",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "87a53c8f-b0e4-477d-91e7-93b904ba965f",
+      "collector": "evtx",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "2dc11b64-72a2-48f5-a273-985e906d5a9e",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "148cbcdd-8d18-4af6-a541-71cc7f21b2eb",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "53528a11-5af7-4e75-94bf-fca07eec6fcc",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "not_found",
+      "retention": "Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier."
+    },
+    {
+      "rule_id": "0999422f-8709-4d85-80e3-39410a85ed6b",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "not_found",
+      "retention": "Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier."
+    },
+    {
+      "rule_id": "d5531c55-1a65-4698-9f39-7cf79bbbb7ba",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "061797d3-161d-4783-89e6-caf658973436",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "282115fe-863d-4e2e-9cf5-4eaf8e7545e4",
+      "collector": "fivem_dir",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "c402aedc-1ed7-49a6-998c-0762e17e9bd0",
+      "collector": "fivem_servers",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "fd58dec6-84c1-49cb-806c-10b4614a046f",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "3ec29285-f365-4e60-81fe-818d27c6b47a",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "f47de6d4-05ef-4f33-9aca-2307170fd5ab",
+      "collector": "install_marker",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "65ee0ec1-bcda-47a3-a401-98632b42e75f",
+      "collector": "net_config",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "The hosts file as it was when the scan ran. A line removed before the scan is not seen."
+    },
+    {
+      "rule_id": "211d278c-58de-4287-974c-dda6f39a153c",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "a935bb41-6ed4-41a3-9477-7b3fe3a987d9",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "3abb40b8-05a4-4cc9-a2f8-17ba52a98714",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "77646339-caf4-4ade-93ef-133089dac30e",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "8f656238-36d2-4178-98db-87f55432edf7",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "cf83f06e-23b5-47fc-b7a0-b6d1b8192379",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "c9012982-5fc1-4d61-ab0c-0bc1abe93830",
+      "collector": "os_image",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "5ec56c3d-da70-4acc-99d6-2c41c0b75d71",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "98ee9213-39f3-4219-b2ac-f2bb3d21d6cc",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
+      "rule_id": "88eb2aca-a33e-414d-bd0f-cfb87af95a2d",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "869c34b6-7b32-4f56-a281-9f5ac00e43c4",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current setting only. It says nothing about how the account was configured in the past."
+    },
+    {
+      "rule_id": "8458638a-04fd-4bbf-910a-c4dd9bbe36bb",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "dc858978-954d-418f-a42e-29f06975f4ed",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "a4af8cdc-a009-42ee-8368-7f35e93051fe",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "d2f86e75-7692-468e-88a2-52eb1e24dc30",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "not_found",
+      "retention": "Current state only. It says nothing about how the PC was set up in the past."
+    },
+    {
+      "rule_id": "66d513b5-fe61-415a-9385-9d01f85c3ef5",
+      "collector": "posture",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "1fd8ec4a-f6d1-4496-aac5-54ed276717f7",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb",
+      "collector": "powershell_text",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "a5b02d12-4999-4cd6-87cc-c7823aee66b9",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "b97cb4c6-9dac-47f4-a974-ce17f07d6fc5",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "account": "same",
+            "count": 1,
+            "decoded": false,
+            "defender_tamper": true,
+            "download_then_execute": false,
+            "encoded_command": false,
+            "execution_policy_bypass": false,
+            "file": "console_host",
+            "game_process": false,
+            "hidden_window": false,
+            "invoke_expression": false,
+            "native_interop": false,
+            "newest_from_end": 2,
+            "remote_download": false,
+            "source": "history",
+            "trace_cleanup": false
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "2b4a3f03-e520-44d4-ad91-77f5d7857d71",
+      "collector": "powershell_text",
+      "strength": "presence",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "account": "same",
+            "count": 1,
+            "decoded": false,
+            "defender_tamper": false,
+            "download_host": "loader.example.invalid",
+            "download_then_execute": true,
+            "encoded_command": false,
+            "execution_policy_bypass": false,
+            "file": "console_host",
+            "game_process": false,
+            "hidden_window": false,
+            "invoke_expression": true,
+            "native_interop": false,
+            "newest_from_end": 4,
+            "remote_download": true,
+            "source": "history",
+            "trace_cleanup": false
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d",
+      "collector": "powershell_text",
+      "strength": "tamper",
+      "state": "found",
+      "observations": [
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "account": "same",
+            "count": 1,
+            "decoded": false,
+            "defender_tamper": false,
+            "download_then_execute": false,
+            "encoded_command": false,
+            "execution_policy_bypass": false,
+            "file": "console_host",
+            "game_process": false,
+            "hidden_window": false,
+            "invoke_expression": false,
+            "native_interop": false,
+            "newest_from_end": 1,
+            "remote_download": false,
+            "source": "history",
+            "trace_cleanup": true
+          }
+        }
+      ]
+    },
+    {
+      "rule_id": "7d493537-7ecf-4f97-90a0-119e079d30d2",
+      "collector": "prefetch",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
+      "rule_id": "1c73241b-b7f1-4f91-81d4-8de53db6d119",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "7996285e-8ccf-4b2d-8fec-339a32b95931",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "91dc8b45-8355-4554-8a6d-e979e4a95ecd",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "926b3863-8f4f-4d18-aab6-26b77934466e",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "8a39617a-30d6-4fc0-9b20-cb4f899985d5",
+      "collector": "usn",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    }
+  ],
+  "own_traces": [],
+  "unmatched": [
+    {
+      "collector": "evtx",
+      "observations": [
+        {
+          "collector": "evtx",
+          "fields": {
+            "entries": 17,
+            "intact": true,
+            "log": "Microsoft-Windows-PowerShell%4Operational.evtx",
+            "newest_record_id": 17,
+            "newest_record_time": "2018-08-03T06:44:06.4185334Z",
+            "oldest_record_id": 1,
+            "oldest_record_time": "2018-07-09T20:49:14.0577461Z",
+            "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-PowerShell%4Operational.evtx",
+            "rejected": 0,
+            "size_bytes": 69632
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "count": 1,
+            "event_id": 4000,
+            "first_seen": "2018-08-03T06:44:06.4185334Z",
+            "last_seen": "2018-08-03T06:44:06.4185334Z",
+            "level": 4,
+            "log": "Microsoft-Windows-PowerShell%4Operational.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "channel": "Microsoft-Windows-LanguagePackSetup/Operational",
+            "count": 8,
+            "event_id": 4000,
+            "first_seen": "2018-07-09T20:49:14.0577461Z",
+            "last_seen": "2018-07-31T06:42:06.5129262Z",
+            "level": 4,
+            "log": "Microsoft-Windows-PowerShell%4Operational.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "channel": "Microsoft-Windows-LanguagePackSetup/Operational",
+            "count": 8,
+            "event_id": 4001,
+            "first_seen": "2018-07-09T20:49:14.0598407Z",
+            "last_seen": "2018-07-31T06:42:06.5134595Z",
+            "level": 4,
+            "log": "Microsoft-Windows-PowerShell%4Operational.evtx",
+            "provider": "Microsoft-Windows-LanguagePackSetup"
+          }
+        },
+        {
+          "collector": "evtx",
+          "fields": {
+            "budget_exhausted": false,
+            "budget_seconds": 30,
+            "channels": 1,
+            "examined": 1,
+            "logs": 1,
+            "logs_without_records": 0,
+            "refused": 0
+          }
+        }
+      ]
+    },
+    {
+      "collector": "fivem_dir",
+      "observations": [
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "plugins"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_asi"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "legacy_logs"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "legacy_crashes"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "legacy_cache"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "legacy_server_cache",
+            "variant": "default"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "legacy_server_cache",
+            "variant": "priv"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "legacy_server_cache",
+            "variant": "fxdk"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_logs"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_crashes"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "absent",
+            "location": "enhanced_launcher_crashes"
+          }
+        },
+        {
+          "collector": "fivem_dir",
+          "fields": {
+            "folder": "unreadable",
+            "location": "enhanced_server_cache"
+          }
+        }
+      ]
+    },
+    {
+      "collector": "install_marker",
+      "observations": [
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\AtlasDesktop",
+            "path": "C:\\Windows\\AtlasDesktop",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\AtlasModules",
+            "path": "C:\\Windows\\AtlasModules",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "folder",
+            "marker": "%SystemRoot%\\Web\\Wallpaper\\MeetRevision",
+            "path": "C:\\Windows\\Web\\Wallpaper\\MeetRevision",
+            "present": false
+          }
+        },
+        {
+          "collector": "install_marker",
+          "fields": {
+            "kind": "registry_key",
+            "marker": "HKLM\\SOFTWARE\\AtlasOS",
+            "path": "HKLM\\SOFTWARE\\AtlasOS",
+            "present": false
+          }
+        }
+      ]
+    },
+    {
+      "collector": "net_config",
+      "observations": [
+        {
+          "collector": "net_config",
+          "fields": {
+            "location": "hosts",
+            "path": "C:\\Windows\\System32\\drivers\\etc\\hosts",
+            "present": false
+          }
+        }
+      ]
+    },
+    {
+      "collector": "posture",
+      "observations": [
+        {
+          "collector": "posture",
+          "fields": {
+            "exception_chain_validation": "not_configured",
+            "object_namespace_protection": "not_configured",
+            "script_block_logging": "not_configured",
+            "script_block_logging_pwsh": "not_configured",
+            "script_block_logging_pwsh_user": "not_configured",
+            "script_block_logging_user": "not_configured",
+            "speculative_execution_mitigations": "not_configured"
+          }
+        }
+      ]
+    },
+    {
+      "collector": "powershell_text",
+      "observations": [
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "account": "same",
+            "file": "console_host",
+            "lines": 6,
+            "lossy_lines": 0,
+            "read": "ok",
+            "source": "history"
+          }
+        },
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "account": "same",
+            "file": "visual_studio_code",
+            "lines": 3,
+            "lossy_lines": 0,
+            "read": "ok",
+            "source": "history"
+          }
+        },
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "account": "same",
+            "count": 1,
+            "decoded": false,
+            "defender_tamper": false,
+            "download_address_kind": "private",
+            "download_then_execute": false,
+            "encoded_command": false,
+            "execution_policy_bypass": false,
+            "file": "visual_studio_code",
+            "game_process": false,
+            "hidden_window": false,
+            "invoke_expression": false,
+            "native_interop": false,
+            "newest_from_end": 1,
+            "remote_download": true,
+            "source": "history",
+            "trace_cleanup": false
+          }
+        },
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "examined": 0,
+            "read": "ok",
+            "rejected": 0,
+            "source": "script_block"
+          }
+        },
+        {
+          "collector": "powershell_text",
+          "fields": {
+            "read": "absent",
+            "source": "engine_start"
+          }
+        }
+      ]
+    },
+    {
+      "collector": "prefetch",
+      "observations": [
+        {
+          "collector": "prefetch",
+          "fields": {
+            "folder": "absent"
+          }
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "not_admin": 0,
+    "not_attempted": 0,
+    "not_consented": 0
+  },
+  "listed": {
+    "found": 3,
+    "not_found": 15,
+    "unmeasured": 34
+  },
+  "hidden": {
+    "not_found": 0,
+    "unmeasured_expected": 0,
+    "unmeasured_unexpected": 0,
+    "unmatched": 0
+  },
+  "timeline": {
+    "entries": [
+      {
+        "at": "2018-07-09T20:49:14.0577461Z",
+        "collector": "evtx",
+        "field": "oldest_record_time",
+        "place": null,
+        "source": {
+          "kind": "selector",
+          "selector_id": "87b47713-1ed3-415e-bc07-9cd0b953d7c1"
+        },
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-PowerShell%4Operational.evtx"
+      },
+      {
+        "at": "2018-07-09T20:49:14.0577461Z",
+        "collector": "evtx",
+        "field": "first_seen",
+        "place": null,
+        "source": {
+          "kind": "observation"
+        },
+        "subject": null
+      },
+      {
+        "at": "2018-07-09T20:49:14.0598407Z",
+        "collector": "evtx",
+        "field": "first_seen",
+        "place": null,
+        "source": {
+          "kind": "observation"
+        },
+        "subject": null
+      },
+      {
+        "at": "2018-07-31T06:42:06.5129262Z",
+        "collector": "evtx",
+        "field": "last_seen",
+        "place": null,
+        "source": {
+          "kind": "observation"
+        },
+        "subject": null
+      },
+      {
+        "at": "2018-07-31T06:42:06.5134595Z",
+        "collector": "evtx",
+        "field": "last_seen",
+        "place": null,
+        "source": {
+          "kind": "observation"
+        },
+        "subject": null
+      },
+      {
+        "at": "2018-08-03T06:44:06.4185334Z",
+        "collector": "evtx",
+        "field": "newest_record_time",
+        "place": null,
+        "source": {
+          "kind": "selector",
+          "selector_id": "87b47713-1ed3-415e-bc07-9cd0b953d7c1"
+        },
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-PowerShell%4Operational.evtx"
+      },
+      {
+        "at": "2018-08-03T06:44:06.4185334Z",
+        "collector": "evtx",
+        "field": "first_seen",
+        "place": null,
+        "source": {
+          "kind": "observation"
+        },
+        "subject": null
+      },
+      {
+        "at": "2018-08-03T06:44:06.4185334Z",
+        "collector": "evtx",
+        "field": "last_seen",
+        "place": null,
+        "source": {
+          "kind": "observation"
+        },
+        "subject": null
+      },
+      {
+        "at": "2026-01-01T00:00:00Z",
+        "collector": null,
+        "field": "generated_at",
+        "place": null,
+        "source": {
+          "kind": "anchor"
+        },
+        "subject": null
+      }
+    ],
+    "bands": [
+      {
+        "collector": "evtx",
+        "place": null,
+        "subject": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-PowerShell%4Operational.evtx",
+        "from": "2018-07-09T20:49:14.0577461Z",
+        "to": "2018-08-03T06:44:06.4185334Z"
+      }
+    ],
+    "unmeasured": [
+      {
+        "collector": "bam",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "plugins",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_exe",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_exe",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_logs",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_crashes",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_cache",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_server_cache",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_servers",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "pca",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "powershell_text",
+        "place": "engine_start",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "prefetch",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "reason": "read_failed"
+      }
+    ]
+  },
+  "collector_order": [
+    "posture",
+    "driver_service",
+    "autostart",
+    "defender_exclusion",
+    "fivem_dir",
+    "fivem_servers",
+    "net_config",
+    "process",
+    "evtx",
+    "powershell_text",
+    "prefetch",
+    "bam",
+    "pca",
+    "usn"
+  ],
+  "trace_ages": {
+    "anchors": [
+      {
+        "anchor": "boot_time",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "install_date",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "setup_earliest_install",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "anchor": "usn_journal_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "system_drive_root_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "recycle_bin_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_legacy_app_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "anchor": "fivem_enhanced_program_folder_created",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ],
+    "rows": [
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_logs",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_crashes",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "legacy_server_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_logs",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_launcher_crashes",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "fivem_dir",
+        "place": "enhanced_server_cache",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Microsoft-Windows-PowerShell%4Operational.evtx",
+        "state": "measured",
+        "oldest": "2018-07-09T20:49:14.0577461Z",
+        "days_before": 2732,
+        "count": 17,
+        "extra": {
+          "size_bytes": 69632
+        }
+      },
+      {
+        "collector": "evtx",
+        "subject": "Microsoft-Windows-Windows Defender%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "Security.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "evtx",
+        "subject": "System.evtx",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "prefetch",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "bam",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "pca",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "usn",
+        "place": "journal",
+        "state": "unmeasured",
+        "reason": "read_failed"
+      }
+    ]
+  }
+}

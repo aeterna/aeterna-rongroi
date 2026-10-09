@@ -1,0 +1,23 @@
+{
+  "description": "The collisions that matter (ADR 0063 Consequences): 4104 at level 5, which every block gets when script block logging is on and is not PowerShell's own 'suspicious'; 4103, pipeline execution, at level 3; and 4104 level 3 from PowerShell 7's provider on its own channel, which ADR 0063 §3 leaves out until it is measured. Counts and times are illustrative.",
+  "observations": [
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-PowerShell%4Operational.evtx",
+      "channel": "Microsoft-Windows-PowerShell/Operational",
+      "provider": "Microsoft-Windows-PowerShell",
+      "event_id": 4104, "level": 5, "count": 1200,
+      "first_seen": "2026-10-07T00:00:00.000Z", "last_seen": "2026-10-08T07:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "Microsoft-Windows-PowerShell%4Operational.evtx",
+      "channel": "Microsoft-Windows-PowerShell/Operational",
+      "provider": "Microsoft-Windows-PowerShell",
+      "event_id": 4103, "level": 3, "count": 4,
+      "first_seen": "2026-10-07T01:00:00.000Z", "last_seen": "2026-10-08T06:00:00.000Z" } },
+    { "collector": "evtx", "fields": {
+      "log": "PowerShellCore%4Operational.evtx",
+      "channel": "PowerShellCore/Operational",
+      "provider": "PowerShellCore",
+      "event_id": 4104, "level": 3, "count": 2,
+      "first_seen": "2026-10-07T02:00:00.000Z", "last_seen": "2026-10-08T05:00:00.000Z" } }
+  ]
+}

@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Synthetic fixture host — see ../PROVENANCE.md.
+# A standard-user scan (ADR 0064): the history folder is the player's own and readable, the Event Log
+# folder's two PowerShell logs are refused, as Windows refuses them without administrator rights.
+platform: windows
+os_build: "26100"
+elevated: false
+env:
+  SystemRoot: 'C:\Windows'
+  APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine':
+    - name: ConsoleHost_history.txt
+      content: "git status\nClear-History\n"
+access_denied:
+  - 'C:\Windows\System32\winevt\Logs\Microsoft-Windows-PowerShell%4Operational.evtx'
+  - 'C:\Windows\System32\winevt\Logs\Windows PowerShell.evtx'

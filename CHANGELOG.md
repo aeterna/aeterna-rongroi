@@ -5,6 +5,77 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-09
+
+PowerShell. A standard scan puts on the timeline when PowerShell itself flagged a script, and counts deletions in
+the folder where it keeps the history of typed commands. A full scan, which the player agrees to before it starts,
+also reads which kinds of words PowerShell's commands held — a download that was run, a change to Microsoft
+Defender, a cleared log — and keeps no command. Eight rules are new, all `experimental`.
+
+### Added
+- `powershell_text`'s history observations say whose history it is (ADR 0064, amended 2026-10-09): `account` is
+  `same` or `other` as the scanning account equals the one Windows' sign-in screen last signed in
+  (`LastLoggedOnUserSID`), or `unknown`; neither SID is reported. Measured on a runner with a second local
+  administrator in the runner's session. The three history rules' `falsepositives` and both screenshare guides
+  say what `other` means.
+- **A full scan reads which kinds of words PowerShell's commands held, never the commands** (ADR 0064, third of
+  three changes): a `full` collector, `powershell_text`, reads the account's PSReadLine history, the script blocks
+  Windows PowerShell flagged and the command lines it was started with, hands each text to the parsers and keeps
+  kinds, counts and times — how many commands ago for the history, which has no times. Six `experimental` rules,
+  per source (history, Windows PowerShell start): downloaded something and ran it (`presence`), told Microsoft
+  Defender to look away and cleared a log, the history or Prefetch (`tamper`); a timeline selector for the logs'
+  download-then-execute times. A download's host is the one text kept: a new sensitive kind, `download_host`, shown
+  in SS mode as `%DOWNLOAD_HOST%` unless the player agrees to its own question (CLI and desktop, both languages);
+  an address is kept as its kind only. The full-scan question names PowerShell. Amended: the collectors'
+  `AGENTS.md`, ADR 0052 §5 and §6, ADR 0060 §4 and PRIVACY.md, each naming this collector as the one exception;
+  `docs/architecture.md`, the glossary and both screenshare guides describe it.
+- `rongroi-parsers::evtx::powershell_text` (ADR 0064, second of three changes; ADR 0018 amended): reads the payload
+  of exactly two kinds of record — a script block Windows PowerShell flagged (4104 level 3, its parts joined by
+  `ScriptBlockId`) and the command line Windows PowerShell started with (400 `HostApplication`) — and classifies
+  each where it is read, returning kinds, a time and at most a download host, never the text. `records` is
+  unchanged. Tested on rendered records (parts out of order, a word split across parts, a missing part, the
+  collisions, three renderings of a 400, a leak test) and, by an ignored test that prints counts only, on the
+  development PC's two logs: 135 blocks and 1 546 starts in under a quarter of a second each. `fuzz_evtx` calls it.
+- `rongroi-parsers::powershell_text` (ADR 0064, first of three changes): classifies a PowerShell history file, a
+  script block's text or a command line into the fixed list of kinds as booleans — after undoing escapes, joined
+  literals and up to two levels of encoded command — plus the host of the first download URL, reduced to a plain name
+  or an address's kind. It keeps no other text; its tests assert that a password, a token, a path, a port and a query
+  do not survive. A fuzz target, `fuzz_powershell_text`, seeded from four synthetic fixtures in
+  `fixtures/parsers/powershell-text/`, joins the CI smoke run. Nothing calls it yet.
+- **PowerShell, without reading what it says** (ADR 0063):
+  - a timeline selector puts on the timeline the first and last time Windows PowerShell's operational log holds a
+    script block PowerShell itself flagged as suspicious (event 4104, level 3) — never the script's text. Not a rule:
+    the one PC measured held 369 such blocks in a day and a half, and a Windows Forms dialog is flagged;
+  - the change journal counts a sixth folder, `psreadline` (`%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine`,
+    where PowerShell keeps the history of commands typed into its window), the first that no other collector reads
+    (ADR 0047, amendment for ADR 0063); two `context`, `experimental` rules read its deletions and renames, since
+    PowerShell itself never deletes or renames the file. The folder's times join the journal's timeline selector;
+  - consent text (CLI and desktop, both languages), PRIVACY.md, both screenshare guides and `docs/architecture.md`
+    name them; three `rules/unconfronted.csv` rows, because no baseline carries a PowerShell log or the folder.
+
+### Changed
+- ADR 0064 accepted: which kinds of words PowerShell's commands held, never the commands — a `full` collector
+  that classifies PowerShell's history, its flagged script blocks and its start command lines into a fixed list of
+  kinds and keeps no text but a download host behind its own question. It asks the owner first whether this
+  project reads what a person typed at all, which three standing texts forbid today; the owner answered yes, under
+  its conditions. Counts of each kind are recorded on the development PC and on a GitHub-hosted runner (run
+  37764960415), whose PowerShell 7 log exists, unlike the PC's MSIX install.
+- ADR 0063 accepted: what PowerShell already records, without reading what it says — a timeline selector for the
+  script blocks PowerShell itself flags (event 4104, level 3) and a sixth folder for the change journal, the one
+  PowerShell keeps its command history in, with two `context` rules; nothing for PowerShell 7 or event 400 yet.
+  Measured on a Windows 11 PC; the owner decided its six questions as recommended on 2026-10-08.
+- Screenshare guides (Thai and English), README and the landing page: the download check uses Command Prompt and
+  `certutil -hashfile <file> SHA256` instead of PowerShell's `Get-FileHash`, the CLI is run from an administrator
+  Command Prompt, and the "downloaded from the internet" mark is removed from the file's Properties instead of with
+  `Unblock-File`. PowerShell keeps its own records on the PC and Windows records when it last ran, so a check typed
+  into it during a screenshare puts the call's own time over what was there. `certutil`'s output and `.\` in
+  Command Prompt were checked on a Windows 11 PC (build 26220), and the 0.7.0 CLI was run from Command Prompt
+  there: hash, version, SS scan in Thai and `--json > report.json` (UTF-8, the consent question on standard error).
+- Screenshare guides: a section on comparing the report with what a server recorded — one clock (the report is
+  UTC), a row near a server's flag is a question and not proof, whether the session statement fits the time the
+  player connected, and which rows to read first for what a server saw. The program still reads nothing from a
+  server and sends nothing to one.
+
 ## [0.7.0] - 2026-10-03
 
 The checks are those of 0.6.0: no collector, rule, report field or text changed. This release changes how the

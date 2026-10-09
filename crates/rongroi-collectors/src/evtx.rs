@@ -12,9 +12,10 @@
 //! Five rules read this collector — the Security log's own record that it was cleared, and the System
 //! log's record that some log file was (ADR 0031); a log file marked read-only (ADR 0037); a log file
 //! that is not the file its channel is written to (ADR 0042); and Microsoft Defender's record that its
-//! real-time protection was switched off (ADR 0059). Three timeline selectors put times from it on the
+//! real-time protection was switched off (ADR 0059). Four timeline selectors put times from it on the
 //! timeline without making evidence: each log's oldest and newest record (ADR 0051), Code Integrity's
-//! refusals to load a file, and Defender's detections (ADR 0059). Everything else it sees is listed
+//! refusals to load a file, Defender's detections (ADR 0059), and the script blocks Windows PowerShell
+//! itself flagged as suspicious (ADR 0063). Everything else it sees is listed
 //! in Self mode as unmatched observations and counted, never listed, in SS mode (ADR 0014).
 //!
 //! # One observation per kind of event, never one per record

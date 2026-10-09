@@ -18,7 +18,8 @@
     "scan_tier": "Scan",
     "tier_standard": "standard",
     "tier_full": "full",
-    "server_identity_hidden": "Server names are shown as %SERVER_IDENTITY%: the player did not agree to show them."
+    "server_identity_hidden": "Server names are shown as %SERVER_IDENTITY%: the player did not agree to show them.",
+    "download_host_hidden": "Website names are shown as %DOWNLOAD_HOST%: the player did not agree to show them."
   },
   "state": {
     "found": "Found",
@@ -87,6 +88,7 @@
   },
   "collector": {
     "posture": "Security settings of this PC",
+    "powershell_text": "PowerShell's commands, as kinds of words",
     "driver_service": "Drivers registered with Windows",
     "autostart": "Programs that start by themselves (services, Run, scheduled tasks)",
     "defender_exclusion": "Microsoft Defender exclusions",

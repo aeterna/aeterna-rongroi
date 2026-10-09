@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 45a6c6d4-6759-48c0-82e6-4cafb2ea2bfb
+title: A command in a Windows PowerShell start downloaded something and ran it
+description: >-
+  In the command lines Windows PowerShell was started with, as its own log keeps them, at least one command held both a word that downloads from the internet and a word that runs text as a command, the shape of a line that fetches a script and runs it without saving it. The row gives how many and the first and last time, and the website's name only if the player agreed to show it. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+# ADR 0064 section 5. `experimental`: the kinds come from one development PC and one runner.
+status: experimental
+collector: powershell_text
+strength: presence
+match:
+  source: engine_start
+  download_then_execute: true
+retention: >-
+  Only the starts the Windows PowerShell log still holds. It keeps 15 MiB by default and overwrites its oldest records when full; on one Windows 11 PC that was about six days. A cleared log holds none.
+# `not_admin` and `not_consented` are scope statements; `source_absent` is a PC with no such history or log.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - Installers and package managers that are installed with one line of this shape — the measured development PC's history held three, all from installing software
+  - Scripts that update or set up developer tools, terminals or Windows tweaks the same way
+  - A program or a scheduled task that starts PowerShell this way to update itself
+  - A missing row does not mean nothing was run, because other ways of running a script are not read
+references:
+  - https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [powershell_text]

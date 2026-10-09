@@ -31,7 +31,7 @@
   "description": "An offline, open-source PC check for FiveM communities. It shows the traces cheats leave on a Windows PC as evidence and never gives a clean verdict.",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Windows (x64)",
-  "softwareVersion": "0.7.0",
+  "softwareVersion": "0.8.0",
   "inLanguage": ["en", "th"],
   "license": "https://www.gnu.org/licenses/gpl-3.0.html",
   "url": "https://aeterna.github.io/aeterna-rongroi/en/",
@@ -58,7 +58,7 @@
       <p class="lead">aeterna-rongroi looks for the traces cheats leave on a Windows PC, and for settings that make cheating easier, then shows them as evidence.
         A player can check their own PC, or server staff can watch over a screenshare (SS) with the player's consent. <strong>It never tells you a PC is "clean".</strong></p>
       <div class="buttons">
-        <a class="btn primary" href="https://github.com/aeterna/aeterna-rongroi/releases">Download · 0.7.0</a>
+        <a class="btn primary" href="https://github.com/aeterna/aeterna-rongroi/releases">Download · 0.8.0</a>
         <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.md">Screenshare guide</a>
         <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi">Source</a>
       </div>
@@ -96,7 +96,7 @@
   </section>
 
   <section>
-    <h2>What 0.7.0 checks</h2>
+    <h2>What 0.8.0 checks</h2>
     <div class="table-scroll"><table>
       <thead><tr><th>What</th><th>In plain words</th></tr></thead>
       <tbody>
@@ -108,6 +108,7 @@
         <tr><td>Deleted or renamed files</td><td>In FiveM's add-on folders</td></tr>
         <tr><td>Modified Windows</td><td>Windows versions that come with protections removed, such as Atlas or ReviOS<small>A person may run whatever Windows they like; this row only says which one it is</small></td></tr>
         <tr><td>Other settings</td><td>Unsigned programs that start by themselves, and a hosts file that redirects FiveM or Rockstar</td></tr>
+        <tr><td>PowerShell</td><td>Whether a command downloaded something and ran it, told Microsoft Defender to look away, or cleared a log — kept as kinds of words, never the command<span class="new">NEW</span><small>Full scan only, with the player's agreement</small></td></tr>
         <tr><td>How far back it can see</td><td>So that "not found" is never read as "never happened"</td></tr>
       </tbody>
     </table></div>
@@ -118,7 +119,7 @@
     <h2>A screenshare in five steps</h2>
     <ol class="steps">
       <li><strong>The player downloads it</strong>from the <a href="https://github.com/aeterna/aeterna-rongroi/releases">Releases page</a>. Send the link, never the file.</li>
-      <li><strong>Check that it is the real file</strong>In PowerShell, in the download folder, run <code>Get-FileHash .\aeterna-rongroi-*-windows-x64.exe</code> and compare it with <code>SHA256SUMS</code> on the release page. If it does not match, stop.</li>
+      <li><strong>Check that it is the real file</strong>In Command Prompt (<code>cmd</code>), in the download folder, run <code>certutil -hashfile &lt;file name&gt; SHA256</code> and compare it with <code>SHA256SUMS</code> on the release page. If it does not match, stop.</li>
       <li><strong>Open SS mode</strong>Click "Screenshare check (SS mode)". The player agrees, or refuses; if they refuse, nothing is read.</li>
       <li><strong>Check the header</strong>It must say official build. If it says UNOFFICIAL BUILD, do not rely on the result.</li>
       <li><strong>Read the results row by row</strong>together with the ordinary causes of each.</li>

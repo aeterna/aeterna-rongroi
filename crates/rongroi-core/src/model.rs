@@ -530,6 +530,8 @@ pub enum SensitiveKind {
     ServerIdentity,
     /// A value that identifies an account.
     AccountIdentifier,
+    /// The host a PowerShell command downloaded from (ADR 0064): one name the player may not want shown.
+    DownloadHost,
 }
 
 impl SensitiveKind {
@@ -538,6 +540,7 @@ impl SensitiveKind {
         match self {
             Self::ServerIdentity => "server_identity",
             Self::AccountIdentifier => "account_identifier",
+            Self::DownloadHost => "download_host",
         }
     }
 }

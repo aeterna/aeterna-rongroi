@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: bc3c9769-c57e-4c01-9f0d-8a71152102ec
+title: When PowerShell's logs recorded a command that downloaded something and ran it
+description: >-
+  Puts on the timeline the first and last time a flagged script block or a Windows PowerShell start held both a word that downloads and a word that runs text as a command. The history has no times and is not on the timeline. This tool reads the command only to sort its words into kinds and keeps no text of it, so the row says what kind of words it held, never which command, what it ran or whether it worked. A word built some other way than PowerShell's ordinary escapes is not recognised, so a missing row says nothing.
+# A timeline selector (ADR 0051, ADR 0064 section 5): it makes no evidence.
+status: experimental
+role: timeline
+collector: powershell_text
+strength: context
+match:
+  download_then_execute: true
+  # Only the two logs' groups carry a time.
+  first_seen|exists: true
+retention: >-
+  Only the records the two Windows PowerShell logs still hold; each keeps 15 MiB by default and overwrites its oldest records when full.
+falsepositives:
+  - Installers and update scripts that download and run in one line
+  - A missing time does not mean nothing ran, and no time before a log's oldest record is seen
+references:
+  - https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md
+author: aeterna-rongroi contributors
+date: 2026-10-08
+tags: [powershell_text]

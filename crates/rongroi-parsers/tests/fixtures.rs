@@ -13,13 +13,14 @@
 
 use std::path::{Path, PathBuf};
 
-use rongroi_parsers::{bam, evtx, filetime, pca, prefetch, task, usn};
+use rongroi_parsers::{bam, evtx, filetime, pca, powershell_text, prefetch, task, usn};
 
 /// The directories that are both an L0 fixture set and a fuzz seed corpus.
-const SEEDED_DIRECTORIES: [&str; 6] = [
+const SEEDED_DIRECTORIES: [&str; 7] = [
     "bam",
     "pca-app-launch",
     "pca-general",
+    "powershell-text",
     "prefetch",
     "task",
     "usn",
@@ -417,4 +418,48 @@ fn the_general_db_fixture_with_varying_field_counts_keeps_every_line_whole() {
     assert_eq!(file.entries.len(), 2);
     assert_eq!(file.entries[0].fields.len(), 7);
     assert_eq!(file.entries[1].fields.len(), 2);
+}
+
+#[test]
+fn the_powershell_text_fixtures_hold_what_their_names_say() {
+    use powershell_text::{AddressKind, DownloadHost};
+
+    let mixed =
+        powershell_text::parse_history(&fixture("powershell-text", "history-mixed-crlf.txt"))
+            .unwrap();
+    assert_eq!((mixed.lines, mixed.lossy_lines), (6, 0));
+    let from_end: Vec<usize> = mixed.classified.iter().map(|(n, _)| *n).collect();
+    assert_eq!(from_end, [4, 2, 1]);
+    let kinds: Vec<_> = mixed.classified.iter().map(|(_, c)| c.kinds).collect();
+    assert!(kinds[0].download_then_execute && kinds[1].defender_tamper && kinds[2].trace_cleanup);
+    assert_eq!(
+        mixed.classified[0].1.download_host,
+        Some(DownloadHost::Name("loader.example.invalid".to_owned()))
+    );
+
+    let lf = powershell_text::parse_history(&fixture("powershell-text", "history-lf-no-bom.txt"))
+        .unwrap();
+    assert_eq!(lf.lines, 3);
+    assert_eq!(lf.classified.len(), 1);
+    assert_eq!(
+        lf.classified[0].1.download_host,
+        Some(DownloadHost::Address(AddressKind::Private))
+    );
+
+    let line = String::from_utf8(fixture("powershell-text", "command-line-encoded.txt")).unwrap();
+    let c = powershell_text::classify(&line);
+    assert!(
+        c.kinds.encoded_command
+            && c.kinds.decoded
+            && c.kinds.hidden_window
+            && c.kinds.download_then_execute
+    );
+    assert_eq!(
+        c.download_host,
+        Some(DownloadHost::Name("encoded.example.invalid".to_owned()))
+    );
+
+    let lossy =
+        powershell_text::parse_history(&fixture("powershell-text", "not-utf8.bin")).unwrap();
+    assert_eq!((lossy.lines, lossy.lossy_lines), (2, 2));
 }

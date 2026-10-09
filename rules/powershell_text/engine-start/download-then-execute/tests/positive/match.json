@@ -1,0 +1,27 @@
+{
+  "description": "Synthetic: one engine_start group holding a download-then-execute command (ADR 0064).",
+  "observations": [
+    {
+      "collector": "powershell_text",
+      "fields": {
+        "invoke_expression": true,
+        "remote_download": true,
+        "download_then_execute": true,
+        "encoded_command": false,
+        "decoded": false,
+        "execution_policy_bypass": false,
+        "hidden_window": false,
+        "native_interop": false,
+        "defender_tamper": false,
+        "trace_cleanup": false,
+        "game_process": false,
+        "source": "engine_start",
+        "count": 1,
+        "first_seen": "2026-10-08T07:10:00Z",
+        "last_seen": "2026-10-08T07:12:00Z",
+        "incomplete": 0
+      }
+    }
+  ],
+  "expect_matches": 1
+}

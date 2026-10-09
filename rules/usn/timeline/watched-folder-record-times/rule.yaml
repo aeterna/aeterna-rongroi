@@ -6,9 +6,11 @@ title: When the change journal recorded changes in a watched folder
 description: >-
   Puts on the timeline the oldest and newest change the NTFS change journal still holds for each
   folder this program watches: Prefetch, the event log folder, the Program Compatibility Assistant
-  folder and FiveM's plugin folders. The journal counts changes without saying which program made
-  them, so a time here is when a file in that folder was created, changed, renamed or deleted, by
-  anyone, including Windows and FiveM. It is not evidence that anything was removed.
+  folder, FiveM's plugin folders and the folder PowerShell keeps its command history in. The journal
+  counts changes without saying which program made them, so a time here is when a file in that folder
+  was created, changed, renamed or deleted, by anyone, including Windows and FiveM; in PowerShell's
+  folder a change is usually a command typed into a PowerShell window, never which command. It is not
+  evidence that anything was removed.
 status: test
 # A timeline selector (ADR 0051). The journal's own span is the coverage band, not an entry.
 role: timeline
@@ -24,6 +26,7 @@ falsepositives:
   - Windows writing and removing Prefetch files, event logs and compatibility records in ordinary use
   - FiveM, its updater and plugins installed or removed by the player changing files in the plugin
     folders
+  - PowerShell adding each command typed into its window to its history file
   - Disk clean-up, backup, antivirus and optimisation tools
   - A folder with no change in the journal's span has no time here, which does not mean nothing
     changed before it

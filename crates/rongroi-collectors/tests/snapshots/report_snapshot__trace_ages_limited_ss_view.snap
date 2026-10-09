@@ -170,6 +170,12 @@ expression: "trace_ages_of(&report, Mode::Ss)"
       },
       {
         "collector": "evtx",
+        "subject": "Microsoft-Windows-PowerShell%4Operational.evtx",
+        "state": "unmeasured",
+        "reason": "not_admin"
+      },
+      {
+        "collector": "evtx",
         "subject": "Microsoft-Windows-Windows Defender%4Operational.evtx",
         "state": "unmeasured",
         "reason": "not_admin"

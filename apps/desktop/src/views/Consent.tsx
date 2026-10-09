@@ -15,11 +15,13 @@ interface Props {
 
 /**
  * SS-mode consent. Nothing from the report reaches the UI until the player agrees. After a full scan,
- * showing server identities is its own choice, off until the player turns it on (ADR 0052).
+ * showing server identities and download hosts are each their own choice, off until the player turns
+ * it on (ADR 0052, ADR 0064).
  */
 export function Consent({ full, onAgree, onRefuse }: Props) {
   const { t } = useTranslation();
   const [serverIdentity, setServerIdentity] = useState(false);
+  const [downloadHost, setDownloadHost] = useState(false);
   return (
     <section className="consent">
       <h2>{t("consent.title")}</h2>
@@ -40,6 +42,16 @@ export function Consent({ full, onAgree, onRefuse }: Props) {
           {t("consent.server_identity")}
         </label>
       )}
+      {full && (
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={downloadHost}
+            onChange={(event) => setDownloadHost(event.target.checked)}
+          />{" "}
+          {t("consent.download_host")}
+        </label>
+      )}
       <p>
         <strong>{t("consent.refuse_ok")}</strong>
       </p>
@@ -47,7 +59,11 @@ export function Consent({ full, onAgree, onRefuse }: Props) {
         <button
           type="button"
           onClick={() =>
-            onAgree({ server_identity: full && serverIdentity, account_identifier: false })
+            onAgree({
+              server_identity: full && serverIdentity,
+              account_identifier: false,
+              download_host: full && downloadHost,
+            })
           }
         >
           {t("consent.agree")}

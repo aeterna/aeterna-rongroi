@@ -7,7 +7,8 @@ FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the
 registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
-for each folder those collectors read, with no file name, and the settings that decide where network
+for each folder those collectors read and for the folder PowerShell keeps its command history in, with no
+file name, and the settings that decide where network
 traffic goes: the hosts file, whether a proxy is set, and the Windows Firewall rules for FiveM, and what
 Windows says this installation is, with how the services Windows ships with are set to start,
 whether six named places are on this PC, and what Windows is set to start by itself — services, `Run`
@@ -70,7 +71,8 @@ Of **what Windows starts by itself** it reads three places (ADR 0060):
 
 **It never reads the arguments a program is given** — not even whether there were any: a command line is
 read only to find where the program's file ends, because arguments are where a token, a password or an
-address is passed to a program. Of a task it also never reads who made it, its description, its working
+address is passed to a program. (The one place this program reads any command, PowerShell's, is a full
+scan's, and it keeps only what kinds of words it held — [below](#a-full-scan-reads-more-and-only-if-you-agree-before-it-starts).) Of a task it also never reads who made it, its description, its working
 folder or the account it runs as into the report; the account is compared with the one running this
 scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file **outside the Windows
 folder** it reads a SHA-256 and what Windows says about its embedded signature, as for FiveM's files;
@@ -160,8 +162,8 @@ different words.
 
 Of the change journal it reads, for the Windows drive only, how many records the journal holds, when the
 oldest and newest were written, whether older records have been trimmed from it, and the journal's maximum
-size; and for each of the Prefetch, event log and Program Compatibility Assistant folders and FiveM's two
-plugin folders, how many records name that folder, how many of those created, deleted, renamed or changed
+size; and for each of the Prefetch, event log and Program Compatibility Assistant folders, FiveM's two
+plugin folders and the folder PowerShell keeps its command history in (ADR 0063), how many records name that folder, how many of those created, deleted, renamed or changed
 a file, and when the oldest and newest of that folder's records were written. **It reads no file name**: the journal names every file
 changed on the drive, and the program's parser skips the name without keeping it. It reports no journal
 identifier and no file number, because each would identify your PC across two reports.
@@ -169,7 +171,12 @@ identifier and no file number, because each would identify your PC across two re
 **Four rules read the deletions and renames of FiveM's two plugin folders** (ADR 0047, amendment of
 2026-09-30). When one matches, SS mode shows that folder's counts and the time of its first and last
 record, beside the span the journal held — still no file name, because none was read. The journal does not
-say which program deleted or renamed a file, and the row says so. The counts of the Prefetch, event log and
+say which program deleted or renamed a file, and the row says so. **Two rules read the deletions and renames of PowerShell's command history folder** (ADR 0063), in the
+same way: counts and times, never the file's name and **never anything the file holds** — this program does
+not open it. It is the one folder the journal is counted for that no other part of this program reads.
+PowerShell adds each command typed into its window to that file, so the times of the folder's changes, on
+the timeline, show when someone typed into a PowerShell window within the journal's span, never what. The
+counts of the Prefetch, event log and
 Program Compatibility Assistant folders are read by no rule. A FiveM folder on another drive is not
 counted at all: the report says it is on another drive, and no other drive's journal is read.
 
@@ -237,6 +244,19 @@ What a full scan reads today:
   joined, with when each was created and last changed (ADR 0055). What the name is made from is not
   known. It stays the same for that server on this PC, so it can match two reports of this PC; whether
   another PC gets the same name is not known. Nothing inside those folders is read.
+- **Which kinds of words your PowerShell commands held** (ADR 0064): the history of commands typed into a
+  PowerShell window on the account running the scan, the scripts PowerShell itself flagged as suspicious in
+  its log, and the command lines Windows PowerShell was started with, as its own log keeps them. **This is
+  the one place this program reads what you typed.** Each command is read only to sort its words into a
+  fixed list — downloads from the internet, runs text as a command, an encoded command, a bypassed
+  execution policy, a hidden window, calls into Windows itself, a change to Microsoft Defender, a cleared
+  log or history, a FiveM or GTA V process name — and then dropped. The report keeps which kinds, how many,
+  how many commands ago (the history has no times) or when (the logs do), and **no text of any command**,
+  with one exception: when a command downloads something, the name of the website, never the rest of the
+  address. A website that is an address is kept as its kind only — loopback, private, public or
+  unspecified. PowerShell itself leaves out of its history every line holding the words password, token,
+  key or secret. Whether that history is the one of the account signed in at the keyboard is said as `same`
+  or `other`, by comparing two account IDs that are never put in the report.
 
 A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
 reads a browser's history, a messenger's storage, or anything that holds a password or a token.
@@ -284,7 +304,7 @@ or allow remote access.
 | Paths | full | your user-profile folder is replaced with `%USERPROFILE%` — see below for which folders that covers |
 | A hosts line's address | shown | **not shown** — only its kind: loopback, unspecified, private or public |
 | The name of a `Run` value or a scheduled task | shown | **not shown** |
-| What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, a separate choice that is off until you turn it on |
+| What a full scan read | shown | listed on the consent screen and shown after you agree; **a server's name is shown as `%SERVER_IDENTITY%`** unless you also agree to show server names, and **a website's name as `%DOWNLOAD_HOST%`** unless you agree to show website names — two separate choices, each off until you turn it on |
 | When Windows last started | shown | shown, as one time at the top of the report |
 | When parts of this PC were set up (dates) | shown | shown — [below](#how-far-back-the-traces-reach) |
 | How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |
@@ -312,6 +332,9 @@ ADR 0051:
   and 3077), and the first and last time Microsoft Defender's log recorded a detection or an action on one
   (events 1116 and 1117), ADR 0059. The events' contents are not read, so this never says which file
   was refused, which program asked, or what Defender detected;
+- the first and last time Windows PowerShell's log recorded a script block that PowerShell itself flagged as
+  suspicious (event 4104 at level 3), ADR 0063. The script's text is not read, so this never says what the
+  script was, who ran it or what it did;
 - the oldest and newest change the change journal holds for each folder it counts.
 
 The same list is on the consent screen. Each entry that comes from this list is shown with the ordinary
