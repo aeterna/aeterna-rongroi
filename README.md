@@ -54,7 +54,7 @@ Releases are not code-signed yet, so Windows SmartScreen will warn when you run 
 have the real file, open Command Prompt (`cmd`) in the download folder and run, with the exact file name:
 
 ```bat
-certutil -hashfile aeterna-rongroi-0.8.0-windows-x64.exe SHA256
+certutil -hashfile aeterna-rongroi-0.8.1-windows-x64.exe SHA256
 ```
 
 `dir /b aeterna-rongroi-*-windows-x64.exe` lists the file names; `certutil` takes one file at a time. Compare
@@ -70,10 +70,11 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 ## Status
 
-**Latest release: [0.8.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.09-0.8.0)**, 9 October 2026 —
+**Latest release: [0.8.1](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.09-0.8.1)**, 9 October 2026 —
 a pre-release. It has 52 rules, and almost all of them are still `experimental`: they have not yet been
-checked against enough real PCs, so read every result with care. 0.8.0 adds PowerShell: what it flagged and
-whether its history was deleted, and, in a full scan, which kinds of words its commands held — never the commands.
+checked against enough real PCs, so read every result with care. 0.8.0 added PowerShell: what it flagged,
+whether its history was deleted, and, in a full scan, which kinds of words its commands held — never the
+commands. 0.8.1 keeps those checks and says what a policy that switches PowerShell's logging off leaves empty.
 Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 
 | What it looks at, in plain words | Technical detail |
