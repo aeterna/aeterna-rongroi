@@ -1,6 +1,7 @@
 # ADR 0065 — Websites known to hand out loaders, as hashes
 
-- Status: proposed — six owner questions below
+- Status: accepted — the owner decided the six questions below on 2026-10-09, each as recommended; not
+  implemented until the first row exists (section 4)
 - Date: 2026-10-09
 
 ## Context
@@ -138,7 +139,11 @@ website, or searches the file for the hash in Self mode; the `seen_in` and `note
   definition, so a dictionary of candidates is easy. The hash keeps the repository from being the directory; it
   does not keep the names secret, and the ADR does not claim it does.
 
-## Owner questions
+## Owner decisions (2026-10-09)
+
+The owner answered "as recommended" to all six, question 1's channel included: the private reporting
+`SECURITY.md` describes carries evidence for a row.
+
 
 1. **Ship the mechanism only with a first row** (section 4), and the first row comes from evidence the owner
    checks. Recommended.

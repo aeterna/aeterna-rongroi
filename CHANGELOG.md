@@ -6,6 +6,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- ADR 0065 accepted: websites known to hand out loaders, as SHA-256 hashes of hosts in a data file with no host,
+  seller or link, matched through `match_lists` against a new `download_host_sha256` that SS mode hides like the
+  host; three per-source `presence` rules. Shared platforms are never listed, a row needs evidence a maintainer
+  checks privately, and nothing ships until the first row exists.
 - When a policy turns Windows PowerShell's script block logging off, the report now says what that empties
   (ADR 0063, amended 2026-10-09): the two Windows PowerShell posture rules' descriptions say the timeline then holds
   no flagged-block time and a full scan finds no kind of word in a flagged block, whatever ran, while the history
