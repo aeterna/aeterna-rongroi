@@ -54,7 +54,15 @@ pub const OPERATIONAL_LOG: &str = "Microsoft-Windows-PowerShell%4Operational.evt
 /// The classic log's file name in the Event Log folder.
 pub const CLASSIC_LOG: &str = "Windows PowerShell.evtx";
 
-const FIELDS: [Field; 25] = [
+/// Where Windows' sign-in screen keeps the account last signed in at the keyboard. Every account
+/// can read it, a non-elevated one included (measured 2026-10-09, ADR 0064 "Amendment").
+pub const LOGON_UI_KEY: &str =
+    r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI";
+/// The value under [`LOGON_UI_KEY`] holding that account's SID. Compared, never reported.
+pub const LAST_LOGGED_ON_USER_SID: &str = "LastLoggedOnUserSID";
+
+const FIELDS: [Field; 26] = [
+    Field::text("account"),
     Field::number("count"),
     Field::boolean("decoded"),
     Field::boolean("defender_tamper"),
@@ -124,6 +132,16 @@ impl Collector for PowershellText {
         }
         let mut run = Run::default();
         read_history(host, &mut run);
+        let account = history_account(host);
+        for history in run
+            .observations
+            .iter_mut()
+            .filter(|o| o.fields[DISCRIMINATOR] == HISTORY)
+        {
+            history
+                .fields
+                .insert("account".to_owned(), Value::from(account));
+        }
         read_logs(host, &mut run);
         CollectorRun::Measured {
             collector: ID.to_owned(),
@@ -152,7 +170,7 @@ impl Run {
             value: Value::from(source),
             gaps: FIELDS
                 .iter()
-                .filter(|f| f.name != DISCRIMINATOR && f.name != "read")
+                .filter(|f| !matches!(f.name, DISCRIMINATOR | "read" | "account"))
                 .map(|f| (f.name.to_owned(), reason))
                 .collect(),
         });
@@ -163,6 +181,21 @@ fn observation<const N: usize>(fields: [(&str, Value); N]) -> Observation {
     Observation {
         collector: ID.to_owned(),
         fields: fields.into_iter().map(|(k, v)| (k.to_owned(), v)).collect(),
+    }
+}
+
+/// Whether the history read is the one of the account signed in at the keyboard: `same`, `other`, or
+/// `unknown` when either SID could not be read. The history is always that of the account this
+/// program runs as, and after a restart with another administrator's password that is the other
+/// administrator (ADR 0064, "Amendment"). Neither SID is reported.
+fn history_account(host: &dyn Host) -> &'static str {
+    let Ok(own) = host.account_sid() else {
+        return "unknown";
+    };
+    match host.read_string(LOGON_UI_KEY, LAST_LOGGED_ON_USER_SID) {
+        Ok(Some(signed_in)) if signed_in.trim().eq_ignore_ascii_case(&own) => "same",
+        Ok(Some(signed_in)) if !signed_in.trim().is_empty() => "other",
+        _ => "unknown",
     }
 }
 
@@ -586,6 +619,52 @@ mod tests {
                 .all(|g| g.gaps["count"] == UnmeasuredReason::SourceAbsent)
         );
         assert!(observations.iter().all(|o| o.fields["read"] == "absent"));
+    }
+
+    /// The history is the scanning account's; after a restart with another administrator's password
+    /// that account is not the one signed in at the keyboard, and every history observation says so.
+    /// Measured on a runner on 2026-10-09: a second administrator started in the runner's own session
+    /// read `LastLoggedOnUserSID` as another account's.
+    #[test]
+    fn the_history_says_whether_it_is_the_signed_in_accounts() {
+        let account = |own: Option<&str>, signed_in: Option<&str>| {
+            let own = own.map_or(String::new(), |own| format!("account_sid: {own}\n"));
+            let registry = signed_in.map_or(String::new(), |signed_in| {
+                format!(
+                    "registry:\n  '{LOGON_UI_KEY}':\n    {LAST_LOGGED_ON_USER_SID}: '{signed_in}'\n"
+                )
+            });
+            let yaml = format!(
+                "platform: windows\nenv:\n  APPDATA: 'C:\\Users\\u\\AppData\\Roaming'\n{own}{registry}"
+            );
+            let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+            let run = PowershellText.collect(&host);
+            let (observations, gaps) = measured(&run);
+            assert!(gaps.iter().all(|g| !g.gaps.contains_key("account")));
+            let history = of(observations, HISTORY);
+            assert_eq!(history.len(), 1);
+            assert!(
+                of(observations, ENGINE_START)
+                    .iter()
+                    .all(|o| !o.fields.contains_key("account"))
+            );
+            history[0].fields["account"].clone()
+        };
+        assert_eq!(
+            account(Some("S-1-5-21-1-2-3-1001"), Some("S-1-5-21-1-2-3-1001")),
+            "same"
+        );
+        assert_eq!(
+            account(Some("S-1-5-21-1-2-3-1001"), Some("s-1-5-21-1-2-3-1001")),
+            "same"
+        );
+        assert_eq!(
+            account(Some("S-1-5-21-1-2-3-1002"), Some("S-1-5-21-1-2-3-1001")),
+            "other"
+        );
+        assert_eq!(account(Some("S-1-5-21-1-2-3-1001"), None), "unknown");
+        assert_eq!(account(Some("S-1-5-21-1-2-3-1001"), Some("")), "unknown");
+        assert_eq!(account(None, Some("S-1-5-21-1-2-3-1001")), "unknown");
     }
 
     #[test]

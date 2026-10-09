@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 65 |
-| SHA-256 | `ee196a80db8c620ef6b5f415810b6a13f513e538935e7f23db6002f1c0ef885c` |
+| SHA-256 | `1caacb556ba6138aefb1ae1125280b68568bed06985e832cf753dfb1fa781fac` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -1957,6 +1957,7 @@ Only the lines PowerShell's history file still holds. It keeps the newest 4096 c
 - Game, emulator or mod guides that tell players to exclude a folder
 - Turning protection off to install a program Defender flagged by mistake
 - A missing row does not mean Defender was never changed, since its own settings and log say more
+- A scan restarted with another administrator's password, which reads that administrator's history, not the person's at the keyboard; each row then says \`account: other\`
 
 **References**
 
@@ -1998,6 +1999,7 @@ Only the lines PowerShell's history file still holds. It keeps the newest 4096 c
 - Scripts that update or set up developer tools, terminals or Windows tweaks the same way
 - A command that was typed and failed, or was cancelled, which the history keeps either way
 - A missing row does not mean nothing was run, because other ways of running a script are not read
+- A scan restarted with another administrator's password, which reads that administrator's history, not the person's at the keyboard; each row then says \`account: other\`
 
 **References**
 
@@ -2039,6 +2041,7 @@ Only the lines PowerShell's history file still holds. It keeps the newest 4096 c
 - A person clearing their own command history
 - Administrators resetting a log while testing
 - A missing row does not mean nothing was cleared, because other tools leave no line here
+- A scan restarted with another administrator's password, which reads that administrator's history, not the person's at the keyboard; each row then says \`account: other\`
 
 **References**
 

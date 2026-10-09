@@ -255,7 +255,8 @@ What a full scan reads today:
   with one exception: when a command downloads something, the name of the website, never the rest of the
   address. A website that is an address is kept as its kind only — loopback, private, public or
   unspecified. PowerShell itself leaves out of its history every line holding the words password, token,
-  key or secret.
+  key or secret. Whether that history is the one of the account signed in at the keyboard is said as `same`
+  or `other`, by comparing two account IDs that are never put in the report.
 
 A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
 reads a browser's history, a messenger's storage, or anything that holds a password or a token.

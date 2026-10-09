@@ -4,6 +4,7 @@
   "Before any code" measured on 2026-10-08 ("Measured before code"): items 1 and 3 on the development PC,
   item 2 on a GitHub-hosted runner; implemented on 2026-10-08 in three changes ("As built")
 - Date: 2026-10-08
+- Amended: 2026-10-09, section 6's account comparison built ("Amendment: whose history it is")
 
 ## Context
 
@@ -292,10 +293,8 @@ and texts. Where the build differs from the decision above, and why:
    `partial` are not reported: the files are read whole, up to `rongroi_host::MAX_FILE_BYTES` like every file
    this program reads, and a larger one is `too_large`.
 5. **Another administrator's history.** Section 6 said a scan elevated with another administrator's
-   password would say so by comparing accounts. The collector reads `%APPDATA%` of the process, which is that
-   administrator's, and does not compare; the rules' `falsepositives` and the screenshare guide say the
-   history is the account running the scan. Comparing accounts is a later change if a screenshare shows it
-   matters.
+   password would say so by comparing accounts. The first build read `%APPDATA%` of the process, which is
+   that administrator's, and did not compare. Built on 2026-10-09 ("Amendment: whose history it is").
 6. **No baseline.** The Consequences below asked for a `baseline-*` host from the runner measurement. The
    runner's history is what a workflow typed into it, and its logs carry its own scripts; neither is an
    ordinary player's PC, and fixtures/hosts/PROVENANCE.md forbids describing one nobody measured. The seven
@@ -315,6 +314,47 @@ starts were read with none rejected. Both download-then-execute rules, the histo
 PowerShell start's, were `found` — the latter from the ADR 0063 probe's two starts — the four tamper rules `not_found`, and the selector
 put one flagged block on the timeline, the probe's own test text. In SS mode without the website question
 every `download_host` was `%DOWNLOAD_HOST%`.
+
+## Amendment: whose history it is (2026-10-09)
+
+Section 6 asked the history's observations to say when the account running the scan is not the one at the
+keyboard. ADR 0060 compares a task's principal with the scanning account; here there is no principal in the
+file, so the comparison needs a second account from somewhere else.
+
+**What is compared.** `account_sid()` (the process token's user, ADR 0060) with `LastLoggedOnUserSID` under
+`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI`, the account Windows' sign-in
+screen last signed in. Every observation with `source: history` gains `account`: `same`, `other`, or `unknown`
+when either SID could not be read or the value is empty. Neither SID reaches the report. The logs' observations
+do not carry it: the two logs are the machine's, not an account's.
+
+**Measured** (counts and equalities only, `.claude/probes/ps-account-compare.ps1`):
+
+| Where | Token | `LastLoggedOnUserSID` | Console session's user (WTS) |
+|---|---|---|---|
+| Development PC, one account, elevated over ssh (session 0) | the account | equal | equal |
+| GitHub-hosted runner, its own account (session 2) | the runner's | equal | equal |
+| The same runner, a second local administrator started in session 2 with `Start-Process -Credential` | the second's, not elevated | **not equal** | not read (the probe's `Add-Type` failed for that account) |
+
+The value was readable from the second account's token, which UAC had filtered; the key grants Users read.
+`%APPDATA%` in that process was the second account's profile, so the history read there would be its own —
+the case this amendment exists for.
+
+**Why this value and not another.** It needs no new host interface: `RegistrySource::read_string` reads it,
+as the collectors read every other `HKLM` value. `WTSQuerySessionInformationW(WTSUserName)` for this process's
+session is documented and would also say who is at the keyboard, but it returns a name, which would need
+`LookupAccountSidW` and a domain to compare, and a new unsafe call in `rongroi-host-windows`. Microsoft does not
+document `LastLoggedOnUserSID`.
+
+**What is unverified.** Fast user switching with two accounts signed in: whether the value follows the account
+switched back to, or only the last fresh sign-in, is not measured, and the row may then say `other` or `same`
+wrongly. An elevation through the UAC credential prompt rather than `Start-Process -Credential` is expected to
+behave the same, since the value is the machine's and the token is the other administrator's either way; not
+measured. A domain account and a Microsoft account were not measured.
+
+The history rules' `falsepositives`, the screenshare guide and `docs/architecture.md` say what `other` means.
+
+A release build's full scan on the development PC the same day gave `account: same` on all six history
+observations and on no log observation.
 
 ## Consequences (if accepted)
 

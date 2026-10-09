@@ -400,6 +400,7 @@ expression: view
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "count": 1,
             "decoded": false,
             "defender_tamper": true,
@@ -428,6 +429,7 @@ expression: view
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "count": 1,
             "decoded": false,
             "defender_tamper": false,
@@ -457,6 +459,7 @@ expression: view
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "count": 1,
             "decoded": false,
             "defender_tamper": false,
@@ -774,6 +777,7 @@ expression: view
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "file": "console_host",
             "lines": 6,
             "lossy_lines": 0,
@@ -784,6 +788,7 @@ expression: view
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "file": "visual_studio_code",
             "lines": 3,
             "lossy_lines": 0,
@@ -794,6 +799,7 @@ expression: view
         {
           "collector": "powershell_text",
           "fields": {
+            "account": "same",
             "count": 1,
             "decoded": false,
             "defender_tamper": false,
