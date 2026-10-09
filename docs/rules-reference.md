@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 65 |
-| SHA-256 | `3115ac07866dae2ededa2d60a70ebda9dc2e872ce4a9ae6904238ae0141d4e4b` |
+| SHA-256 | `ef9cdf3f83ca32e5207291128508a6747829cc3060e2fb0bd295f26ebdb59dfe` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -1566,7 +1566,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 **About this check**
 
-A per-user policy for Windows PowerShell sets script block logging to off, and no machine policy key takes precedence over it. Windows ships with no such policy. With it off, Windows PowerShell run by that account writes none of the script blocks it runs to the Windows event log, not even the ones it otherwise records by itself because their content looks suspicious. That was measured on one test machine, not on this PC. The policy read is the one of the Windows account this scan ran as: if the scan was restarted with a different administrator's password, it is that administrator's policy, and the player's own was not read. It says nothing about which scripts ran or who set the policy. On its own this describes an account's settings — it is not evidence of cheating. This program reads that log too (ADR 0063, ADR 0064): while the policy is off, the timeline holds no time of a script block that account's Windows PowerShell flagged, and a full scan finds no kind of word in one. The command lines Windows PowerShell was started with are still written while the policy is off (measured for the machine policy on a GitHub-hosted runner, 2026-10-09; the per-user one was not measured), and its command history is written by PSReadLine, whose source does not read this policy, so those rows read as usual.
+A per-user policy for Windows PowerShell sets script block logging to off, and no machine policy key takes precedence over it. Windows ships with no such policy. With it off, Windows PowerShell run by that account writes none of the script blocks it runs to the Windows event log, not even the ones it otherwise records by itself because their content looks suspicious. That was measured on one test machine, not on this PC. The policy read is the one of the Windows account this scan ran as: if the scan was restarted with a different administrator's password, it is that administrator's policy, and the player's own was not read. It says nothing about which scripts ran or who set the policy. On its own this describes an account's settings — it is not evidence of cheating. This program reads that log too (ADR 0063, ADR 0064): while the policy is off, the timeline holds no time of a script block that account's Windows PowerShell flagged, and a full scan finds no kind of word in one. The command lines Windows PowerShell was started with are still written while the policy is off (measured for this per-user policy and for the machine one on a GitHub-hosted runner, 2026-10-09), and its command history is written by PSReadLine, whose source does not read this policy, so those rows read as usual.
 
 **Matches when all of these hold for one observation**
 
