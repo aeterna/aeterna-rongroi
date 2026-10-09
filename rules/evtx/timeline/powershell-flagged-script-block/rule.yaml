@@ -32,6 +32,7 @@ falsepositives:
   - No time here does not mean no script ran. PowerShell records nothing this way when a policy turns
     script block logging off, and PowerShell 7 records it in another log, which on one PC measured did not
     exist; scripts run before the log's oldest record are not seen
+  - "A policy that turns script block logging off, which the PowerShell posture rows report: PowerShell then flags nothing, so no time here says nothing"
 references:
   - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows
   - https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/engine/runtime/CompiledScriptBlock.cs

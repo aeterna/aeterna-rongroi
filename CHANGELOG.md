@@ -5,6 +5,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- When a policy turns Windows PowerShell's script block logging off, the report now says what that empties
+  (ADR 0063, amended 2026-10-09): the two Windows PowerShell posture rules' descriptions say the timeline then holds
+  no flagged-block time and a full scan finds no kind of word in a flagged block, whatever ran, while the history
+  and engine starts are not expected to be affected (not measured); the two selectors that read flagged blocks name
+  the policy in their `falsepositives`; both screenshare guides say how a found row changes the reading of the
+  PowerShell rows after it. Text only: a posture row is already listed in SS mode whatever its state.
+- Screenshare guides: two release-history sentences that the 0.8.0 version bump had changed by mistake ("0.6.0 and
+  0.8.0 add no rules", "0.6.0, 0.8.0 and 0.8.0") read 0.7.0 again.
+
 ## [0.8.0] - 2026-10-09
 
 PowerShell. A standard scan puts on the timeline when PowerShell itself flagged a script, and counts deletions in
