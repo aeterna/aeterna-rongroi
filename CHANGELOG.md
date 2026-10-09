@@ -11,8 +11,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `cargo xtask site` builds it, and the landing page's version and download links, from the release list; it
   refuses when GitHub's digest of an executable differs from `SHA256SUMS`. Publishing a release redeploys the page,
   so a release no longer edits `site/`.
+- `cargo xtask check-versions` (CI): the README Status sections, the screenshare guides, the desktop manifests and
+  every release file name in those pages name `Cargo.toml`'s version, so a release pull request cannot miss one.
 
 ### Changed
+- README and screenshare guides: the hash check is one Command Prompt line that is the same for every version,
+  `for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256`, which prints each downloaded
+  file's name above its hash (checked on Windows 11 build 26220); the release file names are written
+  `X.Y.Z`.
 - The two Windows PowerShell script block logging rules say what was measured instead of "not measured": on a
   GitHub-hosted runner, a machine policy set to 0 stopped every 4104 record, flagged ones included, and left 400
   written (ADR 0063, amendment). The command history rests on PSReadLine's source, which does not read the policy.

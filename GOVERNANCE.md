@@ -35,7 +35,8 @@ settings if you have not seen that yourself.
 1. Open a pull request `chore(release): X.Y.Z` against `dev`. It renames `## [Unreleased]` in `CHANGELOG.md` to
    `## [X.Y.Z] - YYYY-MM-DD` and sets version `X.Y.Z` in `Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
    and `apps/desktop/package.json`, and the version in the README's Status section (both languages) and in both
-   screenshare guides. Squash-merge it when CI is green. The landing page is not edited: `cargo xtask site` fills
+   screenshare guides. `cargo xtask check-versions` fails the pull request when one of them still names the
+   previous version. Squash-merge it when CI is green. The landing page is not edited: `cargo xtask site` fills
    its version and links from the published release (step 7).
 2. Open a pull request from `dev` to `main`, also titled `chore(release): X.Y.Z`, and merge it with a **merge
    commit** when CI is green.

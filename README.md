@@ -51,15 +51,15 @@ Details: [PRIVACY.md](PRIVACY.md).
 ## Verifying a download
 
 Releases are not code-signed yet, so Windows SmartScreen will warn when you run them. To check that you
-have the real file, open Command Prompt (`cmd`) in the download folder and run, with the exact file name:
+have the real file, open Command Prompt (`cmd`) in the download folder and run:
 
 ```bat
-certutil -hashfile aeterna-rongroi-0.8.1-windows-x64.exe SHA256
+for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256
 ```
 
-`dir /b aeterna-rongroi-*-windows-x64.exe` lists the file names; `certutil` takes one file at a time. Compare
-the hash with the line for the same file name in `SHA256SUMS` on the GitHub release page; upper or lower case
-does not matter. During a screenshare, use Command Prompt rather than PowerShell: PowerShell keeps its own
+`certutil` takes one file at a time, so the `for` hands it each downloaded file and it prints each file's name
+above its hash. Compare each hash with the line for the same file name in `SHA256SUMS` on the GitHub release
+page; upper or lower case does not matter. During a screenshare, use Command Prompt rather than PowerShell: PowerShell keeps its own
 records on the PC, and a check typed into it adds the call's own time to them
 ([screenshare guide §2](docs/screenshare-guide.md#2-get-the-real-file)). Builds that did not come from the official
 release pipeline show **UNOFFICIAL BUILD** in the window, in the CLI header and in every report.

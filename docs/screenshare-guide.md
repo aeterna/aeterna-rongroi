@@ -23,22 +23,22 @@ never does.
 
 1. The player downloads it from the project's GitHub **Releases** page. Send the player the page,
    not a copy of the file.
-   - `aeterna-rongroi-cli-0.8.1-windows-x64.exe` is the command-line version. It does not use
+   - `aeterna-rongroi-cli-X.Y.Z-windows-x64.exe` is the command-line version. It does not use
      WebView2.
-   - `aeterna-rongroi-0.8.1-windows-x64.exe` is the version with a window.
+   - `aeterna-rongroi-X.Y.Z-windows-x64.exe` is the version with a window.
 2. Do not open it from the browser. Windows SmartScreen will warn, because releases are not
    code-signed yet, and the hash check comes first.
 3. Before running it, the player opens **Command Prompt** (`cmd`) in the download folder — type `cmd` in
-   File Explorer's address bar and press Enter — and runs, with the exact file name:
+   File Explorer's address bar and press Enter — and runs:
 
    ```bat
-   dir /b aeterna-rongroi-*-windows-x64.exe
-   certutil -hashfile aeterna-rongroi-0.8.1-windows-x64.exe SHA256
+   for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256
    ```
 
-   The first line lists the file names; `certutil` takes one file at a time and no `*`. Compare the hash
-   with the line for the same file name in `SHA256SUMS` on the release page. Upper or lower case does not
-   matter.
+   `certutil` takes one file at a time and no `*`, so the `for` hands it each downloaded file in turn and it
+   prints every file's name above its hash (checked on Windows 11 build 26220). The line is the same for
+   every version. Compare each hash with the line for the same file name in `SHA256SUMS` on the release
+   page. Upper or lower case does not matter.
 
    **Use Command Prompt, not PowerShell, during a screenshare.** PowerShell keeps its own records on the
    PC — a history of typed commands and its event logs — and Windows records when PowerShell last ran
