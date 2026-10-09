@@ -349,7 +349,9 @@ document `LastLoggedOnUserSID`.
 switched back to, or only the last fresh sign-in, is not measured, and the row may then say `other` or `same`
 wrongly. An elevation through the UAC credential prompt rather than `Start-Process -Credential` is expected to
 behave the same, since the value is the machine's and the token is the other administrator's either way; not
-measured. A domain account and a Microsoft account were not measured.
+measured. A Microsoft account was measured on 2026-10-09: the development PC's account is a local user whose
+`PrincipalSource` is `MicrosoftAccount`, not domain-joined, and `LastLoggedOnUserSID` equalled the token's SID.
+A domain account was not measured.
 
 The history rules' `falsepositives`, the screenshare guide and `docs/architecture.md` say what `other` means.
 

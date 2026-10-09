@@ -315,8 +315,9 @@ scan was not restarted with somebody else's administrator password. The firmware
 **A Windows PowerShell row that is found changes how to read the PowerShell rows further down.** With
 script block logging off, PowerShell flags no script, so the timeline has no time of a flagged script block
 and a full scan finds no kind of word in one — whatever ran. Their absence then says nothing. The command
-history and the command lines Windows PowerShell started with are other records, which the policy is not
-expected to switch off (not measured), so read those rows as usual (ADR 0063, ADR 0064). The two PowerShell 7
+lines Windows PowerShell started with are still written while the policy is off (measured on a GitHub-hosted
+runner), and the command history is written by PSReadLine, whose source does not read the policy, so read
+those rows as usual (ADR 0063, ADR 0064). The two PowerShell 7
 rows concern a log this program does not read.
 
 The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never

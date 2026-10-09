@@ -12,7 +12,7 @@ description: >-
   not on this PC. It says nothing about which scripts ran or who set the policy. A per-user policy and
   PowerShell 7's policy have rules of their own. On its own this describes the machine — it is not
   evidence of cheating.
-  This program reads that log too (ADR 0063, ADR 0064): while the policy is off, the timeline holds no time of a flagged script block and a full scan finds no kind of word in one, whatever ran. PowerShell's command history and the command lines it was started with are other records, which this policy is not expected to switch off (not measured).
+  This program reads that log too (ADR 0063, ADR 0064): while the policy is off, the timeline holds no time of a flagged script block and a full scan finds no kind of word in one, whatever ran. The command lines Windows PowerShell was started with are still written while the policy is off (measured on a GitHub-hosted runner, 2026-10-09), and its command history is written by PSReadLine, whose source does not read this policy, so those rows read as usual.
 status: experimental
 collector: posture
 strength: posture
