@@ -5,6 +5,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-09
+
+The checks are those of 0.8.0. A rule's text now says what a policy that switches Windows PowerShell's script
+block logging off empties in this program's reading, and two sentences of the screenshare guides read right again.
+
 ### Changed
 - ADR 0065 accepted: websites known to hand out loaders, as SHA-256 hashes of hosts in a data file with no host,
   seller or link, matched through `match_lists` against a new `download_host_sha256` that SS mode hides like the
