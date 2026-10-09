@@ -17,6 +17,7 @@ mod release_check;
 mod release_notes;
 mod release_verify;
 mod rules_reference;
+mod site;
 
 use std::path::{Path, PathBuf};
 
@@ -63,6 +64,8 @@ enum Command {
     ReleaseVerify(release_verify::Args),
     /// Write the release notes for a tag (release workflow).
     ReleaseNotes(release_notes::Args),
+    /// Build the landing page from `site/` and write `release.json` (Pages workflow).
+    Site(site::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -80,6 +83,7 @@ fn main() -> anyhow::Result<()> {
         Command::ReleaseCheck(args) => release_check::run(&root, &args),
         Command::ReleaseVerify(args) => release_verify::run(&args),
         Command::ReleaseNotes(args) => release_notes::run(&root, &args),
+        Command::Site(args) => site::run(&root, &args),
     }
 }
 
