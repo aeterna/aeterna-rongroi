@@ -10,6 +10,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   GitHub-hosted runner, a machine policy set to 0 stopped every 4104 record, flagged ones included, and left 400
   written (ADR 0063, amendment). The command history rests on PSReadLine's source, which does not read the policy.
   ADR 0064 records that a Microsoft account was measured for the history's `account` comparison.
+- The per-user script block logging rule says its policy was measured too: at 0 it silences the flagged blocks and
+  leaves 400 written, and a machine policy decides when both are set (runner run 37925318316, ADR 0063).
 
 ## [0.8.1] - 2026-10-09
 
