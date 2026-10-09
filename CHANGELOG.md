@@ -5,6 +5,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `release.json` on the landing page's site: the latest published release (version, tag, date, links, and each
+  executable's name, size and SHA-256), for other sites to read instead of copying the version by hand.
+  `cargo xtask site` builds it, and the landing page's version and download links, from the release list; it
+  refuses when GitHub's digest of an executable differs from `SHA256SUMS`. Publishing a release redeploys the page,
+  so a release no longer edits `site/`.
+
 ### Changed
 - The two Windows PowerShell script block logging rules say what was measured instead of "not measured": on a
   GitHub-hosted runner, a machine policy set to 0 stopped every 4104 record, flagged ones included, and left 400

@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
-# Publishes site/, the static landing page, to GitHub Pages. Nothing is built: the folder is uploaded as it is.
+# Publishes the landing page to GitHub Pages. `cargo xtask site` fills the release version and links into
+# site/ and writes release.json, the latest published release that other sites read; it reads files only,
+# so the release list and SHA256SUMS are downloaded here.
 
 name: pages
 
@@ -10,7 +12,14 @@ on:
     branches: [dev]
     paths:
       - "site/**"
+      - "xtask/src/site.rs"
       - ".github/workflows/pages.yml"
+  # A published release changes the version on the page and in release.json without a commit.
+  release:
+    types: [published]
+  # A missed release event is caught by the next day's run.
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -21,10 +30,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The github-pages environment deploys from dev only, and a release event runs on the tag. So a published
+  # release starts this workflow again on dev instead of deploying itself; GitHub lets GITHUB_TOKEN start a
+  # workflow_dispatch run.
+  redeploy:
+    name: redeploy on dev
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref dev
+
   deploy:
     name: deploy
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     permissions:
       contents: read
       pages: write
@@ -36,9 +61,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install the toolchain pinned in rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
+      - name: Download the release list and the latest release's SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=30" > "$RUNNER_TEMP/releases.json"
+          tag="$(cargo xtask site --releases "$RUNNER_TEMP/releases.json" --latest-tag)"
+          echo "latest published release: $tag"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --dir "$RUNNER_TEMP/sums"
+      - name: Build the site
+        run: >-
+          cargo xtask site
+          --releases "$RUNNER_TEMP/releases.json"
+          --sums "$RUNNER_TEMP/sums/SHA256SUMS"
+          --out "$RUNNER_TEMP/_site"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: site
+          path: ${{ runner.temp }}/_site
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

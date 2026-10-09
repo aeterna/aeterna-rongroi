@@ -34,9 +34,9 @@ settings if you have not seen that yourself.
 
 1. Open a pull request `chore(release): X.Y.Z` against `dev`. It renames `## [Unreleased]` in `CHANGELOG.md` to
    `## [X.Y.Z] - YYYY-MM-DD` and sets version `X.Y.Z` in `Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`
-   and `apps/desktop/package.json`, and the version shown on the landing page (`site/index.html`,
-   `site/en/index.html`), in the README's Status section (both languages) and in both screenshare guides.
-   Squash-merge it when CI is green.
+   and `apps/desktop/package.json`, and the version in the README's Status section (both languages) and in both
+   screenshare guides. Squash-merge it when CI is green. The landing page is not edited: `cargo xtask site` fills
+   its version and links from the published release (step 7).
 2. Open a pull request from `dev` to `main`, also titled `chore(release): X.Y.Z`, and merge it with a **merge
    commit** when CI is green.
 3. Tag that merge commit on `main` with the date from the changelog heading and push the tag:
@@ -49,6 +49,9 @@ settings if you have not seen that yourself.
    version). Builds are not byte-for-byte reproducible, so a check of an earlier `-rc.N` build does not carry over.
 6. Open the draft, read the notes and the file list, and publish it. With immutable releases enabled, a published
    release cannot have its tag or files changed; a wrong file needs a new version.
+7. Publishing starts the `pages` workflow, which rebuilds the landing page and `release.json` from the new release.
+   It refuses to deploy when GitHub's digest of an executable differs from its line in `SHA256SUMS`; check that the
+   run is green and that `https://aeterna.github.io/aeterna-rongroi/release.json` names the new version.
 
 ## Becoming a maintainer
 
