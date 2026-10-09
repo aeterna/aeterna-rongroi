@@ -5,6 +5,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-09
+
+PowerShell. A standard scan puts on the timeline when PowerShell itself flagged a script, and counts deletions in
+the folder where it keeps the history of typed commands. A full scan, which the player agrees to before it starts,
+also reads which kinds of words PowerShell's commands held — a download that was run, a change to Microsoft
+Defender, a cleared log — and keeps no command. Eight rules are new, all `experimental`.
+
 ### Added
 - `powershell_text`'s history observations say whose history it is (ADR 0064, amended 2026-10-09): `account` is
   `same` or `other` as the scanning account equals the one Windows' sign-in screen last signed in
