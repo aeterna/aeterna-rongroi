@@ -5,6 +5,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- The two Windows PowerShell script block logging rules say what was measured instead of "not measured": on a
+  GitHub-hosted runner, a machine policy set to 0 stopped every 4104 record, flagged ones included, and left 400
+  written (ADR 0063, amendment). The command history rests on PSReadLine's source, which does not read the policy.
+  ADR 0064 records that a Microsoft account was measured for the history's `account` comparison.
+
 ## [0.8.1] - 2026-10-09
 
 The checks are those of 0.8.0. A rule's text now says what a policy that switches Windows PowerShell's script
