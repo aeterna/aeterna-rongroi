@@ -3,6 +3,7 @@
 - Status: accepted — the owner decided the six questions below on 2026-10-08, each as recommended
 - Date: 2026-10-08
 - Implemented: the selector, the `psreadline` place and its two rules, in the change that adds "As built"
+- Amended: 2026-10-09, "Amendment: when a policy silences the flagged blocks"
 
 ## Context
 
@@ -242,4 +243,19 @@ The owner answered "as recommended" to all six:
 
   The newest flagged block was this project's own probe, run on that PC that morning; the PC is the
   development machine, as section "Measured" says. The folder and the files were removed afterwards.
+
+## Amendment: when a policy silences the flagged blocks (2026-10-09)
+
+A Windows PowerShell policy that sets `EnableScriptBlockLogging` to 0 makes PowerShell skip the blocks it would
+otherwise flag ("What PowerShell's source says"), so this ADR's selector and ADR 0064's `script_block` source
+are empty on such a PC whatever ran. A cross-source statement or an `unmeasured` for the selector was weighed
+and not built: the four posture rules of ADR 0038 already read that policy, and a posture rule is listed in SS
+mode whatever its state (ADR 0011), so the warning belongs on that row, which the reviewer already sees. A
+selector cannot be `unmeasured`: it makes no evidence (ADR 0051).
+
+Text only: the two Windows PowerShell posture rules' descriptions say what the policy empties in this program's
+reading (the timeline's flagged-block times, a full scan's kinds from flagged blocks) and what it is not expected
+to (the history and engine starts; not measured); the two timeline selectors that read flagged blocks name the
+policy in their `falsepositives`; both screenshare guides say how a found row changes the reading of the rows
+after it.
 

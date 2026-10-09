@@ -84,7 +84,7 @@ read-only, and the one about an event log file that is not the file Windows writ
   than PowerShell, for the reason in §2.
   `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
   until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
-  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.8.0 and 0.8.0 — but the report from
+  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0 and 0.8.0 — but the report from
   `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
   use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
   (measured on a real Windows 11 machine).
@@ -306,11 +306,18 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 and 0.8.0 add no rules, and eight are new in 0.8.0: the two about PowerShell's command history folder and the six full-scan PowerShell rows. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 and 0.7.0 add no rules, and eight are new in 0.8.0: the two about PowerShell's command history folder and the six full-scan PowerShell rows. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
 scan was not restarted with somebody else's administrator password. The firmware rule does not detect DMA hardware (§1) and says nothing about a second PC.
+
+**A Windows PowerShell row that is found changes how to read the PowerShell rows further down.** With
+script block logging off, PowerShell flags no script, so the timeline has no time of a flagged script block
+and a full scan finds no kind of word in one — whatever ran. Their absence then says nothing. The command
+history and the command lines Windows PowerShell started with are other records, which the policy is not
+expected to switch off (not measured), so read those rows as usual (ADR 0063, ADR 0064). The two PowerShell 7
+rows concern a log this program does not read.
 
 The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
 what a record in it says. None of them says who changed it or when, and on the one Windows 11 machine

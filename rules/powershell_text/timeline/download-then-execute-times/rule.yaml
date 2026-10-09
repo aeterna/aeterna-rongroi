@@ -19,6 +19,7 @@ retention: >-
 falsepositives:
   - Installers and update scripts that download and run in one line
   - A missing time does not mean nothing ran, and no time before a log's oldest record is seen
+  - "A policy that turns script block logging off, which the PowerShell posture rows report: no flagged block is then written, and only Windows PowerShell's starts can put a time here"
 references:
   - https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/adr/0064-words-in-powershell-commands-never-the-commands.md
 author: aeterna-rongroi contributors
