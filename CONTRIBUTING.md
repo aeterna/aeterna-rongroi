@@ -82,7 +82,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo nextest run
 cargo xtask check-rules && cargo xtask check-baseline
 cargo xtask rules-reference --check
-cargo xtask check-locales && cargo xtask check-unicode
+cargo xtask check-locales && cargo xtask check-unicode && cargo xtask check-versions
 uvx --with chardet reuse lint
 pnpm -C apps/desktop typecheck && pnpm -C apps/desktop lint && pnpm -C apps/desktop test
 ```

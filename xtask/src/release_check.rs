@@ -88,7 +88,7 @@ fn changelog_problem(tag: &ReleaseTag, changelog: &str) -> Option<String> {
     }
 }
 
-fn json_version(path: &Path) -> anyhow::Result<String> {
+pub fn json_version(path: &Path) -> anyhow::Result<String> {
     let text =
         std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     let value: serde_json::Value =

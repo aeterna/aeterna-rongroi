@@ -21,18 +21,18 @@
 ## 2. โหลดไฟล์ตัวจริง
 
 1. ให้ผู้เล่นโหลดเองจากหน้า **Releases** ของโปรเจกต์บน GitHub ส่งลิงก์หน้านั้นให้ผู้เล่น อย่าส่งไฟล์ให้เอง
-   - `aeterna-rongroi-cli-0.8.1-windows-x64.exe` คือรุ่นบรรทัดคำสั่ง ไม่ใช้ WebView2
-   - `aeterna-rongroi-0.8.1-windows-x64.exe` คือรุ่นที่มีหน้าต่าง
+   - `aeterna-rongroi-cli-X.Y.Z-windows-x64.exe` คือรุ่นบรรทัดคำสั่ง ไม่ใช้ WebView2
+   - `aeterna-rongroi-X.Y.Z-windows-x64.exe` คือรุ่นที่มีหน้าต่าง
 2. อย่าเปิดไฟล์จากเบราว์เซอร์ Windows SmartScreen จะขึ้นเตือน เพราะ release ยังไม่ได้เซ็นโค้ด และต้องเช็ค hash ก่อน
 3. ก่อนเปิดโปรแกรม ให้ผู้เล่นเปิด **Command Prompt** (`cmd`) ในโฟลเดอร์ที่โหลดไฟล์มา — พิมพ์ `cmd` ในช่องที่อยู่ของ
-   File Explorer แล้วกด Enter — แล้วรัน โดยใส่ชื่อไฟล์เต็ม:
+   File Explorer แล้วกด Enter — แล้วรัน:
 
    ```bat
-   dir /b aeterna-rongroi-*-windows-x64.exe
-   certutil -hashfile aeterna-rongroi-0.8.1-windows-x64.exe SHA256
+   for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256
    ```
 
-   บรรทัดแรกแสดงชื่อไฟล์ `certutil` รับทีละไฟล์และใช้ `*` ไม่ได้ เทียบ hash กับบรรทัดของไฟล์ชื่อเดียวกันใน `SHA256SUMS`
+   `certutil` รับทีละไฟล์และใช้ `*` ไม่ได้ `for` จึงส่งไฟล์ที่โหลดมาให้ทีละไฟล์ และจะพิมพ์ชื่อไฟล์ไว้เหนือ hash ของแต่ละไฟล์
+   (ตรวจบน Windows 11 build 26220) บรรทัดนี้ใช้ได้กับทุกรุ่น เทียบ hash แต่ละตัวกับบรรทัดของไฟล์ชื่อเดียวกันใน `SHA256SUMS`
    บนหน้า release ตัวพิมพ์เล็กหรือใหญ่ไม่มีผล
 
    **ระหว่าง SS ให้ใช้ Command Prompt ไม่ใช่ PowerShell** PowerShell เก็บบันทึกของตัวเองไว้บนเครื่อง — ประวัติคำสั่งที่พิมพ์
