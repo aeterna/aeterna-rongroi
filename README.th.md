@@ -49,7 +49,7 @@ Read in English: [README.md](README.md)
 ตอนนี้ release ยังไม่ได้เซ็นโค้ด Windows SmartScreen จะขึ้นเตือนตอนเปิด ให้เปิด Command Prompt (`cmd`) ในโฟลเดอร์ที่โหลดมา แล้วรันโดยใส่ชื่อไฟล์เต็ม:
 
 ```bat
-certutil -hashfile aeterna-rongroi-0.8.0-windows-x64.exe SHA256
+certutil -hashfile aeterna-rongroi-0.8.1-windows-x64.exe SHA256
 ```
 
 `dir /b aeterna-rongroi-*-windows-x64.exe` แสดงชื่อไฟล์ `certutil` รับทีละไฟล์ ให้เทียบค่ากับบรรทัดที่มีชื่อไฟล์เดียวกันใน `SHA256SUMS` ในหน้า release บน GitHub (ตัวพิมพ์เล็กหรือใหญ่ไม่มีผล) ระหว่าง SS ให้ใช้ Command Prompt แทน PowerShell เพราะ PowerShell เก็บบันทึกของตัวเองไว้บนเครื่อง และคำสั่งที่พิมพ์ลงไปจะเพิ่มเวลาของคอลเข้าไปในบันทึกนั้น ([คู่มือ SS ข้อ 2](docs/screenshare-guide.th.md#2-โหลดไฟล์ตัวจริง)) · build ที่ไม่ได้มาจากระบบ release ทางการ
@@ -61,9 +61,10 @@ certutil -hashfile aeterna-rongroi-0.8.0-windows-x64.exe SHA256
 
 ## สถานะ
 
-**รุ่นล่าสุด: [0.8.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.09-0.8.0)** ออกวันที่ 9 ตุลาคม 2026 —
+**รุ่นล่าสุด: [0.8.1](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.09-0.8.1)** ออกวันที่ 9 ตุลาคม 2026 —
 ยังเป็นรุ่นทดลอง (pre-release) มี rule 52 ตัว เกือบทั้งหมดยังเป็น `experimental` คือยังไม่ได้ลองกับเครื่องจริง
 มากพอ อ่านผลทุกข้ออย่างระมัดระวัง · 0.8.0 เพิ่มเรื่อง PowerShell: สิ่งที่มันตั้งธงไว้และประวัติถูกลบไหม และในการสแกนแบบ Full คำสั่งมีคำชนิดไหน โดยไม่เก็บตัวคำสั่ง
+0.8.1 ตรวจเหมือนเดิม และบอกว่านโยบายที่ปิดการบันทึกของ PowerShell ทำให้อะไรว่างไป
 รุ่นก่อนหน้า: [CHANGELOG.md](CHANGELOG.md)
 
 | ตรวจอะไร (ภาษาคน) | รายละเอียดทางเทคนิค |
