@@ -70,11 +70,13 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 ## Status
 
-**Latest release: [0.8.1](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.09-0.8.1)**, 9 October 2026 —
+**Latest release: [0.8.2](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.10-0.8.2)**, 10 October 2026 —
 a pre-release. It has 52 rules, and almost all of them are still `experimental`: they have not yet been
 checked against enough real PCs, so read every result with care. 0.8.0 added PowerShell: what it flagged,
 whether its history was deleted, and, in a full scan, which kinds of words its commands held — never the
-commands. 0.8.1 keeps those checks and says what a policy that switches PowerShell's logging off leaves empty.
+commands. 0.8.1 said what a policy that switches PowerShell's logging off leaves empty. 0.8.2 keeps the same
+checks; the hash check is one Command Prompt line for every version, and the landing page now reads its version
+and rule count from the published release.
 Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 
 | What it looks at, in plain words | Technical detail |

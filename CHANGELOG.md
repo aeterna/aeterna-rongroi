@@ -5,6 +5,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-10
+
+The checks are those of 0.8.1; two rules' text says what was measured. The hash check is one Command Prompt line
+for every version, and the landing page and `release.json` take the version, files and rule count from the
+published release, so other sites can show them without copying a number.
+
 ### Added
 - `release.json` on the landing page's site: the latest published release (version, tag, date, links, and each
   executable's name, size and SHA-256), for other sites to read instead of copying the version by hand.
