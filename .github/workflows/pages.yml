@@ -75,11 +75,16 @@ jobs:
           tag="$(cargo xtask site --releases "$RUNNER_TEMP/releases.json" --latest-tag)"
           echo "latest published release: $tag"
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --dir "$RUNNER_TEMP/sums"
+          # rules/ as the release shipped it, not as dev holds it now: dev can carry rules no release has yet.
+          git fetch --quiet --depth=1 origin "refs/tags/$tag:refs/tags/$tag"
+          mkdir -p "$RUNNER_TEMP/tag"
+          git archive "$tag" rules | tar -x -C "$RUNNER_TEMP/tag"
       - name: Build the site
         run: >-
           cargo xtask site
           --releases "$RUNNER_TEMP/releases.json"
           --sums "$RUNNER_TEMP/sums/SHA256SUMS"
+          --rules "$RUNNER_TEMP/tag/rules"
           --out "$RUNNER_TEMP/_site"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

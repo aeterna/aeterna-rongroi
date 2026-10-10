@@ -11,6 +11,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `cargo xtask site` builds it, and the landing page's version and download links, from the release list; it
   refuses when GitHub's digest of an executable differs from `SHA256SUMS`. Publishing a release redeploys the page,
   so a release no longer edits `site/`.
+- `release.json` counts the release's rule set as `stats` (rules, timeline selectors, and rules by status), read
+  from `rules/` at the release tag rather than from `dev`, so a page can say how many rules a release ships without
+  anyone typing the number; `{{rongroi.rules}}` gives it to the landing page.
 - `cargo xtask check-versions` (CI): the README Status sections, the screenshare guides, the desktop manifests and
   every release file name in those pages name `Cargo.toml`'s version, so a release pull request cannot miss one.
 
