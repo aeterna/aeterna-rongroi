@@ -102,6 +102,8 @@ jobs:
         run: cargo xtask check-locales
       - name: No invisible or bidi characters
         run: cargo xtask check-unicode
+      - name: Pages that name the release by hand name this version
+        run: cargo xtask check-versions
       - name: No network crates, licenses, advisories, sources
         run: cargo deny check
       - name: Typos

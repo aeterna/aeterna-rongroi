@@ -1,9 +1,9 @@
 # Screenshare guide
 
 For server staff checking a player's PC over a screenshare (an SS, also called a PC check), and for the player. It covers
-aeterna-rongroi **0.8.1**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
+aeterna-rongroi **0.8.2**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
-> ⚠️ **Pre-alpha.** Fifty-two rules ship in 0.8.1, and fifty of them are `experimental`. Do not ban anyone
+> ⚠️ **Pre-alpha.** Fifty-two rules ship in 0.8.2, and fifty of them are `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
 
 ## 1. What it can and cannot show
@@ -23,22 +23,22 @@ never does.
 
 1. The player downloads it from the project's GitHub **Releases** page. Send the player the page,
    not a copy of the file.
-   - `aeterna-rongroi-cli-0.8.1-windows-x64.exe` is the command-line version. It does not use
+   - `aeterna-rongroi-cli-X.Y.Z-windows-x64.exe` is the command-line version. It does not use
      WebView2.
-   - `aeterna-rongroi-0.8.1-windows-x64.exe` is the version with a window.
+   - `aeterna-rongroi-X.Y.Z-windows-x64.exe` is the version with a window.
 2. Do not open it from the browser. Windows SmartScreen will warn, because releases are not
    code-signed yet, and the hash check comes first.
 3. Before running it, the player opens **Command Prompt** (`cmd`) in the download folder — type `cmd` in
-   File Explorer's address bar and press Enter — and runs, with the exact file name:
+   File Explorer's address bar and press Enter — and runs:
 
    ```bat
-   dir /b aeterna-rongroi-*-windows-x64.exe
-   certutil -hashfile aeterna-rongroi-0.8.1-windows-x64.exe SHA256
+   for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256
    ```
 
-   The first line lists the file names; `certutil` takes one file at a time and no `*`. Compare the hash
-   with the line for the same file name in `SHA256SUMS` on the release page. Upper or lower case does not
-   matter.
+   `certutil` takes one file at a time and no `*`, so the `for` hands it each downloaded file in turn and it
+   prints every file's name above its hash (checked on Windows 11 build 26220). The line is the same for
+   every version. Compare each hash with the line for the same file name in `SHA256SUMS` on the release
+   page. Upper or lower case does not matter.
 
    **Use Command Prompt, not PowerShell, during a screenshare.** PowerShell keeps its own records on the
    PC — a history of typed commands and its event logs — and Windows records when PowerShell last ran
@@ -84,7 +84,7 @@ read-only, and the one about an event log file that is not the file Windows writ
   than PowerShell, for the reason in §2.
   `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
   until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
-  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0 and 0.8.1 — but the report from
+  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1 and 0.8.2 — but the report from
   `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
   use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
   (measured on a real Windows 11 machine).
@@ -104,7 +104,7 @@ change the results. The consent screen decides what is shown.
 **CLI** (in the Command Prompt from §3):
 
 ```bat
-.\aeterna-rongroi-cli-0.8.1-windows-x64.exe scan --mode ss
+.\aeterna-rongroi-cli-0.8.2-windows-x64.exe scan --mode ss
 ```
 
 Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
@@ -119,7 +119,7 @@ Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player**
 ### The header
 
 ```
-aeterna-rongroi 0.8.1
+aeterna-rongroi 0.8.2
 official build
 mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
 exe sha256: <hash>
@@ -306,7 +306,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 and 0.7.0 add no rules, and eight are new in 0.8.0: the two about PowerShell's command history folder and the six full-scan PowerShell rows. 0.8.1 adds none. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 and 0.7.0 add no rules, and eight are new in 0.8.0: the two about PowerShell's command history folder and the six full-scan PowerShell rows. 0.8.1 and 0.8.2 add none. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -315,8 +315,9 @@ scan was not restarted with somebody else's administrator password. The firmware
 **A Windows PowerShell row that is found changes how to read the PowerShell rows further down.** With
 script block logging off, PowerShell flags no script, so the timeline has no time of a flagged script block
 and a full scan finds no kind of word in one — whatever ran. Their absence then says nothing. The command
-history and the command lines Windows PowerShell started with are other records, which the policy is not
-expected to switch off (not measured), so read those rows as usual (ADR 0063, ADR 0064). The two PowerShell 7
+lines Windows PowerShell started with are still written while the policy is off (measured on a GitHub-hosted
+runner), and the command history is written by PSReadLine, whose source does not read the policy, so read
+those rows as usual (ADR 0063, ADR 0064). The two PowerShell 7
 rows concern a log this program does not read.
 
 The three rules about a file (ADR 0037, ADR 0042) say what state a Prefetch or log **file** is in, never
@@ -497,12 +498,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 
 ## 9. Keeping a record
 
-- **The window version has no export or save button** in 0.8.1 either: nothing in its source writes a
+- **The window version has no export or save button** in 0.8.2 either: nothing in its source writes a
   file.
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
   ```bat
-  .\aeterna-rongroi-cli-0.8.1-windows-x64.exe scan --mode ss --json > report.json
+  .\aeterna-rongroi-cli-0.8.2-windows-x64.exe scan --mode ss --json > report.json
   ```
 
   The consent question stays on screen, the player answers it there, and the file holds only the JSON.

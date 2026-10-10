@@ -9,6 +9,7 @@ mod check_baseline;
 mod check_locales;
 mod check_rules;
 mod check_unicode;
+mod check_versions;
 mod loldrivers;
 mod new_locale;
 mod new_rule;
@@ -17,6 +18,7 @@ mod release_check;
 mod release_notes;
 mod release_verify;
 mod rules_reference;
+mod site;
 
 use std::path::{Path, PathBuf};
 
@@ -43,6 +45,8 @@ enum Command {
     CheckLocales,
     /// Fail on zero-width and bidi control characters in any text file.
     CheckUnicode,
+    /// Fail when a page that names the release by hand names another version than `Cargo.toml`.
+    CheckVersions,
     /// Rebuild the vulnerable-driver data file from a `LOLDrivers` checkout: `cargo xtask loldrivers --checkout <dir>`.
     Loldrivers(loldrivers::Args),
     /// Scaffold a new rule: `cargo xtask new-rule posture boot/my-rule`.
@@ -63,6 +67,8 @@ enum Command {
     ReleaseVerify(release_verify::Args),
     /// Write the release notes for a tag (release workflow).
     ReleaseNotes(release_notes::Args),
+    /// Build the landing page from `site/` and write `release.json` (Pages workflow).
+    Site(site::Args),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -74,12 +80,14 @@ fn main() -> anyhow::Result<()> {
         Command::RulesReference(args) => rules_reference::run(&root, &args),
         Command::CheckLocales => check_locales::run(&root),
         Command::CheckUnicode => check_unicode::run(&root),
+        Command::CheckVersions => check_versions::run(&root),
         Command::Loldrivers(args) => loldrivers::run(&root, &args),
         Command::NewRule { collector, path } => new_rule::run(&root, &collector, &path),
         Command::NewLocale { lang } => new_locale::run(&root, &lang),
         Command::ReleaseCheck(args) => release_check::run(&root, &args),
         Command::ReleaseVerify(args) => release_verify::run(&args),
         Command::ReleaseNotes(args) => release_notes::run(&root, &args),
+        Command::Site(args) => site::run(&root, &args),
     }
 }
 

@@ -12,7 +12,7 @@ description: >-
   scan was restarted with a different administrator's password, it is that administrator's policy, and
   the player's own was not read. It says nothing about which scripts ran or who set the policy. On its
   own this describes an account's settings — it is not evidence of cheating.
-  This program reads that log too (ADR 0063, ADR 0064): while the policy is off, the timeline holds no time of a script block that account's Windows PowerShell flagged, and a full scan finds no kind of word in one. PowerShell's command history and the command lines it was started with are other records, which this policy is not expected to switch off (not measured).
+  This program reads that log too (ADR 0063, ADR 0064): while the policy is off, the timeline holds no time of a script block that account's Windows PowerShell flagged, and a full scan finds no kind of word in one. The command lines Windows PowerShell was started with are still written while the policy is off (measured for this per-user policy and for the machine one on a GitHub-hosted runner, 2026-10-09), and its command history is written by PSReadLine, whose source does not read this policy, so those rows read as usual.
 status: experimental
 collector: posture
 strength: posture

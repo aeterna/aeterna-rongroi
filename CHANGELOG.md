@@ -5,6 +5,36 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-10
+
+The checks are those of 0.8.1; two rules' text says what was measured. The hash check is one Command Prompt line
+for every version, and the landing page and `release.json` take the version, files and rule count from the
+published release, so other sites can show them without copying a number.
+
+### Added
+- `release.json` on the landing page's site: the latest published release (version, tag, date, links, and each
+  executable's name, size and SHA-256), for other sites to read instead of copying the version by hand.
+  `cargo xtask site` builds it, and the landing page's version and download links, from the release list; it
+  refuses when GitHub's digest of an executable differs from `SHA256SUMS`. Publishing a release redeploys the page,
+  so a release no longer edits `site/`.
+- `release.json` counts the release's rule set as `stats` (rules, timeline selectors, and rules by status), read
+  from `rules/` at the release tag rather than from `dev`, so a page can say how many rules a release ships without
+  anyone typing the number; `{{rongroi.rules}}` gives it to the landing page.
+- `cargo xtask check-versions` (CI): the README Status sections, the screenshare guides, the desktop manifests and
+  every release file name in those pages name `Cargo.toml`'s version, so a release pull request cannot miss one.
+
+### Changed
+- README and screenshare guides: the hash check is one Command Prompt line that is the same for every version,
+  `for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256`, which prints each downloaded
+  file's name above its hash (checked on Windows 11 build 26220); the release file names are written
+  `X.Y.Z`.
+- The two Windows PowerShell script block logging rules say what was measured instead of "not measured": on a
+  GitHub-hosted runner, a machine policy set to 0 stopped every 4104 record, flagged ones included, and left 400
+  written (ADR 0063, amendment). The command history rests on PSReadLine's source, which does not read the policy.
+  ADR 0064 records that a Microsoft account was measured for the history's `account` comparison.
+- The per-user script block logging rule says its policy was measured too: at 0 it silences the flagged blocks and
+  leaves 400 written, and a machine policy decides when both are set (runner run 37925318316, ADR 0063).
+
 ## [0.8.1] - 2026-10-09
 
 The checks are those of 0.8.0. A rule's text now says what a policy that switches Windows PowerShell's script

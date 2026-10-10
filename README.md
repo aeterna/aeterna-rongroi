@@ -51,15 +51,15 @@ Details: [PRIVACY.md](PRIVACY.md).
 ## Verifying a download
 
 Releases are not code-signed yet, so Windows SmartScreen will warn when you run them. To check that you
-have the real file, open Command Prompt (`cmd`) in the download folder and run, with the exact file name:
+have the real file, open Command Prompt (`cmd`) in the download folder and run:
 
 ```bat
-certutil -hashfile aeterna-rongroi-0.8.1-windows-x64.exe SHA256
+for %f in (aeterna-rongroi-*-windows-x64.exe) do @certutil -hashfile %f SHA256
 ```
 
-`dir /b aeterna-rongroi-*-windows-x64.exe` lists the file names; `certutil` takes one file at a time. Compare
-the hash with the line for the same file name in `SHA256SUMS` on the GitHub release page; upper or lower case
-does not matter. During a screenshare, use Command Prompt rather than PowerShell: PowerShell keeps its own
+`certutil` takes one file at a time, so the `for` hands it each downloaded file and it prints each file's name
+above its hash. Compare each hash with the line for the same file name in `SHA256SUMS` on the GitHub release
+page; upper or lower case does not matter. During a screenshare, use Command Prompt rather than PowerShell: PowerShell keeps its own
 records on the PC, and a check typed into it adds the call's own time to them
 ([screenshare guide §2](docs/screenshare-guide.md#2-get-the-real-file)). Builds that did not come from the official
 release pipeline show **UNOFFICIAL BUILD** in the window, in the CLI header and in every report.
@@ -70,11 +70,13 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 ## Status
 
-**Latest release: [0.8.1](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.09-0.8.1)**, 9 October 2026 —
+**Latest release: [0.8.2](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.10-0.8.2)**, 10 October 2026 —
 a pre-release. It has 52 rules, and almost all of them are still `experimental`: they have not yet been
 checked against enough real PCs, so read every result with care. 0.8.0 added PowerShell: what it flagged,
 whether its history was deleted, and, in a full scan, which kinds of words its commands held — never the
-commands. 0.8.1 keeps those checks and says what a policy that switches PowerShell's logging off leaves empty.
+commands. 0.8.1 said what a policy that switches PowerShell's logging off leaves empty. 0.8.2 keeps the same
+checks; the hash check is one Command Prompt line for every version, and the landing page now reads its version
+and rule count from the published release.
 Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 
 | What it looks at, in plain words | Technical detail |

@@ -259,3 +259,37 @@ to (the history and engine starts; not measured); the two timeline selectors tha
 policy in their `falsepositives`; both screenshare guides say how a found row changes the reading of the rows
 after it.
 
+**Measured on 2026-10-09** (GitHub-hosted runner, run 37920379810, counts only; `.claude/probes`): records
+written in `Microsoft-Windows-PowerShell/Operational` (4104) and `Windows PowerShell` (400) by one probe run of
+two fresh `powershell.exe` processes under each machine policy state.
+
+| Policy `EnableScriptBlockLogging` | 4104, all | 4104, level 3 | 400 |
+|---|---|---|---|
+| not set | 1 | 1 | 2 |
+| 0 | **0** | **0** | 2 |
+| 1 | 9 | 1 | 2 |
+| removed again | 2 | 1 | 2 |
+
+The level-3 block counted is the probe script's own text (its child command failed to parse, which does not
+change what the policy does to the log). With the policy at 0 not even a flagged block was written, and 400 was
+written as without it — so "not measured" in the rule texts became this measurement. PSReadLine's source, searched
+on GitHub's default branch, holds no reference to script block logging; the history under the policy is read
+from that, not measured. The per-user policy was not measured separately.
+
+**The per-user policy, measured the same day** (GitHub-hosted runner, run 37925318316). The probe's child now
+passes its flagged text as `-EncodedCommand`, so the child's own block is counted apart from the probe's:
+
+| State | 4104, all | 4104, level 3 | The child's flagged block | 400 |
+|---|---|---|---|---|
+| none | 2 | 2 | 1 | 1 |
+| per-user 0 | **0** | **0** | **0** | 1 |
+| per-user 0, machine 1 | 4 | 2 | 1 | 1 |
+| machine 0 | 1 | 0 | **0** | 1 |
+| machine 0, per-user 1 | 0 | 0 | **0** | 1 |
+| none again | 2 | 2 | 1 | 1 |
+
+A per-user policy at 0 silences the flagged blocks as the machine one does, and 400 is still written. When
+both are set, the machine policy decides either way, which is what the per-user rule's "no machine policy takes
+precedence" says. The one record under "machine 0" is not level 3 and not the child's; what wrote it was not
+read.
+

@@ -5,11 +5,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://aeterna.github.io/aeterna-rongroi/</loc>
+    <lastmod>{{rongroi.published_date}}</lastmod>
     <xhtml:link rel="alternate" hreflang="th" href="https://aeterna.github.io/aeterna-rongroi/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://aeterna.github.io/aeterna-rongroi/en/"/>
   </url>
   <url>
     <loc>https://aeterna.github.io/aeterna-rongroi/en/</loc>
+    <lastmod>{{rongroi.published_date}}</lastmod>
     <xhtml:link rel="alternate" hreflang="th" href="https://aeterna.github.io/aeterna-rongroi/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://aeterna.github.io/aeterna-rongroi/en/"/>
   </url>

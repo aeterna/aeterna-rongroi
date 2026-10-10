@@ -68,6 +68,7 @@ cargo xtask check-baseline     # quiet on an ordinary machine, and every rule co
 cargo xtask rules-reference --check   # docs/rules-reference*.md match the rules; without --check, rewrites them
 cargo xtask check-locales
 cargo xtask check-unicode
+cargo xtask check-versions     # README Status, the screenshare guides and the desktop manifests name Cargo.toml's version
 uvx --with chardet reuse lint   # chardet: see CONTRIBUTING.md
 pnpm -C apps/desktop typecheck && pnpm -C apps/desktop lint && pnpm -C apps/desktop test
 ```
