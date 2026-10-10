@@ -34,6 +34,10 @@ pub struct Args {
     /// Directory to write the built site into; it must not exist yet.
     #[arg(long, required_unless_present = "latest_tag")]
     out: Option<PathBuf>,
+    /// `rules/` as it is in the latest release's tag, counted into `release.json`. Never the working tree:
+    /// `dev` can hold rules no release ships yet.
+    #[arg(long, required_unless_present = "latest_tag")]
+    rules: Option<PathBuf>,
     /// `owner/name` of the repository.
     #[arg(long, default_value = "aeterna/aeterna-rongroi")]
     repo: String,
@@ -78,6 +82,25 @@ pub struct Latest {
     release_url: String,
     sums_url: String,
     files: BTreeMap<&'static str, File>,
+    stats: Stats,
+}
+
+/// What the release's rule set holds: rules (evidence rows) and timeline selectors (ADR 0051), and the rules
+/// by `status`. Counted from the tag's `rules/`, so a page can say "52 rules" without anyone typing 52.
+#[derive(Debug, Serialize, PartialEq, Eq, Default)]
+pub struct Stats {
+    rules: usize,
+    selectors: usize,
+    experimental: usize,
+    test: usize,
+    stable: usize,
+}
+
+#[derive(Deserialize)]
+struct RuleHead {
+    status: String,
+    #[serde(default)]
+    role: Option<String>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -109,12 +132,13 @@ pub fn run(root: &Path, args: &Args) -> anyhow::Result<()> {
         println!("{}", latest.tag_name);
         return Ok(());
     }
-    let (Some(sums), Some(out)) = (&args.sums, &args.out) else {
-        bail!("site: --sums and --out are required");
+    let (Some(sums), Some(out), Some(rules)) = (&args.sums, &args.out, &args.rules) else {
+        bail!("site: --sums, --out and --rules are required");
     };
     let sums =
         std::fs::read_to_string(sums).with_context(|| format!("reading {}", sums.display()))?;
-    let manifest = manifest(&published, &sums, &args.repo)?;
+    let mut manifest = manifest(&published, &sums, &args.repo)?;
+    manifest.latest.stats = count_rules(rules)?;
     build(&root.join("site"), out, &manifest)?;
     println!(
         "site: {} ({}) written to {}",
@@ -229,6 +253,7 @@ fn manifest(
             release_url: release.html_url.clone(),
             sums_url: asset("SHA256SUMS")?.browser_download_url.clone(),
             files,
+            stats: Stats::default(),
         },
         history: published
             .iter()
@@ -244,11 +269,54 @@ fn manifest(
     })
 }
 
+/// Counts every `rule.yaml` under `rules`: `role: timeline` is a selector, anything else a rule, counted by
+/// `status`. An unknown status, or no rule at all, is an error rather than a page that says "0 rules".
+fn count_rules(rules: &Path) -> anyhow::Result<Stats> {
+    let mut files = Vec::new();
+    find_rule_files(rules, &mut files)?;
+    let mut stats = Stats::default();
+    for path in files {
+        let text = std::fs::read_to_string(&path)
+            .with_context(|| format!("reading {}", path.display()))?;
+        let head: RuleHead =
+            serde_saphyr::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
+        if head.role.as_deref() == Some("timeline") {
+            stats.selectors += 1;
+            continue;
+        }
+        stats.rules += 1;
+        match head.status.as_str() {
+            "experimental" => stats.experimental += 1,
+            "test" => stats.test += 1,
+            "stable" => stats.stable += 1,
+            other => bail!("{}: unknown status `{other}`", path.display()),
+        }
+    }
+    if stats.rules == 0 {
+        bail!("site: no rule.yaml under {}", rules.display());
+    }
+    Ok(stats)
+}
+
+fn find_rule_files(dir: &Path, found: &mut Vec<PathBuf>) -> anyhow::Result<()> {
+    for entry in std::fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type()?.is_dir() {
+            find_rule_files(&path, found)?;
+        } else if path.file_name().is_some_and(|name| name == "rule.yaml") {
+            found.push(path);
+        }
+    }
+    Ok(())
+}
+
 /// The values `{{rongroi.*}}` placeholders in `site/` are replaced with.
 fn placeholders(manifest: &Manifest) -> BTreeMap<&'static str, String> {
     let latest = &manifest.latest;
     BTreeMap::from([
         ("rongroi.version", latest.version.clone()),
+        ("rongroi.rules", latest.stats.rules.to_string()),
         ("rongroi.release_url", latest.release_url.clone()),
         (
             "rongroi.published_date",
@@ -466,6 +534,57 @@ mod tests {
             false,
         )];
         assert!(build_manifest(&list, &sums("0.8.2")).is_err());
+    }
+
+    fn write_rule(dir: &Path, path: &str, status: &str, role: Option<&str>) {
+        let file = dir.join(path).join("rule.yaml");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        let role = role.map(|r| format!("role: {r}\n")).unwrap_or_default();
+        std::fs::write(
+            file,
+            format!("id: x\nstatus: {status}\n{role}collector: prefetch\n"),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rules_and_selectors_are_counted_apart() {
+        let dir = std::env::temp_dir().join(format!("rongroi-rules-{}", uuid::Uuid::new_v4()));
+        write_rule(&dir, "bam/a/one", "experimental", None);
+        write_rule(&dir, "bam/a/two", "test", Some("evidence"));
+        write_rule(&dir, "pca/timeline/three", "experimental", Some("timeline"));
+        std::fs::create_dir_all(dir.join("i18n")).unwrap();
+        std::fs::write(dir.join("i18n/th.yaml"), "x: y\n").unwrap();
+        let stats = count_rules(&dir).unwrap();
+        assert_eq!(
+            stats,
+            Stats {
+                rules: 2,
+                selectors: 1,
+                experimental: 1,
+                test: 1,
+                stable: 0
+            }
+        );
+        write_rule(&dir, "bam/a/four", "retired", None);
+        assert!(
+            count_rules(&dir)
+                .unwrap_err()
+                .to_string()
+                .contains("unknown status")
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_shipped_rules_count_as_every_rule_file() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let stats = count_rules(&root.join("rules")).unwrap();
+        let mut files = Vec::new();
+        find_rule_files(&root.join("rules"), &mut files).unwrap();
+        assert_eq!(stats.rules + stats.selectors, files.len());
+        assert_eq!(stats.rules, stats.experimental + stats.test + stats.stable);
+        assert!(stats.selectors > 0);
     }
 
     #[test]
