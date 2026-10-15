@@ -6,6 +6,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- A `windows_start` collector: for each start of Windows its System log remembers, the time and `BootType` of
+  Kernel-Boot event 27 — one number, nothing else of that event — and two timeline selectors that mark a start
+  as after a full shutdown (0) or after a Fast Startup shutdown (1). Beside `pci_device`'s times it tells the
+  two cases apart: a device removed before a full shutdown has no removal time (ADR 0071, amending ADR 0018 and
+  ADR 0024).
 - The PCI devices Windows remembers are read on every scan (`pci_device`, ADR 0070), present or not, as model ids
   with their class code, driver, problem code and the times Windows stores; never a serial number. Two
   `experimental` rules: **a PCI device has no driver installed** (`presence`, problem code 28 — on an ordinary PC

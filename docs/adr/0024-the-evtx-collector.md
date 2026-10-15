@@ -190,6 +190,9 @@ The shape, specifically:
   the collection's worst case is 35 seconds. A service that does not answer gaps only the three
   configuration fields and ends nothing, which makes the "never both" above false: the process can hold
   a blocked service thread and, later, a spinning parse thread.
+- **A second reader of `System.evtx`, by ADR 0071.** `windows_start` reads the same file and parses it a
+  second time, on a thread of its own under a bound equal to `PARSE_BUDGET`, so a parse that does not return
+  costs that collector its run. The worst case adds one more spinning thread and up to 30 more seconds.
 - **The bytes are read on the collector's thread and only the parse is handed to the worker.** A
   `&dyn Host` is not `'static` and cannot be moved into a detachable thread, and the reads are
   already bounded — 64 MiB per file (ADR 0019) — while the parse is the part with no bound. Read time

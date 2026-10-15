@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 68 |
-| SHA-256 | `c4914169e771802fbc031165758d60fbdb72d9e1a66f7f51aa4aaeb181493f11` |
+| Rules | 70 |
+| SHA-256 | `d8932d9fba3cae2065fdde7202d87eb646601e7f5d76739103c748ab0d8325a7` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -132,6 +132,9 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [When Prefetch recorded a program named like FiveM or GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
   - `usn`
     - [When the change journal recorded changes in a watched folder](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+  - `windows_start`
+    - [Windows started after a Fast Startup shutdown](#rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b) — `context` · `experimental`
+    - [Windows started after a full shutdown or a restart](#rule-fa3e721e-98f2-4007-bbd8-133208564682) — `context` · `experimental`
 
 ## Collector `autostart`
 
@@ -2957,3 +2960,63 @@ Only the records the journal still holds. The journal has a fixed size and drops
 - PowerShell adding each command typed into its window to its history file
 - Disk clean-up, backup, antivirus and optimisation tools
 - A folder with no change in the journal's span has no time here, which does not mean nothing changed before it
+
+### `windows_start` / `timeline`
+
+<a id="rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b"></a>
+
+#### Windows started after a Fast Startup shutdown
+
+- Id: `fe57aa65-11b0-4e1f-b81c-a4fda597855b`
+- File: [`rules/windows_start/timeline/fast-startup-start/rule.yaml`](../rules/windows_start/timeline/fast-startup-start/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `windows_start`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `windows_start`, `timeline`
+- Written: 2026-10-15
+
+**About this check**
+
+Puts on the timeline each start of Windows that its System log records with boot type 1, which was measured after a shutdown with Fast Startup on, the default. A device taken out while Windows was off this way has a removal time, written during the shutdown, and the start of Windows does not write its arrival times again.
+
+**Matches when all of these hold for one observation**
+
+- `boot_type`: is `1`
+
+**Look-back**
+
+As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+
+**Ordinary things behind these times**
+
+- Fast Startup is on by default, so most shutdowns from the Start menu end this way
+
+<a id="rule-fa3e721e-98f2-4007-bbd8-133208564682"></a>
+
+#### Windows started after a full shutdown or a restart
+
+- Id: `fa3e721e-98f2-4007-bbd8-133208564682`
+- File: [`rules/windows_start/timeline/full-start/rule.yaml`](../rules/windows_start/timeline/full-start/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `windows_start`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `windows_start`, `timeline`
+- Written: 2026-10-15
+
+**About this check**
+
+Puts on the timeline each start of Windows that its System log records with boot type 0, which was measured after a full shutdown and after a restart. A device taken out while Windows was off this way has no removal time; the last start at which it was present is all Windows keeps of when it left.
+
+**Matches when all of these hold for one observation**
+
+- `boot_type`: is `0`
+
+**Look-back**
+
+As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+
+**Ordinary things behind these times**
+
+- Every PC starts this way; a start is a reference point for the other times, not a finding

@@ -4,6 +4,8 @@
 - Date: 2026-09-12
 - Amended: 2026-10-08, by ADR 0064: `powershell_text` reads the payload of two kinds of event, and only
   a full scan calls it ("Amendment for ADR 0064")
+- Amended: 2026-10-15, by ADR 0071: `windows_starts` reads `BootType` of Kernel-Boot 27 on `System`, one
+  number and nothing else ("Amendment for ADR 0071")
 
 ## Context
 
@@ -398,3 +400,10 @@ leave the function; a test asserts it over records that carry each. Only ADR 006
 Measured on 2026-10-08 on the development PC, over the two logs exported with `wevtutil epl`: 413 flagged
 records joined into 135 blocks, all complete, and 1 546 starts, 0 rejected, in 0.23 s and 0.24 s.
 
+## Amendment for ADR 0071: one number of one event (2026-10-15)
+
+`records` is still unchanged. A third function, `windows_starts`, reads `BootType` of 27 from
+`Microsoft-Windows-Kernel-Boot` on `System`, recognised by provider, channel and id together (ADR 0031), and
+returns the record's time and that number. `LoadOptions`, the other value of the same event, and the record's
+`Computer` field are not read; the type it returns has no field that could hold them. The standard tier's
+`windows_start` collector calls it.

@@ -1,0 +1,9 @@
+{
+  "description": "A full start, a Fast Startup start and a start with no boot type",
+  "observations": [
+    { "collector": "windows_start", "fields": { "started_at": "2026-10-15T11:37:35Z", "boot_type": 0 } },
+    { "collector": "windows_start", "fields": { "started_at": "2026-10-15T11:53:22Z", "boot_type": 1 } },
+    { "collector": "windows_start", "fields": { "started_at": "2026-10-15T11:54:58Z" } }
+  ],
+  "expect_matches": 1
+}

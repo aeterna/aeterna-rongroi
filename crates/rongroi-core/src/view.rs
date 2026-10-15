@@ -24,9 +24,10 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 15] = [
+pub const COLLECTOR_ORDER: [&str; 16] = [
     "posture",
     "driver_service",
+    "windows_start",
     "pci_device",
     "autostart",
     "defender_exclusion",
