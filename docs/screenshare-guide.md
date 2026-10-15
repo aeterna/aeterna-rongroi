@@ -10,7 +10,8 @@ aeterna-rongroi **0.8.2**. อ่านภาษาไทย: [screenshare-guide
 
 | It can show | It cannot show |
 |---|---|
-| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. Also whether the firmware agrees with Windows about Secure Boot, and whether a machine or per-user policy turns script block logging off for Windows PowerShell or PowerShell 7 | Cheats running on a **second PC** (DMA). They leave nothing on the checked PC |
+| Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. Also whether the firmware agrees with Windows about Secure Boot, and whether a machine or per-user policy turns script block logging off for Windows PowerShell or PowerShell 7 | Cheats running on a **second PC** (DMA). They leave no program on the checked PC; a DMA card whose firmware imitates an ordinary device looks like that device |
+| A PCI device in the PC that Windows installed no driver for, and a PCI device Windows set up earlier that is not in the PC now — with the last start of Windows it was present at, and a removal time only when Windows recorded one (after a full shutdown it records none) | A box between the mouse and the PC that moves or clicks it for a cheat: this program does not read USB or HID devices |
 | That the Security log or an event log file recorded being cleared | Overlays hidden from screen capture |
 | For each check, whether it was answered and, if not, why | Anything, if Windows on that PC was modified to lie to the programs that run on it |
 | | That a PC is clean. **No result means that** |
@@ -227,6 +228,8 @@ need by hand, and compare it with the report yourself.
 | An event log file is marked read-only | tamper | `experimental` | the same two |
 | An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |
 | A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
+| A PCI device has no driver installed | presence | `experimental` | Windows installed again before the chipset or device drivers, a capture, sound or expansion card whose driver was never installed, hardware newer or older than Windows' drivers, a virtual machine |
+| A PCI device Windows set up earlier is not present now | context | `experimental` | a graphics card, SSD or network card replaced or moved, a BIOS update or setting, an external PCIe device unplugged, Windows moved to another PC |
 | FiveM for GTA V Enhanced keeps a cache folder for a server (full scan only) | context | `experimental` | joining any server with FiveM for GTA V Enhanced, a folder kept from a server joined long ago or by another person on the same Windows account |
 | The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
 | The registered organisation names a Windows-modification playbook | posture | `experimental` | anyone who applied Atlas or ReviOS for privacy, battery life or an old PC; a second-hand PC that came with it; a name typed in by hand |

@@ -168,3 +168,17 @@ Decided on 2026-10-15: all four as recommended.
 - Two PRs: the `DeviceSource` trait with `LiveHost` and `FixtureHost` (ADR 0069's scope), then this collector, its
   rules, the guide, PRIVACY.md and the consent text.
 - The report gains `pci_device` observations; `REPORT_SCHEMA_VERSION` stays 1 (ADR 0069 §8).
+
+## As built (2026-10-15)
+
+- `crates/rongroi-collectors/src/pci_device.rs`; rules `pci_device/no-driver/problem-28`,
+  `pci_device/absent/not-present` and the selector `pci_device/timeline/absent-device-times`, each with a positive
+  and a negative fixture; the three baselines describe synthetic devices and every rule is quiet and confronted
+  there (`check-baseline`).
+- Every timestamp field is a timeline time, as ADR 0051 makes every time value in Self mode: on an ordinary PC that
+  is one `last_arrival_at` per device at the start of Windows. SS mode shows only the selector's absent devices.
+- The consent question (CLI and desktop, both languages), PRIVACY.md, both screenshare guides and
+  `docs/architecture.md` name the read. `COLLECTOR_ORDER` puts `pci_device` after `driver_service`.
+- A fixture host that describes no devices makes the run `read_failed`, so every older report snapshot gained that
+  one unmeasured run and nothing else.
+- Section 7, the run in the lab virtual machine, is recorded below when it has been done.

@@ -1,0 +1,9 @@
+{
+  "description": "One absent device with a removal time (Fast Startup), one without (full shutdown), and a present one",
+  "observations": [
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10", "present": false, "first_install_at": "2026-10-15T11:32:36Z", "last_arrival_at": "2026-10-15T11:51:35Z", "last_removal_at": "2026-10-15T11:53:25Z" } },
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10", "present": false, "first_install_at": "2026-10-15T11:32:36Z", "last_arrival_at": "2026-10-15T11:32:36Z" } },
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1022&DEV_A0F0&SUBSYS_00000000&REV_00", "present": true, "problem_code": 0 } }
+  ],
+  "expect_matches": 2
+}

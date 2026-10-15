@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 65 |
-| SHA-256 | `ef9cdf3f83ca32e5207291128508a6747829cc3060e2fb0bd295f26ebdb59dfe` |
+| Rules | 68 |
+| SHA-256 | `c4914169e771802fbc031165758d60fbdb72d9e1a66f7f51aa4aaeb181493f11` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -77,6 +77,9 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Microsoft Defender's service is not registered on this PC](#rule-8f656238-36d2-4178-98db-87f55432edf7) — `posture` · `experimental`
   - [The Windows Event Log service does not start with Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
   - [Windows Update's service cannot start on this PC](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
+- `pci_device`
+  - [A PCI device Windows set up earlier is not present now](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `experimental`
+  - [A PCI device has no driver installed](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -120,6 +123,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - `pca`
     - [When Program Compatibility Assistant recorded a program named like FiveM's game process](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
     - [When Program Compatibility Assistant recorded a program named like FiveM or GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `pci_device`
+    - [When Windows recorded a PCI device that is not present now](#rule-f360d84c-0ac6-437c-af21-5193d9264e0f) — `context` · `experimental`
   - `powershell_text`
     - [When PowerShell's logs recorded a command that downloaded something and ran it](#rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec) — `context` · `experimental`
   - `prefetch`
@@ -1305,6 +1310,87 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **References**
 
 - <https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview>
+
+## Collector `pci_device`
+
+### `pci_device` / `absent`
+
+<a id="rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08"></a>
+
+#### A PCI device Windows set up earlier is not present now
+
+- Id: `ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08`
+- File: [`rules/pci_device/absent/not-present/rule.yaml`](../rules/pci_device/absent/not-present/rule.yaml)
+- Collector: `pci_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pci_device`, `hardware`
+- Written: 2026-10-15
+
+**About this check**
+
+Windows set this PCI device up at some time and it is not in the PC now. The row shows when Windows first set it up, the last start of Windows at which it was present, and — only when Windows recorded one — a removal time. Windows records a removal time when a device leaves while Windows is running and, in a Fast Startup shutdown (the default "Shut down"), at the moment Windows resumes; after a full shutdown it records none, so a missing removal time says nothing about when the device left. The row never says how or why the device left, or what it was beyond the ids Windows recorded.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `false`
+
+**Look-back**
+
+Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the device is uninstalled or Windows is installed again.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- A graphics card, SSD or network card replaced, or moved to another slot
+- A BIOS update or setting that changes which devices the board shows — an onboard controller switched off, a slot's mode changed
+- A Thunderbolt or external PCIe device that was unplugged
+- Windows moved to another PC, or the PC's board replaced
+
+### `pci_device` / `no-driver`
+
+<a id="rule-fc74cf1c-a134-45f1-83bd-db42a4dab748"></a>
+
+#### A PCI device has no driver installed
+
+- Id: `fc74cf1c-a134-45f1-83bd-db42a4dab748`
+- File: [`rules/pci_device/no-driver/problem-28/rule.yaml`](../rules/pci_device/no-driver/problem-28/rule.yaml)
+- Collector: `pci_device`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `pci_device`, `hardware`
+- Written: 2026-10-15
+
+**About this check**
+
+Windows found this PCI device and installed no driver for it: Windows records problem code 28 for it. This program reads only the ids Windows recorded — the maker, device and subsystem numbers and the class code — and cannot say what the device is beyond them, what it does or who put it there. A device that imitates another one well enough to get a driver would not appear here, so a row here is not needed for a PCI card to be in the PC, and a missing row says nothing about one.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `true`
+- `problem_code`: is `28`
+
+**Look-back**
+
+The devices present when the scan ran, with the problem code Windows held for each then.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Windows installed again, before the chipset or device drivers were added
+- A capture, sound, serial or expansion card whose maker's driver was never installed
+- Hardware newer or older than the drivers Windows carries
+- A virtual machine, whose virtual devices often have no driver; in one measured, its network device had none
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-install>
 
 ## Collector `posture`
 
@@ -2698,6 +2784,39 @@ Only what the Program Compatibility Assistant files still hold. Windows keeps th
 - A program of another name is not selected, whatever it is, so an absent entry does not mean that nothing ran
 - Windows not writing a record — these files exist only on Windows 11 22H2 and later
 - Windows keeping the record after the program's files were removed
+
+### `pci_device` / `timeline`
+
+<a id="rule-f360d84c-0ac6-437c-af21-5193d9264e0f"></a>
+
+#### When Windows recorded a PCI device that is not present now
+
+- Id: `f360d84c-0ac6-437c-af21-5193d9264e0f`
+- File: [`rules/pci_device/timeline/absent-device-times/rule.yaml`](../rules/pci_device/timeline/absent-device-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `pci_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pci_device`, `timeline`
+- Written: 2026-10-15
+
+**About this check**
+
+Puts on the timeline the times Windows stores for each PCI device that is not in the PC now: when it was first set up, the last start of Windows at which it was present, and a removal time when Windows recorded one. Present devices are left out: every one of them last arrived at the start of Windows. A time here is not evidence that anything was removed on purpose.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `false`
+
+**Look-back**
+
+Devices Windows still remembers, until a device is uninstalled or Windows is installed again.
+
+**Ordinary things behind these times**
+
+- A part replaced or moved, a BIOS update or setting, or an external PCIe device unplugged
+- After a full shutdown Windows records no removal time, so a missing one says nothing about when a device left
+- A clock that was changed, so that these times are not on the same clock as the others
 
 ### `powershell_text` / `timeline`
 

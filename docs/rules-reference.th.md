@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 65 |
-| SHA-256 | `ef9cdf3f83ca32e5207291128508a6747829cc3060e2fb0bd295f26ebdb59dfe` |
+| จำนวน rule | 68 |
+| SHA-256 | `c4914169e771802fbc031165758d60fbdb72d9e1a66f7f51aa4aaeb181493f11` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -73,6 +73,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [เครื่องนี้ไม่มีเซอร์วิสของ Microsoft Defender ลงทะเบียนไว้เลย](#rule-8f656238-36d2-4178-98db-87f55432edf7) — `posture` · `experimental`
   - [เซอร์วิส Windows Event Log ไม่ได้เริ่มพร้อม Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
   - [เซอร์วิส Windows Update เริ่มทำงานไม่ได้บนเครื่องนี้](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
+- `pci_device`
+  - [อุปกรณ์ PCI ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่อยู่ในเครื่อง](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `experimental`
+  - [อุปกรณ์ PCI ที่ไม่มีไดรเวอร์ติดตั้ง](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `experimental`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -116,6 +119,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - `pca`
     - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
     - [เวลาที่ Program Compatibility Assistant บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `pci_device`
+    - [เวลาที่ Windows บันทึกอุปกรณ์ PCI ที่ตอนนี้ไม่อยู่ในเครื่อง](#rule-f360d84c-0ac6-437c-af21-5193d9264e0f) — `context` · `experimental`
   - `powershell_text`
     - [เวลาที่ log ของ PowerShell บันทึกคำสั่งที่ดาวน์โหลดบางอย่างแล้วรัน](#rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec) — `context` · `experimental`
   - `prefetch`
@@ -1328,6 +1333,89 @@ Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อย
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview>
+
+## collector `pci_device`
+
+### `pci_device` / `absent`
+
+<a id="rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08"></a>
+
+#### อุปกรณ์ PCI ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่อยู่ในเครื่อง
+
+- ชื่อภาษาอังกฤษ: A PCI device Windows set up earlier is not present now
+- id: `ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08`
+- ไฟล์: [`rules/pci_device/absent/not-present/rule.yaml`](../rules/pci_device/absent/not-present/rule.yaml)
+- collector: `pci_device`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pci_device`, `hardware`
+- เขียนเมื่อ: 2026-10-15
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows เคยตั้งค่าอุปกรณ์ PCI นี้ไว้ และตอนนี้มันไม่อยู่ในเครื่อง แถวนี้แสดงเวลาที่ Windows ตั้งค่ามันครั้งแรก เวลาที่ Windows เริ่มทำงานครั้งล่าสุดที่มันยังอยู่ และเวลาถอด เฉพาะเมื่อ Windows บันทึกไว้ Windows บันทึกเวลาถอดเมื่ออุปกรณ์ออกไปตอน Windows ทำงานอยู่ และเมื่อปิดแบบ Fast Startup ("Shut down" ปกติ) จะบันทึกเป็นเวลาที่ Windows กลับมาทำงาน ส่วนการปิดเครื่องแบบเต็มจะไม่บันทึกเลย การไม่มีเวลาถอดจึงไม่ได้บอกว่าอุปกรณ์ออกไปเมื่อไร แถวนี้ไม่เคยบอกว่าอุปกรณ์ออกไปอย่างไรหรือเพราะอะไร หรือเป็นอะไรนอกจาก id ที่ Windows บันทึกไว้
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `present`: เป็น `false`
+
+**ย้อนดูได้**
+
+อุปกรณ์ที่ Windows ยังจำไว้ Windows เก็บอุปกรณ์ที่เคยตั้งค่าไว้หลังมันออกไปแล้ว จนกว่าจะถอนการติดตั้งอุปกรณ์หรือติดตั้ง Windows ใหม่
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เปลี่ยนการ์ดจอ SSD หรือการ์ดเครือข่าย หรือย้ายไปช่องอื่น
+- อัปเดต BIOS หรือเปลี่ยนการตั้งค่าที่ทำให้เมนบอร์ดแสดงอุปกรณ์ต่างไป เช่น ปิด controller บนบอร์ด หรือเปลี่ยนโหมดของช่อง
+- ถอดอุปกรณ์ Thunderbolt หรือ PCIe ภายนอก
+- ย้าย Windows ไปเครื่องอื่น หรือเปลี่ยนเมนบอร์ด
+
+### `pci_device` / `no-driver`
+
+<a id="rule-fc74cf1c-a134-45f1-83bd-db42a4dab748"></a>
+
+#### อุปกรณ์ PCI ที่ไม่มีไดรเวอร์ติดตั้ง
+
+- ชื่อภาษาอังกฤษ: A PCI device has no driver installed
+- id: `fc74cf1c-a134-45f1-83bd-db42a4dab748`
+- ไฟล์: [`rules/pci_device/no-driver/problem-28/rule.yaml`](../rules/pci_device/no-driver/problem-28/rule.yaml)
+- collector: `pci_device`
+- strength: `presence` — มีไฟล์อยู่
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pci_device`, `hardware`
+- เขียนเมื่อ: 2026-10-15
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows พบอุปกรณ์ PCI นี้และไม่ได้ติดตั้งไดรเวอร์ให้ Windows บันทึก problem code 28 ไว้ โปรแกรมนี้อ่านได้แค่ id ที่ Windows บันทึกไว้ คือหมายเลขผู้ผลิต อุปกรณ์ subsystem และ class code จึงบอกไม่ได้ว่าอุปกรณ์นี้คืออะไร ทำอะไร หรือใครใส่ไว้ อุปกรณ์ที่ปลอมเป็นอุปกรณ์อื่นได้ดีพอจนได้ไดรเวอร์จะไม่ขึ้นที่นี่ การมีการ์ด PCI ในเครื่องจึงไม่จำเป็นต้องมีแถวนี้ และการไม่มีแถวนี้ก็ไม่ได้บอกอะไรเกี่ยวกับการ์ด
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `present`: เป็น `true`
+- `problem_code`: เป็น `28`
+
+**ย้อนดูได้**
+
+อุปกรณ์ที่ต่ออยู่ตอนสแกน กับ problem code ที่ Windows เก็บไว้ตอนนั้น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ติดตั้ง Windows ใหม่แล้วยังไม่ได้ลงไดรเวอร์ chipset หรือไดรเวอร์อุปกรณ์
+- การ์ดจับภาพ การ์ดเสียง การ์ด serial หรือการ์ดเสริมที่ยังไม่ได้ลงไดรเวอร์ของผู้ผลิต
+- ฮาร์ดแวร์ที่ใหม่หรือเก่ากว่าไดรเวอร์ที่ Windows มีมาให้
+- เครื่องเสมือน (virtual machine) ที่อุปกรณ์เสมือนมักไม่มีไดรเวอร์ ในเครื่องที่วัดมา อุปกรณ์เครือข่ายของมันก็ไม่มี
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-install>
 
 ## collector `posture`
 
@@ -2755,6 +2843,40 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - โปรแกรมที่ชื่ออื่นจะไม่ถูกเลือก ไม่ว่าจะเป็นโปรแกรมอะไร การไม่มีรายการจึงไม่ได้แปลว่าไม่มีอะไรรัน
 - Windows ไม่ได้เขียนบันทึก — ไฟล์เหล่านี้มีเฉพาะใน Windows 11 22H2 ขึ้นไป
 - Windows ยังเก็บบันทึกไว้หลังจากไฟล์ของโปรแกรมถูกลบไปแล้ว
+
+### `pci_device` / `timeline`
+
+<a id="rule-f360d84c-0ac6-437c-af21-5193d9264e0f"></a>
+
+#### เวลาที่ Windows บันทึกอุปกรณ์ PCI ที่ตอนนี้ไม่อยู่ในเครื่อง
+
+- ชื่อภาษาอังกฤษ: When Windows recorded a PCI device that is not present now
+- id: `f360d84c-0ac6-437c-af21-5193d9264e0f`
+- ไฟล์: [`rules/pci_device/timeline/absent-device-times/rule.yaml`](../rules/pci_device/timeline/absent-device-times/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `pci_device`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pci_device`, `timeline`
+- เขียนเมื่อ: 2026-10-15
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ว่า Windows เก็บเวลาอะไรไว้สำหรับอุปกรณ์ PCI แต่ละตัวที่ตอนนี้ไม่อยู่ในเครื่อง คือเวลาที่ตั้งค่าครั้งแรก เวลาที่ Windows เริ่มทำงานครั้งล่าสุดที่มันยังอยู่ และเวลาถอดเมื่อ Windows บันทึกไว้ อุปกรณ์ที่ยังอยู่ไม่ถูกเลือก เพราะทุกตัวเชื่อมต่อล่าสุดตอน Windows เริ่มทำงาน เวลาที่นี่ไม่ใช่หลักฐานว่ามีใครตั้งใจถอดอะไรออก
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `present`: เป็น `false`
+
+**ย้อนดูได้**
+
+อุปกรณ์ที่ Windows ยังจำไว้ จนกว่าจะถอนการติดตั้งอุปกรณ์หรือติดตั้ง Windows ใหม่
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- เปลี่ยนหรือย้ายชิ้นส่วน อัปเดตหรือตั้งค่า BIOS หรือถอดอุปกรณ์ PCIe ภายนอก
+- หลังปิดเครื่องแบบเต็ม Windows ไม่บันทึกเวลาถอด การไม่มีเวลาถอดจึงไม่ได้บอกว่าอุปกรณ์ออกไปเมื่อไร
+- นาฬิกาเครื่องถูกเปลี่ยน ทำให้เวลาเหล่านี้ไม่ได้อยู่บนนาฬิกาเดียวกับเวลาอื่น
 
 ### `powershell_text` / `timeline`
 

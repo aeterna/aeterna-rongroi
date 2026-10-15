@@ -6,6 +6,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The PCI devices Windows remembers are read on every scan (`pci_device`, ADR 0070), present or not, as model ids
+  with their class code, driver, problem code and the times Windows stores; never a serial number. Two
+  `experimental` rules: **a PCI device has no driver installed** (`presence`, problem code 28 — on an ordinary PC
+  the host bridges have no driver service but no problem code) and **a PCI device Windows set up earlier is not
+  present now** (`context`, with the last start of Windows it was present at, and a removal time only when Windows
+  recorded one). A timeline selector puts the absent devices' times on the timeline. The consent text, PRIVACY.md
+  and the screenshare guides say what is read and what it cannot show: a DMA card that imitates an ordinary device,
+  and a mouse box.
 - Hosts can list the devices Windows remembers: `DeviceSource::devices(bus)` reads the `PCI` or `HID` enumerator
   through CfgMgr32, present devices and absent ones, each as a model id with no instance part (no serial number or
   board position), its PCI class code, driver service, problem code and the three times Windows stores, in whole

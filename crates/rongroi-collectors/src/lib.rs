@@ -19,6 +19,7 @@ pub mod net_config;
 pub mod os_image;
 pub mod paths;
 pub mod pca;
+pub mod pci_device;
 pub mod posture;
 pub mod powershell_text;
 pub mod prefetch;
@@ -303,6 +304,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(net_config::NetConfig),
         Box::new(os_image::OsImage),
         Box::new(pca::Pca),
+        Box::new(pci_device::PciDevice),
         Box::new(posture::Posture),
         Box::new(powershell_text::PowershellText),
         Box::new(prefetch::Prefetch),
