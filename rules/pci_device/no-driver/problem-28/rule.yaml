@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: fc74cf1c-a134-45f1-83bd-db42a4dab748
+title: A PCI device has no driver installed
+description: >-
+  Windows found this PCI device and installed no driver for it: Windows records problem code 28 for it.
+  This program reads only the ids Windows recorded — the maker, device and subsystem numbers and the class
+  code — and cannot say what the device is beyond them, what it does or who put it there. A device that
+  imitates another one well enough to get a driver would not appear here, so a row here is not needed for
+  a PCI card to be in the PC, and a missing row says nothing about one.
+status: experimental
+collector: pci_device
+strength: presence
+match:
+  present: true
+  problem_code: 28
+retention: >-
+  The devices present when the scan ran, with the problem code Windows held for each then.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Windows installed again, before the chipset or device drivers were added
+  - A capture, sound, serial or expansion card whose maker's driver was never installed
+  - Hardware newer or older than the drivers Windows carries
+  - A virtual machine, whose virtual devices often have no driver; in one measured, its network device had none
+references:
+  - https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-install
+author: aeterna-rongroi contributors
+date: 2026-10-15
+tags: [pci_device, hardware]

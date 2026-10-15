@@ -4,7 +4,7 @@
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
 FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders and of Legacy's resource cache index, the list of running processes with when each started, the drivers
-registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
+registered with Windows and a SHA-256 of each driver's file, the PCI devices Windows remembers, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read and for the folder PowerShell keeps its command history in, with no
@@ -57,6 +57,18 @@ Of a driver registered with Windows it reads the name of its driver service, whe
 it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
 graphics card vendor, a VPN, a virtualisation product — because their drivers are registered. It does not
 read which drivers are loaded or what they do.
+
+Of the **PCI devices Windows remembers** — the cards, controllers and bridges on the board, present now or
+set up earlier and gone — it reads, through Windows' device list (ADR 0069, ADR 0070): the maker, device and
+subsystem numbers and the class Windows records (`PCI\VEN_…&DEV_…&SUBSYS_…&REV_…`), the driver bound to each,
+its problem code when it is present, whether it is present, and three times Windows stores beside it — when
+Windows first set it up, the last start of Windows at which it was present, and when Windows recorded it
+removed. It never reads a serial number, a device's position on the board, a name you gave a device, or any
+USB device, phone, camera or drive. The list names some of your hardware, as the driver list does. The first-
+set-up times of a PC's devices are close to unique to one Windows installation, so **two reports of the same
+PC can be matched through them**, as file times can (ADR 0050); this tool sends nothing, but whoever receives
+two of your reports can make that match. SS mode shows the device rows a rule matched — a device with no
+driver, a device that is not present now — and only a count of the rest.
 
 Of **what Windows starts by itself** it reads three places (ADR 0060):
 
@@ -432,7 +444,7 @@ like any other.
 ### What a collector saw that no rule matched
 
 Some collectors read things no rule asks about — the list of programs you are running, the drivers
-registered with Windows, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
+registered with Windows, the PCI devices Windows remembers, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
 Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
 can read what the tool saw and judge it yourself.
 

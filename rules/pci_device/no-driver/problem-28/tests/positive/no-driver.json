@@ -1,0 +1,8 @@
+{
+  "description": "A present PCI device with problem code 28, beside a present host bridge with no service and problem code 0",
+  "observations": [
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10", "vendor_id": "1234", "device_id": "11E8", "subsystem_id": "11001AF4", "class_code": "00FF", "present": true, "problem_code": 28, "first_install_at": "2026-10-15T11:32:36Z", "last_arrival_at": "2026-10-15T11:32:36Z" } },
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1022&DEV_A0F0&SUBSYS_00000000&REV_00", "vendor_id": "1022", "device_id": "A0F0", "subsystem_id": "00000000", "class_code": "0600", "present": true, "problem_code": 0 } }
+  ],
+  "expect_matches": 1
+}
