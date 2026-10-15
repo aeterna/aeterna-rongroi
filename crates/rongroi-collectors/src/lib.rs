@@ -26,6 +26,7 @@ pub mod prefetch;
 pub mod process;
 pub mod scan;
 pub mod usn;
+pub mod windows_start;
 
 use rongroi_core::model::{CollectorRun, UnmeasuredReason};
 pub use rongroi_core::model::{ScanTier, SensitiveKind};
@@ -310,6 +311,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
         Box::new(usn::Usn::default()),
+        Box::new(windows_start::WindowsStart),
     ]
 }
 

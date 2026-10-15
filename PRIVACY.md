@@ -68,7 +68,10 @@ USB device, phone, camera or drive. The list names some of your hardware, as the
 set-up times of a PC's devices are close to unique to one Windows installation, so **two reports of the same
 PC can be matched through them**, as file times can (ADR 0050); this tool sends nothing, but whoever receives
 two of your reports can make that match. SS mode shows the device rows a rule matched — a device with no
-driver, a device that is not present now — and only a count of the rest.
+driver, a device that is not present now — and only a count of the rest. Beside them it reads how Windows
+started each time its System log remembers, one number per start (see the event logs below), because a
+device taken out before a full shutdown has no removal time and one taken out during a Fast Startup
+shutdown has one.
 
 Of **what Windows starts by itself** it reads three places (ADR 0060):
 
@@ -165,7 +168,10 @@ Windows overwriting the oldest events when the log fills, of a channel that was 
 a Windows upgrade, and a PC with almost every log empty is what a "PC optimiser" script leaves behind — the
 report says which of these it cannot tell apart. **What each event says is not read into the report at
 all**: an event's own text is where user names, PC names, addresses, account identifiers and full command
-lines live, and none of it survives the step that reads the file.
+lines live, and none of it survives the step that reads the file. **One number is the exception** (ADR 0071):
+of the event Windows writes to its System log each time it starts, the tool reads `BootType`, which says
+whether that start followed a full shutdown or a Fast Startup one, and the time of the event. Nothing else of
+that event is read, and nothing of any other event.
 A log the tool could not read — because Windows refused it, because it is larger than the tool will open,
 or because the tool's own time limit ran out — is **named in the report as one it could not read**, rather
 than passed over in silence. A log the tool never opened at all, because that time limit was already gone

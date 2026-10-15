@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 68 |
-| SHA-256 | `c4914169e771802fbc031165758d60fbdb72d9e1a66f7f51aa4aaeb181493f11` |
+| จำนวน rule | 70 |
+| SHA-256 | `d8932d9fba3cae2065fdde7202d87eb646601e7f5d76739103c748ab0d8325a7` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -128,6 +128,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
     - [เวลาที่ Prefetch บันทึกโปรแกรมที่ชื่อเหมือน FiveM หรือ GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
   - `usn`
     - [เวลาที่ change journal บันทึกการเปลี่ยนแปลงในโฟลเดอร์ที่เฝ้าดู](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+  - `windows_start`
+    - [Windows เริ่มทำงานหลังปิดเครื่องแบบ Fast Startup](#rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b) — `context` · `experimental`
+    - [Windows เริ่มทำงานหลังปิดเครื่องแบบเต็มหรือรีสตาร์ต](#rule-fa3e721e-98f2-4007-bbd8-133208564682) — `context` · `experimental`
 
 ## collector `autostart`
 
@@ -3021,3 +3024,65 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - PowerShell เพิ่มคำสั่งที่พิมพ์ในหน้าต่างลงในไฟล์ประวัติทีละคำสั่ง
 - โปรแกรมทำความสะอาดดิสก์ สำรองข้อมูล แอนตี้ไวรัส และโปรแกรมปรับแต่งเครื่อง
 - โฟลเดอร์ที่ไม่มีการเปลี่ยนแปลงในช่วงที่ journal ครอบคลุมจะไม่มีเวลาในข้อนี้ ซึ่งไม่ได้แปลว่าก่อนหน้านั้นไม่มีอะไรเปลี่ยน
+
+### `windows_start` / `timeline`
+
+<a id="rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b"></a>
+
+#### Windows เริ่มทำงานหลังปิดเครื่องแบบ Fast Startup
+
+- ชื่อภาษาอังกฤษ: Windows started after a Fast Startup shutdown
+- id: `fe57aa65-11b0-4e1f-b81c-a4fda597855b`
+- ไฟล์: [`rules/windows_start/timeline/fast-startup-start/rule.yaml`](../rules/windows_start/timeline/fast-startup-start/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `windows_start`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `windows_start`, `timeline`
+- เขียนเมื่อ: 2026-10-15
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ทุกครั้งที่ log System ของ Windows บันทึกการเริ่มทำงานด้วย boot type 1 ซึ่งวัดได้หลังปิดเครื่องตอนเปิด Fast Startup อยู่ (ค่าเริ่มต้น) อุปกรณ์ที่ถูกถอดออกระหว่างปิดเครื่องแบบนี้มีเวลาถอดที่เขียนตอนปิดเครื่อง และการเริ่มทำงานครั้งนั้นไม่เขียนเวลาเชื่อมต่อใหม่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `boot_type`: เป็น `1`
+
+**ย้อนดูได้**
+
+ตราบที่ log System ยังเก็บ record ไว้ ค่าเริ่มต้นคือเขียนทับ record เก่าสุดเมื่อเต็มขนาด
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- Fast Startup เปิดอยู่เป็นค่าเริ่มต้น การปิดเครื่องจากเมนู Start ส่วนใหญ่จึงจบแบบนี้
+
+<a id="rule-fa3e721e-98f2-4007-bbd8-133208564682"></a>
+
+#### Windows เริ่มทำงานหลังปิดเครื่องแบบเต็มหรือรีสตาร์ต
+
+- ชื่อภาษาอังกฤษ: Windows started after a full shutdown or a restart
+- id: `fa3e721e-98f2-4007-bbd8-133208564682`
+- ไฟล์: [`rules/windows_start/timeline/full-start/rule.yaml`](../rules/windows_start/timeline/full-start/rule.yaml)
+- บทบาท: `timeline` — timeline selector: สิ่งที่ตรงคือเวลาบน timeline ไม่ใช่หลักฐาน
+- collector: `windows_start`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `windows_start`, `timeline`
+- เขียนเมื่อ: 2026-10-15
+
+**เกี่ยวกับการตรวจนี้**
+
+แสดงบน timeline ทุกครั้งที่ log System ของ Windows บันทึกการเริ่มทำงานด้วย boot type 0 ซึ่งวัดได้หลังปิดเครื่องแบบเต็มและหลังรีสตาร์ต อุปกรณ์ที่ถูกถอดออกระหว่างปิดเครื่องแบบนี้ไม่มีเวลาถอด สิ่งเดียวที่ Windows เก็บไว้ว่ามันออกไปเมื่อไรคือการเริ่มทำงานครั้งล่าสุดที่มันยังอยู่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `boot_type`: เป็น `0`
+
+**ย้อนดูได้**
+
+ตราบที่ log System ยังเก็บ record ไว้ ค่าเริ่มต้นคือเขียนทับ record เก่าสุดเมื่อเต็มขนาด
+
+**เรื่องปกติที่อยู่เบื้องหลังเวลาเหล่านี้**
+
+- ทุกเครื่องเริ่มทำงานแบบนี้ การเริ่มทำงานเป็นจุดอ้างอิงของเวลาอื่น ไม่ใช่สิ่งที่พบ

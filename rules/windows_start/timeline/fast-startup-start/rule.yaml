@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: fe57aa65-11b0-4e1f-b81c-a4fda597855b
+title: Windows started after a Fast Startup shutdown
+description: >-
+  Puts on the timeline each start of Windows that its System log records with boot type 1, which was measured
+  after a shutdown with Fast Startup on, the default. A device taken out while Windows was off this way has a
+  removal time, written during the shutdown, and the start of Windows does not write its arrival times again.
+status: experimental
+# A timeline selector (ADR 0051).
+role: timeline
+collector: windows_start
+strength: context
+match:
+  boot_type: 1
+retention: >-
+  As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+falsepositives:
+  - Fast Startup is on by default, so most shutdowns from the Start menu end this way
+author: aeterna-rongroi contributors
+date: 2026-10-15
+tags: [windows_start, timeline]

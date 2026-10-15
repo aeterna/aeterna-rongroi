@@ -45,6 +45,9 @@
 //! straight to [`crate::powershell_text::classify`], which keeps kinds and at most a host, never the text.
 //! [`records`] is unchanged and still reads no payload; only a full scan's collector calls the other.
 //!
+//! **A second, by ADR 0071:** [`windows_starts`] reads one number, `BootType`, of the one event Windows
+//! writes at each start, and no other value of that event or of any other.
+//!
 //! # The dependency's types stop here
 //!
 //! Binary XML, the chunk layout, the string tables and the recovery of records around a damaged chunk
@@ -579,6 +582,85 @@ fn walk_strings(value: &Value, f: &mut dyn FnMut(&str)) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------------
+// How Windows started, one number of one event (ADR 0071, widening ADR 0018 for a third kind of event)
+// ---------------------------------------------------------------------------------------------------
+
+/// The provider, channel and event id Windows writes once at each start, with `BootType` in its data.
+const KERNEL_BOOT_START: (&str, &str, u32) = ("Microsoft-Windows-Kernel-Boot", "System", 27);
+
+/// One start of Windows as [`windows_starts`] reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WindowsStart {
+    /// When the record was written.
+    pub written: Timestamp,
+    /// `BootType` exactly as the record holds it, `None` when the record has none that is a number.
+    /// What a value means is a rule's judgement (ADR 0002, ADR 0071).
+    pub boot_type: Option<u8>,
+}
+
+/// What [`windows_starts`] read from one log.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct WindowsStarts {
+    /// One per start, in the order the records were read.
+    pub starts: Vec<WindowsStart>,
+    /// Chunks or records that did not parse, as [`records`] reports them.
+    pub rejected: Vec<RejectedRecord>,
+}
+
+/// Reads `BootType` of every start Windows recorded in one log, and nothing else of any record (ADR
+/// 0071). A start is 27 from `Microsoft-Windows-Kernel-Boot` on `System`, recognised by provider, channel
+/// and id together (ADR 0031). Its other data, `LoadOptions` among them, is not read.
+///
+/// # Errors
+///
+/// As [`records`].
+pub fn windows_starts(bytes: &[u8]) -> Result<WindowsStarts, ParseError> {
+    if bytes.len() < FILE_HEADER_LEN {
+        return Err(ParseError::Truncated {
+            expected: FILE_HEADER_LEN,
+            found: bytes.len(),
+        });
+    }
+    let mut parser = EvtxParser::from_read_seek(Cursor::new(bytes))
+        .map_err(|error| to_parse_error(&error, Stage::Header))?;
+    let mut out = WindowsStarts::default();
+    for outcome in parser.records_json_value() {
+        match outcome {
+            Ok(parsed) => out.starts.extend(windows_start(&parsed)),
+            Err(error) => out.rejected.push(RejectedRecord {
+                chunk_number: failed_chunk(&error),
+                record_id: failed_record(&error),
+                reason: to_parse_error(&error, Stage::Record),
+            }),
+        }
+    }
+    Ok(out)
+}
+
+fn windows_start(parsed: &SerializedEvtxRecord<Value>) -> Option<WindowsStart> {
+    let identity = record(parsed);
+    let (provider, channel, id) = KERNEL_BOOT_START;
+    if identity.provider.as_deref() != Some(provider)
+        || identity.channel.as_deref() != Some(channel)
+        || identity.event_id != Some(id)
+    {
+        return None;
+    }
+    let boot_type = parsed
+        .data
+        .get("Event")
+        .and_then(|event| event.get("EventData"))
+        .and_then(|data| data.get("BootType"))
+        .map(scalar)
+        .and_then(number)
+        .and_then(|value| u8::try_from(value).ok());
+    Some(WindowsStart {
+        written: parsed.timestamp,
+        boot_type,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{EvtxFile, number, records, scalar};
@@ -1107,6 +1189,106 @@ mod tests {
         for length in (0..every_byte.len()).step_by(101) {
             let _ = records(&every_byte[..length]);
         }
+    }
+}
+
+#[cfg(test)]
+mod start_tests {
+    use evtx::SerializedEvtxRecord;
+    use jiff::Timestamp;
+    use serde_json::{Value, json};
+
+    use super::{WindowsStart, windows_start, windows_starts};
+
+    const LANGUAGE_PACK: &[u8] =
+        include_bytes!("../../../fixtures/evtx/languagepacksetup-operational.evtx");
+
+    fn rendered(
+        provider: &str,
+        channel: &str,
+        event_id: &Value,
+        data: &Value,
+    ) -> SerializedEvtxRecord<Value> {
+        SerializedEvtxRecord {
+            event_record_id: 7,
+            timestamp: Timestamp::from_second(1_791_000_000).unwrap_or(Timestamp::UNIX_EPOCH),
+            data: json!({ "Event": {
+                "System": {
+                    "Provider": { "#attributes": { "Name": provider } },
+                    "EventID": event_id.clone(), "Level": 4, "Channel": channel, "Computer": "WORKSTATION-7"
+                },
+                "EventData": data.clone()
+            }}),
+        }
+    }
+
+    fn start(data: &Value) -> Option<WindowsStart> {
+        windows_start(&rendered(
+            "Microsoft-Windows-Kernel-Boot",
+            "System",
+            &json!(27),
+            data,
+        ))
+    }
+
+    /// The two values measured in a virtual machine (ADR 0071): 0 after a full shutdown, 1 after a Fast
+    /// Startup one. Nothing of `LoadOptions` or `Computer` is in what comes back, which has no field
+    /// that could hold either.
+    #[test]
+    fn a_start_keeps_its_time_and_boot_type_only() {
+        let full = start(
+            &json!({ "BootType": 0, "LoadOptions": " NOEXECUTE=OPTIN  FVEBOOT=1075351552  NOVGA" }),
+        );
+        assert_eq!(full.map(|s| s.boot_type), Some(Some(0)));
+        let fast = start(&json!({ "BootType": "1", "LoadOptions": "" }));
+        assert_eq!(fast.map(|s| s.boot_type), Some(Some(1)));
+        let rendered_with_text = start(&json!({ "BootType": { "#text": 2 } }));
+        assert_eq!(rendered_with_text.map(|s| s.boot_type), Some(Some(2)));
+    }
+
+    /// A start with no number where `BootType` should be is still a start.
+    #[test]
+    fn a_start_without_a_boot_type_number_is_kept_with_none() {
+        for data in [
+            json!({}),
+            json!({ "BootType": "cold" }),
+            json!({ "BootType": 300 }),
+            Value::Null,
+        ] {
+            assert_eq!(start(&data).map(|s| s.boot_type), Some(None), "{data}");
+        }
+    }
+
+    /// Recognised by provider, channel and id together (ADR 0031), never by id alone.
+    #[test]
+    fn only_kernel_boot_27_on_system_is_a_start() {
+        let data = json!({ "BootType": 0 });
+        for (provider, channel, id) in [
+            ("Microsoft-Windows-Kernel-Boot", "System", json!(28)),
+            ("Microsoft-Windows-Kernel-Boot", "Application", json!(27)),
+            ("Some-Other-Provider", "System", json!(27)),
+        ] {
+            assert_eq!(
+                windows_start(&rendered(provider, channel, &id, &data)),
+                None
+            );
+        }
+        assert!(
+            windows_start(&rendered(
+                "Microsoft-Windows-Kernel-Boot",
+                "System",
+                &json!({ "#text": 27 }),
+                &data
+            ))
+            .is_some()
+        );
+    }
+
+    #[test]
+    fn a_log_with_no_start_reads_as_none_and_short_bytes_are_refused() {
+        let read = windows_starts(LANGUAGE_PACK).unwrap();
+        assert!(read.starts.is_empty());
+        assert!(windows_starts(&LANGUAGE_PACK[..100]).is_err());
     }
 }
 

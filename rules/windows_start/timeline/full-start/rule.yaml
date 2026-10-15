@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: fa3e721e-98f2-4007-bbd8-133208564682
+title: Windows started after a full shutdown or a restart
+description: >-
+  Puts on the timeline each start of Windows that its System log records with boot type 0, which was measured
+  after a full shutdown and after a restart. A device taken out while Windows was off this way has no removal
+  time; the last start at which it was present is all Windows keeps of when it left.
+status: experimental
+# A timeline selector (ADR 0051).
+role: timeline
+collector: windows_start
+strength: context
+match:
+  boot_type: 0
+retention: >-
+  As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+falsepositives:
+  - Every PC starts this way; a start is a reference point for the other times, not a finding
+author: aeterna-rongroi contributors
+date: 2026-10-15
+tags: [windows_start, timeline]

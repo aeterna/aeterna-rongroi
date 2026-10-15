@@ -339,6 +339,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders, FiveM's plugin folders and the folder PowerShell keeps its command history in, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
             \x20 - the PCI devices Windows remembers, present or not: the maker, device and subsystem numbers and the class Windows records, the driver bound to each, its problem code, and when Windows set it up, last saw it at a start of Windows and recorded it removed, never a serial number; these times can match two reports of this PC\n\
+            \x20 - how Windows started each time its System log remembers: one number per start that says whether it followed a full shutdown or a Fast Startup one, and nothing else of that event\n\
             \x20 - what Windows starts by itself: each program service's name and start setting, each Run and RunOnce value's name, and each scheduled task's name, whether it is on and what starts it, with the file each one starts — where it is and, outside the Windows folder, its SHA-256 and signature (Authenticode); never the arguments a program is given\n\
             \x20 - Microsoft Defender's exclusions: each folder, program and file type Defender is told not to scan, and how many network addresses it is told to skip, never the addresses\n\
             \x20 - the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are\n\
@@ -361,6 +362,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
             \x20 - อุปกรณ์ PCI ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิต อุปกรณ์ และ subsystem กับ class ที่ Windows บันทึก ไดรเวอร์ที่ผูกกับแต่ละตัว problem code และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียล เวลาเหล่านี้ใช้จับคู่รายงานสองฉบับของเครื่องนี้ได้\n\
+            \x20 - Windows เริ่มทำงานแบบไหนในแต่ละครั้งที่ log System ยังจำไว้: ตัวเลขหนึ่งตัวต่อการเริ่มทำงาน ที่บอกว่าต่อจากการปิดเครื่องแบบเต็มหรือแบบ Fast Startup และไม่อ่านอย่างอื่นของ event นั้น\n\
             \x20 - สิ่งที่ Windows เริ่มเอง: ชื่อและการตั้งค่าการเริ่มทำงานของ service แต่ละตัว ชื่อค่าใน Run และ RunOnce แต่ละค่า และชื่อ scheduled task แต่ละตัว ว่าเปิดอยู่หรือไม่และอะไรทำให้มันเริ่ม พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง และถ้าอยู่นอกโฟลเดอร์ Windows ก็ SHA-256 กับลายเซ็น (Authenticode) โดยไม่อ่าน argument ที่โปรแกรมได้รับเลย\n\
             \x20 - exclusion ของ Microsoft Defender: โฟลเดอร์ โปรแกรม และชนิดไฟล์แต่ละรายการที่ Defender ถูกสั่งไม่ให้สแกน และจำนวน address ของเครือข่ายที่ถูกยกเว้น โดยไม่อ่านตัว address\n\
             \x20 - การตั้งค่าที่กำหนดว่า traffic ของเครือข่ายไปที่ไหน โดยไม่อ่านบันทึกว่าเคยไปที่ไหน: บรรทัดในไฟล์ hosts ที่กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com พร้อม address นั้น (บรรทัดอื่นแค่นับจำนวน) proxy เปิดอยู่หรือไม่ และตั้ง proxy server หรือสคริปต์ตั้งค่า proxy ไว้หรือไม่ โดยไม่อ่าน address ของมัน และ rule ของ Windows Firewall สำหรับโปรแกรมในโฟลเดอร์ของ FiveM พร้อมจำนวน rule ทั้งหมด\n\
@@ -1125,56 +1127,60 @@ mod tests {
     /// words are keyed by collector id and the ids are compared with `rongroi_collectors::all()`, so
     /// adding a collector without saying so here fails this test rather than widening what a player
     /// agreed to without telling them.
+    /// What the consent question says about each collector, in both languages (see the test below).
+    const CONSENT_WORDS: &[(&str, &[&str])] = &[
+        (
+            "autostart",
+            &["Run", "RunOnce", "scheduled task", "SHA-256"],
+        ),
+        ("bam", &["BAM"]),
+        ("defender_exclusion", &["Microsoft Defender", "exclusion"]),
+        ("driver_service", &["driver"]),
+        ("evtx", &["event log"]),
+        (
+            "fivem_dir",
+            &[
+                "FiveM",
+                "plugin",
+                "Legacy",
+                "Enhanced",
+                "FiveM.exe",
+                "Authenticode",
+            ],
+        ),
+        ("fivem_servers", &["FiveM for GTA V Enhanced"]),
+        ("install_marker", &["Atlas", "ReviOS", "Defender"]),
+        (
+            "net_config",
+            &[
+                "hosts",
+                "cfx.re, fivem.net",
+                "rockstargames.com",
+                "proxy",
+                "Windows Firewall",
+                "loopback, unspecified, private",
+            ],
+        ),
+        ("os_image", &["Defender", "Windows Update", "Event Log"]),
+        ("pca", &["Program Compatibility Assistant"]),
+        ("pci_device", &["PCI", "Windows"]),
+        (
+            "posture",
+            &["Secure Boot", "memory integrity", "PowerShell"],
+        ),
+        (
+            "powershell_text",
+            &["PowerShell", "Microsoft Defender", "SS"],
+        ),
+        ("prefetch", &["Prefetch"]),
+        ("process", &[]),
+        ("usn", &["change journal"]),
+        ("windows_start", &["System", "Fast Startup"]),
+    ];
+
     #[test]
     fn consent_names_every_kind_of_source() {
-        let named: &[(&str, &[&str])] = &[
-            (
-                "autostart",
-                &["Run", "RunOnce", "scheduled task", "SHA-256"],
-            ),
-            ("bam", &["BAM"]),
-            ("defender_exclusion", &["Microsoft Defender", "exclusion"]),
-            ("driver_service", &["driver"]),
-            ("evtx", &["event log"]),
-            (
-                "fivem_dir",
-                &[
-                    "FiveM",
-                    "plugin",
-                    "Legacy",
-                    "Enhanced",
-                    "FiveM.exe",
-                    "Authenticode",
-                ],
-            ),
-            ("fivem_servers", &["FiveM for GTA V Enhanced"]),
-            ("install_marker", &["Atlas", "ReviOS", "Defender"]),
-            (
-                "net_config",
-                &[
-                    "hosts",
-                    "cfx.re, fivem.net",
-                    "rockstargames.com",
-                    "proxy",
-                    "Windows Firewall",
-                    "loopback, unspecified, private",
-                ],
-            ),
-            ("os_image", &["Defender", "Windows Update", "Event Log"]),
-            ("pca", &["Program Compatibility Assistant"]),
-            ("pci_device", &["PCI", "Windows"]),
-            (
-                "posture",
-                &["Secure Boot", "memory integrity", "PowerShell"],
-            ),
-            (
-                "powershell_text",
-                &["PowerShell", "Microsoft Defender", "SS"],
-            ),
-            ("prefetch", &["Prefetch"]),
-            ("process", &[]),
-            ("usn", &["change journal"]),
-        ];
+        let named = CONSENT_WORDS;
         let mut ids: Vec<&str> = rongroi_collectors::all().iter().map(|c| c.id()).collect();
         ids.sort_unstable();
         let listed: Vec<&str> = named.iter().map(|(id, _)| *id).collect();

@@ -26,6 +26,8 @@ extend-exclude = [
 hve = "hve"
 # `notatin` is the name of a Rust registry-hive crate evaluated in ADR 0041.
 notatin = "notatin"
+# `OPTIN` is a value of the boot option `NOEXECUTE`, as Kernel-Boot 27 records it (ADR 0071).
+OPTIN = "OPTIN"
 
 [default.extend-identifiers]
 # `amd64fre` is part of Windows' own `BuildLabEx` string, measured on a real PC (ADR 0056): the build

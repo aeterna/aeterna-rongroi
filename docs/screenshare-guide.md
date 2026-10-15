@@ -11,7 +11,7 @@ aeterna-rongroi **0.8.2**. อ่านภาษาไทย: [screenshare-guide
 | It can show | It cannot show |
 |---|---|
 | Machine settings that make kernel-level cheats easier to load: Secure Boot, test signing, memory integrity (HVCI), TPM. Also whether the firmware agrees with Windows about Secure Boot, and whether a machine or per-user policy turns script block logging off for Windows PowerShell or PowerShell 7 | Cheats running on a **second PC** (DMA). They leave no program on the checked PC; a DMA card whose firmware imitates an ordinary device looks like that device |
-| A PCI device in the PC that Windows installed no driver for, and a PCI device Windows set up earlier that is not in the PC now — with the last start of Windows it was present at, and a removal time only when Windows recorded one (after a full shutdown it records none) | A box between the mouse and the PC that moves or clicks it for a cheat: this program does not read USB or HID devices |
+| A PCI device in the PC that Windows installed no driver for, and a PCI device Windows set up earlier that is not in the PC now — with the last start of Windows it was present at, and a removal time only when Windows recorded one (after a full shutdown it records none), beside each start of Windows marked as after a full or a Fast Startup shutdown | A box between the mouse and the PC that moves or clicks it for a cheat: this program does not read USB or HID devices |
 | That the Security log or an event log file recorded being cleared | Overlays hidden from screen capture |
 | For each check, whether it was answered and, if not, why | Anything, if Windows on that PC was modified to lie to the programs that run on it |
 | | That a PC is clean. **No result means that** |

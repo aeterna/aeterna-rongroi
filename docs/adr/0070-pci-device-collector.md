@@ -181,4 +181,23 @@ Decided on 2026-10-15: all four as recommended.
   `docs/architecture.md` name the read. `COLLECTOR_ORDER` puts `pci_device` after `driver_service`.
 - A fixture host that describes no devices makes the run `read_failed`, so every older report snapshot gained that
   one unmeasured run and nothing else.
-- Section 7, the run in the lab virtual machine, is recorded below when it has been done.
+- Section 7, the run in the lab virtual machine, is recorded below ("Section 7, as run").
+
+## Section 7, as run (2026-10-15)
+
+The CLI built from `feat/pci-device` at `6facdd0` (`x86_64-pc-windows-gnu`, run under x64 emulation) ran
+`rongroi scan --json` elevated in the ADR 0069 lab virtual machine (Windows 11 Arm 26300, QEMU's `edu` device as the
+card) at five steps. The steps are those of ADR 0069, run again with the CLI in place of the probe:
+
+| Step | What was done before it | `no-driver` | `absent` | What the absent row held |
+|---|---|---|---|---|
+| T1 | `edu` added, full start | found: `edu` and the VM's network card (no virtio driver on this image), both 28 | not found | — |
+| T2 | `edu` removed while off after a full shutdown | found: the network card | found: `edu` | `last_arrival_at` = T1's start, no `last_removal_at` |
+| T3 | `edu` back, full start | found: both | not found | — |
+| T4 | Fast Startup shutdown with `edu` in | found: both | not found | — |
+| T5 | `edu` removed while off after T4's Fast Startup shutdown | found: the network card | found: `edu` | `last_arrival_at` = T4's start, `last_removal_at` = the resume, 2 minutes later; the report's boot time did not move from T4's |
+
+Every row is what this section asked for. On the timeline the absent device's times were attributed to the
+`absent` rule's evidence, not repeated by the selector. Step 4 of ADR 0069 (a removal while running) is not
+repeated: there the guest never completed the PCI hot-unplug, so that case stays not measured. The reports are kept with the lab
+(`.claude/probes/vm-lab/results/T*-scan.json`, not in this repository: they are a whole report of a lab machine).
