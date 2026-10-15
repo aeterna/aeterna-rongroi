@@ -247,3 +247,17 @@ and the Fast Startup case in a virtual machine before any test card is bought.
   (host bridges without a service are ordinary), so `check-baseline` can confront the later rules. No id from a real
   PC goes into a fixture.
 - PRIVACY.md and the consent question name devices before the first collector reads them.
+
+## As built (2026-10-15)
+
+- `DeviceSource::devices` takes the bus: `devices(&self, bus: DeviceBus)`. Section 1 wrote it without one; with
+  the bus a collector reads only its own enumerator, so the PCI collector (ADR 0070) never lists HID devices.
+- The model id is cut from the device **instance id** the list returns (its first two parts, then the model
+  fields of section 3), not from `DEVPKEY_Device_HardwareIds`: the same fields, with one read fewer per device and
+  a model id even for a device whose properties cannot be read.
+- A property that cannot be read — a failed call, a value of an unexpected type, or one above 64 KiB — is listed
+  in `DeviceRecord::unreadable`, so a collector can make it a gap; a property Windows holds no value for
+  (`CR_NO_SUCH_VALUE`) is `None`.
+- The class code is read for PCI devices only, and the problem code for present devices only.
+- `rongroi-host-windows/src/device.rs` holds every `unsafe` call; the Windows CI job runs
+  `live_devices_pci_and_hid_are_models_with_no_instance_part` on its runner and prints only counts.

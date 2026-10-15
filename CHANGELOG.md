@@ -5,6 +5,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Hosts can list the devices Windows remembers: `DeviceSource::devices(bus)` reads the `PCI` or `HID` enumerator
+  through CfgMgr32, present devices and absent ones, each as a model id with no instance part (no serial number or
+  board position), its PCI class code, driver service, problem code and the three times Windows stores, in whole
+  seconds. A property that cannot be read is named as unreadable rather than read as "no value". No administrator
+  rights are needed. No collector reads it yet (ADR 0069, ADR 0070).
+
 ### Changed
 - ADR 0069 amended with measurements in a virtual machine: a device removed while the PC was off is absent with
   `LastArrivalDate` = the last start it was present at and no `LastRemovalDate`; one removed during a Fast Startup

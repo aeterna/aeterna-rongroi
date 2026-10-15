@@ -489,6 +489,10 @@ jobs:
       # finds records under it. Nothing the journal holds is printed.
       - name: Change journal reads without write access
         run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_usn_/)'
+      # ADR 0069. The device list reads through CfgMgr32 without changing anything; every id comes
+      # back as a model with no instance part. Only counts are printed.
+      - name: Device list reads as models
+        run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_devices_/)'
       - name: Build the desktop app (unofficial build, no installer)
         run: pnpm -C apps/desktop tauri build --no-bundle
       - name: Live smoke — the CLI reads this machine

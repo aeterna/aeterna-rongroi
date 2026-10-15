@@ -18,6 +18,8 @@ pub mod account;
 
 pub mod boot_time;
 
+pub mod device;
+
 pub mod dialog;
 
 pub mod elevate;

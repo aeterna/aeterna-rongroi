@@ -46,8 +46,15 @@ windows-registry.workspace = true
 # under `Win32_System_Ioctl` (ADR 0047; read from the same sources).
 # `MessageBoxW` and its `MB_*` and `IDYES` constants are under `Win32_UI_WindowsAndMessaging`, gated on
 # nothing else (ADR 0052; read from `src/Windows/Win32/UI/WindowsAndMessaging/mod.rs` in 0.62.2).
+# `CM_Get_Device_ID_List_SizeW`, `CM_Get_Device_ID_ListW`, `CM_Locate_DevNodeW`, the `CM_GETIDLIST_*` and
+# `CM_LOCATE_DEVNODE_PHANTOM` flags and the `CR_*` codes are under `Win32_Devices_DeviceAndDriverInstallation`;
+# `CM_Get_DevNode_PropertyW` there is gated on `Win32_Devices_Properties` as well, which also holds the
+# `DEVPKEY_Device_*` keys and `DEVPROP_TYPE_*`; `DEVPROPKEY` is in `Win32_Foundation`, listed (ADR 0069; read
+# from `src/Windows/Win32/Devices/` in 0.62.2).
 windows = { workspace = true, features = [
   "Wdk_System_SystemInformation",
+  "Win32_Devices_DeviceAndDriverInstallation",
+  "Win32_Devices_Properties",
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Security_Cryptography",
