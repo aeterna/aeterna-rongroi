@@ -6,6 +6,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- ADR 0070 accepted (2026-10-15, all four questions as recommended): a `pci_device` collector over ADR 0069's
+  source, with two rules — a present PCI device with no driver installed (problem code 28, `presence`) and a PCI
+  device set up earlier that is not present now (`context`, saying "removed at" only beside a time Windows
+  recorded) — and a timeline selector for absent devices. No HID collector yet.
 - ADR 0069 amended with measurements in a virtual machine: a device removed while the PC was off is absent with
   `LastArrivalDate` = the last start it was present at and no `LastRemovalDate`; one removed during a Fast Startup
   shutdown gets `LastRemovalDate` = the resume, and the kernel's start time does not move then.
