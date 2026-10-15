@@ -1,0 +1,7 @@
+{
+  "description": "An x86 PC whose ACPI tables include neither DMAR nor IVRS",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "iommu_table": "none" } }
+  ],
+  "expect_matches": 1
+}

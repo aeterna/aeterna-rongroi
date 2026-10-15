@@ -199,6 +199,7 @@ Windows เริ่มทำงาน: <เวลา> (<วัน ชั่ว�
 | นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ Windows PowerShell | posture | `experimental` | เหมือนข้างบน และการสแกนที่เริ่มใหม่ด้วยรหัสผ่านของผู้ดูแลระบบคนอื่น ซึ่งอ่านนโยบายของผู้ดูแลคนนั้น |
 | นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7 | posture | `experimental` | เหมือนแถวของ Windows PowerShell, นโยบายของ PowerShell 7 ที่ตั้งให้ใช้ของ Windows PowerShell, นโยบายที่ค้างอยู่บนเครื่องที่ไม่ได้ติดตั้ง PowerShell 7 |
 | นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ PowerShell 7 | posture | `experimental` | เหมือนข้างบน และการสแกนที่เริ่มใหม่ด้วยรหัสผ่านของผู้ดูแลระบบคนอื่น |
+| firmware ไม่ได้ประกาศ IOMMU ให้ Windows | posture | `experimental` | ปิด VT-d หรือ AMD-Vi (IOMMU, SVM) ไว้ใน firmware ซึ่งเมนบอร์ดหลายรุ่นปิดมาจากโรงงาน, CPU รุ่นเก่า, เครื่องเสมือน บอกการตั้งค่าเครื่อง ไม่ได้บอกว่ามีอุปกรณ์ DMA อยู่ในเครื่อง และไม่ได้บอกว่า Kernel DMA Protection เปิดหรือไม่ ไม่อ่านบนเครื่อง Arm |
 | มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว | tamper | `experimental` | มีคนเลือก "อ่านอย่างเดียว" ใน Properties ของโฟลเดอร์, ไฟล์ถูกกู้คืนหรือคัดลอกด้วยโปรแกรมที่เก็บ attribute ไว้ |
 | มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว | tamper | `experimental` | สองอย่างเดียวกันนี้ |
 | มีไฟล์ event log ที่ไม่ใช่ไฟล์ที่ Windows เขียน channel ของมันลงไป | tamper | `experimental` | ไฟล์เก็บถาวรที่ Windows ทำเองเมื่อ log เต็ม, log ที่ถูกบันทึกหรือส่งออกมาไว้ในโฟลเดอร์, log ที่ผู้ดูแลระบบหรือ Group Policy ย้ายที่เก็บ, log ที่คัดลอกมาจากเครื่องอื่น |

@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-09-13
+- Amended: 2026-10-15, `iommu_table` from the ACPI table names ("Amendment of 2026-10-15")
 
 ## Context
 
@@ -533,3 +534,51 @@ to weigh if a report says otherwise.
 - The consent question in the CLI and the app, `PRIVACY.md`, `docs/architecture.md`, both screenshare guides
   and `CHANGELOG.md` say what is read. The Windows CI job keeps the PowerShell step and the two Defender
   steps.
+
+## Amendment of 2026-10-15 — whether the firmware describes an IOMMU (R-C1 of the DMA plan)
+
+Section 3 found no documented source for the state of Kernel DMA Protection, and that is unchanged. One step
+before it does have a documented source: whether the firmware set an IOMMU up and described it to Windows.
+x86 firmware does that with an ACPI table — `DMAR` for Intel VT-d, `IVRS` for AMD-Vi — and Windows lists the
+ACPI tables it was given through `EnumSystemFirmwareTables` with the `ACPI` provider
+([EnumSystemFirmwareTables](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-enumsystemfirmwaretables)).
+The owner approved this reading on 2026-10-15 as step 5 of the DMA plan, with Arm reported as not measured.
+
+### Decision
+
+- `FirmwareSource` gains `iommu_table()`, answering `Dmar`, `Ivrs`, `Neither` or `NotX86`. The live host
+  lists the ACPI table names (4 bytes each, bounded at 64 KiB) and looks for `DMAR`, then `IVRS`. Nothing
+  inside any table is read; `GetSystemFirmwareTable` is not called.
+- `IsWow64Process2` gives the native machine first. On anything that is not `AMD64` or `I386` the answer is
+  `NotX86` — Arm describes an IOMMU in its own table (IORT), which is not read — so an x64 build running
+  under emulation on an Arm PC is not taken for an x86 PC without either table.
+- `posture` reports `iommu_table`: `dmar`, `ivrs` or `none`. `NotX86` is a gap, `source_absent`, never
+  `none`. A failure is a gap as for every other setting.
+- One rule, `posture/dma/no-iommu-table`: `iommu_table: none`, `strength: posture`, `experimental`. Its
+  `falsepositives` are firmware shipped with VT-d or AMD-Vi off, older processors, and virtual machines.
+
+**What this does not say**, as section 3 already said of anything about DMA: a table present does not mean
+Kernel DMA Protection is on, or that Windows uses the IOMMU for any device; a table absent does not mean a
+DMA device is in the PC; and a cheat on a second PC reaches memory through a card this reading does not see.
+
+### Measured
+
+On the development PC (AMD, Windows 11) on 2026-10-15, through PowerShell calling the same function:
+22 tables, `MCFG,FACP,APIC,IVRS,HPET,…`, each name in the order its signature is spelled, and the same list
+under a token from `runas /trustlevel:0x20000` (not elevated) as elevated. No administrator rights are
+needed, so `not_admin` is not expected; a denial is still reported through `failure::reason_for`.
+
+### Still not established
+
+- A PC whose firmware has VT-d or AMD-Vi switched off: expected to list neither table, not measured.
+- An Intel PC: `DMAR` expected, not measured.
+- An Arm PC: `IsWow64Process2` is documented to report the native machine; not measured on Arm hardware.
+
+### Consequences of the amendment
+
+- `rongroi-host`: `IommuTable`, `FirmwareSource::iommu_table`, fixture key `iommu_table`. No `windows`
+  feature is added (`Win32_System_SystemInformation` and `Win32_System_Threading` were already on).
+- `posture` emits one more field; every report with a `posture` observation gains `iommu_table` or its gap,
+  and every report gains the rule. The three baselines hold `ivrs`, `ivrs` and `dmar`.
+- The consent text in the CLI and the app, `PRIVACY.md`, `docs/architecture.md`, both screenshare guides and
+  `CHANGELOG.md` say what is read.

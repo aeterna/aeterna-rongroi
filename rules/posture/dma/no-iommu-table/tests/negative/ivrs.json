@@ -1,0 +1,7 @@
+{
+  "description": "AMD firmware that gives Windows an IVRS table, as the development PC does",
+  "observations": [
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "iommu_table": "ivrs" } },
+    { "collector": "posture", "fields": { "secure_boot": "enabled", "iommu_table": "dmar" } }
+  ]
+}

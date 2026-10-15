@@ -75,6 +75,8 @@ tpm:
 # chosen. No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
 firmware:
   secure_boot: access_denied
+# The IOMMU's ACPI table (ADR 0038, amendment of 2026-10-15): an Intel PC with VT-d on, which is what this hardened machine is assumed to be (not measured).
+iommu_table: dmar
 processes:
   - pid: 4
     name: System

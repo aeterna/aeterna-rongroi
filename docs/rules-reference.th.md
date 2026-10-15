@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 70 |
-| SHA-256 | `d8932d9fba3cae2065fdde7202d87eb646601e7f5d76739103c748ab0d8325a7` |
+| จำนวน rule | 71 |
+| SHA-256 | `435c34e8804d3c5062d0c09bd0c60f23874f2befbb6aa39f1a9a53bfd7665f02` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -80,6 +80,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [เปิดโหมด test signing ของ Windows อยู่](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
+  - [firmware ไม่ได้ประกาศ IOMMU ให้ Windows](#rule-c5c19a2d-8008-4bc8-b36f-6607ed091313) — `posture` · `experimental`
   - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
   - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ PowerShell 7](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
   - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
@@ -1545,6 +1546,48 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option>
+
+### `posture` / `dma`
+
+<a id="rule-c5c19a2d-8008-4bc8-b36f-6607ed091313"></a>
+
+#### firmware ไม่ได้ประกาศ IOMMU ให้ Windows
+
+- ชื่อภาษาอังกฤษ: The firmware describes no IOMMU to Windows
+- id: `c5c19a2d-8008-4bc8-b36f-6607ed091313`
+- ไฟล์: [`rules/posture/dma/no-iommu-table/rule.yaml`](../rules/posture/dma/no-iommu-table/rule.yaml)
+- collector: `posture`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `dma`
+- เขียนเมื่อ: 2026-10-15
+
+**เกี่ยวกับการตรวจนี้**
+
+ไม่มีตาราง ACPI ที่ firmware ของ x86 ใช้บอก Windows ว่ามี IOMMU ทั้ง DMAR (Intel VT-d) และ IVRS (AMD-Vi) IOMMU คือสิ่งที่ทำให้ Windows จำกัดได้ว่าอุปกรณ์ PCIe เข้าถึงหน่วยความจำส่วนไหนได้ และในเมนบอร์ดหลายรุ่นเป็นค่าใน firmware ที่ปิดไว้ตั้งแต่โรงงาน นี่คือการตั้งค่าของเครื่อง ไม่ใช่อุปกรณ์ตัวใดในเครื่อง และไม่ได้บอกว่า Kernel DMA Protection เปิดอยู่หรือไม่
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `iommu_table`: เป็น `none` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+สถานะ firmware ตอนนี้เท่านั้น ไม่ได้บอกอะไรเกี่ยวกับการตั้งค่า firmware ก่อนหน้า
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เมนบอร์ดที่ปิด VT-d หรือ AMD-Vi (มักเรียกว่า IOMMU หรือ SVM) มาจากโรงงาน ซึ่งพบบ่อย
+- CPU หรือชิปเซ็ตรุ่นเก่าที่ไม่มี IOMMU
+- เครื่องเสมือนที่ไม่ได้ให้ IOMMU เสมือน
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-kernel-dma-protection>
 
 ### `posture` / `logging`
 

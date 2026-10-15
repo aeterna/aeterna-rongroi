@@ -96,6 +96,8 @@ tpm:
 # chosen. No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
 firmware:
   secure_boot: access_denied
+# The IOMMU's ACPI table (ADR 0038, amendment of 2026-10-15): IVRS, measured on the AMD development PC under a limited token on 2026-10-15: the ACPI table list needs no administrator rights.
+iommu_table: ivrs
 processes:
   - pid: 4
     name: System
