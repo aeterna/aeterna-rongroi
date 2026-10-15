@@ -6,6 +6,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- ADR 0069 amended with measurements in a virtual machine: a device removed while the PC was off is absent with
+  `LastArrivalDate` = the last start it was present at and no `LastRemovalDate`; one removed during a Fast Startup
+  shutdown gets `LastRemovalDate` = the resume, and the kernel's start time does not move then.
 - ADR 0069 accepted (2026-10-15, all five questions as recommended): a read-only `DeviceSource` that lists the PCI
   and HID devices Windows remembers, present or not, with a model id (never an instance or serial), class code,
   driver service, problem code and the times Windows stores beside each. Measured first on one PC: no administrator
