@@ -5,6 +5,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-15
+
+The first checks about DMA cards, and what they cannot show. Every scan now lists the PCI devices Windows remembers,
+present or not, with a rule for a present one that has no driver and one for a device that is gone; how Windows started
+each time, so a missing removal time can be read; and whether the firmware describes an IOMMU. A DMA card that
+imitates an ordinary device, a cheat on a second PC and a box between the mouse and the PC still leave nothing here.
+
 ### Added
 - A `windows_start` collector: for each start of Windows its System log remembers, the time and `BootType` of
   Kernel-Boot event 27 — one number, nothing else of that event — and two timeline selectors that mark a start
