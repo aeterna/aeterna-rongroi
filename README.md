@@ -70,13 +70,13 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 ## Status
 
-**Latest release: [0.8.2](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.10-0.8.2)**, 10 October 2026 —
-a pre-release. It has 52 rules, and almost all of them are still `experimental`: they have not yet been
+**Latest release: [0.9.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.15-0.9.0)**, 15 October 2026 —
+a pre-release. It has 55 rules, and almost all of them are still `experimental`: they have not yet been
 checked against enough real PCs, so read every result with care. 0.8.0 added PowerShell: what it flagged,
 whether its history was deleted, and, in a full scan, which kinds of words its commands held — never the
-commands. 0.8.1 said what a policy that switches PowerShell's logging off leaves empty. 0.8.2 keeps the same
-checks; the hash check is one Command Prompt line for every version, and the landing page now reads its version
-and rule count from the published release.
+commands. 0.9.0 lists the PCI devices Windows remembers, present or not, with a rule for one that has no driver
+and one for a device that is gone, and says whether the firmware describes an IOMMU; it cannot see a DMA card
+that imitates an ordinary device.
 Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 
 | What it looks at, in plain words | Technical detail |
