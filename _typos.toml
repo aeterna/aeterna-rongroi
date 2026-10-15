@@ -39,3 +39,7 @@ SerCx2 = "SerCx2"
 # Windows task folder names in baseline-elevated-win11's scheduled tasks (ADR 0060), read from a GitHub-hosted runner: data, not prose.
 UPnP = "UPnP"
 UPnPHostConfig = "UPnPHostConfig"
+# Plug and Play, as Windows writes it: the `Microsoft-Windows-Kernel-PnP` event provider and WMI's `Win32_PnPEntity`
+# (ADR 0069). Not a misspelling of "On".
+PnP = "PnP"
+Win32_PnPEntity = "Win32_PnPEntity"

@@ -5,6 +5,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- ADR 0069 accepted (2026-10-15, all five questions as recommended): a read-only `DeviceSource` that lists the PCI
+  and HID devices Windows remembers, present or not, with a model id (never an instance or serial), class code,
+  driver service, problem code and the times Windows stores beside each. Measured first on one PC: no administrator
+  rights needed, `LastArrivalDate` is re-written at each start, and `LastRemovalDate` is not written at shutdown. It
+  does not detect a DMA card, and no rule may say a device was removed until what a card taken out while the PC is
+  off leaves behind is measured.
+
 ## [0.8.2] - 2026-10-10
 
 The checks are those of 0.8.1; two rules' text says what was measured. The hash check is one Command Prompt line
