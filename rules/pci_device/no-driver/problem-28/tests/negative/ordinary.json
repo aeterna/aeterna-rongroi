@@ -1,0 +1,9 @@
+{
+  "description": "Host bridges with no service and problem code 0, a driver that failed to start (code 10), and an absent device",
+  "observations": [
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1022&DEV_A0F0&SUBSYS_00000000&REV_00", "class_code": "0600", "present": true, "problem_code": 0 } },
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_10EC&DEV_A0F7&SUBSYS_88D21043&REV_15", "class_code": "0200", "service": "rt640x64", "present": true, "problem_code": 10 } },
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10", "class_code": "00FF", "present": false, "last_arrival_at": "2026-10-15T11:32:36Z" } }
+  ],
+  "expect_matches": 0
+}

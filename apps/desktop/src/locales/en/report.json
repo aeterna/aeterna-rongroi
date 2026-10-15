@@ -101,6 +101,8 @@
     "prefetch": "Windows Prefetch",
     "bam": "Background Activity Moderator (BAM)",
     "pca": "Program Compatibility Assistant",
+    "pci_device": "PCI devices Windows remembers",
+    "windows_start": "How Windows started",
     "usn": "NTFS change journal",
     "fivem_servers": "FiveM server cache folders (full scan)"
   },

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08
+title: A PCI device Windows set up earlier is not present now
+description: >-
+  Windows set this PCI device up at some time and it is not in the PC now. The row shows when Windows first
+  set it up, the last start of Windows at which it was present, and — only when Windows recorded one — a
+  removal time. Windows records a removal time when a device leaves while Windows is running and, in a
+  Fast Startup shutdown (the default "Shut down"), at the moment Windows resumes; after a full shutdown it
+  records none, so a missing removal time says nothing about when the device left. The row never says how
+  or why the device left, or what it was beyond the ids Windows recorded.
+status: experimental
+collector: pci_device
+strength: context
+match:
+  present: false
+retention: >-
+  Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the
+  device is uninstalled or Windows is installed again.
+unmeasured_when: [not_windows]
+falsepositives:
+  - A graphics card, SSD or network card replaced, or moved to another slot
+  - A BIOS update or setting that changes which devices the board shows — an onboard controller switched off, a slot's mode changed
+  - A Thunderbolt or external PCIe device that was unplugged
+  - Windows moved to another PC, or the PC's board replaced
+author: aeterna-rongroi contributors
+date: 2026-10-15
+tags: [pci_device, hardware]

@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 65 |
-| SHA-256 | `ef9cdf3f83ca32e5207291128508a6747829cc3060e2fb0bd295f26ebdb59dfe` |
+| Rules | 71 |
+| SHA-256 | `435c34e8804d3c5062d0c09bd0c60f23874f2befbb6aa39f1a9a53bfd7665f02` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -77,10 +77,14 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Microsoft Defender's service is not registered on this PC](#rule-8f656238-36d2-4178-98db-87f55432edf7) — `posture` · `experimental`
   - [The Windows Event Log service does not start with Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
   - [Windows Update's service cannot start on this PC](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
+- `pci_device`
+  - [A PCI device Windows set up earlier is not present now](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `experimental`
+  - [A PCI device has no driver installed](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [Windows test signing is turned on](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
+  - [The firmware describes no IOMMU to Windows](#rule-c5c19a2d-8008-4bc8-b36f-6607ed091313) — `posture` · `experimental`
   - [A machine policy turns PowerShell 7 script block logging off](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
   - [A per-user policy turns PowerShell 7 script block logging off](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
   - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
@@ -120,6 +124,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - `pca`
     - [When Program Compatibility Assistant recorded a program named like FiveM's game process](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
     - [When Program Compatibility Assistant recorded a program named like FiveM or GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
+  - `pci_device`
+    - [When Windows recorded a PCI device that is not present now](#rule-f360d84c-0ac6-437c-af21-5193d9264e0f) — `context` · `experimental`
   - `powershell_text`
     - [When PowerShell's logs recorded a command that downloaded something and ran it](#rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec) — `context` · `experimental`
   - `prefetch`
@@ -127,6 +133,9 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [When Prefetch recorded a program named like FiveM or GTA V](#rule-a81a1693-2982-4004-8f40-186c2b90a6a2) — `context` · `experimental`
   - `usn`
     - [When the change journal recorded changes in a watched folder](#rule-82c71896-ef70-492d-b6fc-8671c09b5e1c) — `context` · `test`
+  - `windows_start`
+    - [Windows started after a Fast Startup shutdown](#rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b) — `context` · `experimental`
+    - [Windows started after a full shutdown or a restart](#rule-fa3e721e-98f2-4007-bbd8-133208564682) — `context` · `experimental`
 
 ## Collector `autostart`
 
@@ -1306,6 +1315,87 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 - <https://learn.microsoft.com/en-us/windows/deployment/update/waas-overview>
 
+## Collector `pci_device`
+
+### `pci_device` / `absent`
+
+<a id="rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08"></a>
+
+#### A PCI device Windows set up earlier is not present now
+
+- Id: `ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08`
+- File: [`rules/pci_device/absent/not-present/rule.yaml`](../rules/pci_device/absent/not-present/rule.yaml)
+- Collector: `pci_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pci_device`, `hardware`
+- Written: 2026-10-15
+
+**About this check**
+
+Windows set this PCI device up at some time and it is not in the PC now. The row shows when Windows first set it up, the last start of Windows at which it was present, and — only when Windows recorded one — a removal time. Windows records a removal time when a device leaves while Windows is running and, in a Fast Startup shutdown (the default "Shut down"), at the moment Windows resumes; after a full shutdown it records none, so a missing removal time says nothing about when the device left. The row never says how or why the device left, or what it was beyond the ids Windows recorded.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `false`
+
+**Look-back**
+
+Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the device is uninstalled or Windows is installed again.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- A graphics card, SSD or network card replaced, or moved to another slot
+- A BIOS update or setting that changes which devices the board shows — an onboard controller switched off, a slot's mode changed
+- A Thunderbolt or external PCIe device that was unplugged
+- Windows moved to another PC, or the PC's board replaced
+
+### `pci_device` / `no-driver`
+
+<a id="rule-fc74cf1c-a134-45f1-83bd-db42a4dab748"></a>
+
+#### A PCI device has no driver installed
+
+- Id: `fc74cf1c-a134-45f1-83bd-db42a4dab748`
+- File: [`rules/pci_device/no-driver/problem-28/rule.yaml`](../rules/pci_device/no-driver/problem-28/rule.yaml)
+- Collector: `pci_device`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `pci_device`, `hardware`
+- Written: 2026-10-15
+
+**About this check**
+
+Windows found this PCI device and installed no driver for it: Windows records problem code 28 for it. This program reads only the ids Windows recorded — the maker, device and subsystem numbers and the class code — and cannot say what the device is beyond them, what it does or who put it there. A device that imitates another one well enough to get a driver would not appear here, so a row here is not needed for a PCI card to be in the PC, and a missing row says nothing about one.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `true`
+- `problem_code`: is `28`
+
+**Look-back**
+
+The devices present when the scan ran, with the problem code Windows held for each then.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Windows installed again, before the chipset or device drivers were added
+- A capture, sound, serial or expansion card whose maker's driver was never installed
+- Hardware newer or older than the drivers Windows carries
+- A virtual machine, whose virtual devices often have no driver; in one measured, its network device had none
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-install>
+
 ## Collector `posture`
 
 ### `posture` / `boot`
@@ -1428,6 +1518,47 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **References**
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option>
+
+### `posture` / `dma`
+
+<a id="rule-c5c19a2d-8008-4bc8-b36f-6607ed091313"></a>
+
+#### The firmware describes no IOMMU to Windows
+
+- Id: `c5c19a2d-8008-4bc8-b36f-6607ed091313`
+- File: [`rules/posture/dma/no-iommu-table/rule.yaml`](../rules/posture/dma/no-iommu-table/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `dma`
+- Written: 2026-10-15
+
+**About this check**
+
+Neither of the ACPI tables x86 firmware uses to describe an IOMMU to Windows is present: DMAR (Intel VT-d) or IVRS (AMD-Vi). An IOMMU is what lets Windows restrict which memory a PCIe device can reach, and on many motherboards it is a firmware setting that is off by default. This is about how the PC is set up, not about any device in it, and it does not say whether Kernel DMA Protection is on.
+
+**Matches when all of these hold for one observation**
+
+- `iommu_table`: is `none` (text, ASCII case ignored)
+
+**Look-back**
+
+Current firmware state only. It says nothing about earlier firmware settings.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Motherboards whose firmware ships with VT-d or AMD-Vi (often called IOMMU or SVM) off, which is common
+- Older processors or chipsets without an IOMMU
+- Virtual machines that are given no virtual IOMMU
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-kernel-dma-protection>
 
 ### `posture` / `logging`
 
@@ -2699,6 +2830,39 @@ Only what the Program Compatibility Assistant files still hold. Windows keeps th
 - Windows not writing a record — these files exist only on Windows 11 22H2 and later
 - Windows keeping the record after the program's files were removed
 
+### `pci_device` / `timeline`
+
+<a id="rule-f360d84c-0ac6-437c-af21-5193d9264e0f"></a>
+
+#### When Windows recorded a PCI device that is not present now
+
+- Id: `f360d84c-0ac6-437c-af21-5193d9264e0f`
+- File: [`rules/pci_device/timeline/absent-device-times/rule.yaml`](../rules/pci_device/timeline/absent-device-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `pci_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pci_device`, `timeline`
+- Written: 2026-10-15
+
+**About this check**
+
+Puts on the timeline the times Windows stores for each PCI device that is not in the PC now: when it was first set up, the last start of Windows at which it was present, and a removal time when Windows recorded one. Present devices are left out: every one of them last arrived at the start of Windows. A time here is not evidence that anything was removed on purpose.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `false`
+
+**Look-back**
+
+Devices Windows still remembers, until a device is uninstalled or Windows is installed again.
+
+**Ordinary things behind these times**
+
+- A part replaced or moved, a BIOS update or setting, or an external PCIe device unplugged
+- After a full shutdown Windows records no removal time, so a missing one says nothing about when a device left
+- A clock that was changed, so that these times are not on the same clock as the others
+
 ### `powershell_text` / `timeline`
 
 <a id="rule-bc3c9769-c57e-4c01-9f0d-8a71152102ec"></a>
@@ -2838,3 +3002,63 @@ Only the records the journal still holds. The journal has a fixed size and drops
 - PowerShell adding each command typed into its window to its history file
 - Disk clean-up, backup, antivirus and optimisation tools
 - A folder with no change in the journal's span has no time here, which does not mean nothing changed before it
+
+### `windows_start` / `timeline`
+
+<a id="rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b"></a>
+
+#### Windows started after a Fast Startup shutdown
+
+- Id: `fe57aa65-11b0-4e1f-b81c-a4fda597855b`
+- File: [`rules/windows_start/timeline/fast-startup-start/rule.yaml`](../rules/windows_start/timeline/fast-startup-start/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `windows_start`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `windows_start`, `timeline`
+- Written: 2026-10-15
+
+**About this check**
+
+Puts on the timeline each start of Windows that its System log records with boot type 1, which was measured after a shutdown with Fast Startup on, the default. A device taken out while Windows was off this way has a removal time, written during the shutdown, and the start of Windows does not write its arrival times again.
+
+**Matches when all of these hold for one observation**
+
+- `boot_type`: is `1`
+
+**Look-back**
+
+As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+
+**Ordinary things behind these times**
+
+- Fast Startup is on by default, so most shutdowns from the Start menu end this way
+
+<a id="rule-fa3e721e-98f2-4007-bbd8-133208564682"></a>
+
+#### Windows started after a full shutdown or a restart
+
+- Id: `fa3e721e-98f2-4007-bbd8-133208564682`
+- File: [`rules/windows_start/timeline/full-start/rule.yaml`](../rules/windows_start/timeline/full-start/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `windows_start`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `windows_start`, `timeline`
+- Written: 2026-10-15
+
+**About this check**
+
+Puts on the timeline each start of Windows that its System log records with boot type 0, which was measured after a full shutdown and after a restart. A device taken out while Windows was off this way has no removal time; the last start at which it was present is all Windows keeps of when it left.
+
+**Matches when all of these hold for one observation**
+
+- `boot_type`: is `0`
+
+**Look-back**
+
+As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+
+**Ordinary things behind these times**
+
+- Every PC starts this way; a start is a reference point for the other times, not a finding

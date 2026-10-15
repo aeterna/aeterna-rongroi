@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 65
+      "rule_count": 71
     },
     "platform": "windows",
     "os_build": "26100",
@@ -268,7 +268,31 @@ expression: view
       ]
     },
     {
+      "rule_id": "ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08",
+      "collector": "pci_device",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "fc74cf1c-a134-45f1-83bd-db42a4dab748",
+      "collector": "pci_device",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "c5c19a2d-8008-4bc8-b36f-6607ed091313",
       "collector": "posture",
       "strength": "posture",
       "state": "unmeasured",
@@ -399,7 +423,7 @@ expression: view
   "listed": {
     "found": 3,
     "not_found": 9,
-    "unmeasured": 24
+    "unmeasured": 27
   },
   "hidden": {
     "not_found": 0,
@@ -435,11 +459,19 @@ expression: view
         "reason": "read_failed"
       },
       {
+        "collector": "pci_device",
+        "reason": "read_failed"
+      },
+      {
         "collector": "prefetch",
         "reason": "read_failed"
       },
       {
         "collector": "usn",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "windows_start",
         "reason": "read_failed"
       }
     ]
@@ -447,6 +479,8 @@ expression: view
   "collector_order": [
     "posture",
     "driver_service",
+    "windows_start",
+    "pci_device",
     "autostart",
     "defender_exclusion",
     "fivem_dir",

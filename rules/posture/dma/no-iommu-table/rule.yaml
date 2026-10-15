@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: c5c19a2d-8008-4bc8-b36f-6607ed091313
+title: The firmware describes no IOMMU to Windows
+description: >-
+  Neither of the ACPI tables x86 firmware uses to describe an IOMMU to Windows is present: DMAR (Intel VT-d)
+  or IVRS (AMD-Vi). An IOMMU is what lets Windows restrict which memory a PCIe device can reach, and on many
+  motherboards it is a firmware setting that is off by default. This is about how the PC is set up, not about
+  any device in it, and it does not say whether Kernel DMA Protection is on.
+status: experimental
+collector: posture
+strength: posture
+match:
+  iommu_table: none
+retention: Current firmware state only. It says nothing about earlier firmware settings.
+# On a PC that is not x86 the tables read are not the ones its firmware uses, so the reading is a gap.
+unmeasured_when: [not_windows, source_absent]
+falsepositives:
+  - Motherboards whose firmware ships with VT-d or AMD-Vi (often called IOMMU or SVM) off, which is common
+  - Older processors or chipsets without an IOMMU
+  - Virtual machines that are given no virtual IOMMU
+references:
+  - https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-kernel-dma-protection
+author: aeterna-rongroi contributors
+date: 2026-10-15
+tags: [posture, dma]

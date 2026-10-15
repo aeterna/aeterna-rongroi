@@ -75,6 +75,8 @@ tpm:
 # chosen. No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
 firmware:
   secure_boot: access_denied
+# The IOMMU's ACPI table (ADR 0038, amendment of 2026-10-15): an Intel PC with VT-d on, which is what this hardened machine is assumed to be (not measured).
+iommu_table: dmar
 processes:
   - pid: 4
     name: System
@@ -87,3 +89,18 @@ processes:
   - pid: 3072
     name: steam.exe
     path: 'C:\Program Files (x86)\Steam\steam.exe'
+# The PCI devices Windows remembers (ADR 0069, ADR 0070): shaped like the development PC ADR 0069 measured — host
+# bridges and an SMBus controller with no driver service and problem code 0, the rest with their drivers, all
+# present, all set up the day Windows was installed and last arrived at the last start. Every device id is
+# invented; the vendor ids are the chipset, storage, display, network and audio makers such a PC has.
+devices:
+  - { id: 'PCI\VEN_8086&DEV_A0F0&SUBSYS_00000000&REV_00\3&2411e6fe&0&00', present: true, compatible_ids: ['PCI\CC_060000', 'PCI\CC_0600'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F1&SUBSYS_00000000&REV_00\3&2411e6fe&0&08', present: true, compatible_ids: ['PCI\CC_060000', 'PCI\CC_0600'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F2&SUBSYS_00000000&REV_00\3&2411e6fe&0&10', present: true, compatible_ids: ['PCI\CC_060000', 'PCI\CC_0600'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F3&SUBSYS_A0F31022&REV_71\3&2411e6fe&0&A0', present: true, compatible_ids: ['PCI\CC_0C0500', 'PCI\CC_0C05'], problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F4&SUBSYS_88D21043&REV_00\3&2411e6fe&0&09', present: true, compatible_ids: ['PCI\CC_060400', 'PCI\CC_0604'], service: pci, problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_144D&DEV_A0F5&SUBSYS_A801144D&REV_00\4&1f2e3d4c&0&0009', present: true, compatible_ids: ['PCI\CC_010802', 'PCI\CC_0108'], service: stornvme, problem_code: 0, first_install: '2026-03-02T09:14:20Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_1002&DEV_A0F6&SUBSYS_88D21043&REV_A1\4&2c3b4a59&0&0019', present: true, compatible_ids: ['PCI\CC_030000', 'PCI\CC_0300'], service: amdkmdag, problem_code: 0, first_install: '2026-03-02T09:22:03Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_10EC&DEV_A0F7&SUBSYS_88D21043&REV_15\4&3d4c5b6a&0&0029', present: true, compatible_ids: ['PCI\CC_020000', 'PCI\CC_0200'], service: e1i68x64, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F8&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0341', present: true, compatible_ids: ['PCI\CC_0C0330', 'PCI\CC_0C03'], service: USBXHCI, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
+  - { id: 'PCI\VEN_8086&DEV_A0F9&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0641', present: true, compatible_ids: ['PCI\CC_040300', 'PCI\CC_0403'], service: HDAudBus, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }

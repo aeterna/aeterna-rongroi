@@ -4,7 +4,7 @@
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
 FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders and of Legacy's resource cache index, the list of running processes with when each started, the drivers
-registered with Windows and a SHA-256 of each driver's file, what the Program Compatibility Assistant, Windows
+registered with Windows and a SHA-256 of each driver's file, the PCI devices Windows remembers, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read and for the folder PowerShell keeps its command history in, with no
@@ -57,6 +57,21 @@ Of a driver registered with Windows it reads the name of its driver service, whe
 it, where its file is, and a SHA-256 of that file. The list names some of your hardware and software — a
 graphics card vendor, a VPN, a virtualisation product — because their drivers are registered. It does not
 read which drivers are loaded or what they do.
+
+Of the **PCI devices Windows remembers** — the cards, controllers and bridges on the board, present now or
+set up earlier and gone — it reads, through Windows' device list (ADR 0069, ADR 0070): the maker, device and
+subsystem numbers and the class Windows records (`PCI\VEN_…&DEV_…&SUBSYS_…&REV_…`), the driver bound to each,
+its problem code when it is present, whether it is present, and three times Windows stores beside it — when
+Windows first set it up, the last start of Windows at which it was present, and when Windows recorded it
+removed. It never reads a serial number, a device's position on the board, a name you gave a device, or any
+USB device, phone, camera or drive. The list names some of your hardware, as the driver list does. The first-
+set-up times of a PC's devices are close to unique to one Windows installation, so **two reports of the same
+PC can be matched through them**, as file times can (ADR 0050); this tool sends nothing, but whoever receives
+two of your reports can make that match. SS mode shows the device rows a rule matched — a device with no
+driver, a device that is not present now — and only a count of the rest. Beside them it reads how Windows
+started each time its System log remembers, one number per start (see the event logs below), because a
+device taken out before a full shutdown has no removal time and one taken out during a Fast Startup
+shutdown has one.
 
 Of **what Windows starts by itself** it reads three places (ADR 0060):
 
@@ -153,7 +168,10 @@ Windows overwriting the oldest events when the log fills, of a channel that was 
 a Windows upgrade, and a PC with almost every log empty is what a "PC optimiser" script leaves behind — the
 report says which of these it cannot tell apart. **What each event says is not read into the report at
 all**: an event's own text is where user names, PC names, addresses, account identifiers and full command
-lines live, and none of it survives the step that reads the file.
+lines live, and none of it survives the step that reads the file. **One number is the exception** (ADR 0071):
+of the event Windows writes to its System log each time it starts, the tool reads `BootType`, which says
+whether that start followed a full shutdown or a Fast Startup one, and the time of the event. Nothing else of
+that event is read, and nothing of any other event.
 A log the tool could not read — because Windows refused it, because it is larger than the tool will open,
 or because the tool's own time limit ran out — is **named in the report as one it could not read**, rather
 than passed over in silence. A log the tool never opened at all, because that time limit was already gone
@@ -192,6 +210,10 @@ the whole PC and for the **Windows account the tool is running as** — the per-
 policy, from that account's own part of the registry. That is your account unless the tool was restarted
 with someone else's administrator password, in which case it is theirs. Whether PowerShell 7 is installed
 is not read.
+
+It also reads the **names** of the ACPI tables the PC's firmware gives Windows, to see whether one that
+describes an IOMMU is among them (ADR 0038, amendment of 2026-10-15). Only whether such a table is there is
+kept, and nothing is read from inside any table.
 
 It also reads one Windows setting about itself: whether Windows is writing a record when a program is
 launched (`EnablePrefetcher`). That is a machine setting and names no person. It is read so that "there
@@ -432,7 +454,7 @@ like any other.
 ### What a collector saw that no rule matched
 
 Some collectors read things no rule asks about — the list of programs you are running, the drivers
-registered with Windows, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
+registered with Windows, the PCI devices Windows remembers, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
 Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
 can read what the tool saw and judge it yourself.
 

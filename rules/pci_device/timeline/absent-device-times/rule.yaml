@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: f360d84c-0ac6-437c-af21-5193d9264e0f
+title: When Windows recorded a PCI device that is not present now
+description: >-
+  Puts on the timeline the times Windows stores for each PCI device that is not in the PC now: when it was
+  first set up, the last start of Windows at which it was present, and a removal time when Windows recorded
+  one. Present devices are left out: every one of them last arrived at the start of Windows. A time here is
+  not evidence that anything was removed on purpose.
+status: experimental
+# A timeline selector (ADR 0051).
+role: timeline
+collector: pci_device
+strength: context
+match:
+  present: false
+retention: >-
+  Devices Windows still remembers, until a device is uninstalled or Windows is installed again.
+falsepositives:
+  - A part replaced or moved, a BIOS update or setting, or an external PCIe device unplugged
+  - After a full shutdown Windows records no removal time, so a missing one says nothing about when a device left
+  - A clock that was changed, so that these times are not on the same clock as the others
+author: aeterna-rongroi contributors
+date: 2026-10-15
+tags: [pci_device, timeline]

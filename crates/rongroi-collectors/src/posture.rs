@@ -13,7 +13,7 @@
 use std::collections::BTreeMap;
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{FirmwareSecureBoot, Host, Platform, RegistryData, SourceError};
+use rongroi_host::{FirmwareSecureBoot, Host, IommuTable, Platform, RegistryData, SourceError};
 
 use crate::{Collector, Field};
 
@@ -102,9 +102,10 @@ const REASONS: [UnmeasuredReason; 5] = [
 /// two fields so a rule can compare them (ADR 0038). The four `script_block_logging` fields are one
 /// policy as each PowerShell applies it, per engine and per hive; a policy nobody wrote and a policy
 /// written to off are different statements about a machine, so none of them is a gap when absent.
-const FIELDS: [Field; 13] = [
+const FIELDS: [Field; 14] = [
     Field::text("exception_chain_validation"),
     Field::text("hvci"),
+    Field::text("iommu_table"),
     Field::text("object_namespace_protection"),
     Field::text("script_block_logging"),
     Field::text("script_block_logging_pwsh"),
@@ -172,6 +173,7 @@ impl Collector for Posture {
             "secure_boot_firmware",
             secure_boot_firmware(host),
         );
+        record(&mut fields, &mut gaps, "iommu_table", iommu_table(host));
         let windows_powershell = windows_powershell_script_block_logging(host);
         record(
             &mut fields,
@@ -298,6 +300,22 @@ fn secure_boot_firmware(host: &dyn Host) -> Result<&'static str, UnmeasuredReaso
         Ok(FirmwareSecureBoot::VariableAbsent | FirmwareSecureBoot::NotUefi) => {
             Err(UnmeasuredReason::SourceAbsent)
         }
+        Err(error) => Err(crate::failure::reason_for(host, &error)),
+    }
+}
+
+/// Which ACPI table describing an IOMMU the firmware gives Windows: `dmar` (Intel VT-d), `ivrs` (AMD-Vi)
+/// or `none` (ADR 0038, amendment of 2026-10-15).
+///
+/// A table means the firmware set the IOMMU up; it does not mean Kernel DMA Protection is on, which has
+/// no documented interface (ADR 0038 section 3). A PC that is not x86 describes its IOMMU elsewhere, so
+/// the place this reads is not there: `source_absent`, never `none`.
+fn iommu_table(host: &dyn Host) -> Result<&'static str, UnmeasuredReason> {
+    match host.iommu_table() {
+        Ok(IommuTable::Dmar) => Ok("dmar"),
+        Ok(IommuTable::Ivrs) => Ok("ivrs"),
+        Ok(IommuTable::Neither) => Ok("none"),
+        Ok(IommuTable::NotX86) => Err(UnmeasuredReason::SourceAbsent),
         Err(error) => Err(crate::failure::reason_for(host, &error)),
     }
 }
@@ -565,6 +583,7 @@ tpm:
   spec_version: \"2.0\"
 firmware:
   secure_boot: enabled
+iommu_table: ivrs
 ";
 
     fn field<'a>(run: &'a CollectorRun, name: &str) -> Option<&'a str> {
@@ -797,6 +816,7 @@ tpm:
             [
                 "exception_chain_validation",
                 "hvci",
+                "iommu_table",
                 "object_namespace_protection",
                 "script_block_logging",
                 "script_block_logging_pwsh",
@@ -826,6 +846,27 @@ tpm:
             gap_for(&run, "secure_boot_firmware"),
             Some(UnmeasuredReason::SourceAbsent)
         );
+    }
+
+    /// Arm is `source_absent`, never `none`: its IOMMU is described in tables this does not read.
+    #[test]
+    fn the_iommu_table_is_named_and_arm_is_not_none() {
+        for (described, expected) in [("dmar", "dmar"), ("ivrs", "ivrs"), ("neither", "none")] {
+            let run = Posture.collect(&inline(&format!(
+                "platform: windows\niommu_table: {described}\n"
+            )));
+            assert_eq!(field(&run, "iommu_table"), Some(expected));
+        }
+        for (described, reason) in [
+            ("not_x86", UnmeasuredReason::SourceAbsent),
+            ("read_failed", UnmeasuredReason::ReadFailed),
+        ] {
+            let run = Posture.collect(&inline(&format!(
+                "platform: windows\niommu_table: {described}\n"
+            )));
+            assert_eq!(field(&run, "iommu_table"), None);
+            assert_eq!(gap_for(&run, "iommu_table"), Some(reason));
+        }
     }
 
     #[test]

@@ -1,0 +1,8 @@
+{
+  "description": "Every device present, including one with no driver",
+  "observations": [
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1022&DEV_A0F0&SUBSYS_00000000&REV_00", "present": true, "problem_code": 0 } },
+    { "collector": "pci_device", "fields": { "name": "PCI\\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10", "present": true, "problem_code": 28 } }
+  ],
+  "expect_matches": 0
+}

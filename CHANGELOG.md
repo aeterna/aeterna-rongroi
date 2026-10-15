@@ -5,6 +5,53 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-15
+
+The first checks about DMA cards, and what they cannot show. Every scan now lists the PCI devices Windows remembers,
+present or not, with a rule for a present one that has no driver and one for a device that is gone; how Windows started
+each time, so a missing removal time can be read; and whether the firmware describes an IOMMU. A DMA card that
+imitates an ordinary device, a cheat on a second PC and a box between the mouse and the PC still leave nothing here.
+
+### Added
+- A `windows_start` collector: for each start of Windows its System log remembers, the time and `BootType` of
+  Kernel-Boot event 27 — one number, nothing else of that event — and two timeline selectors that mark a start
+  as after a full shutdown (0) or after a Fast Startup shutdown (1). Beside `pci_device`'s times it tells the
+  two cases apart: a device removed before a full shutdown has no removal time (ADR 0071, amending ADR 0018 and
+  ADR 0024).
+- The PCI devices Windows remembers are read on every scan (`pci_device`, ADR 0070), present or not, as model ids
+  with their class code, driver, problem code and the times Windows stores; never a serial number. Two
+  `experimental` rules: **a PCI device has no driver installed** (`presence`, problem code 28 — on an ordinary PC
+  the host bridges have no driver service but no problem code) and **a PCI device Windows set up earlier is not
+  present now** (`context`, with the last start of Windows it was present at, and a removal time only when Windows
+  recorded one). A timeline selector puts the absent devices' times on the timeline. The consent text, PRIVACY.md
+  and the screenshare guides say what is read and what it cannot show: a DMA card that imitates an ordinary device,
+  and a mouse box.
+- `posture` reports `iommu_table`: whether the firmware gives Windows an ACPI table describing an IOMMU — `dmar`
+  (Intel VT-d), `ivrs` (AMD-Vi) or `none` — read from the table names alone, with no administrator rights. Not read
+  on Arm PCs, where the field is a gap. A new `experimental` posture rule, "The firmware describes no IOMMU to
+  Windows". It says nothing about whether Kernel DMA Protection is on, and nothing about any device (ADR 0038,
+  amendment of 2026-10-15).
+- Hosts can list the devices Windows remembers: `DeviceSource::devices(bus)` reads the `PCI` or `HID` enumerator
+  through CfgMgr32, present devices and absent ones, each as a model id with no instance part (no serial number or
+  board position), its PCI class code, driver service, problem code and the three times Windows stores, in whole
+  seconds. A property that cannot be read is named as unreadable rather than read as "no value". No administrator
+  rights are needed. No collector reads it yet (ADR 0069, ADR 0070).
+
+### Changed
+- ADR 0070 accepted (2026-10-15, all four questions as recommended): a `pci_device` collector over ADR 0069's
+  source, with two rules — a present PCI device with no driver installed (problem code 28, `presence`) and a PCI
+  device set up earlier that is not present now (`context`, saying "removed at" only beside a time Windows
+  recorded) — and a timeline selector for absent devices. No HID collector yet.
+- ADR 0069 amended with measurements in a virtual machine: a device removed while the PC was off is absent with
+  `LastArrivalDate` = the last start it was present at and no `LastRemovalDate`; one removed during a Fast Startup
+  shutdown gets `LastRemovalDate` = the resume, and the kernel's start time does not move then.
+- ADR 0069 accepted (2026-10-15, all five questions as recommended): a read-only `DeviceSource` that lists the PCI
+  and HID devices Windows remembers, present or not, with a model id (never an instance or serial), class code,
+  driver service, problem code and the times Windows stores beside each. Measured first on one PC: no administrator
+  rights needed, `LastArrivalDate` is re-written at each start, and `LastRemovalDate` is not written at shutdown. It
+  does not detect a DMA card, and no rule may say a device was removed until what a card taken out while the PC is
+  off leaves behind is measured.
+
 ## [0.8.2] - 2026-10-10
 
 The checks are those of 0.8.1; two rules' text says what was measured. The hash check is one Command Prompt line

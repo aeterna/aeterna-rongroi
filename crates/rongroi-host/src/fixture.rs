@@ -11,8 +11,9 @@ use serde::Deserialize;
 
 use crate::{
     AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
-    DirEntryInfo, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
-    FirmwareSecureBoot, FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistryData,
+    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, EntryTimes,
+    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
+    FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource, RegistryData,
     RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
     TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
 };
@@ -61,6 +62,10 @@ struct HostFile {
     tpm: Option<FixtureTpm>,
     #[serde(default)]
     firmware: Option<FixtureFirmware>,
+    /// What the firmware's ACPI tables say about an IOMMU (ADR 0038, amendment of 2026-10-15). Absent
+    /// means the fixture never modelled it, which the accessor reports as `Unsupported`.
+    #[serde(default)]
+    iommu_table: Option<FixtureIommuTable>,
     #[serde(default)]
     processes: Option<Vec<FixtureProcess>>,
     /// What `GetTickCount64` would answer. Absent means the fixture never modelled it, which the
@@ -77,10 +82,101 @@ struct HostFile {
     /// it, which the accessor reports as `Unsupported`. A fixture's SID is invented, never a real one.
     #[serde(default)]
     account_sid: Option<String>,
+    /// The devices Windows remembers (ADR 0069). Absent means the fixture never modelled them, which
+    /// the accessor reports as `Unsupported`; an empty list is a machine with no such device.
+    #[serde(default)]
+    devices: Option<Vec<FixtureDevice>>,
     /// The creation and last-write times of drive roots, keyed `C:` (ADR 0061). A drive root has no
     /// parent listing to carry them, so they are written here; a drive not named here is not there.
     #[serde(default)]
     drive_roots: BTreeMap<String, FixtureTimes>,
+}
+
+/// One device a fixture describes (ADR 0069). `id` is a device **instance** id, as `CfgMgr32` lists it,
+/// so that the fixture exercises the same reduction to a model a live host makes; a fixture's ids are
+/// invented, never read from a real PC.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureDevice {
+    id: String,
+    present: bool,
+    #[serde(default)]
+    compatible_ids: Vec<String>,
+    #[serde(default)]
+    service: Option<String>,
+    #[serde(default)]
+    problem_code: Option<u32>,
+    #[serde(default)]
+    first_install: Option<String>,
+    #[serde(default)]
+    last_arrival: Option<String>,
+    #[serde(default)]
+    last_removal: Option<String>,
+    /// Properties a live host could not read for this device.
+    #[serde(default)]
+    unreadable: Vec<FixtureDeviceProperty>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureDeviceProperty {
+    CompatibleIds,
+    Service,
+    ProblemCode,
+    FirstInstall,
+    LastArrival,
+    LastRemoval,
+}
+
+/// Turns one described device into the record a live host returns. A device whose id belongs to
+/// neither enumerator, or a problem code on an absent device, is a mistake in the fixture: a live
+/// host lists by enumerator and reads a problem code only for a present device.
+fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, FixtureError> {
+    let fail = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message,
+    };
+    let id = &device.id;
+    let (bus, model_id) = [DeviceBus::Pci, DeviceBus::Hid]
+        .into_iter()
+        .find_map(|bus| crate::device_model_id(bus, id).map(|model| (bus, model)))
+        .ok_or_else(|| {
+            fail(format!(
+                "device `{id}` is neither a PCI nor a HID instance id"
+            ))
+        })?;
+    if !device.present && device.problem_code.is_some() {
+        return Err(fail(format!(
+            "device `{id}` is absent but has a problem code; a live host reads one only for a present device"
+        )));
+    }
+    let class_code = match bus {
+        DeviceBus::Pci => crate::pci_class_code(&device.compatible_ids),
+        DeviceBus::Hid => None,
+    };
+    Ok(DeviceRecord {
+        bus,
+        model_id,
+        class_code,
+        service: device.service,
+        problem_code: device.problem_code,
+        present: device.present,
+        first_install: listed_time_of(device.first_install.as_deref(), id, origin)?,
+        last_arrival: listed_time_of(device.last_arrival.as_deref(), id, origin)?,
+        last_removal: listed_time_of(device.last_removal.as_deref(), id, origin)?,
+        unreadable: device
+            .unreadable
+            .into_iter()
+            .map(|property| match property {
+                FixtureDeviceProperty::CompatibleIds => DeviceProperty::CompatibleIds,
+                FixtureDeviceProperty::Service => DeviceProperty::Service,
+                FixtureDeviceProperty::ProblemCode => DeviceProperty::ProblemCode,
+                FixtureDeviceProperty::FirstInstall => DeviceProperty::FirstInstall,
+                FixtureDeviceProperty::LastArrival => DeviceProperty::LastArrival,
+                FixtureDeviceProperty::LastRemoval => DeviceProperty::LastRemoval,
+            })
+            .collect(),
+    })
 }
 
 /// One entry's own times, written as a listing writes them: RFC 3339 in whole seconds (ADR 0061).
@@ -207,6 +303,18 @@ enum FixtureFirmwareSecureBoot {
     Disabled,
     VariableAbsent,
     NotUefi,
+    AccessDenied,
+    ReadFailed,
+}
+
+/// Every answer a live host gives about the IOMMU's ACPI table, and the two that are not answers.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureIommuTable {
+    Dmar,
+    Ivrs,
+    Neither,
+    NotX86,
     AccessDenied,
     ReadFailed,
 }
@@ -544,6 +652,29 @@ fn resolve_file(
 
 /// Parses a `created:` or `modified:` value. A live listing never reports a fraction of a second
 /// (ADR 0050), so a fixture that writes one describes something no machine returns, and fails to load.
+/// The times a fixture gives each drive's root, keyed as a live host would look the drive up.
+fn resolve_drive_roots(
+    described: BTreeMap<String, FixtureTimes>,
+    origin: &str,
+) -> Result<BTreeMap<String, EntryTimes>, FixtureError> {
+    let mut drive_roots = BTreeMap::new();
+    for (drive, times) in described {
+        let key = normalise_path(&drive);
+        if !is_drive_root(&key) {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("drive_roots: `{drive}` is not a drive such as `C:`"),
+            });
+        }
+        let times = EntryTimes {
+            created: listed_time_of(times.created.as_deref(), &drive, origin)?,
+            modified: listed_time_of(times.modified.as_deref(), &drive, origin)?,
+        };
+        drive_roots.insert(key, times);
+    }
+    Ok(drive_roots)
+}
+
 fn listed_time_of(
     text: Option<&str>,
     name: &str,
@@ -939,12 +1070,14 @@ pub struct FixtureHost {
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
     firmware: Option<FixtureFirmware>,
+    iommu_table: Option<FixtureIommuTable>,
     processes: Option<Vec<ProcessRecord>>,
     milliseconds_since_boot: Option<u64>,
     /// Keyed by the lower-cased channel name, like every other name this host compares.
     event_log_channels: Option<BTreeMap<String, StoredChannel>>,
     usn_journal: Option<StoredUsnJournal>,
     account_sid: Option<String>,
+    devices: Option<Vec<DeviceRecord>>,
     /// Keyed by the lower-cased drive, `c:`.
     drive_roots: BTreeMap<String, EntryTimes>,
 }
@@ -994,21 +1127,7 @@ impl FixtureHost {
             .into_iter()
             .map(|(name, value)| (name.to_ascii_lowercase(), value))
             .collect();
-        let mut drive_roots = BTreeMap::new();
-        for (drive, times) in file.drive_roots {
-            let key = normalise_path(&drive);
-            if !is_drive_root(&key) {
-                return Err(FixtureError::Parse {
-                    path: origin.to_owned(),
-                    message: format!("drive_roots: `{drive}` is not a drive such as `C:`"),
-                });
-            }
-            let times = EntryTimes {
-                created: listed_time_of(times.created.as_deref(), &drive, origin)?,
-                modified: listed_time_of(times.modified.as_deref(), &drive, origin)?,
-            };
-            drive_roots.insert(key, times);
-        }
+        let drive_roots = resolve_drive_roots(file.drive_roots, origin)?;
         let mut filesystem = BTreeMap::new();
         for (dir, files) in file.filesystem {
             let mut entries = Vec::with_capacity(files.len());
@@ -1032,6 +1151,7 @@ impl FixtureHost {
             code_integrity: file.code_integrity,
             tpm: file.tpm,
             firmware: file.firmware,
+            iommu_table: file.iommu_table,
             processes: file
                 .processes
                 .map(|described| {
@@ -1043,6 +1163,15 @@ impl FixtureHost {
                 .transpose()?,
             milliseconds_since_boot: file.milliseconds_since_boot,
             account_sid: file.account_sid,
+            devices: file
+                .devices
+                .map(|described| {
+                    described
+                        .into_iter()
+                        .map(|device| device_record(device, origin))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?,
             drive_roots,
             event_log_channels: file
                 .event_log_channels
@@ -1421,6 +1550,19 @@ impl TpmSource for FixtureHost {
     }
 }
 
+impl DeviceSource for FixtureHost {
+    fn devices(&self, bus: DeviceBus) -> Result<Vec<DeviceRecord>, SourceError> {
+        let described = self.devices.as_ref().ok_or_else(|| {
+            SourceError::Unsupported("this fixture host does not describe devices".to_owned())
+        })?;
+        Ok(described
+            .iter()
+            .filter(|device| device.bus == bus)
+            .cloned()
+            .collect())
+    }
+}
+
 impl BootTimeSource for FixtureHost {
     fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
         self.milliseconds_since_boot
@@ -1511,6 +1653,24 @@ impl FirmwareSource for FixtureHost {
             )),
         }
     }
+
+    fn iommu_table(&self) -> Result<IommuTable, SourceError> {
+        let described = self.iommu_table.ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe its ACPI tables".to_owned(),
+            )
+        })?;
+        match described {
+            FixtureIommuTable::Dmar => Ok(IommuTable::Dmar),
+            FixtureIommuTable::Ivrs => Ok(IommuTable::Ivrs),
+            FixtureIommuTable::Neither => Ok(IommuTable::Neither),
+            FixtureIommuTable::NotX86 => Ok(IommuTable::NotX86),
+            FixtureIommuTable::AccessDenied => Err(SourceError::AccessDenied),
+            FixtureIommuTable::ReadFailed => Err(SourceError::Failed(
+                "this fixture host describes an ACPI table read that failed".to_owned(),
+            )),
+        }
+    }
 }
 
 impl SignatureSource for FixtureHost {
@@ -1568,6 +1728,73 @@ mod tests {
             ),
             "inline",
         )
+    }
+
+    const DEVICES: &str = r"platform: windows
+devices:
+  - id: 'PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10\4&c580b9d&0&0020'
+    present: true
+    compatible_ids: ['PCI\CC_00FF00', 'PCI\CC_00FF']
+    problem_code: 28
+    first_install: '2026-10-15T11:32:36Z'
+    last_arrival: '2026-10-15T11:32:36Z'
+  - id: 'PCI\VEN_1B36&DEV_0008&SUBSYS_11001AF4&REV_00\3&11583659&0&00'
+    present: false
+    last_arrival: '2026-10-15T11:51:35Z'
+    last_removal: '2026-10-15T11:53:25Z'
+    unreadable: [service]
+  - id: 'HID\VID_0627&PID_0001\6&43b7243&0&0000'
+    present: true
+    service: kbdhid
+";
+
+    #[test]
+    fn devices_are_listed_per_bus_as_models_with_their_times() {
+        let host = FixtureHost::from_yaml_str(DEVICES, "inline").unwrap();
+        let pci = host.devices(DeviceBus::Pci).unwrap();
+        assert_eq!(pci.len(), 2);
+        assert_eq!(
+            pci[0].model_id,
+            r"PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10"
+        );
+        assert_eq!(pci[0].class_code.as_deref(), Some("00FF"));
+        assert_eq!(pci[0].problem_code, Some(28));
+        assert!(pci[0].present);
+        assert_eq!(
+            pci[1].last_removal,
+            Some("2026-10-15T11:53:25Z".parse().unwrap())
+        );
+        assert_eq!(pci[1].unreadable, vec![DeviceProperty::Service]);
+        let hid = host.devices(DeviceBus::Hid).unwrap();
+        assert_eq!(hid.len(), 1);
+        assert_eq!(hid[0].class_code, None);
+        assert_eq!(hid[0].service.as_deref(), Some("kbdhid"));
+    }
+
+    #[test]
+    fn a_host_that_describes_no_devices_is_unsupported_and_an_empty_list_is_none() {
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            silent.devices(DeviceBus::Pci),
+            Err(SourceError::Unsupported(_))
+        ));
+        let empty =
+            FixtureHost::from_yaml_str("platform: windows\ndevices: []\n", "inline").unwrap();
+        assert_eq!(empty.devices(DeviceBus::Pci), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn a_fixture_device_a_live_host_could_not_report_fails_to_load() {
+        for yaml in [
+            "platform: windows\ndevices:\n  - { id: 'USB\\VID_0627&PID_0001\\1', present: true }\n",
+            "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, problem_code: 28 }\n",
+            "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: true, first_install: '2026-10-15T11:32:36.5Z' }\n",
+        ] {
+            assert!(
+                FixtureHost::from_yaml_str(yaml, "inline").is_err(),
+                "{yaml}"
+            );
+        }
     }
 
     #[test]

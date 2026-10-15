@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 65
+      "rule_count": 71
     },
     "platform": "windows",
     "os_build": "26100",
@@ -287,6 +287,22 @@ expression: view
       "expected": true
     },
     {
+      "rule_id": "ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08",
+      "collector": "pci_device",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "fc74cf1c-a134-45f1-83bd-db42a4dab748",
+      "collector": "pci_device",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
       "collector": "posture",
       "strength": "posture",
@@ -325,6 +341,14 @@ expression: view
       "strength": "posture",
       "state": "not_found",
       "retention": "Current setting only. It says nothing about how the PC was configured in the past."
+    },
+    {
+      "rule_id": "c5c19a2d-8008-4bc8-b36f-6607ed091313",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
     },
     {
       "rule_id": "98ee9213-39f3-4219-b2ac-f2bb3d21d6cc",
@@ -519,7 +543,7 @@ expression: view
   "listed": {
     "found": 1,
     "not_found": 11,
-    "unmeasured": 40
+    "unmeasured": 43
   },
   "hidden": {
     "not_found": 0,
@@ -569,11 +593,19 @@ expression: view
         "reason": "read_failed"
       },
       {
+        "collector": "pci_device",
+        "reason": "read_failed"
+      },
+      {
         "collector": "prefetch",
         "reason": "read_failed"
       },
       {
         "collector": "usn",
+        "reason": "read_failed"
+      },
+      {
+        "collector": "windows_start",
         "reason": "read_failed"
       }
     ]
@@ -581,6 +613,8 @@ expression: view
   "collector_order": [
     "posture",
     "driver_service",
+    "windows_start",
+    "pci_device",
     "autostart",
     "defender_exclusion",
     "fivem_dir",

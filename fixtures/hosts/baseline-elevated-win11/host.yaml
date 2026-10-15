@@ -4902,6 +4902,8 @@ tpm:
 # No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
 firmware:
   secure_boot: enabled
+# The IOMMU's ACPI table (ADR 0038, amendment of 2026-10-15): IVRS, measured on the AMD development PC.
+iommu_table: ivrs
 # What the Event Log service states about the one channel this baseline's log holds, as it stated it on
 # a Windows 11 machine (build 26220) on 2026-09-13: the default file name, which is the channel's name
 # with `/` written `%4`, and the 1 052 672-byte cap that 1 166 of that machine's 1 243 channels had
@@ -4922,3 +4924,7 @@ processes:
   - pid: 5120
     name: FiveM.exe
     path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe'
+# The PCI devices Windows remembers (ADR 0069, ADR 0070): one present device with its driver, as the Windows CI
+# job's runner listed one PCI device (2026-10-15, read without a gap); its class and device id are invented.
+devices:
+  - { id: 'PCI\VEN_1414&DEV_A0FA&SUBSYS_00000000&REV_00\5&1a2b3c4d&0&0', present: true, compatible_ids: ['PCI\CC_010802', 'PCI\CC_0108'], service: stornvme, problem_code: 0, first_install: '2026-09-01T00:10:00Z', last_arrival: '2026-10-15T15:02:11Z' }

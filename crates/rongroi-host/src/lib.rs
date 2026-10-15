@@ -405,6 +405,28 @@ pub trait FirmwareSource {
     /// Reading a firmware variable needs a privilege that a process without administrator rights does
     /// not hold. That is [`SourceError::AccessDenied`], never a guessed value.
     fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError>;
+
+    /// Which ACPI table describing an IOMMU the firmware gives Windows (ADR 0038, amendment of
+    /// 2026-10-15). Nothing is read from the table but its name.
+    fn iommu_table(&self) -> Result<IommuTable, SourceError>;
+}
+
+/// Whether the firmware describes an IOMMU to Windows, by the ACPI table x86 firmware uses for one
+/// (ADR 0038, amendment of 2026-10-15).
+///
+/// A table says the firmware set the IOMMU up and handed Windows its description. It does **not** say
+/// that Windows' Kernel DMA Protection is on, which has no documented interface (ADR 0038 section 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IommuTable {
+    /// `DMAR`: Intel VT-d.
+    Dmar,
+    /// `IVRS`: AMD-Vi.
+    Ivrs,
+    /// An x86 PC whose ACPI tables include neither.
+    Neither,
+    /// Not an x86 PC. Arm describes an IOMMU in other tables, which are not read, so the absence of
+    /// both x86 tables says nothing.
+    NotX86,
 }
 
 /// One process that was running when the process list was read.
@@ -465,6 +487,148 @@ pub trait BootTimeSource {
     ///
     /// Nothing about who is logged on is read: it is one number about the machine.
     fn since_boot(&self) -> Result<std::time::Duration, SourceError>;
+}
+
+/// The device enumerator a [`DeviceRecord`] was listed under (ADR 0069 section 2). Only these two are
+/// read; storage, phones, cameras and every other enumerator are not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DeviceBus {
+    /// `PCI`: cards, controllers and the board's own bridges.
+    Pci,
+    /// `HID`: mice, keyboards and other human-interface devices.
+    Hid,
+}
+
+impl DeviceBus {
+    /// The enumerator's name as `CfgMgr32` takes it, and the first part of a device instance id.
+    pub fn enumerator(self) -> &'static str {
+        match self {
+            Self::Pci => "PCI",
+            Self::Hid => "HID",
+        }
+    }
+}
+
+/// A property of a device that a host tried to read and could not (ADR 0070 section 1). A property
+/// Windows holds no value for is `None` in the record, never one of these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DeviceProperty {
+    /// `DEVPKEY_Device_CompatibleIds`, which holds the class code.
+    CompatibleIds,
+    /// `DEVPKEY_Device_Service`.
+    Service,
+    /// `DEVPKEY_Device_ProblemCode`.
+    ProblemCode,
+    /// `DEVPKEY_Device_FirstInstallDate`.
+    FirstInstall,
+    /// `DEVPKEY_Device_LastArrivalDate`.
+    LastArrival,
+    /// `DEVPKEY_Device_LastRemovalDate`.
+    LastRemoval,
+}
+
+/// One device Windows remembers, present or not (ADR 0069).
+///
+/// It names a **model**, never an instance: `model_id` keeps only the fields of the device id that
+/// name a maker, a product and a revision, so no serial number or position on the board reaches a
+/// report (ADR 0069 section 3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceRecord {
+    /// The enumerator it was listed under.
+    pub bus: DeviceBus,
+    /// The model, e.g. `PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10` (see [`device_model_id`]).
+    pub model_id: String,
+    /// For a PCI device, the four hex digits of `PCI\CC_xxxx` in its compatible ids, upper case.
+    pub class_code: Option<String>,
+    /// The driver service bound to the device; `None` when none is.
+    pub service: Option<String>,
+    /// Windows' problem code, read for present devices only; `None` for an absent one.
+    pub problem_code: Option<u32>,
+    /// Listed when only present devices are asked for.
+    pub present: bool,
+    /// `DEVPKEY_Device_FirstInstallDate`, in whole seconds.
+    pub first_install: Option<jiff::Timestamp>,
+    /// `DEVPKEY_Device_LastArrivalDate`, in whole seconds. Re-written at each start of Windows, but
+    /// not at a resume from a Fast Startup shutdown (ADR 0069, measured).
+    pub last_arrival: Option<jiff::Timestamp>,
+    /// `DEVPKEY_Device_LastRemovalDate`, in whole seconds. Not written at a full shutdown (ADR 0069,
+    /// measured).
+    pub last_removal: Option<jiff::Timestamp>,
+    /// The properties that could not be read, so that a collector can make each one a gap rather
+    /// than read its `None` as "Windows holds no value".
+    pub unreadable: Vec<DeviceProperty>,
+}
+
+/// Read-only access to the devices Windows remembers (ADR 0069). Nothing is installed, started,
+/// stopped or changed.
+pub trait DeviceSource {
+    /// Every device `bus`'s enumerator lists, present or not.
+    ///
+    /// One device whose properties cannot be read is still returned, with those properties in
+    /// [`DeviceRecord::unreadable`]; only a list that cannot be read at all is an error.
+    fn devices(&self, bus: DeviceBus) -> Result<Vec<DeviceRecord>, SourceError>;
+}
+
+/// The model part of a device instance id (ADR 0069 section 3), or `None` when `instance_id` is not
+/// one of `bus`'s.
+///
+/// An instance id is `<enumerator>\<device id>\<instance>`. The instance part is dropped: for a
+/// device behind USB it is often the device's serial number, for a PCI device a position on the
+/// board. Of the device id, only the `&`-separated fields that name a model are kept — `VEN_`,
+/// `DEV_`, `SUBSYS_` and `REV_` for PCI; `VID_`, `PID_`, `REV_`, `MI_` and `COL` for HID — in the
+/// order Windows wrote them, upper case. Anything else in the device id is dropped rather than kept
+/// unread.
+pub fn device_model_id(bus: DeviceBus, instance_id: &str) -> Option<String> {
+    let mut parts = instance_id.split('\\');
+    let enumerator = parts.next()?;
+    if !enumerator.eq_ignore_ascii_case(bus.enumerator()) {
+        return None;
+    }
+    let device = parts.next()?;
+    let wanted: &[&str] = match bus {
+        DeviceBus::Pci => &["VEN_", "DEV_", "SUBSYS_", "REV_"],
+        DeviceBus::Hid => &["VID_", "PID_", "REV_", "MI_", "COL"],
+    };
+    let kept: Vec<String> = device
+        .split('&')
+        .map(str::to_ascii_uppercase)
+        .filter(|field| wanted.iter().any(|prefix| field.starts_with(prefix)))
+        .filter(|field| {
+            field
+                .split_once('_')
+                .map_or(field.len() > 3, |(_, value)| !value.is_empty())
+        })
+        .filter(|field| {
+            field
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
+        .collect();
+    Some(format!("{}\\{}", bus.enumerator(), kept.join("&")))
+}
+
+/// The class code of a PCI device: the first four hex digits after `PCI\CC_` in its compatible ids,
+/// upper case — `0600` for a host bridge, `0108` for an `NVMe` controller. `None` when no compatible id
+/// carries one.
+pub fn pci_class_code<S: AsRef<str>>(compatible_ids: &[S]) -> Option<String> {
+    compatible_ids.iter().find_map(|id| {
+        let id = id.as_ref();
+        let rest = id
+            .get(..7)
+            .filter(|prefix| prefix.eq_ignore_ascii_case("PCI\\CC_"))
+            .map(|_| &id[7..])?;
+        let digits = rest.get(..4)?;
+        digits
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+            .then(|| digits.to_ascii_uppercase())
+    })
+}
+
+/// A device time property, a `FILETIME`, as a timestamp in whole seconds: the conversion
+/// [`process_started_at`] makes, for the same reasons (ADR 0050, ADR 0062).
+pub fn device_time(filetime: u64) -> Option<jiff::Timestamp> {
+    process_started_at(filetime)
 }
 
 /// A volume's change journal as `FSCTL_QUERY_USN_JOURNAL` states it, without its identifier
@@ -700,6 +864,7 @@ pub trait Host:
     + FirmwareSource
     + ProcessSource
     + BootTimeSource
+    + DeviceSource
     + UsnJournalSource
     + AccountSource
 {
@@ -830,6 +995,12 @@ impl FirmwareSource for NonWindowsHost {
             "no Windows firmware interface on this platform".to_owned(),
         ))
     }
+
+    fn iommu_table(&self) -> Result<IommuTable, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows firmware interface on this platform".to_owned(),
+        ))
+    }
 }
 
 impl ProcessSource for NonWindowsHost {
@@ -844,6 +1015,14 @@ impl BootTimeSource for NonWindowsHost {
     fn since_boot(&self) -> Result<std::time::Duration, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows boot time on this platform".to_owned(),
+        ))
+    }
+}
+
+impl DeviceSource for NonWindowsHost {
+    fn devices(&self, _bus: DeviceBus) -> Result<Vec<DeviceRecord>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows devices on this platform".to_owned(),
         ))
     }
 }
@@ -896,6 +1075,83 @@ mod tests {
 
     fn at(text: &str) -> jiff::Timestamp {
         text.parse().unwrap()
+    }
+
+    #[test]
+    fn a_pci_instance_id_keeps_its_model_and_drops_the_instance() {
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Pci,
+                r"PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10\4&c580b9d&0&0020"
+            )
+            .as_deref(),
+            Some(r"PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10")
+        );
+    }
+
+    #[test]
+    fn a_hid_instance_id_keeps_vendor_product_interface_and_collection() {
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Hid,
+                r"HID\VID_046D&PID_C52B&MI_02&Col01\8&2a1b3c4d&0&0000"
+            )
+            .as_deref(),
+            Some(r"HID\VID_046D&PID_C52B&MI_02&COL01")
+        );
+    }
+
+    /// Whatever the device id holds besides the model fields is dropped rather than carried unread:
+    /// a Bluetooth HID id puts a service GUID where a vendor would be.
+    #[test]
+    fn fields_that_name_no_model_are_dropped() {
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Hid,
+                r"HID\{00001124-0000-1000-8000-00805f9b34fb}_VID&0002046d_PID&b023\9&1&0&0000"
+            )
+            .as_deref(),
+            Some(r"HID\")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Pci, r"PCI\VEN_8086&DEV_&CC_0600\3&0").as_deref(),
+            Some(r"PCI\VEN_8086")
+        );
+    }
+
+    #[test]
+    fn an_id_of_another_enumerator_is_not_a_device_of_this_bus() {
+        assert_eq!(
+            device_model_id(DeviceBus::Pci, r"USB\VID_0627&PID_0001\1"),
+            None
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Hid, r"PCI\VEN_1234&DEV_11E8\1"),
+            None
+        );
+        assert_eq!(device_model_id(DeviceBus::Pci, "PCI"), None);
+    }
+
+    #[test]
+    fn the_class_code_is_the_first_four_hex_digits_of_the_cc_compatible_id() {
+        let ids = [
+            r"PCI\VEN_1B36&DEV_0010&REV_02",
+            r"PCI\CC_010802",
+            r"PCI\CC_0108",
+        ];
+        assert_eq!(pci_class_code(&ids).as_deref(), Some("0108"));
+        assert_eq!(pci_class_code(&[r"pci\cc_0c05"]).as_deref(), Some("0C05"));
+        assert_eq!(pci_class_code(&[r"PCI\CC_06"]), None);
+        assert_eq!(pci_class_code(&[r"PCI\CC_ZZZZ"]), None);
+        assert_eq!(pci_class_code::<&str>(&[]), None);
+    }
+
+    #[test]
+    fn a_device_time_is_the_filetime_in_whole_seconds() {
+        // 2026-10-15T11:32:36Z plus 0.5 s, as a FILETIME.
+        let filetime = (1_792_063_956 * 10_000_000) + UNIX_EPOCH_AS_FILETIME + 5_000_000;
+        assert_eq!(device_time(filetime), Some(at("2026-10-15T11:32:36Z")));
+        assert_eq!(device_time(0), None);
     }
 
     /// A `FILETIME` of 2020-01-01T00:00:00Z plus most of a day: only the UTC date comes back.
