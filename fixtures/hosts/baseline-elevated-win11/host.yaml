@@ -4902,6 +4902,8 @@ tpm:
 # No PowerShell policy key is written: Windows ships with none (fixtures/hosts/PROVENANCE.md).
 firmware:
   secure_boot: enabled
+# The IOMMU's ACPI table (ADR 0038, amendment of 2026-10-15): IVRS, measured on the AMD development PC.
+iommu_table: ivrs
 # What the Event Log service states about the one channel this baseline's log holds, as it stated it on
 # a Windows 11 machine (build 26220) on 2026-09-13: the default file name, which is the channel's name
 # with `/` written `%4`, and the 1 052 672-byte cap that 1 166 of that machine's 1 243 channels had

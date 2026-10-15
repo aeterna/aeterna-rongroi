@@ -10,7 +10,7 @@
 //! this touches is this program's own token, where `SeSystemEnvironmentPrivilege` is enabled for the
 //! read — the documented requirement for reading a firmware variable — and put back as it was.
 
-use rongroi_host::{FirmwareSecureBoot, SourceError};
+use rongroi_host::{FirmwareSecureBoot, IommuTable, SourceError};
 
 /// The UEFI variable that says whether the firmware is enforcing Secure Boot.
 pub const SECURE_BOOT_VARIABLE: &str = "SecureBoot";
@@ -101,6 +101,46 @@ pub fn secure_boot_from_read(
     }
 }
 
+/// `IMAGE_FILE_MACHINE_AMD64` and `IMAGE_FILE_MACHINE_I386`, as `windows` 0.62.2 declares them in
+/// `Win32::System::SystemInformation`: the native machines whose firmware describes an IOMMU in `DMAR` or
+/// `IVRS`.
+pub const IMAGE_FILE_MACHINE_AMD64: u16 = 0x8664;
+
+/// `IMAGE_FILE_MACHINE_I386`.
+pub const IMAGE_FILE_MACHINE_I386: u16 = 0x014c;
+
+/// Names which IOMMU table is among the ACPI tables `EnumSystemFirmwareTables` listed (ADR 0038, amendment
+/// of 2026-10-15).
+///
+/// `signatures` is the buffer the call filled, four bytes per table, each in the order the table's own
+/// signature is spelled (measured on 2026-10-15: `MCFG,FACP,APIC,IVRS,…`). `native_machine` is what
+/// `IsWow64Process2` says the PC is, so that this program running under x64 emulation on Arm is not taken
+/// for an x86 PC.
+pub fn iommu_table_from(signatures: &[u8], native_machine: u16) -> IommuTable {
+    if !matches!(
+        native_machine,
+        IMAGE_FILE_MACHINE_AMD64 | IMAGE_FILE_MACHINE_I386
+    ) {
+        return IommuTable::NotX86;
+    }
+    let (tables, _) = signatures.as_chunks::<4>();
+    if tables.contains(b"DMAR") {
+        IommuTable::Dmar
+    } else if tables.contains(b"IVRS") {
+        IommuTable::Ivrs
+    } else {
+        IommuTable::Neither
+    }
+}
+
+/// The ACPI provider's signature, `'ACPI'` read as a big-endian number, as `windows` declares `ACPI`.
+#[cfg(windows)]
+const ACPI_PROVIDER: u32 = u32::from_be_bytes(*b"ACPI");
+
+/// The most this program reads of the table list: 4 bytes per table, far beyond any PC's count.
+#[cfg(windows)]
+const TABLE_LIST_MAX: u32 = 64 * 1024;
+
 #[cfg(windows)]
 impl rongroi_host::FirmwareSource for crate::LiveHost {
     #[allow(unsafe_code)]
@@ -129,6 +169,44 @@ impl rongroi_host::FirmwareSource for crate::LiveHost {
         let result = read_secure_boot_variable();
         privilege.restore();
         result
+    }
+
+    #[allow(unsafe_code)]
+    fn iommu_table(&self) -> Result<IommuTable, SourceError> {
+        use windows::Win32::System::SystemInformation::{
+            EnumSystemFirmwareTables, FIRMWARE_TABLE_PROVIDER, IMAGE_FILE_MACHINE,
+        };
+        use windows::Win32::System::Threading::{GetCurrentProcess, IsWow64Process2};
+
+        let mut process = IMAGE_FILE_MACHINE::default();
+        let mut native = IMAGE_FILE_MACHINE::default();
+        // SAFETY: both out-pointers are initialised locals that outlive the call; the pseudo-handle of
+        // this process needs no closing.
+        unsafe { IsWow64Process2(GetCurrentProcess(), &raw mut process, Some(&raw mut native)) }
+            .map_err(|error| SourceError::Failed(format!("IsWow64Process2 failed: {error}")))?;
+
+        let provider = FIRMWARE_TABLE_PROVIDER(ACPI_PROVIDER);
+        // SAFETY: no buffer is passed, so the call only reports the size the list needs.
+        let needed = unsafe { EnumSystemFirmwareTables(provider, None) };
+        if needed == 0 {
+            return Err(SourceError::Failed(
+                "EnumSystemFirmwareTables(ACPI) listed no tables".to_owned(),
+            ));
+        }
+        if needed > TABLE_LIST_MAX {
+            return Err(SourceError::TooLarge {
+                limit: usize::try_from(TABLE_LIST_MAX).unwrap_or(usize::MAX),
+            });
+        }
+        let mut buffer = vec![0u8; usize::try_from(needed).unwrap_or(0)];
+        // SAFETY: `buffer` is a live, writable slice; the wrapper passes its pointer and length.
+        let written = unsafe { EnumSystemFirmwareTables(provider, Some(&mut buffer)) };
+        let Some(listed) = usize::try_from(written).ok().and_then(|n| buffer.get(..n)) else {
+            return Err(SourceError::Failed(format!(
+                "EnumSystemFirmwareTables(ACPI) reported {written} bytes for a {needed}-byte buffer"
+            )));
+        };
+        Ok(iommu_table_from(listed, native.0))
     }
 }
 
@@ -361,6 +439,42 @@ mod tests {
         if before.is_some() {
             assert_ne!(answer, Err(SourceError::AccessDenied));
         }
+    }
+
+    #[test]
+    fn the_iommu_table_is_named_from_the_list_on_x86_only() {
+        let measured = b"MCFGFACPAPICIVRSHPETFPDTSSDT";
+        assert_eq!(
+            iommu_table_from(measured, IMAGE_FILE_MACHINE_AMD64),
+            IommuTable::Ivrs
+        );
+        assert_eq!(
+            iommu_table_from(b"FACPDMARAPIC", IMAGE_FILE_MACHINE_I386),
+            IommuTable::Dmar
+        );
+        assert_eq!(
+            iommu_table_from(b"FACPAPICSSDT", IMAGE_FILE_MACHINE_AMD64),
+            IommuTable::Neither
+        );
+        // A signature split across two entries is not a table.
+        assert_eq!(
+            iommu_table_from(b"xxIVRSxx", IMAGE_FILE_MACHINE_AMD64),
+            IommuTable::Neither
+        );
+        // Arm64 (0xAA64): its IOMMU is described elsewhere, so the list says nothing.
+        assert_eq!(iommu_table_from(measured, 0xAA64), IommuTable::NotX86);
+    }
+
+    /// Prints what this PC answers; run with `--ignored` on Windows.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "reads this PC's ACPI table list"]
+    fn live_iommu_table_reads() {
+        use rongroi_host::FirmwareSource as _;
+
+        let answer = crate::LiveHost.iommu_table();
+        println!("iommu_table: {answer:?}");
+        assert!(answer.is_ok(), "{answer:?}");
     }
 
     #[test]

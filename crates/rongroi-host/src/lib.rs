@@ -405,6 +405,28 @@ pub trait FirmwareSource {
     /// Reading a firmware variable needs a privilege that a process without administrator rights does
     /// not hold. That is [`SourceError::AccessDenied`], never a guessed value.
     fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError>;
+
+    /// Which ACPI table describing an IOMMU the firmware gives Windows (ADR 0038, amendment of
+    /// 2026-10-15). Nothing is read from the table but its name.
+    fn iommu_table(&self) -> Result<IommuTable, SourceError>;
+}
+
+/// Whether the firmware describes an IOMMU to Windows, by the ACPI table x86 firmware uses for one
+/// (ADR 0038, amendment of 2026-10-15).
+///
+/// A table says the firmware set the IOMMU up and handed Windows its description. It does **not** say
+/// that Windows' Kernel DMA Protection is on, which has no documented interface (ADR 0038 section 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IommuTable {
+    /// `DMAR`: Intel VT-d.
+    Dmar,
+    /// `IVRS`: AMD-Vi.
+    Ivrs,
+    /// An x86 PC whose ACPI tables include neither.
+    Neither,
+    /// Not an x86 PC. Arm describes an IOMMU in other tables, which are not read, so the absence of
+    /// both x86 tables says nothing.
+    NotX86,
 }
 
 /// One process that was running when the process list was read.
@@ -969,6 +991,12 @@ impl TpmSource for NonWindowsHost {
 
 impl FirmwareSource for NonWindowsHost {
     fn firmware_secure_boot(&self) -> Result<FirmwareSecureBoot, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows firmware interface on this platform".to_owned(),
+        ))
+    }
+
+    fn iommu_table(&self) -> Result<IommuTable, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows firmware interface on this platform".to_owned(),
         ))

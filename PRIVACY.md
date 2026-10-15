@@ -211,6 +211,10 @@ policy, from that account's own part of the registry. That is your account unles
 with someone else's administrator password, in which case it is theirs. Whether PowerShell 7 is installed
 is not read.
 
+It also reads the **names** of the ACPI tables the PC's firmware gives Windows, to see whether one that
+describes an IOMMU is among them (ADR 0038, amendment of 2026-10-15). Only whether such a table is there is
+kept, and nothing is read from inside any table.
+
 It also reads one Windows setting about itself: whether Windows is writing a record when a program is
 launched (`EnablePrefetcher`). That is a machine setting and names no person. It is read so that "there
 is no record of this program" can be told apart from "Windows is not keeping such records on this PC",

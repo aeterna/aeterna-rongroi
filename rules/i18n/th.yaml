@@ -1062,3 +1062,14 @@ fe57aa65-11b0-4e1f-b81c-a4fda597855b:
   retention: ตราบที่ log System ยังเก็บ record ไว้ ค่าเริ่มต้นคือเขียนทับ record เก่าสุดเมื่อเต็มขนาด
   falsepositives:
     - Fast Startup เปิดอยู่เป็นค่าเริ่มต้น การปิดเครื่องจากเมนู Start ส่วนใหญ่จึงจบแบบนี้
+c5c19a2d-8008-4bc8-b36f-6607ed091313:
+  title: firmware ไม่ได้ประกาศ IOMMU ให้ Windows
+  description: >-
+    ไม่มีตาราง ACPI ที่ firmware ของ x86 ใช้บอก Windows ว่ามี IOMMU ทั้ง DMAR (Intel VT-d) และ IVRS (AMD-Vi)
+    IOMMU คือสิ่งที่ทำให้ Windows จำกัดได้ว่าอุปกรณ์ PCIe เข้าถึงหน่วยความจำส่วนไหนได้ และในเมนบอร์ดหลายรุ่นเป็นค่าใน firmware ที่ปิดไว้ตั้งแต่โรงงาน
+    นี่คือการตั้งค่าของเครื่อง ไม่ใช่อุปกรณ์ตัวใดในเครื่อง และไม่ได้บอกว่า Kernel DMA Protection เปิดอยู่หรือไม่
+  retention: สถานะ firmware ตอนนี้เท่านั้น ไม่ได้บอกอะไรเกี่ยวกับการตั้งค่า firmware ก่อนหน้า
+  falsepositives:
+    - เมนบอร์ดที่ปิด VT-d หรือ AMD-Vi (มักเรียกว่า IOMMU หรือ SVM) มาจากโรงงาน ซึ่งพบบ่อย
+    - CPU หรือชิปเซ็ตรุ่นเก่าที่ไม่มี IOMMU
+    - เครื่องเสมือนที่ไม่ได้ให้ IOMMU เสมือน

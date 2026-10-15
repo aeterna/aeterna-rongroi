@@ -224,6 +224,7 @@ need by hand, and compare it with the report yourself.
 | A per-user policy turns Windows PowerShell script block logging off | posture | `experimental` | the same, and a scan restarted with a different administrator's password, which reads that administrator's policy |
 | A machine policy turns PowerShell 7 script block logging off | posture | `experimental` | the same as the Windows PowerShell row, a PowerShell 7 policy set to use the Windows PowerShell one, and a policy left on a PC without PowerShell 7 |
 | A per-user policy turns PowerShell 7 script block logging off | posture | `experimental` | the same, and a scan restarted with a different administrator's password |
+| The firmware describes no IOMMU to Windows | posture | `experimental` | VT-d or AMD-Vi (IOMMU, SVM) off in the firmware, which many motherboards ship with, older processors, virtual machines. Says how the PC is set up, not that a DMA device is in it, and not whether Kernel DMA Protection is on. Not read on Arm PCs |
 | A Prefetch file is marked read-only | tamper | `experimental` | read-only chosen in a folder's Properties, files restored or copied by software that keeps attributes |
 | An event log file is marked read-only | tamper | `experimental` | the same two |
 | An event log file is not the file Windows writes its channel to | tamper | `experimental` | Windows' own archive of a full log, a log saved or exported into the folder, a log moved by an administrator or Group Policy, a log copied from another PC |

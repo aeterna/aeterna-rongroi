@@ -19,6 +19,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   recorded one). A timeline selector puts the absent devices' times on the timeline. The consent text, PRIVACY.md
   and the screenshare guides say what is read and what it cannot show: a DMA card that imitates an ordinary device,
   and a mouse box.
+- `posture` reports `iommu_table`: whether the firmware gives Windows an ACPI table describing an IOMMU — `dmar`
+  (Intel VT-d), `ivrs` (AMD-Vi) or `none` — read from the table names alone, with no administrator rights. Not read
+  on Arm PCs, where the field is a gap. A new `experimental` posture rule, "The firmware describes no IOMMU to
+  Windows". It says nothing about whether Kernel DMA Protection is on, and nothing about any device (ADR 0038,
+  amendment of 2026-10-15).
 - Hosts can list the devices Windows remembers: `DeviceSource::devices(bus)` reads the `PCI` or `HID` enumerator
   through CfgMgr32, present devices and absent ones, each as a model id with no instance part (no serial number or
   board position), its PCI class code, driver service, problem code and the three times Windows stores, in whole

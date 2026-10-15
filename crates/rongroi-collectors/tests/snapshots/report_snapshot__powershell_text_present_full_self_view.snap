@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 70
+      "rule_count": 71
     },
     "platform": "windows",
     "os_build": "26100",
@@ -312,6 +312,14 @@ expression: view
     },
     {
       "rule_id": "75162c70-a6d1-47ec-94af-be25184d5ece",
+      "collector": "posture",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "c5c19a2d-8008-4bc8-b36f-6607ed091313",
       "collector": "posture",
       "strength": "posture",
       "state": "unmeasured",
@@ -872,7 +880,7 @@ expression: view
   "listed": {
     "found": 3,
     "not_found": 15,
-    "unmeasured": 36
+    "unmeasured": 37
   },
   "hidden": {
     "not_found": 0,

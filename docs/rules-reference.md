@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 70 |
-| SHA-256 | `d8932d9fba3cae2065fdde7202d87eb646601e7f5d76739103c748ab0d8325a7` |
+| Rules | 71 |
+| SHA-256 | `435c34e8804d3c5062d0c09bd0c60f23874f2befbb6aa39f1a9a53bfd7665f02` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -84,6 +84,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [Windows test signing is turned on](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
+  - [The firmware describes no IOMMU to Windows](#rule-c5c19a2d-8008-4bc8-b36f-6607ed091313) — `posture` · `experimental`
   - [A machine policy turns PowerShell 7 script block logging off](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
   - [A per-user policy turns PowerShell 7 script block logging off](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
   - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
@@ -1517,6 +1518,47 @@ Current setting only. It says nothing about how the PC was configured in the pas
 **References**
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option>
+
+### `posture` / `dma`
+
+<a id="rule-c5c19a2d-8008-4bc8-b36f-6607ed091313"></a>
+
+#### The firmware describes no IOMMU to Windows
+
+- Id: `c5c19a2d-8008-4bc8-b36f-6607ed091313`
+- File: [`rules/posture/dma/no-iommu-table/rule.yaml`](../rules/posture/dma/no-iommu-table/rule.yaml)
+- Collector: `posture`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `dma`
+- Written: 2026-10-15
+
+**About this check**
+
+Neither of the ACPI tables x86 firmware uses to describe an IOMMU to Windows is present: DMAR (Intel VT-d) or IVRS (AMD-Vi). An IOMMU is what lets Windows restrict which memory a PCIe device can reach, and on many motherboards it is a firmware setting that is off by default. This is about how the PC is set up, not about any device in it, and it does not say whether Kernel DMA Protection is on.
+
+**Matches when all of these hold for one observation**
+
+- `iommu_table`: is `none` (text, ASCII case ignored)
+
+**Look-back**
+
+Current firmware state only. It says nothing about earlier firmware settings.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Motherboards whose firmware ships with VT-d or AMD-Vi (often called IOMMU or SVM) off, which is common
+- Older processors or chipsets without an IOMMU
+- Virtual machines that are given no virtual IOMMU
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-kernel-dma-protection>
 
 ### `posture` / `logging`
 

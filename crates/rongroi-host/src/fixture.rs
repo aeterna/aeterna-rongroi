@@ -13,9 +13,9 @@ use crate::{
     AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
     DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, EntryTimes,
     EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
-    FirmwareSource, Host, Platform, ProcessRecord, ProcessSource, RegistryData, RegistrySource,
-    SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo, TpmSource,
-    UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
+    FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource, RegistryData,
+    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
+    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -62,6 +62,10 @@ struct HostFile {
     tpm: Option<FixtureTpm>,
     #[serde(default)]
     firmware: Option<FixtureFirmware>,
+    /// What the firmware's ACPI tables say about an IOMMU (ADR 0038, amendment of 2026-10-15). Absent
+    /// means the fixture never modelled it, which the accessor reports as `Unsupported`.
+    #[serde(default)]
+    iommu_table: Option<FixtureIommuTable>,
     #[serde(default)]
     processes: Option<Vec<FixtureProcess>>,
     /// What `GetTickCount64` would answer. Absent means the fixture never modelled it, which the
@@ -299,6 +303,18 @@ enum FixtureFirmwareSecureBoot {
     Disabled,
     VariableAbsent,
     NotUefi,
+    AccessDenied,
+    ReadFailed,
+}
+
+/// Every answer a live host gives about the IOMMU's ACPI table, and the two that are not answers.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureIommuTable {
+    Dmar,
+    Ivrs,
+    Neither,
+    NotX86,
     AccessDenied,
     ReadFailed,
 }
@@ -636,6 +652,29 @@ fn resolve_file(
 
 /// Parses a `created:` or `modified:` value. A live listing never reports a fraction of a second
 /// (ADR 0050), so a fixture that writes one describes something no machine returns, and fails to load.
+/// The times a fixture gives each drive's root, keyed as a live host would look the drive up.
+fn resolve_drive_roots(
+    described: BTreeMap<String, FixtureTimes>,
+    origin: &str,
+) -> Result<BTreeMap<String, EntryTimes>, FixtureError> {
+    let mut drive_roots = BTreeMap::new();
+    for (drive, times) in described {
+        let key = normalise_path(&drive);
+        if !is_drive_root(&key) {
+            return Err(FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("drive_roots: `{drive}` is not a drive such as `C:`"),
+            });
+        }
+        let times = EntryTimes {
+            created: listed_time_of(times.created.as_deref(), &drive, origin)?,
+            modified: listed_time_of(times.modified.as_deref(), &drive, origin)?,
+        };
+        drive_roots.insert(key, times);
+    }
+    Ok(drive_roots)
+}
+
 fn listed_time_of(
     text: Option<&str>,
     name: &str,
@@ -1031,6 +1070,7 @@ pub struct FixtureHost {
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
     firmware: Option<FixtureFirmware>,
+    iommu_table: Option<FixtureIommuTable>,
     processes: Option<Vec<ProcessRecord>>,
     milliseconds_since_boot: Option<u64>,
     /// Keyed by the lower-cased channel name, like every other name this host compares.
@@ -1087,21 +1127,7 @@ impl FixtureHost {
             .into_iter()
             .map(|(name, value)| (name.to_ascii_lowercase(), value))
             .collect();
-        let mut drive_roots = BTreeMap::new();
-        for (drive, times) in file.drive_roots {
-            let key = normalise_path(&drive);
-            if !is_drive_root(&key) {
-                return Err(FixtureError::Parse {
-                    path: origin.to_owned(),
-                    message: format!("drive_roots: `{drive}` is not a drive such as `C:`"),
-                });
-            }
-            let times = EntryTimes {
-                created: listed_time_of(times.created.as_deref(), &drive, origin)?,
-                modified: listed_time_of(times.modified.as_deref(), &drive, origin)?,
-            };
-            drive_roots.insert(key, times);
-        }
+        let drive_roots = resolve_drive_roots(file.drive_roots, origin)?;
         let mut filesystem = BTreeMap::new();
         for (dir, files) in file.filesystem {
             let mut entries = Vec::with_capacity(files.len());
@@ -1125,6 +1151,7 @@ impl FixtureHost {
             code_integrity: file.code_integrity,
             tpm: file.tpm,
             firmware: file.firmware,
+            iommu_table: file.iommu_table,
             processes: file
                 .processes
                 .map(|described| {
@@ -1623,6 +1650,24 @@ impl FirmwareSource for FixtureHost {
             FixtureFirmwareSecureBoot::AccessDenied => Err(SourceError::AccessDenied),
             FixtureFirmwareSecureBoot::ReadFailed => Err(SourceError::Failed(
                 "this fixture host describes a firmware read that failed".to_owned(),
+            )),
+        }
+    }
+
+    fn iommu_table(&self) -> Result<IommuTable, SourceError> {
+        let described = self.iommu_table.ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe its ACPI tables".to_owned(),
+            )
+        })?;
+        match described {
+            FixtureIommuTable::Dmar => Ok(IommuTable::Dmar),
+            FixtureIommuTable::Ivrs => Ok(IommuTable::Ivrs),
+            FixtureIommuTable::Neither => Ok(IommuTable::Neither),
+            FixtureIommuTable::NotX86 => Ok(IommuTable::NotX86),
+            FixtureIommuTable::AccessDenied => Err(SourceError::AccessDenied),
+            FixtureIommuTable::ReadFailed => Err(SourceError::Failed(
+                "this fixture host describes an ACPI table read that failed".to_owned(),
             )),
         }
     }
