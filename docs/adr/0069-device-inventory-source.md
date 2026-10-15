@@ -3,6 +3,7 @@
 - Status: accepted — the owner decided the five questions below on 2026-10-15, each as recommended. The
   collectors and rules that would read this source are later ADRs
 - Date: 2026-10-14
+- Amended: 2026-10-15, with measurements in a virtual machine ("Measured in a virtual machine")
 - Number: 0066–0068 are held by another plan that is still in review; this one keeps 0069
 
 ## Context
@@ -118,9 +119,11 @@ prose is missing.
 
 Proposed: read them, and every place that shows one says **what was measured** rather than what the name suggests —
 "Windows recorded this time under *last arrival*; on a measured PC it is re-written at each start" and
-"Windows recorded this time under *last removal*; on a measured PC it was not written at shutdown". Measurement 6 is
-the open half: until a test card shows what a card taken out while the PC is off leaves behind, no rule may say a
-card was removed.
+"Windows recorded this time under *last removal*; on a measured PC it was not written at shutdown". What a device taken
+out while the PC is off leaves behind was measured in a virtual machine afterwards ("Measured in a virtual
+machine"): no removal time after a full shutdown, the resume's time after a Fast Startup one. A rule may say a device
+is absent and when it was last present at a start; it says "removed at" only beside a `LastRemovalDate`, and never
+claims to know how the device left.
 
 ### 5. One Windows feature set, recorded where it is used
 
@@ -180,14 +183,45 @@ The collector ADRs confirm this against the code before they merge.
 - **Only the devices a rule matches.** Smaller, but a device that left the PC cannot be shown beside what stayed,
   and the server-side comparison the plan relies on has nothing to compare (section 6).
 
+## Measured in a virtual machine
+
+On 2026-10-15, in a QEMU virtual machine on the development Mac (Windows 11 on Arm, build 26300, unactivated,
+no network), with a probe that calls the same CfgMgr32 functions. The machine is synthetic, so the probe printed
+every device. A PCI device with no Windows driver (QEMU's `edu`, which reports itself as an unclassified device) stood
+in for a card; a second USB mouse stood in for a mouse box. Eight starts, each recorded at its own logon:
+
+| Step | What changed before the start | The PCI device | The extra mouse (HID) | Kernel start |
+|---|---|---|---|---|
+| 1 | Added, PC off | present · problem code 28 · no service · `FirstInstallDate` = this start · `LastArrivalDate` = this start | present · `FirstInstallDate` = this start | new |
+| 2 | **Removed, PC off** (full shutdown) | **absent · `LastRemovalDate` none · `LastArrivalDate` = step 1's start** | same as the PCI device | new |
+| 3 | Added again, PC off | present · `FirstInstallDate` unchanged · `LastArrivalDate` = this start | same | new |
+| 4 | Both removed **while running** | **still present after 12 minutes**: the guest never completed the PCI hot-unplug, so a PCI device removed while running is **not measured** | absent · `LastRemovalDate` = the minute it was removed | — |
+| 5 | Added; then "Shut down" **with Fast Startup** (`shutdown /s /hybrid`) | present | present | new |
+| 6 | **Removed while that shutdown lasted** | **absent · `LastRemovalDate` = the moment Windows resumed · `LastArrivalDate` = step 5's start** | same as the PCI device | **unchanged** (step 5's); the System log's Kernel-Boot event 27 says `BootType=1` |
+| 7 | Nothing (full start) | as in step 6 | as in step 6 | new; event 27 `BootType=0` |
+
+`Kernel-PnP/Configuration` wrote events 430 and 400 for the PCI device only the first time it was set up (step 1),
+and nothing when it left or came back.
+
+What this means for the source, on this one machine:
+
+- A device that left the PC **while it was off** keeps `LastArrivalDate` = the last start at which it was present,
+  and has **no** `LastRemovalDate`. The row can say "present at the start of <time>, absent now" and nothing about
+  when it left.
+- A device that left while the PC was in a **Fast Startup shutdown** gets `LastRemovalDate` = the moment Windows
+  resumed. The kernel's start time does not move then, so "a start after the player left the game" does not appear;
+  the removal time does. Telling the two apart needs the boot type (event 27), which no collector reads today.
+- `LastRemovalDate` is written when a device leaves a running PC (step 4, for a USB device) and at a Fast Startup
+  resume (step 6). It was not written at a full shutdown in any step, here or on the development PC.
+- `FirstInstallDate` survives removal and return: a device seen before is not "new" when it comes back.
+
+A virtual machine is not a PC: the device is QEMU's, the firmware is EDK II, and a real card with firmware that
+imitates another device was not tested. These rows show what Windows records; they do not show what any card does.
+
 ## What is unverified
 
-- Measurement 6: what a PCI card taken out while the PC is off leaves behind (`present`, `last_arrival`,
-  `last_removal`). The source is useful without it (which devices exist, which have no driver, when each was first
-  set up), but the "left before the check" row depends on it.
-- Fast Startup: whether Windows re-writes `LastArrivalDate` when it resumes from a default "Shut down"
-  (`BootTimeSource` already says the kernel does not restart then). A card can only be taken out with the power off,
-  so the "a start after the player left the game" reading of the plan needs this measured too.
+- A PCI device removed while the PC runs (the virtual machine's guest did not complete it).
+- The same measurements on physical hardware and on x64 Windows: the virtual machine runs Windows on Arm.
 - The Thunderbolt / USB4 enumerator name and class code (no such controller on the measured PC).
 - One PC only. The plan asks for three for the "no driver" baseline (measurement 7).
 - Whether `CM_Get_DevNode_PropertyW` returns `ProblemCode` for an absent device (not needed: it is read for
