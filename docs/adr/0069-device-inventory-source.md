@@ -1,10 +1,9 @@
 # ADR 0069 — Which devices Windows knows, and when they came and went
 
-- Status: proposed — five questions for the owner at the end ("Decisions for the owner"). No code until they are
-  decided; the collectors and rules that would read this source are later ADRs
+- Status: accepted — the owner decided the five questions below on 2026-10-15, each as recommended. The
+  collectors and rules that would read this source are later ADRs
 - Date: 2026-10-14
-- Number: 0066–0068 are held by another plan that is still in review. The number is kept if it is free when this
-  merges; otherwise it takes the next free one
+- Number: 0066–0068 are held by another plan that is still in review; this one keeps 0069
 
 ## Context
 
@@ -195,6 +194,9 @@ The collector ADRs confirm this against the code before they merge.
   present devices only).
 
 ## Decisions for the owner
+
+Decided on 2026-10-15: all five as recommended. The owner also chose to measure question 6 of "Measured before code"
+and the Fast Startup case in a virtual machine before any test card is bought.
 
 | # | Question | Recommended |
 |---|---|---|
