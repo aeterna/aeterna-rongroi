@@ -45,7 +45,7 @@ no instance id, hardware id, name or serial left the PC. It ran twice, at High i
 | 1 | Do the reads need administrator rights? | **No.** Every line of the two runs is identical apart from the integrity level: the device lists, every property, `setupapi.dev.log` and the `Kernel-PnP/Configuration` log |
 | 2 | How many devices, and how many not present? | 235 device ids without the "present" filter, 229 with it. PCI 40 (all present) · USB 22 (21 present) · HID 25 (all present). No Thunderbolt or USB4 enumerator exists on this PC, so the name of that enumerator is **not measured** |
 | 3 | Which time properties have a value? | `FirstInstallDate`, `InstallDate` and `LastArrivalDate` on every PCI, USB and HID entry. `LastRemovalDate` on **none** of the 86 present entries and on the one absent USB entry |
-| 4 | What does `LastArrivalDate` mean for a PCI device? | All 40 fall within 15 minutes after the kernel started (uptime 134.5 h). On this PC it is re-written at each start: it says "present at the last start", not "plugged in at that time" |
+| 4 | What does `LastArrivalDate` mean for a PCI device? | All 40 fall within 15 minutes after the kernel started (uptime 134.5 h). On this PC it is re-written at each start: it says "present at the last start", not "plugged in at that time". For HID it does move: 6 of 25 HID devices arrived 1–30 days after the start, while the PC was running (a receiver or a mouse plugged in again) |
 | 5 | Is `LastRemovalDate` written at shutdown? | **No** for present devices (none has one). The absent USB device has one, 1–30 days old |
 | 6 | Does a PCI card taken out while the PC is off get a `LastRemovalDate`? | **Not measured.** This PC has no absent PCI device. Needs a test card (PLAN-DMA §6 H1) |
 | 7 | How many present PCI devices have no driver service? | 17 of 40: 16 host bridges (class `0600`) and one SMBus controller (`0C05`), all with problem code 0. **"No service" alone is ordinary.** One PC only; the plan asks for three |
@@ -138,9 +138,15 @@ read keeps its bus and `present` and is still returned — one device is never a
 
 `crates/rongroi-collectors/AGENTS.md` says "collect only what a rule needs". A device row is useful to a person
 mainly beside the others: what else is in the PC, which device left, which is the only one of its kind. Proposed: the
-collectors emit every PCI and HID device as an observation, and ADR 0014 decides what is shown — Self mode lists the
-devices no rule matched, SS mode counts them. The collectors' AGENTS.md gets a second named exception, as it has
-for `powershell_text`.
+collectors emit every PCI and HID device as an observation, and the report keeps all of them. The collectors'
+AGENTS.md gets a second named exception, as it has for `powershell_text`.
+
+What a screen shows follows ADR 0014, with one consequence spelled out. Self mode lists every device. SS mode shows
+in full every device row a rule matched — a device with no driver, a device first set up recently, a device that is
+no longer present — and only a count of the rest. A person watching a screenshare therefore sees the rows that
+need a question, and the rest of the inventory is not shown to the audience of a stream. The report file holds the
+whole inventory either way, because a comparison with an earlier report of the same PC (which device is new, which
+left) needs it; whoever receives that file is the one who must say why they keep it.
 
 ### 7. What it reveals
 
@@ -194,7 +200,7 @@ The collector ADRs confirm this against the code before they merge.
 |---|---|---|
 | 1 | Read `LastArrivalDate` / `LastRemovalDate`, which have no documentation page (section 4)? | **Yes**, labelled with what was measured, and no rule says "removed" until measurement 6 exists |
 | 2 | Read `HID` only and not `USB` (section 2)? | **Yes**. Drops the USB-serial row |
-| 3 | Emit the whole PCI + HID inventory, with SS mode showing only counts of unmatched rows (section 6)? | **Yes**, and amend the collectors' AGENTS.md |
+| 3 | Emit the whole PCI + HID inventory: the report file keeps all of it, SS mode shows rule-matched device rows in full and counts the rest (section 6)? | **Yes**, and amend the collectors' AGENTS.md |
 | 4 | Leave `LocationPaths`, `BusReportedDeviceDesc` and friendly names unread (section 2)? | **Yes**. A later rule that needs one asks for it in its own ADR |
 | 5 | Park the SetupAPI-log ADR until a test card shows it adds something ("What this does not do")? | **Yes** |
 
