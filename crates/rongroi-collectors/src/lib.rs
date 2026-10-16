@@ -14,6 +14,7 @@ pub mod failure;
 pub mod fivem_dir;
 pub mod fivem_edition;
 pub mod fivem_servers;
+pub mod hid_device;
 pub mod install_marker;
 pub mod net_config;
 pub mod os_image;
@@ -306,6 +307,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(os_image::OsImage),
         Box::new(pca::Pca),
         Box::new(pci_device::PciDevice),
+        Box::new(hid_device::HidDevice),
         Box::new(posture::Posture),
         Box::new(powershell_text::PowershellText),
         Box::new(prefetch::Prefetch),

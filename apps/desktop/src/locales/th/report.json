@@ -102,6 +102,7 @@
     "bam": "Background Activity Moderator (BAM)",
     "pca": "Program Compatibility Assistant",
     "pci_device": "อุปกรณ์ PCI ที่ Windows จำไว้",
+    "hid_device": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่นที่ Windows จำไว้",
     "windows_start": "Windows เริ่มทำงานแบบไหน",
     "usn": "บันทึกการเปลี่ยนแปลงไฟล์ของ NTFS (USN journal)",
     "fivem_servers": "โฟลเดอร์ cache ของเซิร์ฟเวอร์ใน FiveM (สแกนแบบ Full)"

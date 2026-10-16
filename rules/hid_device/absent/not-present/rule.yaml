@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: e1dc0747-5038-4389-be3d-80de451d7fe6
+title: A mouse, keyboard or other input device Windows set up earlier is not present now
+description: >-
+  Windows set this HID device up at some time and it is not connected now. HID devices are mice, keyboards, game
+  controllers and the other input devices Windows talks to the same way; the row names the driver (mouhid for a mouse,
+  kbdhid for a keyboard) and the maker and model numbers. It shows when Windows first set the device up, the last start
+  of Windows at which it was present, and a removal time when Windows recorded one: when the device was unplugged while
+  Windows was running, or at the resume after a Fast Startup shutdown, and none after a full shutdown. The row never
+  says what the device was beyond its numbers and its driver, or why it left. A box between a mouse and the PC that
+  copies the mouse's numbers looks like that mouse.
+status: experimental
+collector: hid_device
+strength: context
+match:
+  present: false
+retention: >-
+  Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the
+  device is uninstalled or Windows is installed again.
+unmeasured_when: [not_windows]
+falsepositives:
+  - A mouse, keyboard, headset or game controller that was used once and put away — on most PCs there are several
+  - A wireless receiver plugged into another USB port, which Windows can set up again as another device
+  - A drawing tablet, a remote or a docking station with its own keyboard functions
+  - Windows moved to another PC
+author: aeterna-rongroi contributors
+date: 2026-10-16
+tags: [hid_device, hardware]

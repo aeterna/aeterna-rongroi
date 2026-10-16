@@ -5,6 +5,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- The mice, keyboards and other input devices Windows remembers are read on every scan (`hid_device`, ADR 0072),
+  present or not: the maker and model numbers, the driver (`mouhid`, `kbdhid`) and the times Windows stores; never a
+  serial number or a name. One `experimental` `context` rule, **an input device Windows set up earlier is not present
+  now**, and a timeline selector that puts every input device's times on the timeline, so a mouse taken out and
+  another plugged in can be read beside the session. It cannot tell a box between the mouse and the PC from a mouse.
+
 ## [0.9.0] - 2026-10-15
 
 The first checks about DMA cards, and what they cannot show. Every scan now lists the PCI devices Windows remembers,

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 959b560a-7822-491d-9404-094edc6c8be1
+title: When Windows recorded each mouse, keyboard or other input device
+description: >-
+  Puts on the timeline the times Windows stores for every HID device it remembers, present or not: when it first set
+  each up, the last start of Windows at which each was present, and a removal time when Windows recorded one. A mouse
+  taken out and another plugged in shows as one removal and one first set-up a minute apart; so does an ordinary mouse
+  swap. A time here is not evidence of anything on its own.
+status: experimental
+# A timeline selector (ADR 0051).
+role: timeline
+collector: hid_device
+strength: context
+match:
+  present: [true, false]
+retention: >-
+  Devices Windows still remembers, until a device is uninstalled or Windows is installed again.
+falsepositives:
+  - Every PC has these; a mouse or keyboard plugged in, unplugged or replaced is ordinary
+  - After a full shutdown Windows records no removal time, so a missing one says nothing about when a device left
+  - A clock that was changed, so that these times are not on the same clock as the others
+author: aeterna-rongroi contributors
+date: 2026-10-16
+tags: [hid_device, timeline]
