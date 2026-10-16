@@ -121,3 +121,20 @@ Decided on 2026-10-16.
   changelog name the read. ADR 0070 carries the amendment.
 - The reading was mapped first through `aeterna-delegate` (read mode, verified) and every fact used was checked
   in the files.
+
+## Question 4, as run (2026-10-16)
+
+The CLI built from this branch at `56cb183` (`x86_64-pc-windows-gnu`, under x64 emulation) ran `scan --json` elevated
+in the ADR 0069 lab virtual machine (Windows 11 Arm 26300). The VM has a QEMU USB tablet and keyboard; a second QEMU
+USB mouse (`VID_0627&PID_0001`, `mouhid`) stood in for a device plugged in where a mouse was.
+
+| Step | What was done | `absent` rule | The second mouse | Timeline |
+|---|---|---|---|---|
+| H1 | second mouse added while off | not found | present, `last_arrival_at` = this start | all 3 HID devices, through the selector |
+| H2, before | full start with it | not found | present | all 3 |
+| H2, after | removed while Windows was running, 2½ minutes after the start | **found** | absent, `last_removal_at` 144 s after the start | 2 through the selector, the absent one through the rule |
+| H3 | full start without it | **found** | absent, the same `last_removal_at` | as H2 after |
+
+Every row is what this ADR expects. The removal time is to the second and survives a full shutdown. The second mouse
+and the VM's own mouse have the same model id, as a box that copies a mouse's numbers would; they are told apart only
+by their times. The reports are kept with the lab, not in this repository.
