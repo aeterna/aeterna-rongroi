@@ -342,5 +342,16 @@
       "clock": "a clock that was changed, so that times from different sources are not on the same clock",
       "cleanup": "disk-cleaning software, or a profile moved or restored from a backup"
     }
+  },
+  "saved": {
+    "label": "Saved report",
+    "case_code": "Case code:",
+    "digest": "Report SHA-256 — staff, note these 16:",
+    "note": "This is the SHA-256 of the file Save writes: the view on this screen, the device list and the case code. A file whose SHA-256 starts the same is this report. It does not prove the screen was honest.",
+    "button": "Save this report",
+    "dialog_title": "Save this report",
+    "done": "Saved to {{path}}",
+    "cancelled": "Not saved.",
+    "failed": "Could not save: {{reason}}"
   }
 }

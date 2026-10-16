@@ -61,6 +61,10 @@ let linksNeverResolve = false;
 let headerFails = false;
 let linksFail = false;
 let clipboardWrites: string[] = [];
+/** What the mocked Rust saw of the saved record (ADR 0073). */
+let savedArgs: Record<string, unknown>[] = [];
+let saveAnswer: string | null = "C:\\Users\\player\\Documents\\rongroi-K7Q-2MX-3f9a1c2e.json";
+const DIGEST = "3f9a1c2e7b4d5a60918273645f0e1d2c3b4a5968778695a4b3c2d1e0f9a8b7c6";
 const REPOSITORY = "https://github.com/aeterna/aeterna-rongroi";
 const COMMIT = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
 // Carried fix (d): the real descriptor before any test stubs it, so it can be restored afterwards
@@ -81,6 +85,8 @@ beforeEach(async () => {
   headerFails = false;
   linksFail = false;
   clipboardWrites = [];
+  savedArgs = [];
+  saveAnswer = "C:\\Users\\player\\Documents\\rongroi-K7Q-2MX-3f9a1c2e.json";
   await i18n.changeLanguage("en");
   mockIPC((cmd, args) => {
     calls.push(cmd);
@@ -131,6 +137,16 @@ beforeEach(async () => {
         return linksOverride ?? { repository: REPOSITORY, code: REPOSITORY, commit: null };
       case "relaunch_full":
         return "failed";
+      case "build_saved_record": {
+        savedArgs.push(payload);
+        const typed = payload.caseCode as string | null;
+        if (typed === "K7Q-2MU") {
+          throw "a case code cannot hold 'U'";
+        }
+        return { digest: DIGEST, size: 163_000, case_code: typed ? "K7Q-2MX" : null };
+      }
+      case "save_saved_record":
+        return saveAnswer;
       case "code_link_qr":
         return `<?xml version="1.0" standalone="yes"?><svg xmlns="http://www.w3.org/2000/svg"></svg>`;
       default:
@@ -411,6 +427,56 @@ describe("App", () => {
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
+  });
+
+  it("builds the saved record at consent with the typed case code and shows its digest for staff to note", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.change(screen.getByPlaceholderText("XXX-XXX"), { target: { value: "k7q-2mx" } });
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(await screen.findByText("3f9a 1c2e 7b4d 5a60")).toBeTruthy();
+    expect(screen.getByText("K7Q-2MX")).toBeTruthy();
+    expect(screen.getByText(DIGEST)).toBeTruthy();
+    expect(savedArgs).toEqual([
+      {
+        options: { server_identity: false, account_identifier: false, download_host: false },
+        caseCode: "k7q-2mx",
+      },
+    ]);
+  });
+
+  it("keeps the player on the consent screen when the case code is refused", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.change(screen.getByPlaceholderText("XXX-XXX"), { target: { value: "K7Q-2MU" } });
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(
+      await screen.findByText(/That case code was not accepted: a case code cannot hold 'U'/),
+    ).toBeTruthy();
+    expect(calls).not.toContain("report_view");
+  });
+
+  it("saves the record where the player chose and says where, or that it was not saved", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    fireEvent.click(await screen.findByText("Save this report"));
+    expect(
+      await screen.findByText(
+        /Saved to C:\\Users\\player\\Documents\\rongroi-K7Q-2MX-3f9a1c2e\.json/,
+      ),
+    ).toBeTruthy();
+    saveAnswer = null;
+    fireEvent.click(screen.getByText("Save this report"));
+    expect(await screen.findByText("Not saved.")).toBeTruthy();
+  });
+
+  it("offers no save and no digest in Self mode", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Found")).toBeTruthy();
+    expect(screen.queryByText("Save this report")).toBeNull();
+    expect(calls).not.toContain("build_saved_record");
   });
 
   it("shows the program version in the report header, which the release notes ask people to check", async () => {
@@ -781,10 +847,16 @@ describe("App", () => {
       if (cmd === "code_links") {
         return { repository: REPOSITORY, code: REPOSITORY, commit: null };
       }
+      if (cmd === "build_saved_record") {
+        // The record is built with the same answer the view is (ADR 0073).
+        seen.push((args as Record<string, unknown>).options);
+        return { digest: DIGEST, size: 1, case_code: null };
+      }
       return selfView.header;
     });
     fireEvent.click(screen.getByText("I agree — show the SS view"));
     await screen.findByText("Found");
+    expect(seen).toHaveLength(2);
     expect(seen).toContainEqual({
       server_identity: true,
       account_identifier: false,

@@ -120,6 +120,9 @@ Showing a short digest of the report on screen during the session, for staff to 
 afterwards, is not signing. It would tie a file to what staff saw on screen and say nothing more than the
 screen did. It is neither accepted nor rejected by this ADR and would need its own proposal.
 
+**Taken up by ADR 0073 (2026-10-16):** a saved record's SHA-256 is shown on screen, 16 characters large, for staff
+to compare with the file they receive. It is not a signature, and this ADR's decision is unchanged.
+
 ## Consequences
 
 - A report file is worth what the session it came from was worth. Staff who want more than that have to

@@ -63,6 +63,11 @@ struct ScanArgs {
     /// Restart with administrator rights before scanning (Windows only). Windows asks you to confirm.
     #[arg(long)]
     elevate: bool,
+    /// Case code from the server, as `XXX-XXX` (ADR 0073). With `--mode ss --json`, prints a saved record —
+    /// the SS view, every PCI and HID device and this code — instead of the view, and its SHA-256 on
+    /// standard error for the person watching to note.
+    #[arg(long, value_name = "CODE")]
+    case_code: Option<String>,
     /// Wait for Enter before exiting. Added by `--elevate` to the copy it starts, whose console window
     /// Windows closes as soon as that copy exits (ADR 0012, amended); not meant to be typed.
     #[arg(long, hide = true)]
@@ -110,6 +115,16 @@ fn main() -> ExitCode {
 fn scan(args: &ScanArgs) -> anyhow::Result<()> {
     let bundle = Bundle::embedded().context("the embedded rules bundle is invalid")?;
     let mode = Mode::from(args.mode);
+    // Checked before anything is read: a code that cannot be used should not cost the player a scan.
+    let case_code = match &args.case_code {
+        None => None,
+        Some(_) if mode != Mode::Ss || !args.json => {
+            anyhow::bail!("{}", output::case_code_needs_ss_json(args.lang))
+        }
+        Some(typed) => Some(view::canonical_case_code(typed).map_err(|error| {
+            anyhow::anyhow!("{}: {error}", output::case_code_refused(args.lang))
+        })?),
+    };
     let host = live_host();
 
     // Elevation is a property of a process token, so it takes a new process (ADR 0012). Asked before the
@@ -165,8 +180,30 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
         tier,
     };
     let report = scan::run(host.as_ref(), &bundle, context);
-    let view = view::for_mode_with(&report, mode, options);
+    let scan_finished_at = jiff::Timestamp::now().to_string();
 
+    if let Some(code) = case_code {
+        let times = view::SavedTimes {
+            scan_finished_at,
+            saved_at: jiff::Timestamp::now().to_string(),
+        };
+        // Serialised once; the digest and standard output are the same bytes, with nothing after them.
+        let bytes = view::saved_record(&report, options, Some(code.clone()), times).to_bytes()?;
+        eprintln!(
+            "{}",
+            output::saved_digest(
+                args.lang,
+                &view::shown_case_code(&code),
+                &view::digest(&bytes)
+            )
+        );
+        let mut stdout = std::io::stdout().lock();
+        stdout.write_all(&bytes)?;
+        stdout.flush()?;
+        return Ok(());
+    }
+
+    let view = view::for_mode_with(&report, mode, options);
     if args.json {
         println!("{}", serde_json::to_string_pretty(&view)?);
     } else {

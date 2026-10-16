@@ -221,6 +221,18 @@ fn text_timeline(lang: Lang, key: &str) -> &'static str {
 /// so neither table grows past what one screen can check.
 fn scan_text(lang: Lang, key: &str) -> &'static str {
     match (lang, key) {
+        (Lang::En, "case_code_needs_ss_json") => {
+            "--case-code makes a saved record, which needs --mode ss --json (ADR 0073)."
+        }
+        (Lang::Th, "case_code_needs_ss_json") => {
+            "--case-code ใช้ทำรายงานที่บันทึก ต้องใช้คู่กับ --mode ss --json (ADR 0073)"
+        }
+        (Lang::En, "case_code_refused") => "This is not a case code",
+        (Lang::Th, "case_code_refused") => "นี่ไม่ใช่รหัสคดี",
+        (Lang::En, "saved_case_code") => "Case code:",
+        (Lang::Th, "saved_case_code") => "รหัสคดี:",
+        (Lang::En, "saved_digest") => "Report SHA-256 (note the first 16):",
+        (Lang::Th, "saved_digest") => "SHA-256 ของรายงาน (จด 16 ตัวแรก):",
         (Lang::En, "tier_standard") => "standard scan",
         (Lang::Th, "tier_standard") => "สแกนแบบมาตรฐาน",
         (Lang::En, "tier_full") => "full scan",
@@ -348,7 +360,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
             \x20 - when parts of this PC were set up, as dates and never times: when this Windows installation was installed or last feature-upgraded, the earliest installation date Windows Setup kept and how many it kept, when the Windows drive's change journal, its root folder and its $Recycle.Bin were created, and when FiveM's program folders were created; these dates can match two reports of this PC\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; the first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as suspicious, never what the script said; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; the first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as suspicious, never what the script said; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. With --case-code, the output also holds every PCI and input device above (model numbers and times, no names) and the case code. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
@@ -372,7 +384,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
             \x20 - ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร เป็นวันที่ ไม่ใช่เวลา: Windows ชุดนี้ติดตั้งหรืออัปเกรด feature ครั้งล่าสุดเมื่อไร วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้และเก็บไว้กี่รายการ change journal ของไดรฟ์ Windows, root ของไดรฟ์ และ $Recycle.Bin ถูกสร้างเมื่อไร และโฟลเดอร์โปรแกรมของ FiveM ถูกสร้างเมื่อไร วันที่เหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Windows PowerShell บันทึก script block ที่ PowerShell เองตั้งธงว่าน่าสงสัย โดยไม่บอกว่า script เขียนว่าอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Windows PowerShell บันทึก script block ที่ PowerShell เองตั้งธงว่าน่าสงสัย โดยไม่บอกว่า script เขียนว่าอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ถ้าใช้ --case-code ผลที่ออกมาจะมีอุปกรณ์ PCI และอุปกรณ์อินพุตทุกตัวข้างต้น (หมายเลขรุ่นและเวลา ไม่มีชื่อ) และรหัสคดีด้วย ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
@@ -429,6 +441,34 @@ pub fn full_question(lang: Lang) -> String {
 /// Printed when the full-scan question was not answered `yes`.
 pub fn full_declined(lang: Lang) -> &'static str {
     scan_text(lang, "full_declined")
+}
+
+/// Why `--case-code` was refused: it only makes a saved record with `--mode ss --json` (ADR 0073).
+pub fn case_code_needs_ss_json(lang: Lang) -> &'static str {
+    scan_text(lang, "case_code_needs_ss_json")
+}
+
+/// The start of the message for a case code that is not six characters of the alphabet.
+pub fn case_code_refused(lang: Lang) -> &'static str {
+    scan_text(lang, "case_code_refused")
+}
+
+/// The line the person watching notes: the case code and the saved record's SHA-256, the first 16 characters
+/// in four groups and then all 64 (ADR 0073 §3).
+pub fn saved_digest(lang: Lang, shown_code: &str, digest: &str) -> String {
+    let short = digest
+        .get(..rongroi_core::view::SHOWN_DIGEST_LEN)
+        .unwrap_or(digest)
+        .as_bytes()
+        .chunks(4)
+        .map(|c| String::from_utf8_lossy(c).into_owned())
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "{} {shown_code}\n{} {short}\n  {digest}",
+        scan_text(lang, "saved_case_code"),
+        scan_text(lang, "saved_digest")
+    )
 }
 
 /// The SS-mode question about one kind of sensitive value (ADR 0052). Default no.

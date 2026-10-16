@@ -66,3 +66,54 @@ fn pause_at_exit_asks_on_standard_error_and_ends_at_end_of_input() {
     serde_json::from_slice::<serde_json::Value>(&output.stdout)
         .expect("the pause adds nothing to standard output");
 }
+
+/// ADR 0073: with a case code, standard output is the saved record's bytes and nothing after them, and the
+/// SHA-256 on standard error is of exactly those bytes.
+#[test]
+fn a_case_code_prints_a_saved_record_whose_digest_is_on_standard_error() {
+    let output = run(
+        &[
+            "scan",
+            "--mode",
+            "ss",
+            "--json",
+            "--yes",
+            "--case-code",
+            "k7q-2mx",
+        ],
+        "",
+    );
+    assert!(output.status.success(), "{}", text(&output.stderr));
+    let record: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("standard output is only the saved record");
+    assert_eq!(record["kind"], "rongroi-saved-report");
+    assert_eq!(record["case_code"], "K7Q2MX");
+    assert_eq!(record["view"]["mode"], "ss");
+    let digest = rongroi_core::view::digest(&output.stdout);
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("K7Q-2MX") && stderr.contains(&digest),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn a_case_code_is_refused_before_anything_is_read_outside_ss_json_or_when_malformed() {
+    for args in [
+        &["scan", "--json", "--case-code", "K7Q2MX"][..],
+        &["scan", "--mode", "ss", "--yes", "--case-code", "K7Q2MX"][..],
+        &[
+            "scan",
+            "--mode",
+            "ss",
+            "--json",
+            "--yes",
+            "--case-code",
+            "K7Q2MU",
+        ][..],
+    ] {
+        let output = run(args, "");
+        assert!(!output.status.success(), "{args:?}");
+        assert!(output.stdout.is_empty(), "{args:?}");
+    }
+}

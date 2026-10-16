@@ -21,6 +21,7 @@ pub mod boot_time;
 pub mod device;
 
 pub mod dialog;
+pub mod save_dialog;
 
 pub mod elevate;
 

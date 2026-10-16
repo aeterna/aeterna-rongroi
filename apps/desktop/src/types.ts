@@ -372,3 +372,13 @@ export interface CodeLinks {
   code: string;
   commit: string | null;
 }
+
+/** What the window shows about a saved record once it is built (ADR 0073). */
+export interface SavedSummary {
+  /** SHA-256 of the record's bytes, 64 lowercase hex characters. */
+  digest: string;
+  /** Size of the record in bytes. */
+  size: number;
+  /** The case code as shown, `XXX-XXX`, when one was typed. */
+  case_code: string | null;
+}

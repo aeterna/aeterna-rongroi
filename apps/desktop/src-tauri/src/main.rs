@@ -17,10 +17,15 @@ use rongroi_core::model::{Report, ScanTier};
 use rongroi_core::provenance::Provenance;
 use rongroi_host::Host;
 
-/// Everything the UI may ask for. Created before any window exists and never changed afterwards.
+/// Everything the UI may ask for. Created before any window exists; the report is never changed afterwards.
 pub struct AppState {
     bundle: Bundle,
     report: Report,
+    /// When the scan returned, for a saved record (ADR 0073).
+    scan_finished_at: String,
+    /// The saved record's bytes, once the player confirmed SS mode: serialised once, and what both the
+    /// digest on screen and the file are taken from (ADR 0073).
+    saved: std::sync::Mutex<Option<Vec<u8>>>,
 }
 
 /// The flag that asks for a full scan (ADR 0052). It only asks: [`chosen_tier`] decides.
@@ -85,6 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let host = live_host();
     let report = scan::run(host.as_ref(), &bundle, context);
+    let scan_finished_at = jiff::Timestamp::now().to_string();
 
     // 2. Only now create the UI, with its profile in a per-run temporary folder. The folders earlier
     //    runs could not delete because they were stopped go first; the scan is already over.
@@ -92,7 +98,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = webview_hardening::run_data_dir();
     let window_dir = data_dir.clone();
     let app = tauri::Builder::default()
-        .manage(AppState { bundle, report })
+        .manage(AppState {
+            bundle,
+            report,
+            scan_finished_at,
+            saved: std::sync::Mutex::new(None),
+        })
         .invoke_handler(tauri::generate_handler![
             commands::report_header,
             commands::report_view,
@@ -101,7 +112,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::relaunch_elevated,
             commands::relaunch_full,
             commands::code_links,
-            commands::code_link_qr
+            commands::code_link_qr,
+            commands::build_saved_record,
+            commands::save_saved_record
         ])
         .setup(move |app| {
             webview_hardening::build_main_window(app, &window_dir)?;

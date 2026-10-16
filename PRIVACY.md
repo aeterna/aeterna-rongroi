@@ -477,8 +477,12 @@ is nothing; what it removes is this list and the evidence that did not match.
 
 ## What is stored
 
-Nothing. The window version has no export or save button. The CLI prints the view it was asked for,
-as text or with `--json` as JSON, and writes a file only if you redirect that output into one yourself;
-it contains the view you asked for (SS-mode output is redacted). If you send such a file to a server's
+Nothing, unless you press **Save this report** in SS mode (ADR 0073). Then the window writes one file,
+where you choose in Windows' own Save dialog and nowhere else: exactly what the SS screen showed, every PCI
+and input device the scan read (model numbers and times, no names), the case code you typed, and when the
+scan ran. The window shows the file's SHA-256 before you save, so staff can note it and later recognise the
+file. Self mode has no Save. The CLI prints the view it was asked for, as text or with `--json` as JSON, and
+writes a file only if you redirect that output into one yourself; it contains the view you asked for
+(SS-mode output is redacted), and with `--case-code` it is the same kind of record the window saves. If you send such a file to a server's
 staff, that server becomes responsible for how it keeps it. Such a file is not signed: anyone who holds
 it can change it, and nothing in it shows whether they did (ADR 0040).
