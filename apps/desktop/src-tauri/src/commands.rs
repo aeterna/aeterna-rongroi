@@ -99,8 +99,12 @@ pub fn default_file_name(case_code: Option<&str>, saved_on: &str, digest: &str) 
 /// # Errors
 ///
 /// A sentence for the player: nothing was built yet, the dialog failed, or the file could not be written.
+///
+/// `async`, so Tauri runs it off the window's thread: the dialog is owned by the window, and Windows disables
+/// an owner by sending its thread a message. A command on that thread waiting for the dialog would never let
+/// the message through (ADR 0073).
 #[tauri::command]
-pub fn save_saved_record(
+pub async fn save_saved_record(
     state: State<'_, AppState>,
     window: tauri::WebviewWindow,
     title: String,
@@ -121,7 +125,12 @@ pub fn save_saved_record(
         });
     let today = jiff::Zoned::now().date().to_string();
     let name = default_file_name(code.as_deref(), &today, &digest);
-    let path = rongroi_host_windows_save(&title, &name, owner_of(&window))?;
+    let owner = owner_of(&window);
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        rongroi_host_windows_save(&title, &name, owner)
+    })
+    .await
+    .map_err(|e| format!("the Save dialog stopped: {e}"))??;
     let Some(path) = path else {
         return Ok(None);
     };
