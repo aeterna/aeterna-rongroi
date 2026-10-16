@@ -17,10 +17,12 @@ import type {
   ReportView,
   RowBand,
   RuleText,
+  SavedSummary,
   SsOptions,
 } from "../types";
 import { EvidenceRow } from "./EvidenceRow";
 import { ReportSummary } from "./ReportSummary";
+import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
 import { CrossSource, TraceAges } from "./TraceAges";
 
@@ -28,10 +30,12 @@ interface Props {
   mode: Mode;
   /** What the player agreed SS mode may show beyond its default (ADR 0052). */
   options?: SsOptions;
+  /** The saved record built at consent, in SS mode (ADR 0073). */
+  saved?: SavedSummary;
   onBack: () => void;
 }
 
-export function Report({ mode, options, onBack }: Props) {
+export function Report({ mode, options, saved, onBack }: Props) {
   const { t, i18n } = useTranslation("report");
   const [view, setView] = useState<ReportView | null>(null);
   const [texts, setTexts] = useState<Record<string, RuleText>>({});
@@ -82,6 +86,7 @@ export function Report({ mode, options, onBack }: Props) {
 
   return (
     <section className="report">
+      {mode === "ss" && saved && <SavedRecordBox saved={saved} />}
       <ReportSummary listed={view.listed} filter={filter} onFilter={setFilter} />
 
       <dl className="facts context">

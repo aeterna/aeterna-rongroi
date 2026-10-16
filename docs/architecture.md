@@ -241,6 +241,12 @@ deleted at the next start, after the scan), keeps SmartScreen off inside the Web
 content-security policy that allows no network connections. WebView2's own Windows diagnostics are outside
 the app's control and are disclosed in the consent screen (ADR 0001, PRIVACY.md).
 
+The one file it writes is a saved report, in SS mode, when the player presses Save (ADR 0073). The record is
+built once in `rongroi_core::view::saved_record` when the player confirms the SS consent with an optional case
+code, its bytes are kept in Rust, and both the SHA-256 the window shows and the file come from those bytes. The
+UI still has no file access: Rust opens Windows' own Save dialog (`rongroi_host_windows::save_dialog`, COM on a
+thread of its own) and writes the kept bytes with `std::fs::write`. No Tauri plugin is added.
+
 Because the scan happens first, a collector that does not return is not a stalled progress bar — it is an
 app that never appears. That is why the `evtx` collector, the only one whose input is both large and
 attacker-chosen, bounds its own wall-clock and reports the logs it did not reach (ADR 0024).

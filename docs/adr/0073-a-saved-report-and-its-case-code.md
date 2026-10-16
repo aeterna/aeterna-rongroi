@@ -1,7 +1,7 @@
 # ADR 0073 — A saved report, its case code, and the digest staff see on screen
 
-- Status: proposed — the owner asked for a save button (DMA plan Q-R2, 2026-10-15) and for this ADR (2026-10-16);
-  the questions at the end are open
+- Status: accepted — the owner asked for a save button (DMA plan Q-R2, 2026-10-15) and decided the six questions
+  below as recommended on 2026-10-16; implemented the same day ("As built")
 - Date: 2026-10-16
 - Takes up: ADR 0040 "Not decided here" (a short digest on screen); ADR 0070's deferral of "the case code and the
   button that saves a report"
@@ -34,7 +34,7 @@ say nothing more than the screen did." (0040:119-121). This ADR proposes it.
 main.rs:87-95`), so nothing typed into the window can be part of the scan. A case code has to be part of the file
 that is saved, not of the scan.
 
-## Decision (proposed)
+## Decision
 
 ### 1. A saved record, built once, in the core
 
@@ -135,6 +135,8 @@ record over it is still saved, and the window says how large it is.
 
 ## Decisions for the owner
 
+Decided on 2026-10-16: all six as recommended.
+
 | # | Question | Recommended |
 |---|---|---|
 | 1 | A save button in the window, SS mode only, writing a saved record built once in the core? | **Yes** |
@@ -156,3 +158,21 @@ record over it is still saved, and the window says how large it is.
   nakara parser ignores fields it does not know and refuses another `kind` or an unknown `schema`.
 - The release that adds the button also carries `hid_device` (ADR 0072, merged), so the file holds HID devices from
   its first version, and the server's consent text names mice and keyboards.
+
+## As built (2026-10-16)
+
+- `crates/rongroi-core/src/view/saved.rs`: `saved_record`, `SavedRecord::to_bytes` (compact, no BOM),
+  `canonical_case_code`, `shown_case_code`, `digest`. Tests: canonical forms, refused codes, the digest; and in
+  `crates/rongroi-collectors/tests/saved_record.rs` that the record's `view` equals the SS view, holds no
+  `profiles_directory` and no unmatched list, carries the consumer baseline's 10 PCI and 6 HID devices, and gives
+  the same bytes twice.
+- CLI: `--case-code`, only with `--mode ss --json` and checked before anything is read; standard output is the
+  record's bytes with nothing after them, and standard error the code and the digest. `tests/streams.rs` checks
+  that the SHA-256 of standard output is the one printed.
+- `crates/rongroi-host-windows/src/save_dialog.rs`: `IFileSaveDialog` on its own thread with COM initialised
+  there, Documents folder, `.json`, Windows' replace prompt. Features `Win32_System_Com` and `Win32_UI_Shell_Common`.
+- Desktop: `AppState` keeps `scan_finished_at` and the record's bytes; commands `build_saved_record` (called once
+  at consent; a refused code keeps the player on the consent screen) and `save_saved_record`. UI: the case code
+  field, `SavedRecordBox` with the code, the 16 characters in four groups, the full digest and the button.
+- The Save dialog was not run on a real Windows desktop in this change: it compiles and passes clippy for
+  `x86_64-pc-windows-gnu`, and the release check runs it before the release is published.

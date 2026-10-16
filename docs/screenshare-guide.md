@@ -503,8 +503,20 @@ modes, lists what it saw of itself. It is not evidence about the PC.
 
 ## 9. Keeping a record
 
-- **The window version has no export or save button** in 0.9.0 either: nothing in its source writes a
-  file.
+- **The window version saves a report** in SS mode (ADR 0073). Before the scan's results show, the
+  consent screen asks for the **case code** your server gave the player (six letters and digits, such as
+  `K7Q-2MX`; optional). The SS screen then shows the code and **the report's SHA-256: note the 16
+  characters shown large**. **Save this report** opens Windows' Save dialog and writes exactly that file:
+  the SS view, every PCI and input device (model numbers and times, no names) and the code. When the file
+  reaches you, its SHA-256 must start with the 16 characters you noted; if it does not, it is not the report
+  you watched. The match shows only that the file is what was on screen, not that the screen was honest
+  (ADR 0040).
+- **The CLI** does the same with `--case-code`: standard output is the record and the SHA-256 is printed
+  above it on the screen:
+
+  ```bat
+  .\aeterna-rongroi-cli-0.9.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
+  ```
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
   ```bat

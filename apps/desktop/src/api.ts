@@ -12,6 +12,7 @@ import type {
   ReportHeader,
   ReportView,
   RuleText,
+  SavedSummary,
   SsOptions,
 } from "./types";
 
@@ -65,4 +66,20 @@ export function codeLinks(): Promise<CodeLinks> {
 /** A QR code of a link into the repository as SVG text, drawn in Rust; `null` for any other text. */
 export function codeLinkQr(url: string): Promise<string | null> {
   return invoke<string | null>("code_link_qr", { url });
+}
+
+/**
+ * Builds the SS-mode saved record with `options` and the typed case code, once, in Rust (ADR 0073), and
+ * returns its digest. Rejects with a sentence when the code is not a case code.
+ */
+export function buildSavedRecord(options: SsOptions, caseCode: string): Promise<SavedSummary> {
+  return invoke<SavedSummary>("build_saved_record", { options, caseCode: caseCode || null });
+}
+
+/**
+ * Asks where to save the record with Windows' Save dialog and writes exactly the bytes built by
+ * `buildSavedRecord`. Resolves to the path written, or `null` when the player cancelled.
+ */
+export function saveSavedRecord(title: string): Promise<string | null> {
+  return invoke<string | null>("save_saved_record", { title });
 }

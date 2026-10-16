@@ -6,6 +6,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Save this report**, in SS mode only (ADR 0073). The consent screen takes an optional **case code** from the
+  server (six Crockford base32 characters, shown `XXX-XXX`); the SS screen shows the code and the SHA-256 of the
+  saved record, its first 16 characters large for staff to note, and Save writes exactly those bytes through
+  Windows' own Save dialog: the SS view, every PCI and HID device, the code and when the scan ran. The CLI does
+  the same with `scan --mode ss --json --case-code CODE`, printing the SHA-256 on standard error. Nothing is
+  signed and nothing is sent; a matching digest shows only that a file is what was on screen (ADR 0040).
 - The mice, keyboards and other input devices Windows remembers are read on every scan (`hid_device`, ADR 0072),
   present or not: the maker and model numbers, the driver (`mouhid`, `kbdhid`) and the times Windows stores; never a
   serial number or a name. One `experimental` `context` rule, **an input device Windows set up earlier is not present

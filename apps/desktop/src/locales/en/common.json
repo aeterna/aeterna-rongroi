@@ -34,7 +34,10 @@
     "refuse": "I refuse",
     "full_reads": "A full scan also read the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server this PC joined — with when it was created and last changed. What the name is made from is not known; it stays the same for that server on this PC, so it can match two reports of this PC. It also read the words in PowerShell's commands, kept only as kinds — whether a command downloaded something and ran it, told Microsoft Defender to look away, cleared a log or history, or named FiveM — from the history of commands typed into a PowerShell window, the scripts Windows PowerShell flagged as suspicious, and the command lines it was started with. No command was kept; the one thing kept is the name of a website a command downloaded from.",
     "server_identity": "Also show which servers these are (the folder names). Off: each name is shown as %SERVER_IDENTITY%.",
-    "download_host": "Also show the name of each website a PowerShell command downloaded from. Off: each name is shown as %DOWNLOAD_HOST%."
+    "download_host": "Also show the name of each website a PowerShell command downloaded from. Off: each name is shown as %DOWNLOAD_HOST%.",
+    "saved": "If you press Save on the next screen, the file holds what that screen shows, every PCI and input device listed above (model numbers and times, no names) and the case code. It is written only where you choose, and nothing is sent.",
+    "case_code": "Case code from the server (optional):",
+    "case_code_refused": "That case code was not accepted: {{reason}}. A case code is six letters and digits, such as K7Q-2MX."
   },
   "declined": {
     "title": "Nothing was shown",
