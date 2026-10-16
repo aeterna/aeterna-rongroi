@@ -122,3 +122,12 @@ devices:
   - { id: 'PCI\VEN_10EC&DEV_A0F7&SUBSYS_88D21043&REV_15\4&3d4c5b6a&0&0029', present: true, compatible_ids: ['PCI\CC_020000', 'PCI\CC_0200'], service: rt640x64, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
   - { id: 'PCI\VEN_1022&DEV_A0F8&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0341', present: true, compatible_ids: ['PCI\CC_0C0330', 'PCI\CC_0C03'], service: USBXHCI, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
   - { id: 'PCI\VEN_1022&DEV_A0F9&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0641', present: true, compatible_ids: ['PCI\CC_040300', 'PCI\CC_0403'], service: HDAudBus, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
+# The HID devices Windows remembers (ADR 0072): one mouse and one keyboard with the collections Windows lists
+# beside them — a driver service only on the mouse (mouhid) and keyboard (kbdhid) entries, as measured on the
+# development PC (2026-10-16) — all present. QEMU's vendor id with invented product ids.
+  - { id: 'HID\VID_0627&PID_A101&MI_00\7&1a2b3c4d&0&0000', present: true, service: mouhid, first_install: '2026-03-02T09:14:25Z', last_arrival: '2026-10-09T08:46:16Z' }
+  - { id: 'HID\VID_0627&PID_A101&MI_01&COL01\7&2b3c4d5e&0&0000', present: true, first_install: '2026-03-02T09:14:25Z', last_arrival: '2026-10-09T08:46:16Z' }
+  - { id: 'HID\VID_0627&PID_A102&MI_00\7&3c4d5e6f&0&0000', present: true, service: kbdhid, first_install: '2026-03-02T09:14:26Z', last_arrival: '2026-10-09T08:46:16Z' }
+  - { id: 'HID\VID_0627&PID_A102&MI_01&COL01\7&4d5e6f70&0&0000', present: true, first_install: '2026-03-02T09:14:26Z', last_arrival: '2026-10-09T08:46:16Z' }
+  - { id: 'HID\VID_0627&PID_A102&MI_01&COL02\7&4d5e6f70&0&0001', present: true, service: kbdhid, first_install: '2026-03-02T09:14:26Z', last_arrival: '2026-10-09T08:46:16Z' }
+  - { id: 'HID\VID_0627&PID_A103&MI_03\7&5e6f7081&0&0000', present: true, first_install: '2026-05-11T19:02:44Z', last_arrival: '2026-10-09T08:46:16Z' }

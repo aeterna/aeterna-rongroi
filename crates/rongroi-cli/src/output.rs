@@ -339,6 +339,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders, FiveM's plugin folders and the folder PowerShell keeps its command history in, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
             \x20 - the PCI devices Windows remembers, present or not: the maker, device and subsystem numbers and the class Windows records, the driver bound to each, its problem code, and when Windows set it up, last saw it at a start of Windows and recorded it removed, never a serial number; these times can match two reports of this PC\n\
+            \x20 - the mice, keyboards and other input devices (HID) Windows remembers, present or not: the maker and model numbers and the driver, and when Windows set each up, last saw it at a start of Windows and recorded it removed, never a serial number or a name\n\
             \x20 - how Windows started each time its System log remembers: one number per start that says whether it followed a full shutdown or a Fast Startup one, and nothing else of that event\n\
             \x20 - what Windows starts by itself: each program service's name and start setting, each Run and RunOnce value's name, and each scheduled task's name, whether it is on and what starts it, with the file each one starts — where it is and, outside the Windows folder, its SHA-256 and signature (Authenticode); never the arguments a program is given\n\
             \x20 - Microsoft Defender's exclusions: each folder, program and file type Defender is told not to scan, and how many network addresses it is told to skip, never the addresses\n\
@@ -362,6 +363,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
             \x20 - อุปกรณ์ PCI ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิต อุปกรณ์ และ subsystem กับ class ที่ Windows บันทึก ไดรเวอร์ที่ผูกกับแต่ละตัว problem code และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียล เวลาเหล่านี้ใช้จับคู่รายงานสองฉบับของเครื่องนี้ได้\n\
+            \x20 - เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น (HID) ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิตและรุ่น ไดรเวอร์ และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียลหรือชื่อ\n\
             \x20 - Windows เริ่มทำงานแบบไหนในแต่ละครั้งที่ log System ยังจำไว้: ตัวเลขหนึ่งตัวต่อการเริ่มทำงาน ที่บอกว่าต่อจากการปิดเครื่องแบบเต็มหรือแบบ Fast Startup และไม่อ่านอย่างอื่นของ event นั้น\n\
             \x20 - สิ่งที่ Windows เริ่มเอง: ชื่อและการตั้งค่าการเริ่มทำงานของ service แต่ละตัว ชื่อค่าใน Run และ RunOnce แต่ละค่า และชื่อ scheduled task แต่ละตัว ว่าเปิดอยู่หรือไม่และอะไรทำให้มันเริ่ม พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง และถ้าอยู่นอกโฟลเดอร์ Windows ก็ SHA-256 กับลายเซ็น (Authenticode) โดยไม่อ่าน argument ที่โปรแกรมได้รับเลย\n\
             \x20 - exclusion ของ Microsoft Defender: โฟลเดอร์ โปรแกรม และชนิดไฟล์แต่ละรายการที่ Defender ถูกสั่งไม่ให้สแกน และจำนวน address ของเครือข่ายที่ถูกยกเว้น โดยไม่อ่านตัว address\n\
@@ -1149,6 +1151,7 @@ mod tests {
             ],
         ),
         ("fivem_servers", &["FiveM for GTA V Enhanced"]),
+        ("hid_device", &["HID", "Windows"]),
         ("install_marker", &["Atlas", "ReviOS", "Defender"]),
         (
             "net_config",

@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 71
+      "rule_count": 73
     },
     "platform": "windows",
     "os_build": "26100",
@@ -164,6 +164,14 @@ expression: view
           }
         }
       ]
+    },
+    {
+      "rule_id": "e1dc0747-5038-4389-be3d-80de451d7fe6",
+      "collector": "hid_device",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
     },
     {
       "rule_id": "65ee0ec1-bcda-47a3-a401-98632b42e75f",
@@ -329,7 +337,7 @@ expression: view
   "listed": {
     "found": 2,
     "not_found": 8,
-    "unmeasured": 20
+    "unmeasured": 21
   },
   "hidden": {
     "not_found": 5,
@@ -369,6 +377,10 @@ expression: view
         "reason": "read_failed"
       },
       {
+        "collector": "hid_device",
+        "reason": "read_failed"
+      },
+      {
         "collector": "prefetch",
         "reason": "read_failed"
       },
@@ -387,6 +399,7 @@ expression: view
     "driver_service",
     "windows_start",
     "pci_device",
+    "hid_device",
     "autostart",
     "defender_exclusion",
     "fivem_dir",

@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 71 |
-| SHA-256 | `435c34e8804d3c5062d0c09bd0c60f23874f2befbb6aa39f1a9a53bfd7665f02` |
+| Rules | 73 |
+| SHA-256 | `9e40e68c8fc9b7c82cba372d7e241cf73c2fdd9b26826a3bd9625165e07a1478` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -63,6 +63,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `fivem_servers`
   - [FiveM for GTA V Enhanced keeps a cache folder for a server](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
+- `hid_device`
+  - [A mouse, keyboard or other input device Windows set up earlier is not present now](#rule-e1dc0747-5038-4389-be3d-80de451d7fe6) — `context` · `experimental`
 - `install_marker`
   - [A folder or key the Atlas playbook installs is on this PC](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
   - [A folder the ReviOS playbook installs is on this PC](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
@@ -121,6 +123,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [When PowerShell recorded a script block it considers suspicious](#rule-5bd03528-fcfe-4e57-8a7f-3a2ec815a7af) — `context` · `experimental`
   - `fivem_dir`
     - [When FiveM's log, crash and cache folders were written](#rule-2ef0da16-e65e-4bb6-90c5-0898ffc93ad8) — `context` · `test`
+  - `hid_device`
+    - [When Windows recorded each mouse, keyboard or other input device](#rule-959b560a-7822-491d-9404-094edc6c8be1) — `context` · `experimental`
   - `pca`
     - [When Program Compatibility Assistant recorded a program named like FiveM's game process](#rule-eaf79187-e067-43ed-9afe-bffe65e6b2e5) — `context` · `experimental`
     - [When Program Compatibility Assistant recorded a program named like FiveM or GTA V](#rule-6487719d-15cf-422c-8b8a-858647091fd1) — `context` · `experimental`
@@ -864,6 +868,45 @@ The server cache folders there when the scan ran. A folder the player, a cleaner
 
 - Joining any server with FiveM for GTA V Enhanced, which is what leaves these folders
 - A folder kept from a server joined long ago, or by another person using this Windows account
+
+## Collector `hid_device`
+
+### `hid_device` / `absent`
+
+<a id="rule-e1dc0747-5038-4389-be3d-80de451d7fe6"></a>
+
+#### A mouse, keyboard or other input device Windows set up earlier is not present now
+
+- Id: `e1dc0747-5038-4389-be3d-80de451d7fe6`
+- File: [`rules/hid_device/absent/not-present/rule.yaml`](../rules/hid_device/absent/not-present/rule.yaml)
+- Collector: `hid_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `hid_device`, `hardware`
+- Written: 2026-10-16
+
+**About this check**
+
+Windows set this HID device up at some time and it is not connected now. HID devices are mice, keyboards, game controllers and the other input devices Windows talks to the same way; the row names the driver (mouhid for a mouse, kbdhid for a keyboard) and the maker and model numbers. It shows when Windows first set the device up, the last start of Windows at which it was present, and a removal time when Windows recorded one: when the device was unplugged while Windows was running, or at the resume after a Fast Startup shutdown, and none after a full shutdown. The row never says what the device was beyond its numbers and its driver, or why it left. A box between a mouse and the PC that copies the mouse's numbers looks like that mouse.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `false`
+
+**Look-back**
+
+Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the device is uninstalled or Windows is installed again.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- A mouse, keyboard, headset or game controller that was used once and put away — on most PCs there are several
+- A wireless receiver plugged into another USB port, which Windows can set up again as another device
+- A drawing tablet, a remote or a docking station with its own keyboard functions
+- Windows moved to another PC
 
 ## Collector `install_marker`
 
@@ -2762,6 +2805,39 @@ The folders as they are at the moment of the scan. FiveM writes, rotates and rem
 - The player clearing FiveM's cache or logs
 - Reinstalling FiveM, moving it to another PC, or restoring it from a backup
 - A backup, sync or copy tool that sets file times
+
+### `hid_device` / `timeline`
+
+<a id="rule-959b560a-7822-491d-9404-094edc6c8be1"></a>
+
+#### When Windows recorded each mouse, keyboard or other input device
+
+- Id: `959b560a-7822-491d-9404-094edc6c8be1`
+- File: [`rules/hid_device/timeline/device-times/rule.yaml`](../rules/hid_device/timeline/device-times/rule.yaml)
+- Role: `timeline` — a timeline selector: its matches are times on the timeline, never evidence
+- Collector: `hid_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `hid_device`, `timeline`
+- Written: 2026-10-16
+
+**About this check**
+
+Puts on the timeline the times Windows stores for every HID device it remembers, present or not: when it first set each up, the last start of Windows at which each was present, and a removal time when Windows recorded one. A mouse taken out and another plugged in shows as one removal and one first set-up a minute apart; so does an ordinary mouse swap. A time here is not evidence of anything on its own.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is one of `true`, `false`
+
+**Look-back**
+
+Devices Windows still remembers, until a device is uninstalled or Windows is installed again.
+
+**Ordinary things behind these times**
+
+- Every PC has these; a mouse or keyboard plugged in, unplugged or replaced is ordinary
+- After a full shutdown Windows records no removal time, so a missing one says nothing about when a device left
+- A clock that was changed, so that these times are not on the same clock as the others
 
 ### `pca` / `timeline`
 

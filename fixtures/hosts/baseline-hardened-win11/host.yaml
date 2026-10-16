@@ -104,3 +104,7 @@ devices:
   - { id: 'PCI\VEN_10EC&DEV_A0F7&SUBSYS_88D21043&REV_15\4&3d4c5b6a&0&0029', present: true, compatible_ids: ['PCI\CC_020000', 'PCI\CC_0200'], service: e1i68x64, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
   - { id: 'PCI\VEN_8086&DEV_A0F8&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0341', present: true, compatible_ids: ['PCI\CC_0C0330', 'PCI\CC_0C03'], service: USBXHCI, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
   - { id: 'PCI\VEN_8086&DEV_A0F9&SUBSYS_88D21043&REV_00\4&4e5d6c7b&0&0641', present: true, compatible_ids: ['PCI\CC_040300', 'PCI\CC_0403'], service: HDAudBus, problem_code: 0, first_install: '2026-03-02T09:14:21Z', last_arrival: '2026-10-09T08:46:15Z' }
+# The HID devices Windows remembers (ADR 0072): one mouse and one keyboard, present. QEMU's vendor id with invented
+# product ids.
+  - { id: 'HID\VID_0627&PID_A111\7&6f708192&0&0000', present: true, service: mouhid, first_install: '2026-04-20T10:02:11Z', last_arrival: '2026-10-08T07:30:02Z' }
+  - { id: 'HID\VID_0627&PID_A112\7&708192a3&0&0000', present: true, service: kbdhid, first_install: '2026-04-20T10:02:12Z', last_arrival: '2026-10-08T07:30:02Z' }

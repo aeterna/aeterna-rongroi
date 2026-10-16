@@ -1,0 +1,6 @@
+{
+  "description": "A device whose presence could not be read is not selected",
+  "observations": [
+    { "collector": "hid_device", "fields": { "name": "HID\\VID_0627&PID_0001", "service": "mouhid" } }
+  ]
+}
