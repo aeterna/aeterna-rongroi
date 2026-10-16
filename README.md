@@ -70,13 +70,14 @@ system could fake what is displayed. Treat results as evidence for a person to j
 
 ## Status
 
-**Latest release: [0.9.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.15-0.9.0)**, 15 October 2026 —
-a pre-release. It has 55 rules, and almost all of them are still `experimental`: they have not yet been
+**Latest release: [0.10.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.16-0.10.0)**, 16 October 2026 —
+a pre-release. It has 56 rules, and almost all of them are still `experimental`: they have not yet been
 checked against enough real PCs, so read every result with care. 0.8.0 added PowerShell: what it flagged,
 whether its history was deleted, and, in a full scan, which kinds of words its commands held — never the
-commands. 0.9.0 lists the PCI devices Windows remembers, present or not, with a rule for one that has no driver
-and one for a device that is gone, and says whether the firmware describes an IOMMU; it cannot see a DMA card
-that imitates an ordinary device.
+commands. 0.9.0 added the PCI devices Windows remembers and whether the firmware describes an IOMMU. 0.10.0 saves
+an SS report with the server's case code and shows its SHA-256 for staff to note, and puts the times of mice and
+keyboards being plugged in and taken out on the timeline; it cannot tell a box between the mouse and the PC from a
+mouse.
 Earlier versions: [CHANGELOG.md](CHANGELOG.md).
 
 | What it looks at, in plain words | Technical detail |

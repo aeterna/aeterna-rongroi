@@ -5,6 +5,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-16
+
+A report can be kept. In SS mode the window takes a case code from the server, shows the SHA-256 of the report for
+staff to note, and saves exactly that report where the player chooses; a file whose SHA-256 starts the same is the
+report that was on screen. Every scan also reads the mice, keyboards and other input devices Windows remembers, for
+their times: when one was taken out and another plugged in. Nothing is signed and nothing is sent.
+
 ### Added
 - **Save this report**, in SS mode only (ADR 0073). The consent screen takes an optional **case code** from the
   server (six Crockford base32 characters, shown `XXX-XXX`); the SS screen shows the code and the SHA-256 of the

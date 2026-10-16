@@ -1,9 +1,9 @@
 # Screenshare guide
 
 For server staff checking a player's PC over a screenshare (an SS, also called a PC check), and for the player. It covers
-aeterna-rongroi **0.9.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
+aeterna-rongroi **0.10.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
-> ⚠️ **Pre-alpha.** Fifty-five rules ship in 0.9.0, and fifty-three of them are `experimental`. Do not ban anyone
+> ⚠️ **Pre-alpha.** Fifty-six rules ship in 0.10.0, and fifty-four of them are `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
 
 ## 1. What it can and cannot show
@@ -85,7 +85,7 @@ read-only, and the one about an event log file that is not the file Windows writ
   than PowerShell, for the reason in §2.
   `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
   until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
-  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2 and 0.9.0 — but the report from
+  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2, 0.9.0 and 0.10.0 — but the report from
   `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
   use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
   (measured on a real Windows 11 machine).
@@ -105,7 +105,7 @@ change the results. The consent screen decides what is shown.
 **CLI** (in the Command Prompt from §3):
 
 ```bat
-.\aeterna-rongroi-cli-0.9.0-windows-x64.exe scan --mode ss
+.\aeterna-rongroi-cli-0.10.0-windows-x64.exe scan --mode ss
 ```
 
 Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
@@ -120,7 +120,7 @@ Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player**
 ### The header
 
 ```
-aeterna-rongroi 0.9.0
+aeterna-rongroi 0.10.0
 official build
 mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
 exe sha256: <hash>
@@ -311,7 +311,7 @@ Four things to know about the seven FiveM rules:
   check the certificate of a FiveM.exe freshly installed from Cfx.re on your own machine, and tell this
   project.
 
-A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 and 0.7.0 add no rules, and eight are new in 0.8.0: the two about PowerShell's command history folder and the six full-scan PowerShell rows. 0.8.1 and 0.8.2 add none, and three are new in 0.9.0: the two PCI device rows and the IOMMU row. None of the
+A 0.2.0 report has only the first six rules in this table; the next fifteen are new in 0.3.0, the sixteen after them — vulnerable drivers, a server cache folder, the hosts file, and the thirteen about which Windows this is — are new in 0.4.0, and the last seven — Defender's real-time protection, the four about the change journal, a program that starts by itself and a Defender exclusion — are new in 0.5.0. 0.6.0 and 0.7.0 add no rules, and eight are new in 0.8.0: the two about PowerShell's command history folder and the six full-scan PowerShell rows. 0.8.1 and 0.8.2 add none, three are new in 0.9.0: the two PCI device rows and the IOMMU row, and one is new in 0.10.0: the input device row. None of the
 firmware and PowerShell posture rows means "a policy nobody wrote" or "Secure Boot is off" on its own: the
 firmware row needs the two readings to disagree, each PowerShell row needs a policy written to off. The two
 per-user rows read the Windows account the scan ran as, which is the player's only when the
@@ -515,12 +515,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   above it on the screen:
 
   ```bat
-  .\aeterna-rongroi-cli-0.9.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
+  .\aeterna-rongroi-cli-0.10.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
   ```
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
   ```bat
-  .\aeterna-rongroi-cli-0.9.0-windows-x64.exe scan --mode ss --json > report.json
+  .\aeterna-rongroi-cli-0.10.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
   The consent question stays on screen, the player answers it there, and the file holds only the JSON.
