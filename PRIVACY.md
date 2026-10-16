@@ -4,7 +4,7 @@
 
 Only local artifacts needed by its collectors, for example machine security settings (Secure Boot),
 FiveM's plugin folders (for GTA V Legacy and Enhanced) and the signatures of the files in them, FiveM's own program file (`FiveM.exe`) and its signature, counts, sizes and times of FiveM's log, crash and cache folders and of Legacy's resource cache index, the list of running processes with when each started, the drivers
-registered with Windows and a SHA-256 of each driver's file, the PCI devices Windows remembers, what the Program Compatibility Assistant, Windows
+registered with Windows and a SHA-256 of each driver's file, the PCI devices and the mice, keyboards and other input devices Windows remembers, what the Program Compatibility Assistant, Windows
 Prefetch and the Background Activity Moderator recorded about programs that ran, and what the Windows
 event logs hold, counts of the Windows drive's change journal records, for the drive as a whole and
 for each folder those collectors read and for the folder PowerShell keeps its command history in, with no
@@ -72,6 +72,14 @@ driver, a device that is not present now — and only a count of the rest. Besid
 started each time its System log remembers, one number per start (see the event logs below), because a
 device taken out before a full shutdown has no removal time and one taken out during a Fast Startup
 shutdown has one.
+
+Of the **mice, keyboards and other input devices Windows remembers** (HID devices, ADR 0072), present now or set up
+earlier and gone, it reads the same kind of thing: the maker and model numbers (`HID\VID_…&PID_…`), the driver
+(`mouhid` for a mouse, `kbdhid` for a keyboard), whether it is present, and the same three times. It never reads a
+serial number, a device's name, which USB port it is in, or what was typed or clicked. SS mode shows the devices
+that are gone, and puts the times of every input device on the timeline — when each was set up, last seen and
+taken out — because a mouse taken out and another plugged in is what a reviewer may want to see; an ordinary mouse
+swap looks the same.
 
 Of **what Windows starts by itself** it reads three places (ADR 0060):
 
@@ -454,7 +462,7 @@ like any other.
 ### What a collector saw that no rule matched
 
 Some collectors read things no rule asks about — the list of programs you are running, the drivers
-registered with Windows, the PCI devices Windows remembers, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
+registered with Windows, the PCI and input devices Windows remembers, what Windows recorded about programs that ran, whether each FiveM plugin folder was there, the counts and times of FiveM's log, crash and cache folders, and how many records the
 Windows drive's change journal holds and how many named each folder it reads. **Self mode lists them**, under "unmatched observations", so that you
 can read what the tool saw and judge it yourself.
 
@@ -469,8 +477,12 @@ is nothing; what it removes is this list and the evidence that did not match.
 
 ## What is stored
 
-Nothing. The window version has no export or save button. The CLI prints the view it was asked for,
-as text or with `--json` as JSON, and writes a file only if you redirect that output into one yourself;
-it contains the view you asked for (SS-mode output is redacted). If you send such a file to a server's
+Nothing, unless you press **Save this report** in SS mode (ADR 0073). Then the window writes one file,
+where you choose in Windows' own Save dialog and nowhere else: exactly what the SS screen showed, every PCI
+and input device the scan read (model numbers and times, no names), the case code you typed, and when the
+scan ran. The window shows the file's SHA-256 before you save, so staff can note it and later recognise the
+file. Self mode has no Save. The CLI prints the view it was asked for, as text or with `--json` as JSON, and
+writes a file only if you redirect that output into one yourself; it contains the view you asked for
+(SS-mode output is redacted), and with `--case-code` it is the same kind of record the window saves. If you send such a file to a server's
 staff, that server becomes responsible for how it keeps it. Such a file is not signed: anyone who holds
 it can change it, and nothing in it shows whether they did (ADR 0040).

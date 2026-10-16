@@ -1,0 +1,7 @@
+{
+  "description": "A present mouse and keyboard",
+  "observations": [
+    { "collector": "hid_device", "fields": { "name": "HID\\VID_0627&PID_0001", "vendor_id": "0627", "product_id": "0001", "service": "mouhid", "present": true, "first_install_at": "2026-10-15T11:07:36Z", "last_arrival_at": "2026-10-15T11:32:36Z" } },
+    { "collector": "hid_device", "fields": { "name": "HID\\VID_0627&PID_0001&MI_01", "vendor_id": "0627", "product_id": "0001", "service": "kbdhid", "present": true, "first_install_at": "2026-10-15T11:07:36Z", "last_arrival_at": "2026-10-15T11:32:36Z" } }
+  ]
+}

@@ -9,8 +9,10 @@ import type { SsOptions } from "../types";
 interface Props {
   /** Whether this scan was a full scan, whose extra reads the question must name (ADR 0052). */
   full: boolean;
-  onAgree: (options: SsOptions) => void;
+  onAgree: (options: SsOptions, caseCode: string) => void;
   onRefuse: () => void;
+  /** Why the typed case code was refused, when it was (ADR 0073). */
+  caseCodeError?: string | null;
 }
 
 /**
@@ -18,8 +20,9 @@ interface Props {
  * showing server identities and download hosts are each their own choice, off until the player turns
  * it on (ADR 0052, ADR 0064).
  */
-export function Consent({ full, onAgree, onRefuse }: Props) {
+export function Consent({ full, onAgree, onRefuse, caseCodeError }: Props) {
   const { t } = useTranslation();
+  const [caseCode, setCaseCode] = useState("");
   const [serverIdentity, setServerIdentity] = useState(false);
   const [downloadHost, setDownloadHost] = useState(false);
   return (
@@ -31,7 +34,23 @@ export function Consent({ full, onAgree, onRefuse }: Props) {
         <li>{t("consent.shows")}</li>
         <li>{t("consent.sends")}</li>
         <li>{t("consent.webview")}</li>
+        <li>{t("consent.saved")}</li>
       </ul>
+      <label className="case-code">
+        {t("consent.case_code")}{" "}
+        <input
+          type="text"
+          value={caseCode}
+          maxLength={9}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="XXX-XXX"
+          onChange={(event) => setCaseCode(event.target.value)}
+        />
+      </label>
+      {caseCodeError && (
+        <p className="note">{t("consent.case_code_refused", { reason: caseCodeError })}</p>
+      )}
       {full && (
         <label className="switch">
           <input
@@ -59,11 +78,14 @@ export function Consent({ full, onAgree, onRefuse }: Props) {
         <button
           type="button"
           onClick={() =>
-            onAgree({
-              server_identity: full && serverIdentity,
-              account_identifier: false,
-              download_host: full && downloadHost,
-            })
+            onAgree(
+              {
+                server_identity: full && serverIdentity,
+                account_identifier: false,
+                download_host: full && downloadHost,
+              },
+              caseCode,
+            )
           }
         >
           {t("consent.agree")}

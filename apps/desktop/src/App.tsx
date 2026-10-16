@@ -4,15 +4,26 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type ElevateOutcome, relaunchElevated, relaunchFull, reportHeader } from "./api";
+import {
+  buildSavedRecord,
+  type ElevateOutcome,
+  relaunchElevated,
+  relaunchFull,
+  reportHeader,
+} from "./api";
 import { languageNames, supportedLanguages } from "./i18n";
-import type { Mode, ReportHeader, SsOptions } from "./types";
+import type { Mode, ReportHeader, SavedSummary, SsOptions } from "./types";
 import { About } from "./views/About";
 import { Consent } from "./views/Consent";
 import { Report } from "./views/Report";
 import { UnofficialBanner } from "./views/UnofficialBanner";
 
-type Screen = "start" | "consent" | "declined" | "about" | { report: Mode; options?: SsOptions };
+type Screen =
+  | "start"
+  | "consent"
+  | "declined"
+  | "about"
+  | { report: Mode; options?: SsOptions; saved?: SavedSummary };
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -24,6 +35,7 @@ export function App() {
   const [beforeAbout, setBeforeAbout] = useState<Exclude<Screen, "about">>("start");
   const [elevation, setElevation] = useState<ElevateOutcome | null>(null);
   const [fullScan, setFullScan] = useState<ElevateOutcome | null>(null);
+  const [caseCodeError, setCaseCodeError] = useState<string | null>(null);
   const full = header?.scan_tier === "full";
 
   useEffect(() => {
@@ -116,7 +128,18 @@ export function App() {
       {screen === "consent" && (
         <Consent
           full={full}
-          onAgree={(options) => setScreen({ report: "ss", options })}
+          caseCodeError={caseCodeError}
+          onAgree={(options, caseCode) =>
+            // The record is built once, here, from what was agreed; the digest and a saved file are
+            // both taken from it (ADR 0073). A refused code keeps the player on this screen.
+            void buildSavedRecord(options, caseCode).then(
+              (saved) => {
+                setCaseCodeError(null);
+                setScreen({ report: "ss", options, saved });
+              },
+              (error: unknown) => setCaseCodeError(String(error)),
+            )
+          }
           onRefuse={() => setScreen("declined")}
         />
       )}
@@ -133,7 +156,12 @@ export function App() {
       )}
 
       {typeof screen === "object" && (
-        <Report mode={screen.report} options={screen.options} onBack={() => setScreen("start")} />
+        <Report
+          mode={screen.report}
+          options={screen.options}
+          saved={screen.saved}
+          onBack={() => setScreen("start")}
+        />
       )}
 
       <footer className="muted">{t("footer.evidence_only")}</footer>

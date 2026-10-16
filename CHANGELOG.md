@@ -5,6 +5,26 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-16
+
+A report can be kept. In SS mode the window takes a case code from the server, shows the SHA-256 of the report for
+staff to note, and saves exactly that report where the player chooses; a file whose SHA-256 starts the same is the
+report that was on screen. Every scan also reads the mice, keyboards and other input devices Windows remembers, for
+their times: when one was taken out and another plugged in. Nothing is signed and nothing is sent.
+
+### Added
+- **Save this report**, in SS mode only (ADR 0073). The consent screen takes an optional **case code** from the
+  server (six Crockford base32 characters, shown `XXX-XXX`); the SS screen shows the code and the SHA-256 of the
+  saved record, its first 16 characters large for staff to note, and Save writes exactly those bytes through
+  Windows' own Save dialog: the SS view, every PCI and HID device, the code and when the scan ran. The CLI does
+  the same with `scan --mode ss --json --case-code CODE`, printing the SHA-256 on standard error. Nothing is
+  signed and nothing is sent; a matching digest shows only that a file is what was on screen (ADR 0040).
+- The mice, keyboards and other input devices Windows remembers are read on every scan (`hid_device`, ADR 0072),
+  present or not: the maker and model numbers, the driver (`mouhid`, `kbdhid`) and the times Windows stores; never a
+  serial number or a name. One `experimental` `context` rule, **an input device Windows set up earlier is not present
+  now**, and a timeline selector that puts every input device's times on the timeline, so a mouse taken out and
+  another plugged in can be read beside the session. It cannot tell a box between the mouse and the PC from a mouse.
+
 ## [0.9.0] - 2026-10-15
 
 The first checks about DMA cards, and what they cannot show. Every scan now lists the PCI devices Windows remembers,
@@ -35,7 +55,7 @@ imitates an ordinary device, a cheat on a second PC and a box between the mouse 
   through CfgMgr32, present devices and absent ones, each as a model id with no instance part (no serial number or
   board position), its PCI class code, driver service, problem code and the three times Windows stores, in whole
   seconds. A property that cannot be read is named as unreadable rather than read as "no value". No administrator
-  rights are needed. No collector reads it yet (ADR 0069, ADR 0070).
+  rights are needed. `pci_device` reads the PCI half; no collector reads HID yet (ADR 0069, ADR 0070).
 
 ### Changed
 - ADR 0070 accepted (2026-10-15, all four questions as recommended): a `pci_device` collector over ADR 0069's

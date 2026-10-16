@@ -35,6 +35,138 @@ pub fn report_view(
     view::for_mode_with(&state.report, mode, options.unwrap_or_default())
 }
 
+/// What the window shows about a saved record once it is built (ADR 0073 §3).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SavedSummary {
+    /// The record's SHA-256, 64 lowercase hex characters; the window shows the first 16 large.
+    pub digest: String,
+    /// The record's size in bytes.
+    pub size: usize,
+    /// The case code as shown, `XXX-XXX`, when one was typed.
+    pub case_code: Option<String>,
+}
+
+/// Builds the SS-mode saved record with `options` and the typed case code, keeps its bytes, and returns what
+/// the window shows (ADR 0073). An empty code is no code; a malformed one is refused with a sentence. Building
+/// again replaces the kept bytes, so the digest on screen is always of the record a Save would write.
+///
+/// # Errors
+///
+/// A sentence for the player: the code is not a case code, or the record could not be built.
+#[tauri::command]
+pub fn build_saved_record(
+    state: State<'_, AppState>,
+    options: Option<SsOptions>,
+    case_code: Option<String>,
+) -> Result<SavedSummary, String> {
+    let code = match case_code.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(typed) => Some(view::canonical_case_code(typed).map_err(|e| e.to_string())?),
+    };
+    let times = view::SavedTimes {
+        scan_finished_at: state.scan_finished_at.clone(),
+        saved_at: jiff::Timestamp::now().to_string(),
+    };
+    let bytes = view::saved_record(
+        &state.report,
+        options.unwrap_or_default(),
+        code.clone(),
+        times,
+    )
+    .to_bytes()
+    .map_err(|e| e.to_string())?;
+    let summary = SavedSummary {
+        digest: view::digest(&bytes),
+        size: bytes.len(),
+        case_code: code.as_deref().map(view::shown_case_code),
+    };
+    *state
+        .saved
+        .lock()
+        .map_err(|_| "the saved record is unavailable".to_owned())? = Some(bytes);
+    Ok(summary)
+}
+
+/// The name the Save dialog offers: `rongroi-<case code or date>-<first 8 of the digest>.json`.
+pub fn default_file_name(case_code: Option<&str>, saved_on: &str, digest: &str) -> String {
+    let label = case_code.map_or_else(|| saved_on.to_owned(), str::to_owned);
+    format!("rongroi-{label}-{}.json", digest.get(..8).unwrap_or(digest))
+}
+
+/// Asks where to save the kept record with Windows' own Save dialog and writes exactly its bytes there
+/// (ADR 0073 §4). `Ok(None)` when the player cancelled; otherwise the path written.
+///
+/// # Errors
+///
+/// A sentence for the player: nothing was built yet, the dialog failed, or the file could not be written.
+///
+/// `async`, so Tauri runs it off the window's thread: the dialog is owned by the window, and Windows disables
+/// an owner by sending its thread a message. A command on that thread waiting for the dialog would never let
+/// the message through (ADR 0073).
+#[tauri::command]
+pub async fn save_saved_record(
+    state: State<'_, AppState>,
+    window: tauri::WebviewWindow,
+    title: String,
+) -> Result<Option<String>, String> {
+    let bytes = state
+        .saved
+        .lock()
+        .map_err(|_| "the saved record is unavailable".to_owned())?
+        .clone()
+        .ok_or_else(|| "nothing to save yet".to_owned())?;
+    let digest = view::digest(&bytes);
+    let code = serde_json::from_slice::<serde_json::Value>(&bytes)
+        .ok()
+        .and_then(|v| {
+            v.get("case_code")
+                .and_then(|c| c.as_str())
+                .map(view::shown_case_code)
+        });
+    let today = jiff::Zoned::now().date().to_string();
+    let name = default_file_name(code.as_deref(), &today, &digest);
+    let owner = owner_of(&window);
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        rongroi_host_windows_save(&title, &name, owner)
+    })
+    .await
+    .map_err(|e| format!("the Save dialog stopped: {e}"))??;
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    std::fs::write(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(Some(path.display().to_string()))
+}
+
+#[cfg(windows)]
+fn rongroi_host_windows_save(
+    title: &str,
+    name: &str,
+    owner: Option<isize>,
+) -> Result<Option<std::path::PathBuf>, String> {
+    rongroi_host_windows::save_dialog::ask_save_path(title, name, owner)
+}
+
+/// No Windows, no Save dialog.
+#[cfg(not(windows))]
+fn rongroi_host_windows_save(
+    _title: &str,
+    _name: &str,
+    _owner: Option<isize>,
+) -> Result<Option<std::path::PathBuf>, String> {
+    Err("there is no Save dialog on this platform".to_owned())
+}
+
+#[cfg(windows)]
+fn owner_of(window: &tauri::WebviewWindow) -> Option<isize> {
+    window.hwnd().ok().map(|hwnd| hwnd.0 as isize)
+}
+
+#[cfg(not(windows))]
+fn owner_of(_window: &tauri::WebviewWindow) -> Option<isize> {
+    None
+}
+
 /// The arguments a new copy is started with: this copy's own, with `--full` only when `full` is true.
 ///
 /// A copy whose player answered No to the full-scan question still carries the flag; forwarding it

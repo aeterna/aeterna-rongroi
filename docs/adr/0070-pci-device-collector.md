@@ -2,6 +2,7 @@
 
 - Status: accepted — the owner decided the four questions below on 2026-10-15, each as recommended
 - Date: 2026-10-15
+- Amended: 2026-10-16, by ADR 0072: decision 4 (no HID collector) is replaced by an HID collector for the times
 
 ## Context
 

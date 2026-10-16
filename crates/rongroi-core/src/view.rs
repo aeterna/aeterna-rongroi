@@ -8,8 +8,14 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
+mod saved;
 mod session;
 
+pub use saved::{
+    CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,
+    SHOWN_DIGEST_LEN, SavedRecord, SavedTimes, canonical_case_code, digest, saved_record,
+    shown_case_code,
+};
 pub use session::{
     AnchorName, Comparison, Duration, DurationUnit, IndexBeside, LineState, Relation, SessionEnd,
     SessionLine, SessionStart, SessionState, SessionStatement,
@@ -24,11 +30,12 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 16] = [
+pub const COLLECTOR_ORDER: [&str; 17] = [
     "posture",
     "driver_service",
     "windows_start",
     "pci_device",
+    "hid_device",
     "autostart",
     "defender_exclusion",
     "fivem_dir",
