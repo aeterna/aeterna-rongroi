@@ -174,5 +174,8 @@ Decided on 2026-10-16: all six as recommended.
 - Desktop: `AppState` keeps `scan_finished_at` and the record's bytes; commands `build_saved_record` (called once
   at consent; a refused code keeps the player on the consent screen) and `save_saved_record`. UI: the case code
   field, `SavedRecordBox` with the code, the 16 characters in four groups, the full digest and the button.
+- `save_saved_record` is an `async` command and runs the dialog with `spawn_blocking`, off the window's thread:
+  the dialog's owner is the window, and Windows disables an owner by messaging its thread, which a command
+  waiting on that thread would block (found before release, 2026-10-16).
 - The Save dialog was not run on a real Windows desktop in this change: it compiles and passes clippy for
   `x86_64-pc-windows-gnu`, and the release check runs it before the release is published.
