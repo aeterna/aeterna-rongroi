@@ -27,7 +27,7 @@ jobs:
     runs-on: windows-latest
     # See ci.yml's `rust` job. Windows runners are the slowest here — the last runs took about
     # eight minutes end to end — so this is generous and still far below the six-hour default.
-    timeout-minutes: 45
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,8 +35,8 @@ jobs:
           # Two deep so a pull request's merge commit has its base (`HEAD^1`) for the scope step below.
           fetch-depth: 2
       # The script block logging measurement launches PowerShell four times and scans the whole machine
-      # for each of its 37 policy cases: about 15–18 of this job's 25–29 minutes. On a pull request it
-      # runs only when something it measures could have changed — any crate, the posture rules, the
+      # for each of its 36 policy cases: 10.7–18.6 minutes over 16 runs on 2026-10-15. On a pull request
+      # it runs only when something it measures could have changed — any crate, the posture rules, the
       # toolchain, the lockfile or this workflow. Every push to dev and main runs it.
       - name: Which measurements this pull request needs
         id: scope
@@ -664,7 +664,9 @@ jobs:
       - name: What PowerShell does with a script block logging policy
         if: steps.scope.outputs.policy == 'true'
         shell: pwsh
-        timeout-minutes: 20
+        # 10.7 to 18.6 minutes on the same code (16 runs, 2026-10-15): the runner's speed decides it, and
+        # one run past 20 minutes timed out with nothing wrong. 30 leaves room; the job's 55 covers it.
+        timeout-minutes: 30
         run: |
           $ErrorActionPreference = 'Stop'
           cargo build --locked --quiet -p rongroi-cli
