@@ -221,6 +221,18 @@ fn text_timeline(lang: Lang, key: &str) -> &'static str {
 /// so neither table grows past what one screen can check.
 fn scan_text(lang: Lang, key: &str) -> &'static str {
     match (lang, key) {
+        (Lang::En, "case_code_needs_ss_json") => {
+            "--case-code makes a saved record, which needs --mode ss --json (ADR 0073)."
+        }
+        (Lang::Th, "case_code_needs_ss_json") => {
+            "--case-code ใช้ทำรายงานที่บันทึก ต้องใช้คู่กับ --mode ss --json (ADR 0073)"
+        }
+        (Lang::En, "case_code_refused") => "This is not a case code",
+        (Lang::Th, "case_code_refused") => "นี่ไม่ใช่รหัสคดี",
+        (Lang::En, "saved_case_code") => "Case code:",
+        (Lang::Th, "saved_case_code") => "รหัสคดี:",
+        (Lang::En, "saved_digest") => "Report SHA-256 (note the first 16):",
+        (Lang::Th, "saved_digest") => "SHA-256 ของรายงาน (จด 16 ตัวแรก):",
         (Lang::En, "tier_standard") => "standard scan",
         (Lang::Th, "tier_standard") => "สแกนแบบมาตรฐาน",
         (Lang::En, "tier_full") => "full scan",
@@ -429,6 +441,34 @@ pub fn full_question(lang: Lang) -> String {
 /// Printed when the full-scan question was not answered `yes`.
 pub fn full_declined(lang: Lang) -> &'static str {
     scan_text(lang, "full_declined")
+}
+
+/// Why `--case-code` was refused: it only makes a saved record with `--mode ss --json` (ADR 0073).
+pub fn case_code_needs_ss_json(lang: Lang) -> &'static str {
+    scan_text(lang, "case_code_needs_ss_json")
+}
+
+/// The start of the message for a case code that is not six characters of the alphabet.
+pub fn case_code_refused(lang: Lang) -> &'static str {
+    scan_text(lang, "case_code_refused")
+}
+
+/// The line the person watching notes: the case code and the saved record's SHA-256, the first 16 characters
+/// in four groups and then all 64 (ADR 0073 §3).
+pub fn saved_digest(lang: Lang, shown_code: &str, digest: &str) -> String {
+    let short = digest
+        .get(..rongroi_core::view::SHOWN_DIGEST_LEN)
+        .unwrap_or(digest)
+        .as_bytes()
+        .chunks(4)
+        .map(|c| String::from_utf8_lossy(c).into_owned())
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "{} {shown_code}\n{} {short}\n  {digest}",
+        scan_text(lang, "saved_case_code"),
+        scan_text(lang, "saved_digest")
+    )
 }
 
 /// The SS-mode question about one kind of sensitive value (ADR 0052). Default no.
