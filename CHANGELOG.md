@@ -5,6 +5,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-17
+
+Human-First Summary View and AI Export capability (ADR 0045).
+Users can now switch effortlessly between an approachable, friendly Overview Summary and the complete forensic Detailed Report. Includes a 4-node horizon timeline (History Origin, Last Boot, FiveM Play, and Current Scan), 3 quick-glance focus cards with reassuring explanations, category filters, and an AI Export button that packages a sanitized, privacy-safe forensic prompt with Windows usernames and SIDs masked for pasting into AI assistants.
+
+### Added
+- **Human-First Overview Summary View** (`apps/desktop`, ADR 0045): Seamless tab switching between "Overview Summary" and "Detailed Report" with glider animation.
+- **Horizon Timeline**: 4 interactive milestone cards detailing machine history continuity, last boot time, FiveM session status, and current scan integrity.
+- **Quick Glance & Reassurance Cards**: 3 focus cards highlighting FiveM activity, history continuity (USN/Event Log clearing detection), and findings breakdown with plain-language explanations of benign causes.
+- **AI Export Button**: Instant one-click clipboard export formatting report facts and observations into a neutral AI analysis prompt, automatically sanitizing user account directories (`C:\Users\<user>\`) and Windows security identifiers (SIDs).
+- **Strict Vector Icons**: All emojis replaced with crisp inline SVG vector icons complying with Aeterna design standards.
+
 ## [0.11.0] - 2026-10-17
 
 Detection rules expand to 77 across 12 collectors. New capabilities detect NTFS change journal (USN) truncation

@@ -20,7 +20,9 @@ import type {
   SavedSummary,
   SsOptions,
 } from "../types";
+import { AiExportButton } from "./AiExportButton";
 import { EvidenceRow } from "./EvidenceRow";
+import { HumanSummary } from "./HumanSummary";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
@@ -44,6 +46,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const [filter, setFilter] = useState<StateFilter | null>(null);
   const [technicalAll, setTechnicalAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"summary" | "technical">("summary");
 
   useEffect(() => {
     void reportView(mode, options).then(setView);
@@ -105,182 +108,250 @@ export function Report({ mode, options, saved, onBack }: Props) {
   return (
     <section className="report">
       {mode === "ss" && saved && <SavedRecordBox saved={saved} />}
-      <ReportSummary listed={view.listed} filter={filter} onFilter={setFilter} />
 
-      <dl className="facts context">
-        <dt>{mode === "ss" ? t("header.mode_ss") : t("header.mode_self")}</dt>
-        <dd />
-        <dt>{t("header.scan_tier")}</dt>
-        <dd>{header.scan_tier === "full" ? t("header.tier_full") : t("header.tier_standard")}</dd>
-        <dt>{t("header.version")}</dt>
-        <dd>{header.provenance.version}</dd>
-        <dt>{t("header.platform")}</dt>
-        <dd>{[header.platform, header.os_build].filter(Boolean).join(" ")}</dd>
-        <dt>{t("header.rights")}</dt>
-        <dd>{rights}</dd>
-        {/* One line of context for reading every time below it, with the sentence that stops a start
-            days ago being read as something the player did (ADR 0039). */}
-        <dt>{t("header.boot_time")}</dt>
-        <dd>
-          <BootTimeValue bootTime={header.boot_time} />
-        </dd>
-        <dt>{t("header.rules")}</dt>
-        <dd>
-          {header.rules_bundle.rule_count} · <code>{header.rules_bundle.sha256.slice(0, 12)}</code>
-        </dd>
-      </dl>
-
-      {/* Facts about the scan, not about the machine: each applies to every rule it stopped, so it
-          is stated once here rather than as a row per rule (ADR 0027, ADR 0030). */}
-      {view.scope.not_admin > 0 && (
-        <p className="scope">{t("scope.not_admin", { checks: view.scope.not_admin })}</p>
-      )}
-      {view.scope.not_attempted > 0 && (
-        <p className="scope">{t("scope.not_attempted", { checks: view.scope.not_attempted })}</p>
-      )}
-      {(view.scope.not_consented ?? 0) > 0 && (
-        <p className="scope">
-          {t("scope.not_consented", { checks: view.scope.not_consented ?? 0 })}
-        </p>
-      )}
-      {mode === "ss" && header.scan_tier === "full" && !options?.server_identity && (
-        <p className="muted">{t("header.server_identity_hidden")}</p>
-      )}
-      {mode === "ss" && header.scan_tier === "full" && !options?.download_host && (
-        <p className="muted">{t("header.download_host_hidden")}</p>
-      )}
-
-      <div className="toolbar">
-        <div className="toolbar-search">
-          <input
-            type="search"
-            className="search-input"
-            placeholder={t("toolbar.search_placeholder")}
-            aria-label={t("toolbar.search_label")}
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              className="clear-search"
-              aria-label={t("toolbar.clear_search")}
-              onClick={() => setSearchQuery("")}
+      <div className="report-mode-bar">
+        <div className="view-switcher-wrap">
+          <div className={`glider ${viewMode === "technical" ? "right" : ""}`} />
+          <button
+            type="button"
+            className={`view-pill ${viewMode === "summary" ? "active" : ""}`}
+            onClick={() => setViewMode("summary")}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              ✕
-            </button>
-          )}
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>{t("view_switcher.summary")}</span>
+          </button>
+          <button
+            type="button"
+            className={`view-pill ${viewMode === "technical" ? "active" : ""}`}
+            onClick={() => setViewMode("technical")}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            <span>{t("view_switcher.technical")}</span>
+          </button>
         </div>
-        <div className="toolbar-controls">
-          {filter ? (
-            <p className="muted">
-              {t("toolbar.filtered")}{" "}
-              <button type="button" className="disclosure" onClick={() => setFilter(null)}>
-                {t("toolbar.clear")}
-              </button>
-            </p>
-          ) : (
-            <span />
-          )}
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={technicalAll}
-              onChange={(event) => setTechnicalAll(event.target.checked)}
-            />{" "}
-            {t("toolbar.technical_all")}
-          </label>
-        </div>
+        <AiExportButton view={view} header={header} texts={texts} />
       </div>
 
-      {view.evidence.length === 0 && <p>{t("empty")}</p>}
-      {/* A count of 0 is still a filter; choosing it says so rather than showing nothing. */}
-      {view.evidence.length > 0 && groups.length === 0 && (
-        <p className="muted">{t(query ? "toolbar.search_empty" : "toolbar.filtered_empty")}</p>
-      )}
-      {groups.map((group) => (
-        <Group
-          key={group.collector}
-          group={group}
+      <div
+        className="view-human-wrap"
+        style={{ display: viewMode === "summary" ? "block" : "none" }}
+      >
+        <HumanSummary
+          view={view}
+          header={header}
           texts={texts}
-          bands={view.row_bands ?? {}}
-          fileBase={fileBase}
-          treeBase={treeBase}
-          linksKnown={linksKnown}
-          official={official}
-          technicalAll={technicalAll}
-          unfold={filter === "not_found"}
+          onSwitchToTechnical={() => setViewMode("technical")}
         />
-      ))}
+      </div>
 
-      {/* After the evidence and apart from it: the times this view may show, in order (ADR 0051). */}
-      {/* Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3). */}
-      <CrossSource statements={view.cross_source ?? []} />
+      <div
+        className="view-tech-wrap"
+        style={{ display: viewMode === "technical" ? "block" : "none" }}
+      >
+        <ReportSummary listed={view.listed} filter={filter} onFilter={setFilter} />
 
-      <Timeline timeline={view.timeline} texts={texts} />
+        <dl className="facts context">
+          <dt>{mode === "ss" ? t("header.mode_ss") : t("header.mode_self")}</dt>
+          <dd />
+          <dt>{t("header.scan_tier")}</dt>
+          <dd>{header.scan_tier === "full" ? t("header.tier_full") : t("header.tier_standard")}</dd>
+          <dt>{t("header.version")}</dt>
+          <dd>{header.provenance.version}</dd>
+          <dt>{t("header.platform")}</dt>
+          <dd>{[header.platform, header.os_build].filter(Boolean).join(" ")}</dd>
+          <dt>{t("header.rights")}</dt>
+          <dd>{rights}</dd>
+          {/* One line of context for reading every time below it, with the sentence that stops a start
+            days ago being read as something the player did (ADR 0039). */}
+          <dt>{t("header.boot_time")}</dt>
+          <dd>
+            <BootTimeValue bootTime={header.boot_time} />
+          </dd>
+          <dt>{t("header.rules")}</dt>
+          <dd>
+            {header.rules_bundle.rule_count} ·{" "}
+            <code>{header.rules_bundle.sha256.slice(0, 12)}</code>
+          </dd>
+        </dl>
 
-      {/* Beside the timeline, in both modes (ADR 0061). */}
-      {view.trace_ages && <TraceAges ages={view.trace_ages} texts={ages} />}
+        {/* Facts about the scan, not about the machine: each applies to every rule it stopped, so it
+          is stated once here rather than as a row per rule (ADR 0027, ADR 0030). */}
+        {view.scope.not_admin > 0 && (
+          <p className="scope">{t("scope.not_admin", { checks: view.scope.not_admin })}</p>
+        )}
+        {view.scope.not_attempted > 0 && (
+          <p className="scope">{t("scope.not_attempted", { checks: view.scope.not_attempted })}</p>
+        )}
+        {(view.scope.not_consented ?? 0) > 0 && (
+          <p className="scope">
+            {t("scope.not_consented", { checks: view.scope.not_consented ?? 0 })}
+          </p>
+        )}
+        {mode === "ss" && header.scan_tier === "full" && !options?.server_identity && (
+          <p className="muted">{t("header.server_identity_hidden")}</p>
+        )}
+        {mode === "ss" && header.scan_tier === "full" && !options?.download_host && (
+          <p className="muted">{t("header.download_host_hidden")}</p>
+        )}
 
-      {/* Apart from the evidence, and shown in both modes: this is what the program itself left in
+        <div className="toolbar">
+          <div className="toolbar-search">
+            <input
+              type="search"
+              className="search-input"
+              placeholder={t("toolbar.search_placeholder")}
+              aria-label={t("toolbar.search_label")}
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="clear-search"
+                aria-label={t("toolbar.clear_search")}
+                onClick={() => setSearchQuery("")}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="toolbar-controls">
+            {filter ? (
+              <p className="muted">
+                {t("toolbar.filtered")}{" "}
+                <button type="button" className="disclosure" onClick={() => setFilter(null)}>
+                  {t("toolbar.clear")}
+                </button>
+              </p>
+            ) : (
+              <span />
+            )}
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={technicalAll}
+                onChange={(event) => setTechnicalAll(event.target.checked)}
+              />{" "}
+              {t("toolbar.technical_all")}
+            </label>
+          </div>
+        </div>
+
+        {view.evidence.length === 0 && <p>{t("empty")}</p>}
+        {/* A count of 0 is still a filter; choosing it says so rather than showing nothing. */}
+        {view.evidence.length > 0 && groups.length === 0 && (
+          <p className="muted">{t(query ? "toolbar.search_empty" : "toolbar.filtered_empty")}</p>
+        )}
+        {groups.map((group) => (
+          <Group
+            key={group.collector}
+            group={group}
+            texts={texts}
+            bands={view.row_bands ?? {}}
+            fileBase={fileBase}
+            treeBase={treeBase}
+            linksKnown={linksKnown}
+            official={official}
+            technicalAll={technicalAll}
+            unfold={filter === "not_found"}
+          />
+        ))}
+
+        {/* After the evidence and apart from it: the times this view may show, in order (ADR 0051). */}
+        {/* Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3). */}
+        <CrossSource statements={view.cross_source ?? []} />
+
+        <Timeline timeline={view.timeline} texts={texts} />
+
+        {/* Beside the timeline, in both modes (ADR 0061). */}
+        {view.trace_ages && <TraceAges ages={view.trace_ages} texts={ages} />}
+
+        {/* Apart from the evidence, and shown in both modes: this is what the program itself left in
           what the collectors saw, not evidence about the PC (ADR 0010). */}
-      {view.own_traces.length > 0 && (
-        <section className="own-traces" aria-labelledby="own-traces-title">
-          <h3 id="own-traces-title">{t("own_traces.title")}</h3>
-          <details>
-            <summary className="muted">{t("own_traces.note")}</summary>
-            <ul className="observations">
-              {withKeys(
-                view.own_traces,
-                (entry) => `${entry.collector}:${fieldsOf(entry.observation)}`,
-              ).map(([key, entry]) => (
-                <li key={key}>
-                  <span className="muted">({entry.collector})</span>
-                  <div className="detail">{fieldsOf(entry.observation)}</div>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </section>
-      )}
+        {view.own_traces.length > 0 && (
+          <section className="own-traces" aria-labelledby="own-traces-title">
+            <h3 id="own-traces-title">{t("own_traces.title")}</h3>
+            <details>
+              <summary className="muted">{t("own_traces.note")}</summary>
+              <ul className="observations">
+                {withKeys(
+                  view.own_traces,
+                  (entry) => `${entry.collector}:${fieldsOf(entry.observation)}`,
+                ).map(([key, entry]) => (
+                  <li key={key}>
+                    <span className="muted">({entry.collector})</span>
+                    <div className="detail">{fieldsOf(entry.observation)}</div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </section>
+        )}
 
-      {/* After the evidence and the own traces: what the collectors saw that no rule matched. Self
+        {/* After the evidence and the own traces: what the collectors saw that no rule matched. Self
           mode lists it; in SS mode the list is empty and it is counted below instead (ADR 0014). */}
-      {view.unmatched.length > 0 && (
-        <section className="unmatched" aria-labelledby="unmatched-title">
-          <h3 id="unmatched-title">{t("unmatched.title")}</h3>
-          <details>
-            <summary className="muted">{t("unmatched.note")}</summary>
-            <ul className="observations">
-              {withKeys(
-                view.unmatched.flatMap((group) =>
-                  group.observations.map((observation) => ({
-                    collector: group.collector,
-                    observation,
-                  })),
-                ),
-                ({ collector, observation }) => `${collector}:${fieldsOf(observation)}`,
-              ).map(([key, { collector, observation }]) => (
-                <li key={key}>
-                  <span className="muted">({collector})</span>
-                  <div className="detail">{fieldsOf(observation)}</div>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </section>
-      )}
+        {view.unmatched.length > 0 && (
+          <section className="unmatched" aria-labelledby="unmatched-title">
+            <h3 id="unmatched-title">{t("unmatched.title")}</h3>
+            <details>
+              <summary className="muted">{t("unmatched.note")}</summary>
+              <ul className="observations">
+                {withKeys(
+                  view.unmatched.flatMap((group) =>
+                    group.observations.map((observation) => ({
+                      collector: group.collector,
+                      observation,
+                    })),
+                  ),
+                  ({ collector, observation }) => `${collector}:${fieldsOf(observation)}`,
+                ).map(([key, { collector, observation }]) => (
+                  <li key={key}>
+                    <span className="muted">({collector})</span>
+                    <div className="detail">{fieldsOf(observation)}</div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </section>
+        )}
 
-      {mode === "ss" && (
-        <p className="muted">
-          {t("hidden", {
-            notFound: view.hidden.not_found,
-            unmeasuredExpected: view.hidden.unmeasured_expected,
-            unmeasuredUnexpected: view.hidden.unmeasured_unexpected,
-            unmatched: view.hidden.unmatched,
-          })}
-        </p>
-      )}
+        {mode === "ss" && (
+          <p className="muted">
+            {t("hidden", {
+              notFound: view.hidden.not_found,
+              unmeasuredExpected: view.hidden.unmeasured_expected,
+              unmeasuredUnexpected: view.hidden.unmeasured_unexpected,
+              unmatched: view.hidden.unmatched,
+            })}
+          </p>
+        )}
+      </div>
 
       <button type="button" onClick={onBack}>
         {t("common:actions.back")}

@@ -1,35 +1,57 @@
-# aeterna-rongroi
-
 <div align="center">
 
-# 🔍 aeterna-rongroi (ร่องรอย)
+[🇬🇧 English](README.md) · **ภาษาไทย**
+
+# aeterna-rongroi (ร่องรอย)
+
 ### โปรแกรมตรวจเครื่อง (PC Forensics) สำหรับชุมชน FiveM แบบ Open-Source และ Offline
 
-[![Release](https://img.shields.io/badge/Release-0.11.0-0869b0?style=for-the-badge&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
-[![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=for-the-badge)](docs/rules-reference.th.md)
-[![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=for-the-badge)](PRIVACY.md)
-[![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](LICENSE)
-[![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=for-the-badge)](docs/adr/0002-no-clean-verdict.md)
+**แสดงหลักฐานตามจริง — ไม่มีวันบอกว่าเครื่อง "สะอาด"**
 
-**[🌐 เว็บไซต์ทางการ](https://aeterna.github.io/aeterna-rongroi/)** •
-**[📖 คู่มือการตรวจระหว่างแชร์หน้าจอ (SS)](docs/screenshare-guide.th.md)** •
-**[🔎 คู่มืออ้างอิง 77 Rules](docs/rules-reference.th.md)** •
-**[🛡️ นโยบายความเป็นส่วนตัว](PRIVACY.md)** •
-**[🇬🇧 Read in English](README.md)**
+[![Release](https://img.shields.io/badge/Release-0.12.0-0869b0?style=flat-square&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
+[![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=flat-square)](docs/rules-reference.th.md)
+[![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=flat-square)](PRIVACY.md)
+[![License](https://img.shields.io/badge/License-GPL--3.0-f4c430?style=flat-square)](LICENSE)
+[![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=flat-square)](docs/adr/0002-no-clean-verdict.md)
 
----
+**[เว็บไซต์ทางการ](https://aeterna.github.io/aeterna-rongroi/) · [คู่มือตรวจแชร์จอ (SS)](docs/screenshare-guide.th.md) · [คู่มืออ้างอิง 77 Rules](docs/rules-reference.th.md) · [นโยบายความเป็นส่วนตัว](PRIVACY.md)**
+
+[เริ่มต้นใช้งาน](#เริ่มต้นใช้งานด่วน) · [คืออะไร / ไม่ใช่อะไร](#คืออะไร--และไม่ใช่อะไร) · [สถาปัตยกรรมนิติวิทยาศาสตร์](#สถาปัตยกรรมนิติวิทยาศาสตร์) · [โมเดลหลักฐาน 3 ชั้น](#โมเดลหลักฐาน-3-ชั้น-adr-0045) · [77 Rules](#ตรวจอะไรบ้าง-77-rules-จาก-12-สายข้อมูล) · [ตรวจสอบไฟล์](#การตรวจสอบความถูกต้องของไฟล์ที่ดาวน์โหลด)
+
+<code>aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode ss --lang th</code>
+
 </div>
 
 > [!WARNING]
 > **ยังเป็นรุ่นทดลอง (pre-alpha)** ตอนนี้โปรแกรมตรวจด้วย rule ทั้งหมด 77 ตัว จากแหล่งข้อมูล 12 สาย เกือบทั้งหมดยังอยู่ในสถานะทดลอง (experimental) และยังไม่ได้ผ่านการสอบทานกับเครื่องจริงมากพอ ห้ามแบนผู้เล่นโดยอาศัยรายงานนี้เพียงอย่างเดียว และห้ามใช้โปรแกรมนี้เพื่อรับรองว่าเครื่อง "สะอาด"
 
-**รุ่นล่าสุด: [0.11.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.17-0.11.0)**, 17 ตุลาคม 2026.
+**รุ่นล่าสุด: [0.12.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.17-0.12.0)**, 17 ตุลาคม 2026.
 
 **โปรแกรมตรวจเครื่อง (PC check) สำหรับชุมชน FiveM แบบ open-source ทำงาน offline** มองหาร่องรอยที่โปรโกงทิ้งไว้บนเครื่อง Windows และการตั้งค่าเครื่องที่เปิดทางให้โกงได้ง่าย แล้วแสดงหลักฐานพร้อมที่มาทางเทคนิคให้คนดู **ไม่มีวันบอกว่าเครื่อง "สะอาด"**
 
 ผู้เล่นสามารถเปิดตรวจเครื่องตัวเองได้ หรือให้แอดมินดูผ่านการแชร์หน้าจอ (SS) โดยผู้เล่นต้องได้รับข้อมูลและให้ความยินยอมก่อนเสมอ
 
 *rongroi* แปลว่า "ร่องรอย" (Traces)
+
+---
+
+## ⚡ เริ่มต้นใช้งานด่วน
+
+### 1. แอปแบบหน้าต่าง Desktop (แนะนำ)
+1. ดาวน์โหลดไฟล์ `aeterna-rongroi-0.12.0-windows-x64.exe` จาก [Official Releases](https://github.com/aeterna/aeterna-rongroi/releases)
+2. เปิดใช้งานได้ทันที (ไม่ต้องติดตั้ง เป็นไฟล์เดี่ยว portable ทำงาน offline 100% ปลอดภัย)
+3. เลือก **ตรวจเครื่องตัวเอง (Self Check)** หรือ **โหมดแชร์หน้าจอ (SS Mode)** สำหรับให้แอดมินตรวจ
+4. สลับดูระหว่าง **สรุปภาพรวม (Overview Summary)** สำหรับคนทั่วไปพร้อมปุ่มส่งให้ AI ช่วยวิเคราะห์ และ **รายงานฉบับเต็ม (Detailed Report)** สำหรับหลักฐานเชิงลึก
+
+### 2. แบบบรรทัดคำสั่ง Standalone CLI (สำหรับเครื่องที่ไม่มี WebView)
+เปิด Command Prompt (`cmd`) แล้วรัน:
+```bat
+.\aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode self --lang th
+```
+สำหรับการตรวจผ่านการแชร์หน้าจอพร้อมซ่อน path ผู้ใช้:
+```bat
+.\aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode ss --lang th
+```
 
 ---
 
