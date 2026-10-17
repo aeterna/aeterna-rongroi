@@ -5,7 +5,7 @@
 # 🔍 aeterna-rongroi (ร่องรอย)
 ### Transparent, Offline PC Forensics & Evidence Scanner for FiveM
 
-[![Release](https://img.shields.io/badge/Release-0.11.0-0869b0?style=for-the-badge&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
+[![Release](https://img.shields.io/badge/Release-0.12.0-0869b0?style=for-the-badge&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
 [![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=for-the-badge)](docs/rules-reference.md)
 [![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=for-the-badge)](PRIVACY.md)
 [![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](LICENSE)
@@ -23,7 +23,7 @@
 > [!WARNING]
 > **Pre-alpha.** The scanner currently implements 77 rules across 12 collector sources. Most rules are experimental and calibrated for research and testing. Never ban a player solely based on these results, and never proclaim a machine is "clean".
 
-**Latest release: [0.11.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.17-0.11.0)**, 17 October 2026.
+**Latest release: [0.12.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.17-0.12.0)**, 17 October 2026.
 
 **An offline, open-source PC-check tool for FiveM communities.** It looks for traces that cheats leave on a Windows PC and for machine settings that make cheating easier, then presents the evidence with full technical provenance. **It never gives a "clean" verdict.**
 

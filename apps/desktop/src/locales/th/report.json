@@ -360,5 +360,68 @@
     "done": "บันทึกไว้ที่ {{path}}",
     "cancelled": "ไม่ได้บันทึก",
     "failed": "บันทึกไม่ได้: {{reason}}"
+  },
+  "view_switcher": {
+    "summary": "สรุปภาพรวม",
+    "technical": "รายงานฉบับเต็ม"
+  },
+  "hero_note": {
+    "title": "ภาพรวมผลการสแกนเครื่องนี้",
+    "reassurance_benign": "ไม่พบร่องรอยการดัดแปลงไฟล์เกม FiveM และไม่พบการลบประวัติเครื่อง โดยตรวจพบข้อสังเกตทั่วไป {{count}} ข้อ ซึ่งเป็นพฤติกรรมปกติของโปรแกรมปรับการ์ดจอ/พัดลม, Discord, สคริปต์ และตัวติดตั้งในโฟลเดอร์ Temp",
+    "reassurance_tamper": "ตรวจพบบันทึกการล้างประวัติของระบบ (Event Log ถูกเคลียร์ หรือ USN Reset) ทำให้ไม่สามารถย้อนดูประวัติก่อนหน้านั้นได้อย่างสมบูรณ์",
+    "reassurance_proxy": "พบไฟล์ DLL แปลกปลอมที่ไม่มีลายเซ็นดิจิทัลอยู่ในโฟลเดอร์ FiveM.app และมีประวัติการบล็อกไดรเวอร์ภายนอก",
+    "reassurance_unmeasured": "การสแกนนี้ทำงานด้วยสิทธิ์ผู้ใช้ทั่วไป ทำให้มีรายการตรวจสอบเชิงลึก {{count}} ข้อที่ไม่สามารถเข้าถึงได้ แนะนำให้เปิดด้วยสิทธิ์ผู้ดูแลระบบ"
+  },
+  "horizon_timeline": {
+    "title": "ขอบเขตเวลาที่ตรวจย้อนหลังได้",
+    "badge_continuous": "ประวัติต่อเนื่อง · ไม่พบการล้างข้อมูล",
+    "badge_broken": "ประวัติถูกลบหรือตัดทอน",
+    "badge_short": "ประวัติต่อเนื่องตามอายุ OS",
+    "badge_unmeasured": "สิทธิ์ไม่พอ · ตรวจได้บางส่วน",
+    "step_history_start": "เริ่มบันทึกประวัติ",
+    "step_history_start_sub": "Event Logs บันทึกต่อเนื่อง",
+    "step_boot_time": "เปิดเครื่องล่าสุด",
+    "step_fivem_session": "เล่น FiveM ล่าสุด",
+    "step_current_scan": "จุดที่ทำการสแกน",
+    "step_current_scan_sub": "Offline Sealed"
+  },
+  "glance": {
+    "fivem_title": "การเล่น FiveM ล่าสุด",
+    "history_title": "ความสมบูรณ์ของประวัติ",
+    "obs_title": "ข้อสังเกตที่พบ",
+    "fivem_session_text": "เข้าเล่นนาน {{duration}} ปิดเกมตามกระบวนการปกติ",
+    "fivem_none_text": "ไม่พบประวัติเซสชันการเล่น FiveM ในช่วงเวลาที่บันทึกไว้",
+    "history_clean_badge": "ไม่มีการล้างประวัติ",
+    "history_tamper_badge": "ประวัติขาดตอน",
+    "history_clean_desc": "Event Logs บันทึกต่อเนื่อง ไม่พบการเคลียร์ Log หรือการรีเซ็ต USN Journal",
+    "history_tamper_desc": "พบบันทึกการล้าง Event Log หรือรีเซ็ต USN Journal ทำให้ประวัติขาดตอน",
+    "obs_benign_badge": "เป็นเรื่องปกติได้",
+    "obs_tamper_badge": "พบการล้างข้อมูล",
+    "obs_unmeasured_badge": "ยังไม่ได้วัด {{count}} ข้อ",
+    "obs_benign_desc": "อธิบายได้ด้วยโปรแกรมทั่วไปที่ผู้เล่นใช้งาน",
+    "obs_tamper_desc": "พบข้อสังเกตที่มีลักษณะเป็นการลบหรือตัดทอนประวัติ",
+    "obs_unmeasured_desc": "ต้องการสิทธิ์ผู้ดูแลระบบเพื่อตรวจสอบครบถ้วน"
+  },
+  "ai_export": {
+    "button_label": "คัดลอกส่งให้ AI สรุปวิเคราะห์",
+    "copied_label": "คัดลอกเรียบร้อย!",
+    "toast_message": "คัดลอก Prompt สำหรับ AI เรียบร้อยแล้ว! (ปกปิดข้อมูลส่วนตัวและ Username อัตโนมัติ)"
+  },
+  "human_findings": {
+    "section_title": "สิ่งที่ตรวจพบ",
+    "match_stat": "แสดง {{visible}} จาก {{total}} รายการ",
+    "match_stat_all": "แสดงทั้งหมด {{total}} รายการ",
+    "chip_all": "ทั้งหมด",
+    "chip_hardware": "ฮาร์ดแวร์ & ไดรเวอร์",
+    "chip_startup": "โปรแกรมเริ่มเอง",
+    "chip_script": "คำสั่ง & ไฟล์ชั่วคราว",
+    "chip_fivem": "ไฟล์ FiveM",
+    "chip_unmeasured": "ยังไม่ได้วัด",
+    "search_placeholder": "ค้นหาข้อตรวจพบ...",
+    "show_causes": "กดดูสาเหตุ ▾",
+    "hide_causes": "กดดูสาเหตุ ▴",
+    "causes_title": "เรื่องปกติที่ทำให้เกิดผลแบบนี้:",
+    "unmeasured_causes_title": "เหตุผลทางเทคนิคที่ไม่สามารถวัดค่าได้:",
+    "tamper_causes_title": "ข้อเท็จจริงทางเทคนิค:"
   }
 }
