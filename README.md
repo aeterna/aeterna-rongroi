@@ -1,23 +1,25 @@
-# aeterna-rongroi
-
 <div align="center">
 
-# 🔍 aeterna-rongroi (ร่องรอย)
+**English** · [🇹🇭 ภาษาไทย](README.th.md)
+
+# aeterna-rongroi (ร่องรอย)
+
 ### Transparent, Offline PC Forensics & Evidence Scanner for FiveM
 
-[![Release](https://img.shields.io/badge/Release-0.12.0-0869b0?style=for-the-badge&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
-[![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=for-the-badge)](docs/rules-reference.md)
-[![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=for-the-badge)](PRIVACY.md)
-[![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](LICENSE)
-[![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=for-the-badge)](docs/adr/0002-no-clean-verdict.md)
+**Shows evidence — never gives a "clean" verdict.**
 
-**[🌐 Official Website](https://aeterna.github.io/aeterna-rongroi/)** •
-**[📖 Screenshare Guide](docs/screenshare-guide.md)** •
-**[🔎 77 Rules Reference](docs/rules-reference.md)** •
-**[🛡️ Privacy Policy](PRIVACY.md)** •
-**[🇹🇭 ภาษาไทย](README.th.md)**
+[![Release](https://img.shields.io/badge/Release-0.12.0-0869b0?style=flat-square&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
+[![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=flat-square)](docs/rules-reference.md)
+[![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=flat-square)](PRIVACY.md)
+[![License](https://img.shields.io/badge/License-GPL--3.0-f4c430?style=flat-square)](LICENSE)
+[![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=flat-square)](docs/adr/0002-no-clean-verdict.md)
 
----
+**[Official Website](https://aeterna.github.io/aeterna-rongroi/) · [Screenshare Guide](docs/screenshare-guide.md) · [77 Rules Reference](docs/rules-reference.md) · [Privacy Policy](PRIVACY.md)**
+
+[Quick start](#quick-start) · [What it is](#what-it-is--and-what-it-is-not) · [Forensic Architecture](#forensic-architecture) · [3-Layer Evidence Model](#the-3-layer-evidence-model-adr-0045) · [77 Rules](#what-it-inspects-77-rules-across-12-collectors) · [Verification](#verifying-a-download)
+
+<code>aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode ss</code>
+
 </div>
 
 > [!WARNING]
@@ -30,6 +32,26 @@
 Players can run it to inspect their own machines, or server staff can review findings over a screenshare (SS) with the player's explicit, informed consent.
 
 *rongroi* (ร่องรอย) is Thai for "traces".
+
+---
+
+## ⚡ Quick Start
+
+### Graphical Desktop App (Recommended)
+1. Download `aeterna-rongroi-0.12.0-windows-x64.exe` from [Official Releases](https://github.com/aeterna/aeterna-rongroi/releases).
+2. Run the application (portable single-file, 100% offline, zero network dependencies).
+3. Choose **Self Check** to inspect your own machine or **SS Mode** for staff review.
+4. Easily switch between the **Overview Summary** (plain-language breakdown with AI export) and the **Detailed Report** (forensic technical facts).
+
+### Standalone CLI (Zero-GUI / Minimal Environment)
+Open Command Prompt (`cmd`) and run:
+```bat
+.\aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode self
+```
+For screenshare review with user path redaction:
+```bat
+.\aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode ss
+```
 
 ---
 
