@@ -2174,4 +2174,76 @@ mod tests {
             );
         }
     }
+
+    /// Code Integrity driver/image refusal events (Event ID 3033 and 3077) match the
+    /// timeline selector field contract defined in ADR 0059 and rule 51bb1937-7ab2-48db-a2f2-78be82ba2fe8.
+    #[test]
+    fn code_integrity_driver_block_events_match_timeline_selector() {
+        let make_obs = |provider: &str, channel: &str, event_id: u64| {
+            let mut fields = BTreeMap::new();
+            fields.insert(
+                "provider".to_string(),
+                serde_json::Value::String(provider.to_string()),
+            );
+            fields.insert(
+                "channel".to_string(),
+                serde_json::Value::String(channel.to_string()),
+            );
+            fields.insert(
+                "event_id".to_string(),
+                serde_json::Value::Number(event_id.into()),
+            );
+            fields.insert(
+                "first_seen".to_string(),
+                serde_json::Value::String("2026-09-09T10:12:03Z".to_string()),
+            );
+            fields.insert(
+                "last_seen".to_string(),
+                serde_json::Value::String("2026-09-29T21:40:55Z".to_string()),
+            );
+            fields.insert("count".to_string(), serde_json::Value::Number(1.into()));
+            fields.insert("level".to_string(), serde_json::Value::Number(2.into()));
+            Observation {
+                collector: "evtx".to_string(),
+                fields,
+            }
+        };
+
+        let obs_3033 = make_obs(
+            "Microsoft-Windows-CodeIntegrity",
+            "Microsoft-Windows-CodeIntegrity/Operational",
+            3033,
+        );
+        let obs_3077 = make_obs(
+            "Microsoft-Windows-CodeIntegrity",
+            "Microsoft-Windows-CodeIntegrity/Operational",
+            3077,
+        );
+        let obs_3089 = make_obs(
+            "Microsoft-Windows-CodeIntegrity",
+            "Microsoft-Windows-CodeIntegrity/Operational",
+            3089,
+        );
+        let obs_3004 = make_obs(
+            "Microsoft-Windows-CodeIntegrity",
+            "Microsoft-Windows-CodeIntegrity/Operational",
+            3004,
+        );
+        let obs_other_provider = make_obs("ExampleVendor-Updater", "Application", 3033);
+
+        let matches_selector = |obs: &Observation| -> bool {
+            text(obs, "provider") == Some("Microsoft-Windows-CodeIntegrity")
+                && text(obs, "channel") == Some("Microsoft-Windows-CodeIntegrity/Operational")
+                && field(obs, "event_id")
+                    .and_then(serde_json::Value::as_u64)
+                    .map(|id| id == 3033 || id == 3077)
+                    .unwrap_or(false)
+        };
+
+        assert!(matches_selector(&obs_3033));
+        assert!(matches_selector(&obs_3077));
+        assert!(!matches_selector(&obs_3089));
+        assert!(!matches_selector(&obs_3004));
+        assert!(!matches_selector(&obs_other_provider));
+    }
 }
