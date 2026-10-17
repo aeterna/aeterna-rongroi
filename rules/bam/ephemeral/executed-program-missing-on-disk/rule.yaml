@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 14afcc4e-5567-424d-8502-dae7b65a1af8
+title: Program recorded by BAM from temporary or removable path is missing from disk
+description: >-
+  The Windows Background Activity Moderator (BAM) recorded execution of a program from a
+  temporary directory, Downloads folder, or removable drive, but the executable file is no
+  longer present on disk at that path. This pattern is consistent with ephemeral execution,
+  self-deleting loaders, or software executed from temporary storage that was subsequently removed.
+  It is not proof of cheat software on its own, as legitimate installers and cleanup utilities also
+  produce this pattern.
+status: experimental
+collector: bam
+strength: context
+match:
+  disappeared_from_disk: true
+retention: >-
+  Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so
+  an older execution leaves no entry here.
+unmeasured_when: [not_windows, not_admin, source_absent]
+falsepositives:
+  - Legitimate installers or self-extracting archives that unpack to Temp, execute, and delete themselves
+  - Executables downloaded and run from Downloads that the user manually deleted afterwards
+  - Temporary files cleaned up by Windows Storage Sense, disk cleanup tools, or browser cleaners
+  - Executables run from a removable USB flash drive or portable disk that has since been unplugged
+references: []
+author: aeterna-rongroi contributors
+date: 2026-10-17
+tags: [bam, execution, ephemeral]

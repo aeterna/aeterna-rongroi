@@ -17,7 +17,7 @@ default-members = ["crates/*", "xtask"]
 exclude = ["fuzz", "third_party/evtx"]
 
 [workspace.package]
-version = "0.10.0"
+version = "0.11.0"
 edition = "2024"
 rust-version = "1.98"
 license = "GPL-3.0-or-later"
@@ -75,6 +75,13 @@ undocumented_unsafe_blocks = "deny"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# Dependencies only, optimised in test and debug builds. A debug-built scan of a CI runner took 20 to 30
+# seconds (the Windows policy step runs 36 of them), and the CLI tests that scan for real ran three at once
+# and reached nextest's 60-second slow mark, once its 180-second limit. The workspace's own crates stay
+# unoptimised, so their debug assertions, overflow checks and debugger view are unchanged.
+[profile.dev.package."*"]
+opt-level = 2
 
 # The registry `evtx` 0.12.2 reserves a `Vec` from a record's substitution count without bounding it
 # against the bytes remaining, which a crafted 68 KiB file turns into a 7.7 GB allocation — measured on

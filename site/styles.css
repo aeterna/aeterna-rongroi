@@ -97,6 +97,85 @@ summary:focus-visible {
   border-radius: 6px;
 }
 
+/* Inline SVG icon styles (strict zero-emoji policy) */
+.icon {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  stroke-width: 2;
+  stroke: currentColor;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.icon-sm {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+}
+
+.icon-lg {
+  width: 1.4em;
+  height: 1.4em;
+  vertical-align: -0.25em;
+}
+
+.icon-alert {
+  color: #b45309;
+}
+
+.icon-info {
+  color: #1e40af;
+}
+
+/* Strength badges */
+.badge-strength {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 8px;
+  border-radius: 6px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge-strength-tamper {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.badge-strength-presence {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.badge-strength-execution {
+  background: #f5f3ff;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+.badge-strength-posture {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-strength-context {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
 .wrap {
   max-width: 1080px;
   margin: 0 auto;
@@ -377,21 +456,60 @@ nav.lang a[aria-current="page"] {
   margin: 0;
 }
 
+.specimen-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.specimen-search input {
+  width: 100%;
+  padding: 7px 12px 7px 32px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-solid);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.specimen-search .search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--muted);
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
 .specimen-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 4px 10px;
+  gap: 6px 10px;
   align-items: start;
   border: 1px solid var(--found-line);
   background: var(--found-ground);
   box-shadow: inset 4px 0 0 var(--found-mark);
   border-radius: 16px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   font-size: 0.92rem;
 }
 
 .specimen-row .mark {
   margin-top: 6px;
+}
+
+.specimen-title-wrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.specimen-title {
+  font-weight: 600;
+  color: var(--navy);
 }
 
 .specimen-row .pill {
@@ -400,9 +518,56 @@ nav.lang a[aria-current="page"] {
   background: var(--surface-solid);
 }
 
-.specimen-row small {
-  grid-column: 2 / 4;
+.specimen-desc {
+  grid-column: 2 / -1;
   color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.specimen-falsepositives {
+  grid-column: 2 / -1;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.specimen-falsepositives-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1e40af;
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.specimen-falsepositives ul {
+  margin: 0;
+  padding-left: 1.2em;
+  color: #1e3a8a;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.specimen-tech-btn {
+  grid-column: 2 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-solid);
+  color: var(--text);
 }
 
 /* State marks, as in the window. */
@@ -440,12 +605,20 @@ nav.lang a[aria-current="page"] {
 }
 
 .note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   border: 1px solid #cfe5f8;
   border-left: 5px solid var(--blue);
   background: var(--blue-soft);
   border-radius: 16px;
-  padding: 12px 18px;
+  padding: 14px 18px;
   margin: 8px 0 24px;
+  line-height: 1.6;
+}
+
+.note .icon {
+  margin-top: 3px;
 }
 
 /* Sections: a rounded title with a gradient dot, like a chapter of the reference site. */

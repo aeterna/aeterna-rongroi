@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: f934b261-18f8-4c4e-b3b3-1163d644cf0e
+title: The change journal was truncated or recreated after Windows was installed
+description: >-
+  The NTFS change journal shows evidence of being reset, truncated, or recreated after
+  Windows was installed. Anti-forensics tools and trace-clearing utilities commonly delete
+  the change journal (for example via fsutil usn deletejournal) to purge historical file activity records.
+status: experimental
+collector: usn
+strength: tamper
+match:
+  location: journal
+  journal_truncated_or_recreated: true
+retention: >-
+  Current state only: whether the change journal's metadata and earliest records indicate a reset or
+  truncation event relative to the operating system installation date.
+unmeasured_when: [not_windows, not_admin, access_denied, source_absent]
+falsepositives:
+  - An administrator or maintenance script running fsutil usn deletejournal to reclaim disk space
+  - Volume repair or chkdsk rebuilding the NTFS change journal
+  - Major disk partitioning or volume resizing operations
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/change-journals
+  - https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-usn
+author: aeterna-rongroi contributors
+date: 2026-10-17
+tags: [usn, integrity]

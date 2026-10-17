@@ -97,7 +97,8 @@ const REASONS: [UnmeasuredReason; 7] = [
 ///
 /// A key it could not enumerate is a gap in all of them. One value it could not read or decode is
 /// not: see the comment on [`Bam::collect`].
-const FIELDS: [Field; 15] = [
+const FIELDS: [Field; 16] = [
+    Field::boolean("disappeared_from_disk"),
     Field::number("entries"),
     Field::text(fivem_edition::FIELD),
     Field::boolean("intact"),
@@ -120,7 +121,8 @@ const FIELDS: [Field; 15] = [
 /// The subset a content-level reason gaps: `source_empty` and `partial` both describe a key this
 /// collector **did** enumerate, so gapping `users`, `values`, `entries`, `rejected` or `intact` —
 /// which were measured — would claim it had not (ADR 0030).
-const RECORD_FIELDS: [&str; 7] = [
+const RECORD_FIELDS: [&str; 8] = [
+    "disappeared_from_disk",
     fivem_edition::FIELD,
     "last_run",
     "moderation_state",
@@ -242,7 +244,7 @@ impl Collector for Bam {
                     Ok(Some(bytes)) => match bam::parse_value(&bytes) {
                         Ok(entry) => {
                             parsed += 1;
-                            observations.push(execution(name, bytes.len(), &entry));
+                            observations.push(execution(host, name, bytes.len(), &entry));
                         }
                         Err(error) => {
                             rejected += 1;
@@ -328,13 +330,72 @@ fn record_gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
         .collect()
 }
 
+/// Whether an executable path is located in a temporary directory (Temp, Downloads, Removable).
+pub fn is_ephemeral_candidate(host: &dyn Host, path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    if lower.contains(r"\temp\")
+        || lower.contains("/temp/")
+        || lower.contains(r"\tmp\")
+        || lower.contains("/tmp/")
+        || lower.contains(r"\downloads\")
+        || lower.contains("/downloads/")
+        || lower.contains(r"\removable\")
+        || lower.contains("/removable/")
+        || lower.contains(r"\usb\")
+        || lower.contains("/usb/")
+        || lower.contains(r"\media\")
+        || lower.contains("/media/")
+    {
+        return true;
+    }
+
+    if is_drive_rooted(path) {
+        let drive = path.as_bytes().first().map_or(b'C', u8::to_ascii_uppercase);
+        let sys_drive = host
+            .env_var("SystemDrive")
+            .as_deref()
+            .and_then(|s| s.as_bytes().first())
+            .map_or(b'C', u8::to_ascii_uppercase);
+        if drive != sys_drive {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Whether the target executable no longer exists on disk (ADR 0034).
+fn target_disappeared_from_disk(host: &dyn Host, path: &str) -> bool {
+    if !is_ephemeral_candidate(host, path) {
+        return false;
+    }
+    if is_drive_rooted(path) {
+        match host.times(path) {
+            Ok(Some(_)) => false,
+            Ok(None) => true,
+            Err(_) => !std::path::Path::new(path).exists(),
+        }
+    } else {
+        match host.times(path) {
+            Ok(None) => true,
+            Ok(Some(_)) | Err(_) => false,
+        }
+    }
+}
+
 /// One program BAM recorded, from one registry value that decoded.
 ///
 /// `value_bytes` is how many bytes the value held. ADR 0013 names it as the first thing to check on a
 /// current Windows build — whether a value is still the 24 the write-ups describe — and it is the one
 /// number here that means the same thing on every machine.
-fn execution(path: &str, value_bytes: usize, entry: &BamEntry) -> Observation {
+fn execution(host: &dyn Host, path: &str, value_bytes: usize, entry: &BamEntry) -> Observation {
     let mut fields = BTreeMap::new();
+    if target_disappeared_from_disk(host, path) {
+        fields.insert(
+            "disappeared_from_disk".to_owned(),
+            serde_json::Value::from(true),
+        );
+    }
     if let Some(name) = file_name(path) {
         fields.insert("name".to_owned(), serde_json::Value::from(name));
     }
@@ -983,5 +1044,55 @@ mod tests {
             }),
             "malformed"
         );
+    }
+
+    #[test]
+    fn an_ephemeral_executable_missing_from_disk_is_marked_as_disappeared() {
+        let yaml = format!(
+            "platform: windows\nregistry:\n  '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1001':\n    \
+             'C:\\Users\\fixtureuser\\AppData\\Local\\Temp\\loader.exe':\n      content: '012345678901234567890123'\n    \
+             'E:\\cheat.exe':\n      content: '012345678901234567890123'\n"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 2, "{records:?}");
+        assert_eq!(
+            field(records[0], "disappeared_from_disk"),
+            Some(&true.into())
+        );
+        assert_eq!(
+            field(records[1], "disappeared_from_disk"),
+            Some(&true.into())
+        );
+    }
+
+    #[test]
+    fn an_ephemeral_executable_present_on_disk_is_not_marked_disappeared() {
+        let yaml = format!(
+            "platform: windows\nfilesystem:\n  'C:\\Users\\fixtureuser\\Downloads':\n    - name: 'tool.exe'\nregistry:\n  '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1001':\n    \
+             'C:\\Users\\fixtureuser\\Downloads\\tool.exe':\n      content: '012345678901234567890123'\n"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(field(records[0], "disappeared_from_disk"), None);
+    }
+
+    #[test]
+    fn a_non_ephemeral_missing_executable_is_not_marked_disappeared() {
+        let yaml = format!(
+            "platform: windows\nregistry:\n  '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1001':\n    \
+             'C:\\Windows\\System32\\uninstalled.exe':\n      content: '012345678901234567890123'\n"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(field(records[0], "disappeared_from_disk"), None);
     }
 }

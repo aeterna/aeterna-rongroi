@@ -43,6 +43,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const [links, setLinks] = useState<CodeLinks | null>(null);
   const [filter, setFilter] = useState<StateFilter | null>(null);
   const [technicalAll, setTechnicalAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     void reportView(mode, options).then(setView);
@@ -82,7 +83,24 @@ export function Report({ mode, options, saved, onBack }: Props) {
   // Carried fix (b): whether `codeLinks()` has arrived at all, independent of what it said.
   const linksKnown = links !== null;
   const official = header.provenance.official;
-  const groups = groupEvidence(view.evidence, filter, view.collector_order);
+  const query = searchQuery.trim().toLowerCase();
+  const filteredEvidence = query
+    ? view.evidence.filter((item) => {
+        const text = texts[item.rule_id];
+        if (item.rule_id.toLowerCase().includes(query)) return true;
+        if (item.collector.toLowerCase().includes(query)) return true;
+        if (text?.title?.toLowerCase().includes(query)) return true;
+        if (text?.description?.toLowerCase().includes(query)) return true;
+        if (
+          item.state === "found" &&
+          item.observations.some((obs) => JSON.stringify(obs.fields).toLowerCase().includes(query))
+        ) {
+          return true;
+        }
+        return false;
+      })
+    : view.evidence;
+  const groups = groupEvidence(filteredEvidence, filter, view.collector_order);
 
   return (
     <section className="report">
@@ -133,30 +151,52 @@ export function Report({ mode, options, saved, onBack }: Props) {
       )}
 
       <div className="toolbar">
-        {filter ? (
-          <p className="muted">
-            {t("toolbar.filtered")}{" "}
-            <button type="button" className="disclosure" onClick={() => setFilter(null)}>
-              {t("toolbar.clear")}
-            </button>
-          </p>
-        ) : (
-          <span />
-        )}
-        <label className="switch">
+        <div className="toolbar-search">
           <input
-            type="checkbox"
-            checked={technicalAll}
-            onChange={(event) => setTechnicalAll(event.target.checked)}
-          />{" "}
-          {t("toolbar.technical_all")}
-        </label>
+            type="search"
+            className="search-input"
+            placeholder={t("toolbar.search_placeholder")}
+            aria-label={t("toolbar.search_label")}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="clear-search"
+              aria-label={t("toolbar.clear_search")}
+              onClick={() => setSearchQuery("")}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <div className="toolbar-controls">
+          {filter ? (
+            <p className="muted">
+              {t("toolbar.filtered")}{" "}
+              <button type="button" className="disclosure" onClick={() => setFilter(null)}>
+                {t("toolbar.clear")}
+              </button>
+            </p>
+          ) : (
+            <span />
+          )}
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={technicalAll}
+              onChange={(event) => setTechnicalAll(event.target.checked)}
+            />{" "}
+            {t("toolbar.technical_all")}
+          </label>
+        </div>
       </div>
 
       {view.evidence.length === 0 && <p>{t("empty")}</p>}
       {/* A count of 0 is still a filter; choosing it says so rather than showing nothing. */}
       {view.evidence.length > 0 && groups.length === 0 && (
-        <p className="muted">{t("toolbar.filtered_empty")}</p>
+        <p className="muted">{t(query ? "toolbar.search_empty" : "toolbar.filtered_empty")}</p>
       )}
       {groups.map((group) => (
         <Group

@@ -21,6 +21,8 @@ usn_journal:
     'C:\Windows\appcompat\pca': 3
     'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins': 4
     'C:\Users\fixtureuser\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine': 5
+    'C:\Users\fixtureuser\AppData\Local\DigitalEntitlements': 6
+    'C:\Users\fixtureuser\AppData\Roaming\CitizenFX': 7
   records:
     - parent: 'C:\Windows\Prefetch'
       reasons: [file_create, data_extend, close]
