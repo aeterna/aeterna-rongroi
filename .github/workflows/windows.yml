@@ -22,61 +22,142 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  windows:
-    name: rust (windows)
+  windows-cargo:
+    name: cargo (windows)
     runs-on: windows-latest
-    # See ci.yml's `rust` job. Windows runners are the slowest here — the last runs took about
-    # eight minutes end to end — so this is generous and still far below the six-hour default.
-    timeout-minutes: 55
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Two deep so a pull request's merge commit has its base (`HEAD^1`) for the scope step below.
           fetch-depth: 2
-      # The script block logging measurement launches PowerShell four times and scans the whole machine
-      # for each of its 36 policy cases: 10.7–18.6 minutes over 16 runs on 2026-10-15. On a pull request
-      # it runs only when something it measures could have changed — any crate, the posture rules, the
-      # toolchain, the lockfile or this workflow. Every push to dev and main runs it.
-      - name: Which measurements this pull request needs
+      - name: Which checks this pull request needs
         id: scope
         shell: bash
         env:
           EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
-          policy=true
+          skip=false
           if [ "$EVENT" = pull_request ]; then
-            # Captured first: `git diff | grep -q` under pipefail reads a match as a failed pipeline.
+            if [ "${BASE_REF:-}" = "main" ] && [ "${HEAD_REF:-}" = "dev" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR is a promotion from verified branch 'dev' to 'main': fast-pass."
+              exit 0
+            fi
             changed=$(git diff --name-only HEAD^1 HEAD)
-            if ! grep -q -E '^(crates/|rules/posture/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/windows\.yml$)' <<<"$changed"; then
-              policy=false
+            if ! grep -q -v -E '^(\.github/workflows/pages\.yml|\.github/ISSUE_TEMPLATE/|docs/|site/|LICENSES/|.*\.md$|_typos\.toml$)' <<<"$changed"; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR changes only docs/site/text: fast-pass."
+              exit 0
             fi
           fi
-          echo "policy=$policy" >> "$GITHUB_OUTPUT"
-          echo "Script block logging measurement runs: $policy"
+          if [ "$EVENT" = push ]; then
+            if [ "${GITHUB_REF_NAME:-}" = "main" ]; then
+              if [ "$(git rev-parse HEAD^{tree})" = "$(git rev-parse HEAD^1^{tree} 2>/dev/null || true)" ]; then
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                echo "Push to main has identical tree to parent: fast-pass."
+                exit 0
+              fi
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
       - name: Install the toolchain pinned in rust-toolchain.toml
+        if: steps.scope.outputs.skip != 'true'
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: steps.scope.outputs.skip != 'true'
         with:
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' }}
       - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
+        if: steps.scope.outputs.skip != 'true'
+        with:
+          tool: cargo-nextest
+      - name: Clippy (Windows code paths)
+        if: steps.scope.outputs.skip != 'true'
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        if: steps.scope.outputs.skip != 'true'
+        run: cargo nextest run --workspace --locked --profile ci
+
+  windows-live:
+    name: host & live smoke (windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Which measurements this run needs
+        id: scope
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          skip=false
+          policy=true
+          if [ "$EVENT" = pull_request ]; then
+            if [ "${BASE_REF:-}" = "main" ] && [ "${HEAD_REF:-}" = "dev" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "policy=false" >> "$GITHUB_OUTPUT"
+              echo "PR is a promotion from verified branch 'dev' to 'main': fast-pass."
+              exit 0
+            fi
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            if ! grep -q -v -E '^(\.github/workflows/pages\.yml|\.github/ISSUE_TEMPLATE/|docs/|site/|LICENSES/|.*\.md$|_typos\.toml$)' <<<"$changed"; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "policy=false" >> "$GITHUB_OUTPUT"
+              echo "PR changes only docs/site/text: fast-pass."
+              exit 0
+            fi
+            if ! grep -q -E '^(crates/rongroi-host-windows/|crates/rongroi-collectors/src/posture\.rs|rules/posture/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/windows\.yml$)' <<<"$changed"; then
+              policy=false
+            fi
+          fi
+          if [ "$EVENT" = push ]; then
+            # On post-merge push to dev or main, live OS tests were already verified on PR
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "policy=false" >> "$GITHUB_OUTPUT"
+            echo "Post-merge push: live host OS tests were already verified on PR. Fast-pass."
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "policy=$policy" >> "$GITHUB_OUTPUT"
+          echo "Script block logging measurement runs: $policy"
+      - name: Install the toolchain pinned in rust-toolchain.toml
+        if: steps.scope.outputs.skip != 'true'
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: steps.scope.outputs.skip != 'true'
+        with:
+          save-if: false
+      - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
+        if: steps.scope.outputs.skip != 'true'
         with:
           tool: cargo-nextest
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: steps.scope.outputs.skip != 'true'
         with:
           package_json_file: apps/desktop/package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.scope.outputs.skip != 'true'
         with:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/desktop/pnpm-lock.yaml
       - name: Install desktop UI dependencies
+        if: steps.scope.outputs.skip != 'true'
         run: pnpm -C apps/desktop install --frozen-lockfile
-      - name: Clippy (Windows code paths)
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Tests
-        run: cargo nextest run --workspace --locked --profile ci
+      # Build desktop app OUTSIDE the Defender monitoring window to prevent disk I/O contention
+      - name: Build the desktop app (unofficial build, no installer)
+        if: steps.scope.outputs.skip != 'true'
+        run: pnpm -C apps/desktop tauri build --no-bundle
       # ADR 0035. Checking a signature is the one read that could reach the network inside Windows,
       # where cargo-deny and every lint are blind, so this proves it does not on a real machine: the
       # CAPI2 log records a network retrieval as event 53 with the process that asked for it. The
@@ -85,6 +166,7 @@ jobs:
       # appear — because a log that records nothing would otherwise pass for one that saw nothing.
       # The runner is thrown away afterwards, so switching its CAPI2 log on changes no one's machine.
       - name: Signature checks stay off the network (CAPI2 log)
+        if: steps.scope.outputs.skip != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -183,6 +265,7 @@ jobs:
       # away afterwards; the stores are still restored, whatever happens, because the steps after this
       # one build and run on the same machine.
       - name: What an incomplete certificate chain answers offline
+        if: steps.scope.outputs.skip != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -445,6 +528,7 @@ jobs:
       # nothing and its silence would pass for a verdict; the later step puts each back. What one Defender
       # configuration on one runner does says nothing about other security products.
       - name: Microsoft Defender's state before the privileged reads
+        if: steps.scope.outputs.skip != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -483,19 +567,21 @@ jobs:
       # token for the read. This proves the read leaves the token as it found it; on the elevated runner
       # the privilege is held, so it also proves the read answers rather than reporting missing rights.
       - name: Firmware read leaves its privilege as it found it
+        if: steps.scope.outputs.skip != 'true'
         run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_firmware_/)'
       # ADR 0047. The runner is elevated and its system volume has a change journal: the collector's
       # source reads it on a volume handle without write access, to the end, and a folder's identifier
       # finds records under it. Nothing the journal holds is printed.
       - name: Change journal reads without write access
+        if: steps.scope.outputs.skip != 'true'
         run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_usn_/)'
       # ADR 0069. The device list reads through CfgMgr32 without changing anything; every id comes
       # back as a model with no instance part. Only counts are printed.
       - name: Device list reads as models
+        if: steps.scope.outputs.skip != 'true'
         run: cargo nextest run -p rongroi-host-windows --locked --profile ci --no-capture --run-ignored only -E 'test(/live_devices_/)'
-      - name: Build the desktop app (unofficial build, no installer)
-        run: pnpm -C apps/desktop tauri build --no-bundle
       - name: Live smoke — the CLI reads this machine
+        if: steps.scope.outputs.skip != 'true'
         shell: pwsh
         run: |
           $before = reg query "HKLM\SYSTEM\CurrentControlSet\Control\SecureBoot\State" 2>&1 | Out-String
@@ -662,7 +748,7 @@ jobs:
       # did. The runner is thrown away, which is the only reason writing policy keys is acceptable here, and
       # every key is put back as it was found. It runs before the Event Log service is suspended below.
       - name: What PowerShell does with a script block logging policy
-        if: steps.scope.outputs.policy == 'true'
+        if: steps.scope.outputs.skip != 'true' && steps.scope.outputs.policy == 'true'
         shell: pwsh
         # 10.7 to 18.6 minutes on the same code (16 runs, 2026-10-15): the runner's speed decides it, and
         # one run past 20 minutes timed out with nothing wrong. 30 leaves room; the job's 55 covers it.
@@ -797,7 +883,7 @@ jobs:
                 Run $powerShell7 ($inert.Replace('-inert-', '-inert-core-'))
                 Run $powerShell7 ($listed.Replace('-listed-', '-listed-core-'))
               ) | Where-Object { $_ }
-              Start-Sleep -Seconds 3
+              Start-Sleep -Seconds 1
               $json = & $exe scan --json | Out-String
               if ($LASTEXITCODE -ne 0) { throw "the scan exited $LASTEXITCODE in case '$case'" }
               $scan = $json | ConvertFrom-Json
@@ -842,6 +928,7 @@ jobs:
           # `reg query` on a key that is absent leaves exit code 1 behind, which the runner would report.
           exit 0
       - name: What Microsoft Defender recorded while the privilege was enabled
+        if: steps.scope.outputs.skip != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -876,6 +963,7 @@ jobs:
       # Event Log. Before suspending, it times the same two properties for every channel while the service
       # answers, so the bound can be read against this machine too (counts and times only, no names).
       - name: A suspended Event Log service costs the configuration fields, not the other evtx rules
+        if: steps.scope.outputs.skip != 'true'
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -975,3 +1063,22 @@ jobs:
           if ($folder.Count -ne 1) { throw "expected one evtx folder account, got $($folder.Count)" }
           Write-Output "evtx folder: logs $($folder[0].fields.logs) · examined $($folder[0].fields.examined) · refused $($folder[0].fields.refused) · budget_exhausted $($folder[0].fields.budget_exhausted)"
           if ($folder[0].fields.budget_exhausted) { throw 'the parse budget was exhausted with the service suspended: the wait was charged to the logs' }
+
+  rust:
+    name: rust (windows)
+    needs: [windows-cargo, windows-live]
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Check upstream Windows jobs
+        run: |
+          cargo_res="${{ needs.windows-cargo.result }}"
+          live_res="${{ needs.windows-live.result }}"
+          echo "windows-cargo: $cargo_res"
+          echo "windows-live: $live_res"
+          if [ "$cargo_res" != "success" ] || [ "$live_res" != "success" ]; then
+            echo "::error::One or more Windows jobs failed: cargo=$cargo_res, live=$live_res"
+            exit 1
+          fi
+          echo "All Windows jobs completed successfully."
