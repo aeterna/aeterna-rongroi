@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 73 |
-| SHA-256 | `9e40e68c8fc9b7c82cba372d7e241cf73c2fdd9b26826a3bd9625165e07a1478` |
+| Rules | 74 |
+| SHA-256 | `7afc8e64eb481154c650fe8becd71292210125f355e368272d6ad09de2a6be36` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -43,6 +43,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 - `autostart`
   - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
+- `bam`
+  - [Program recorded by BAM from temporary or removable path is missing from disk](#rule-14afcc4e-5567-424d-8502-dae7b65a1af8) — `context` · `experimental`
 - `defender_exclusion`
   - [A Microsoft Defender exclusion covers a FiveM folder](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
@@ -185,6 +187,47 @@ The services, Run and RunOnce values and scheduled tasks registered when the sca
 - Open-source and self-built tools, which are often not signed
 - A file signed through a Windows catalog, which this check does not read
 - A Run entry switched off in Task Manager, which this program cannot tell from one that is on
+
+## Collector `bam`
+
+### `bam` / `ephemeral`
+
+<a id="rule-14afcc4e-5567-424d-8502-dae7b65a1af8"></a>
+
+#### Program recorded by BAM from temporary or removable path is missing from disk
+
+- Id: `14afcc4e-5567-424d-8502-dae7b65a1af8`
+- File: [`rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml`](../rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml)
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `execution`, `ephemeral`
+- Written: 2026-10-17
+
+**About this check**
+
+The Windows Background Activity Moderator (BAM) recorded execution of a program from a temporary directory, Downloads folder, or removable drive, but the executable file is no longer present on disk at that path. This pattern is consistent with ephemeral execution, self-deleting loaders, or software executed from temporary storage that was subsequently removed. It is not proof of cheat software on its own, as legitimate installers and cleanup utilities also produce this pattern.
+
+**Matches when all of these hold for one observation**
+
+- `disappeared_from_disk`: is `true`
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older execution leaves no entry here.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Legitimate installers or self-extracting archives that unpack to Temp, execute, and delete themselves
+- Executables downloaded and run from Downloads that the user manually deleted afterwards
+- Temporary files cleaned up by Windows Storage Sense, disk cleanup tools, or browser cleaners
+- Executables run from a removable USB flash drive or portable disk that has since been unplugged
 
 ## Collector `defender_exclusion`
 

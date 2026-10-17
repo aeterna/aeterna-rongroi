@@ -17,3 +17,6 @@ registry:
       from: '../../parsers/bam/documented-24-byte-value.bin'
     'C:\Windows\System32\notepad.exe':
       from: '../../parsers/bam/moderation-state-set.bin'
+filesystem:
+  'C:\Users\fixtureuser\Downloads':
+    - name: 'example.exe'
