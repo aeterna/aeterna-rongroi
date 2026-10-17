@@ -64,6 +64,14 @@ pub const APPCOMPAT_PCA_LOCATION: &str = "appcompat_pca";
 pub const PSREADLINE_LOCATION: &str = "psreadline";
 /// Where `PSReadLine` keeps `ConsoleHost_history.txt`, under `%APPDATA%` (ADR 0063).
 pub const PSREADLINE_RELATIVE_PATH: &str = r"Microsoft\Windows\PowerShell\PSReadLine";
+/// The `location` of `DigitalEntitlements` under `%LOCALAPPDATA%`.
+pub const DIGITALENTITLEMENTS_LOCATION: &str = "digitalentitlements";
+/// Where Rockstar Games keeps entitlement tokens, relative to `%LOCALAPPDATA%`.
+pub const DIGITALENTITLEMENTS_RELATIVE_PATH: &str = "DigitalEntitlements";
+/// The `location` of `CitizenFX` under `%APPDATA%`.
+pub const CITIZENFX_LOCATION: &str = "citizenfx";
+/// Where `CitizenFX` keeps credentials and data, relative to `%APPDATA%`.
+pub const CITIZENFX_RELATIVE_PATH: &str = "CitizenFX";
 
 /// `folder` when the folder's identifiers were read and its records counted.
 pub const FOLDER_IDENTIFIED: &str = "identified";
@@ -78,13 +86,14 @@ pub const FOLDER_OTHER_VOLUME: &str = "other_volume";
 /// ADR 0047 measured about one second for a 32 MiB journal; an administrator can make one larger.
 pub const BUDGET: Duration = Duration::from_secs(30);
 
-static FIELDS: [Field; 14] = [
+static FIELDS: [Field; 15] = [
     Field::number("created"),
     Field::number("data_changed"),
     Field::number("deleted"),
     Field::timestamp("first_seen"),
     Field::text("folder"),
     Field::text("journal_created_on"),
+    Field::boolean("journal_truncated_or_recreated"),
     Field::timestamp("last_seen"),
     Field::text("location"),
     Field::number("maximum_size"),
@@ -126,7 +135,7 @@ struct Place {
     relative: &'static str,
 }
 
-const PLACES: [Place; 6] = [
+const PLACES: [Place; 8] = [
     Place {
         location: PREFETCH_LOCATION,
         base: prefetch::SYSTEM_ROOT,
@@ -157,6 +166,16 @@ const PLACES: [Place; 6] = [
         location: PSREADLINE_LOCATION,
         base: fivem_dir::ROAMING_APP_DATA,
         relative: PSREADLINE_RELATIVE_PATH,
+    },
+    Place {
+        location: DIGITALENTITLEMENTS_LOCATION,
+        base: fivem_dir::LOCAL_APP_DATA,
+        relative: DIGITALENTITLEMENTS_RELATIVE_PATH,
+    },
+    Place {
+        location: CITIZENFX_LOCATION,
+        base: fivem_dir::ROAMING_APP_DATA,
+        relative: CITIZENFX_RELATIVE_PATH,
     },
 ];
 
@@ -265,9 +284,12 @@ impl Collector for Usn {
             Err(error) => return unmeasured(reason_for(host, &error)),
         };
 
+        let journal_truncated_or_recreated =
+            is_journal_truncated_or_recreated(host, &read.state, tally.all.first);
         let mut journal = tally.journal_observation(
             read.state.first_usn != read.state.lowest_valid_usn,
             read.state.maximum_size,
+            journal_truncated_or_recreated,
         );
         // The date the identifier gives when read as a `FILETIME`, which is not documented to be a
         // time; left out when it gives no plausible date, as a hash that could not be read is. Never
@@ -299,6 +321,46 @@ impl Collector for Usn {
             discriminator_gaps,
         }
     }
+}
+
+/// Inspects NTFS USN metadata and compares against OS install age (from `InstallDate`) to detect
+/// whether the journal was reset, truncated, or recreated.
+fn is_journal_truncated_or_recreated(
+    host: &dyn Host,
+    state: &rongroi_host::UsnJournalState,
+    oldest_record_time: Option<Timestamp>,
+) -> bool {
+    let install_time = match host.read_value(
+        r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+        "InstallDate",
+    ) {
+        Ok(Some(rongroi_host::RegistryData::Dword(seconds))) => {
+            Timestamp::from_second(i64::from(seconds)).ok()
+        }
+        _ => None,
+    };
+
+    let Some(install_time) = install_time else {
+        return false;
+    };
+    let install_date = install_time.to_zoned(jiff::tz::TimeZone::UTC).date();
+
+    if state
+        .created_on
+        .is_some_and(|created_on| created_on.since(install_date).is_ok_and(|span| span.get_days() > 1))
+    {
+        return true;
+    }
+
+    let untrimmed = state.first_usn == state.lowest_valid_usn;
+    if untrimmed
+        && oldest_record_time
+            .is_some_and(|oldest| oldest > install_time + Duration::from_hours(24))
+    {
+        return true;
+    }
+
+    false
 }
 
 /// The run's gaps on the fields a read that did not finish leaves unanswered. A damaged buffer
@@ -459,7 +521,12 @@ impl Tally {
         }
     }
 
-    fn journal_observation(&self, trimmed: bool, maximum_size: u64) -> Observation {
+    fn journal_observation(
+        &self,
+        trimmed: bool,
+        maximum_size: u64,
+        journal_truncated_or_recreated: bool,
+    ) -> Observation {
         let mut fields = BTreeMap::new();
         fields.insert(
             "location".to_owned(),
@@ -481,6 +548,10 @@ impl Tally {
         fields.insert(
             "maximum_size".to_owned(),
             serde_json::Value::from(maximum_size),
+        );
+        fields.insert(
+            "journal_truncated_or_recreated".to_owned(),
+            serde_json::Value::from(journal_truncated_or_recreated),
         );
         self.all.times(&mut fields);
         Observation {
@@ -683,6 +754,14 @@ mod tests {
         assert_eq!(psreadline.fields["first_seen"], "2026-09-14T11:00:00Z");
         assert_eq!(psreadline.fields["last_seen"], "2026-09-14T11:05:00Z");
 
+        let digitalentitlements = at(observations, DIGITALENTITLEMENTS_LOCATION);
+        assert_eq!(digitalentitlements.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(digitalentitlements.fields["records"], 0);
+
+        let citizenfx = at(observations, CITIZENFX_LOCATION);
+        assert_eq!(citizenfx.fields["folder"], FOLDER_IDENTIFIED);
+        assert_eq!(citizenfx.fields["records"], 0);
+
         let enhanced = at(observations, fivem_dir::ENHANCED_ASI_LOCATION);
         assert_eq!(enhanced.fields["folder"], FOLDER_ABSENT);
         assert!(!enhanced.fields.contains_key("records"));
@@ -698,9 +777,12 @@ mod tests {
 
         // Nothing a name could hide in: every value is a number, a boolean, a fixed word or a time.
         for observation in observations {
-            for value in observation.fields.values() {
+            for (field, value) in &observation.fields {
                 if let Some(text) = value.as_str() {
-                    assert!(!text.contains('\\') && !text.contains("fx"), "{text}");
+                    assert!(!text.contains('\\'), "{text}");
+                    if field != "location" {
+                        assert!(!text.contains("fx"), "{text}");
+                    }
                 }
             }
         }
@@ -891,7 +973,7 @@ mod tests {
         ]));
 
         assert!(tally.damaged);
-        assert_eq!(tally.journal_observation(false, 0).fields["records"], 1);
+        assert_eq!(tally.journal_observation(false, 0, false).fields["records"], 1);
         let gaps = counted_gaps(tally.damaged, UsnReadEnd::Complete);
         assert_eq!(gaps.len(), COUNTED.len());
         assert!(
@@ -906,7 +988,7 @@ mod tests {
         tally.add(&[0; 7]);
 
         assert!(tally.damaged);
-        assert_eq!(tally.journal_observation(false, 0).fields["records"], 0);
+        assert_eq!(tally.journal_observation(false, 0, false).fields["records"], 0);
         let gaps = counted_gaps(tally.damaged, UsnReadEnd::Complete);
         assert_eq!(gaps["records"], UnmeasuredReason::ReadFailed);
         assert_eq!(gaps["created"], UnmeasuredReason::ReadFailed);
@@ -941,15 +1023,20 @@ mod tests {
         let (observations, gaps, discriminator_gaps) = measured(&run);
         assert!(gaps.is_empty());
         // Enhanced is not installed on this baseline, so its plugin folder is absent, as on the
-        // runner. PSReadLine's history folder was not watched when the runner was read (ADR 0063 came
-        // later) and the baseline describes none, so it is absent too: the two discriminator gaps.
+        // runner. PSReadLine's history folder, DigitalEntitlements, and CitizenFX were not watched
+        // when the runner was read and the baseline describes none, so they are absent too: the discriminator gaps.
         let absent: Vec<&str> = discriminator_gaps
             .iter()
             .filter_map(|gap| gap.value.as_str())
             .collect();
         assert_eq!(
             absent,
-            [fivem_dir::ENHANCED_ASI_LOCATION, PSREADLINE_LOCATION]
+            [
+                fivem_dir::ENHANCED_ASI_LOCATION,
+                PSREADLINE_LOCATION,
+                DIGITALENTITLEMENTS_LOCATION,
+                CITIZENFX_LOCATION,
+            ]
         );
 
         let journal = at(observations, JOURNAL_LOCATION);
@@ -960,6 +1047,7 @@ mod tests {
         assert_eq!(journal.fields["maximum_size"], 33_554_432);
         assert_eq!(journal.fields["first_seen"], "2026-09-08T01:12:08.3678392Z");
         assert_eq!(journal.fields["last_seen"], "2026-09-15T05:07:08.7795416Z");
+        assert_eq!(journal.fields["journal_truncated_or_recreated"], false);
 
         let prefetch = at(observations, PREFETCH_LOCATION);
         assert_eq!(prefetch.fields["folder"], FOLDER_IDENTIFIED);
@@ -989,5 +1077,64 @@ mod tests {
 
         let enhanced = at(observations, fivem_dir::ENHANCED_ASI_LOCATION);
         assert_eq!(enhanced.fields["folder"], FOLDER_ABSENT);
+    }
+
+    #[test]
+    fn detects_journal_truncation_or_reset_anomaly_when_journal_created_long_after_install() {
+        let yaml = r"
+platform: windows
+registry:
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    InstallDate: 1704067200
+";
+        let host = FixtureHost::from_yaml_str(yaml, "inline").unwrap();
+        let state = rongroi_host::UsnJournalState {
+            first_usn: 0,
+            next_usn: 100,
+            lowest_valid_usn: 0,
+            maximum_size: 33_554_432,
+            created_on: Some(jiff::civil::date(2026, 1, 1)),
+        };
+        assert!(is_journal_truncated_or_recreated(&host, &state, None));
+    }
+
+    #[test]
+    fn detects_journal_reset_when_untrimmed_records_are_much_newer_than_install() {
+        let yaml = r"
+platform: windows
+registry:
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    InstallDate: 1704067200
+";
+        let host = FixtureHost::from_yaml_str(yaml, "inline").unwrap();
+        let state = rongroi_host::UsnJournalState {
+            first_usn: 0,
+            next_usn: 100,
+            lowest_valid_usn: 0,
+            maximum_size: 33_554_432,
+            created_on: None,
+        };
+        let oldest = "2026-01-01T12:00:00Z".parse::<Timestamp>().ok();
+        assert!(is_journal_truncated_or_recreated(&host, &state, oldest));
+    }
+
+    #[test]
+    fn continuous_journal_matching_install_date_is_not_anomalous() {
+        let yaml = r"
+platform: windows
+registry:
+  'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion':
+    InstallDate: 1704067200
+";
+        let host = FixtureHost::from_yaml_str(yaml, "inline").unwrap();
+        let state = rongroi_host::UsnJournalState {
+            first_usn: 0,
+            next_usn: 100,
+            lowest_valid_usn: 0,
+            maximum_size: 33_554_432,
+            created_on: Some(jiff::civil::date(2024, 1, 1)),
+        };
+        let oldest = "2024-01-01T01:00:00Z".parse::<Timestamp>().ok();
+        assert!(!is_journal_truncated_or_recreated(&host, &state, oldest));
     }
 }

@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 74
+      "rule_count": 75
     },
     "platform": "windows",
     "os_build": "26100",
@@ -77,14 +77,6 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
-    },
-    {
-      "rule_id": "14afcc4e-5567-424d-8502-dae7b65a1af8",
-      "collector": "bam",
-      "strength": "context",
-      "state": "unmeasured",
-      "reason": "source_absent",
-      "expected": true
     },
     {
       "rule_id": "d7191cf3-ce56-480b-8501-66a198f83e08",
@@ -544,6 +536,22 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "57107ac5-d826-431c-8ce9-08a0e7b0000f",
+      "collector": "usn",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "f934b261-18f8-4c4e-b3b3-1163d644cf0e",
+      "collector": "usn",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "91dc8b45-8355-4554-8a6d-e979e4a95ecd",
       "collector": "usn",
       "strength": "context",
@@ -896,7 +904,7 @@ expression: view
   "listed": {
     "found": 3,
     "not_found": 15,
-    "unmeasured": 39
+    "unmeasured": 40
   },
   "hidden": {
     "not_found": 0,

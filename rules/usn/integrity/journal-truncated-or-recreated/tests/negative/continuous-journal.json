@@ -1,0 +1,21 @@
+{
+  "description": "Synthetic: Continuous journal with normal trimming and history dating back to OS install.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "journal",
+        "records": 100000,
+        "records_version_2": 0,
+        "records_version_3": 100000,
+        "trimmed": true,
+        "maximum_size": 33554432,
+        "first_seen": "2026-09-08T01:12:08Z",
+        "last_seen": "2026-09-15T05:07:08Z",
+        "journal_created_on": "2021-05-10",
+        "journal_truncated_or_recreated": false
+      }
+    }
+  ],
+  "expect_matches": 0
+}

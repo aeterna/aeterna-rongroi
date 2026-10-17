@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 74 |
-| SHA-256 | `7afc8e64eb481154c650fe8becd71292210125f355e368272d6ad09de2a6be36` |
+| จำนวน rule | 75 |
+| SHA-256 | `1d961506fdb7dbc3a56e6b46e86378bf031a5534e7c28ee44f097500def1697c` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -39,8 +39,6 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 - `autostart`
   - [โปรแกรมที่เริ่มทำงานเองไม่มีลายเซ็นฝังในไฟล์ที่ใช้ได้ และอยู่นอกโฟลเดอร์ Windows กับ Program Files](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
-- `bam`
-  - [โปรแกรมที่ BAM บันทึกว่าเคยรันจากโฟลเดอร์ชั่วคราวหรือไดรฟ์ภายนอกไม่มีไฟล์อยู่บนดิสก์แล้ว](#rule-14afcc4e-5567-424d-8502-dae7b65a1af8) — `context` · `experimental`
 - `defender_exclusion`
   - [exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
@@ -106,6 +104,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 - `usn`
   - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
+  - [change journal มีบันทึกการลบไฟล์ใน DigitalEntitlements](#rule-57107ac5-d826-431c-8ce9-08a0e7b0000f) — `tamper` · `experimental`
+  - [change journal ถูกตัดทอนหรือสร้างขึ้นใหม่หลังติดตั้ง Windows](#rule-f934b261-18f8-4c4e-b3b3-1163d644cf0e) — `tamper` · `experimental`
   - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ plugin ของ FiveM](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ plugin ของ FiveM](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
   - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ประวัติคำสั่งของ PowerShell](#rule-926b3863-8f4f-4d18-aab6-26b77934466e) — `context` · `experimental`
@@ -184,48 +184,6 @@ service ค่าใน Run และ RunOnce และ scheduled task ที่
 - เครื่องมือ open source และเครื่องมือที่สร้างเอง ซึ่งมักไม่ได้เซ็น
 - ไฟล์ที่เซ็นผ่าน catalog ของ Windows ซึ่งการตรวจนี้ไม่ได้อ่าน
 - ค่าใน Run ที่ถูกปิดไว้ใน Task Manager ซึ่งโปรแกรมนี้แยกไม่ออกจากค่าที่เปิดอยู่
-
-## collector `bam`
-
-### `bam` / `ephemeral`
-
-<a id="rule-14afcc4e-5567-424d-8502-dae7b65a1af8"></a>
-
-#### โปรแกรมที่ BAM บันทึกว่าเคยรันจากโฟลเดอร์ชั่วคราวหรือไดรฟ์ภายนอกไม่มีไฟล์อยู่บนดิสก์แล้ว
-
-- ชื่อภาษาอังกฤษ: Program recorded by BAM from temporary or removable path is missing from disk
-- id: `14afcc4e-5567-424d-8502-dae7b65a1af8`
-- ไฟล์: [`rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml`](../rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml)
-- collector: `bam`
-- strength: `context` — ข้อมูลประกอบ
-- status: `experimental` — อยู่ระหว่างพัฒนา
-- tag: `bam`, `execution`, `ephemeral`
-- เขียนเมื่อ: 2026-10-17
-
-**เกี่ยวกับการตรวจนี้**
-
-Windows Background Activity Moderator (BAM) บันทึกประวัติการรันโปรแกรมจากโฟลเดอร์ชั่วคราว (Temp), โฟลเดอร์ Downloads หรือไดรฟ์ภายนอก แต่ปัจจุบันไม่พบไฟล์โปรแกรมดังกล่าวอยู่ที่เส้นทางนั้นแล้ว ลักษณะนี้ตรงกับรูปแบบการรันโปรแกรมแบบชั่วคราว (ephemeral execution) โปรแกรมที่ลบตัวเองหลังทำงาน หรือการรันจากอุปกรณ์พกพาที่ถูกถอดออกไปแล้ว ข้อนี้อย่างเดียวไม่ใช่หลักฐานว่าโกง เนื่องจากตัวติดตั้งปกติและการล้างไฟล์ชั่วคราวก็ทำให้เกิดรูปแบบนี้ได้เช่นกัน
-
-**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
-
-- `disappeared_from_disk`: เป็น `true`
-
-**ย้อนดูได้**
-
-เฉพาะประวัติที่ BAM ยังเก็บอยู่เท่านั้น Windows จะลบรายการ BAM ที่เก่ากว่า 7 วันเมื่อเริ่มระบบ การรันก่อนหน้านั้นจึงไม่ปรากฏที่นี่
-
-**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
-
-- `not_windows` — ไม่ได้รันบน Windows
-- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
-- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
-
-**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
-
-- ตัวติดตั้งหรือไฟล์แตกตัวเอง (self-extracting archive) ที่แตกไฟล์ลง Temp แล้วรันก่อนลบตัวเองทิ้ง
-- ผู้ใช้ดาวน์โหลดโปรแกรมลงโฟลเดอร์ Downloads รันใช้งาน แล้วลบไฟล์ทิ้งด้วยตนเองในภายหลัง
-- ระบบล้างไฟล์ชั่วคราวของ Windows (Storage Sense) หรือเครื่องมือทำความสะอาดดิสก์ที่ลบไฟล์ใน Temp
-- โปรแกรมที่ถูกรันจากแฟลชไดรฟ์ USB หรือไดรฟ์ภายนอกที่ปัจจุบันไม่ได้เชื่อมต่ออยู่กับเครื่อง
 
 ## collector `defender_exclusion`
 
@@ -2455,6 +2413,97 @@ NTFS change journal มี record อย่างน้อยหนึ่งร�
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
 - <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+### `usn` / `identity`
+
+<a id="rule-57107ac5-d826-431c-8ce9-08a0e7b0000f"></a>
+
+#### change journal มีบันทึกการลบไฟล์ใน DigitalEntitlements
+
+- ชื่อภาษาอังกฤษ: The change journal holds a deletion in DigitalEntitlements
+- id: `57107ac5-d826-431c-8ce9-08a0e7b0000f`
+- ไฟล์: [`rules/usn/identity/digitalentitlements-file-deleted/rule.yaml`](../rules/usn/identity/digitalentitlements-file-deleted/rule.yaml)
+- collector: `usn`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `identity`, `digitalentitlements`
+- เขียนเมื่อ: 2026-10-17
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal มี record อย่างน้อยหนึ่งรายการของไฟล์ที่ถูกลบโดยตรงใน DigitalEntitlements ซึ่งเป็นที่เก็บ entitlement token ของ Rockstar Games และ FiveM การลบไฟล์ที่นี่มักสัมพันธ์กับเครื่องมือล้างตัวตน (identity wiping) หรือ unban cleaner
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `deleted|gte`: ตั้งแต่ `1` ขึ้นไป
+- `folder`: เป็น `identified` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `location`: เป็น `digitalentitlements` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เฉพาะช่วงที่ change journal ยังเก็บไว้ตอนที่สแกนอ่าน ซึ่งแสดงไว้ข้างแถวนี้ journal มีขนาดคงที่และทิ้ง record เก่าสุดก่อน
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `other_volume` — ส่วนนี้อยู่บนไดรฟ์อื่น และโปรแกรมนี้อ่าน change journal ของไดรฟ์ระบบเท่านั้น
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- การแก้ปัญหาการล็อกอิน Rockstar Games Launcher หรือ FiveM โดยผู้ใช้ลบไฟล์ token ด้วยตนเอง
+- การติดตั้งใหม่หรือการถอนการติดตั้ง Rockstar Games Launcher แบบล้างข้อมูล
+- โปรแกรมทำความสะอาดเครื่องที่ล้างข้อมูลแอปพลิเคชันชั่วคราว
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
+### `usn` / `integrity`
+
+<a id="rule-f934b261-18f8-4c4e-b3b3-1163d644cf0e"></a>
+
+#### change journal ถูกตัดทอนหรือสร้างขึ้นใหม่หลังติดตั้ง Windows
+
+- ชื่อภาษาอังกฤษ: The change journal was truncated or recreated after Windows was installed
+- id: `f934b261-18f8-4c4e-b3b3-1163d644cf0e`
+- ไฟล์: [`rules/usn/integrity/journal-truncated-or-recreated/rule.yaml`](../rules/usn/integrity/journal-truncated-or-recreated/rule.yaml)
+- collector: `usn`
+- strength: `tamper` — ร่องรอยถูกล้าง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usn`, `integrity`
+- เขียนเมื่อ: 2026-10-17
+
+**เกี่ยวกับการตรวจนี้**
+
+NTFS change journal แสดงหลักฐานว่าถูกรีเซ็ต ตัดทอน หรือสร้างขึ้นใหม่หลังจากติดตั้ง Windows เครื่องมือ anti-forensics และสคริปต์ลบร่องรอยมักจะสั่งลบ change journal (เช่น คำสั่ง fsutil usn deletejournal) เพื่อล้างประวัติการเปลี่ยนแปลงและลบร่องรอยไฟล์
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `journal_truncated_or_recreated`: เป็น `true`
+- `location`: เป็น `journal` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น ซึ่งตรวจจาก metadata ของ change journal และเวลาของ record เริ่มต้นเทียบกับวันติดตั้งระบบปฏิบัติการ
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ผู้ดูแลระบบหรือสคริปต์บำรุงรักษาเครื่องสั่งรัน fsutil usn deletejournal เพื่อคืนพื้นที่ดิสก์
+- การซ่อมแซมไดรฟ์หรือคำสั่ง chkdsk ที่สร้าง NTFS change journal ใหม่
+- การแบ่งพาร์ติชันดิสก์ใหม่หรือการปรับขนาด volume
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journals>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-usn>
 
 ### `usn` / `plugins`
 
