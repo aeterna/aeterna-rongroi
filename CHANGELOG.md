@@ -5,6 +5,20 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Ephemeral execution anomaly detection** (`bam`, ADR 0034): An entry in BAM whose target binary was
+  executed from user temporary directories (`%TEMP%`, `Downloads`, removable media) but no longer exists
+  on disk (`executed-program-missing-on-disk`, `context`).
+- **FiveM root proxy DLL Authenticode verification** (`fivem_dir`): Looks for proxy DLL targets directly in
+  `FiveM.app` root (`version.dll`, `dxgi.dll`, `d3d11.dll`, `winmm.dll`, `winhttp.dll`) lacking a valid embedded
+  digital signature (`unsigned-root-proxy-dll`, `presence`).
+- **NTFS USN Journal reset and truncation detection** (`usn`): Compares oldest USN record and journal creation
+  against OS installation age to detect journal deletion/reset anti-forensics (`journal-truncated-or-recreated`, `tamper`).
+- **Rockstar / FiveM entitlement deletion watcher** (`usn`): Watches `%LOCALAPPDATA%\DigitalEntitlements` for
+  file deletion records indicative of identity wiping / spoofer token cleaners (`digitalentitlements-file-deleted`, `tamper`).
+- **Kernel Code Integrity driver block timeline** (`evtx`, ADR 0059): Timeline integration contract for
+  `Microsoft-Windows-CodeIntegrity/Operational` events 3033 and 3077.
+
 ## [0.10.0] - 2026-10-16
 
 A report can be kept. In SS mode the window takes a case code from the server, shows the SHA-256 of the report for
