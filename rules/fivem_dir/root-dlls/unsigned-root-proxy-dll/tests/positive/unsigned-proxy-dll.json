@@ -1,0 +1,15 @@
+{
+  "description": "An unsigned proxy DLL (version.dll) in FiveM.app root. The hash is invented.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "root_dlls",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.app\\version.dll",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "signature": "no_embedded_signature"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

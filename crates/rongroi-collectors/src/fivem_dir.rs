@@ -50,6 +50,18 @@ pub const ROAMING_APP_DATA: &str = "APPDATA";
 pub const PLUGINS_RELATIVE_PATH: &str = r"FiveM\FiveM.app\plugins";
 /// Value of the `location` field for the Legacy plugin folder.
 pub const PLUGINS_LOCATION: &str = "plugins";
+/// The root folder of `FiveM.app`, relative to `%LOCALAPPDATA%`.
+pub const ROOT_DLLS_RELATIVE_PATH: &str = r"FiveM\FiveM.app";
+/// Value of the `location` field for proxy DLLs in FiveM.app root.
+pub const ROOT_DLLS_LOCATION: &str = "root_dlls";
+/// Specific proxy DLL targets scanned in FiveM.app root (TASK-FIVEM-ROOT-PROXY).
+pub const PROXY_DLL_TARGETS: [&str; 5] = [
+    "version.dll",
+    "dxgi.dll",
+    "d3d11.dll",
+    "winmm.dll",
+    "winhttp.dll",
+];
 /// The Enhanced edition's `asi` folder, relative to `%APPDATA%` (ADR 0035). Present on one measured
 /// install; not established to be a folder the client loads from.
 pub const ENHANCED_ASI_RELATIVE_PATH: &str = r"FiveM for GTAV Enhanced\gta5enhanced\asi";
@@ -116,6 +128,8 @@ enum Reads {
     /// A program folder: an observation for the one file of this name, when it is there, and nothing
     /// about the folder or anything else in it (ADR 0036).
     OneFile(&'static str),
+    /// Proxy DLL targets directly in FiveM.app root (TASK-FIVEM-ROOT-PROXY).
+    ProxyDlls,
     /// A log, crash or cache folder: one folder-activity observation, and nothing about any file by
     /// name (ADR 0053).
     FolderActivity,
@@ -143,7 +157,7 @@ struct Location {
 }
 
 /// Every folder this collector looks in, in the order observations are reported.
-const LOCATIONS: [Location; 14] = [
+const LOCATIONS: [Location; 15] = [
     Location {
         name: PLUGINS_LOCATION,
         base: LOCAL_APP_DATA,
@@ -156,6 +170,13 @@ const LOCATIONS: [Location; 14] = [
         base: ROAMING_APP_DATA,
         relative: ENHANCED_ASI_RELATIVE_PATH,
         reads: Reads::EveryFile,
+        variant: None,
+    },
+    Location {
+        name: ROOT_DLLS_LOCATION,
+        base: LOCAL_APP_DATA,
+        relative: ROOT_DLLS_RELATIVE_PATH,
+        reads: Reads::ProxyDlls,
         variant: None,
     },
     Location {
@@ -373,19 +394,7 @@ impl Collector for FivemDir {
         // Every place that could not be read, with its reason, in the order `LOCATIONS` lists them.
         let mut unread: Vec<(&Location, UnmeasuredReason)> = Vec::new();
         for (location, folder) in folders {
-            let listing = match folder {
-                None => Err(UnmeasuredReason::ReadFailed),
-                Some(folder) => match host.list_dir(&folder) {
-                    Ok(None) => Ok(None),
-                    Ok(Some(entries)) => Ok(Some((folder, entries))),
-                    Err(SourceError::AccessDenied) => Err(UnmeasuredReason::AccessDenied),
-                    Err(
-                        SourceError::Failed(_)
-                        | SourceError::Unsupported(_)
-                        | SourceError::TooLarge { .. },
-                    ) => Err(UnmeasuredReason::ReadFailed),
-                },
-            };
+            let listing = list_folder(host, folder);
             match (listing, location.reads) {
                 // Not there — this edition is not installed for this user. The collector *did* look.
                 (Ok(None), Reads::EveryFile) => {
@@ -400,11 +409,9 @@ impl Collector for FivemDir {
                     ));
                     observations.extend(files);
                 }
-                // A program folder that is not there, or holds no file of that name, is nothing to
-                // report: the plugin folders' own observations already say which editions are
-                // installed, and an observation per absent executable would be a second way of saying
-                // it that no rule reads (ADR 0036).
-                (Ok(None), Reads::OneFile(_)) => {}
+                // A program folder or FiveM.app that is not there reports nothing: the plugin
+                // folders' own observations already say which editions are installed (ADR 0036).
+                (Ok(None), Reads::OneFile(_) | Reads::ProxyDlls) => {}
                 (Ok(Some((folder, entries))), Reads::OneFile(name)) => {
                     let named: Vec<DirEntryInfo> = entries
                         .into_iter()
@@ -418,6 +425,10 @@ impl Collector for FivemDir {
                         }
                     }
                     observations.extend(files);
+                }
+                // Proxy DLL targets in FiveM.app root (TASK-FIVEM-ROOT-PROXY).
+                (Ok(Some((folder, entries))), Reads::ProxyDlls) => {
+                    observations.extend(proxy_dll_observations(host, location, &folder, entries));
                 }
                 // A launch-mode cache that is not there is the ordinary case for all but one mode, so it
                 // is not reported; a place with no variant says it is absent, as a plugin folder does.
@@ -446,9 +457,9 @@ impl Collector for FivemDir {
                     observations.push(observation);
                 }
                 (Err(reason), reads) => {
-                    // A program folder carries no folder observation, so the gap is what says it could
-                    // not be read.
-                    if !matches!(reads, Reads::OneFile(_)) {
+                    // A program folder or root proxy DLL check carries no folder observation,
+                    // so the gap is what says it could not be read.
+                    if !matches!(reads, Reads::OneFile(_) | Reads::ProxyDlls) {
                         observations.push(folder_observation(location, FOLDER_UNREADABLE, None));
                     }
                     unread.push((location, reason));
@@ -518,6 +529,21 @@ fn folder_of(host: &dyn Host, location: &Location) -> Option<String> {
     let base = host.env_var(location.base)?;
     let base = base.trim_end_matches(['\\', '/']);
     (!base.is_empty()).then(|| format!(r"{base}\{}", location.relative))
+}
+
+fn list_folder(
+    host: &dyn Host,
+    folder: Option<String>,
+) -> Result<Option<(String, Vec<DirEntryInfo>)>, UnmeasuredReason> {
+    let folder = folder.ok_or(UnmeasuredReason::ReadFailed)?;
+    match host.list_dir(&folder) {
+        Ok(None) => Ok(None),
+        Ok(Some(entries)) => Ok(Some((folder, entries))),
+        Err(SourceError::AccessDenied) => Err(UnmeasuredReason::AccessDenied),
+        Err(
+            SourceError::Failed(_) | SourceError::Unsupported(_) | SourceError::TooLarge { .. },
+        ) => Err(UnmeasuredReason::ReadFailed),
+    }
 }
 
 /// What was seen of one folder as a whole. No path: `location` already says which folder, and a path
@@ -840,6 +866,59 @@ fn lowercase_digest(digest: &str) -> Option<String> {
     (digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())).then_some(digest)
 }
 
+/// What was seen of proxy DLL targets in FiveM.app root (TASK-FIVEM-ROOT-PROXY).
+///
+/// Looks only for specific targets known to be used for DLL proxying / hijacking:
+/// `version.dll`, `dxgi.dll`, `d3d11.dll`, `winmm.dll`, and `winhttp.dll`.
+/// Emits an observation only when the signature is unsigned (`no_embedded_signature`)
+/// or invalid (`invalid`, `unverifiable_offline`).
+fn proxy_dll_observations(
+    host: &dyn Host,
+    location: &Location,
+    dir: &str,
+    entries: Vec<DirEntryInfo>,
+) -> Vec<Observation> {
+    let mut files: Vec<DirEntryInfo> = entries
+        .into_iter()
+        .filter(|entry| {
+            entry.is_file
+                && PROXY_DLL_TARGETS
+                    .iter()
+                    .any(|target| entry.name.eq_ignore_ascii_case(target))
+        })
+        .collect();
+    files.sort_by(|left, right| left.name.cmp(&right.name));
+    files
+        .into_iter()
+        .filter_map(|entry| {
+            let path = format!(r"{dir}\{}", entry.name);
+            let Ok(signature) = host.file_signature(&path) else {
+                return None;
+            };
+            let sig_str = match signature {
+                SignatureCheck::NoEmbeddedSignature => "no_embedded_signature",
+                SignatureCheck::Invalid => "invalid",
+                SignatureCheck::UnverifiableOffline => "unverifiable_offline",
+                SignatureCheck::Valid { .. } => return None,
+            };
+            let mut fields = BTreeMap::new();
+            if let Some(sha256) = file_sha256(host, &path) {
+                fields.insert("sha256".to_owned(), serde_json::Value::from(sha256));
+            }
+            fields.insert("signature".to_owned(), serde_json::Value::from(sig_str));
+            fields.insert(
+                "location".to_owned(),
+                serde_json::Value::from(location.name),
+            );
+            fields.insert("path".to_owned(), serde_json::Value::from(path));
+            Some(Observation {
+                collector: ID.to_owned(),
+                fields,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -1026,7 +1105,7 @@ mod tests {
     #[test]
     fn every_place_unreadable_is_a_gap_for_the_whole_run() {
         let host = inline(
-            "platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\naccess_denied:\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\plugins'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\logs'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\crashes'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\cache'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache-priv'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache-fxdk'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced\\servercache'\n",
+            "platform: windows\nenv:\n  LOCALAPPDATA: 'C:\\Users\\a\\AppData\\Local'\naccess_denied:\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\plugins'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\logs'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\crashes'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\cache'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache-priv'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM\\FiveM.app\\data\\server-cache-fxdk'\n  - 'C:\\Users\\a\\AppData\\Local\\FiveM for GTAV Enhanced\\servercache'\n",
         );
         let run = FivemDir.collect(&host);
         let (observations, gaps) = measured(&run);
@@ -1670,5 +1749,81 @@ filesystem:
         assert!(!is_server_folder(&"a".repeat(39)));
         assert!(!is_server_folder(&"g".repeat(40)));
         assert!(!is_server_folder(&format!("{}.bak", "a".repeat(40))));
+    }
+
+    #[test]
+    fn root_proxy_dll_unsigned_and_invalid_are_observed() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app':
+    - name: version.dll
+      sha256: 1111111111111111111111111111111111111111111111111111111111111111
+      signature: { state: no_embedded_signature }
+    - name: dxgi.dll
+      sha256: 2222222222222222222222222222222222222222222222222222222222222222
+      signature: { state: invalid }
+    - name: d3d11.dll
+      sha256: 3333333333333333333333333333333333333333333333333333333333333333
+      signature: { state: unverifiable_offline }
+    - name: CitizenGame.dll
+      sha256: 4444444444444444444444444444444444444444444444444444444444444444
+      signature: { state: no_embedded_signature }
+    - name: logs
+      directory: true
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, _) = measured(&run);
+        let root_dlls: Vec<&Observation> = observations
+            .iter()
+            .filter(|o| field(o, "location") == Some(ROOT_DLLS_LOCATION))
+            .collect();
+        assert_eq!(root_dlls.len(), 3);
+
+        let v = by_name(observations, "version.dll");
+        assert_eq!(field(v, "location"), Some(ROOT_DLLS_LOCATION));
+        assert_eq!(field(v, "signature"), Some("no_embedded_signature"));
+        assert_eq!(field(v, "sha256"), Some("1".repeat(64).as_str()));
+
+        let dxgi = by_name(observations, "dxgi.dll");
+        assert_eq!(field(dxgi, "location"), Some(ROOT_DLLS_LOCATION));
+        assert_eq!(field(dxgi, "signature"), Some("invalid"));
+
+        let d3d11 = by_name(observations, "d3d11.dll");
+        assert_eq!(field(d3d11, "location"), Some(ROOT_DLLS_LOCATION));
+        assert_eq!(field(d3d11, "signature"), Some("unverifiable_offline"));
+    }
+
+    #[test]
+    fn root_proxy_dll_valid_signature_is_not_observed() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app':
+    - name: version.dll
+      sha256: 1111111111111111111111111111111111111111111111111111111111111111
+      signature:
+        state: valid
+        signer: Microsoft Windows
+        signer_cert_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, _) = measured(&run);
+        let root_dlls: Vec<&Observation> = observations
+            .iter()
+            .filter(|o| field(o, "location") == Some(ROOT_DLLS_LOCATION))
+            .collect();
+        assert!(
+            root_dlls.is_empty(),
+            "valid signature root proxy DLL should not be emitted: {root_dlls:?}"
+        );
     }
 }
