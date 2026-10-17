@@ -10,9 +10,11 @@
 # that regression is the runner's default six-hour limit, on a job that then says only that it timed
 # out.
 #
-# 60 seconds is far above every honest test in this repository — the whole suite is 463 tests in
-# about 3.5 seconds — so a test that reaches it is stuck rather than slow. Three periods, because a
-# machine under load deserves more than one chance before its result is thrown away.
+# 60 seconds is far above every honest test in this repository, so a test that reaches it is stuck
+# rather than slow. The slowest are the three CLI tests in `rongroi-cli::streams` that scan the machine
+# for real: 17 seconds on the Windows runner, once dependencies are optimised in debug builds
+# (Cargo.toml `[profile.dev.package."*"]`); 50 to 62 seconds before. Three periods, because a machine
+# under load deserves more than one chance before its result is thrown away.
 [profile.default]
 slow-timeout = { period = "60s", terminate-after = 3 }
 
