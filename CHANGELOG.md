@@ -5,6 +5,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-17
+
+Detection rules expand to 77 across 12 collectors. New capabilities detect NTFS change journal (USN) truncation
+and identity store deletion (Rockstar / FiveM token wiping), ephemeral executions from temporary paths whose
+binary is missing on disk, unsigned FiveM root proxy DLLs, and driver block events from Code Integrity telemetry.
+The desktop UI is upgraded with forensic strength badges, false-positive reassurance cards, raw JSON clipboard
+copying, and responsive log filtering.
+
 ### Added
 - **Ephemeral execution anomaly detection** (`bam`, ADR 0034): An entry in BAM whose target binary was
   executed from user temporary directories (`%TEMP%`, `Downloads`, removable media) but no longer exists
@@ -18,6 +26,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   file deletion records indicative of identity wiping / spoofer token cleaners (`digitalentitlements-file-deleted`, `tamper`).
 - **Kernel Code Integrity driver block timeline** (`evtx`, ADR 0059): Timeline integration contract for
   `Microsoft-Windows-CodeIntegrity/Operational` events 3033 and 3077.
+- **Desktop UI and UX enhancements**: Added visual badges for rule strength categories (`TAMPER`, `PRESENCE`,
+  `EXECUTION`, `POSTURE`, `CONTEXT`), false-positive reassurance cards explaining environmental anomalies,
+  quick search input filter for findings, and one-click raw JSON copy to clipboard.
 
 ## [0.10.0] - 2026-10-16
 

@@ -5,7 +5,7 @@
 # 🔍 aeterna-rongroi (ร่องรอย)
 ### โปรแกรมตรวจเครื่อง (PC Forensics) สำหรับชุมชน FiveM แบบ Open-Source และ Offline
 
-[![Release](https://img.shields.io/badge/Release-0.10.0-0869b0?style=for-the-badge&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
+[![Release](https://img.shields.io/badge/Release-0.11.0-0869b0?style=for-the-badge&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
 [![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=for-the-badge)](docs/rules-reference.th.md)
 [![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=for-the-badge)](PRIVACY.md)
 [![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](LICENSE)
@@ -22,6 +22,8 @@
 
 > [!WARNING]
 > **ยังเป็นรุ่นทดลอง (pre-alpha)** ตอนนี้โปรแกรมตรวจด้วย rule ทั้งหมด 77 ตัว จากแหล่งข้อมูล 12 สาย เกือบทั้งหมดยังอยู่ในสถานะทดลอง (experimental) และยังไม่ได้ผ่านการสอบทานกับเครื่องจริงมากพอ ห้ามแบนผู้เล่นโดยอาศัยรายงานนี้เพียงอย่างเดียว และห้ามใช้โปรแกรมนี้เพื่อรับรองว่าเครื่อง "สะอาด"
+
+**รุ่นล่าสุด: [0.11.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.10.17-0.11.0)**, 17 ตุลาคม 2026.
 
 **โปรแกรมตรวจเครื่อง (PC check) สำหรับชุมชน FiveM แบบ open-source ทำงาน offline** มองหาร่องรอยที่โปรโกงทิ้งไว้บนเครื่อง Windows และการตั้งค่าเครื่องที่เปิดทางให้โกงได้ง่าย แล้วแสดงหลักฐานพร้อมที่มาทางเทคนิคให้คนดู **ไม่มีวันบอกว่าเครื่อง "สะอาด"**
 
