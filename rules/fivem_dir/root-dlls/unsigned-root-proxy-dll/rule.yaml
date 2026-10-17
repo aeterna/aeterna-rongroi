@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 6e275262-bc1e-4b59-8301-01c3fd179fa8
+title: A proxy DLL in FiveM's root folder has no embedded signature that verifies here
+description: >-
+  FiveM for GTA V Legacy's application folder (%LOCALAPPDATA%\FiveM\FiveM.app) holds a DLL known to be used
+  as a proxy target (such as version.dll, dxgi.dll, d3d11.dll, winmm.dll, or winhttp.dll), and Windows
+  found no signature embedded in it, one that does not verify, or one it could not verify without the
+  internet; each file shown says which. Windows searches the application directory before system directories
+  when loading DLLs, making root DLLs a common mechanism for DLL hijacking and proxying. Legitimate
+  installations do not place these system DLLs directly in FiveM.app. "Could not verify without the internet"
+  includes a certificate chain that ends at a root certificate this PC does not hold as trusted. The check
+  does not say what a file is or does, or who put it there.
+status: experimental
+collector: fivem_dir
+strength: presence
+match:
+  location: root_dlls
+  signature: [no_embedded_signature, invalid, unverifiable_offline]
+retention: >-
+  Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and
+  this check cannot say what the folder held earlier.
+unmeasured_when: [not_windows]
+falsepositives:
+  - Graphics mods, overlays, or recording tools installed directly into the FiveM.app folder instead of the plugins folder
+  - A tool or mod that ships an unsigned proxy DLL
+  - A signature that does not verify because the file was damaged, or whose certificate expired without a timestamp
+  - A signature this PC could not verify offline, because its certificate chain needs something Windows has not already stored
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order
+  - https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust
+author: aeterna-rongroi contributors
+date: 2026-10-17
+tags: [fivem_dir, root_dlls, signature]
+related:
+  - id: 061797d3-161d-4783-89e6-caf658973436
+    type: similar
+  - id: 0999422f-8709-4d85-80e3-39410a85ed6b
+    type: similar
