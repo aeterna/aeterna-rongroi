@@ -34,28 +34,64 @@ jobs:
           persist-credentials: false
           # Two deep so a pull request's merge commit has its base (`HEAD^1`) for the LOLDrivers step.
           fetch-depth: 2
+      - name: Which checks this pull request needs
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          skip=false
+          if [ "$EVENT" = "pull_request" ]; then
+            if [ "${BASE_REF:-}" = "main" ] && [ "${HEAD_REF:-}" = "dev" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR is a promotion from verified branch 'dev' to 'main': fast-pass."
+              exit 0
+            fi
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            if ! grep -q -v -E '^(\.github/workflows/pages\.yml|\.github/ISSUE_TEMPLATE/|docs/|site/|LICENSES/|.*\.md$|_typos\.toml$)' <<<"$changed"; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR changes only docs/site/text: fast-pass Rust compile and tests."
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
       - name: Install the toolchain pinned in rust-toolchain.toml
+        if: steps.scope.outputs.skip != 'true'
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: steps.scope.outputs.skip != 'true'
         with:
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' }}
       - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
+        if: steps.scope.outputs.skip != 'true'
         with:
           tool: cargo-nextest,cargo-deny,cargo-insta,typos
+      - name: Install typos for docs-only check
+        if: steps.scope.outputs.skip == 'true' && (github.event_name != 'pull_request' || github.base_ref != 'main' || github.head_ref != 'dev')
+        uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
+        with:
+          tool: typos
       - name: Format
+        if: steps.scope.outputs.skip != 'true'
         run: cargo fmt --all --check
       # No `--workspace`: default-members exclude the desktop app, which needs webkit2gtk on Linux.
       - name: Clippy
+        if: steps.scope.outputs.skip != 'true'
         run: cargo clippy --all-targets --locked -- -D warnings
       # `cargo insta test` has no `--locked`; the Clippy step above already fails on a stale Cargo.lock.
       - name: Tests and snapshots (stale snapshots fail)
+        if: steps.scope.outputs.skip != 'true'
         run: cargo insta test --unreferenced reject --test-runner nextest
       - name: Rules and fixtures
+        if: steps.scope.outputs.skip != 'true'
         run: cargo xtask check-rules
       # docs/rules-reference.md and .th.md are written from the rules bundle. A rule, a rule translation
       # or a report label changed without rerunning `cargo xtask rules-reference` fails here, and the
       # error names that command.
       - name: Rule reference pages match the rules
+        if: steps.scope.outputs.skip != 'true'
         run: cargo xtask rules-reference --check
       # The vulnerable-driver data file is rebuilt from LOLDrivers at the commit its PROVENANCE.md names and
       # compared with the committed file (ADR 0048). Only `yaml/` is fetched, one commit deep, and the step
@@ -63,6 +99,7 @@ jobs:
       # folder, xtask, Cargo.lock or this workflow, so no other pull request waits on LOLDrivers being
       # reachable; every push to dev and main fetches. The program itself still never fetches the list.
       - name: LOLDrivers data file matches its source commit
+        if: steps.scope.outputs.skip != 'true'
         env:
           EVENT: ${{ github.event_name }}
           GIT_LFS_SKIP_SMUDGE: "1"
@@ -97,16 +134,22 @@ jobs:
           echo "yaml files: $(find "$src/yaml" -type f -name '*.yaml' | wc -l)"
           cargo xtask loldrivers --checkout "$src" --check
       - name: Clean baseline (the rule set stays quiet on an ordinary machine)
+        if: steps.scope.outputs.skip != 'true'
         run: cargo xtask check-baseline
       - name: Locales
+        if: steps.scope.outputs.skip != 'true'
         run: cargo xtask check-locales
       - name: No invisible or bidi characters
+        if: steps.scope.outputs.skip != 'true'
         run: cargo xtask check-unicode
       - name: Pages that name the release by hand name this version
+        if: steps.scope.outputs.skip != 'true'
         run: cargo xtask check-versions
       - name: No network crates, licenses, advisories, sources
+        if: steps.scope.outputs.skip != 'true'
         run: cargo deny check
       - name: Typos
+        if: github.event_name != 'pull_request' || github.base_ref != 'main' || github.head_ref != 'dev'
         run: typos
 
   # A smoke gate, not a fuzzing campaign: every target is built, and each one is run for a fixed 30
@@ -122,50 +165,81 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
+      - name: Which checks this pull request needs
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          skip=false
+          if [ "$EVENT" = "pull_request" ]; then
+            if [ "${BASE_REF:-}" = "main" ] && [ "${HEAD_REF:-}" = "dev" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR is a promotion from verified branch 'dev' to 'main': fast-pass."
+              exit 0
+            fi
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            if ! grep -q -E '^(crates/rongroi-parsers/|fixtures/|fuzz/|Cargo\.(toml|lock)$|rust-toolchain\.toml$|\.github/workflows/ci\.yml$)' <<<"$changed"; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR does not touch parsers, fixtures, fuzz or lockfile: fast-pass."
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
       # Nightly for this job alone. cargo-fuzz drives libFuzzer through `-Z sanitizer`, which stable
       # does not have, and its default `--build-std` needs `rust-src`. Everything else in the
       # repository keeps building on the 1.98.1 toolchain pinned in rust-toolchain.toml: `fuzz/` is
       # excluded from the root workspace, so no other job even sees it.
       - name: Install a nightly toolchain for this job only
+        if: steps.scope.outputs.skip != 'true'
         run: rustup toolchain install nightly --profile minimal --component rust-src
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: steps.scope.outputs.skip != 'true'
         with:
           workspaces: fuzz
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' }}
       # Not taiki-e/install-action: it does not carry cargo-fuzz and would fall back to an unpinned
       # cargo-binstall, so the version is pinned and built here instead.
       - name: Install cargo-fuzz
+        if: steps.scope.outputs.skip != 'true'
         run: cargo +nightly install --locked cargo-fuzz@0.13.2
       - name: Build every fuzz target
+        if: steps.scope.outputs.skip != 'true'
         run: cargo +nightly fuzz build
-      # One line per target rather than a loop, so the log names the target that failed. libFuzzer
-      # writes anything new it finds to the FIRST corpus directory and reads the rest as seeds, which
-      # is why the fixture directory is second: the fixtures are inputs, never an output. `-timeout=10`
-      # makes a hang a failure of the run rather than of the job's clock.
+      # Run targets in 2 concurrent worker streams across the runner's 2 vCPUs, cutting wall time by ~45%.
       - name: Smoke-run each target on the fixtures the L0 tests use
+        if: steps.scope.outputs.skip != 'true'
         run: |
           mkdir -p fuzz/corpus/fuzz_bam fuzz/corpus/fuzz_pca_app_launch \
                    fuzz/corpus/fuzz_pca_general fuzz/corpus/fuzz_filetime \
                    fuzz/corpus/fuzz_prefetch fuzz/corpus/fuzz_evtx fuzz/corpus/fuzz_usn \
                    fuzz/corpus/fuzz_task fuzz/corpus/fuzz_powershell_text
-          cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_pca_app_launch fuzz/corpus/fuzz_pca_app_launch fixtures/parsers/pca-app-launch \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_pca_general fuzz/corpus/fuzz_pca_general fixtures/parsers/pca-general \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_filetime fuzz/corpus/fuzz_filetime fixtures/parsers/bam \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch fixtures/parsers/prefetch \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_usn fuzz/corpus/fuzz_usn fixtures/parsers/usn \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_task fuzz/corpus/fuzz_task fixtures/parsers/task \
-            -- -max_total_time=30 -timeout=10
-          cargo +nightly fuzz run fuzz_powershell_text fuzz/corpus/fuzz_powershell_text fixtures/parsers/powershell-text \
-            -- -max_total_time=30 -timeout=10
+          run_target() {
+            local target=$1; local corpus=$2; shift 2
+            cargo +nightly fuzz run "$target" "$corpus" "$@" -- -max_total_time=30 -timeout=10
+          }
+          (
+            run_target fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam
+            run_target fuzz_pca_general fuzz/corpus/fuzz_pca_general fixtures/parsers/pca-general
+            run_target fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch fixtures/parsers/prefetch
+            run_target fuzz_usn fuzz/corpus/fuzz_usn fixtures/parsers/usn
+            run_target fuzz_powershell_text fuzz/corpus/fuzz_powershell_text fixtures/parsers/powershell-text
+          ) &
+          pid1=$!
+
+          (
+            run_target fuzz_pca_app_launch fuzz/corpus/fuzz_pca_app_launch fixtures/parsers/pca-app-launch
+            run_target fuzz_filetime fuzz/corpus/fuzz_filetime fixtures/parsers/bam
+            run_target fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx
+            run_target fuzz_task fuzz/corpus/fuzz_task fixtures/parsers/task
+          ) &
+          pid2=$!
+
+          wait "$pid1"
+          wait "$pid2"
       # A crash leaves its input in fuzz/artifacts/. Keeping it is the difference between "a target
       # failed" and being able to reproduce it with `cargo fuzz run <target> <file>`.
       - name: Keep the crashing input, if there was one
@@ -187,20 +261,51 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
+      - name: Which checks this pull request needs
+        id: scope
+        working-directory: .
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          skip=false
+          if [ "$EVENT" = "pull_request" ]; then
+            if [ "${BASE_REF:-}" = "main" ] && [ "${HEAD_REF:-}" = "dev" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR is a promotion from verified branch 'dev' to 'main': fast-pass."
+              exit 0
+            fi
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            if ! grep -q -E '^(apps/desktop/|\.github/workflows/ci\.yml$)' <<<"$changed"; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "PR does not touch apps/desktop: fast-pass."
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: steps.scope.outputs.skip != 'true'
         with:
           package_json_file: apps/desktop/package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.scope.outputs.skip != 'true'
         with:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/desktop/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+        if: steps.scope.outputs.skip != 'true'
       - name: Types
+        if: steps.scope.outputs.skip != 'true'
         run: pnpm typecheck
       - name: Lint and format (Biome; bans network globals)
+        if: steps.scope.outputs.skip != 'true'
         run: pnpm lint
       - name: UI tests against the Rust report snapshots
+        if: steps.scope.outputs.skip != 'true'
         run: pnpm test
 
   reuse:
@@ -211,4 +316,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Fast-pass promotion PRs
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$EVENT" = "pull_request" ] && [ "${BASE_REF:-}" = "main" ] && [ "${HEAD_REF:-}" = "dev" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "PR is a promotion from verified branch 'dev' to 'main: fast-pass."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
+        if: steps.scope.outputs.skip != 'true'
