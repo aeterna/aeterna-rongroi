@@ -13,6 +13,7 @@ use anyhow::bail;
 // committed, and a run that happens to produce a byte order mark must not fail this check.
 const SKIP_DIRS: &[&str] = &[
     ".git",
+    ".claude",
     "target",
     "node_modules",
     "dist",

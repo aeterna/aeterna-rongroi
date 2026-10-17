@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 75 |
-| SHA-256 | `1d961506fdb7dbc3a56e6b46e86378bf031a5534e7c28ee44f097500def1697c` |
+| จำนวน rule | 77 |
+| SHA-256 | `8c36ae097c75224e212fd5c50b13dccaa16c98a7e7c82e08d6467c24d0d1c5d2` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -39,6 +39,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 - `autostart`
   - [โปรแกรมที่เริ่มทำงานเองไม่มีลายเซ็นฝังในไฟล์ที่ใช้ได้ และอยู่นอกโฟลเดอร์ Windows กับ Program Files](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
+- `bam`
+  - [โปรแกรมที่ BAM บันทึกว่าเคยรันจากโฟลเดอร์ชั่วคราวหรือไดรฟ์ภายนอกไม่มีไฟล์อยู่บนดิสก์แล้ว](#rule-14afcc4e-5567-424d-8502-dae7b65a1af8) — `context` · `experimental`
 - `defender_exclusion`
   - [exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
@@ -56,6 +58,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [มีไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-0999422f-8709-4d85-80e3-39410a85ed6b) — `presence` · `experimental`
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่มีลายเซ็นฝังในไฟล์ซึ่งถูกต้อง](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
+  - [มีไฟล์ proxy DLL ในโฟลเดอร์หลักของ FiveM ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-6e275262-bc1e-4b59-8301-01c3fd179fa8) — `presence` · `experimental`
   - [ตรวจลายเซ็นของไฟล์ FiveM ไม่ได้](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `fivem_servers`
   - [FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
@@ -184,6 +187,48 @@ service ค่าใน Run และ RunOnce และ scheduled task ที่
 - เครื่องมือ open source และเครื่องมือที่สร้างเอง ซึ่งมักไม่ได้เซ็น
 - ไฟล์ที่เซ็นผ่าน catalog ของ Windows ซึ่งการตรวจนี้ไม่ได้อ่าน
 - ค่าใน Run ที่ถูกปิดไว้ใน Task Manager ซึ่งโปรแกรมนี้แยกไม่ออกจากค่าที่เปิดอยู่
+
+## collector `bam`
+
+### `bam` / `ephemeral`
+
+<a id="rule-14afcc4e-5567-424d-8502-dae7b65a1af8"></a>
+
+#### โปรแกรมที่ BAM บันทึกว่าเคยรันจากโฟลเดอร์ชั่วคราวหรือไดรฟ์ภายนอกไม่มีไฟล์อยู่บนดิสก์แล้ว
+
+- ชื่อภาษาอังกฤษ: Program recorded by BAM from temporary or removable path is missing from disk
+- id: `14afcc4e-5567-424d-8502-dae7b65a1af8`
+- ไฟล์: [`rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml`](../rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml)
+- collector: `bam`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `bam`, `execution`, `ephemeral`
+- เขียนเมื่อ: 2026-10-17
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows Background Activity Moderator (BAM) บันทึกประวัติการรันโปรแกรมจากโฟลเดอร์ชั่วคราว (Temp), โฟลเดอร์ Downloads หรือไดรฟ์ภายนอก แต่ปัจจุบันไม่พบไฟล์โปรแกรมดังกล่าวอยู่ที่เส้นทางนั้นแล้ว ลักษณะนี้ตรงกับรูปแบบการรันโปรแกรมแบบชั่วคราว (ephemeral execution) โปรแกรมที่ลบตัวเองหลังทำงาน หรือการรันจากอุปกรณ์พกพาที่ถูกถอดออกไปแล้ว ข้อนี้อย่างเดียวไม่ใช่หลักฐานว่าโกง เนื่องจากตัวติดตั้งปกติและการล้างไฟล์ชั่วคราวก็ทำให้เกิดรูปแบบนี้ได้เช่นกัน
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `disappeared_from_disk`: เป็น `true`
+
+**ย้อนดูได้**
+
+เฉพาะประวัติที่ BAM ยังเก็บอยู่เท่านั้น Windows จะลบรายการ BAM ที่เก่ากว่า 7 วันเมื่อเริ่มระบบ การรันก่อนหน้านั้นจึงไม่ปรากฏที่นี่
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ตัวติดตั้งหรือไฟล์แตกตัวเอง (self-extracting archive) ที่แตกไฟล์ลง Temp แล้วรันก่อนลบตัวเองทิ้ง
+- ผู้ใช้ดาวน์โหลดโปรแกรมลงโฟลเดอร์ Downloads รันใช้งาน แล้วลบไฟล์ทิ้งด้วยตนเองในภายหลัง
+- ระบบล้างไฟล์ชั่วคราวของ Windows (Storage Sense) หรือเครื่องมือทำความสะอาดดิสก์ที่ลบไฟล์ใน Temp
+- โปรแกรมที่ถูกรันจากแฟลชไดรฟ์ USB หรือไดรฟ์ภายนอกที่ปัจจุบันไม่ได้เชื่อมต่ออยู่กับเครื่อง
 
 ## collector `defender_exclusion`
 
@@ -800,6 +845,55 @@ FiveM.exe ในโฟลเดอร์โปรแกรมของ FiveM for
 **แหล่งอ้างอิง**
 
 - <https://forum.cfx.re/t/how-to-install-reshade/5352795>
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+### `fivem_dir` / `root-dlls`
+
+<a id="rule-6e275262-bc1e-4b59-8301-01c3fd179fa8"></a>
+
+#### มีไฟล์ proxy DLL ในโฟลเดอร์หลักของ FiveM ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้
+
+- ชื่อภาษาอังกฤษ: A proxy DLL in FiveM's root folder has no embedded signature that verifies here
+- id: `6e275262-bc1e-4b59-8301-01c3fd179fa8`
+- ไฟล์: [`rules/fivem_dir/root-dlls/unsigned-root-proxy-dll/rule.yaml`](../rules/fivem_dir/root-dlls/unsigned-root-proxy-dll/rule.yaml)
+- collector: `fivem_dir`
+- strength: `presence` — มีไฟล์อยู่
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `fivem_dir`, `root_dlls`, `signature`
+- เขียนเมื่อ: 2026-10-17
+
+**เกี่ยวกับการตรวจนี้**
+
+โฟลเดอร์หลักของ FiveM (%LOCALAPPDATA%\\FiveM\\FiveM.app) มีไฟล์ DLL ที่มักถูกใช้เป็นเป้าหมาย proxy (เช่น version.dll, dxgi.dll, d3d11.dll, winmm.dll หรือ winhttp.dll) และ Windows พบว่าไฟล์นั้นไม่มีลายเซ็นฝังอยู่ หรือมีแต่ตรวจไม่ผ่าน หรือตรวจไม่ได้ถ้าไม่ต่ออินเทอร์เน็ต แต่ละไฟล์ที่แสดงจะบอกว่าเป็นกรณีไหน การทำงานของ Windows จะค้นหา DLL จากโฟลเดอร์ของโปรแกรมก่อนโฟลเดอร์ระบบ ทำให้การวางไฟล์ไว้ที่นี่ถูกใช้ในการแทรกแซง (DLL hijacking/proxying) การติดตั้ง FiveM ปกติจะไม่มีไฟล์ DLL ระบบเหล่านี้อยู่ใน FiveM.app ข้อนี้ไม่ได้บอกว่าไฟล์คืออะไร หรือใครเป็นคนใส่ไว้
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `location`: เป็น `root_dlls` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `signature`: เป็นค่าใดค่าหนึ่งใน `no_embedded_signature`, `invalid`, `unverifiable_offline` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+เห็นเฉพาะไฟล์ที่อยู่ในโฟลเดอร์ตอนที่สแกนเท่านั้น ไฟล์ที่ถูกลบไปก่อนหน้านั้นไม่เหลือร่องรอยที่นี่ และข้อนี้บอกไม่ได้ว่าก่อนหน้านี้ในโฟลเดอร์เคยมีอะไร
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- ม็อดกราฟิกหรือ overlay ที่ติดตั้งลงในโฟลเดอร์ FiveM.app โดยตรงแทนที่จะวางในโฟลเดอร์ plugins
+- ม็อดหรือเครื่องมือทั่วไปที่ใช้ proxy DLL และไม่ได้เซ็นลายเซ็นดิจิทัล
+- ลายเซ็นที่ตรวจไม่ผ่านเพราะไฟล์เสีย หรือใบรับรองหมดอายุโดยไม่มีการประทับเวลา
+- ลายเซ็นที่เครื่องนี้ตรวจแบบออฟไลน์ไม่ได้ เพราะสายใบรับรองต้องใช้ข้อมูลที่ Windows ยังไม่ได้เก็บไว้
+
+**rule ที่เกี่ยวข้อง**
+
+- คล้ายกับ [มีไฟล์ในโฟลเดอร์ plugins ของ FiveM ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-061797d3-161d-4783-89e6-caf658973436)
+- คล้ายกับ [มีไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced ที่ไม่มีลายเซ็นฝังในไฟล์ซึ่งตรวจผ่านบนเครื่องนี้](#rule-0999422f-8709-4d85-80e3-39410a85ed6b)
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order>
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
 
 ### `fivem_dir` / `signatures`
