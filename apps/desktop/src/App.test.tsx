@@ -581,6 +581,7 @@ describe("App", () => {
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Detailed Report"));
     const section = await screen.findByRole("region", { name: "Own traces (excluded)" });
     expect(section.textContent).toContain("aeterna-rongroi.exe");
     // The evidence list above it is untouched.
@@ -607,6 +608,7 @@ describe("App", () => {
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Detailed Report"));
     const section = await screen.findByRole("region", { name: "Unmatched observations" });
     expect(section.textContent).toContain("overlay.dll");
     // The evidence list above it is untouched.
@@ -914,6 +916,7 @@ describe("App", () => {
   it("lists how many rows are in each state, beside the sentence that it proves nothing clean", async () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Detailed Report"));
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     const buttons = Array.from(summary.querySelectorAll("button"));
     expect(buttons.map((b) => b.textContent)).toEqual([
@@ -933,6 +936,7 @@ describe("App", () => {
   it("filters the rows to one state from its count", async () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Detailed Report"));
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     const found = summary.querySelector("button");
     if (!found) throw new Error("no count");
@@ -953,6 +957,7 @@ describe("App", () => {
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Detailed Report"));
     const summary = await screen.findByRole("region", { name: "What this scan lists" });
     expect(screen.queryByText("No row in this scan is in this state.")).toBeNull();
     fireEvent.click(summary.querySelectorAll("button")[2] as HTMLElement);
@@ -977,6 +982,7 @@ describe("App", () => {
     try {
       render(<App />);
       fireEvent.click(await screen.findByText("Check my own PC"));
+      fireEvent.click(await screen.findByText("Detailed Report"));
       const section = await screen.findByRole("region", { name: "Unmatched observations" });
       expect(section.querySelectorAll("li").length).toBeGreaterThanOrEqual(2);
       expect(section.textContent?.split("name=FiveM.exe").length).toBe(3);
@@ -995,6 +1001,7 @@ describe("App", () => {
       await i18n.changeLanguage("th");
     });
     fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    fireEvent.click(await screen.findByText("รายงานฉบับเต็ม"));
     expect(await screen.findByRole("region", { name: "การตั้งค่าความปลอดภัยของเครื่อง" })).toBeTruthy();
   });
 
@@ -1014,6 +1021,7 @@ describe("App", () => {
     };
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Detailed Report"));
     fireEvent.click(await screen.findByText("Not found: 1 — show what was checked"));
     const head = screen.getByText("Check: Secure Boot is turned off").closest("button");
     expect(head?.getAttribute("aria-expanded")).toBe("false");
@@ -1245,6 +1253,7 @@ describe("App", () => {
     stubClipboard("ok");
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByText("Detailed Report"));
     fireEvent.click(await screen.findByLabelText("Show technical details for every row"));
     const copyJsonButtons = await screen.findAllByRole("button", { name: "Copy raw JSON" });
     expect(copyJsonButtons.length).toBeGreaterThan(0);
@@ -1254,5 +1263,34 @@ describe("App", () => {
     expect(clipboardWrites.length).toBeGreaterThan(0);
     expect(clipboardWrites[0]).toContain("secure_boot");
     expect(copyJsonButtons[0]?.textContent).toBe("Copied");
+  });
+
+  it("switches between Overview Summary and Detailed Report tabs", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    // Overview Summary is active by default
+    expect(await screen.findByText("Overview Summary")).toBeTruthy();
+    expect(screen.getByText("Observations Found")).toBeTruthy();
+    // Switch to Detailed Report
+    fireEvent.click(screen.getByText("Detailed Report"));
+    expect(await screen.findByRole("region", { name: "What this scan lists" })).toBeTruthy();
+    // Switch back to Overview Summary
+    fireEvent.click(screen.getByText("Overview Summary"));
+    expect(screen.getByText("Observations Found")).toBeTruthy();
+  });
+
+  it("copies sanitized AI export prompt to clipboard", async () => {
+    stubClipboard("ok");
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const aiButton = await screen.findByRole("button", { name: "Copy for AI Analysis" });
+    await act(async () => {
+      fireEvent.click(aiButton);
+    });
+    expect(clipboardWrites.length).toBeGreaterThan(0);
+    expect(clipboardWrites[0]).toContain(
+      "Please analyze this PC Forensics / FiveM inspection report",
+    );
+    expect(aiButton.textContent).toContain("Copied!");
   });
 });

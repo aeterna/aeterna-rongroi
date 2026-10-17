@@ -360,5 +360,68 @@
     "done": "Saved to {{path}}",
     "cancelled": "Not saved.",
     "failed": "Could not save: {{reason}}"
+  },
+  "view_switcher": {
+    "summary": "Overview Summary",
+    "technical": "Detailed Report"
+  },
+  "hero_note": {
+    "title": "Scan Overview for this PC",
+    "reassurance_benign": "No FiveM game file modifications or history wiping detected. Found {{count}} common observations, which are typical behaviors of GPU/fan software, Discord, scripts, and temp installers.",
+    "reassurance_tamper": "System history clearing detected (Event Log cleared or USN Reset), preventing full retrospective verification before that point.",
+    "reassurance_proxy": "Unsigned foreign DLL detected in FiveM.app folder alongside driver load block events.",
+    "reassurance_unmeasured": "This scan ran with standard user rights. {{count}} deep checks could not be measured. Running as Administrator is recommended."
+  },
+  "horizon_timeline": {
+    "title": "Forensic Time Horizon",
+    "badge_continuous": "Continuous History · No Wiping Detected",
+    "badge_broken": "History Wiped or Truncated",
+    "badge_short": "Continuous History (New OS)",
+    "badge_unmeasured": "Partial Coverage · Limited Rights",
+    "step_history_start": "History Origin",
+    "step_history_start_sub": "Event Logs recorded continuously",
+    "step_boot_time": "Last Boot",
+    "step_fivem_session": "Last FiveM Play",
+    "step_current_scan": "Current Scan",
+    "step_current_scan_sub": "Offline Sealed"
+  },
+  "glance": {
+    "fivem_title": "Recent FiveM Session",
+    "history_title": "History Continuity",
+    "obs_title": "Findings Overview",
+    "fivem_session_text": "Session duration {{duration}}, exited normally",
+    "fivem_none_text": "No recent FiveM sessions recorded in the inspected horizon",
+    "history_clean_badge": "No Wiping Found",
+    "history_tamper_badge": "History Interrupted",
+    "history_clean_desc": "Event Logs continuous, no audit log clearing or USN truncation anomalies",
+    "history_tamper_desc": "Event log clearing or USN reset detected, interrupting retrospective timeline",
+    "obs_benign_badge": "Benign Patterns",
+    "obs_tamper_badge": "Tamper Detected",
+    "obs_unmeasured_badge": "{{count}} Unmeasured",
+    "obs_benign_desc": "Explainable by standard background tools and software",
+    "obs_tamper_desc": "Observations indicate intentional history alteration or wiping",
+    "obs_unmeasured_desc": "Requires Administrator rights to measure fully"
+  },
+  "ai_export": {
+    "button_label": "Copy for AI Analysis",
+    "copied_label": "Copied!",
+    "toast_message": "Prompt copied for AI analysis! (Usernames and private paths masked)"
+  },
+  "human_findings": {
+    "section_title": "Observations Found",
+    "match_stat": "Showing {{visible}} of {{total}} items",
+    "match_stat_all": "Showing all {{total}} items",
+    "chip_all": "All",
+    "chip_hardware": "Hardware & Drivers",
+    "chip_startup": "Autostart",
+    "chip_script": "Scripts & Temp",
+    "chip_fivem": "FiveM Files",
+    "chip_unmeasured": "Unmeasured",
+    "search_placeholder": "Search findings...",
+    "show_causes": "View causes ▾",
+    "hide_causes": "View causes ▴",
+    "causes_title": "Common benign causes for this result:",
+    "unmeasured_causes_title": "Technical reasons why this could not be measured:",
+    "tamper_causes_title": "Technical forensic observations:"
   }
 }
