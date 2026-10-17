@@ -423,7 +423,7 @@ describe("App", () => {
     // registry marker, which needs no environment variable and answered `present: false`.
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 18 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
+        "Hidden in SS mode: 1 not found · 19 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -1221,5 +1221,38 @@ describe("App", () => {
       fireEvent.click(screen.getAllByText("Copy link")[0] as HTMLElement);
     });
     expect(screen.getByText("Could not copy — select the text instead")).toBeTruthy();
+  });
+
+  it("shows strength badge beside the check title", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Check: Secure Boot is turned off");
+    expect(screen.getAllByText("posture").length).toBeGreaterThan(0);
+  });
+
+  it("filters evidence rows with quick search and shows search empty state", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const searchInput = await screen.findByPlaceholderText("Search checks, collectors, rule IDs…");
+    fireEvent.change(searchInput, { target: { value: "nonexistent-keyword-xyz" } });
+    expect(screen.getByText("No checks match your search.")).toBeTruthy();
+    expect(screen.queryByText("Check: Secure Boot is turned off")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Clear search"));
+    expect(screen.getByText("Check: Secure Boot is turned off")).toBeTruthy();
+  });
+
+  it("copies raw observation JSON to clipboard in technical layer", async () => {
+    stubClipboard("ok");
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    fireEvent.click(await screen.findByLabelText("Show technical details for every row"));
+    const copyJsonButtons = await screen.findAllByRole("button", { name: "Copy raw JSON" });
+    expect(copyJsonButtons.length).toBeGreaterThan(0);
+    await act(async () => {
+      fireEvent.click(copyJsonButtons[0] as HTMLElement);
+    });
+    expect(clipboardWrites.length).toBeGreaterThan(0);
+    expect(clipboardWrites[0]).toContain("secure_boot");
+    expect(copyJsonButtons[0]?.textContent).toBe("Copied");
   });
 });

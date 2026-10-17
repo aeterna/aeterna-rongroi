@@ -84,7 +84,11 @@
     "technical_all": "แสดงรายละเอียดทางเทคนิคทุกแถว",
     "filtered": "กำลังแสดงสถานะเดียว",
     "clear": "แสดงทุกสถานะ",
-    "filtered_empty": "ไม่มีแถวใดในการสแกนนี้อยู่ในสถานะนี้"
+    "filtered_empty": "ไม่มีแถวใดในการสแกนนี้อยู่ในสถานะนี้",
+    "search_placeholder": "ค้นหารายการตรวจ, collector, รหัสกฎ…",
+    "search_label": "ค้นหารายการตรวจ",
+    "clear_search": "ล้างการค้นหา",
+    "search_empty": "ไม่พบรายการตรวจที่ตรงกับการค้นหา"
   },
   "collector": {
     "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
@@ -116,6 +120,9 @@
   "layers": {
     "technical": "รายละเอียดทางเทคนิค",
     "observation": "สิ่งที่ collector เห็น",
+    "copy_json": "คัดลอก JSON ดิบ",
+    "copied": "คัดลอกแล้ว",
+    "copy_failed": "คัดลอกไม่สำเร็จ",
     "field": "field",
     "value": "ค่า",
     "rule_id": "rule id",
