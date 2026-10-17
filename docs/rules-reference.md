@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 73 |
-| SHA-256 | `9e40e68c8fc9b7c82cba372d7e241cf73c2fdd9b26826a3bd9625165e07a1478` |
+| Rules | 75 |
+| SHA-256 | `1d961506fdb7dbc3a56e6b46e86378bf031a5534e7c28ee44f097500def1697c` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -108,6 +108,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `usn`
   - [The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
+  - [The change journal holds a deletion in DigitalEntitlements](#rule-57107ac5-d826-431c-8ce9-08a0e7b0000f) — `tamper` · `experimental`
+  - [The change journal was truncated or recreated after Windows was installed](#rule-f934b261-18f8-4c4e-b3b3-1163d644cf0e) — `tamper` · `experimental`
   - [The change journal holds a deletion in FiveM's plugin folder](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
   - [The change journal holds a rename in FiveM's plugin folder](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
   - [The change journal holds a deletion in PowerShell's command history folder](#rule-926b3863-8f4f-4d18-aab6-26b77934466e) — `context` · `experimental`
@@ -2363,6 +2365,95 @@ Only the span the change journal still held when the scan read it, shown beside 
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
 - <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+### `usn` / `identity`
+
+<a id="rule-57107ac5-d826-431c-8ce9-08a0e7b0000f"></a>
+
+#### The change journal holds a deletion in DigitalEntitlements
+
+- Id: `57107ac5-d826-431c-8ce9-08a0e7b0000f`
+- File: [`rules/usn/identity/digitalentitlements-file-deleted/rule.yaml`](../rules/usn/identity/digitalentitlements-file-deleted/rule.yaml)
+- Collector: `usn`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `usn`, `identity`, `digitalentitlements`
+- Written: 2026-10-17
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file deleted directly inside DigitalEntitlements, where Rockstar Games and FiveM entitlement tokens are kept. Deletions here are typically associated with identity wiping or unban cleaner utilities.
+
+**Matches when all of these hold for one observation**
+
+- `deleted|gte`: is at least `1`
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `digitalentitlements` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- Troubleshooting Rockstar Games Launcher or FiveM login issues by manually deleting entitlement files
+- Reinstalling or clean-uninstalling Rockstar Games Launcher
+- Clean-up tools clearing temporary application data
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
+### `usn` / `integrity`
+
+<a id="rule-f934b261-18f8-4c4e-b3b3-1163d644cf0e"></a>
+
+#### The change journal was truncated or recreated after Windows was installed
+
+- Id: `f934b261-18f8-4c4e-b3b3-1163d644cf0e`
+- File: [`rules/usn/integrity/journal-truncated-or-recreated/rule.yaml`](../rules/usn/integrity/journal-truncated-or-recreated/rule.yaml)
+- Collector: `usn`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `usn`, `integrity`
+- Written: 2026-10-17
+
+**About this check**
+
+The NTFS change journal shows evidence of being reset, truncated, or recreated after Windows was installed. Anti-forensics tools and trace-clearing utilities commonly delete the change journal (for example via fsutil usn deletejournal) to purge historical file activity records.
+
+**Matches when all of these hold for one observation**
+
+- `journal_truncated_or_recreated`: is `true`
+- `location`: is `journal` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only: whether the change journal's metadata and earliest records indicate a reset or truncation event relative to the operating system installation date.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- An administrator or maintenance script running fsutil usn deletejournal to reclaim disk space
+- Volume repair or chkdsk rebuilding the NTFS change journal
+- Major disk partitioning or volume resizing operations
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journals>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-usn>
 
 ### `usn` / `plugins`
 

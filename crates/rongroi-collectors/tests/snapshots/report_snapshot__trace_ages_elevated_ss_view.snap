@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 73
+      "rule_count": 75
     },
     "platform": "windows",
     "os_build": "26100",
@@ -342,10 +342,10 @@ expression: view
     "unmeasured": 7
   },
   "hidden": {
-    "not_found": 11,
-    "unmeasured_expected": 21,
+    "not_found": 12,
+    "unmeasured_expected": 22,
     "unmeasured_unexpected": 0,
-    "unmatched": 37
+    "unmatched": 39
   },
   "timeline": {
     "entries": [
@@ -577,6 +577,16 @@ expression: view
       {
         "collector": "usn",
         "place": "psreadline",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "place": "digitalentitlements",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "usn",
+        "place": "citizenfx",
         "reason": "source_absent"
       }
     ]
