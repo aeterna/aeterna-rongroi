@@ -2236,8 +2236,7 @@ mod tests {
                 && text(obs, "channel") == Some("Microsoft-Windows-CodeIntegrity/Operational")
                 && field(obs, "event_id")
                     .and_then(serde_json::Value::as_u64)
-                    .map(|id| id == 3033 || id == 3077)
-                    .unwrap_or(false)
+                    .is_some_and(|id| id == 3033 || id == 3077)
         };
 
         assert!(matches_selector(&obs_3033));

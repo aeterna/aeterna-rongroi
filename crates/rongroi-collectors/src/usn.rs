@@ -345,17 +345,17 @@ fn is_journal_truncated_or_recreated(
     };
     let install_date = install_time.to_zoned(jiff::tz::TimeZone::UTC).date();
 
-    if state
-        .created_on
-        .is_some_and(|created_on| created_on.since(install_date).is_ok_and(|span| span.get_days() > 1))
-    {
+    if state.created_on.is_some_and(|created_on| {
+        created_on
+            .since(install_date)
+            .is_ok_and(|span| span.get_days() > 1)
+    }) {
         return true;
     }
 
     let untrimmed = state.first_usn == state.lowest_valid_usn;
     if untrimmed
-        && oldest_record_time
-            .is_some_and(|oldest| oldest > install_time + Duration::from_hours(24))
+        && oldest_record_time.is_some_and(|oldest| oldest > install_time + Duration::from_hours(24))
     {
         return true;
     }
@@ -973,7 +973,10 @@ mod tests {
         ]));
 
         assert!(tally.damaged);
-        assert_eq!(tally.journal_observation(false, 0, false).fields["records"], 1);
+        assert_eq!(
+            tally.journal_observation(false, 0, false).fields["records"],
+            1
+        );
         let gaps = counted_gaps(tally.damaged, UsnReadEnd::Complete);
         assert_eq!(gaps.len(), COUNTED.len());
         assert!(
@@ -988,7 +991,10 @@ mod tests {
         tally.add(&[0; 7]);
 
         assert!(tally.damaged);
-        assert_eq!(tally.journal_observation(false, 0, false).fields["records"], 0);
+        assert_eq!(
+            tally.journal_observation(false, 0, false).fields["records"],
+            0
+        );
         let gaps = counted_gaps(tally.damaged, UsnReadEnd::Complete);
         assert_eq!(gaps["records"], UnmeasuredReason::ReadFailed);
         assert_eq!(gaps["created"], UnmeasuredReason::ReadFailed);

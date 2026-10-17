@@ -350,12 +350,12 @@ pub fn is_ephemeral_candidate(host: &dyn Host, path: &str) -> bool {
     }
 
     if is_drive_rooted(path) {
-        let drive = path.chars().next().unwrap().to_ascii_uppercase();
+        let drive = path.as_bytes().first().map_or(b'C', u8::to_ascii_uppercase);
         let sys_drive = host
             .env_var("SystemDrive")
-            .and_then(|s| s.chars().next())
-            .map(|c| c.to_ascii_uppercase())
-            .unwrap_or('C');
+            .as_deref()
+            .and_then(|s| s.as_bytes().first())
+            .map_or(b'C', u8::to_ascii_uppercase);
         if drive != sys_drive {
             return true;
         }
@@ -377,9 +377,8 @@ fn target_disappeared_from_disk(host: &dyn Host, path: &str) -> bool {
         }
     } else {
         match host.times(path) {
-            Ok(Some(_)) => false,
             Ok(None) => true,
-            Err(_) => false,
+            Ok(Some(_)) | Err(_) => false,
         }
     }
 }
@@ -1059,8 +1058,14 @@ mod tests {
         let (observations, _) = measured(&run);
         let records = executions(observations);
         assert_eq!(records.len(), 2, "{records:?}");
-        assert_eq!(field(records[0], "disappeared_from_disk"), Some(&true.into()));
-        assert_eq!(field(records[1], "disappeared_from_disk"), Some(&true.into()));
+        assert_eq!(
+            field(records[0], "disappeared_from_disk"),
+            Some(&true.into())
+        );
+        assert_eq!(
+            field(records[1], "disappeared_from_disk"),
+            Some(&true.into())
+        );
     }
 
     #[test]
