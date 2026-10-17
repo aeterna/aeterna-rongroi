@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 73
+      "rule_count": 77
     },
     "platform": "windows",
     "os_build": "26100",
@@ -182,6 +182,14 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "6e275262-bc1e-4b59-8301-01c3fd179fa8",
+      "collector": "fivem_dir",
+      "strength": "presence",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "282115fe-863d-4e2e-9cf5-4eaf8e7545e4",
       "collector": "fivem_dir",
       "strength": "context",
@@ -319,6 +327,22 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "57107ac5-d826-431c-8ce9-08a0e7b0000f",
+      "collector": "usn",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "f934b261-18f8-4c4e-b3b3-1163d644cf0e",
+      "collector": "usn",
+      "strength": "tamper",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "91dc8b45-8355-4554-8a6d-e979e4a95ecd",
       "collector": "usn",
       "strength": "context",
@@ -361,11 +385,11 @@ expression: view
   "listed": {
     "found": 0,
     "not_found": 8,
-    "unmeasured": 28
+    "unmeasured": 31
   },
   "hidden": {
     "not_found": 0,
-    "unmeasured_expected": 20,
+    "unmeasured_expected": 21,
     "unmeasured_unexpected": 0,
     "unmatched": 8
   },

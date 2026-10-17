@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 57107ac5-d826-431c-8ce9-08a0e7b0000f
+title: The change journal holds a deletion in DigitalEntitlements
+description: >-
+  The NTFS change journal holds at least one record of a file deleted directly inside
+  DigitalEntitlements, where Rockstar Games and FiveM entitlement tokens are kept.
+  Deletions here are typically associated with identity wiping or unban cleaner utilities.
+status: experimental
+collector: usn
+strength: tamper
+match:
+  location: digitalentitlements
+  folder: identified
+  deleted|gte: 1
+retention: >-
+  Only the span the change journal still held when the scan read it, shown beside this row. The journal
+  keeps a fixed size and drops its oldest records first.
+unmeasured_when: [not_windows, source_absent, other_volume]
+falsepositives:
+  - Troubleshooting Rockstar Games Launcher or FiveM login issues by manually deleting entitlement files
+  - Reinstalling or clean-uninstalling Rockstar Games Launcher
+  - Clean-up tools clearing temporary application data
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records
+author: aeterna-rongroi contributors
+date: 2026-10-17
+tags: [usn, identity, digitalentitlements]

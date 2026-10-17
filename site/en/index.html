@@ -58,24 +58,64 @@
       <p class="lead">aeterna-rongroi looks for the traces cheats leave on a Windows PC, and for settings that make cheating easier, then shows them as evidence.
         A player can check their own PC, or server staff can watch over a screenshare (SS) with the player's consent. <strong>It never tells you a PC is "clean".</strong></p>
       <div class="buttons">
-        <a class="btn primary" href="{{rongroi.release_url}}">Download · {{rongroi.version}}</a>
-        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.md">Screenshare guide</a>
-        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi">Source</a>
+        <a class="btn primary" href="{{rongroi.release_url}}">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download · {{rongroi.version}}
+        </a>
+        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.md">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Screenshare guide
+        </a>
+        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi">
+          <svg class="icon" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Source
+        </a>
       </div>
     </div>
     <figure class="specimen" aria-label="An example of the program's summary; the numbers are illustrative">
       <div class="specimen-head"><strong>What this scan lists</strong><span>EXAMPLE</span></div>
+      <div class="specimen-search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Search checks, collectors, rule IDs…" readonly value="" aria-label="Search checks">
+      </div>
       <div class="tally">
         <div class="t-found"><b><span class="mark mark-found"></span>5</b><span>found</span></div>
         <div class="t-not-found"><b><span class="mark mark-not-found"></span>12</b><span>not found</span></div>
         <div class="t-unmeasured"><b><span class="mark mark-unmeasured"></span>3</b><span>not measured</span></div>
       </div>
-      <div class="specimen-row"><span class="mark mark-found"></span><span>Check: Secure Boot is turned off</span><span class="pill">Found</span><small>Many ordinary PCs run with it off, so on its own this describes the machine — not evidence of cheating.</small></div>
-      <p class="note">Evidence only. This report cannot prove that a PC is clean.</p>
+      <div class="specimen-row">
+        <span class="mark mark-found"></span>
+        <span class="specimen-title-wrap">
+          <span class="specimen-title">Check: Secure Boot is turned off</span>
+          <span class="badge-strength badge-strength-posture">posture</span>
+        </span>
+        <span class="pill">Found</span>
+        <span class="specimen-desc">Windows reports that UEFI Secure Boot is off.</span>
+        <div class="specimen-falsepositives">
+          <p class="specimen-falsepositives-title">
+            <svg class="icon icon-sm icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            Ordinary things that also produce this:
+          </p>
+          <ul>
+            <li>PCs that boot in legacy BIOS or CSM mode</li>
+          </ul>
+        </div>
+        <div class="specimen-tech-btn">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy raw JSON
+        </div>
+      </div>
+      <p class="note">
+        <svg class="icon icon-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Evidence only. This report cannot prove that a PC is clean.</span>
+      </p>
     </figure>
   </div>
 
-  <p class="note">⚠️ <strong>Pre-alpha.</strong> Most rules have not yet been checked against enough real PCs. Do not ban anyone because of what this tool shows, or clear anyone because of it.</p>
+  <p class="note">
+    <svg class="icon icon-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span><strong>Pre-alpha.</strong> Most rules have not yet been checked against enough real PCs. Do not ban anyone because of what this tool shows, or clear anyone because of it.</span>
+  </p>
 
   <section>
     <h2>How it differs from other PC checkers</h2>

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { withKeys } from "../keys";
 import type { Evidence, Observation, RowBand, RuleFiles, RuleText } from "../types";
@@ -65,8 +65,13 @@ export function EvidenceRow({
         onClick={() => setOpen(!shown)}
       >
         <span className={`mark mark-${item.state}`} aria-hidden="true" />
-        <span className="title">
-          {t("check")}: {text?.title ?? item.rule_id}
+        <span className="title-wrap">
+          <span className="title">
+            {t("check")}: {text?.title ?? item.rule_id}
+          </span>
+          <span className={`badge-strength badge-strength-${item.strength}`}>
+            {t(`strength.${item.strength}`)}
+          </span>
         </span>
         <span className="state">{t(`state.${stateKey}`)}</span>
         {!shown && text?.description && <span className="clamp">{text.description}</span>}
@@ -113,7 +118,7 @@ function Meaning({ item, text }: { item: Evidence; text: RuleText | undefined })
       const causes = text?.falsepositives ?? [];
       return causes.length === 0 ? null : (
         <div className="falsepositives">
-          <p className="muted">{t("falsepositives")}:</p>
+          <p className="falsepositives-title">{t("falsepositives")}:</p>
           <ul>
             {causes.map((cause) => (
               <li key={cause}>{cause}</li>
@@ -147,6 +152,39 @@ function Band({ item, band }: { item: Evidence; band: RowBand }) {
   return <p className="detail">{t(key, { from: band.from, to: band.to })}</p>;
 }
 
+function CopyJsonButton({ json }: { json: string }) {
+  const { t } = useTranslation("report");
+  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
+
+  useEffect(() => {
+    if (copied !== "copied") {
+      return;
+    }
+    const timer = setTimeout(() => setCopied("idle"), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied("copied");
+    } catch {
+      setCopied("failed");
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="copy-json-btn"
+      onClick={() => void onCopy()}
+      aria-label={t("layers.copy_json")}
+    >
+      {copied === "copied" ? t("layers.copied") : t("layers.copy_json")}
+    </button>
+  );
+}
+
 function Technical({
   item,
   text,
@@ -168,25 +206,30 @@ function Technical({
     <div className="technical">
       {withKeys(observations, (observation) => JSON.stringify(observation.fields)).map(
         ([key, observation]) => (
-          <table className="fields" key={key}>
-            <caption>{t("layers.observation")}</caption>
-            <thead>
-              <tr>
-                <th scope="col">{t("layers.field")}</th>
-                <th scope="col">{t("layers.value")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(observation.fields).map(([field, value]) => (
-                <tr key={field}>
-                  <th scope="row">{field}</th>
-                  <td>
-                    <code className="selectable">{String(value)}</code>
-                  </td>
+          <div className="observation-block" key={key}>
+            <div className="observation-header">
+              <span className="observation-caption">{t("layers.observation")}</span>
+              <CopyJsonButton json={JSON.stringify(observation.fields, null, 2)} />
+            </div>
+            <table className="fields">
+              <thead>
+                <tr>
+                  <th scope="col">{t("layers.field")}</th>
+                  <th scope="col">{t("layers.value")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {Object.entries(observation.fields).map(([field, value]) => (
+                  <tr key={field}>
+                    <th scope="row">{field}</th>
+                    <td>
+                      <code className="selectable">{String(value)}</code>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ),
       )}
       <dl className="facts">

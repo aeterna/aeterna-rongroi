@@ -1,0 +1,34 @@
+{
+  "description": "Synthetic: DigitalEntitlements folder with a deleted entitlement token file.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "journal",
+        "records": 100,
+        "records_version_2": 0,
+        "records_version_3": 100,
+        "trimmed": true,
+        "maximum_size": 33554432,
+        "first_seen": "2026-10-17T08:00:00Z",
+        "last_seen": "2026-10-17T08:30:00Z",
+        "journal_truncated_or_recreated": false
+      }
+    },
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "digitalentitlements",
+        "folder": "identified",
+        "records": 2,
+        "created": 1,
+        "deleted": 1,
+        "renamed": 0,
+        "data_changed": 0,
+        "first_seen": "2026-10-17T08:05:00Z",
+        "last_seen": "2026-10-17T08:10:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

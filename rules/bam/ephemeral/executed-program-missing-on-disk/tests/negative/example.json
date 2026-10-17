@@ -1,0 +1,36 @@
+{
+  "description": "BAM recorded executions that remain on disk or ran from standard system folders",
+  "observations": [
+    {
+      "collector": "bam",
+      "fields": {
+        "last_run": "2026-10-15T10:00:00Z",
+        "moderation_state": 0,
+        "name": "notepad.exe",
+        "path": "C:\\Windows\\System32\\notepad.exe",
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "last_run": "2026-10-15T11:00:00Z",
+        "moderation_state": 0,
+        "name": "installer.exe",
+        "path": "C:\\Users\\fixtureuser\\Downloads\\installer.exe",
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "entries": 2,
+        "intact": true,
+        "metadata_values": 2,
+        "rejected": 0,
+        "sid_withheld": "per_user_identifier",
+        "users": 1
+      }
+    }
+  ]
+}

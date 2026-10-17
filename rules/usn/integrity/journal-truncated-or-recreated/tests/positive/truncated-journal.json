@@ -1,0 +1,21 @@
+{
+  "description": "Synthetic: The change journal was recreated or reset after Windows installation.",
+  "observations": [
+    {
+      "collector": "usn",
+      "fields": {
+        "location": "journal",
+        "records": 50,
+        "records_version_2": 0,
+        "records_version_3": 50,
+        "trimmed": false,
+        "maximum_size": 33554432,
+        "first_seen": "2026-10-15T10:00:00Z",
+        "last_seen": "2026-10-15T11:00:00Z",
+        "journal_created_on": "2026-10-15",
+        "journal_truncated_or_recreated": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

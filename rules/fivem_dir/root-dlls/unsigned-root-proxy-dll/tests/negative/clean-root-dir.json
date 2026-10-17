@@ -1,0 +1,24 @@
+{
+  "description": "A clean FiveM installation with no proxy DLLs in FiveM.app root.",
+  "observations": [
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "plugins",
+        "folder": "listed",
+        "files": 0
+      }
+    },
+    {
+      "collector": "fivem_dir",
+      "fields": {
+        "location": "legacy_exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\FiveM\\FiveM.exe",
+        "sha256": "891e48128dc9c287aaa204757acac61d469eef9de82714cec4404d254a73c844",
+        "signature": "valid",
+        "signer": "Rockstar Games, Inc.",
+        "signer_cert_sha256": "65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f"
+      }
+    }
+  ]
+}

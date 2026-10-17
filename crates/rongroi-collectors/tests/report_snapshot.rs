@@ -150,6 +150,7 @@ fn a_fivem_folder_that_could_not_be_listed_leaves_the_rules_that_could_match_the
     const CLIENT_NOT_VERIFIED: &str = "148cbcdd-8d18-4af6-a541-71cc7f21b2eb";
     const CLIENT_OTHER_CERTIFICATE: &str = "2dc11b64-72a2-48f5-a273-985e906d5a9e";
     const NOT_CHECKED: &str = "282115fe-863d-4e2e-9cf5-4eaf8e7545e4";
+    const ROOT_PROXY_UNSIGNED: &str = "6e275262-bc1e-4b59-8301-01c3fd179fa8";
 
     // `true`: unmeasured / access_denied. `false`: not_found.
     let expectations: [(&str, &[(&str, bool)]); 2] = [
@@ -164,6 +165,7 @@ fn a_fivem_folder_that_could_not_be_listed_leaves_the_rules_that_could_match_the
                 (CLIENT_NOT_VERIFIED, false),
                 (CLIENT_OTHER_CERTIFICATE, false),
                 (NOT_CHECKED, true),
+                (ROOT_PROXY_UNSIGNED, false),
             ],
         ),
         // Legacy's program folder denied; its plugins folder listed and empty.
@@ -177,6 +179,7 @@ fn a_fivem_folder_that_could_not_be_listed_leaves_the_rules_that_could_match_the
                 (CLIENT_NOT_VERIFIED, true),
                 (CLIENT_OTHER_CERTIFICATE, true),
                 (NOT_CHECKED, true),
+                (ROOT_PROXY_UNSIGNED, false),
             ],
         ),
     ];

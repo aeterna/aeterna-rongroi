@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 73 |
-| SHA-256 | `9e40e68c8fc9b7c82cba372d7e241cf73c2fdd9b26826a3bd9625165e07a1478` |
+| Rules | 77 |
+| SHA-256 | `8c36ae097c75224e212fd5c50b13dccaa16c98a7e7c82e08d6467c24d0d1c5d2` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -43,6 +43,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 - `autostart`
   - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
+- `bam`
+  - [Program recorded by BAM from temporary or removable path is missing from disk](#rule-14afcc4e-5567-424d-8502-dae7b65a1af8) — `context` · `experimental`
 - `defender_exclusion`
   - [A Microsoft Defender exclusion covers a FiveM folder](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
@@ -60,6 +62,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here](#rule-0999422f-8709-4d85-80e3-39410a85ed6b) — `presence` · `experimental`
   - [A file in FiveM's plugins folder carries a valid embedded signature](#rule-d5531c55-1a65-4698-9f39-7cf79bbbb7ba) — `presence` · `experimental`
   - [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436) — `presence` · `experimental`
+  - [A proxy DLL in FiveM's root folder has no embedded signature that verifies here](#rule-6e275262-bc1e-4b59-8301-01c3fd179fa8) — `presence` · `experimental`
   - [A FiveM file's signature could not be checked](#rule-282115fe-863d-4e2e-9cf5-4eaf8e7545e4) — `context` · `experimental`
 - `fivem_servers`
   - [FiveM for GTA V Enhanced keeps a cache folder for a server](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
@@ -108,6 +111,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `usn`
   - [The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
+  - [The change journal holds a deletion in DigitalEntitlements](#rule-57107ac5-d826-431c-8ce9-08a0e7b0000f) — `tamper` · `experimental`
+  - [The change journal was truncated or recreated after Windows was installed](#rule-f934b261-18f8-4c4e-b3b3-1163d644cf0e) — `tamper` · `experimental`
   - [The change journal holds a deletion in FiveM's plugin folder](#rule-91dc8b45-8355-4554-8a6d-e979e4a95ecd) — `context` · `experimental`
   - [The change journal holds a rename in FiveM's plugin folder](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
   - [The change journal holds a deletion in PowerShell's command history folder](#rule-926b3863-8f4f-4d18-aab6-26b77934466e) — `context` · `experimental`
@@ -185,6 +190,47 @@ The services, Run and RunOnce values and scheduled tasks registered when the sca
 - Open-source and self-built tools, which are often not signed
 - A file signed through a Windows catalog, which this check does not read
 - A Run entry switched off in Task Manager, which this program cannot tell from one that is on
+
+## Collector `bam`
+
+### `bam` / `ephemeral`
+
+<a id="rule-14afcc4e-5567-424d-8502-dae7b65a1af8"></a>
+
+#### Program recorded by BAM from temporary or removable path is missing from disk
+
+- Id: `14afcc4e-5567-424d-8502-dae7b65a1af8`
+- File: [`rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml`](../rules/bam/ephemeral/executed-program-missing-on-disk/rule.yaml)
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `execution`, `ephemeral`
+- Written: 2026-10-17
+
+**About this check**
+
+The Windows Background Activity Moderator (BAM) recorded execution of a program from a temporary directory, Downloads folder, or removable drive, but the executable file is no longer present on disk at that path. This pattern is consistent with ephemeral execution, self-deleting loaders, or software executed from temporary storage that was subsequently removed. It is not proof of cheat software on its own, as legitimate installers and cleanup utilities also produce this pattern.
+
+**Matches when all of these hold for one observation**
+
+- `disappeared_from_disk`: is `true`
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older execution leaves no entry here.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Legitimate installers or self-extracting archives that unpack to Temp, execute, and delete themselves
+- Executables downloaded and run from Downloads that the user manually deleted afterwards
+- Temporary files cleaned up by Windows Storage Sense, disk cleanup tools, or browser cleaners
+- Executables run from a removable USB flash drive or portable disk that has since been unplugged
 
 ## Collector `defender_exclusion`
 
@@ -788,6 +834,54 @@ Only the files in the folder when the scan ran. A file removed before then leave
 **References**
 
 - <https://forum.cfx.re/t/how-to-install-reshade/5352795>
+- <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
+
+### `fivem_dir` / `root-dlls`
+
+<a id="rule-6e275262-bc1e-4b59-8301-01c3fd179fa8"></a>
+
+#### A proxy DLL in FiveM's root folder has no embedded signature that verifies here
+
+- Id: `6e275262-bc1e-4b59-8301-01c3fd179fa8`
+- File: [`rules/fivem_dir/root-dlls/unsigned-root-proxy-dll/rule.yaml`](../rules/fivem_dir/root-dlls/unsigned-root-proxy-dll/rule.yaml)
+- Collector: `fivem_dir`
+- Strength: `presence`
+- Status: `experimental` — being developed
+- Tags: `fivem_dir`, `root_dlls`, `signature`
+- Written: 2026-10-17
+
+**About this check**
+
+FiveM for GTA V Legacy's application folder (%LOCALAPPDATA%\\FiveM\\FiveM.app) holds a DLL known to be used as a proxy target (such as version.dll, dxgi.dll, d3d11.dll, winmm.dll, or winhttp.dll), and Windows found no signature embedded in it, one that does not verify, or one it could not verify without the internet; each file shown says which. Windows searches the application directory before system directories when loading DLLs, making root DLLs a common mechanism for DLL hijacking and proxying. Legitimate installations do not place these system DLLs directly in FiveM.app. "Could not verify without the internet" includes a certificate chain that ends at a root certificate this PC does not hold as trusted. The check does not say what a file is or does, or who put it there.
+
+**Matches when all of these hold for one observation**
+
+- `location`: is `root_dlls` (text, ASCII case ignored)
+- `signature`: is one of `no_embedded_signature`, `invalid`, `unverifiable_offline` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the files in the folder when the scan ran. A file removed before then leaves nothing here, and this check cannot say what the folder held earlier.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- Graphics mods, overlays, or recording tools installed directly into the FiveM.app folder instead of the plugins folder
+- A tool or mod that ships an unsigned proxy DLL
+- A signature that does not verify because the file was damaged, or whose certificate expired without a timestamp
+- A signature this PC could not verify offline, because its certificate chain needs something Windows has not already stored
+
+**Related rules**
+
+- similar to [A file in FiveM's plugins folder has no embedded signature that verifies here](#rule-061797d3-161d-4783-89e6-caf658973436)
+- similar to [A file in FiveM for GTA V Enhanced's asi folder has no embedded signature that verifies here](#rule-0999422f-8709-4d85-80e3-39410a85ed6b)
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order>
 - <https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust>
 
 ### `fivem_dir` / `signatures`
@@ -2363,6 +2457,95 @@ Only the span the change journal still held when the scan read it, shown beside 
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
 - <https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v3>
+
+### `usn` / `identity`
+
+<a id="rule-57107ac5-d826-431c-8ce9-08a0e7b0000f"></a>
+
+#### The change journal holds a deletion in DigitalEntitlements
+
+- Id: `57107ac5-d826-431c-8ce9-08a0e7b0000f`
+- File: [`rules/usn/identity/digitalentitlements-file-deleted/rule.yaml`](../rules/usn/identity/digitalentitlements-file-deleted/rule.yaml)
+- Collector: `usn`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `usn`, `identity`, `digitalentitlements`
+- Written: 2026-10-17
+
+**About this check**
+
+The NTFS change journal holds at least one record of a file deleted directly inside DigitalEntitlements, where Rockstar Games and FiveM entitlement tokens are kept. Deletions here are typically associated with identity wiping or unban cleaner utilities.
+
+**Matches when all of these hold for one observation**
+
+- `deleted|gte`: is at least `1`
+- `folder`: is `identified` (text, ASCII case ignored)
+- `location`: is `digitalentitlements` (text, ASCII case ignored)
+
+**Look-back**
+
+Only the span the change journal still held when the scan read it, shown beside this row. The journal keeps a fixed size and drops its oldest records first.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `source_absent` — this PC has no such record to read
+- `other_volume` — this is on another drive, and this program reads only the system drive's change journal
+
+**Ordinary things that also produce this**
+
+- Troubleshooting Rockstar Games Launcher or FiveM login issues by manually deleting entitlement files
+- Reinstalling or clean-uninstalling Rockstar Games Launcher
+- Clean-up tools clearing temporary application data
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
+### `usn` / `integrity`
+
+<a id="rule-f934b261-18f8-4c4e-b3b3-1163d644cf0e"></a>
+
+#### The change journal was truncated or recreated after Windows was installed
+
+- Id: `f934b261-18f8-4c4e-b3b3-1163d644cf0e`
+- File: [`rules/usn/integrity/journal-truncated-or-recreated/rule.yaml`](../rules/usn/integrity/journal-truncated-or-recreated/rule.yaml)
+- Collector: `usn`
+- Strength: `tamper`
+- Status: `experimental` — being developed
+- Tags: `usn`, `integrity`
+- Written: 2026-10-17
+
+**About this check**
+
+The NTFS change journal shows evidence of being reset, truncated, or recreated after Windows was installed. Anti-forensics tools and trace-clearing utilities commonly delete the change journal (for example via fsutil usn deletejournal) to purge historical file activity records.
+
+**Matches when all of these hold for one observation**
+
+- `journal_truncated_or_recreated`: is `true`
+- `location`: is `journal` (text, ASCII case ignored)
+
+**Look-back**
+
+Current state only: whether the change journal's metadata and earliest records indicate a reset or truncation event relative to the operating system installation date.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `access_denied` — Windows refused to open this
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- An administrator or maintenance script running fsutil usn deletejournal to reclaim disk space
+- Volume repair or chkdsk rebuilding the NTFS change journal
+- Major disk partitioning or volume resizing operations
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journals>
+- <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-usn>
 
 ### `usn` / `plugins`
 
