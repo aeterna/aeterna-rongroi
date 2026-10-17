@@ -59,24 +59,64 @@
       <p class="lead">aeterna-rongroi มองหาร่องรอยที่โปรโกงทิ้งไว้บนเครื่อง Windows และการตั้งค่าที่เปิดทางให้โกงได้ง่าย แล้วแสดงเป็นหลักฐานให้คนดู
         ใช้เช็คเครื่องตัวเอง หรือให้แอดมินดูระหว่างแชร์หน้าจอ (SS) โดยผู้เล่นยินยอม <strong>ไม่มีวันบอกว่าเครื่อง "สะอาด"</strong></p>
       <div class="buttons">
-        <a class="btn primary" href="{{rongroi.release_url}}">ดาวน์โหลด · รุ่น {{rongroi.version}}</a>
-        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.th.md">คู่มือ SS</a>
-        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi">ดูโค้ด</a>
+        <a class="btn primary" href="{{rongroi.release_url}}">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          ดาวน์โหลด · รุ่น {{rongroi.version}}
+        </a>
+        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi/blob/dev/docs/screenshare-guide.th.md">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          คู่มือ SS
+        </a>
+        <a class="btn secondary" href="https://github.com/aeterna/aeterna-rongroi">
+          <svg class="icon" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          ดูโค้ด
+        </a>
       </div>
     </div>
     <figure class="specimen" aria-label="ตัวอย่างหน้าสรุปในโปรแกรม ตัวเลขเป็นตัวอย่าง">
       <div class="specimen-head"><strong>สิ่งที่การสแกนนี้แสดง</strong><span>ตัวอย่าง</span></div>
+      <div class="specimen-search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="ค้นหารายการตรวจ, collector, รหัสกฎ…" readonly value="" aria-label="ค้นหารายการตรวจ">
+      </div>
       <div class="tally">
         <div class="t-found"><b><span class="mark mark-found"></span>5</b><span>เจอ</span></div>
         <div class="t-not-found"><b><span class="mark mark-not-found"></span>12</b><span>ไม่เจอ</span></div>
         <div class="t-unmeasured"><b><span class="mark mark-unmeasured"></span>3</b><span>ยังไม่ได้วัด</span></div>
       </div>
-      <div class="specimen-row"><span class="mark mark-found"></span><span>ตรวจ: Secure Boot ถูกปิดอยู่</span><span class="pill">เจอ</span><small>เครื่องทั่วไปจำนวนมากก็ปิดไว้ ข้อนี้อย่างเดียวบอกลักษณะของเครื่อง ไม่ใช่หลักฐานว่าโกง</small></div>
-      <p class="note">เป็นหลักฐานประกอบเท่านั้น รายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด</p>
+      <div class="specimen-row">
+        <span class="mark mark-found"></span>
+        <span class="specimen-title-wrap">
+          <span class="specimen-title">ตรวจ: Secure Boot ถูกปิดอยู่</span>
+          <span class="badge-strength badge-strength-posture">สถานะเครื่อง</span>
+        </span>
+        <span class="pill">เจอ</span>
+        <span class="specimen-desc">Windows รายงานว่า UEFI Secure Boot ถูกปิดอยู่</span>
+        <div class="specimen-falsepositives">
+          <p class="specimen-falsepositives-title">
+            <svg class="icon icon-sm icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน:
+          </p>
+          <ul>
+            <li>เครื่องที่บูตแบบ legacy BIOS หรือ CSM</li>
+          </ul>
+        </div>
+        <div class="specimen-tech-btn">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          คัดลอก JSON ดิบ
+        </div>
+      </div>
+      <p class="note">
+        <svg class="icon icon-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>เป็นหลักฐานประกอบเท่านั้น รายงานนี้พิสูจน์ไม่ได้ว่าเครื่องสะอาด</span>
+      </p>
     </figure>
   </div>
 
-  <p class="note">⚠️ <strong>ยังเป็นรุ่นทดลอง (pre-alpha)</strong> rule ส่วนใหญ่ยังไม่ได้ลองกับเครื่องจริงมากพอ อย่าแบนใครเพราะสิ่งที่โปรแกรมนี้แสดง และอย่าใช้ยืนยันว่าใครไม่ผิด</p>
+  <p class="note">
+    <svg class="icon icon-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span><strong>ยังเป็นรุ่นทดลอง (pre-alpha)</strong> rule ส่วนใหญ่ยังไม่ได้ลองกับเครื่องจริงมากพอ อย่าแบนใครเพราะสิ่งที่โปรแกรมนี้แสดง และอย่าใช้ยืนยันว่าใครไม่ผิด</span>
+  </p>
 
   <section>
     <h2>ต่างจากโปรแกรมเช็คโปรอื่นตรงไหน</h2>
