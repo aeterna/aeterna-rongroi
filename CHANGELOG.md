@@ -16,6 +16,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   guides and the key ADRs. `cargo xtask site` fills its version, date and rule and selector counts from the
   published release, as it does for the pages.
 
+### Changed
+- The first three rules are `stable`: a PCI device no longer present, a PCI device with no driver (problem
+  code 28), and an input device no longer present. Each was seen `found` on the lab virtual machine (ADR 0070,
+  ADR 0072), is measured on a client Windows build and is confronted by a baseline — the three conditions of
+  ADR 0074 §5. What a rule says it shows and does not show is unchanged.
+- The rules reference describes `stable` by those three conditions instead of "proven on real traffic".
+
 ## [0.12.0] - 2026-10-17
 
 Human-First Summary View and AI Export capability (ADR 0045).

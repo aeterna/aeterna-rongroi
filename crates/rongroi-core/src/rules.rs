@@ -62,7 +62,7 @@ pub enum Status {
     Experimental,
     /// Believed correct; positive and negative fixtures required.
     Test,
-    /// Proven on real traffic; fixtures required.
+    /// Seen found on a lab machine, measured on a client build, baseline-confronted (ADR 0074 section 5); fixtures required.
     Stable,
     /// Kept for history; never evaluated.
     Deprecated,

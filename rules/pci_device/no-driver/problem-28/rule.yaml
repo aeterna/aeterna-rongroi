@@ -9,7 +9,7 @@ description: >-
   code — and cannot say what the device is beyond them, what it does or who put it there. A device that
   imitates another one well enough to get a driver would not appear here, so a row here is not needed for
   a PCI card to be in the PC, and a missing row says nothing about one.
-status: experimental
+status: stable
 collector: pci_device
 strength: presence
 match:

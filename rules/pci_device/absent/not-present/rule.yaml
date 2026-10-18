@@ -10,7 +10,7 @@ description: >-
   Fast Startup shutdown (the default "Shut down"), at the moment Windows resumes; after a full shutdown it
   records none, so a missing removal time says nothing about when the device left. The row never says how
   or why the device left, or what it was beyond the ids Windows recorded.
-status: experimental
+status: stable
 collector: pci_device
 strength: context
 match:

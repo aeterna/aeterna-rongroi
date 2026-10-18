@@ -307,7 +307,7 @@ const EN: Words = Words {
     statuses: [
         "being developed",
         "believed correct; has a positive and a negative fixture",
-        "proven on real traffic; has a positive and a negative fixture",
+        "seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)",
         "kept for history; never evaluated",
     ],
     related_kinds: [
@@ -398,7 +398,7 @@ const TH: Words = Words {
     statuses: [
         "อยู่ระหว่างพัฒนา",
         "เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ",
-        "พิสูจน์แล้วกับการใช้งานจริง มี fixture ทั้งแบบเจอและแบบไม่เจอ",
+        "เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)",
         "เก็บไว้เป็นประวัติ ไม่ถูกประเมิน",
     ],
     related_kinds: ["เปลี่ยนชื่อมาจาก", "ใช้แทน", "ดัดแปลงมาจาก", "รวมมาจาก", "คล้ายกับ"],
