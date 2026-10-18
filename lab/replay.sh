@@ -132,6 +132,7 @@ check_not_running() {
 
 # Runs on every exit, including timeouts, refusals and signals. Only the two overlay files are deleted,
 # by exact path: WORK is checked first so an unset WORK can never turn these into "/disk.qcow2".
+# shellcheck disable=SC2329 # called by the EXIT trap, which shellcheck cannot see
 cleanup() {
   local rc=$?
   if [[ -n "$QEMU_PID" ]] && kill -0 "$QEMU_PID" 2>/dev/null; then
@@ -181,6 +182,9 @@ unmount_share() {
 
 # run.ps1 is written here with the scenario's restart flag filled in. The heredoc is quoted so PowerShell
 # variables are not expanded by bash; the one placeholder is replaced by sed.
+# Windows PowerShell 5.1 re-encodes > output as UTF-16LE (seen 2026-10-18), so cmd does the redirect and
+# scan.json holds the bytes rongroi.exe writes. The share root is a drive root (D:\), so relative paths
+# with no inner quotes avoid cmd's quote-stripping rules.
 write_run_ps1() {
   sed "s/__RESTART__/$RESTART/" >"$SHARE_MNT/run.ps1" <<'PS1'
 param([string]$Root)
@@ -192,7 +196,8 @@ if ((Test-Path $setup) -and -not (Test-Path $done)) {
   & $setup *> (Join-Path $out 'setup.txt'); Set-Content -Path $done -Value (Get-Date).ToUniversalTime().ToString('o')
   if (__RESTART__ -eq 1) { Stop-Transcript; shutdown /r /f /t 10; exit }
 }
-& (Join-Path $Root 'rongroi.exe') scan --json 1> (Join-Path $out 'scan.json') 2> (Join-Path $out 'scan-stderr.txt')
+Set-Location $Root
+cmd /c 'rongroi.exe scan --json > out\scan.json 2> out\scan-stderr.txt'
 Remove-Item (Join-Path $Root 'run.ps1')
 Stop-Transcript
 shutdown /s /f /t 10
@@ -217,6 +222,7 @@ prepare_share() {
 
 # No network device at all (-nic none): the VM cannot fetch anything during a run.
 boot_vm() {
+  # shellcheck disable=SC2054 # the commas are qemu option syntax inside single arguments, not array separators
   local args=(
     -M virt -accel hvf -cpu host -smp 4 -m 4096
     -drive "if=pflash,format=raw,unit=0,file=$(qesc "$QEMU_SHARE")/edk2-aarch64-code.fd,readonly=on"
@@ -292,8 +298,13 @@ run_check() {
   fi
   local status=0
   "${cmd[@]}" || status=$?
-  echo "replay: to print ledger rows, run: cargo xtask lab-check --expect \"$SCEN_DIR/expect.yaml\"" \
-    "--scan \"$RESULTS/scan.json\" --evidence \"lab/scenarios/$NAME (run $RUN_ID)\" --date $(date -u +%Y-%m-%d)"
+  # ADR 0076 §1: ledger rows are only meaningful from a check that included the control scan.
+  if [[ -n "${RONGROI_LAB_CONTROL:-}" ]]; then
+    echo "replay: to print ledger rows, run: cargo xtask lab-check --expect \"$SCEN_DIR/expect.yaml\"" \
+      "--scan \"$RESULTS/scan.json\" --control \"$RONGROI_LAB_CONTROL\" --evidence \"lab/scenarios/$NAME (run $RUN_ID)\" --date $(date -u +%Y-%m-%d)"
+  else
+    echo "replay: no RONGROI_LAB_CONTROL set; run lab/replay.sh control first and pass its scan.json before recording ledger rows"
+  fi
   exit "$status"
 }
 

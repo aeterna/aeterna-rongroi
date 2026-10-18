@@ -134,11 +134,29 @@ and collectors. That is its own decision and is not made here.
 
 ## What is unverified
 
-- How long one replay takes. A step waits 60 seconds after logon before its setup (`lab.sh`) and is cut off
-  at 30 minutes; the time from boot to power-off was not recorded for the ADR 0069 steps.
-- Whether a fresh overlay boots as fast as the base disk, and whether Windows' first-boot work on an
-  overlay changes what a scan sees (expected not, since the base is already installed).
+- Whether Windows' first-boot work on an overlay changes what a scan sees (expected not, since the base is
+  already installed). Two control scans agreed with each other (as built, below); neither was compared
+  with a scan of the base disk itself.
 - Whether every collector in the first batch reads the same on Arm as on x64.
+
+## As built (2026-10-18)
+
+`lab/replay.sh` and `cargo xtask lab-check` (§1, §4). Two control replays on the lab machine, with the
+rongroi build of 2026-10-17 (rules bundle `944035a4…`, 77 rules):
+
+- **Time.** 110 and 111 seconds from boot to power-off, the 60-second wait after logon included. A batch
+  of five scenarios plus its control is about ten minutes, not the hours the 30-minute limit allowed for.
+- **The control scan earns its place.** With no scenario, three rules already read `found`:
+  `hid_device/absent/not-present` and `pci_device/absent/not-present`, because the installed disk
+  remembers the devices the ADR 0070 and ADR 0072 steps emulated, and `posture/tpm/tpm-absent`, because
+  the machine has no TPM (`tpm-tis-device` fails under the Mac's hypervisor). A scenario can never be
+  credited with these; 35 rules read `not_found` and 22 `unmeasured`.
+- **Encoding.** Windows PowerShell 5.1 rewrites a redirected program's output as UTF-16LE. The first control
+  scan came back that way; `run.ps1` now lets `cmd` do the redirect, so `scan.json` holds the bytes the
+  program wrote, and the second came back as UTF-8.
+
+The build the virtual machine runs is the maintainer's `cli.exe`. Ledger rows from a replay are only as
+current as that build's rules bundle, whose hash every scan carries in `header.rules_bundle`.
 
 ## Owner decisions (2026-10-18)
 

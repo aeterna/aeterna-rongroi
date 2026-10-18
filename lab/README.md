@@ -43,6 +43,10 @@ cargo xtask lab-check --expect lab/scenarios/<collector>/<name>/expect.yaml \
 
 Append them to `rules/measured.csv`, run `cargo xtask coverage`, and open a pull request.
 
+The scan runs the build in `$RONGROI_LAB/cli.exe`. Build it from the commit you are measuring: a scan
+carries its rules bundle's hash in `header.rules_bundle`, and a rule changed since that build is not what
+the ledger row would claim. A control replay takes about two minutes (ADR 0076, "As built").
+
 ## When a scenario fails
 
 - A rule reads `not_found` where `expect.yaml` says `found`: a false negative. Open an issue naming the
