@@ -215,7 +215,10 @@ fn read_inputs(root: &Path, bundle: &Bundle) -> anyhow::Result<Inputs> {
         for problem in &problems {
             eprintln!("error: {problem}");
         }
-        bail!("coverage: {} problem(s) in the inputs; no table is written", problems.len());
+        bail!(
+            "coverage: {} problem(s) in the inputs; no table is written",
+            problems.len()
+        );
     }
 
     Ok(Inputs {
@@ -229,12 +232,11 @@ fn read_inputs(root: &Path, bundle: &Bundle) -> anyhow::Result<Inputs> {
 /// One row per rule, sorted by collector, then rule directory.
 fn rule_rows(root: &Path, bundle: &Bundle, inputs: &Inputs) -> anyhow::Result<Vec<RuleRow>> {
     let ages = bundle.ages();
-    let retention = |collector: &str| {
-        match ages.iter().find(|age| age.text.collector == collector) {
-            Some(age) if age.text.documented => Retention::Documented,
-            Some(_) => Retention::Stated,
-            None => Retention::None,
-        }
+    let retention = |collector: &str| match ages.iter().find(|age| age.text.collector == collector)
+    {
+        Some(age) if age.text.documented => Retention::Documented,
+        Some(_) => Retention::Stated,
+        None => Retention::None,
     };
 
     let mut rows = Vec::new();
@@ -252,7 +254,14 @@ fn rule_rows(root: &Path, bundle: &Bundle, inputs: &Inputs) -> anyhow::Result<Ve
             .ledger
             .iter()
             .filter(|row| row.subject == rule.collector && is_measurement(row))
-            .map(|row| format!("{} {} {}", row.os_build, row.edition.code(), row.arch.code()))
+            .map(|row| {
+                format!(
+                    "{} {} {}",
+                    row.os_build,
+                    row.edition.code(),
+                    row.arch.code()
+                )
+            })
             .collect();
         rows.push(RuleRow {
             dir,

@@ -1,0 +1,413 @@
+// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+//! Tests of `cargo xtask coverage` (ADR 0074): a small rules tree in a temporary directory, and what
+//! `build`, `render` and `run --check` make of it. The three rules sit on real collectors: `prefetch` is
+//! measured once, on a server, without elevation; `pca` on two builds, as a client, elevated; `usn` never,
+//! and has no ages file.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use super::{Args, COMMAND, PAGE, Retention, RuleRow, Table, build, render, run};
+
+const PREFETCH_DIR: &str = "prefetch/file-attributes/prefetch-file-read-only";
+const PCA_DIR: &str = "pca/timeline/fivem-game-process-by-name";
+const USN_DIR: &str = "usn/timeline/folder-identified";
+
+/// Modelled on `rules/prefetch/file-attributes/prefetch-file-read-only/rule.yaml`.
+const PREFETCH_RULE: &str = r"id: 7d493537-7ecf-4f97-90a0-119e079d30d2
+title: A Prefetch file is marked read-only
+description: A file in the Windows Prefetch folder carries the read-only attribute.
+status: experimental
+collector: prefetch
+strength: tamper
+match:
+  read_only: true
+retention: The attribute as it is at the moment of the scan.
+unmeasured_when: [not_windows, not_admin, source_absent, service_disabled]
+falsepositives:
+  - Read-only chosen in the Properties of the Prefetch folder
+author: aeterna-rongroi contributors
+date: 2026-09-13
+";
+
+/// Modelled on `rules/pca/timeline/fivem-game-process-by-name/rule.yaml`, a timeline selector.
+const PCA_RULE: &str = r"id: eaf79187-e067-43ed-9afe-bffe65e6b2e5
+title: When Program Compatibility Assistant recorded a program named like the game process
+description: Puts on the timeline the time the Program Compatibility Assistant recorded for a program with a matching name. It is not evidence of anything.
+status: experimental
+role: timeline
+collector: pca
+strength: context
+match:
+  name|startswith: FiveM_b
+  name|endswith: _GTAProcess.exe
+retention: Only what the Program Compatibility Assistant files still hold.
+falsepositives:
+  - A program renamed to that shape is recorded under it
+author: aeterna-rongroi contributors
+date: 2026-09-17
+";
+
+/// A timeline selector on `usn`, which keeps no name and has no ages file in this tree.
+const USN_RULE: &str = r"id: 0c9a4e7d-2b1f-4a6e-8d3c-5f7e9a1b2c4d
+title: When the change journal recorded changes in a watched folder
+description: Puts on the timeline the oldest and newest change the change journal still holds for a watched folder. It is not evidence that anything was removed.
+status: test
+role: timeline
+collector: usn
+strength: context
+match:
+  folder: identified
+retention: Only the records the journal still holds.
+falsepositives:
+  - Windows writing and removing Prefetch files in ordinary use
+author: aeterna-rongroi contributors
+date: 2026-09-17
+";
+
+/// Documented: its reference is on Microsoft Learn, so the page shows `documented`.
+const PCA_AGES: &str = r"id: 3564307c-fda1-4d02-b938-cadc0e2af637
+collector: pca
+retention: Kept as Windows keeps the Program Compatibility Assistant files.
+documented: true
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/eventlog/eventlog-key
+";
+
+/// Not documented by Microsoft, so the page shows `stated`.
+const PREFETCH_AGES: &str = r"id: 4be2c346-393f-446e-a964-6f9318f880e3
+collector: prefetch
+retention: Windows removes Prefetch files itself. Microsoft does not document how many it keeps.
+documented: false
+references:
+  - docs/adr/0030-the-words-for-what-was-not-measured.md
+";
+
+const KNOWN_FPS: &str = concat!(
+    "rule_id,baseline,reason,added\n",
+    "7d493537-7ecf-4f97-90a0-119e079d30d2,baseline-quiet,Read-only set by a folder rule,2026-09-12\n",
+);
+
+const UNCONFRONTED: &str = concat!(
+    "rule_id,reason,resolved_when,added\n",
+    "eaf79187-e067-43ed-9afe-bffe65e6b2e5,No baseline holds a Program Compatibility Assistant record of that name,A baseline whose Windows 11 machine has one,2026-09-13\n",
+);
+
+/// `pca` has a Windows 10 build and an arm64 row that is unmeasured; `prefetch` ran once, as a server.
+const LEDGER: &str = concat!(
+    "subject,machine,os_build,edition,arch,token,seen,evidence,date\n",
+    "pca,owner-pc,26100.4061,client,x64,elevated,observations,probe pca-run,2026-10-01\n",
+    "pca,owner-pc,19045.5854,client,x64,elevated,observations,probe pca-run-19045,2026-10-02\n",
+    "pca,lab-vm-arm64,22631.4,client,arm64,elevated,unmeasured: the lab VM was not booted,probe pca-lab,2026-10-03\n",
+    "prefetch,gha-windows-2025,26100.4061,server,x64,limited,none,ci run 1,2026-10-03\n",
+    "7d493537-7ecf-4f97-90a0-119e079d30d2,owner-pc,26100.4061,client,x64,elevated,found,probe prefetch-read-only,2026-10-04\n",
+);
+
+const HEADER_LINE: &str = "<!-- Generated by `cargo xtask coverage` from rules/. Do not edit by hand: change the inputs and run the command. -->";
+
+const PCA_ROW: &str = "| `pca/timeline/fivem-game-process-by-name` | pca | timeline | context | experimental | 0 / 0 | unconfronted | documented | never | 19045.5854 client x64, 26100.4061 client x64 |";
+const PREFETCH_ROW: &str = "| `prefetch/file-attributes/prefetch-file-read-only` | prefetch | evidence | tamper | experimental | 2 / 1 | known fp | stated | owner-pc 26100.4061 | 26100.4061 server x64 |";
+const USN_ROW: &str = "| `usn/timeline/folder-identified` | usn | timeline | context | test | 0 / 0 | confronted | none | never | never |";
+
+const PREFETCH_ROW_NO_LEDGER: &str = "| `prefetch/file-attributes/prefetch-file-read-only` | prefetch | evidence | tamper | experimental | 2 / 1 | confronted | stated | never | never |";
+
+const PCA_GAP_LINE: &str = "`pca/timeline/fivem-game-process-by-name` — added 2026-09-13; resolved when: A baseline whose Windows 11 machine has one";
+
+/// A temp directory unique to one test, deleted on drop even when an assertion fails.
+struct TempRoot(PathBuf);
+
+impl TempRoot {
+    fn new(label: &str) -> Self {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock is after the epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "aeterna-rongroi-xtask-coverage-{}-{label}-{n}-{nanos}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).expect("create temp root");
+        Self(dir)
+    }
+
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempRoot {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn write(path: &Path, contents: &str) {
+    fs::create_dir_all(path.parent().expect("path has a parent")).expect("create parent dirs");
+    fs::write(path, contents).expect("write fixture file");
+}
+
+/// The three rules, their age texts, the prefetch fixtures and `docs/`; no ledger or baseline lists.
+fn rules_tree(root: &Path) {
+    let rules = root.join("rules");
+    let prefetch = rules.join(PREFETCH_DIR);
+    write(&prefetch.join("rule.yaml"), PREFETCH_RULE);
+    write(&prefetch.join("tests/positive/one.json"), "{}");
+    write(&prefetch.join("tests/positive/two.json"), "{}");
+    write(&prefetch.join("tests/negative/one.json"), "{}");
+    write(&rules.join(PCA_DIR).join("rule.yaml"), PCA_RULE);
+    write(&rules.join(USN_DIR).join("rule.yaml"), USN_RULE);
+    write(&rules.join("ages/pca.yaml"), PCA_AGES);
+    write(&rules.join("ages/prefetch.yaml"), PREFETCH_AGES);
+    fs::create_dir_all(root.join("docs")).expect("create docs");
+}
+
+/// The rules tree with a ledger and both baseline lists: the state most tests check.
+fn full_tree(root: &Path) {
+    rules_tree(root);
+    write(&root.join("rules/known-fps.csv"), KNOWN_FPS);
+    write(&root.join("rules/unconfronted.csv"), UNCONFRONTED);
+    write(&root.join("rules/measured.csv"), LEDGER);
+}
+
+fn page_of(root: &Path) -> String {
+    render(root).expect("the tree renders")
+}
+
+fn row_for<'a>(table: &'a Table, dir: &str) -> &'a RuleRow {
+    table
+        .rows
+        .iter()
+        .find(|row| row.dir == dir)
+        .unwrap_or_else(|| panic!("the table has a row for {dir}"))
+}
+
+/// The gap list `title`: its heading carries the count of `items`, and its bullets are `items`.
+fn assert_gap(page: &str, title: &str, items: &[&str]) {
+    let heading = format!("### {title} ({})", items.len());
+    let mut lines = page.lines();
+    assert!(lines.any(|line| line == heading), "missing `{heading}`");
+    let listed: Vec<&str> = lines
+        .skip(1)
+        .take_while(|line| !line.is_empty())
+        .filter(|line| *line != "None.")
+        .map(|line| line.strip_prefix("- ").expect("a gap item is a bullet"))
+        .collect();
+    assert_eq!(listed, items, "under `{heading}`");
+}
+
+fn assert_has_lines(page: &str, lines: &[&str]) {
+    for line in lines {
+        assert!(
+            page.lines().any(|candidate| candidate == *line),
+            "the page has the line `{line}`"
+        );
+    }
+}
+
+#[test]
+fn the_page_opens_with_the_generated_warning_and_has_no_percentage() {
+    let tmp = TempRoot::new("header");
+    full_tree(tmp.path());
+    let page = page_of(tmp.path());
+
+    assert_eq!(page.lines().next(), Some(HEADER_LINE));
+    assert!(page.ends_with('\n') && !page.ends_with("\n\n"));
+    // ADR 0074 §3: counts and lists, never a percentage.
+    assert!(!page.contains('%'));
+}
+
+#[test]
+fn the_rules_table_has_one_row_per_rule_in_collector_then_directory_order() {
+    let tmp = TempRoot::new("rows");
+    full_tree(tmp.path());
+    let page = page_of(tmp.path());
+    assert_has_lines(&page, &[PCA_ROW, PREFETCH_ROW, USN_ROW]);
+    let at = [PCA_ROW, PREFETCH_ROW, USN_ROW].map(|row| page.find(row));
+    assert!(at.windows(2).all(|pair| pair[0] < pair[1]), "{at:?}");
+    assert!(!page.contains("has no rows yet"));
+}
+
+#[test]
+fn a_rule_with_an_unconfronted_row_shows_unconfronted_and_its_way_out() {
+    let tmp = TempRoot::new("unconfronted");
+    full_tree(tmp.path());
+    let page = page_of(tmp.path());
+
+    assert_has_lines(&page, &[PCA_ROW]);
+    assert_gap(&page, "Rules on the unconfronted list", &[PCA_GAP_LINE]);
+}
+
+#[test]
+fn rule_rows_show_fixtures_retention_and_known_fp() {
+    let tmp = TempRoot::new("rule-rows");
+    full_tree(tmp.path());
+    let table = build(tmp.path()).expect("the tree builds");
+
+    let prefetch = row_for(&table, PREFETCH_DIR);
+    assert!(prefetch.known_fp && !prefetch.unconfronted);
+    assert_eq!((prefetch.positive, prefetch.negative), (2, 1));
+    assert_eq!(prefetch.retention, Retention::Stated);
+    let pca = row_for(&table, PCA_DIR);
+    assert!(pca.unconfronted && !pca.known_fp);
+    assert_eq!((pca.positive, pca.negative), (0, 0));
+    assert_eq!(pca.retention, Retention::Documented);
+    assert_eq!(row_for(&table, USN_DIR).retention, Retention::None);
+}
+
+#[test]
+fn counts_are_plain_counts_of_status_baseline_retention_and_ledger_rows() {
+    let tmp = TempRoot::new("counts");
+    full_tree(tmp.path());
+    let page = page_of(tmp.path());
+
+    assert_has_lines(
+        &page,
+        &[
+            "| experimental | 2 |",
+            "| test | 1 |",
+            "| confronted | 1 |",
+            "| known fp | 1 |",
+            "| unconfronted | 1 |",
+            "| known fp; unconfronted | 0 |",
+            "| documented | 1 |",
+            "| stated | 1 |",
+            "| none | 1 |",
+            "| found | 1 |",
+            "| never | 2 |",
+            "| collector | 4 |",
+            "| rule | 1 |",
+        ],
+    );
+}
+
+#[test]
+fn a_found_ledger_row_fills_seen_found_and_leaves_the_never_found_gap() {
+    let tmp = TempRoot::new("found");
+    full_tree(tmp.path());
+    let table = build(tmp.path()).expect("the tree builds");
+    let page = page_of(tmp.path());
+
+    assert_eq!(
+        row_for(&table, PREFETCH_DIR).seen_found,
+        ["owner-pc 26100.4061"]
+    );
+    assert!(row_for(&table, PCA_DIR).seen_found.is_empty());
+    assert_gap(
+        &page,
+        "Rules never seen found outside a fixture",
+        &[
+            "`pca/timeline/fivem-game-process-by-name`",
+            "`usn/timeline/folder-identified`",
+        ],
+    );
+}
+
+/// One build, server only, Windows 11 only, elevated only: each gap list names exactly the collectors
+/// the ledger leaves in it, and the collector with no ages file is listed.
+#[test]
+fn collector_gap_lists_follow_the_ledger() {
+    let tmp = TempRoot::new("collectors");
+    full_tree(tmp.path());
+    let page = page_of(tmp.path());
+
+    assert_gap(&page, "Collectors never measured", &["`usn`"]);
+    assert_gap(
+        &page,
+        "Collectors measured on only one build",
+        &["`prefetch`"],
+    );
+    assert_gap(
+        &page,
+        "Collectors never measured on a client edition",
+        &["`prefetch`"],
+    );
+    assert_gap(
+        &page,
+        "Collectors never measured on Windows 10",
+        &["`prefetch`"],
+    );
+    assert_gap(
+        &page,
+        "Collectors never measured without elevation",
+        &["`pca`"],
+    );
+    assert_gap(&page, "Collectors with no `rules/ages` file", &["`usn`"]);
+}
+
+#[test]
+fn an_empty_ledger_says_so_and_its_columns_read_never() {
+    let tmp = TempRoot::new("empty-ledger");
+    rules_tree(tmp.path());
+    let table = build(tmp.path()).expect("the tree builds");
+    let page = page_of(tmp.path());
+
+    assert_eq!(table.ledger_collector_rows + table.ledger_rule_rows, 0);
+    assert!(page.contains("`rules/measured.csv` has no rows yet"));
+    assert_has_lines(&page, &[PREFETCH_ROW_NO_LEDGER]);
+    assert_gap(
+        &page,
+        "Collectors never measured",
+        &["`pca`", "`prefetch`", "`usn`"],
+    );
+}
+
+/// A committed page with Windows line endings is the same page: git on Windows may write it so.
+#[test]
+fn check_passes_on_the_page_the_command_wrote_with_either_line_endings() {
+    let tmp = TempRoot::new("fresh");
+    full_tree(tmp.path());
+
+    run(tmp.path(), &Args { check: false }).expect("the command writes the page");
+    let written = fs::read_to_string(tmp.path().join(PAGE)).expect("the page was written");
+    assert_eq!(written, page_of(tmp.path()));
+    run(tmp.path(), &Args { check: true }).expect("a fresh page passes --check");
+
+    fs::write(tmp.path().join(PAGE), written.replace('\n', "\r\n")).expect("write the CRLF page");
+    run(tmp.path(), &Args { check: true }).expect("the CRLF page matches the inputs");
+}
+
+/// A missing page and an edited page both fail `--check`, and each failure names the fix command.
+#[test]
+fn check_fails_on_a_missing_or_edited_page_and_names_the_fix_command() {
+    let tmp = TempRoot::new("edited");
+    full_tree(tmp.path());
+    let err = run(tmp.path(), &Args { check: true }).expect_err("a missing page fails --check");
+    assert!(err.to_string().contains(COMMAND), "{err}");
+    assert!(!tmp.path().join(PAGE).exists());
+
+    run(tmp.path(), &Args { check: false }).expect("the command writes the page");
+    let written = page_of(tmp.path());
+    fs::write(tmp.path().join(PAGE), format!("{written}A hand edit.\n")).expect("edit the page");
+    let error = run(tmp.path(), &Args { check: true }).expect_err("an edited page fails --check");
+    let message = error.to_string();
+    assert!(message.contains("is out of date"), "{message}");
+    assert!(message.contains(COMMAND), "{message}");
+}
+
+/// ADR 0074 §1 and §2: a broken ledger stops the command, so no table that looks complete is written.
+#[test]
+fn a_ledger_problem_stops_generation_and_writes_no_page() {
+    let tmp = TempRoot::new("bad-ledger");
+    full_tree(tmp.path());
+    // `found` is a rule's word, not a collector's: this row is a problem.
+    write(
+        &tmp.path().join("rules/measured.csv"),
+        concat!(
+            "subject,machine,os_build,edition,arch,token,seen,evidence,date\n",
+            "pca,owner-pc,26100.4061,client,x64,elevated,found,probe pca-run,2026-10-01\n",
+        ),
+    );
+
+    let error = build(tmp.path()).expect_err("a bad ledger row stops the build");
+    let message = error.to_string();
+    assert!(message.contains("no table is written"), "{message}");
+    assert!(render(tmp.path()).is_err());
+    assert!(run(tmp.path(), &Args { check: false }).is_err());
+    assert!(!tmp.path().join(PAGE).exists());
+}

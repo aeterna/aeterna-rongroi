@@ -108,7 +108,12 @@ fn counts(out: &mut String, table: &Table) {
         .filter(|row| !row.seen_found.is_empty())
         .count();
     let never = table.rows.len() - found;
-    count_table(out, "Rules seen found", "seen", &[("found", found), ("never", never)]);
+    count_table(
+        out,
+        "Rules seen found",
+        "seen",
+        &[("found", found), ("never", never)],
+    );
     count_table(
         out,
         "Ledger rows by kind",

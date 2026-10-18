@@ -61,7 +61,8 @@ const EVIDENCE: usize = 7;
 const DATE: usize = 8;
 
 /// A valid collector row: `pca` measured on an owner PC.
-const COLLECTOR_ROW: &str = "pca,owner-pc,26100.4061,client,x64,elevated,observations,ci run 123,2026-10-18";
+const COLLECTOR_ROW: &str =
+    "pca,owner-pc,26100.4061,client,x64,elevated,observations,ci run 123,2026-10-18";
 /// A valid rule row (`RULE_ID`) measured on a lab VM.
 const RULE_ROW: &str = "00000000-0000-4000-8000-000000000001,lab-vm-arm64,26100,server,arm64,limited,found,docs/evidence/x.md,2026-10-18";
 
@@ -137,7 +138,10 @@ fn rule(line: usize) -> Measured {
 fn rejected(label: &str, record: String, message: &str) {
     let tmp = TempRoot::new(label);
     let (parsed, problems) = read_text(&tmp, &with_header(&[record]));
-    assert!(parsed.is_empty(), "a failed row is not returned, got {parsed:?}");
+    assert!(
+        parsed.is_empty(),
+        "a failed row is not returned, got {parsed:?}"
+    );
     assert_eq!(problems, [format!("{MEASURED}:2: {message}")]);
 }
 
@@ -173,9 +177,15 @@ fn rule_seen_message(value: &str) -> String {
 fn an_absent_ledger_and_a_header_alone_are_no_rows_and_no_problems() {
     let tmp = TempRoot::new("empty");
     let (rows, problems) = read(tmp.path(), &rule_ids(), &collectors()).expect("read the ledger");
-    assert!(rows.is_empty() && problems.is_empty(), "absent: {rows:?} {problems:?}");
+    assert!(
+        rows.is_empty() && problems.is_empty(),
+        "absent: {rows:?} {problems:?}"
+    );
     let (rows, problems) = read_text(&tmp, &format!("{HEADER}\n"));
-    assert!(rows.is_empty() && problems.is_empty(), "header only: {rows:?} {problems:?}");
+    assert!(
+        rows.is_empty() && problems.is_empty(),
+        "header only: {rows:?} {problems:?}"
+    );
 }
 
 #[test]
@@ -224,7 +234,10 @@ fn an_unknown_subject_is_reported_and_its_seen_is_checked_for_shape_only() {
     // With no kind, `found` is well formed, so only the subject fails.
     let row = set_field(&set_field(COLLECTOR_ROW, SUBJECT, "nope"), SEEN, "found");
     let (rows, problems) = read_text(&tmp, &with_header(&[row]));
-    assert!(rows.is_empty(), "a row with an unknown subject is not returned");
+    assert!(
+        rows.is_empty(),
+        "a row with an unknown subject is not returned"
+    );
     let message = "`subject` `nope` is neither a rule in the bundle nor a collector";
     assert_eq!(problems, [format!("{MEASURED}:2: {message}")]);
 }
@@ -239,7 +252,14 @@ fn machine_values_outside_the_three_forms_are_reported() {
 
 #[test]
 fn os_build_values_outside_digits_dot_digits_are_reported() {
-    for value in ["", "026100", "26100.", "26100.4061.1", "2610a", "26100.04061"] {
+    for value in [
+        "",
+        "026100",
+        "26100.",
+        "26100.4061.1",
+        "2610a",
+        "26100.04061",
+    ] {
         let row = set_field(COLLECTOR_ROW, OS_BUILD, value);
         rejected("bad-os-build", row, &os_build_message(value));
     }
@@ -248,7 +268,11 @@ fn os_build_values_outside_digits_dot_digits_are_reported() {
 #[test]
 fn an_edition_other_than_client_or_server_is_reported() {
     let row = set_field(COLLECTOR_ROW, EDITION, "Client");
-    rejected("bad-edition", row, "`edition` `Client` must be `client` or `server`");
+    rejected(
+        "bad-edition",
+        row,
+        "`edition` `Client` must be `client` or `server`",
+    );
 }
 
 #[test]
@@ -260,7 +284,11 @@ fn an_arch_other_than_x64_or_arm64_is_reported() {
 #[test]
 fn a_token_other_than_elevated_or_limited_is_reported() {
     let row = set_field(COLLECTOR_ROW, TOKEN, "admin");
-    rejected("bad-token", row, "`token` `admin` must be `elevated` or `limited`");
+    rejected(
+        "bad-token",
+        row,
+        "`token` `admin` must be `elevated` or `limited`",
+    );
 }
 
 #[test]
@@ -299,7 +327,14 @@ fn an_empty_evidence_is_reported() {
 
 #[test]
 fn a_date_not_written_as_a_real_day_is_reported() {
-    for value in ["2026-02-30", "2026/10/18", "2026-1-05", "20261018", "2026-13-01", "18-10-2026"] {
+    for value in [
+        "2026-02-30",
+        "2026/10/18",
+        "2026-1-05",
+        "20261018",
+        "2026-13-01",
+        "18-10-2026",
+    ] {
         let row = set_field(COLLECTOR_ROW, DATE, value);
         rejected("bad-date", row, &date_message(value));
     }
@@ -307,7 +342,11 @@ fn a_date_not_written_as_a_real_day_is_reported() {
 
 #[test]
 fn a_row_with_the_wrong_field_count_is_reported() {
-    let short = COLLECTOR_ROW.rsplit_once(',').expect("nine fields").0.to_owned();
+    let short = COLLECTOR_ROW
+        .rsplit_once(',')
+        .expect("nine fields")
+        .0
+        .to_owned();
     let long = format!("{COLLECTOR_ROW},extra");
     for record in [short, long] {
         let found = record.split(',').count();
@@ -325,7 +364,10 @@ fn a_wrong_header_is_reported_and_the_rows_after_it_are_still_read() {
     let short_header = "subject,machine,os_build,edition,arch,token,seen,evidence";
     let (rows, problems) = read_text(&tmp, &format!("{short_header}\n{COLLECTOR_ROW}\n"));
     assert_eq!(rows, [collector(2)]);
-    assert_eq!(problems, [format!("{MEASURED}:1: the header must be `{HEADER}`")]);
+    assert_eq!(
+        problems,
+        [format!("{MEASURED}:1: the header must be `{HEADER}`")]
+    );
 }
 
 #[test]
@@ -333,7 +375,10 @@ fn a_ledger_with_no_header_is_reported() {
     let tmp = TempRoot::new("no-header");
     let (rows, problems) = read_text(&tmp, "# no header here\n\n");
     assert!(rows.is_empty(), "no header means no rows, got {rows:?}");
-    assert_eq!(problems, [format!("{MEASURED}: the header `{HEADER}` is missing")]);
+    assert_eq!(
+        problems,
+        [format!("{MEASURED}: the header `{HEADER}` is missing")]
+    );
 }
 
 #[test]
@@ -351,11 +396,22 @@ fn a_repeated_row_is_reported_and_names_the_line_it_repeats() {
     let tmp = TempRoot::new("duplicate");
     // The third row differs only in its date, so it is not a repeat.
     let differing = set_field(COLLECTOR_ROW, DATE, "2026-10-19");
-    let text = with_header(&[COLLECTOR_ROW.to_owned(), COLLECTOR_ROW.to_owned(), differing]);
+    let text = with_header(&[
+        COLLECTOR_ROW.to_owned(),
+        COLLECTOR_ROW.to_owned(),
+        differing,
+    ]);
     let (rows, problems) = read_text(&tmp, &text);
     let lines: Vec<usize> = rows.iter().map(|parsed| parsed.line).collect();
-    assert_eq!(lines, [2, 4], "the first row and the differing row are kept");
-    assert_eq!(problems, [format!("{MEASURED}:3: repeats the row on line 2")]);
+    assert_eq!(
+        lines,
+        [2, 4],
+        "the first row and the differing row are kept"
+    );
+    assert_eq!(
+        problems,
+        [format!("{MEASURED}:3: repeats the row on line 2")]
+    );
 }
 
 #[test]
@@ -365,13 +421,22 @@ fn a_bad_field_is_reported_on_its_own_physical_line_and_good_rows_still_parse() 
     let text = format!("# a note\n\n{HEADER}\n{COLLECTOR_ROW}\n{bad}\n");
     let (rows, problems) = read_text(&tmp, &text);
     assert_eq!(rows, [collector(4)]);
-    assert_eq!(problems, [format!("{MEASURED}:5: `arch` `x86` must be `x64` or `arm64`")]);
+    assert_eq!(
+        problems,
+        [format!(
+            "{MEASURED}:5: `arch` `x86` must be `x64` or `arm64`"
+        )]
+    );
 }
 
 #[test]
 fn every_failed_field_of_a_row_is_reported_in_column_order() {
     let tmp = TempRoot::new("every-field");
-    let bad = set_field(&set_field(COLLECTOR_ROW, MACHINE, "laptop"), DATE, "2026-02-30");
+    let bad = set_field(
+        &set_field(COLLECTOR_ROW, MACHINE, "laptop"),
+        DATE,
+        "2026-02-30",
+    );
     let (rows, problems) = read_text(&tmp, &with_header(&[bad]));
     assert!(rows.is_empty(), "a row with failed fields is not returned");
     let expected = [

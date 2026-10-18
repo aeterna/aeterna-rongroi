@@ -63,16 +63,6 @@ pub(crate) enum Token {
     Limited,
 }
 
-impl Token {
-    /// The spelling this value has in the CSV.
-    pub(crate) fn code(self) -> &'static str {
-        match self {
-            Self::Elevated => "elevated",
-            Self::Limited => "limited",
-        }
-    }
-}
-
 /// What was seen. A collector row takes `Observations`, `None` or `Unmeasured`; a rule row takes
 /// `Found`, `NotFound` or `Unmeasured`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,20 +73,6 @@ pub(crate) enum Seen {
     NotFound,
     /// Not measured here, for the reason given (never empty).
     Unmeasured(String),
-}
-
-impl Seen {
-    /// The keyword this value has in the CSV. `Unmeasured` gives `unmeasured`; its reason follows the
-    /// colon in the file.
-    pub(crate) fn code(&self) -> &'static str {
-        match self {
-            Self::Observations => "observations",
-            Self::None => "none",
-            Self::Found => "found",
-            Self::NotFound => "not_found",
-            Self::Unmeasured(_) => "unmeasured",
-        }
-    }
 }
 
 /// One validated row of `rules/measured.csv`.
@@ -190,10 +166,24 @@ fn check_row(
     rule_ids: &BTreeSet<String>,
     collectors: &BTreeSet<String>,
 ) -> Result<Measured, Vec<String>> {
-    let [subject, machine, os_build, edition, arch, token, seen, evidence, date] = fields else {
+    let [
+        subject,
+        machine,
+        os_build,
+        edition,
+        arch,
+        token,
+        seen,
+        evidence,
+        date,
+    ] = fields
+    else {
         return Err(vec![problem(
             line,
-            format!("expected the 9 fields of `{HEADER}`, found {}", fields.len()),
+            format!(
+                "expected the 9 fields of `{HEADER}`, found {}",
+                fields.len()
+            ),
         )]);
     };
     let mut problems = Vec::new();
@@ -230,7 +220,9 @@ fn check_row(
     if !problems.is_empty() {
         return Err(problems);
     }
-    match (machine, os_build, edition, arch, token, seen, evidence, date) {
+    match (
+        machine, os_build, edition, arch, token, seen, evidence, date,
+    ) {
         (
             Some(machine),
             Some(os_build),
@@ -379,7 +371,9 @@ fn parse_date(text: &str) -> Result<Date, String> {
         });
     match text.parse::<Date>() {
         Ok(date) if shaped => Ok(date),
-        _ => Err(format!("`date` `{text}` must be a day written `YYYY-MM-DD`")),
+        _ => Err(format!(
+            "`date` `{text}` must be a day written `YYYY-MM-DD`"
+        )),
     }
 }
 
