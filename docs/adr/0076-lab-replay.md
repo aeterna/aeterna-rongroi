@@ -155,6 +155,14 @@ rongroi build of 2026-10-17 (rules bundle `944035a4…`, 77 rules):
   scan came back that way; `run.ps1` now lets `cmd` do the redirect, so `scan.json` holds the bytes the
   program wrote, and the second came back as UTF-8.
 
+**First batch (2026-10-18).** Seven scenarios, one trace each, all passing against one control replay with a
+build of `dev` at `2d0c11d` (rules bundle `42ed5dca…`): the two machine policies that turn script block logging
+off, a Defender exclusion of FiveM's folder, an unsigned program in the profile's Run key, an event log file set
+read-only, the Application log cleared (with one restart), and a FiveM name in the hosts file. Their 15 ledger
+rows raised the rules seen `found` outside a fixture from 10 to 16, and three of them then met §5 of ADR 0074 and
+became `stable`. One lesson: an unchanged copy of the running program is the tool's own trace (ADR 0010) and
+never reaches a rule, so a scenario that needs an inert program changes the copy's bytes.
+
 The build the virtual machine runs is the maintainer's `cli.exe`. Ledger rows from a replay are only as
 current as that build's rules bundle, whose hash every scan carries in `header.rules_bundle`.
 
