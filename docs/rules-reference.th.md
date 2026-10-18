@@ -17,7 +17,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 |---|---|
 | รูปแบบ rule | 4 |
 | จำนวน rule | 77 |
-| SHA-256 | `c0b3ef72e37fa5dcbc5c5f4f1fce39b4c9a9bfd3a78e4a5f5393ffa06c39ec9a` |
+| SHA-256 | `021e4776068b756d9248d76e4bfe4a1c58f803c7e42dc83b754a6baedb9e7c39` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -49,7 +49,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [Microsoft Defender บันทึกว่าการป้องกันแบบ real-time ถูกปิด](#rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185) — `context` · `experimental`
   - [มี event log ไฟล์หนึ่งถูกล้าง](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [Security log มีบันทึกว่าตัวเองถูกล้าง](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
-  - [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
+  - [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `stable`
   - [มีไฟล์ event log ที่ไม่ใช่ไฟล์ที่ Windows เขียน channel ของมันลงไป](#rule-87a53c8f-b0e4-477d-91e7-93b904ba965f) — `tamper` · `experimental`
 - `fivem_dir`
   - [FiveM.exe มีลายเซ็นที่ถูกต้อง แต่ไม่ได้เซ็นด้วยใบรับรองที่ rule นี้รู้จัก](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e) — `presence` · `experimental`
@@ -86,9 +86,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [เปิดโหมด test signing ของ Windows อยู่](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
   - [firmware ไม่ได้ประกาศ IOMMU ให้ Windows](#rule-c5c19a2d-8008-4bc8-b36f-6607ed091313) — `posture` · `experimental`
-  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
+  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `stable`
   - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ PowerShell 7](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
-  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
+  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `stable`
   - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ Windows PowerShell](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [ปิด SEHOP (การตรวจสอบสายตัวจัดการข้อยกเว้น) ไว้](#rule-dc858978-954d-418f-a42e-29f06975f4ed) — `posture` · `experimental`
@@ -476,7 +476,7 @@ Security log มีบันทึกว่าบันทึกการตร�
 - ไฟล์: [`rules/evtx/log-file/event-log-file-read-only/rule.yaml`](../rules/evtx/log-file/event-log-file-read-only/rule.yaml)
 - collector: `evtx`
 - strength: `tamper` — ร่องรอยถูกล้าง
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `evtx`, `log-file`
 - เขียนเมื่อ: 2026-09-13
 
@@ -1740,7 +1740,7 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 - ไฟล์: [`rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml)
 - collector: `posture`
 - strength: `posture` — สถานะเครื่อง
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `posture`, `logging`
 - เขียนเมื่อ: 2026-09-14
 
@@ -1822,7 +1822,7 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 - ไฟล์: [`rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml)
 - collector: `posture`
 - strength: `posture` — สถานะเครื่อง
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `posture`, `logging`
 - เขียนเมื่อ: 2026-09-13 · แก้ไขล่าสุด: 2026-09-14
 

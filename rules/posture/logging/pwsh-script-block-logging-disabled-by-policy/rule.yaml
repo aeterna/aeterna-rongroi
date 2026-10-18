@@ -12,7 +12,7 @@ description: >-
   PowerShell 7 is installed here is not read, and neither is PowerShell 7's own configuration file. It
   says nothing about which scripts ran or who set the policy. On its own this describes the machine — it
   is not evidence of cheating.
-status: experimental
+status: stable
 collector: posture
 strength: posture
 match:
