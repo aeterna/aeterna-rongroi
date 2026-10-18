@@ -14,7 +14,7 @@
 [![License](https://img.shields.io/badge/License-GPL--3.0-f4c430?style=flat-square)](LICENSE)
 [![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=flat-square)](docs/adr/0002-no-clean-verdict.md)
 
-**[Official Website](https://aeterna.github.io/aeterna-rongroi/) · [Screenshare Guide](docs/screenshare-guide.md) · [77 Rules Reference](docs/rules-reference.md) · [Privacy Policy](PRIVACY.md)**
+**[Official Website](https://aeterna.github.io/aeterna-rongroi/) · [Screenshare Guide](docs/screenshare-guide.md) · [77 Rules Reference](docs/rules-reference.md) · [Privacy Policy](PRIVACY.md) · [Discord](https://discord.gg/eZ8CNrGe2b)**
 
 [Quick start](#quick-start) · [What it is](#what-it-is--and-what-it-is-not) · [Forensic Architecture](#forensic-architecture) · [3-Layer Evidence Model](#the-3-layer-evidence-model-adr-0045) · [77 Rules](#what-it-inspects-77-rules-across-12-collectors) · [Verification](#verifying-a-download)
 

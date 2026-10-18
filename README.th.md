@@ -14,7 +14,7 @@
 [![License](https://img.shields.io/badge/License-GPL--3.0-f4c430?style=flat-square)](LICENSE)
 [![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=flat-square)](docs/adr/0002-no-clean-verdict.md)
 
-**[เว็บไซต์ทางการ](https://aeterna.github.io/aeterna-rongroi/) · [คู่มือตรวจแชร์จอ (SS)](docs/screenshare-guide.th.md) · [คู่มืออ้างอิง 77 Rules](docs/rules-reference.th.md) · [นโยบายความเป็นส่วนตัว](PRIVACY.md)**
+**[เว็บไซต์ทางการ](https://aeterna.github.io/aeterna-rongroi/) · [คู่มือตรวจแชร์จอ (SS)](docs/screenshare-guide.th.md) · [คู่มืออ้างอิง 77 Rules](docs/rules-reference.th.md) · [นโยบายความเป็นส่วนตัว](PRIVACY.md) · [Discord](https://discord.gg/eZ8CNrGe2b)**
 
 [เริ่มต้นใช้งาน](#เริ่มต้นใช้งานด่วน) · [คืออะไร / ไม่ใช่อะไร](#คืออะไร--และไม่ใช่อะไร) · [สถาปัตยกรรมนิติวิทยาศาสตร์](#สถาปัตยกรรมนิติวิทยาศาสตร์) · [โมเดลหลักฐาน 3 ชั้น](#โมเดลหลักฐาน-3-ชั้น-adr-0045) · [77 Rules](#ตรวจอะไรบ้าง-77-rules-จาก-12-สายข้อมูล) · [ตรวจสอบไฟล์](#การตรวจสอบความถูกต้องของไฟล์ที่ดาวน์โหลด)
 

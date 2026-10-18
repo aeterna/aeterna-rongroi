@@ -6,6 +6,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The landing page's footer and the README link the AETERNA Game Discord (https://discord.gg/eZ8CNrGe2b), a plain link; questions
+  and false-positive reports still belong in GitHub Discussions.
 - The landing page's link previews carry an image (`og:image`, `twitter:card`), so a link pasted into Discord or
   another chat shows a card with a picture.
 - The landing page's FAQ is also in its JSON-LD as a `FAQPage`; a test fails when the eight questions on the page
