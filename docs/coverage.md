@@ -45,27 +45,24 @@
 
 | seen | count |
 | --- | ---: |
-| found | 10 |
-| never | 67 |
+| found | 16 |
+| never | 61 |
 
 ### Ledger rows by kind
 
 | kind | count |
 | --- | ---: |
 | collector | 34 |
-| rule | 41 |
+| rule | 56 |
 
 ## Gaps
 
-### Rules never seen found outside a fixture (67)
+### Rules never seen found outside a fixture (61)
 
-- `autostart/outside-windows/no-valid-embedded-signature`
 - `bam/ephemeral/executed-program-missing-on-disk`
 - `bam/timeline/fivem-game-process-by-name`
 - `bam/timeline/fivem-or-gta-v-by-name`
-- `defender_exclusion/fivem/fivem-folder-excluded`
 - `evtx/defender/defender-real-time-protection-turned-off`
-- `evtx/log-file/event-log-file-read-only`
 - `evtx/log-file/event-log-not-at-configured-path`
 - `evtx/timeline/code-integrity-blocked-image`
 - `evtx/timeline/defender-detection`
@@ -83,7 +80,6 @@
 - `install_marker/modified-build/atlas-files-present`
 - `install_marker/modified-build/revios-files-present`
 - `install_marker/windows-components/defender-platform-folder-absent`
-- `net_config/hosts/fivem-or-rockstar-name-in-hosts`
 - `os_image/modified-build/oem-manufacturer-is-a-windows-modification-project`
 - `os_image/modified-build/oem-model-names-a-windows-modification-playbook`
 - `os_image/modified-build/organisation-names-a-windows-modification-playbook`
@@ -98,9 +94,7 @@
 - `posture/boot/secure-boot-firmware-disagrees`
 - `posture/boot/test-signing-enabled`
 - `posture/dma/no-iommu-table`
-- `posture/logging/pwsh-script-block-logging-disabled-by-policy`
 - `posture/logging/pwsh-script-block-logging-disabled-by-user-policy`
-- `posture/logging/script-block-logging-disabled-by-policy`
 - `posture/logging/script-block-logging-disabled-by-user-policy`
 - `posture/memory-integrity/hvci-disabled`
 - `posture/mitigations/exception-chain-validation-disabled`
@@ -229,16 +223,16 @@
 
 | rule | collector | role | strength | status | fixtures | baseline | retention | seen found | measured on |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | never | 26100 server x64 |
+| `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
 | `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-or-gta-v-by-name` | bam | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26100 server x64, 26220 client x64 |
-| `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | never | 26100 server x64 |
+| `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
 | `driver_service/vulnerable-driver/loldrivers-listed` | driver_service | evidence | posture | test | 1 / 1 | confronted | none | owner-pc 26220 | 26100 server x64, 26220 client x64 |
 | `evtx/defender/defender-real-time-protection-turned-off` | evtx | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
-| `evtx/log-clearing/event-log-file-cleared` | evtx | evidence | tamper | experimental | 2 / 3 | unconfronted | documented | gha-windows-latest 26100 | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/log-clearing/event-log-file-cleared` | evtx | evidence | tamper | experimental | 2 / 3 | unconfronted | documented | gha-windows-latest 26100, lab-vm-arm64 26300 | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/log-clearing/security-audit-log-cleared` | evtx | evidence | tamper | experimental | 1 / 3 | unconfronted | documented | gha-windows-latest 26100 | 20348 server x64, 26100 server x64, 26220 client x64 |
-| `evtx/log-file/event-log-file-read-only` | evtx | evidence | tamper | experimental | 2 / 1 | confronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/log-file/event-log-file-read-only` | evtx | evidence | tamper | experimental | 2 / 1 | confronted | documented | lab-vm-arm64 26300 | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/log-file/event-log-not-at-configured-path` | evtx | evidence | tamper | experimental | 1 / 1 | confronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/timeline/code-integrity-blocked-image` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/timeline/defender-detection` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
@@ -259,7 +253,7 @@
 | `install_marker/modified-build/atlas-files-present` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `install_marker/modified-build/revios-files-present` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `install_marker/windows-components/defender-platform-folder-absent` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `net_config/hosts/fivem-or-rockstar-name-in-hosts` | net_config | evidence | posture | experimental | 1 / 1 | unconfronted | none | never | never |
+| `net_config/hosts/fivem-or-rockstar-name-in-hosts` | net_config | evidence | posture | experimental | 1 / 1 | unconfronted | none | lab-vm-arm64 26300 | never |
 | `os_image/modified-build/oem-manufacturer-is-a-windows-modification-project` | os_image | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `os_image/modified-build/oem-model-names-a-windows-modification-playbook` | os_image | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `os_image/modified-build/organisation-names-a-windows-modification-playbook` | os_image | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
@@ -276,9 +270,9 @@
 | `posture/boot/secure-boot-firmware-disagrees` | posture | evidence | posture | experimental | 1 / 3 | confronted | none | never | 26220 client x64 |
 | `posture/boot/test-signing-enabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
 | `posture/dma/no-iommu-table` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
-| `posture/logging/pwsh-script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
+| `posture/logging/pwsh-script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | lab-vm-arm64 26300 | 26220 client x64 |
 | `posture/logging/pwsh-script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
-| `posture/logging/script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
+| `posture/logging/script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | lab-vm-arm64 26300 | 26220 client x64 |
 | `posture/logging/script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
 | `posture/memory-integrity/hvci-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
 | `posture/mitigations/exception-chain-validation-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+# On the lab machine the control scan reads this rule `unmeasured` (access_denied: some task files are refused
+# even elevated), so `found` here is the scenario's.
+found:
+  - 72820eaf-1469-4ea7-bb0f-17f145d26dfc   # autostart/outside-windows/no-valid-embedded-signature: a Run value at sign-in names an unsigned file in the user's profile
+restart: false
