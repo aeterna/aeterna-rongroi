@@ -13,8 +13,6 @@
 
 `rules/ages` records whether Microsoft documents a retention (`documented`) or the text states it on other grounds (`stated`); it has no field for a measured retention yet, so `measured` is never shown.
 
-`rules/measured.csv` has no rows yet; the back-fill from the ADRs is a separate change (ADR 0074, owner decision 3), so the ledger columns read `never` for now.
-
 ## Counts
 
 ### Rules by status
@@ -47,35 +45,31 @@
 
 | seen | count |
 | --- | ---: |
-| found | 0 |
-| never | 77 |
+| found | 10 |
+| never | 67 |
 
 ### Ledger rows by kind
 
 | kind | count |
 | --- | ---: |
-| collector | 0 |
-| rule | 0 |
+| collector | 34 |
+| rule | 41 |
 
 ## Gaps
 
-### Rules never seen found outside a fixture (77)
+### Rules never seen found outside a fixture (67)
 
 - `autostart/outside-windows/no-valid-embedded-signature`
 - `bam/ephemeral/executed-program-missing-on-disk`
 - `bam/timeline/fivem-game-process-by-name`
 - `bam/timeline/fivem-or-gta-v-by-name`
 - `defender_exclusion/fivem/fivem-folder-excluded`
-- `driver_service/vulnerable-driver/loldrivers-listed`
 - `evtx/defender/defender-real-time-protection-turned-off`
-- `evtx/log-clearing/event-log-file-cleared`
-- `evtx/log-clearing/security-audit-log-cleared`
 - `evtx/log-file/event-log-file-read-only`
 - `evtx/log-file/event-log-not-at-configured-path`
 - `evtx/timeline/code-integrity-blocked-image`
 - `evtx/timeline/defender-detection`
 - `evtx/timeline/log-oldest-and-newest-record`
-- `evtx/timeline/powershell-flagged-script-block`
 - `fivem_dir/client/client-exe-signed-with-another-certificate`
 - `fivem_dir/client/client-exe-without-verified-signature`
 - `fivem_dir/enhanced-asi/asi-file-with-valid-signature`
@@ -86,8 +80,6 @@
 - `fivem_dir/signatures/signature-not-checked`
 - `fivem_dir/timeline/folder-activity-times`
 - `fivem_servers/enhanced/server-cache-folder`
-- `hid_device/absent/not-present`
-- `hid_device/timeline/device-times`
 - `install_marker/modified-build/atlas-files-present`
 - `install_marker/modified-build/revios-files-present`
 - `install_marker/windows-components/defender-platform-folder-absent`
@@ -101,8 +93,6 @@
 - `os_image/windows-components/windows-update-service-cannot-start`
 - `pca/timeline/fivem-game-process-by-name`
 - `pca/timeline/fivem-or-gta-v-by-name`
-- `pci_device/absent/not-present`
-- `pci_device/no-driver/problem-28`
 - `pci_device/timeline/absent-device-times`
 - `posture/boot/secure-boot-disabled`
 - `posture/boot/secure-boot-firmware-disagrees`
@@ -118,10 +108,8 @@
 - `posture/mitigations/speculative-execution-mitigations-disabled`
 - `posture/tpm/tpm-absent`
 - `powershell_text/engine-start/defender-tamper`
-- `powershell_text/engine-start/download-then-execute`
 - `powershell_text/engine-start/trace-cleanup`
 - `powershell_text/history/defender-tamper`
-- `powershell_text/history/download-then-execute`
 - `powershell_text/history/trace-cleanup`
 - `powershell_text/timeline/download-then-execute-times`
 - `prefetch/file-attributes/prefetch-file-read-only`
@@ -173,42 +161,54 @@
 - `fivem_dir/root-dlls/unsigned-root-proxy-dll` — added 2026-10-17; resolved when: A baseline's FiveM.app folder holds a proxy DLL measured on a real machine from a published release (such as a signed graphics mod or overlay placed in FiveM.app), with a PROVENANCE row saying where it came from, the date and the Windows build. Not a file invented to stand for a proxy DLL.
 - `usn/identity/digitalentitlements-file-deleted` — added 2026-10-17; resolved when: A baseline's `usn_journal:` block is rebuilt from a reading of a machine this project may publish taken with this collector, with its PROVENANCE row, listing DigitalEntitlements as identified — with no `deleted` record, which confronts this rule, or with one and a `known-fps.csv` row saying what produced it.
 
-### Collectors never measured (18)
+### Collectors never measured (5)
+
+- `fivem_dir`
+- `install_marker`
+- `net_config`
+- `os_image`
+- `windows_start`
+
+### Collectors measured on only one build (9)
+
+- `autostart`
+- `defender_exclusion`
+- `fivem_servers`
+- `hid_device`
+- `pca`
+- `pci_device`
+- `posture`
+- `powershell_text`
+- `prefetch`
+
+### Collectors never measured on a client edition (2)
+
+- `autostart`
+- `defender_exclusion`
+
+### Collectors never measured on Windows 10 (12)
 
 - `autostart`
 - `bam`
 - `defender_exclusion`
 - `driver_service`
-- `evtx`
-- `fivem_dir`
 - `fivem_servers`
 - `hid_device`
-- `install_marker`
-- `net_config`
-- `os_image`
 - `pca`
 - `pci_device`
 - `posture`
 - `powershell_text`
 - `prefetch`
 - `usn`
-- `windows_start`
 
-### Collectors measured on only one build (0)
+### Collectors never measured without elevation (6)
 
-None.
-
-### Collectors never measured on a client edition (0)
-
-None.
-
-### Collectors never measured on Windows 10 (0)
-
-None.
-
-### Collectors never measured without elevation (0)
-
-None.
+- `autostart`
+- `defender_exclusion`
+- `hid_device`
+- `pci_device`
+- `powershell_text`
+- `usn`
 
 ### Collectors with no `rules/ages` file (12)
 
@@ -229,21 +229,21 @@ None.
 
 | rule | collector | role | strength | status | fixtures | baseline | retention | seen found | measured on |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | never | never |
-| `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 1 / 1 | unconfronted | stated | never | never |
-| `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | never |
-| `bam/timeline/fivem-or-gta-v-by-name` | bam | timeline | context | experimental | 1 / 1 | confronted | stated | never | never |
-| `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | never | never |
-| `driver_service/vulnerable-driver/loldrivers-listed` | driver_service | evidence | posture | test | 1 / 1 | confronted | none | never | never |
-| `evtx/defender/defender-real-time-protection-turned-off` | evtx | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `evtx/log-clearing/event-log-file-cleared` | evtx | evidence | tamper | experimental | 2 / 3 | unconfronted | documented | never | never |
-| `evtx/log-clearing/security-audit-log-cleared` | evtx | evidence | tamper | experimental | 1 / 3 | unconfronted | documented | never | never |
-| `evtx/log-file/event-log-file-read-only` | evtx | evidence | tamper | experimental | 2 / 1 | confronted | documented | never | never |
-| `evtx/log-file/event-log-not-at-configured-path` | evtx | evidence | tamper | experimental | 1 / 1 | confronted | documented | never | never |
-| `evtx/timeline/code-integrity-blocked-image` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `evtx/timeline/defender-detection` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `evtx/timeline/log-oldest-and-newest-record` | evtx | timeline | context | test | 1 / 1 | confronted | documented | never | never |
-| `evtx/timeline/powershell-flagged-script-block` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | never |
+| `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | never | 26100 server x64 |
+| `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
+| `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
+| `bam/timeline/fivem-or-gta-v-by-name` | bam | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26100 server x64, 26220 client x64 |
+| `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | never | 26100 server x64 |
+| `driver_service/vulnerable-driver/loldrivers-listed` | driver_service | evidence | posture | test | 1 / 1 | confronted | none | owner-pc 26220 | 26100 server x64, 26220 client x64 |
+| `evtx/defender/defender-real-time-protection-turned-off` | evtx | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/log-clearing/event-log-file-cleared` | evtx | evidence | tamper | experimental | 2 / 3 | unconfronted | documented | gha-windows-latest 26100 | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/log-clearing/security-audit-log-cleared` | evtx | evidence | tamper | experimental | 1 / 3 | unconfronted | documented | gha-windows-latest 26100 | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/log-file/event-log-file-read-only` | evtx | evidence | tamper | experimental | 2 / 1 | confronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/log-file/event-log-not-at-configured-path` | evtx | evidence | tamper | experimental | 1 / 1 | confronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/timeline/code-integrity-blocked-image` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/timeline/defender-detection` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/timeline/log-oldest-and-newest-record` | evtx | timeline | context | test | 1 / 1 | confronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/timeline/powershell-flagged-script-block` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | owner-pc 26220 | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `fivem_dir/client/client-exe-signed-with-another-certificate` | fivem_dir | evidence | presence | experimental | 1 / 1 | confronted | stated | never | never |
 | `fivem_dir/client/client-exe-without-verified-signature` | fivem_dir | evidence | presence | experimental | 2 / 1 | confronted | stated | never | never |
 | `fivem_dir/enhanced-asi/asi-file-with-valid-signature` | fivem_dir | evidence | presence | experimental | 1 / 1 | unconfronted | stated | never | never |
@@ -253,9 +253,9 @@ None.
 | `fivem_dir/root-dlls/unsigned-root-proxy-dll` | fivem_dir | evidence | presence | experimental | 1 / 1 | unconfronted | stated | never | never |
 | `fivem_dir/signatures/signature-not-checked` | fivem_dir | evidence | context | experimental | 1 / 1 | confronted | stated | never | never |
 | `fivem_dir/timeline/folder-activity-times` | fivem_dir | timeline | context | test | 1 / 1 | confronted | stated | never | never |
-| `fivem_servers/enhanced/server-cache-folder` | fivem_servers | evidence | context | experimental | 1 / 1 | unconfronted | none | never | never |
-| `hid_device/absent/not-present` | hid_device | evidence | context | experimental | 1 / 1 | confronted | none | never | never |
-| `hid_device/timeline/device-times` | hid_device | timeline | context | experimental | 1 / 1 | confronted | none | never | never |
+| `fivem_servers/enhanced/server-cache-folder` | fivem_servers | evidence | context | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
+| `hid_device/absent/not-present` | hid_device | evidence | context | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
+| `hid_device/timeline/device-times` | hid_device | timeline | context | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
 | `install_marker/modified-build/atlas-files-present` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `install_marker/modified-build/revios-files-present` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `install_marker/windows-components/defender-platform-folder-absent` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
@@ -267,42 +267,42 @@ None.
 | `os_image/windows-components/defender-service-not-registered` | os_image | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `os_image/windows-components/event-log-service-not-automatic` | os_image | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `os_image/windows-components/windows-update-service-cannot-start` | os_image | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `pca/timeline/fivem-game-process-by-name` | pca | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | never |
-| `pca/timeline/fivem-or-gta-v-by-name` | pca | timeline | context | experimental | 1 / 1 | confronted | stated | never | never |
-| `pci_device/absent/not-present` | pci_device | evidence | context | experimental | 1 / 1 | confronted | none | never | never |
-| `pci_device/no-driver/problem-28` | pci_device | evidence | presence | experimental | 1 / 1 | confronted | none | never | never |
-| `pci_device/timeline/absent-device-times` | pci_device | timeline | context | experimental | 1 / 1 | confronted | none | never | never |
-| `posture/boot/secure-boot-disabled` | posture | evidence | posture | test | 1 / 1 | confronted | none | never | never |
-| `posture/boot/secure-boot-firmware-disagrees` | posture | evidence | posture | experimental | 1 / 3 | confronted | none | never | never |
-| `posture/boot/test-signing-enabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `posture/dma/no-iommu-table` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `posture/logging/pwsh-script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | never |
-| `posture/logging/pwsh-script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | never |
-| `posture/logging/script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | never |
-| `posture/logging/script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | never |
-| `posture/memory-integrity/hvci-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `posture/mitigations/exception-chain-validation-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `posture/mitigations/object-namespace-protection-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `posture/mitigations/speculative-execution-mitigations-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
-| `posture/tpm/tpm-absent` | posture | evidence | context | experimental | 1 / 1 | confronted | none | never | never |
-| `powershell_text/engine-start/defender-tamper` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | never |
-| `powershell_text/engine-start/download-then-execute` | powershell_text | evidence | presence | experimental | 1 / 1 | unconfronted | none | never | never |
-| `powershell_text/engine-start/trace-cleanup` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | never |
-| `powershell_text/history/defender-tamper` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | never |
-| `powershell_text/history/download-then-execute` | powershell_text | evidence | presence | experimental | 1 / 1 | unconfronted | none | never | never |
-| `powershell_text/history/trace-cleanup` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | never |
-| `powershell_text/timeline/download-then-execute-times` | powershell_text | timeline | context | experimental | 1 / 1 | unconfronted | none | never | never |
-| `prefetch/file-attributes/prefetch-file-read-only` | prefetch | evidence | tamper | experimental | 2 / 2 | confronted | stated | never | never |
-| `prefetch/timeline/fivem-game-process-by-name` | prefetch | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | never |
-| `prefetch/timeline/fivem-or-gta-v-by-name` | prefetch | timeline | context | experimental | 1 / 1 | confronted | stated | never | never |
-| `usn/enhanced-asi/files-deleted` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `usn/enhanced-asi/files-renamed` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `usn/identity/digitalentitlements-file-deleted` | usn | evidence | tamper | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `usn/integrity/journal-truncated-or-recreated` | usn | evidence | tamper | experimental | 1 / 1 | confronted | documented | never | never |
-| `usn/plugins/files-deleted` | usn | evidence | context | experimental | 1 / 1 | confronted | documented | never | never |
-| `usn/plugins/files-renamed` | usn | evidence | context | experimental | 1 / 1 | confronted | documented | never | never |
-| `usn/psreadline/files-deleted` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `usn/psreadline/files-renamed` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | never |
-| `usn/timeline/watched-folder-record-times` | usn | timeline | context | test | 1 / 1 | confronted | documented | never | never |
+| `pca/timeline/fivem-game-process-by-name` | pca | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26220 client x64 |
+| `pca/timeline/fivem-or-gta-v-by-name` | pca | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26220 client x64 |
+| `pci_device/absent/not-present` | pci_device | evidence | context | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
+| `pci_device/no-driver/problem-28` | pci_device | evidence | presence | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
+| `pci_device/timeline/absent-device-times` | pci_device | timeline | context | experimental | 1 / 1 | confronted | none | never | 26300 client arm64 |
+| `posture/boot/secure-boot-disabled` | posture | evidence | posture | test | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `posture/boot/secure-boot-firmware-disagrees` | posture | evidence | posture | experimental | 1 / 3 | confronted | none | never | 26220 client x64 |
+| `posture/boot/test-signing-enabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `posture/dma/no-iommu-table` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `posture/logging/pwsh-script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
+| `posture/logging/pwsh-script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
+| `posture/logging/script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
+| `posture/logging/script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
+| `posture/memory-integrity/hvci-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `posture/mitigations/exception-chain-validation-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `posture/mitigations/object-namespace-protection-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `posture/mitigations/speculative-execution-mitigations-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `posture/tpm/tpm-absent` | posture | evidence | context | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
+| `powershell_text/engine-start/defender-tamper` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
+| `powershell_text/engine-start/download-then-execute` | powershell_text | evidence | presence | experimental | 1 / 1 | unconfronted | none | owner-pc 26220 | 26220 client x64 |
+| `powershell_text/engine-start/trace-cleanup` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
+| `powershell_text/history/defender-tamper` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
+| `powershell_text/history/download-then-execute` | powershell_text | evidence | presence | experimental | 1 / 1 | unconfronted | none | owner-pc 26220 | 26220 client x64 |
+| `powershell_text/history/trace-cleanup` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
+| `powershell_text/timeline/download-then-execute-times` | powershell_text | timeline | context | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
+| `prefetch/file-attributes/prefetch-file-read-only` | prefetch | evidence | tamper | experimental | 2 / 2 | confronted | stated | never | 26220 client x64 |
+| `prefetch/timeline/fivem-game-process-by-name` | prefetch | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26220 client x64 |
+| `prefetch/timeline/fivem-or-gta-v-by-name` | prefetch | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26220 client x64 |
+| `usn/enhanced-asi/files-deleted` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/enhanced-asi/files-renamed` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/identity/digitalentitlements-file-deleted` | usn | evidence | tamper | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/integrity/journal-truncated-or-recreated` | usn | evidence | tamper | experimental | 1 / 1 | confronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/plugins/files-deleted` | usn | evidence | context | experimental | 1 / 1 | confronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/plugins/files-renamed` | usn | evidence | context | experimental | 1 / 1 | confronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/psreadline/files-deleted` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/psreadline/files-renamed` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
+| `usn/timeline/watched-folder-record-times` | usn | timeline | context | test | 1 / 1 | confronted | documented | never | 26100 server x64, 26220 client x64 |
 | `windows_start/timeline/fast-startup-start` | windows_start | timeline | context | experimental | 1 / 1 | unconfronted | none | never | never |
 | `windows_start/timeline/full-start` | windows_start | timeline | context | experimental | 1 / 1 | unconfronted | none | never | never |
