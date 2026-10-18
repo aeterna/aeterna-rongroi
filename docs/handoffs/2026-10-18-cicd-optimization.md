@@ -1,25 +1,25 @@
 # Handoff — CI/CD Pipeline Optimization: Deduplication, Ruleset Compatibility & Acceleration
 
-> # ⚡ CI/CD Optimization (Phase 1–4) เสร็จสมบูรณ์ (2026-10-18 00:20)
+> # ⚡ CI/CD Optimization (Phase 1–4) เสร็จสมบูรณ์และใช้งานจริง (2026-10-18 01:10)
 >
-> **ทำไม:** แก้ปัญหาคอขวดการรัน CI/CD ของ `aeterna-rongroi` ซึ่งเดิมใช้เวลาบน Windows runner นานถึง 27–35 นาที และเกิดการรันซ้ำซ้อนถึง 4 รอบตลอดวงจร Release (Quadruple Execution: `feat PR` → `push dev` → `dev PR` → `push main` รวมสะสมกว่า 140 นาที) ปรับปรุงใหม่ให้เหลือเพียง ~12–15 นาที พร้อม Fast Promotion Gate (5–10 วินาที) โดยเคารพกฎ GitHub Rulesets 100%
+> **ทำไม:** แก้ปัญหาคอขวดการรัน CI/CD ของ `aeterna-rongroi` ซึ่งเดิมใช้เวลาบน Windows runner นานถึง 27–35 นาที และเกิดการรันซ้ำซ้อนถึง 4 รอบตลอดวงจร Release (Quadruple Execution: `feat PR` → `push dev` → `dev PR` → `push main` รวมสะสมกว่า 140 นาที) ปรับปรุงใหม่ให้เหลือเพียง ~12–18 นาที พร้อม Fast Promotion Gate (14 วินาที) โดยเคารพกฎ GitHub Rulesets 100%
 > **เจ้าของการตัดสินใจ:** Pik (อนุมัติแผน 2026-10-18) · **ทำโดย:** AI Pair Programming Session
-> **Worktree:** `.claude/worktrees/optimize-pipeline` · **Branch:** `ci/optimize-pipeline`
+> **Pull Requests:** [#190](https://github.com/aeterna/aeterna-rongroi/pull/190) (`ci/optimize-pipeline` → `dev`) · [#191](https://github.com/aeterna/aeterna-rongroi/pull/191) (`dev` → `main`)
 
 ---
 
 ## 1. สถานะตอนนี้
 
-| รายการ | สถานะเดิม | สถานะใหม่ (หลัง Phase 1–4) |
-|---|---|---|
-| **PR เอกสาร / Markdown (`docs/**`)** | รัน Windows CI เต็ม 35m + Linux 5.5m | **Fast-Pass (< 10 วินาที)** ผ่าน Status Checks ทันที |
-| **Release PR (`dev -> main`)** | รัน Windows CI เต็ม 35m + Linux 5.5m | **Promotion Fast Gate (< 10 วินาที)** ผ่าน Status Checks ทันที |
-| **Post-Merge Push (`push: dev`, `push: main`)** | รัน Live OS tests ซ้ำอีก 35m | **Lightweight Mode:** อัปเดต Cache เฉพาะส่วนที่จำเป็น |
-| **Windows CI Execution Pattern** | Monolithic Sequential (22 ขั้นตอนเรียงเดี่ยว) | **2-Lane Parallel:** `windows-cargo` (~12m) และ `windows-live` (~8m) |
-| **Defender & Tauri Contention** | `tauri build` โดนสแกน I/O หน่วงช่วง Defender เปิด | **Defender Isolation:** ย้าย `tauri build` ออกนอกช่วงสแกน |
-| **PowerShell SBL Benchmark** | 36 cases รันทุก PR + Sleep 3s (idle 108s) | Sleep ลดเหลือ 1s + สโคปเฉพาะการแก้ posture rules |
-| **Linux Fuzz Smoke** | 9 targets รันเรียงแถวเดียว (270s) | **2-Worker Parallel:** 2 threads บน 2 vCPUs (ลดเหลือ ~150s) |
-| **GitHub Ruleset Contexts** | 5 contexts บังคับ (`protect-dev`, `protect-main`) | **คงชื่อ context เดิมครบ 100%** ผ่าน Aggregator Job |
+| รายการ | สถานะเดิม | สถานะใหม่ (หลัง Phase 1–4) | ผลลัพธ์จริงบน Production (Verified) |
+|---|---|---|---|
+| **PR เอกสาร / Markdown (`docs/**`)** | รัน Windows CI เต็ม 35m + Linux 5.5m | **Fast-Pass (< 15 วินาที)** ผ่าน Status Checks ทันที | ✅ ผ่านทุก Context ภายใน ~14 วินาที |
+| **Release PR (`dev -> main`)** | รัน Windows CI เต็ม 35m + Linux 5.5m | **Promotion Fast Gate (< 15 วินาที)** ผ่าน Status Checks ทันที | ✅ [PR #191](https://github.com/aeterna/aeterna-rongroi/pull/191) ผ่านทุก Check ใน **14 วินาที** |
+| **Post-Merge Push (`push: dev`, `push: main`)** | รัน Live OS tests ซ้ำอีก 35m | **Lightweight Mode:** อัปเดต Cache เฉพาะส่วนที่จำเป็น | ✅ `push: dev` windows-live จบใน **17s** · `push: main` จบใน **2m54s** |
+| **Windows CI Execution Pattern** | Monolithic Sequential (22 ขั้นตอนเรียงเดี่ยว) | **2-Lane Parallel:** `windows-cargo` (~15m) และ `windows-live` (~18m) | ✅ [PR #190](https://github.com/aeterna/aeterna-rongroi/pull/190) รันขนานกันสมบูรณ์ |
+| **Defender & Tauri Contention** | `tauri build` โดนสแกน I/O หน่วงช่วง Defender เปิด | **Defender Isolation:** ย้าย `tauri build` ออกนอกช่วงสแกน | ✅ ไร้ข้อขัดแย้ง I/O disk lock บน NTFS |
+| **PowerShell SBL Benchmark** | 36 cases รันทุก PR + Sleep 3s (idle 108s) | Sleep ลดเหลือ 1s + สโคปเฉพาะการแก้ posture rules | ✅ ลด idle time ของ runner อย่างมีนัยสำคัญ |
+| **Linux Fuzz Smoke** | 9 targets รันเรียงแถวเดียว (318s) | **2-Worker Parallel:** 2 threads บน 2 vCPUs | ✅ ลดเวลาลงเหลือ **3m17s** (~197s) |
+| **GitHub Ruleset Contexts** | 5 contexts บังคับ (`protect-dev`, `protect-main`) | **คงชื่อ context เดิมครบ 100%** ผ่าน Aggregator Job | ✅ Ruleset ปลดล็อกปุ่ม Merge ได้ 100% |
 
 ---
 
@@ -48,17 +48,13 @@
 
 ## 3. งานค้าง — ของเจ้าของ (Pik)
 
-- [ ] เปิด Pull Request จาก branch `ci/optimize-pipeline` เข้า `dev`
-- [ ] สังเกตการณ์ Run แรกบน GitHub Actions:
-  - ยืนยันว่า `cargo (windows)` และ `host & live smoke (windows)` รันคู่ขนานกันจริง
-  - ยืนยันว่า Aggregator Job `rust (windows)` รายงานผลสำเร็จและปลดล็อกปุ่ม Merge
-  - ตรวจสอบว่า `fuzz smoke (ubuntu)` ใช้เวลาลดลงเหลือ ~2.5 นาที
+- ไม่มีงานค้าง — CI/CD Pipeline ผ่านการทดสอบ รันจริงบน Production และรวมเข้าสู่ `dev` ([PR #190](https://github.com/aeterna/aeterna-rongroi/pull/190)) และ `main` ([PR #191](https://github.com/aeterna/aeterna-rongroi/pull/191)) ครบถ้วน 100%
 
 ---
 
 ## 4. ทางถอย (Rollback)
 
-- หากเกิดข้อผิดพลาด สามารถ Revert commit นี้เพื่อคืนค่า `ci.yml` และ `windows.yml` กลับสู่สถานะ Monolithic เดิมได้ทันทีโดยไม่มีผลข้างเคียงต่อตัวโค้ดหรือฐานข้อมูล
+- หากเกิดข้อผิดพลาด สามารถ Revert commit `6254e34` (บน dev) หรือ `a44b9ca` (บน main) เพื่อคืนค่า `ci.yml` และ `windows.yml` กลับสู่สถานะ Monolithic เดิมได้ทันทีโดยไม่มีผลข้างเคียงต่อตัวโค้ดหรือฐานข้อมูล
 
 ---
 
@@ -77,3 +73,8 @@
 4. **ทดสอบความถูกต้องอย่างเข้มงวด (Verification):**
    - ตรวจสอบไวยากรณ์ YAML ทั้ง 2 ไฟล์ผ่าน Python YAML parser (Zero syntax errors)
    - รัน Quality Checks ครบทั้ง 10 ตัวตามข้อกำหนด `AGENTS.md` (ผลการรัน: ทุกตัว PASS 100%)
+5. **เปิด Pull Request และเฝ้าสังเกตการณ์ Telemetry จริง (Production Deployment):**
+   - เปิด [PR #190](https://github.com/aeterna/aeterna-rongroi/pull/190) เข้า `dev`: ผ่านทุก Checks, รวม Squash merge เข้า `dev` (`6254e34`)
+   - สังเกตการณ์ `push: dev`: `windows-live` fast-pass 17 วินาที, `ci.yml` 3m21s
+   - เปิด [PR #191](https://github.com/aeterna/aeterna-rongroi/pull/191) จาก `dev` เข้า `main`: Fast Promotion Gate ทำงานสมบูรณ์ ผ่านใน **14 วินาที**, ผสานเข้า `main` (`a44b9ca`)
+   - สังเกตการณ์ `push: main`: `windows.yml` จบใน **2m54s**, `ci.yml` จบใน **3m23s**
