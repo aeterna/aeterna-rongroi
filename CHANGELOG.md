@@ -5,6 +5,15 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- The landing page's link previews carry an image (`og:image`, `twitter:card`), so a link pasted into Discord or
+  another chat shows a card with a picture.
+- The landing page's FAQ is also in its JSON-LD as a `FAQPage`; a test fails when the eight questions on the page
+  and in the JSON-LD differ.
+- `llms.txt` on the landing page's site (llmstxt.org): what the tool does and does not do, and links to the README,
+  guides and the key ADRs. `cargo xtask site` fills its version, date and rule and selector counts from the
+  published release, as it does for the pages.
+
 ## [0.12.0] - 2026-10-17
 
 Human-First Summary View and AI Export capability (ADR 0045).

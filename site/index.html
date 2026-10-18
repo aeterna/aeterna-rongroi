@@ -19,26 +19,48 @@
 <meta property="og:url" content="https://aeterna.github.io/aeterna-rongroi/">
 <meta property="og:locale" content="th_TH">
 <meta property="og:locale:alternate" content="en_US">
+<meta property="og:image" content="https://aeterna.github.io/aeterna-rongroi/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="aeterna-rongroi โปรแกรมเช็คโปร FiveM ฟรี แสดงหลักฐาน ไม่ตัดสินแทนคน">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="google-site-verification" content="ljcMA4upuRpIMgANB294jDlAr2ukNkFkTA87kV5y3Cs">
 <meta name="theme-color" content="#a9d8ff">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="styles.css">
 <script type="application/ld+json">
 {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "aeterna-rongroi",
-  "alternateName": "โปรแกรมเช็คโปร FiveM",
-  "description": "โปรแกรมตรวจเครื่อง (PC check) สำหรับชุมชน FiveM แบบ open-source ทำงาน offline แสดงร่องรอยที่โปรโกงทิ้งไว้เป็นหลักฐาน ไม่ตัดสินว่าเครื่องสะอาด",
-  "applicationCategory": "SecurityApplication",
-  "operatingSystem": "Windows (x64)",
-  "softwareVersion": "{{rongroi.version}}",
-  "inLanguage": ["th", "en"],
-  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
-  "url": "https://aeterna.github.io/aeterna-rongroi/",
-  "downloadUrl": "{{rongroi.release_url}}",
-  "codeRepository": "https://github.com/aeterna/aeterna-rongroi",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "THB" }
+"@context": "https://schema.org",
+"@graph": [
+  {
+    "@type": "SoftwareApplication",
+    "name": "aeterna-rongroi",
+    "alternateName": "โปรแกรมเช็คโปร FiveM",
+    "description": "โปรแกรมตรวจเครื่อง (PC check) สำหรับชุมชน FiveM แบบ open-source ทำงาน offline แสดงร่องรอยที่โปรโกงทิ้งไว้เป็นหลักฐาน ไม่ตัดสินว่าเครื่องสะอาด",
+    "applicationCategory": "SecurityApplication",
+    "operatingSystem": "Windows (x64)",
+    "softwareVersion": "{{rongroi.version}}",
+    "inLanguage": ["th", "en"],
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "url": "https://aeterna.github.io/aeterna-rongroi/",
+    "downloadUrl": "{{rongroi.release_url}}",
+    "codeRepository": "https://github.com/aeterna/aeterna-rongroi",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "THB" }
+  },
+  {
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "ใช้ฟรีไหม", "acceptedAnswer": { "@type": "Answer", "text": "ฟรี เป็น open-source ภายใต้สัญญาอนุญาต GPL-3.0-or-later ส่วน rule ใช้ CC-BY-SA-4.0" } },
+      { "@type": "Question", "name": "ส่งข้อมูลเครื่องผมออกไปไหนไหม", "acceptedAnswer": { "@type": "Answer", "text": "โค้ดของโปรแกรมไม่ส่งอะไรออกไปเลย รุ่นที่มีหน้าต่างใช้ Microsoft WebView2 ซึ่งเป็นส่วนหนึ่งของ Windows และอาจส่งข้อมูลวินิจฉัยของ Windows ตามการตั้งค่า Windows ของคุณ ถ้าไม่อยากให้มีส่วนนี้ ใช้รุ่นบรรทัดคำสั่ง (CLI) ซึ่งไม่ใช้ WebView2 รายละเอียดอยู่ใน <a href=\"https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md\">PRIVACY.md</a>" } },
+      { "@type": "Question", "name": "ทำไม Windows ขึ้นเตือนตอนเปิด", "acceptedAnswer": { "@type": "Answer", "text": "เพราะรุ่นนี้ยังไม่ได้เซ็นโค้ด ให้เช็ค hash ตามขั้นที่ 2 ก่อนเปิดเสมอ และอย่าปิด SmartScreen ทั้งเครื่อง" } },
+      { "@type": "Question", "name": "ต้องใช้สิทธิ์ผู้ดูแลระบบ (admin) ไหม", "acceptedAnswer": { "@type": "Answer", "text": "ไม่บังคับ สแกนได้โดยไม่มีสิทธิ์ admin แต่บางข้อจะขึ้นว่า \"ยังไม่ได้วัด\" และรายงานจะบอกจำนวนไว้" } },
+      { "@type": "Question", "name": "จับโปรได้ทุกตัวไหม", "acceptedAnswer": { "@type": "Answer", "text": "ไม่ได้ โปรแกรมแสดงร่องรอยที่เหลืออยู่บนเครื่องเท่านั้น โปรบนเครื่องที่สอง (DMA) และเมนูที่ซ่อนจากการแชร์หน้าจอ จะมองไม่เห็น" } },
+      { "@type": "Question", "name": "บอกได้ไหมว่าเครื่องนี้สะอาด", "acceptedAnswer": { "@type": "Answer", "text": "ไม่ได้ และจะไม่มีวันบอก การไม่เจออะไรไม่ได้แปลว่าไม่มีอะไร" } },
+      { "@type": "Question", "name": "ใช้กับ Windows แบบไหนได้", "acceptedAnswer": { "@type": "Answer", "text": "Windows 64 บิต (x64) การวัดที่บันทึกไว้ในโปรเจกต์ทำบน Windows 11" } },
+      { "@type": "Question", "name": "เจอวิธีหลบการตรวจ ควรแจ้งที่ไหน", "acceptedAnswer": { "@type": "Answer", "text": "แจ้งแบบส่วนตัวตาม <a href=\"https://github.com/aeterna/aeterna-rongroi/blob/dev/SECURITY.md\">SECURITY.md</a> อย่าโพสต์ในที่สาธารณะ" } }
+    ]
+  }
+]
 }
 </script>
 </head>

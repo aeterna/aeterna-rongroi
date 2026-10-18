@@ -317,6 +317,7 @@ fn placeholders(manifest: &Manifest) -> BTreeMap<&'static str, String> {
     BTreeMap::from([
         ("rongroi.version", latest.version.clone()),
         ("rongroi.rules", latest.stats.rules.to_string()),
+        ("rongroi.selectors", latest.stats.selectors.to_string()),
         ("rongroi.release_url", latest.release_url.clone()),
         (
             "rongroi.published_date",
@@ -346,7 +347,7 @@ fn fill(text: &str, values: &BTreeMap<&'static str, String>, file: &str) -> anyh
     Ok(out)
 }
 
-/// Copies `site/` to `out`, filling placeholders in HTML and XML, and writes `release.json` beside it.
+/// Copies `site/` to `out`, filling placeholders in HTML, XML and text, and writes `release.json` beside it.
 fn build(site: &Path, out: &Path, manifest: &Manifest) -> anyhow::Result<()> {
     if out.exists() {
         bail!("site: {} already exists", out.display());
@@ -380,7 +381,7 @@ fn copy(
         let dest = target.join(entry.file_name());
         let templated = matches!(
             path.extension().and_then(|e| e.to_str()),
-            Some("html" | "xml")
+            Some("html" | "xml" | "txt")
         );
         if templated {
             let shown = path.strip_prefix(site)?.display().to_string();
@@ -603,6 +604,61 @@ mod tests {
         assert!(fill("{{rongroi.version", &values, "t").is_err());
     }
 
+    /// The questions and answers of a page's `<details>` FAQ, in page order.
+    fn faq_on_page(page: &str) -> Vec<(String, String)> {
+        let mut found = Vec::new();
+        let mut rest = page;
+        while let Some(start) = rest.find("<details><summary>") {
+            rest = &rest[start + "<details><summary>".len()..];
+            let (question, after) = rest.split_once("</summary><p>").unwrap();
+            let (answer, after) = after.split_once("</p></details>").unwrap();
+            found.push((question.to_owned(), answer.to_owned()));
+            rest = after;
+        }
+        found
+    }
+
+    /// The questions and answers of the page's `FAQPage` JSON-LD, in order.
+    fn faq_in_json_ld(page: &str) -> Vec<(String, String)> {
+        let (_, after) = page
+            .split_once("<script type=\"application/ld+json\">")
+            .unwrap();
+        let (json, _) = after.split_once("</script>").unwrap();
+        let data: serde_json::Value = serde_json::from_str(json).unwrap();
+        let faq = data["@graph"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|node| node["@type"] == "FAQPage")
+            .expect("a FAQPage node");
+        faq["mainEntity"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|q| {
+                (
+                    q["name"].as_str().unwrap().to_owned(),
+                    q["acceptedAnswer"]["text"].as_str().unwrap().to_owned(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_faq_structured_data_says_what_the_page_says() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        for page in ["site/index.html", "site/en/index.html"] {
+            let text = std::fs::read_to_string(root.join(page)).unwrap();
+            let shown = faq_on_page(&text);
+            assert!(!shown.is_empty(), "{page}: no FAQ found");
+            assert_eq!(
+                shown,
+                faq_in_json_ld(&text),
+                "{page}: FAQ and FAQPage differ"
+            );
+        }
+    }
+
     #[test]
     fn the_shipped_site_builds_from_a_release() {
         let list = [release(
@@ -620,6 +676,10 @@ mod tests {
         assert!(!page.contains("{{"));
         assert!(out.join("release.json").is_file());
         assert!(out.join("en/index.html").is_file());
+        let llms = std::fs::read_to_string(out.join("llms.txt")).unwrap();
+        assert!(llms.starts_with("# aeterna-rongroi\n"));
+        assert!(llms.contains("Latest release: 0.8.1 (2026-10-09)"));
+        assert!(!llms.contains("{{"));
         std::fs::remove_dir_all(&out).unwrap();
     }
 }
