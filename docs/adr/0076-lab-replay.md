@@ -1,8 +1,8 @@
 # ADR 0076 — Lab replay: showing a rule fires on a real Windows
 
-- Status: proposed — drafted 2026-10-18 at the owner's request, as the validation ("red") half of the
-  detection-validation programme of ADR 0074 and ADR 0075; the owner's questions are at the end. Nothing
-  here is built yet.
+- Status: accepted — drafted 2026-10-18 at the owner's request, as the validation ("red") half of the
+  detection-validation programme of ADR 0074 and ADR 0075; the owner answered its four questions the same
+  day (Owner decisions, at the end). Nothing here is built yet.
 - Date: 2026-10-18
 - Related: ADR 0074 (the ledger and the `stable` requirements), ADR 0069 (the virtual machine lab),
   ADR 0017 and ADR 0033 (baseline), `fixtures/hosts/PROVENANCE.md`, `SECURITY.md`, `AGENTS.md` (purpose
@@ -18,6 +18,12 @@ ADR 0074 §5 makes `stable` require a rule to have been seen `found` on a lab ma
   GitHub runner;
 - fixtures are fed to the engine directly, not through a collector (`xtask/src/check_rules.rs`), so a green
   `check-rules` does not show that a collector on a real Windows emits what the fixture claims.
+
+The four rules seen `found` on `lab-vm-arm64` came from the ADR 0070 and ADR 0072 lab steps, which emulated
+a device. Three of them — `pci_device/absent/not-present`, `pci_device/no-driver/problem-28`,
+`hid_device/absent/not-present` — already show all three conditions of ADR 0074 §5 in `docs/coverage.md`
+(confronted, seen found on the lab machine, measured on a client build); the fourth is a timeline selector.
+Promoting them is its own change and does not wait for this ADR.
 
 The ADR 0069 lab already does the hard part. `.claude/probes/vm-lab/lab.sh boot <step>` boots a Windows 11
 Arm virtual machine, runs a script from a USB share before the scan (`PRE_CMD`), runs `rongroi.exe scan
@@ -40,8 +46,18 @@ A **scenario** names one rule (or a few that read the same trace) and has three 
 
 Each run boots from a fresh copy-on-write overlay of the installed system disk (`qemu-img create -b
 win.qcow2`), and the overlay is deleted after the scan. Nothing a scenario does survives it; there is no
-teardown to get wrong. `lab.sh` gains a `replay <scenario>` command that does this, checks the scan against
-`expect.yaml`, and prints one line per rule.
+teardown to get wrong. A `replay <scenario>` command does this, checks the scan against `expect.yaml`, and
+prints one line per rule.
+
+**A control scan.** The lab machine is not an ordinary PC: a virtual machine on Arm may already read
+`found` for some rules with no scenario at all (no IOMMU table, memory integrity off). Each batch therefore
+starts with one scan of a fresh overlay with no `setup.ps1`. A scenario passes only if every rule it
+expects `found` reads `not_found` in that control scan; otherwise the `found` belongs to the machine, not to
+the scenario, and the scenario is rewritten or the rule is left out of it.
+
+**One restart.** A setting that Windows reads only at boot (for example test signing) cannot be shown by a
+scan in the same session as its setup. `expect.yaml` may ask for one restart between `setup.ps1` and the
+scan; nothing else changes.
 
 ### 2. What a scenario may put on the machine
 
@@ -80,11 +96,20 @@ row and by the provenance of its list.
 
 ### 6. Order of work
 
-1. `lab.sh replay` with overlays, and the scenario format — no scenario yet.
-2. A first batch of five scenarios, one per collector, from the collectors whose trace is a Windows setting
-   or a file shape: `defender_exclusion`, `net_config`, `autostart`, `evtx` (a log-clearing event on the
-   machine's own log), `fivem_dir`.
-3. Further batches by the coverage table's gap list, oldest gap first.
+1. The `replay` command with overlays, the control scan, and the scenario format — no scenario yet. One
+   replay of an empty scenario is timed before the first batch (What is unverified).
+2. A first batch of five scenarios, one per collector, whose trace is a Windows setting or a file shape:
+   `defender_exclusion`, `autostart`, `evtx` (a log file set read-only, and a log-clearing event on the
+   machine's own log), `net_config`, `posture` (the two script block logging policies). Owner decision 3
+   moved `fivem_dir` to the second batch and added `posture`.
+3. Further batches by the coverage table's gap list, oldest gap first; `fivem_dir` first.
+
+Not every rule in the first batch can reach `stable` after it. Read from `docs/coverage.md` on 2026-10-18:
+the `posture` logging rules and `evtx/log-file/event-log-file-read-only` are `confronted`, so a pass gives
+them all three conditions. `defender_exclusion/fivem/fivem-folder-excluded` and
+`autostart/outside-windows/no-valid-embedded-signature` read `known fp`, and
+`net_config/hosts/fivem-or-rockstar-name-in-hosts` and the log-clearing rules are `unconfronted`; a pass
+adds their ledger rows but leaves the first condition open.
 
 Scenarios and their results feed the next step later: a fixture host generated from a real collector run
 (`fixtures/hosts/PROVENANCE.md`, "generated from a real Windows install") closes the gap between fixtures
@@ -115,10 +140,14 @@ and collectors. That is its own decision and is not made here.
   overlay changes what a scan sees (expected not, since the base is already installed).
 - Whether every collector in the first batch reads the same on Arm as on x64.
 
-## Questions for the owner
+## Owner decisions (2026-10-18)
 
-1. Scenarios live in this public repository (`lab/scenarios/`), or stay in the maintainer's untracked
-   notes like the lab today?
-2. `rules/not-replayable.csv` (§5): accept it as the way hash-list rules reach `stable`?
-3. The first batch of five in §6.2: these five, or others?
-4. GitHub runners as a second replay target after the first batch (Alternatives): yes or not yet?
+1. **Scenarios are public**, in `lab/scenarios/`, and so is the `replay` command, which takes the virtual
+   machine's location from the environment rather than a path on one maintainer's machine. What builds the
+   virtual machine (the answer file, with its throwaway local account, and the ISO) stays with the
+   maintainer. A scenario is reviewed against §2 and §3 the way a fixture is.
+2. **`rules/not-replayable.csv` is accepted** (§5): one row per rule, each added with the owner's yes and
+   naming where the rule's list comes from.
+3. **The first batch** is `defender_exclusion`, `autostart`, `evtx`, `net_config` and `posture` (§6.2);
+   `fivem_dir`, most of whose rules are `unconfronted`, moves to the second batch.
+4. **GitHub runners: not yet.** Revisit after the first batch (Alternatives).
