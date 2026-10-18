@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# The measurement ledger of ADR 0074, section 1: one row per thing seen on one machine at one time.
+# A row holds states and builds only, never a value a collector read, and never a player's machine.
+# Lines starting with `#` and blank lines are ignored; a field containing a comma is double-quoted.
+#
+# The reader (xtask/src/measured.rs) is strict, for the same reason `unconfronted.csv` is:
+#   - `subject` is a rule id in the bundle, or a collector name.
+#   - `machine` is `owner-pc`, `lab-vm-arm64`, or `gha-<label>`, where the label is lowercase letters,
+#     digits and `-`, and does not start or end with `-`.
+#   - `os_build` is digits, optionally a `.` and digits, with no leading zero: `26100` or `26100.4061`.
+#   - `edition` is `client` or `server`; `arch` is `x64` or `arm64`; `token` is `elevated` or `limited`.
+#   - `seen` for a collector is `observations`, `none` or `unmeasured:<reason>`; for a rule it is `found`,
+#     `not_found` or `unmeasured:<reason>`. The reason must not be empty.
+#   - `evidence` must not be empty: a CI run id, a path under `docs/`, or the name of a probe result.
+#   - `date` is `YYYY-MM-DD`, the day it was measured.
+#   - A row that repeats an earlier row in all nine fields is an error.
+subject,machine,os_build,edition,arch,token,seen,evidence,date
