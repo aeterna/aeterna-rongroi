@@ -93,6 +93,12 @@ jobs:
       - name: Rule reference pages match the rules
         if: steps.scope.outputs.skip != 'true'
         run: cargo xtask rules-reference --check
+      # docs/coverage.md is written from the rules, the baseline lists, rules/ages and the measurement
+      # ledger rules/measured.csv (ADR 0074). It fails when the page is stale or the ledger does not
+      # parse; a coverage gap never fails it (ADR 0074 §4).
+      - name: Coverage table matches the rules and the ledger
+        if: steps.scope.outputs.skip != 'true'
+        run: cargo xtask coverage --check
       # The vulnerable-driver data file is rebuilt from LOLDrivers at the commit its PROVENANCE.md names and
       # compared with the committed file (ADR 0048). Only `yaml/` is fetched, one commit deep, and the step
       # fails if any other file lands on disk. A pull request fetches only when it changes the data file's
