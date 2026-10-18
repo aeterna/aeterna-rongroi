@@ -12,6 +12,7 @@ mod check_unicode;
 mod check_versions;
 mod coverage;
 mod loldrivers;
+mod measured;
 mod new_locale;
 mod new_rule;
 mod release;
