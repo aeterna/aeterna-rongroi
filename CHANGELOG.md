@@ -22,6 +22,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   ADR 0072), is measured on a client Windows build and is confronted by a baseline — the three conditions of
   ADR 0074 §5. What a rule says it shows and does not show is unchanged.
 - The rules reference describes `stable` by those three conditions instead of "proven on real traffic".
+- Three more rules are `stable`: Windows PowerShell's and PowerShell 7's script block logging turned off by a
+  machine policy, and an event log file set read-only. Each was seen `found` in a lab replay (ADR 0076,
+  `lab/scenarios/`), is measured on a client Windows build and is confronted by a baseline.
 
 ## [0.12.0] - 2026-10-17
 

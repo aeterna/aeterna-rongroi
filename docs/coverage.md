@@ -19,9 +19,9 @@
 
 | status | count |
 | --- | ---: |
-| experimental | 69 |
+| experimental | 66 |
 | test | 5 |
-| stable | 3 |
+| stable | 6 |
 | deprecated | 0 |
 
 ### Rules by baseline
@@ -232,7 +232,7 @@
 | `evtx/defender/defender-real-time-protection-turned-off` | evtx | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/log-clearing/event-log-file-cleared` | evtx | evidence | tamper | experimental | 2 / 3 | unconfronted | documented | gha-windows-latest 26100, lab-vm-arm64 26300 | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/log-clearing/security-audit-log-cleared` | evtx | evidence | tamper | experimental | 1 / 3 | unconfronted | documented | gha-windows-latest 26100 | 20348 server x64, 26100 server x64, 26220 client x64 |
-| `evtx/log-file/event-log-file-read-only` | evtx | evidence | tamper | experimental | 2 / 1 | confronted | documented | lab-vm-arm64 26300 | 20348 server x64, 26100 server x64, 26220 client x64 |
+| `evtx/log-file/event-log-file-read-only` | evtx | evidence | tamper | stable | 2 / 1 | confronted | documented | lab-vm-arm64 26300 | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/log-file/event-log-not-at-configured-path` | evtx | evidence | tamper | experimental | 1 / 1 | confronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/timeline/code-integrity-blocked-image` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/timeline/defender-detection` | evtx | timeline | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
@@ -270,9 +270,9 @@
 | `posture/boot/secure-boot-firmware-disagrees` | posture | evidence | posture | experimental | 1 / 3 | confronted | none | never | 26220 client x64 |
 | `posture/boot/test-signing-enabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
 | `posture/dma/no-iommu-table` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
-| `posture/logging/pwsh-script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | lab-vm-arm64 26300 | 26220 client x64 |
+| `posture/logging/pwsh-script-block-logging-disabled-by-policy` | posture | evidence | posture | stable | 1 / 2 | confronted | none | lab-vm-arm64 26300 | 26220 client x64 |
 | `posture/logging/pwsh-script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
-| `posture/logging/script-block-logging-disabled-by-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | lab-vm-arm64 26300 | 26220 client x64 |
+| `posture/logging/script-block-logging-disabled-by-policy` | posture | evidence | posture | stable | 1 / 2 | confronted | none | lab-vm-arm64 26300 | 26220 client x64 |
 | `posture/logging/script-block-logging-disabled-by-user-policy` | posture | evidence | posture | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
 | `posture/memory-integrity/hvci-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
 | `posture/mitigations/exception-chain-validation-disabled` | posture | evidence | posture | experimental | 1 / 1 | confronted | none | never | 26220 client x64 |
