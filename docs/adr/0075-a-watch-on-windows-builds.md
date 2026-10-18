@@ -82,6 +82,12 @@ blocklist, device enumeration, Secure Boot and firmware. Its output is unverifie
 checked each claim against the source it cites (§10.4); only then is it recorded. The result is one line in `docs/research/` per
 month: "nothing that touches a collector", or a link to the issue or ADR amendment it led to.
 
+**Amendment of 2026-10-18 (first read).** `aeterna-delegate`'s read mode has no network: its engines read
+an export of the repository and are denied anything else. The read is therefore done by a read-only helper
+with web access (organisation standard §10.6, an orchestrator's helper, which reads and writes no product
+code), and checked by a maintainer as above. The log is `docs/research/windows-changes.md`. If
+`aeterna-delegate` gains a web-reading mode, the read moves to it.
+
 No program in this repository fetches those notes. ADR 0003 is about this program's code; keeping the
 read outside it keeps that claim simple to check.
 

@@ -19,3 +19,4 @@ Conventions used in these notes:
 | [04 — Open-source detection-rule projects](04-oss-detection-rule-projects.md) | How do large projects structure rules, IDs, validation and contribution? |
 | [05 — Rust and Tauri repository practices](05-oss-rust-tauri-repo-practices.md) | How do large Rust/Tauri projects organise crates, quality gates, releases and signing? |
 | [06 — Testing Windows forensic code](06-testing-windows-forensic-code.md) | How do real projects test Windows-only parsers and collectors, and which fixtures can we use? |
+| [Windows changes](windows-changes.md) | Monthly since 2026-10 (ADR 0075 §3): what Microsoft changed that may touch a collector |
