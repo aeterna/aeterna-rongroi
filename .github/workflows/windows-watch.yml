@@ -28,9 +28,6 @@ on:
     # 05:41 UTC every Monday.
     - cron: "41 5 * * 1"
   workflow_dispatch:
-  # TEMPORARY — removed before merge: workflow_dispatch needs the file on the default branch first.
-  push:
-    branches: [ci/windows-watch]
 
 permissions:
   contents: read
@@ -57,7 +54,9 @@ jobs:
         # `windows-latest` is today image windows-2025-vs2026 (ADR 0060), which `windows-2025` and
         # `windows-2025-vs2026` also name, so it is listed once, by the label pull requests use: when
         # GitHub moves `windows-latest`, its shape is the one that changes. Edit this list when GitHub
-        # adds or retires an image.
+        # adds or retires an image. On 2026-10-18 `windows-11-arm` and `windows-11-vs2026-arm` both ran
+        # image win11-vs2026-arm64 (run 39107233878); both are kept because the README lists them as two
+        # images, and the day they part is a thing this watch should show.
         label:
           - windows-latest
           - windows-2022
