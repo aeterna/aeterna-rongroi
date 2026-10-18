@@ -114,10 +114,10 @@ struct Evidence {
 }
 
 pub fn run(root: &Path, args: &Args) -> anyhow::Result<()> {
-    if let Some(date) = args.date.as_deref() {
-        if !is_date(date) {
-            bail!("lab-check: --date must be YYYY-MM-DD, got `{date}`");
-        }
+    if let Some(date) = args.date.as_deref()
+        && !is_date(date)
+    {
+        bail!("lab-check: --date must be YYYY-MM-DD, got `{date}`");
     }
     let known = rule_ids(root)?;
     let expect = parse_expect(&read(&args.expect)?)?;
@@ -134,7 +134,10 @@ pub fn run(root: &Path, args: &Args) -> anyhow::Result<()> {
     }
     println!("lab-check: {} ok, {} failed", report.ok, report.failed);
     if report.failed > 0 {
-        bail!("lab-check: {} check(s) failed; no ledger row is written", report.failed);
+        bail!(
+            "lab-check: {} check(s) failed; no ledger row is written",
+            report.failed
+        );
     }
     if let (Some(evidence), Some(date)) = (args.evidence.as_deref(), args.date.as_deref()) {
         for row in ledger_rows(&expect, &scan, evidence, date) {
@@ -182,7 +185,10 @@ pub(crate) fn validate_expect(expect: &Expect, known: &BTreeSet<String>) -> anyh
         }
     }
     if !problems.is_empty() {
-        bail!("lab-check: expect.yaml refused:\n  {}", problems.join("\n  "));
+        bail!(
+            "lab-check: expect.yaml refused:\n  {}",
+            problems.join("\n  ")
+        );
     }
     Ok(())
 }
@@ -195,7 +201,11 @@ pub(crate) fn check(expect: &Expect, scan: &Scan, control: Option<&Scan>) -> Rep
         check_state(&mut report, "found", id, scan.state(id), "found");
         if let Some(control) = control {
             let pass = control.state(id) != "found";
-            let tail = if pass { "" } else { " read found with no scenario" };
+            let tail = if pass {
+                ""
+            } else {
+                " read found with no scenario"
+            };
             report.push(pass, "control", id, tail);
         }
     }
@@ -252,7 +262,11 @@ pub(crate) fn is_date(text: &str) -> bool {
 
 fn check_state(report: &mut Report, kind: &str, id: &str, state: &str, want: &str) {
     let pass = state == want;
-    let tail = if pass { String::new() } else { format!(" read {state}") };
+    let tail = if pass {
+        String::new()
+    } else {
+        format!(" read {state}")
+    };
     report.push(pass, kind, id, &tail);
 }
 
