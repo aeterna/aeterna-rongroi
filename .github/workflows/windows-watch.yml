@@ -28,6 +28,9 @@ on:
     # 05:41 UTC every Monday.
     - cron: "41 5 * * 1"
   workflow_dispatch:
+  # TEMPORARY — removed before merge: workflow_dispatch needs the file on the default branch first.
+  push:
+    branches: [ci/windows-watch]
 
 permissions:
   contents: read
