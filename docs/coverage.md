@@ -19,9 +19,9 @@
 
 | status | count |
 | --- | ---: |
-| experimental | 72 |
+| experimental | 69 |
 | test | 5 |
-| stable | 0 |
+| stable | 3 |
 | deprecated | 0 |
 
 ### Rules by baseline
@@ -254,7 +254,7 @@
 | `fivem_dir/signatures/signature-not-checked` | fivem_dir | evidence | context | experimental | 1 / 1 | confronted | stated | never | never |
 | `fivem_dir/timeline/folder-activity-times` | fivem_dir | timeline | context | test | 1 / 1 | confronted | stated | never | never |
 | `fivem_servers/enhanced/server-cache-folder` | fivem_servers | evidence | context | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
-| `hid_device/absent/not-present` | hid_device | evidence | context | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
+| `hid_device/absent/not-present` | hid_device | evidence | context | stable | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
 | `hid_device/timeline/device-times` | hid_device | timeline | context | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
 | `install_marker/modified-build/atlas-files-present` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `install_marker/modified-build/revios-files-present` | install_marker | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
@@ -269,8 +269,8 @@
 | `os_image/windows-components/windows-update-service-cannot-start` | os_image | evidence | posture | experimental | 1 / 1 | confronted | none | never | never |
 | `pca/timeline/fivem-game-process-by-name` | pca | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26220 client x64 |
 | `pca/timeline/fivem-or-gta-v-by-name` | pca | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26220 client x64 |
-| `pci_device/absent/not-present` | pci_device | evidence | context | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
-| `pci_device/no-driver/problem-28` | pci_device | evidence | presence | experimental | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
+| `pci_device/absent/not-present` | pci_device | evidence | context | stable | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
+| `pci_device/no-driver/problem-28` | pci_device | evidence | presence | stable | 1 / 1 | confronted | none | lab-vm-arm64 26300 | 26300 client arm64 |
 | `pci_device/timeline/absent-device-times` | pci_device | timeline | context | experimental | 1 / 1 | confronted | none | never | 26300 client arm64 |
 | `posture/boot/secure-boot-disabled` | posture | evidence | posture | test | 1 / 1 | confronted | none | never | 26220 client x64 |
 | `posture/boot/secure-boot-firmware-disagrees` | posture | evidence | posture | experimental | 1 / 3 | confronted | none | never | 26220 client x64 |

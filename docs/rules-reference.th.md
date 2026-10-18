@@ -17,7 +17,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 |---|---|
 | รูปแบบ rule | 4 |
 | จำนวน rule | 77 |
-| SHA-256 | `8c36ae097c75224e212fd5c50b13dccaa16c98a7e7c82e08d6467c24d0d1c5d2` |
+| SHA-256 | `c0b3ef72e37fa5dcbc5c5f4f1fce39b4c9a9bfd3a78e4a5f5393ffa06c39ec9a` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -63,7 +63,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 - `fivem_servers`
   - [FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
 - `hid_device`
-  - [เมาส์ คีย์บอร์ด หรืออุปกรณ์อินพุตอื่นที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้ต่ออยู่](#rule-e1dc0747-5038-4389-be3d-80de451d7fe6) — `context` · `experimental`
+  - [เมาส์ คีย์บอร์ด หรืออุปกรณ์อินพุตอื่นที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้ต่ออยู่](#rule-e1dc0747-5038-4389-be3d-80de451d7fe6) — `context` · `stable`
 - `install_marker`
   - [มีโฟลเดอร์หรือคีย์ที่ Atlas playbook ติดตั้งอยู่บนเครื่องนี้](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
   - [มีโฟลเดอร์ที่ ReviOS playbook ติดตั้งอยู่บนเครื่องนี้](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
@@ -79,8 +79,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [เซอร์วิส Windows Event Log ไม่ได้เริ่มพร้อม Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
   - [เซอร์วิส Windows Update เริ่มทำงานไม่ได้บนเครื่องนี้](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
 - `pci_device`
-  - [อุปกรณ์ PCI ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่อยู่ในเครื่อง](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `experimental`
-  - [อุปกรณ์ PCI ที่ไม่มีไดรเวอร์ติดตั้ง](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `experimental`
+  - [อุปกรณ์ PCI ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่อยู่ในเครื่อง](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `stable`
+  - [อุปกรณ์ PCI ที่ไม่มีไดรเวอร์ติดตั้ง](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `stable`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -990,7 +990,7 @@ FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache หนึ่
 - ไฟล์: [`rules/hid_device/absent/not-present/rule.yaml`](../rules/hid_device/absent/not-present/rule.yaml)
 - collector: `hid_device`
 - strength: `context` — ข้อมูลประกอบ
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `hid_device`, `hardware`
 - เขียนเมื่อ: 2026-10-16
 
@@ -1491,7 +1491,7 @@ Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อย
 - ไฟล์: [`rules/pci_device/absent/not-present/rule.yaml`](../rules/pci_device/absent/not-present/rule.yaml)
 - collector: `pci_device`
 - strength: `context` — ข้อมูลประกอบ
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `pci_device`, `hardware`
 - เขียนเมื่อ: 2026-10-15
 
@@ -1529,7 +1529,7 @@ Windows เคยตั้งค่าอุปกรณ์ PCI นี้ไว�
 - ไฟล์: [`rules/pci_device/no-driver/problem-28/rule.yaml`](../rules/pci_device/no-driver/problem-28/rule.yaml)
 - collector: `pci_device`
 - strength: `presence` — มีไฟล์อยู่
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `pci_device`, `hardware`
 - เขียนเมื่อ: 2026-10-15
 
