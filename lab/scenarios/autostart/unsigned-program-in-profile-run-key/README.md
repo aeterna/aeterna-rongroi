@@ -4,7 +4,8 @@
 
 A Run value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, named `rongroi-lab`, whose data is the
 quoted path of `%LOCALAPPDATA%\rongroi-lab\lab-tool.exe`. That file is a copy of this repository's own unsigned
-build. Windows starts a program named by a Run value when the account signs in. The file is outside the Windows
+build with a few bytes added at the end, so that it is not the running program
+([ADR 0010](../../../../docs/adr/0010-process-source-and-own-traces.md)). Windows starts a program named by a Run value when the account signs in. The file is outside the Windows
 folder and Program Files, and carries no embedded signature Windows trusts. The build does nothing on its own;
 what the trace shows is the entry and the file, not what the program does.
 

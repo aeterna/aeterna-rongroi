@@ -10,7 +10,7 @@ Defender is told not to scan that folder; the scenario writes it the way an admi
 ## What the scenario shows
 
 The defender_exclusion collector reads the path exclusion from Defender's settings, with `set_by` `settings`.
-It is a folder above FiveM's own folders, so it covers them, and `defender_exclusion/fivem/fivem-folder-excluded`
+It is one of FiveM's own folders, so it covers it, and `defender_exclusion/fivem/fivem-folder-excluded`
 reads `found`. The scenario lists no neighbours, so it shows nothing about other exclusions staying quiet.
 
 ## What the scenario does not show

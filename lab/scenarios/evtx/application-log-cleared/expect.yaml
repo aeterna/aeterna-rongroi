@@ -6,4 +6,5 @@ found:
   - f4c99b57-02c8-4e53-82d0-dba8bdc13dda   # evtx/log-clearing/event-log-file-cleared
 not_found:
   - ff967b28-984b-4de0-b361-58367ae0c2d5   # evtx/log-clearing/security-audit-log-cleared: the Security log was not cleared, so no 1102 was written
-restart: false
+# Scanned after one restart, as a PC brought to a check would be.
+restart: true

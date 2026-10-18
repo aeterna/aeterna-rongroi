@@ -10,7 +10,11 @@ $ErrorActionPreference = 'Stop'
 $folder = Join-Path $env:LOCALAPPDATA 'rongroi-lab'
 New-Item -Path $folder -ItemType Directory -Force | Out-Null
 $target = Join-Path $folder 'lab-tool.exe'
+# The engine sets aside any observation that carries the running program's own digest as the tool's own trace
+# (docs/adr/0010-process-source-and-own-traces.md), so an unchanged copy would never reach the rule. Bytes after
+# the end of a program file leave it an unsigned program that still does nothing on its own.
 Copy-Item -Path (Join-Path $PSScriptRoot 'rongroi.exe') -Destination $target -Force
+[System.IO.File]::AppendAllText($target, 'rongroi lab scenario copy')
 
 $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 New-ItemProperty -Path $key -Name 'rongroi-lab' -PropertyType String -Value "`"$target`"" -Force | Out-Null

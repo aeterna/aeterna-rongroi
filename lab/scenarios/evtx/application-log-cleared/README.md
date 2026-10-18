@@ -11,7 +11,8 @@ cleared the log or why, and it does not say what the Application log held before
 
 The evtx collector reads the System log's event 104 from `Microsoft-Windows-Eventlog`, and
 `evtx/log-clearing/event-log-file-cleared` reads `found`. The Security log is not cleared, so no 1102 is
-written there, and `evtx/log-clearing/security-audit-log-cleared` stays `not_found`.
+written there, and `evtx/log-clearing/security-audit-log-cleared` stays `not_found`. The machine restarts once between the
+clearing and the scan (restart: true in expect.yaml).
 
 ## What the scenario does not show
 
