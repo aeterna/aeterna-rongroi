@@ -2,6 +2,8 @@
 
 - Status: proposed — drafted 2026-10-18 at the owner's request, as the first half of a detection-validation
   programme; the owner's questions are at the end. Nothing here is built yet.
+  Owner decided 2026-10-18: the machine names in §1 may be public; `stable` requires columns of the
+  table (§4).
 - Date: 2026-10-18
 - Related: ADR 0017 and ADR 0033 (baseline and "confronted"), ADR 0002 (evidence, never a verdict),
   ADR 0061 (`rules/ages`), ADR 0075 (the Windows build watch, which writes rows into the ledger below)
@@ -93,8 +95,19 @@ column are enough to see a trend.
 
 ### 4. Not a gate
 
-`--check` keeps the file current; it does not fail on a gap. Status changes stay governed by
-`docs/rules-authoring.md` until the owner decides question 2 below.
+`--check` keeps the file current; it does not fail on a gap.
+
+### 5. What `stable` requires
+
+A rule is promoted to `stable` only when the table shows all three:
+
+- `baseline` is `confronted`, or the rule's `rules/unconfronted.csv` row records an owner decision;
+- `seen found` names at least one lab machine (`lab-vm-arm64` or a later lab machine), not only fixtures;
+- `measured on` includes at least one `client` build.
+
+`test` keeps the requirement it has today in `docs/rules-authoring.md`: a positive and a negative fixture.
+No rule is `stable` today, so no rule changes status because of this; the five `test` rules are not
+affected. `docs/rules-authoring.md` gains these three lines when the xtask command is built.
 
 ## What this does not do
 
@@ -120,8 +133,7 @@ column are enough to see a trend.
 
 ## Questions for the owner
 
-1. Are `owner-pc` and `lab-vm-arm64` acceptable machine names in a public file? (They name no person.)
-2. Should promotion to `test` and `stable` start to require columns from this table — for example
-   `stable` needs `confronted` and `seen found` on at least one lab machine and one client build? Not
-   decided here.
-3. Back-fill the ledger from the existing ADRs in the same pull request as the xtask command, or after?
+Decided 2026-10-18: `owner-pc` and `lab-vm-arm64` may be public (§1); `stable` requires the table's
+columns, `test` does not (§5).
+
+1. Back-fill the ledger from the existing ADRs in the same pull request as the xtask command, or after?

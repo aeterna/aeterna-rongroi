@@ -2,7 +2,8 @@
 
 - Status: proposed — drafted 2026-10-18 at the owner's request, as the second half of a detection-validation
   programme beside ADR 0074; the owner's questions are at the end. Nothing here is built yet.
-  Owner decided 2026-10-18: the monthly read is a delegated read-only run, checked by a maintainer (§3).
+  Owner decided 2026-10-18: weekly (§1); no Windows 10 lab machine for now (§2); the monthly read is a
+  delegated read-only run, checked by a maintainer (§3).
 - Date: 2026-10-18
 - Related: ADR 0074 (the ledger this writes into), ADR 0003 (offline), ADR 0048 (a runner image's data
   belongs to no person), `.github/workflows/certificate-pins.yml` (the scheduled-check pattern this follows)
@@ -37,7 +38,8 @@ and nothing compares one run's states to the last.
 
 ### 1. A scheduled workflow on GitHub's Windows images: `windows-watch.yml`
 
-- Runs weekly and on `workflow_dispatch`, never on `pull_request` or `push`, and is never a required
+- Runs weekly (owner's choice: GitHub updates its images more often than monthly, and a month of
+  changes in one comparison cannot be told apart) and on `workflow_dispatch`, never on `pull_request` or `push`, and is never a required
   check — the reason `certificate-pins.yml` gives: a calendar must not turn someone's pull request red.
 - A matrix over the Windows images GitHub offers by label (`windows-latest` is today image
   `windows-2025-vs2026`, ADR 0060; the other labels on offer are to be read from GitHub's runner-images
@@ -66,7 +68,13 @@ without new infrastructure:
 - The ADR 0069 virtual machine is used when a question needs a fresh install, a Fast Startup case or a
   different build, as it is now.
 
-Neither is scheduled. A Windows 10 machine is not part of this ADR; see question 3.
+Neither is scheduled.
+
+No Windows 10 lab machine is set up now (owner decision): this Mac runs Windows 10 x64 only slowly, and an
+Arm build of Windows 10 is hard to obtain. ADR 0074's table lists "never measured on Windows 10" as a gap
+for every collector, so the cost is visible — chiefly the rules whose source differs by version (`bam`,
+`pca`). A Windows 10 measurement becomes its own piece of work when a reviewer reports from Windows 10, or
+when it is shown that players on Windows 10 are many.
 
 ### 3. A monthly read of what Microsoft changed
 
@@ -105,14 +113,13 @@ read outside it keeps that claim simple to check.
   on pull request 184), so two images weekly is roughly an hour of Windows time a week, not measured.
 - Whether the shape is stable from week to week on one image. If an Event Log channel or a driver appears
   and disappears between runs, the shape needs to leave that collector's field set out; to be measured
-  with the first few runs before the job can fail.
+  with the first two or three runs, during which the job reports a difference without failing.
 - GitHub may delay or drop a scheduled run, and disables schedules in a public repository after 60 days
   without activity (as `certificate-pins.yml` notes).
 
 ## Questions for the owner
 
-1. Weekly, or monthly like `certificate-pins.yml`?
-2. May the release GUI check on your PC write ledger rows (build and collector states, no values) into
+Decided 2026-10-18: weekly; no Windows 10 lab machine for now; the monthly read is delegated and checked.
+
+1. May the release GUI check on your PC write ledger rows (build and collector states, no values) into
    the public repository?
-3. Is a Windows 10 measurement wanted — a Windows 10 virtual machine in the existing lab, or none, since
-   Windows 10 support ended for consumers in October 2025?
