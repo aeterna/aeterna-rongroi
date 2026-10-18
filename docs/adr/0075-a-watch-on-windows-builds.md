@@ -2,6 +2,7 @@
 
 - Status: proposed — drafted 2026-10-18 at the owner's request, as the second half of a detection-validation
   programme beside ADR 0074; the owner's questions are at the end. Nothing here is built yet.
+  Owner decided 2026-10-18: the monthly read is a delegated read-only run, checked by a maintainer (§3).
 - Date: 2026-10-18
 - Related: ADR 0074 (the ledger this writes into), ADR 0003 (offline), ADR 0048 (a runner image's data
   belongs to no person), `.github/workflows/certificate-pins.yml` (the scheduled-check pattern this follows)
@@ -69,10 +70,10 @@ Neither is scheduled. A Windows 10 machine is not part of this ADR; see question
 
 ### 3. A monthly read of what Microsoft changed
 
-Once a month, a maintainer — or a read-only delegated run whose output is checked before it is used
-(organisation standard §10) — reads Windows release notes for changes to what the collectors read: event
+Once a month, a read-only delegated run (`aeterna-delegate`, read mode, organisation standard §10) reads Windows release notes for changes to what the collectors read: event
 log channels, Defender and Code Integrity events, the PCA and Prefetch folders, BAM, the vulnerable driver
-blocklist, device enumeration, Secure Boot and firmware. The result is one line in `docs/research/` per
+blocklist, device enumeration, Secure Boot and firmware. Its output is unverified until a maintainer has
+checked each claim against the source it cites (§10.4); only then is it recorded. The result is one line in `docs/research/` per
 month: "nothing that touches a collector", or a link to the issue or ADR amendment it led to.
 
 No program in this repository fetches those notes. ADR 0003 is about this program's code; keeping the
@@ -115,4 +116,3 @@ read outside it keeps that claim simple to check.
    the public repository?
 3. Is a Windows 10 measurement wanted — a Windows 10 virtual machine in the existing lab, or none, since
    Windows 10 support ended for consumers in October 2025?
-4. The monthly read of release notes: a maintainer, or a delegated read-only run checked by a maintainer?
