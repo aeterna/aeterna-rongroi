@@ -1,9 +1,7 @@
 # ADR 0075 — A watch on Windows builds
 
-- Status: proposed — drafted 2026-10-18 at the owner's request, as the second half of a detection-validation
-  programme beside ADR 0074; the owner's questions are at the end. Nothing here is built yet.
-  Owner decided 2026-10-18: weekly (§1); no Windows 10 lab machine for now (§2); the monthly read is a
-  delegated read-only run, checked by a maintainer (§3).
+- Status: accepted — the owner approved it on 2026-10-18, as the second half of a detection-validation
+  programme beside ADR 0074; nothing is built yet (decisions at the end)
 - Date: 2026-10-18
 - Related: ADR 0074 (the ledger this writes into), ADR 0003 (offline), ADR 0048 (a runner image's data
   belongs to no person), `.github/workflows/certificate-pins.yml` (the scheduled-check pattern this follows)
@@ -117,9 +115,11 @@ read outside it keeps that claim simple to check.
 - GitHub may delay or drop a scheduled run, and disables schedules in a public repository after 60 days
   without activity (as `certificate-pins.yml` notes).
 
-## Questions for the owner
+## Owner decisions (2026-10-18)
 
-Decided 2026-10-18: weekly; no Windows 10 lab machine for now; the monthly read is delegated and checked.
-
-1. May the release GUI check on your PC write ledger rows (build and collector states, no values) into
-   the public repository?
+1. The watch runs weekly (§1).
+2. The release GUI check on the owner's PC writes ledger rows — build, edition, arch, token and each
+   collector's state, never a value — into this public repository (§2).
+3. No Windows 10 lab machine for now; the gap is shown in ADR 0074's table (§2).
+4. The monthly read of release notes is a delegated read-only run, checked by a maintainer before it is
+   recorded (§3).

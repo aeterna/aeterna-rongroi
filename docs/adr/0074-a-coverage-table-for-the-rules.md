@@ -1,9 +1,7 @@
 # ADR 0074 — A coverage table for the rules, and a ledger of where they were measured
 
-- Status: proposed — drafted 2026-10-18 at the owner's request, as the first half of a detection-validation
-  programme; the owner's questions are at the end. Nothing here is built yet.
-  Owner decided 2026-10-18: the machine names in §1 may be public; `stable` requires columns of the
-  table (§4).
+- Status: accepted — the owner approved it on 2026-10-18, as the first half of a detection-validation
+  programme beside ADR 0075; nothing is built yet (decisions at the end)
 - Date: 2026-10-18
 - Related: ADR 0017 and ADR 0033 (baseline and "confronted"), ADR 0002 (evidence, never a verdict),
   ADR 0061 (`rules/ages`), ADR 0075 (the Windows build watch, which writes rows into the ledger below)
@@ -131,9 +129,10 @@ affected. `docs/rules-authoring.md` gains these three lines when the xtask comma
 - Whether `docs/coverage.md` stays a readable size at 77 rules. `docs/rules-reference.md` is about 3,300
   lines; this table should be far shorter, not measured.
 
-## Questions for the owner
+## Owner decisions (2026-10-18)
 
-Decided 2026-10-18: `owner-pc` and `lab-vm-arm64` may be public (§1); `stable` requires the table's
-columns, `test` does not (§5).
-
-1. Back-fill the ledger from the existing ADRs in the same pull request as the xtask command, or after?
+1. `owner-pc` and `lab-vm-arm64` may be machine names in this public file (§1).
+2. `stable` requires the table's columns; `test` keeps today's requirement (§5).
+3. The ledger is back-filled from the existing ADRs in its own pull request, after the pull request that
+   builds `cargo xtask coverage`, so code and data are reviewed apart. Until then the table is nearly
+   empty, and says so.
