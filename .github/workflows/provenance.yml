@@ -36,13 +36,13 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.head_ref }}
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-          APP_ID: ${{ vars.ORG_STANDARDS_APP_ID }}
+          CLIENT_ID: ${{ vars.ORG_STANDARDS_APP_CLIENT_ID }}
           HAS_KEY: ${{ secrets.ORG_STANDARDS_APP_PRIVATE_KEY != '' }}
         run: |
           if [ "$BASE_REF" = "main" ] && [ "$HEAD_REF" = "dev" ] && [ "$SAME_REPO" = "true" ]; then
             echo "PR is a promotion from 'dev' to 'main': its commits were checked on their own PRs. Fast-pass."
             echo "run=false" >> "$GITHUB_OUTPUT"
-          elif [ -z "$APP_ID" ] || [ "$HAS_KEY" != "true" ]; then
+          elif [ -z "$CLIENT_ID" ] || [ "$HAS_KEY" != "true" ]; then
             echo "::notice title=provenance skipped::the org-standards App is not configured for this run (fork PR, or the variable or secret is missing)"
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
@@ -55,7 +55,7 @@ jobs:
         timeout-minutes: 2
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.ORG_STANDARDS_APP_ID }}
+          client-id: ${{ vars.ORG_STANDARDS_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_STANDARDS_APP_PRIVATE_KEY }}
           owner: aeterna
           repositories: org-standards
