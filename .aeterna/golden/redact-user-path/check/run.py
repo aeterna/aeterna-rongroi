@@ -4,10 +4,12 @@
 
 The fixture is engine code, and it can run at compile time, so only a child process without AETERNA_GOLDEN_NONCE
 compiles and runs it. The child builds check/tests.rs with rustc --test, lists the tests, runs them, and prints
-MARKER only when the listed tests are exactly the ones in the file and all of them passed. The parent prints the
-nonce last, and only after the child's MARKER.
+MARKER only when the check's own listed tests are exactly the ones in the file (the fixture's unit tests under
+fixture:: are allowed) and every listed test passed. The parent prints the nonce last, and only after the child's
+MARKER.
 
 Residual risk: the fixture runs in the child and can print text that imitates the harness output or MARKER.
+Residual risk: the nonce is in the parent's own environment, which a process of the same user can read in principle.
 """
 import os
 import re
@@ -22,6 +24,7 @@ TEST_FN = re.compile(r"#\[test\]\s*fn\s+(\w+)")
 LIST_LINE = re.compile(r"^(\S+): test$", re.M)
 OK_LINE = re.compile(r"^test (\S+) \.\.\. ok$", re.M)
 RESULT_LINE = re.compile(r"^test result: ok\. (\d+) passed; 0 failed;", re.M)
+FIXTURE_PREFIX = "fixture::"  # unit tests the fixture file carries under its own module
 
 
 def child():
@@ -40,14 +43,16 @@ def child():
             print("golden checks: the fixture does not compile", file=sys.stderr)
             return 1
         listed = subprocess.run([binary, "--list"], cwd=tmp, capture_output=True, text=True)
-        if sorted(LIST_LINE.findall(listed.stdout)) != expected:
+        names = sorted(LIST_LINE.findall(listed.stdout))
+        if sorted(n for n in names if not n.startswith(FIXTURE_PREFIX)) != expected:
             print("golden checks: the test list does not match check/tests.rs", file=sys.stderr)
             return 1
         run = subprocess.run([binary], cwd=tmp, capture_output=True, text=True)
         sys.stderr.write(run.stdout + run.stderr)
         result = RESULT_LINE.search(run.stdout)
-        ok = (run.returncode == 0 and sorted(OK_LINE.findall(run.stdout)) == expected
-              and result is not None and int(result.group(1)) == len(expected))
+        # Every listed test, the fixture's own included, must report ok; the summary alone is not enough.
+        ok = (run.returncode == 0 and sorted(OK_LINE.findall(run.stdout)) == names
+              and result is not None and int(result.group(1)) == len(names))
     if not ok:
         print("golden checks: not every test passed", file=sys.stderr)
         return 1

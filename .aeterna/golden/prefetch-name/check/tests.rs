@@ -65,6 +65,11 @@ fn rejects_hash_that_is_not_eight_hex_digits() {
 }
 
 #[test]
+fn rejects_signed_hash() {
+    assert_eq!(parse_prefetch_name("A-+1234567.pf"), None);
+}
+
+#[test]
 fn rejects_empty_name() {
     assert_eq!(parse_prefetch_name("-0BADF00D.pf"), None);
 }

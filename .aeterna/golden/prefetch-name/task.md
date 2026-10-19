@@ -18,7 +18,7 @@ The cases the tests check are:
 - `ทดสอบ-FFFFFFFF.pf` returns `Some(("ทดสอบ", 0xFFFF_FFFF))`.
 - `A-00000000.pf` returns `Some(("A", 0))`.
 - `None` for `C:\Temp\A-1A2B3C4D-0BADF00D.pf` and for `dir/A-1A2B3C4D-0BADF00D.pf`, because the name contains a path separator.
-- `None` for `A-1A2B3C4.pf` (7 hex digits), `A-1A2B3C4DE.pf` (9 hex digits), `A-0x12345678.pf` (a `0x` prefix), and `A-1A2B3C4G.pf` (a non-hex character).
+- `None` for `A-1A2B3C4.pf` (7 hex digits), `A-1A2B3C4DE.pf` (9 hex digits), `A-0x12345678.pf` (a `0x` prefix), `A-+1234567.pf` (8 characters but a leading `+`, not hex), and `A-1A2B3C4G.pf` (a non-hex character).
 - `None` for `-0BADF00D.pf`, because the name is empty.
 - `None` for `NODASH.pf` (no dash) and `.pf` (empty stem).
 - `None` for `A-1A2B3C4D-0BADF00D.exe`, `A-1A2B3C4D-0BADF00D` (no `.pf`), and `A-1A2B3C4D-0BADF00D.pf.bak`.
