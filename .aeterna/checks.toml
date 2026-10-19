@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# Repo checks for aeterna-delegate (Q2, T10). Mirrors the `rust` job of .github/workflows/ci.yml, minus what
+# cannot run in the no-network sandbox. Each check runs on a clean copy of base and on a copy of the result,
+# with HOME, TMPDIR and CARGO_TARGET_DIR in the run's scratch dir, so every check starts cold.
+#
+# Every cargo-based check points CARGO_HOME and RUSTUP_HOME at the real user's home, resolved from USER,
+# because HOME is the scratch dir. CARGO_NET_OFFLINE makes any attempt to fetch fail fast instead of hanging.
+#
+# Left out, because they cannot run in the sandbox:
+# - desktop UI (typecheck, lint, test): needs apps/desktop/node_modules, which the sandbox does not have.
+# - reuse lint: needs the uvx tool, which fetches from the network.
+# - cargo deny advisories: fetches the RustSec advisory database. Only bans, licenses and sources run.
+# - cargo xtask loldrivers: fetches the LOLDrivers repository.
+# - typos: not a cargo tool, so it is not installed in the sandbox.
+# - fuzz smoke: needs a nightly toolchain and a 30-second run per target; it is not part of the rust job.
+
+[[checks]]
+name = "format"
+cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo fmt --all --check'
+timeout = 120
+deps = ["rustfmt.toml", "rust-toolchain.toml"]
+
+[[checks]]
+name = "clippy"
+cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo clippy --all-targets --locked -- -D warnings'
+timeout = 600
+deps = ["clippy.toml", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
+
+# `cargo insta test` with the nextest runner and unreferenced snapshots rejected: a stale snapshot fails.
+[[checks]]
+name = "tests"
+cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo insta test --unreferenced reject --test-runner nextest'
+timeout = 600
+deps = [".config/nextest.toml", "Cargo.toml", "fixtures/**", "rules/**"]
+
+# The rule gates, in CI's order. Each compares or validates rules/, fixtures/ and docs/ against the code.
+[[checks]]
+name = "rule-gates"
+cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-rules && cargo xtask check-baseline && cargo xtask rules-reference --check && cargo xtask coverage --check'
+timeout = 600
+deps = [".cargo/config.toml", "docs/**", "fixtures/**", "rules/**", "xtask/**"]
+
+# The repo gates. check-unicode scans every text file in the tree, so any text change is in scope for it.
+[[checks]]
+name = "repo-gates"
+cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-locales && cargo xtask check-unicode && cargo xtask check-versions'
+timeout = 600
+deps = ["README.md", "README.th.md", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src/locales/**", "docs/**", "xtask/**"]
+
+# Bans, licenses and sources only. `--offline` keeps cargo-deny from fetching anything.
+[[checks]]
+name = "deny"
+cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo deny --offline check bans licenses sources'
+timeout = 120
+deps = ["Cargo.lock", "deny.toml"]
