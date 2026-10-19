@@ -24,4 +24,6 @@ Every other input is returned unchanged. The cases the tests check are:
 - Unchanged: `\\?\C:\Users\tester\a`, because the path must start with a drive letter.
 - Unchanged: `1:\Users\tester\a` and `É:\Users\tester\a`, because the drive must be an ASCII letter.
 
+The engine may also add its own `#[cfg(test)]` unit tests in the fixture file, and those tests must pass too.
+
 Only edit files under `fixture/`. Do not touch `check/`.

@@ -23,4 +23,6 @@ The cases the tests check are:
 - `None` for `NODASH.pf` (no dash) and `.pf` (empty stem).
 - `None` for `A-1A2B3C4D-0BADF00D.exe`, `A-1A2B3C4D-0BADF00D` (no `.pf`), and `A-1A2B3C4D-0BADF00D.pf.bak`.
 
+The engine may also add its own `#[cfg(test)]` unit tests in the fixture file, and those tests must pass too.
+
 Only edit files under `fixture/`. Do not touch `check/`.
