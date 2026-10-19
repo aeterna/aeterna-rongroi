@@ -14,7 +14,6 @@
 # - reuse lint: needs the uvx tool, which fetches from the network.
 # - cargo deny advisories: fetches the RustSec advisory database. Only bans, licenses and sources run.
 # - cargo xtask loldrivers: fetches the LOLDrivers repository.
-# - typos: not a cargo tool, so it is not installed in the sandbox.
 # - fuzz smoke: needs a nightly toolchain and a 30-second run per target; it is not part of the rust job.
 
 [[checks]]
@@ -34,7 +33,7 @@ deps = ["clippy.toml", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
 name = "tests"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo insta test --unreferenced reject --test-runner nextest'
 timeout = 600
-deps = [".config/nextest.toml", "Cargo.toml", "fixtures/**", "rules/**"]
+deps = [".config/nextest.toml", "Cargo.toml", "crates/**/snapshots/*.snap", "fixtures/**", "rules/**"]
 
 # The rule gates, in CI's order. Each compares or validates rules/, fixtures/ and docs/ against the code.
 [[checks]]
@@ -56,3 +55,10 @@ name = "deny"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo deny --offline check bans licenses sources'
 timeout = 120
 deps = ["Cargo.lock", "deny.toml"]
+
+# The CI `rust` job's spell check. It reads _typos.toml and runs offline.
+[[checks]]
+name = "typos"
+cmd = 'typos'
+timeout = 120
+deps = ["_typos.toml"]
