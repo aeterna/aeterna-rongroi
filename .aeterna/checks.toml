@@ -35,19 +35,21 @@ cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.ru
 timeout = 600
 deps = [".config/nextest.toml", "Cargo.toml", "crates/**/snapshots/*.snap", "fixtures/**", "rules/**"]
 
-# The rule gates, in CI's order. Each compares or validates rules/, fixtures/ and docs/ against the code.
+# The rule gates. Each compares or validates rules/ and fixtures/ against the code, and two of them read the generated
+# docs/rules-reference*.md and docs/coverage.md. The order here differs from CI's `rust` job, which runs check-baseline
+# after coverage; the commands are the same.
 [[checks]]
 name = "rule-gates"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-rules && cargo xtask check-baseline && cargo xtask rules-reference --check && cargo xtask coverage --check'
 timeout = 600
-deps = [".cargo/config.toml", "docs/**", "fixtures/**", "rules/**", "xtask/**"]
+deps = [".cargo/config.toml", "docs/coverage.md", "docs/rules-reference.md", "docs/rules-reference.th.md", "fixtures/**", "rules/**", "xtask/**"]
 
 # The repo gates. check-unicode scans every text file in the tree, so any text change is in scope for it.
 [[checks]]
 name = "repo-gates"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-locales && cargo xtask check-unicode && cargo xtask check-versions'
 timeout = 600
-deps = ["README.md", "README.th.md", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src/locales/**", "docs/**", "xtask/**"]
+deps = ["README.md", "README.th.md", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src/locales/**", "docs/screenshare-guide*.md", "xtask/**"]
 
 # Bans, licenses and sources only. `--offline` keeps cargo-deny from fetching anything.
 [[checks]]
