@@ -5145,4 +5145,188 @@ mod tests {
             .collect();
         assert_eq!(order, ["gone.exe", "time-only.exe"]);
     }
+
+    // ---- ADR 0078 section 5 and ADR 0079: I3, I4 and the SS list ----
+
+    /// One BAM record and the `recorded_files` observation of the same path, read, carrying
+    /// `extra`'s identity fields (ADR 0079 amendment 7).
+    fn identified_candidate(
+        name: &str,
+        path: &str,
+        extra: &[(&'static str, serde_json::Value)],
+    ) -> Vec<Observation> {
+        vec![
+            recorded("bam", name, Some(path), "last_run", "2026-01-10T09:50:00Z"),
+            recorded_file(path, Some("read"), extra),
+        ]
+    }
+
+    /// The identity fields a `read` leaves for I3 and I4: the content kind, the version resource's
+    /// name, a valid signature, and where the file lives.
+    fn identity_fields(
+        content_kind: &str,
+        original_filename: Option<&str>,
+        on_system_drive: bool,
+        under_system_root: bool,
+    ) -> Vec<(&'static str, serde_json::Value)> {
+        let mut fields = vec![
+            ("content_kind", serde_json::json!(content_kind)),
+            ("signature", serde_json::json!("valid")),
+            ("on_system_drive", serde_json::json!(on_system_drive)),
+            ("under_system_root", serde_json::json!(under_system_root)),
+        ];
+        if let Some(original_filename) = original_filename {
+            fields.push(("original_filename", serde_json::json!(original_filename)));
+        }
+        fields
+    }
+
+    /// f6: I3 is true when a recorded name contradicts what ran or what the file is. A Prefetch-only
+    /// `banner.png` was recorded running with an extension that is not an executable's; `x.png.exe`
+    /// has a double extension; a bidi control in the name hides its extension; `svchost.exe` outside
+    /// `%SystemRoot%` is a Windows file name where Windows does not keep it. `tool.exe` whose
+    /// `OriginalFilename` is `TOOL.EXE` only differs in ASCII case, so it is false.
+    #[test]
+    fn f6_i3_is_true_when_the_name_contradicts_what_ran_or_what_the_file_is() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("banner.png", None, &["2026-01-10T09:50:00Z"]));
+        observations.extend(identified_candidate(
+            "tool.exe",
+            r"C:\Tools\tool.exe",
+            &identity_fields("pe_executable", Some("TOOL.EXE"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "x.png.exe",
+            r"C:\Tools\x.png.exe",
+            &identity_fields("pe_executable", Some("x.png.exe"), true, false),
+        ));
+        let bidi_name = "a\u{202E}gnp.exe";
+        let bidi_path = "C:\\Tools\\a\u{202E}gnp.exe";
+        observations.extend(identified_candidate(
+            bidi_name,
+            bidi_path,
+            &identity_fields("pe_executable", Some(bidi_name), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "svchost.exe",
+            r"C:\Tools\svchost.exe",
+            &identity_fields("pe_executable", Some("svchost.exe"), true, false),
+        ));
+
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let banner = game_candidate(&view, "banner.png");
+        assert!(banner.path.is_none(), "Prefetch emits no program path");
+        assert_eq!(
+            banner.i3,
+            IdentityFact::True,
+            "a non-executable name recorded running"
+        );
+        assert_eq!(
+            game_candidate(&view, "tool.exe").i3,
+            IdentityFact::False,
+            "OriginalFilename differing only in ASCII case"
+        );
+        assert_eq!(
+            game_candidate(&view, "x.png.exe").i3,
+            IdentityFact::True,
+            "a double extension ending in an executable one"
+        );
+        assert_eq!(
+            game_candidate(&view, bidi_name).i3,
+            IdentityFact::True,
+            "a bidi control in the name"
+        );
+        assert_eq!(
+            game_candidate(&view, "svchost.exe").i3,
+            IdentityFact::True,
+            "a Windows file name outside %SystemRoot%"
+        );
+    }
+
+    /// f7: I4 is true under Temp or Downloads, and on a drive other than the system drive; a Program
+    /// Files path is neither, so it is false (a writable folder in general is not I4).
+    #[test]
+    fn f7_i4_is_true_under_temp_or_downloads_or_off_the_system_drive() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "temp.exe",
+            r"C:\Users\fixtureuser\AppData\Local\Temp\temp.exe",
+            &identity_fields("pe_executable", Some("temp.exe"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "portable.exe",
+            r"D:\Tools\portable.exe",
+            &identity_fields("pe_executable", Some("portable.exe"), false, false),
+        ));
+        observations.extend(identified_candidate(
+            "installed.exe",
+            r"C:\Program Files\Tool\installed.exe",
+            &identity_fields("pe_executable", Some("installed.exe"), true, false),
+        ));
+
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "temp.exe").i4,
+            IdentityFact::True,
+            "a path under \\AppData\\Local\\Temp\\"
+        );
+        assert_eq!(
+            game_candidate(&view, "portable.exe").i4,
+            IdentityFact::True,
+            "a path on a drive other than the system drive"
+        );
+        assert_eq!(
+            game_candidate(&view, "installed.exe").i4,
+            IdentityFact::False,
+            "a path under Program Files"
+        );
+    }
+
+    /// f8: SS mode lists a candidate with a true identity fact, its path redacted as rows are, and
+    /// counts a candidate with none; Self mode lists both. The listed candidate is on the Desktop, so
+    /// I4 is false and its I3 alone puts it in the SS list.
+    #[test]
+    fn f8_ss_lists_only_candidates_with_an_identity_fact_and_redacts_their_paths() {
+        const RAW: &str = r"C:\Users\fixtureuser\Desktop\x.png.exe";
+        const REDACTED: &str = r"%USERPROFILE%\Desktop\x.png.exe";
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "x.png.exe",
+            RAW,
+            &identity_fields("pe_executable", Some("x.png.exe"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "plain.exe",
+            r"C:\Tools\plain.exe",
+            &identity_fields("pe_executable", Some("plain.exe"), true, false),
+        ));
+        let report = game_report(observations);
+
+        let own = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(own.candidates.len(), 2);
+        assert!(
+            own.candidates
+                .iter()
+                .any(|candidate| candidate.path.as_deref() == Some(RAW)),
+            "Self mode shows the unredacted path: {:?}",
+            own.candidates
+        );
+
+        let ss = game_windows(&report, Mode::Ss);
+        assert_eq!(ss.candidates.len(), 1, "{:?}", ss.candidates);
+        let listed = &ss.candidates[0];
+        assert_eq!(listed.name, "x.png.exe");
+        assert_eq!(listed.path.as_deref(), Some(REDACTED));
+        assert_eq!(listed.i3, IdentityFact::True);
+        assert_eq!(listed.i4, IdentityFact::False, "the Desktop is not I4");
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("plain.exe")),
+            "{:?}",
+            ss.candidates
+        );
+        assert_eq!(ss.counts, own.counts);
+        assert_eq!(ss.counts.before, 2, "the plain candidate is counted");
+    }
 }
