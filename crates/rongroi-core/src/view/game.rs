@@ -67,6 +67,8 @@ pub enum IdentityNotKnownReason {
     NoObservationForPath,
     /// The path was not read; `identity_read` says why.
     NotRead,
+    /// The signature could not be checked offline (ADR 0035).
+    Unverifiable,
     /// The candidate has no program path, so nothing can be joined (ADR 0078 section 4).
     NoPath,
     /// The fields I3 or I4 needs were not read, or I5 arrives with later work (ADR 0078 section 5,
@@ -114,7 +116,7 @@ pub struct GameCandidate {
     pub i2: IdentityFact,
     /// I3: its name contradicts what the file is or did (ADR 0078 section 5).
     pub i3: IdentityFact,
-    /// I4: its path is under Temp or Downloads, or off the system drive (ADR 0078 section 5).
+    /// I4: its path is under Temp or Downloads (ADR 0078 section 5).
     pub i4: IdentityFact,
     /// I5: the change journal holds its rename or deletion (deferred, ADR 0079 section 5).
     pub i5: IdentityFact,
@@ -255,10 +257,11 @@ impl<'r> RecordedFiles<'r> {
             i1,
             i2,
             name_fact(candidate, observation),
-            location_fact(candidate, observation),
+            location_fact(candidate),
             deferred(),
         ]
     }
+
     /// I1 and I2 for `candidate`, from the `recorded_files` observation of its path.
     fn time_and_signature_facts(&self, candidate: &Candidate) -> (IdentityFact, IdentityFact) {
         let Some(observation) = self.joined(candidate) else {
@@ -273,9 +276,15 @@ impl<'r> RecordedFiles<'r> {
             return (fact.clone(), fact);
         };
         match session::text(observation, "identity_read") {
-            // A missing file is gone (I1) and has no embedded signature (I2).
-            Some("missing") => (IdentityFact::True, IdentityFact::True),
-            Some("read") => (IdentityFact::False, signature_fact(observation)),
+            // A missing file is gone (I1), but the file was not read, so I2 is not known.
+            Some("missing") => (
+                IdentityFact::True,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::NotRead,
+                },
+            ),
+            // A file too large to read still exists, and its signature field is what was read.
+            Some("read" | "too_large") => (IdentityFact::False, signature_fact(observation)),
             _ => {
                 let fact = IdentityFact::NotKnown {
                     reason: IdentityNotKnownReason::NotRead,
@@ -285,13 +294,22 @@ impl<'r> RecordedFiles<'r> {
         }
     }
 }
-/// I2: true unless the file's embedded signature verified as `valid` (ADR 0035).
+
+/// I2: false for a valid signature, true for an invalid or missing one, not known otherwise.
 fn signature_fact(observation: &Observation) -> IdentityFact {
     match session::text(observation, "signature") {
         Some("valid") => IdentityFact::False,
-        _ => IdentityFact::True,
+        Some("invalid" | "no_embedded_signature") => IdentityFact::True,
+        Some("unverifiable_offline") => IdentityFact::NotKnown {
+            reason: IdentityNotKnownReason::Unverifiable,
+        },
+        // An absent or unrecognised field established no signature.
+        _ => IdentityFact::NotKnown {
+            reason: IdentityNotKnownReason::NotRead,
+        },
     }
 }
+
 /// A fact whose fields the scan did not read, or which arrives with later work.
 fn deferred() -> IdentityFact {
     IdentityFact::NotKnown {
@@ -302,8 +320,17 @@ fn deferred() -> IdentityFact {
 const PE_EXTENSIONS: [&str; 10] = [
     "exe", "dll", "sys", "scr", "com", "cpl", "ocx", "drv", "efi", "mui",
 ];
+
+/// Document, media and archive extensions a file can wear before a program's, for I3's double
+/// extension (ADR 0078 section 5).
+const DISGUISE_EXTENSIONS: [&str; 24] = [
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "jpg", "jpeg", "png", "gif",
+    "bmp", "webp", "mp3", "mp4", "avi", "mkv", "mov", "wav", "zip", "rar", "7z",
+];
+
 /// Extensions of a program recorded running (ADR 0078 section 5).
 const PROGRAM_EXTENSIONS: [&str; 4] = ["exe", "com", "scr", "cpl"];
+
 /// Windows file names that belong under `%SystemRoot%` (ADR 0078 section 5).
 const SYSTEM_NAMES: [&str; 13] = [
     "svchost",
@@ -332,10 +359,11 @@ fn name_fact(candidate: &Candidate, observation: Option<&Observation>) -> Identi
         deferred()
     }
 }
+
 /// Whether any of I3's name, content or version-resource shapes holds (ADR 0078 section 5).
 fn name_contradicts(candidate: &Candidate, observation: Option<&Observation>) -> bool {
     let recorded = candidate.name.as_str();
-    if !has_extension(recorded, &PROGRAM_EXTENSIONS)
+    if has_extension_other_than(recorded, &PROGRAM_EXTENSIONS)
         || has_double_executable_extension(recorded)
         || has_bidi_control(recorded)
         || has_mixed_scripts(recorded)
@@ -350,6 +378,7 @@ fn name_contradicts(candidate: &Candidate, observation: Option<&Observation>) ->
         || original_filename_contradicts(observation, file)
         || is_system_name_outside_root(recorded, observation)
 }
+
 /// Whether the read of `observation` says `file` is a PE image under another kind of name.
 fn content_contradicts_extension(observation: &Observation, file: &str) -> bool {
     let Some(kind) = session::text(observation, "content_kind") else {
@@ -370,24 +399,49 @@ fn has_extension(name: &str, allowed: &[&str]) -> bool {
             .any(|allowed| extension.eq_ignore_ascii_case(allowed))
     })
 }
-/// The extension of `name`: what follows its last dot, when it is not empty.
+
+/// Whether `name` has an extension and it is not one of `allowed`; no extension is not a
+/// contradiction by itself (ADR 0078 section 5).
+fn has_extension_other_than(name: &str, allowed: &[&str]) -> bool {
+    extension(name).is_some_and(|extension| {
+        !allowed
+            .iter()
+            .any(|allowed| extension.eq_ignore_ascii_case(allowed))
+    })
+}
+
+/// The extension of `name`: what follows its last dot, when it is 1 to 4 ASCII alphanumerics.
 fn extension(name: &str) -> Option<&str> {
     name.rsplit_once('.')
         .map(|(_, extension)| extension)
-        .filter(|extension| !extension.is_empty())
+        .filter(|extension| {
+            (1..=4).contains(&extension.len())
+                && extension
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())
+        })
 }
+
 /// Whether `name` has a double extension that ends in a program's (ADR 0078 section 5).
 fn has_double_executable_extension(name: &str) -> bool {
-    let Some((stem, extension)) = name.rsplit_once('.') else {
+    let Some(extension) = extension(name) else {
         return false;
     };
-    PROGRAM_EXTENSIONS
+    if !PROGRAM_EXTENSIONS
         .iter()
         .any(|program| extension.eq_ignore_ascii_case(program))
-        && stem
-            .rsplit_once('.')
-            .is_some_and(|(_, earlier)| !earlier.is_empty())
+    {
+        return false;
+    }
+    name.rsplit_once('.')
+        .and_then(|(stem, _)| stem.rsplit_once('.'))
+        .is_some_and(|(_, earlier)| {
+            DISGUISE_EXTENSIONS
+                .iter()
+                .any(|disguise| earlier.eq_ignore_ascii_case(disguise))
+        })
 }
+
 /// Whether `name` carries a right-to-left override or another bidi control (ADR 0078 section 5).
 fn has_bidi_control(name: &str) -> bool {
     name.chars()
@@ -443,23 +497,20 @@ fn is_system_name_outside_root(name: &str, observation: &Observation) -> bool {
             .and_then(serde_json::Value::as_bool)
             == Some(false)
 }
-/// I4: the path is under a Temp or Downloads folder, or off the system drive (ADR 0078 section 5).
-fn location_fact(candidate: &Candidate, observation: Option<&Observation>) -> IdentityFact {
+/// I4: the path is under a Temp or Downloads folder; other writable folders arrive with later work
+/// (ADR 0078 section 5).
+fn location_fact(candidate: &Candidate) -> IdentityFact {
     let Some(path) = candidate.path.as_deref() else {
-        return deferred();
+        return IdentityFact::NotKnown {
+            reason: IdentityNotKnownReason::NoPath,
+        };
     };
     if path_under_temp_or_downloads(path) {
         return IdentityFact::True;
     }
-    match observation
-        .and_then(|observation| observation.fields.get("on_system_drive"))
-        .and_then(serde_json::Value::as_bool)
-    {
-        Some(false) => IdentityFact::True,
-        Some(true) => IdentityFact::False,
-        None => deferred(),
-    }
+    deferred()
 }
+
 /// Whether a folder of `path`, other than the file itself, is `Temp` or `Downloads`.
 fn path_under_temp_or_downloads(path: &str) -> bool {
     let mut folders = path.split(['\\', '/']).peekable();
