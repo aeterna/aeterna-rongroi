@@ -179,3 +179,28 @@ it was given, without reporting names. That is a privacy change to ADR 0047 and 
 - `rongroi-core`: `SS_WITHHELD_FIELDS` grows. The game-windows view fills I1 to I4 from these fields, and
   I5 stays "not known".
 - `PRIVACY.md`, the consent text and `docs/architecture.md` change with the code.
+
+## Measured: the stream read (2026-10-21)
+
+The section 1 precondition was measured on a Windows 11 PC (build 26220). `fsutil behavior query
+disablelastaccess` reported `2`: system-managed, with last-access updates **enabled**. A probe made a folder
+under `%TEMP%` holding two 64-byte files, `sample.bin` with a `Zone.Identifier` stream and `control.bin`
+with none. It set all three times of both files two days back, because NTFS updates a last-access time
+only when the stored one is older than an hour. It then opened each file once with the request
+`std::fs::File::open` makes (`CreateFileW`, `GENERIC_READ`, share read, write and delete, `OPEN_EXISTING`)
+and read it: `sample.bin:Zone.Identifier` (57 bytes) and `control.bin` (64 bytes). It then read the times
+again and deleted the folder and the probe script, and checked that both were gone.
+
+| Read | Creation time | Last-write time | Last-access time |
+|---|---|---|---|
+| the stream, `sample.bin:Zone.Identifier` | unchanged | unchanged | **set to the time of the read** |
+| the file, `control.bin` (what `read_file` and `file_sha256` do today) | unchanged | unchanged | **set to the time of the read** |
+
+**The precondition as written is not met.** Reading the stream moves the file's last-access time on a PC
+with last-access updates enabled. So does every read this program already makes: hashing in `fivem_dir`,
+`autostart` and `driver_service`, and `read_file` for Prefetch, event logs and task files. ADR 0050 noted
+that the last-access time is "moved by reading". The comment on the Windows host's `read_file` ("no
+timestamp changed") is wrong on such a PC. Creation and last-write times are untouched in both cases.
+
+The owner decides whether the stream method may merge on these terms. Until then it stays unmerged, as
+section 1 says.
