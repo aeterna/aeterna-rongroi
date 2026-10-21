@@ -391,8 +391,9 @@ pub fn consent(lang: Lang) -> String {
     }
 }
 
-/// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055).
-fn full_reads(lang: Lang) -> [&'static str; 2] {
+/// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055,
+/// ADR 0079).
+fn full_reads(lang: Lang) -> [&'static str; 3] {
     match lang {
         Lang::En => [
             "the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server \
@@ -405,6 +406,12 @@ fn full_reads(lang: Lang) -> [&'static str; 2] {
              Windows PowerShell flagged as suspicious, and the command lines it was started with, with \
              how many and when. No command is kept or shown; the one thing kept is the name of a website \
              a command downloaded from, which SS mode shows only if you agree to that separately",
+            "the files of programs Windows recorded running (BAM, Program Compatibility \
+             Assistant, the programs running now): what kind of content each holds, its hash, \
+             digital signature and version name, the download zone Windows wrote on it, and the \
+             name of the website it came from — never the rest of the address — starting nearest \
+             your last FiveM or GTA V session, for up to 90 seconds. Reading a file can update its \
+             last-access time",
         ],
         Lang::Th => [
             "ชื่อโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ที่ FiveM for GTA V Enhanced เก็บไว้ \
@@ -415,6 +422,11 @@ fn full_reads(lang: Lang) -> [&'static str; 2] {
              มองข้ามบางอย่างหรือไม่ ล้าง log หรือประวัติหรือไม่ หรือพูดถึง FiveM หรือไม่ — จากประวัติคำสั่งที่พิมพ์ในหน้าต่าง \
              PowerShell, script ที่ Windows PowerShell ตั้งธงว่าน่าสงสัย และ command line ที่ใช้เปิดมัน พร้อมจำนวนและเวลา \
              ไม่เก็บและไม่แสดงคำสั่งใด ๆ สิ่งเดียวที่เก็บคือชื่อเว็บไซต์ที่คำสั่งดาวน์โหลดมา ซึ่งโหมด SS จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง",
+            "ไฟล์ของโปรแกรมที่ Windows บันทึกว่าเคยรัน (BAM, Program Compatibility Assistant, \
+             โปรแกรมที่กำลังรัน): เนื้อไฟล์เป็นชนิดไหน hash ลายเซ็นดิจิทัล และชื่อในข้อมูลเวอร์ชัน \
+             โซนดาวน์โหลดที่ Windows เขียนไว้บนไฟล์ และชื่อเว็บไซต์ที่ไฟล์มาจาก โดยไม่เก็บส่วนอื่นของที่อยู่ \
+             เริ่มจากไฟล์ที่ใกล้เซสชัน FiveM หรือ GTA V ล่าสุดก่อน ใช้เวลาไม่เกิน 90 วินาที \
+             การอ่านไฟล์อาจทำให้เวลาเข้าถึงล่าสุดของไฟล์เปลี่ยน",
         ],
     }
 }
@@ -1217,6 +1229,7 @@ mod tests {
         ),
         ("prefetch", &["Prefetch"]),
         ("process", &[]),
+        ("recorded_files", &["BAM", "hash", "90"]),
         ("usn", &["change journal"]),
         ("windows_start", &["System", "Fast Startup"]),
     ];
@@ -1314,6 +1327,34 @@ mod tests {
             assert!(
                 sensitive_question(lang, SensitiveKind::DownloadHost).contains("%DOWNLOAD_HOST%")
             );
+        }
+    }
+
+    /// ADR 0079 section 6: the full scan's two questions name the files that the recorded programs
+    /// point at, together with the last-access time a read can move; the standard scan's names none
+    /// of it.
+    #[test]
+    fn a_full_scan_names_the_files_of_recorded_programs_and_the_last_access_time() {
+        for (lang, words) in [
+            (
+                Lang::En,
+                ["programs Windows recorded running", "last-access time"],
+            ),
+            (Lang::Th, ["โปรแกรมที่ Windows บันทึกว่าเคยรัน", "เวลาเข้าถึงล่าสุด"]),
+        ] {
+            let full = format!(
+                "{}{}",
+                consent_for(lang, ScanTier::Full),
+                full_question(lang)
+            );
+            for word in words {
+                assert!(full.contains(word), "{word} missing from {full}");
+                assert!(
+                    !consent(lang).contains(word),
+                    "{word} is in the standard consent: {}",
+                    consent(lang)
+                );
+            }
         }
     }
 
