@@ -31,8 +31,24 @@ const DLL_CHARACTERISTICS: u16 = 0x2000;
 const SUBSYSTEM_NATIVE: u16 = 1;
 /// The NUL-free window that decides whether bytes are text.
 const SCRIPT_NUL_WINDOW: usize = 4096;
+/// The optional-header magic values a PE32 or PE32+ image carries.
+const PE32_MAGIC: u16 = 0x10B;
+const PE32_PLUS_MAGIC: u16 = 0x20B;
 const PNG_SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+/// The DIB header sizes that start a BMP's bitmap header.
+const BMP_DIB_HEADER_SIZES: [u32; 6] = [12, 40, 52, 56, 108, 124];
+/// Where a BMP's DIB header size starts, after its 14-byte file header.
+const BMP_DIB_HEADER_OFFSET: usize = 14;
+/// The shortest BMP that reaches the DIB header size.
+const BMP_MIN_LEN: usize = 18;
+/// An ICO's fixed header, before its directory entries.
+const ICO_HEADER_LEN: usize = 6;
+/// One ICO directory entry, which must be present for the first image.
+const ICO_DIRECTORY_ENTRY_LEN: usize = 16;
+/// The most images an ICO header may name.
+const ICO_MAX_IMAGES: u16 = 256;
 const ZIP_EOCD: [u8; 4] = [b'P', b'K', 0x05, 0x06];
+const ZIP_CENTRAL_HEADER: [u8; 4] = [b'P', b'K', 0x01, 0x02];
 
 /// What a file's bytes say it is (ADR 0078 section 8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -159,6 +175,10 @@ fn pe_at(bytes: &[u8], base: usize) -> Option<PeHeader> {
     if optional_size < OPTIONAL_SUBSYSTEM_NEEDED {
         return None;
     }
+    let magic = u16_at(bytes, coff_end)?;
+    if magic != PE32_MAGIC && magic != PE32_PLUS_MAGIC {
+        return None;
+    }
     let optional_end = coff_end.checked_add(optional_size)?;
     if optional_end > bytes.len() {
         return None;
@@ -188,13 +208,44 @@ fn is_image(bytes: &[u8]) -> bool {
     bytes.starts_with(&PNG_SIGNATURE)
         || bytes.starts_with(&[0xFF, 0xD8, 0xFF])
         || is_gif(bytes)
-        || bytes.starts_with(b"BM")
+        || is_bmp(bytes)
         || (bytes.starts_with(b"RIFF") && bytes.get(8..12).is_some_and(|tag| tag == b"WEBP"))
-        || bytes.starts_with(&[0x00, 0x00, 0x01, 0x00])
+        || is_ico(bytes)
 }
 
 fn is_gif(bytes: &[u8]) -> bool {
     bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a")
+}
+
+/// Whether the bytes carry a BMP file header and a DIB header size the format defines.
+fn is_bmp(bytes: &[u8]) -> bool {
+    bytes.len() >= BMP_MIN_LEN
+        && bytes.starts_with(b"BM")
+        && u32_at(bytes, BMP_DIB_HEADER_OFFSET)
+            .is_some_and(|size| BMP_DIB_HEADER_SIZES.contains(&size))
+}
+
+/// Whether the bytes carry an ICO header whose first directory entry names a byte inside the file.
+fn is_ico(bytes: &[u8]) -> bool {
+    if !bytes.starts_with(&[0x00, 0x00, 0x01, 0x00]) {
+        return false;
+    }
+    let Some(count) = u16_at(bytes, 4) else {
+        return false;
+    };
+    if !(1..=ICO_MAX_IMAGES).contains(&count) {
+        return false;
+    }
+    let Some(entry) = bytes.get(ICO_HEADER_LEN..ICO_HEADER_LEN + ICO_DIRECTORY_ENTRY_LEN) else {
+        return false;
+    };
+    // `bReserved` is the entry's fourth byte and must be zero.
+    if entry[3] != 0 {
+        return false;
+    }
+    u32_at(bytes, ICO_HEADER_LEN + 12)
+        .and_then(|offset| usize::try_from(offset).ok())
+        .is_some_and(|offset| offset < bytes.len())
 }
 
 /// Whether the whole slice is UTF-8 and the first 4096 bytes hold no NUL.
@@ -289,7 +340,8 @@ fn jpeg_scan_end(bytes: &[u8], mut offset: usize) -> Option<usize> {
             return Some(offset + 2);
         }
         // `FF 00` is stuffed data and `FF D0..=FF D7` a restart marker: both stay inside the scan.
-        offset += 2;
+        // A fill `FF` advances one byte, so the run's last `FF` can still start `FF D9`.
+        offset += if next == 0xFF { 1 } else { 2 };
     }
 }
 
@@ -348,7 +400,6 @@ fn skip_sub_blocks(bytes: &[u8], mut offset: usize) -> Option<usize> {
 
 /// The end of a ZIP's end-of-central-directory record, comment included.
 fn zip_end(bytes: &[u8]) -> Option<usize> {
-    let mut last = None;
     for (offset, signature) in bytes.windows(ZIP_EOCD.len()).enumerate() {
         if signature != &ZIP_EOCD[..] {
             continue;
@@ -356,15 +407,38 @@ fn zip_end(bytes: &[u8]) -> Option<usize> {
         let Some(comment_length) = u16_at(bytes, offset + 20) else {
             continue;
         };
-        let end = offset
-            .checked_add(22)?
-            .checked_add(usize::from(comment_length))?;
-        if end == bytes.len() {
-            return Some(end);
+        let Some(directory_size) = u32_at(bytes, offset + 12) else {
+            continue;
+        };
+        let Some(directory_offset) = u32_at(bytes, offset + 16) else {
+            continue;
+        };
+        let Some(directory_end) = directory_offset.checked_add(directory_size) else {
+            continue;
+        };
+        if usize::try_from(directory_end).ok() != Some(offset) {
+            continue;
         }
-        last = Some(end);
+        let Some(directory_start) = usize::try_from(directory_offset).ok() else {
+            continue;
+        };
+        // An empty central directory ends where it starts; any other must begin with its header.
+        let empty_directory = directory_size == 0 && directory_start == offset;
+        if !empty_directory && !starts_with_at(bytes, directory_start, &ZIP_CENTRAL_HEADER) {
+            continue;
+        }
+        let Some(end) = offset
+            .checked_add(22)
+            .and_then(|end| end.checked_add(usize::from(comment_length)))
+        else {
+            continue;
+        };
+        if end > bytes.len() {
+            continue;
+        }
+        return Some(end);
     }
-    last.filter(|&end| end < bytes.len())
+    None
 }
 
 fn contains_pe(bytes: &[u8]) -> bool {
@@ -591,8 +665,9 @@ mod tests {
     }
 
     fn bmp() -> Vec<u8> {
-        let mut bytes = Vec::from(*b"BM");
-        bytes.extend_from_slice(&[0u8; 12]);
+        let mut bytes = vec![0u8; 54];
+        bytes[0..2].copy_from_slice(b"BM");
+        bytes[14..18].copy_from_slice(&40u32.to_le_bytes());
         bytes
     }
 
@@ -604,7 +679,11 @@ mod tests {
     }
 
     fn ico() -> Vec<u8> {
-        Vec::from([0x00, 0x00, 0x01, 0x00, 0x01, 0x00])
+        let mut bytes = Vec::from([0x00, 0x00, 0x01, 0x00, 0x01, 0x00]);
+        // One directory entry: width, height, colours, reserved, planes, bit count, size, offset.
+        bytes.extend_from_slice(&[1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 22, 0, 0, 0]);
+        bytes.push(0);
+        bytes
     }
 
     #[test]
@@ -660,6 +739,30 @@ mod tests {
     }
 
     #[test]
+    fn c4_jpeg_fill_bytes_before_the_end_marker_do_not_hide_it() {
+        let mut bytes = Vec::from([0xFF, 0xD8]);
+        bytes.extend_from_slice(&[0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00]);
+        bytes.extend_from_slice(&[0x01, 0xFF, 0xFF, 0xD9]);
+        assert_eq!(parse_ok(&bytes).trailing_data, Some(false));
+
+        bytes.push(0xAA);
+        assert_eq!(parse_ok(&bytes).trailing_data, Some(true));
+    }
+
+    #[test]
+    fn c4_zip_forged_eocd_at_eof_does_not_hide_trailing_bytes() {
+        let mut bytes = zip(b"");
+        bytes.extend_from_slice(b"junk");
+        // An EOCD claiming an empty central directory at offset zero, which is not where it is.
+        bytes.extend_from_slice(b"PK\x05\x06");
+        bytes.extend_from_slice(&[0u8; 18]);
+
+        let description = parse_ok(&bytes);
+        assert_eq!(description.kind, FileKind::Archive);
+        assert_eq!(description.trailing_data, Some(true));
+    }
+
+    #[test]
     fn c4_zip_trailing_data_follows_the_end_of_central_directory() {
         let base = zip(b"export");
         let description = parse_ok(&base);
@@ -702,6 +805,39 @@ mod tests {
         ] {
             assert_eq!(parse_ok(&bytes).kind, FileKind::Archive, "{name}");
         }
+    }
+
+    #[test]
+    fn c5_bmp_and_ico_need_more_than_their_prefix() {
+        // Text that begins with the BMP marker must still reach the script check.
+        assert_eq!(parse_ok(b"BMW_CONFIG=1\n").kind, FileKind::Script);
+
+        let mut short_bmp = Vec::from(*b"BM");
+        short_bmp.extend_from_slice(&[0u8; 12]);
+        assert_eq!(parse_ok(&short_bmp).kind, FileKind::Unknown);
+
+        let mut wrong_dib = bmp();
+        wrong_dib[14..18].copy_from_slice(&41u32.to_le_bytes());
+        assert_eq!(parse_ok(&wrong_dib).kind, FileKind::Unknown);
+
+        // A header alone is not an icon directory.
+        assert_eq!(
+            parse_ok(&[0x00, 0x00, 0x01, 0x00, 0x01, 0x00]).kind,
+            FileKind::Unknown
+        );
+
+        let mut zero_images = ico();
+        zero_images[4..6].copy_from_slice(&0u16.to_le_bytes());
+        assert_eq!(parse_ok(&zero_images).kind, FileKind::Unknown);
+
+        let mut reserved_byte = ico();
+        reserved_byte[6 + 3] = 1;
+        assert_eq!(parse_ok(&reserved_byte).kind, FileKind::Unknown);
+
+        let mut past_end = ico();
+        let end = u32::try_from(past_end.len()).expect("a test ICO fits in u32");
+        past_end[6 + 12..6 + 16].copy_from_slice(&end.to_le_bytes());
+        assert_eq!(parse_ok(&past_end).kind, FileKind::Unknown);
     }
 
     #[test]
@@ -751,6 +887,14 @@ mod tests {
         let mut below_the_header = pe(SUBSYSTEM_WINDOWS_GUI, false);
         below_the_header[0x3C..0x40].copy_from_slice(&0x10u32.to_le_bytes());
         assert_eq!(parse_ok(&below_the_header).kind, FileKind::Unknown);
+    }
+
+    #[test]
+    fn c7_a_pe_with_an_unknown_optional_header_magic_is_not_a_pe() {
+        let mut bytes = pe(SUBSYSTEM_WINDOWS_GUI, false);
+        let optional = PE_OFFSET + 4 + 20;
+        bytes[optional..optional + 2].copy_from_slice(&0x999u16.to_le_bytes());
+        assert_eq!(parse_ok(&bytes).kind, FileKind::Unknown);
     }
 
     #[test]

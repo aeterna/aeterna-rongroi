@@ -16,10 +16,14 @@ const E_LFANEW_MAX: u32 = 4096;
 const PE32_MAGIC: u16 = 0x10B;
 const PE32_PLUS_MAGIC: u16 = 0x20B;
 const RESOURCE_DIRECTORY_INDEX: usize = 2;
+/// The Windows loader refuses an image with more sections than this.
+const MAX_SECTIONS: usize = 96;
 
 // Resource tree layout and the bounds a hostile directory cannot exceed.
 const RT_VERSION: u32 = 16;
 const RESOURCE_ENTRY_LEN: usize = 8;
+/// The 24 bytes of data-directory entries this parser reads from the optional header.
+const DATA_DIRECTORY_REACH: usize = 24;
 const SUBDIRECTORY_FLAG: u32 = 0x8000_0000;
 const OFFSET_MASK: u32 = 0x7FFF_FFFF;
 const NAME_IS_STRING: u32 = 0x8000_0000;
@@ -129,6 +133,9 @@ fn pe_image(bytes: &[u8]) -> Result<Option<PeImage>, ParseError> {
         bad!("pe_header", "the COFF header is truncated");
     }
     let number_of_sections = usize::from(need!(u16_at(bytes, signature_end + 2), "pe_header"));
+    if number_of_sections > MAX_SECTIONS {
+        bad!("pe_header", "the section count exceeds the loader limit");
+    }
     let optional_size = usize::from(need!(u16_at(bytes, signature_end + 16), "pe_header"));
     let optional_end = need!(optional.checked_add(optional_size), "pe_header");
     if optional_end > bytes.len() {
@@ -140,7 +147,7 @@ fn pe_image(bytes: &[u8]) -> Result<Option<PeImage>, ParseError> {
         PE32_PLUS_MAGIC => (108, 112),
         _ => bad!("pe_header", "an unknown optional-header magic"),
     };
-    let directory_end = directories_offset + RESOURCE_ENTRY_LEN * MAX_RESOURCE_DEPTH;
+    let directory_end = directories_offset + DATA_DIRECTORY_REACH;
     if rva_count_offset + 4 > optional_size || directory_end > optional_size {
         bad!("pe_header", "the optional header is too short");
     }
@@ -825,6 +832,14 @@ mod tests {
         let resource = resource_claiming_many_entries();
         let bytes = pe(PE32_MAGIC, Some(&resource));
         assert_eq!(malformed_field(&bytes), "resource_directory");
+    }
+
+    #[test]
+    fn v7_more_than_96_sections_is_a_pe_header_error() {
+        let resource = version_resource(&[&[("OriginalFilename", "loader.exe")]], true);
+        let mut bytes = pe(PE32_MAGIC, Some(&resource));
+        write_u16(&mut bytes, PE_OFFSET + 4 + 2, 97);
+        assert_eq!(malformed_field(&bytes), "pe_header");
     }
 
     #[test]
