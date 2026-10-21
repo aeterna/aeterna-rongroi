@@ -8,7 +8,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use super::{TraceAgeState, observations_of, scan_time, session, time_of, trace_ages};
+use super::{
+    TraceAgeState, observations_of, redact_profile_paths, scan_time, session, time_of, trace_ages,
+};
 use crate::model::{Mode, Observation, Report};
 
 /// How far before a session's start and after its end a window reaches (ADR 0078 section 3).
@@ -67,7 +69,8 @@ pub enum IdentityNotKnownReason {
     NotRead,
     /// The candidate has no program path, so nothing can be joined (ADR 0078 section 4).
     NoPath,
-    /// I3, I4 and I5 arrive with later work (ADR 0078 section 5, ADR 0079 section 5).
+    /// The fields I3 or I4 needs were not read, or I5 arrives with later work (ADR 0078 section 5,
+    /// ADR 0079 section 5).
     Deferred,
 }
 /// How many sessions' windows hold one of a candidate's times, out of the sessions found (R).
@@ -109,14 +112,24 @@ pub struct GameCandidate {
     pub i1: IdentityFact,
     /// I2: the file's embedded signature is not `valid`, including none (ADR 0035).
     pub i2: IdentityFact,
-    /// I3: its name contradicts what the file is (deferred to F2).
+    /// I3: its name contradicts what the file is or did (ADR 0078 section 5).
     pub i3: IdentityFact,
-    /// I4: its path is under a folder the account can write (deferred to F2).
+    /// I4: its path is under Temp or Downloads, or off the system drive (ADR 0078 section 5).
     pub i4: IdentityFact,
     /// I5: the change journal holds its rename or deletion (deferred, ADR 0079 section 5).
     pub i5: IdentityFact,
     /// R: how many sessions' windows hold one of its times.
     pub near_sessions: NearSessions,
+}
+impl GameCandidate {
+    /// The candidate as SS mode shows it: its path redacted as evidence rows are (ADR 0049).
+    fn redacted(mut self, profiles: Option<&str>) -> Self {
+        self.path = self
+            .path
+            .as_deref()
+            .map(|path| redact_profile_paths(path, profiles));
+        self
+    }
 }
 /// How many candidates have a time in each window, in both modes (ADR 0078 section 9).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -136,13 +149,14 @@ pub struct WindowCounts {
 pub struct GameWindows {
     /// One latest session per edition, then the earlier sessions Prefetch kept.
     pub sessions: Vec<GameSession>,
-    /// Self mode's candidates; empty in SS mode, which shows their counts instead.
+    /// Self mode's candidates; in SS mode only those with a true identity fact, their paths redacted.
     pub candidates: Vec<GameCandidate>,
     /// How many candidates each window holds, in both modes.
     pub counts: WindowCounts,
 }
 
-/// The game-windows view for `mode` (ADR 0078): every candidate in Self mode, counts only in SS.
+/// The game-windows view for `mode` (ADR 0078): every candidate in Self mode; in SS mode only those
+/// with a true identity fact, their paths redacted as rows are (ADR 0078 section 9).
 pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
     let sessions = timed_sessions(report);
     if sessions.is_empty() {
@@ -154,33 +168,36 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
     let found = sessions.len();
     let oldest = oldest_by_source(report);
     let files = RecordedFiles::of(report);
-    let candidates = match mode {
-        Mode::SelfCheck => {
-            let mut shown: Vec<(GameCandidate, i64)> = candidates
-                .into_iter()
-                .map(|candidate| {
-                    let earliest = candidate
-                        .times
-                        .iter()
-                        .map(|time| time.as_second())
-                        .min()
-                        .unwrap_or(i64::MAX);
-                    (
-                        with_facts(&candidate, &sessions, scan, &oldest, found, &files),
-                        earliest,
-                    )
-                })
-                .collect();
-            shown.sort_by(|(left, left_time), (right, right_time)| {
-                identity_rank(right)
-                    .cmp(&identity_rank(left))
-                    .then_with(|| true_facts(right).cmp(&true_facts(left)))
-                    .then_with(|| left_time.cmp(right_time))
-            });
-            shown.into_iter().map(|(candidate, _)| candidate).collect()
-        }
-        Mode::Ss => Vec::new(),
-    };
+    let mut shown: Vec<(GameCandidate, i64)> = candidates
+        .into_iter()
+        .map(|candidate| {
+            let earliest = candidate
+                .times
+                .iter()
+                .map(|time| time.as_second())
+                .min()
+                .unwrap_or(i64::MAX);
+            (
+                with_facts(&candidate, &sessions, scan, &oldest, found, &files),
+                earliest,
+            )
+        })
+        .collect();
+    shown.sort_by(|(left, left_time), (right, right_time)| {
+        identity_rank(right)
+            .cmp(&identity_rank(left))
+            .then_with(|| true_facts(right).cmp(&true_facts(left)))
+            .then_with(|| left_time.cmp(right_time))
+    });
+    let profiles = report.header.profiles_directory.as_deref();
+    let candidates = shown
+        .into_iter()
+        .filter_map(|(candidate, _)| match mode {
+            Mode::SelfCheck => Some(candidate),
+            Mode::Ss if has_identity_fact(&candidate) => Some(candidate.redacted(profiles)),
+            Mode::Ss => None,
+        })
+        .collect();
     GameWindows {
         sessions: sessions.iter().map(game_session).collect(),
         candidates,
@@ -230,13 +247,17 @@ impl<'r> RecordedFiles<'r> {
             .as_deref()
             .and_then(|path| self.by_path.get(&path.to_ascii_lowercase()).copied())
     }
-    /// I1 to I5 for `candidate`; I3, I4 and I5 wait for later work (ADR 0079 section 5).
+    /// I1 to I5 for `candidate`; I5 waits for its own ADR (ADR 0079 section 5).
     fn facts(&self, candidate: &Candidate) -> [IdentityFact; 5] {
-        let deferred = IdentityFact::NotKnown {
-            reason: IdentityNotKnownReason::Deferred,
-        };
+        let observation = self.joined(candidate);
         let (i1, i2) = self.time_and_signature_facts(candidate);
-        [i1, i2, deferred.clone(), deferred.clone(), deferred]
+        [
+            i1,
+            i2,
+            name_fact(candidate, observation),
+            location_fact(candidate, observation),
+            deferred(),
+        ]
     }
     /// I1 and I2 for `candidate`, from the `recorded_files` observation of its path.
     fn time_and_signature_facts(&self, candidate: &Candidate) -> (IdentityFact, IdentityFact) {
@@ -270,6 +291,193 @@ fn signature_fact(observation: &Observation) -> IdentityFact {
         Some("valid") => IdentityFact::False,
         _ => IdentityFact::True,
     }
+}
+/// A fact whose fields the scan did not read, or which arrives with later work.
+fn deferred() -> IdentityFact {
+    IdentityFact::NotKnown {
+        reason: IdentityNotKnownReason::Deferred,
+    }
+}
+/// Extensions a PE image may have without its name contradicting its content (ADR 0078 section 5).
+const PE_EXTENSIONS: [&str; 10] = [
+    "exe", "dll", "sys", "scr", "com", "cpl", "ocx", "drv", "efi", "mui",
+];
+/// Extensions of a program recorded running (ADR 0078 section 5).
+const PROGRAM_EXTENSIONS: [&str; 4] = ["exe", "com", "scr", "cpl"];
+/// Windows file names that belong under `%SystemRoot%` (ADR 0078 section 5).
+const SYSTEM_NAMES: [&str; 13] = [
+    "svchost",
+    "lsass",
+    "csrss",
+    "winlogon",
+    "services",
+    "smss",
+    "wininit",
+    "spoolsv",
+    "dllhost",
+    "conhost",
+    "taskhostw",
+    "ctfmon",
+    "rundll32",
+];
+/// I3: the recorded name contradicts what the file is or did (ADR 0078 section 5).
+fn name_fact(candidate: &Candidate, observation: Option<&Observation>) -> IdentityFact {
+    if name_contradicts(candidate, observation) {
+        return IdentityFact::True;
+    }
+    // The name shapes are all false. Only a read that says what the content is can make I3 false.
+    if observation.is_some_and(|observation| session::text(observation, "content_kind").is_some()) {
+        IdentityFact::False
+    } else {
+        deferred()
+    }
+}
+/// Whether any of I3's name, content or version-resource shapes holds (ADR 0078 section 5).
+fn name_contradicts(candidate: &Candidate, observation: Option<&Observation>) -> bool {
+    let recorded = candidate.name.as_str();
+    if !has_extension(recorded, &PROGRAM_EXTENSIONS)
+        || has_double_executable_extension(recorded)
+        || has_bidi_control(recorded)
+        || has_mixed_scripts(recorded)
+    {
+        return true;
+    }
+    let Some(observation) = observation else {
+        return false;
+    };
+    let file = candidate.path.as_deref().map_or(recorded, file_name);
+    content_contradicts_extension(observation, file)
+        || original_filename_contradicts(observation, file)
+        || is_system_name_outside_root(recorded, observation)
+}
+/// Whether the read of `observation` says `file` is a PE image under another kind of name.
+fn content_contradicts_extension(observation: &Observation, file: &str) -> bool {
+    let Some(kind) = session::text(observation, "content_kind") else {
+        return false;
+    };
+    matches!(kind, "pe_executable" | "pe_dll" | "pe_driver") && !has_extension(file, &PE_EXTENSIONS)
+}
+/// Whether the version resource's `OriginalFilename` differs from the file's own name, in ASCII case.
+fn original_filename_contradicts(observation: &Observation, file: &str) -> bool {
+    session::text(observation, "original_filename")
+        .is_some_and(|original| !original.eq_ignore_ascii_case(file))
+}
+/// Whether `name` ends in one of `allowed`, in ASCII case.
+fn has_extension(name: &str, allowed: &[&str]) -> bool {
+    extension(name).is_some_and(|extension| {
+        allowed
+            .iter()
+            .any(|allowed| extension.eq_ignore_ascii_case(allowed))
+    })
+}
+/// The extension of `name`: what follows its last dot, when it is not empty.
+fn extension(name: &str) -> Option<&str> {
+    name.rsplit_once('.')
+        .map(|(_, extension)| extension)
+        .filter(|extension| !extension.is_empty())
+}
+/// Whether `name` has a double extension that ends in a program's (ADR 0078 section 5).
+fn has_double_executable_extension(name: &str) -> bool {
+    let Some((stem, extension)) = name.rsplit_once('.') else {
+        return false;
+    };
+    PROGRAM_EXTENSIONS
+        .iter()
+        .any(|program| extension.eq_ignore_ascii_case(program))
+        && stem
+            .rsplit_once('.')
+            .is_some_and(|(_, earlier)| !earlier.is_empty())
+}
+/// Whether `name` carries a right-to-left override or another bidi control (ADR 0078 section 5).
+fn has_bidi_control(name: &str) -> bool {
+    name.chars()
+        .any(|character| matches!(character, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'))
+}
+/// Whether `name` has letters from more than one of Latin, Cyrillic and Greek (ADR 0078 section 5).
+fn has_mixed_scripts(name: &str) -> bool {
+    let mut seen = [false; 3];
+    for character in name.chars() {
+        if let Some(script) = script_of(character) {
+            seen[script as usize] = true;
+        }
+    }
+    seen.into_iter().filter(|seen| *seen).count() > 1
+}
+/// The script of `character`, for the three scripts a disguised name mixes.
+#[derive(Clone, Copy)]
+enum Script {
+    Latin,
+    Cyrillic,
+    Greek,
+}
+/// The script a letter belongs to, or `None` for anything else.
+fn script_of(character: char) -> Option<Script> {
+    match character {
+        '\u{0041}'..='\u{005A}'
+        | '\u{0061}'..='\u{007A}'
+        | '\u{00C0}'..='\u{024F}'
+        | '\u{1E00}'..='\u{1EFF}'
+        | '\u{2C60}'..='\u{2C7F}'
+        | '\u{A720}'..='\u{A7FF}'
+        | '\u{AB30}'..='\u{AB6F}'
+        | '\u{FF21}'..='\u{FF3A}'
+        | '\u{FF41}'..='\u{FF5A}' => Some(Script::Latin),
+        '\u{0400}'..='\u{052F}'
+        | '\u{1C80}'..='\u{1C8F}'
+        | '\u{2DE0}'..='\u{2DFF}'
+        | '\u{A640}'..='\u{A69F}' => Some(Script::Cyrillic),
+        '\u{0370}'..='\u{03FF}' | '\u{1F00}'..='\u{1FFF}' => Some(Script::Greek),
+        _ => None,
+    }
+}
+/// Whether `name` is a Windows file name kept outside `%SystemRoot%` (ADR 0078 section 5).
+fn is_system_name_outside_root(name: &str, observation: &Observation) -> bool {
+    let lower = name.to_ascii_lowercase();
+    let Some(stem) = lower.strip_suffix(".exe") else {
+        return false;
+    };
+    SYSTEM_NAMES.contains(&stem)
+        && observation
+            .fields
+            .get("under_system_root")
+            .and_then(serde_json::Value::as_bool)
+            == Some(false)
+}
+/// I4: the path is under a Temp or Downloads folder, or off the system drive (ADR 0078 section 5).
+fn location_fact(candidate: &Candidate, observation: Option<&Observation>) -> IdentityFact {
+    let Some(path) = candidate.path.as_deref() else {
+        return deferred();
+    };
+    if path_under_temp_or_downloads(path) {
+        return IdentityFact::True;
+    }
+    match observation
+        .and_then(|observation| observation.fields.get("on_system_drive"))
+        .and_then(serde_json::Value::as_bool)
+    {
+        Some(false) => IdentityFact::True,
+        Some(true) => IdentityFact::False,
+        None => deferred(),
+    }
+}
+/// Whether a folder of `path`, other than the file itself, is `Temp` or `Downloads`.
+fn path_under_temp_or_downloads(path: &str) -> bool {
+    let mut folders = path.split(['\\', '/']).peekable();
+    while let Some(folder) = folders.next() {
+        if folders.peek().is_some()
+            && (folder.eq_ignore_ascii_case("temp") || folder.eq_ignore_ascii_case("downloads"))
+        {
+            return true;
+        }
+    }
+    false
+}
+/// Whether `candidate` has a true identity fact among I1 to I4, which SS mode lists it for
+/// (ADR 0078 section 9). I5 is not computed yet (ADR 0079 section 5).
+fn has_identity_fact(candidate: &GameCandidate) -> bool {
+    [&candidate.i1, &candidate.i2, &candidate.i3, &candidate.i4]
+        .into_iter()
+        .any(|fact| *fact == IdentityFact::True)
 }
 fn game_session(session: &TimedSession) -> GameSession {
     GameSession {
