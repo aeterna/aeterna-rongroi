@@ -4847,6 +4847,32 @@ mod tests {
         );
     }
 
+    /// b13: two Prefetch records with the same name are two files, each with its own `.pf` hash, so
+    /// with no path candidate to join they stay two candidates rather than merging by name.
+    #[test]
+    fn b13_two_prefetch_records_with_one_name_stay_two_candidates() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("setup.exe", None, &["2026-01-10T09:40:00Z"]));
+        observations.push(prefetch_runs("setup.exe", None, &["2026-01-10T09:50:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let setups: Vec<&GameCandidate> = view
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("setup.exe"))
+            .collect();
+        assert_eq!(setups.len(), 2, "{setups:?}");
+        assert!(
+            setups.iter().all(|candidate| candidate.path.is_none()),
+            "{setups:?}"
+        );
+        assert!(
+            setups
+                .iter()
+                .all(|candidate| candidate.t1 == TimeFact::True),
+            "{setups:?}"
+        );
+    }
+
     /// c1 (control): Prefetch's trace age is later than the before window, so the missing before time
     /// is not known, not false.
     #[test]

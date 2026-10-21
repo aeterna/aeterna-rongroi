@@ -283,7 +283,6 @@ fn gather(
     scan: Option<jiff::Timestamp>,
 ) -> Vec<Candidate> {
     let mut paths: BTreeMap<String, Candidate> = BTreeMap::new();
-    let mut names: BTreeMap<String, Candidate> = BTreeMap::new();
     let mut standalone: Vec<Candidate> = Vec::new();
     let mut prefetch: Vec<Candidate> = Vec::new();
     for collector in ["prefetch", "bam", "pca", "process"] {
@@ -334,7 +333,8 @@ fn gather(
             })
             .map(|(key, _)| key.clone());
         // A Prefetch record joins the one path candidate whose file name is its own; with none or
-        // several it stays a candidate by its name (ADR 0078 section 4).
+        // several it stays a candidate of its own, as another Prefetch record of the same name is
+        // a different file (ADR 0078 section 4).
         match (matching.next(), matching.next()) {
             (Some(key), None) => {
                 if let Some(candidate) = paths.get_mut(&key) {
@@ -342,12 +342,11 @@ fn gather(
                     candidate.sources.extend(record.sources);
                 }
             }
-            _ => merge(&mut names, record.name.to_ascii_lowercase(), record),
+            _ => standalone.push(record),
         }
     }
     paths
         .into_values()
-        .chain(names.into_values())
         .chain(standalone)
         .filter(|candidate| hits_of(candidate, sessions, scan).any())
         .collect()
