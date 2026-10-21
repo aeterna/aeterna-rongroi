@@ -41,6 +41,35 @@ pub enum NotKnownReason {
         source: String,
     },
 }
+/// Whether a candidate's file identity fact is true, false, or not known (ADR 0078 section 5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "fact", rename_all = "snake_case")]
+pub enum IdentityFact {
+    /// The fact holds.
+    True,
+    /// The fact does not hold within what was read.
+    False,
+    /// The fact is not known.
+    NotKnown {
+        /// Why it is not known.
+        reason: IdentityNotKnownReason,
+    },
+}
+/// Why a file identity fact is not known (ADR 0079).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "reason", rename_all = "snake_case")]
+pub enum IdentityNotKnownReason {
+    /// A standard scan does not run `recorded_files` (ADR 0052, ADR 0079 amendment 7).
+    RecordedFilesNotRun,
+    /// `recorded_files` ran but holds no observation for the path.
+    NoObservationForPath,
+    /// The path was not read; `identity_read` says why.
+    NotRead,
+    /// The candidate has no program path, so nothing can be joined (ADR 0078 section 4).
+    NoPath,
+    /// I3, I4 and I5 arrive with later work (ADR 0078 section 5, ADR 0079 section 5).
+    Deferred,
+}
 /// How many sessions' windows hold one of a candidate's times, out of the sessions found (R).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NearSessions {
@@ -76,6 +105,16 @@ pub struct GameCandidate {
     pub t3: TimeFact,
     /// T4: a time in the before-the-scan window.
     pub t4: TimeFact,
+    /// I1: the recorded file is no longer at its path (ADR 0078 section 5).
+    pub i1: IdentityFact,
+    /// I2: the file's embedded signature is not `valid`, including none (ADR 0035).
+    pub i2: IdentityFact,
+    /// I3: its name contradicts what the file is (deferred to F2).
+    pub i3: IdentityFact,
+    /// I4: its path is under a folder the account can write (deferred to F2).
+    pub i4: IdentityFact,
+    /// I5: the change journal holds its rename or deletion (deferred, ADR 0079 section 5).
+    pub i5: IdentityFact,
     /// R: how many sessions' windows hold one of its times.
     pub near_sessions: NearSessions,
 }
@@ -114,6 +153,7 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
     let counts = counts_of(&candidates, &sessions, scan);
     let found = sessions.len();
     let oldest = oldest_by_source(report);
+    let files = RecordedFiles::of(report);
     let candidates = match mode {
         Mode::SelfCheck => {
             let mut shown: Vec<(GameCandidate, i64)> = candidates
@@ -126,16 +166,14 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
                         .min()
                         .unwrap_or(i64::MAX);
                     (
-                        with_facts(&candidate, &sessions, scan, &oldest, found),
+                        with_facts(&candidate, &sessions, scan, &oldest, found, &files),
                         earliest,
                     )
                 })
                 .collect();
             shown.sort_by(|(left, left_time), (right, right_time)| {
-                right
-                    .near_sessions
-                    .near
-                    .cmp(&left.near_sessions.near)
+                identity_rank(right)
+                    .cmp(&identity_rank(left))
                     .then_with(|| true_facts(right).cmp(&true_facts(left)))
                     .then_with(|| left_time.cmp(right_time))
             });
@@ -163,6 +201,75 @@ struct Candidate {
     times: Vec<jiff::Timestamp>,
     /// The collectors that recorded one of its times.
     sources: BTreeSet<&'static str>,
+}
+/// The `recorded_files` observations by path, ignoring ASCII case (ADR 0079 amendment 7).
+struct RecordedFiles<'r> {
+    by_path: BTreeMap<String, &'r Observation>,
+    /// Whether `recorded_files` ran at all: a standard scan does not run it.
+    ran: bool,
+}
+impl<'r> RecordedFiles<'r> {
+    /// Every `recorded_files` observation the report holds, joined by its path.
+    fn of(report: &'r Report) -> Self {
+        let mut by_path = BTreeMap::new();
+        let mut ran = false;
+        for observation in observations_of(report, "recorded_files") {
+            ran = true;
+            if let Some(path) = session::text(observation, "path") {
+                by_path
+                    .entry(path.to_ascii_lowercase())
+                    .or_insert(observation);
+            }
+        }
+        Self { by_path, ran }
+    }
+    /// The observation of `candidate`'s path, when the collector holds one.
+    fn joined(&self, candidate: &Candidate) -> Option<&'r Observation> {
+        candidate
+            .path
+            .as_deref()
+            .and_then(|path| self.by_path.get(&path.to_ascii_lowercase()).copied())
+    }
+    /// I1 to I5 for `candidate`; I3, I4 and I5 wait for later work (ADR 0079 section 5).
+    fn facts(&self, candidate: &Candidate) -> [IdentityFact; 5] {
+        let deferred = IdentityFact::NotKnown {
+            reason: IdentityNotKnownReason::Deferred,
+        };
+        let (i1, i2) = self.time_and_signature_facts(candidate);
+        [i1, i2, deferred.clone(), deferred.clone(), deferred]
+    }
+    /// I1 and I2 for `candidate`, from the `recorded_files` observation of its path.
+    fn time_and_signature_facts(&self, candidate: &Candidate) -> (IdentityFact, IdentityFact) {
+        let Some(observation) = self.joined(candidate) else {
+            let reason = if candidate.path.is_none() {
+                IdentityNotKnownReason::NoPath
+            } else if self.ran {
+                IdentityNotKnownReason::NoObservationForPath
+            } else {
+                IdentityNotKnownReason::RecordedFilesNotRun
+            };
+            let fact = IdentityFact::NotKnown { reason };
+            return (fact.clone(), fact);
+        };
+        match session::text(observation, "identity_read") {
+            // A missing file is gone (I1) and has no embedded signature (I2).
+            Some("missing") => (IdentityFact::True, IdentityFact::True),
+            Some("read") => (IdentityFact::False, signature_fact(observation)),
+            _ => {
+                let fact = IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::NotRead,
+                };
+                (fact.clone(), fact)
+            }
+        }
+    }
+}
+/// I2: true unless the file's embedded signature verified as `valid` (ADR 0035).
+fn signature_fact(observation: &Observation) -> IdentityFact {
+    match session::text(observation, "signature") {
+        Some("valid") => IdentityFact::False,
+        _ => IdentityFact::True,
+    }
 }
 fn game_session(session: &TimedSession) -> GameSession {
     GameSession {
@@ -411,13 +518,15 @@ enum WindowKind {
     After,
     BeforeScan,
 }
-/// One candidate's T1 to T4 and R, from the windows known and their sources' trace ages.
+/// One candidate's T1 to T4, R and I1 to I5, from the windows known and the identity the
+/// `recorded_files` observation of its path carries.
 fn with_facts(
     candidate: &Candidate,
     sessions: &[TimedSession],
     scan: Option<jiff::Timestamp>,
     oldest: &BTreeMap<&'static str, Option<jiff::Timestamp>>,
     found: usize,
+    files: &RecordedFiles<'_>,
 ) -> GameCandidate {
     let near = sessions
         .iter()
@@ -428,6 +537,7 @@ fn with_facts(
                 .any(|time| hits(session, *time, scan).any())
         })
         .count();
+    let [i1, i2, i3, i4, i5] = files.facts(candidate);
     GameCandidate {
         name: candidate.name.clone(),
         path: candidate.path.clone(),
@@ -435,6 +545,11 @@ fn with_facts(
         t2: fact(WindowKind::During, candidate, sessions, scan, oldest),
         t3: fact(WindowKind::After, candidate, sessions, scan, oldest),
         t4: fact(WindowKind::BeforeScan, candidate, sessions, scan, oldest),
+        i1,
+        i2,
+        i3,
+        i4,
+        i5,
         near_sessions: NearSessions { near, found },
     }
 }
@@ -565,6 +680,15 @@ fn oldest_by_source(report: &Report) -> BTreeMap<&'static str, Option<jiff::Time
         oldest.entry(source).or_insert(time);
     }
     oldest
+}
+/// How many of R (near at least two sessions) and I1 to I4 are true, for the view's ordering
+/// (ADR 0078 section 5). I5 waits for its own ADR (ADR 0079 section 5).
+fn identity_rank(candidate: &GameCandidate) -> usize {
+    usize::from(candidate.near_sessions.near >= 2)
+        + [&candidate.i1, &candidate.i2, &candidate.i3, &candidate.i4]
+            .into_iter()
+            .filter(|fact| **fact == IdentityFact::True)
+            .count()
 }
 /// How many of T1 to T4 are true, for the view's ordering (ADR 0078 section 5).
 fn true_facts(candidate: &GameCandidate) -> usize {
