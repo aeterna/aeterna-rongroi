@@ -100,7 +100,7 @@ const REASONS: [UnmeasuredReason; 8] = [
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
 /// the comment on [`Prefetch::collect`].
-const FIELDS: [Field; 17] = [
+const FIELDS: [Field; 18] = [
     Field::number("enable_prefetcher"),
     Field::number("entries"),
     Field::number("files"),
@@ -116,6 +116,7 @@ const FIELDS: [Field; 17] = [
     Field::number("recorded_runs"),
     Field::number("rejected"),
     Field::number("run_count"),
+    Field::timestamp_list("run_times"),
     Field::number("scca_version"),
     Field::text("volumes_withheld"),
 ];
@@ -126,13 +127,14 @@ const FIELDS: [Field; 17] = [
 /// all describe a folder this collector **did** read, so gapping `files`, `entries`, `rejected` or
 /// `intact` — which were measured — would claim it had not. The reasons that describe a folder
 /// nothing was read from keep gapping every field (ADR 0030).
-const RECORD_FIELDS: [&str; 7] = [
+const RECORD_FIELDS: [&str; 8] = [
     fivem_edition::FIELD,
     "last_run",
     "name",
     "path",
     "recorded_runs",
     "run_count",
+    "run_times",
     "scca_version",
 ];
 
@@ -455,6 +457,19 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
             serde_json::Value::from(at.to_string()),
         );
     }
+    // Every run time the file still holds, newest first and at most eight. The unrepresentable ones
+    // are left out rather than invented; the representable ones stay, in time order. Read only by
+    // the game-windows view, never put on the timeline (ADR 0078 section 6).
+    let mut run_times: Vec<jiff::Timestamp> =
+        record.last_runs.iter().filter_map(|run| run.at).collect();
+    // The file's order is not always the clock's: one fixture holds two runs a fraction of a second
+    // out of place, so the list is ordered here rather than trusted as read.
+    run_times.sort_unstable_by(|left, right| right.cmp(left));
+    let run_times: Vec<serde_json::Value> = run_times
+        .into_iter()
+        .map(|at| serde_json::Value::from(at.to_string()))
+        .collect();
+    fields.insert("run_times".to_owned(), serde_json::Value::Array(run_times));
     fields.insert(
         "scca_version".to_owned(),
         serde_json::Value::from(record.scca_version),

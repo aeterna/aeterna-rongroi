@@ -54,6 +54,13 @@ pub const NAME_ONLY_COLLECTORS: [&str; 3] = ["bam", "pca", "prefetch"];
 /// The fields [`NAME_ONLY_COLLECTORS`] carry that name a program.
 pub const NAMING_FIELDS: [&str; 2] = ["name", "path"];
 
+/// Observation fields that hold a list of instants rather than one value (ADR 0078 section 6).
+///
+/// A comparison asks about one value, so no rule may name one of these. `cargo xtask check-rules`
+/// enforces the same rule for every field a collector declares as a list of timestamps, using the
+/// collectors' own declaration; this list is what the bundle loader can know without them.
+const TIMESTAMP_LIST_FIELDS: [&str; 1] = ["run_times"];
+
 /// Lifecycle of a rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -633,6 +640,7 @@ fn validate_rule(rule: &Rule, report: &mut impl FnMut(String)) {
     }
     validate_cased(rule, report);
     validate_role(rule, report);
+    validate_timestamp_lists(rule, report);
     if rule.falsepositives.is_empty() || rule.falsepositives.iter().any(|f| f.trim().is_empty()) {
         report("`falsepositives` must list what legitimately produces this evidence".to_owned());
     }
@@ -704,6 +712,35 @@ fn validate_role(rule: &Rule, report: &mut impl FnMut(String)) {
                     }
                 }
             }
+        }
+    }
+}
+
+/// Refuses a `match` or `match_lists` entry that names a list of instants.
+///
+/// A list is not one value a comparison can ask about: the engine would compare the array and the
+/// rule would be `not_found` on every machine. The bundle loader expands `match_lists` into `match`
+/// before this runs, so the first loop covers the expanded form; the second covers the file as the
+/// author wrote it, which is what the message should say (ADR 0078 section 6).
+fn validate_timestamp_lists(rule: &Rule, report: &mut impl FnMut(String)) {
+    let mut named = BTreeSet::new();
+    for key in rule.matcher.keys() {
+        let field = parse_match_key(key).field();
+        if TIMESTAMP_LIST_FIELDS.contains(&field) {
+            named.insert(field);
+            report(format!(
+                "a rule on `{}` may not match `{field}`: it is a list of timestamps, not one value a comparison can ask about (ADR 0078)",
+                rule.collector
+            ));
+        }
+    }
+    for key in rule.match_lists.keys() {
+        let field = parse_match_key(key).field();
+        if TIMESTAMP_LIST_FIELDS.contains(&field) && !named.contains(field) {
+            report(format!(
+                "a rule on `{}` may not name `{field}` in `match_lists`: it is a list of timestamps, not one value a comparison can ask about (ADR 0078)",
+                rule.collector
+            ));
         }
     }
 }
@@ -1591,7 +1628,7 @@ date: 2026-09-15
     /// The control: `last_run` is the one time a rule on Prefetch may match, and this change leaves
     /// it alone.
     #[test]
-    fn a_rule_that_matches_prefetchs_last_run_is_allowed() {
+    fn a_rule_that_matches_prefetch_last_run_is_allowed() {
         let rule = name_only(
             "prefetch",
             "evidence",

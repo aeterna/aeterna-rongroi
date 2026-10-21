@@ -353,6 +353,14 @@ fn check_operator(
     let key = operator
         .as_str()
         .map_or_else(|| field.to_owned(), |name| format!("{field}|{name}"));
+    // A list is not a value any operator can compare against, so the operator does not matter:
+    // every `match` that names one is refused, naming the rule and the field (ADR 0078 section 6).
+    if kind == FieldKind::TimestampList {
+        problems.push(format!(
+            "rules/{path}: `match` key `{key}` names `{field}`, which the `{collector}` collector emits as a list of timestamps; no comparison can match a list of timestamps (ADR 0078 section 6)"
+        ));
+        return;
+    }
     if operator.is_ordinal() {
         match kind {
             FieldKind::Number if !holds(value, serde_json::Value::is_number) => problems.push(format!(
@@ -362,7 +370,7 @@ fn check_operator(
                 "rules/{path}: `match` key `{key}` puts values in order, and the `{collector}` collector emits `{field}` as a timestamp, so the value must be an RFC 3339 timestamp such as `2026-09-13T00:00:00Z`"
             )),
             FieldKind::Number | FieldKind::Timestamp => {}
-            FieldKind::Text | FieldKind::Bool => problems.push(format!(
+            FieldKind::Text | FieldKind::Bool | FieldKind::TimestampList => problems.push(format!(
                 "rules/{path}: `match` key `{key}` puts values in order, which the `{collector}` collector's `{field}` cannot be: it emits {}. `gt`, `gte`, `lt` and `lte` need a number or a timestamp",
                 kind.as_str()
             )),
@@ -1332,7 +1340,7 @@ date: 2026-09-11
 
     /// The control: matching Prefetch's `last_run` is allowed, before and after the list joins it.
     #[test]
-    fn a_match_on_prefetchs_last_run_is_accepted() {
+    fn a_match_on_prefetch_last_run_is_accepted() {
         let problems = checked_rule(
             &prefetch_rule("  last_run|lt: \"2026-09-13T00:00:00Z\"\n"),
             &[],

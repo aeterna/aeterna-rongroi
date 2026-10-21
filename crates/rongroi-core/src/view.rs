@@ -4743,7 +4743,7 @@ mod tests {
     /// c1 (control): Prefetch's trace age is later than the before window, so the missing before time
     /// is not known, not false.
     #[test]
-    fn c1_a_window_before_prefetchs_trace_age_is_not_known() {
+    fn c1_a_window_before_prefetch_trace_age_is_not_known() {
         let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
         observations.push(prefetch_runs("during.exe", None, &["2026-01-10T10:15:00Z"]));
         let view = game_windows(&game_report(observations), Mode::SelfCheck);
