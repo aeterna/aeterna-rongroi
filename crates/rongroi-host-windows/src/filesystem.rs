@@ -207,4 +207,28 @@ mod tests {
         std::fs::set_permissions(&set, permissions).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
     }
+
+    /// The stream is read from a real file system, and a file without one has none (ADR 0079 section
+    /// 1). The stream is written to a file this test created in its own temporary folder, never to
+    /// anything a scan reads.
+    #[cfg(windows)]
+    #[test]
+    fn the_zone_identifier_stream_is_read_from_a_real_file() {
+        let dir = std::env::temp_dir().join(format!("rongroi-zone-id-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let with_stream = dir.join("with-stream.bin");
+        let plain = dir.join("plain.bin");
+        std::fs::write(&with_stream, b"x").unwrap();
+        std::fs::write(&plain, b"x").unwrap();
+        let stream = b"[ZoneTransfer]\r\nZoneId=3\r\n";
+        let mut stream_path = with_stream.as_os_str().to_os_string();
+        stream_path.push(":Zone.Identifier");
+        std::fs::write(&stream_path, stream).unwrap();
+
+        let answer = |path: &std::path::Path| LiveHost.zone_identifier(path.to_str().unwrap());
+        assert_eq!(answer(&with_stream), Ok(Some(stream.to_vec())));
+        assert_eq!(answer(&plain), Ok(None));
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

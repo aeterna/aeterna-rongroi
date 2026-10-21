@@ -2273,6 +2273,81 @@ processes:
         ));
     }
 
+    /// The stream is a property of one file: what the fixture wrote, absent for a file that wrote
+    /// none, and absent for a file the fixture never listed (ADR 0079 section 1).
+    #[test]
+    fn the_zone_identifier_stream_is_the_one_the_fixture_wrote() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: downloaded.exe\n      content: x\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\n\"\n    - name: local.exe\n      content: x\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.zone_identifier(r"C:\p\downloaded.exe"),
+            Ok(Some(b"[ZoneTransfer]\r\nZoneId=3\r\n".to_vec()))
+        );
+        assert_eq!(host.zone_identifier(r"C:\p\local.exe"), Ok(None));
+        assert_eq!(host.zone_identifier(r"C:\p\absent.exe"), Ok(None));
+    }
+
+    /// The refusal runs before the suffix is joined and before the fixture is looked up: a refused
+    /// form is `Failed` even when normalising it would reach a file that carries a stream (ADR 0048).
+    #[test]
+    fn a_refused_path_fails_before_its_stream_is_looked_up() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: downloaded.exe\n      content: x\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\n\"\n",
+            "inline",
+        )
+        .unwrap();
+        assert!(matches!(
+            host.zone_identifier(r"C:\p\..\p\downloaded.exe"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// Exactly the limit is read whole and one byte more is refused whole, never truncated; a host
+    /// on another platform has no streams to read (ADR 0079 section 1).
+    #[test]
+    fn a_stream_over_the_limit_is_too_large_and_another_platform_is_unsupported() {
+        let limit = crate::MAX_STREAM_BYTES;
+        assert_eq!(limit, 64 * 1024);
+        let at_limit = "a".repeat(limit);
+        let over_limit = "a".repeat(limit + 1);
+        let host = FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: at-limit.bin\n      zone_identifier: \"{at_limit}\"\n    - name: over-limit.bin\n      zone_identifier: \"{over_limit}\"\n"
+            ),
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.zone_identifier(r"C:\p\at-limit.bin"),
+            Ok(Some(at_limit.into_bytes()))
+        );
+        assert_eq!(
+            host.zone_identifier(r"C:\p\over-limit.bin"),
+            Err(SourceError::TooLarge { limit })
+        );
+        assert!(matches!(
+            crate::NonWindowsHost.zone_identifier(r"C:\p\at-limit.bin"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// Hex is how a fixture describes bytes a YAML file cannot hold, such as a PE's header.
+    #[test]
+    fn content_hex_is_the_bytes_the_fixture_wrote() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: pe.bin\n      content_hex: \"4d5a00ff\"\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.read_file(r"C:\p\pe.bin"),
+            Ok(Some(vec![0x4d, 0x5a, 0x00, 0xff]))
+        );
+    }
+
     #[test]
     fn a_file_describing_its_bytes_twice_is_rejected() {
         let error = FixtureHost::from_yaml_str(
