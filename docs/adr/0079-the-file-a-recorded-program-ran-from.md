@@ -268,7 +268,7 @@ differs from this ADR and from ADR 0078 section 5 in these places:
    process list is a second snapshot that can differ from `process`'s. Each file is opened up to four times
    (bytes, hash, signature, stream), so a file replaced between them can give a hash and a content kind of
    different bytes. The hash of a `too_large` file reads the whole file, and the budget is checked only
-   between files, so one very large file can overrun it. An unreadable or unparseable stream leaves no
+   between files, so one very large file can overrun it. An unreadable or unparsable stream leaves no
    marker beside an absent one. `ZoneId=+3` parses as 3.
 10. **The fixture host** gained `content_hex:` for registry binaries and file contents, and
     `zone_identifier:` for a file's stream, because a patch from the delegation wrapper cannot carry binary
