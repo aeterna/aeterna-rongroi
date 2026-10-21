@@ -9,7 +9,90 @@
 //! module keeps only the zone id and the host, reduced as [`crate::powershell_text::DownloadHost`]
 //! reduces it.
 
+use crate::error::ParseError;
+use crate::powershell_text::{DownloadHost, first_url_host};
+
+/// What one `Zone.Identifier` stream says: its zone and its download host, and nothing else.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ZoneIdentifier {
+    /// The `ZoneId` number, when the section has one that fits a `u32`.
+    pub zone_id: Option<u32>,
+    /// The host of `HostUrl`, reduced as [`DownloadHost`] says; `None` when it is absent or is not an
+    /// `http`/`https` URL.
+    pub host: Option<DownloadHost>,
+}
+
+/// Parses a `Zone.Identifier` stream (ADR 0079 section 2).
+///
+/// Reads UTF-8 with an optional BOM, or UTF-16LE with a BOM. Only `ZoneId` and `HostUrl` in the
+/// `[ZoneTransfer]` section are kept; every other key and the rest of each value is dropped here.
+///
+/// # Errors
+///
+/// [`ParseError::Malformed`] with the field `"zone_identifier"` when the bytes are not text in either
+/// encoding, or when there is no `[ZoneTransfer]` section.
+pub fn parse(bytes: &[u8]) -> Result<ZoneIdentifier, ParseError> {
+    let text = decode_text(bytes).ok_or_else(not_text)?;
+    let mut zone = ZoneIdentifier::default();
+    let mut saw_section = false;
+    let mut in_section = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') && line.ends_with(']') {
+            in_section = line.eq_ignore_ascii_case("[ZoneTransfer]");
+            saw_section |= in_section;
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        if key.eq_ignore_ascii_case("ZoneId") {
+            zone.zone_id = value.trim().parse::<u32>().ok();
+        } else if key.eq_ignore_ascii_case("HostUrl") {
+            zone.host = first_url_host(value.trim());
+        }
+    }
+    if saw_section {
+        Ok(zone)
+    } else {
+        Err(ParseError::Malformed {
+            field: "zone_identifier",
+            detail: "no [ZoneTransfer] section".to_owned(),
+        })
+    }
+}
+
+/// Decodes the stream's text, or `None` when the bytes are not UTF-8 or BOM-marked UTF-16LE.
+fn decode_text(bytes: &[u8]) -> Option<String> {
+    if let Some(rest) = bytes.strip_prefix(&[0xFF, 0xFE]) {
+        if rest.len() % 2 != 0 {
+            return None;
+        }
+        let units: Vec<u16> = rest
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| u16::from_le_bytes(*pair))
+            .collect();
+        return String::from_utf16(&units).ok();
+    }
+    let rest = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
+    std::str::from_utf8(rest).ok().map(str::to_owned)
+}
+
+fn not_text() -> ParseError {
+    ParseError::Malformed {
+        field: "zone_identifier",
+        detail: "not UTF-8 or UTF-16LE text".to_owned(),
+    }
+}
+
 #[cfg(test)]
+#[allow(clippy::match_wildcard_for_single_variants)] // any variant other than Malformed must fail the test
 mod tests {
     use crate::error::ParseError;
     use crate::powershell_text::{AddressKind, DownloadHost};
