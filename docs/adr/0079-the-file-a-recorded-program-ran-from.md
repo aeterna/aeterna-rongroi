@@ -204,3 +204,30 @@ timestamp changed") is wrong on such a PC. Creation and last-write times are unt
 
 The owner decides whether the stream method may merge on these terms. Until then it stays unmerged, as
 section 1 says.
+
+## Amendment (2026-10-21): owner decisions 6 and 7
+
+6. **The stream read is accepted on the measured terms.** It moves the file's last-access time on a PC with
+   last-access updates enabled, as every read this program already makes does. The change that adds
+   `zone_identifier` also corrects the Windows host's `read_file` comment ("no timestamp changed").
+   `PRIVACY.md` says so from this change on, for every read, not only the stream.
+7. **One full-tier collector, `recorded_files`, replaces sections 3 and 4.** A collector cannot tell a
+   full scan from a standard one: `scan::run` does not call a full-tier collector in a standard scan
+   (ADR 0052), and `Collector::collect` takes only the host. Identity reads therefore move out of `bam`,
+   `pca`, `process` and `autostart` into one collector whose tier is `full`:
+   - It finds the program paths those four collectors emit, through the same host calls and their
+     path-resolving functions, which are shared and not copied. It keeps drive-rooted paths only, and makes
+     one observation per distinct path, comparing paths ignoring ASCII case.
+   - Each observation carries `path`, `name`, which sources recorded it (`by_bam`, `by_pca`, `by_process`,
+     `by_autostart`, booleans), `identity_read`, and the identity fields of section 3's table. The view
+     joins these observations to its candidates by path.
+   - Its budget is 90 seconds, the total owner decision 1 allowed, checked between files. Paths are read
+     nearest first to the newest FiveM or GTA V record that its sources hold, and newest first when they
+     hold none.
+   - `bam`, `pca`, `process` and `autostart` emit nothing new. `bam`'s fallback to
+     `std::path::Path::exists` still goes through the host instead, in the same change, so no collector
+     makes an OS call of its own.
+   - No rule ships with `recorded_files`, and SS mode shows its fields only through the game-windows view
+     (section 6). A rule written on it later follows the ordinary SS rules for evidence.
+   - Its run-wide gaps are those of its sources: a registry or process list it could not read. A file it
+     could not read is never a gap; `identity_read` says why.
