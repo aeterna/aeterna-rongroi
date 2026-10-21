@@ -1,6 +1,7 @@
 # ADR 0079 — The file a recorded program ran from
 
-- Status: proposed — five owner questions under "Owner decisions"; nothing is built
+- Status: accepted — the owner decided the five questions below on 2026-10-21, each as recommended;
+  nothing is built
 - Date: 2026-10-21
 - Related: ADR 0019 (reading file bytes), ADR 0034 (Prefetch, BAM and PCA carry no identity), ADR 0035
   (signatures), ADR 0044 (gaps for one place), ADR 0048 (refused path forms, R1), ADR 0052 (full scan and
@@ -138,16 +139,14 @@ it was given, without reporting names. That is a privacy change to ADR 0047 and 
   Windows' records point at, their signature and content kind, their download zone, and the host they came
   from.
 
-## Owner decisions (pending)
+## Owner decisions (2026-10-21, each as recommended)
 
-1. **Budget:** 30 seconds per collector, so up to 90 s more in a full scan (recommended), or 30 seconds
-   shared by the three collectors.
-2. **Order:** nearest to the collector's newest FiveM/GTA V record first (recommended), or newest first.
-3. **I5 deferred** to its own ADR on the change journal (recommended), or I5 dropped from ADR 0078.
-4. **`download_host` in SS mode** under ADR 0064's existing question (recommended), or never shown in SS
-   mode.
-5. **The stream measurement** (section 1 precondition) on `pik-windows` before the stream method merges
-   (recommended), or on another Windows 11 PC that Pik names.
+1. **Budget:** 30 seconds per collector, so up to 90 s more in a full scan.
+2. **Order:** nearest to the collector's newest FiveM/GTA V record first.
+3. **I5 deferred** to its own ADR on the change journal.
+4. **`download_host` in SS mode** under ADR 0064's existing question.
+5. **The stream measurement** (section 1 precondition) on the owner's Windows 11 PC before the stream
+   method merges.
 
 ## Alternatives weighed
 
