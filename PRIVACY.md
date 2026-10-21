@@ -287,6 +287,14 @@ What a full scan reads today:
   unspecified. PowerShell itself leaves out of its history every line holding the words password, token,
   key or secret. Whether that history is the one of the account signed in at the keyboard is said as `same`
   or `other`, by comparing two account IDs that are never put in the report.
+- **The files of programs Windows recorded running** (ADR 0079): for each path BAM, the Program
+  Compatibility Assistant or the list of running programs names, the file at that path is read for what
+  kind of content it holds (whether its bytes match its name, whether data trails its end, whether a
+  program is hidden inside), its hash, its digital signature, the original file name in its version
+  information, and its `Zone.Identifier` stream: the download zone Windows wrote on it and the name of the
+  website it came from. The rest of the download address and the page that linked to it are never kept.
+  The website's name is shown in SS mode only if you agree to that separately, as for PowerShell. Files
+  are read nearest your last FiveM or GTA V session first, for up to 90 seconds in total.
 
 A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
 reads a browser's history, a messenger's storage, or anything that holds a password or a token.
