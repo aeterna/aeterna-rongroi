@@ -273,3 +273,20 @@ places. Each is recorded here and is not a change of decision:
 4. **Facts with no history behind them (section 5).** A running process has no trace age. A fact that
    rests on a `process` time is therefore "true" or "not known", never "false". When a candidate was seen
    by several collectors, its fact is "false" only when every one of them covers the window.
+
+## As built: P2 (2026-10-21)
+
+P2 shipped in workstream R-06: `rongroi_parsers::content_kind::parse` and
+`rongroi_parsers::pe_version::original_filename`. Each has a fuzz target. Neither is called by a collector
+yet; that is P3. The build differs from section 8 in three places:
+
+1. **The whole file, not its first and last bytes.** `trailing_data` is decided by walking the format to
+   its own end: PNG chunks, JPEG segments and then the scan, GIF blocks, and the zip end-of-central-directory
+   record. A head and a tail cannot answer that, so the parser takes the whole file. P3 sets the largest
+   file a collector reads; a larger file is not read.
+2. **Two decisions are deliberately narrow.** `trailing_data` is decided only for PNG, JPEG, GIF and zip,
+   and is "not decided" for every other kind. `embedded_pe` is decided only for a file that is not itself a
+   PE, because installers legitimately carry other PEs.
+3. **No seed fixtures of their own.** The delegation wrapper cannot carry binary files in a patch. The two
+   fuzz targets therefore start from the repository's other fixtures, and their tests build their bytes in
+   code.
