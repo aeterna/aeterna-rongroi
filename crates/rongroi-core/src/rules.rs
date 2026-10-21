@@ -1550,6 +1550,57 @@ date: 2026-09-15
         assert_eq!(problems_at("process", &elsewhere), Vec::<String>::new());
     }
 
+    /// `run_times` is a list of times, not one value a comparison can ask about: the bundle loader
+    /// refuses a `match` that names it, as it refuses name and path on a name-only record
+    /// (ADR 0078 section 6).
+    #[test]
+    fn a_rule_that_matches_a_timestamp_list_field_is_refused() {
+        let rule = name_only(
+            "prefetch",
+            "evidence",
+            "execution",
+            "  run_times: \"2025-12-30T00:00:00Z\"\n",
+        );
+        let problems = problems_at("prefetch", &rule);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The same through `match_lists`: a listed field expands into `match`, and a list of times
+    /// cannot be matched by equality either.
+    #[test]
+    fn a_match_lists_entry_for_a_timestamp_list_field_is_refused() {
+        let rule = name_only("prefetch", "evidence", "execution", "  run_count|gte: 1\n").replace(
+            "retention:",
+            "match_lists:\n  run_times: run_times.csv\nretention:",
+        );
+        let problems = problems_at("prefetch", &rule);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(problems[0].contains("match_lists"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The control: `last_run` is the one time a rule on Prefetch may match, and this change leaves
+    /// it alone.
+    #[test]
+    fn a_rule_that_matches_prefetchs_last_run_is_allowed() {
+        let rule = name_only(
+            "prefetch",
+            "evidence",
+            "execution",
+            "  last_run|lt: \"2026-09-13T00:00:00Z\"\n",
+        );
+        assert_eq!(problems_at("prefetch", &rule), Vec::<String>::new());
+    }
+
     #[test]
     fn a_timeline_selector_is_context() {
         let selector = name_only("usn", "timeline", "tamper", "  folder: identified\n");

@@ -575,6 +575,7 @@ mod tests {
     use std::path::PathBuf;
 
     use rongroi_host::{FixtureHost, NonWindowsHost};
+    use rongroi_parsers::prefetch::PrefetchRun;
 
     use super::*;
 
@@ -602,6 +603,21 @@ mod tests {
 
     fn text<'a>(observation: &'a Observation, name: &str) -> Option<&'a str> {
         field(observation, name).and_then(serde_json::Value::as_str)
+    }
+
+    /// Every run time the observation carries, in the order it emitted them.
+    fn run_times_of(observation: &Observation) -> Vec<String> {
+        field(observation, "run_times")
+            .and_then(serde_json::Value::as_array)
+            .expect("an execution observation carries run_times")
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .expect("every run time is an RFC 3339 string")
+                    .to_owned()
+            })
+            .collect()
     }
 
     /// The one observation that says what the folder held.
@@ -649,6 +665,79 @@ mod tests {
             text(records[0], "last_run"),
             Some("2016-01-12T20:07:03.9810694Z")
         );
+    }
+
+    /// Every run time the Windows 10 fixture holds is representable, so `run_times` carries all
+    /// eight, newest first, and its first entry is the `last_run` the collector already emitted
+    /// (ADR 0078 section 6).
+    #[test]
+    fn the_windows_10_fixture_emits_every_run_time_newest_first() {
+        let run = Prefetch.collect(&fixture("prefetch-files-present"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        let record = executions(observations)[0];
+
+        let times = run_times_of(record);
+        assert!(!times.is_empty(), "{times:?}");
+        assert_eq!(
+            field(record, "recorded_runs").and_then(serde_json::Value::as_u64),
+            Some(times.len() as u64),
+            "every recorded run in this fixture is representable: {times:?}"
+        );
+        assert_eq!(Some(times[0].as_str()), text(record, "last_run"));
+        let instants: Vec<jiff::Timestamp> = times
+            .iter()
+            .map(|time| time.parse().expect("an RFC 3339 timestamp"))
+            .collect();
+        assert!(
+            instants.windows(2).all(|pair| pair[0] >= pair[1]),
+            "run_times is not newest first: {times:?}"
+        );
+
+        let declared = FIELDS
+            .iter()
+            .find(|field| field.name == "run_times")
+            .expect("the collector declares run_times");
+        // The ADR names the new variant; `Debug` keeps this test independent of `as_str`'s wording.
+        assert_eq!(format!("{:?}", declared.kind), "TimestampList");
+        assert!(
+            !declared.on_timeline,
+            "run_times must not put its up to eight times on the timeline"
+        );
+    }
+
+    /// A raw `FILETIME` that names no representable instant is left out, and the older runs that
+    /// are representable stay in order. `last_run` stays absent, as it was before the list existed.
+    #[test]
+    fn an_unrepresentable_newest_run_is_left_out_and_the_older_runs_are_kept() {
+        let newest = "2016-01-12T20:07:03.9810694Z".to_owned();
+        let older = "2016-01-11T20:07:03.9810694Z".to_owned();
+        let instant = |value: &str| Some(value.parse::<jiff::Timestamp>().expect("test instant"));
+        let record = PrefetchRecord {
+            scca_version: 30,
+            executable: "CMD.EXE".to_owned(),
+            run_count: 3,
+            last_runs: vec![
+                PrefetchRun {
+                    filetime: u64::MAX,
+                    at: None,
+                },
+                PrefetchRun {
+                    filetime: 2,
+                    at: instant(&newest),
+                },
+                PrefetchRun {
+                    filetime: 1,
+                    at: instant(&older),
+                },
+            ],
+            volumes: Vec::new(),
+            loaded_files: Vec::new(),
+        };
+
+        let observation = execution(r"C:\Windows\Prefetch\CMD.EXE-D269B812.pf", &record, None);
+        assert_eq!(text(&observation, "last_run"), None);
+        assert_eq!(run_times_of(&observation), vec![newest, older]);
     }
 
     /// The account is what a rule can ask a question of: an emptied folder is `files: 0`, and a
