@@ -208,6 +208,42 @@ impl Collector for Pca {
     }
 }
 
+/// The program paths `PcaAppLaunchDic.txt` names, for `recorded_files` (ADR 0079 amendment 7).
+///
+/// Only the path of a launch line matters here, so a line whose timestamp did not parse still names
+/// its program: the path is the text before the first `|`, as the parser defines it.
+/// A rejected line with no such prefix leaves an unknown path, which is `partial`; a file that could
+/// not be read or is not PCA text leaves all of them, which is that reason. The general databases
+/// contribute no paths, so their state says nothing here.
+pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<String>, UnmeasuredReason> {
+    let Some(dir) = pca_dir(host) else {
+        return Err(UnmeasuredReason::ReadFailed);
+    };
+    let path = format!(r"{dir}\{}", SOURCES[0].1);
+    let bytes = match host.read_file(&path) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Ok(Vec::new()),
+        Err(error) => return Err(reason_for(host, &error)),
+    };
+    let file = pca::parse_app_launch_dic(&bytes).map_err(|_| UnmeasuredReason::ReadFailed)?;
+    let mut paths: Vec<String> = file
+        .entries
+        .iter()
+        .map(|entry| entry.path.clone())
+        .collect();
+    let mut lost = false;
+    for rejected in &file.rejected {
+        match rejected.text.split_once('|') {
+            Some((path, _)) if !path.is_empty() => paths.push(path.to_owned()),
+            _ => lost = true,
+        }
+    }
+    if lost {
+        return Err(UnmeasuredReason::Partial);
+    }
+    Ok(paths)
+}
+
 /// Why none of PCA's three files was there, most specific answer first.
 ///
 /// - **This Windows is older than 22H2**, so the folder has never existed on it and its absence

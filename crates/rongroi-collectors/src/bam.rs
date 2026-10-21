@@ -290,6 +290,41 @@ impl Collector for Bam {
     }
 }
 
+/// The program paths BAM recorded, for `recorded_files` (ADR 0079 amendment 7).
+///
+/// This runs the same collection [`Bam::collect`] does and keeps the `path` each observation carries,
+/// so the two collectors cannot disagree about which values are programs or which paths are emitted.
+/// A status row that names neither a path nor a withheld path is an account key whose value names
+/// could not be listed: an unknown number of paths is missing, so the source is a gap for the whole
+/// run. A value that did not decode still names its program, so a partial run loses no path here.
+pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<String>, UnmeasuredReason> {
+    match Bam.collect(host) {
+        CollectorRun::Unmeasured { reason, .. } => Err(reason),
+        CollectorRun::Measured {
+            observations, gaps, ..
+        } => {
+            let lost_names = observations.iter().any(|observation| {
+                observation.fields.contains_key("read")
+                    && !observation.fields.contains_key("path")
+                    && !observation.fields.contains_key("path_withheld")
+            });
+            if lost_names {
+                return Err(gaps
+                    .values()
+                    .next()
+                    .copied()
+                    .unwrap_or(UnmeasuredReason::ReadFailed));
+            }
+            Ok(observations
+                .iter()
+                .filter_map(|observation| observation.fields.get("path"))
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .collect())
+        }
+    }
+}
+
 /// Whether `name` is one of an account key's own two values ([`ACCOUNT_METADATA`]).
 ///
 /// `Some(true)` when the name is one of the two and the value reads as a number; `None` when the name

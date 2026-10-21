@@ -121,6 +121,23 @@ fn observation(process: &ProcessRecord) -> Observation {
     }
 }
 
+/// The image paths of the processes running now, for `recorded_files` (ADR 0079 amendment 7).
+///
+/// This runs the same collection [`Process::collect`] does and keeps the `path` each observation
+/// carries, through the same filter that drops an empty path. A process whose image path could not be
+/// resolved contributes nothing, and the list being unreadable is the source's gap.
+pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<String>, UnmeasuredReason> {
+    match Process.collect(host) {
+        CollectorRun::Unmeasured { reason, .. } => Err(reason),
+        CollectorRun::Measured { observations, .. } => Ok(observations
+            .iter()
+            .filter_map(|observation| observation.fields.get("path"))
+            .filter_map(serde_json::Value::as_str)
+            .map(str::to_owned)
+            .collect()),
+    }
+}
+
 /// How a failed source read is reported, as `posture` and `fivem_dir` already do it: `Unsupported`,
 /// `Failed` and `TooLarge` all mean the list was not read, and nothing about it may be shown as
 /// "not found".

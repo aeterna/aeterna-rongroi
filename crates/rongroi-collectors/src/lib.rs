@@ -25,6 +25,7 @@ pub mod posture;
 pub mod powershell_text;
 pub mod prefetch;
 pub mod process;
+pub mod recorded_files;
 pub mod scan;
 pub mod usn;
 pub mod windows_start;
@@ -330,6 +331,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(powershell_text::PowershellText),
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
+        Box::new(recorded_files::RecordedFiles::default()),
         Box::new(usn::Usn::default()),
         Box::new(windows_start::WindowsStart),
     ]
