@@ -1493,4 +1493,32 @@ mod tests {
             sha256_reader(&bytes[..READ_BLOCK]).unwrap()
         );
     }
+
+    #[test]
+    fn the_refused_forms_are_refused_and_an_ordinary_path_is_not() {
+        for refused in [
+            r"C:\Users\..\x.exe",
+            r"C:\.\x.exe",
+            r"C:\\x.exe",
+            r"C:\x\",
+            r"C:\Users.\x.exe",
+            r"C:\Users \x.exe",
+            r"C:\x.exe:stream",
+            r"C:\Documents and Settings\bob\x.exe",
+        ] {
+            assert!(is_refused_form(refused), "{refused}");
+        }
+        assert!(!is_refused_form(r"C:\Program Files\Vendor\app.exe"));
+        assert!(!is_refused_form(r"D:\Games\Documents and Settings\x.exe"));
+    }
+
+    /// The `:`-after-the-drive rule covers the whole remainder after `X:`, whichever separator it
+    /// uses (ADR 0079 section 1, R-08): a stream cannot be reached through a mixed spelling.
+    #[test]
+    fn a_colon_after_the_drive_is_refused_with_either_separator() {
+        for refused in [r"C:/x:y", r"C:\x/y:z"] {
+            assert!(is_refused_form(refused), "{refused}");
+        }
+        assert!(!is_refused_form(r"C:\x\y"));
+    }
 }

@@ -74,24 +74,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_refused_forms_are_refused_and_an_ordinary_path_is_not() {
-        for refused in [
-            r"C:\Users\..\x.exe",
-            r"C:\.\x.exe",
-            r"C:\\x.exe",
-            r"C:\x\",
-            r"C:\Users.\x.exe",
-            r"C:\Users \x.exe",
-            r"C:\x.exe:stream",
-            r"C:\Documents and Settings\bob\x.exe",
-        ] {
-            assert!(is_refused_form(refused), "{refused}");
-        }
-        assert!(!is_refused_form(r"C:\Program Files\Vendor\app.exe"));
-        assert!(!is_refused_form(r"D:\Games\Documents and Settings\x.exe"));
-    }
-
-    #[test]
     fn a_name_is_the_last_segment_lower_cased() {
         assert_eq!(
             file_name(r"C:\Users\alex\Game.EXE").as_deref(),
