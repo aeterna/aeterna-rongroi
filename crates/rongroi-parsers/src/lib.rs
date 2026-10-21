@@ -42,3 +42,4 @@ pub mod powershell_text;
 pub mod prefetch;
 pub mod task;
 pub mod usn;
+pub mod zone_identifier;
