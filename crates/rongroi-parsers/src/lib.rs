@@ -37,6 +37,7 @@ pub mod error;
 pub mod evtx;
 pub mod filetime;
 pub mod pca;
+pub mod pe_version;
 pub mod powershell_text;
 pub mod prefetch;
 pub mod task;
