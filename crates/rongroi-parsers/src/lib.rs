@@ -31,6 +31,7 @@
 //! [`rongroi_host::Host`]: https://github.com/aeterna/aeterna-rongroi
 
 pub mod bam;
+pub mod content_kind;
 mod cp1252;
 pub mod error;
 pub mod evtx;
