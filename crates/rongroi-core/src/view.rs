@@ -4272,4 +4272,490 @@ mod tests {
         );
         assert_eq!(sessions_of(&nothing), vec![]);
     }
+
+    // ---- ADR 0078 P1: the game-windows view, data only ----
+    //
+    // The shape these tests hold `view::game_windows` to:
+    //
+    // - `GameWindows { sessions: Vec<GameSession>, candidates: Vec<GameCandidate>,
+    //   counts: WindowCounts }`;
+    // - `GameSession { edition, start, end: Option<String>, latest: bool }`, where `latest` is ADR
+    //   0062's session and an earlier one has no end;
+    // - `GameCandidate { name, path: Option<String>, t1, t2, t3, t4: TimeFact,
+    //   near_sessions: NearSessions }`;
+    // - `TimeFact::{True, False, NotKnown { reason: NotKnownReason }}`, with
+    //   `NotKnownReason::{SessionEndNotRecorded, BeforeTraceAge { source }}` (ADR 0078 sections 4 and
+    //   5, ADR 0061's trace ages);
+    // - `NearSessions { near, found }` for R, a fact value rather than a score;
+    // - `WindowCounts { before, during, after, before_scan }`, in both modes.
+
+    const GAME_START_1: &str = "2026-01-10T08:00:00Z";
+    const GAME_START_2: &str = "2026-01-10T09:00:00Z";
+    const GAME_START_3: &str = "2026-01-10T10:00:00Z";
+    const GAME_END: &str = "2026-01-10T10:30:00Z";
+
+    /// One Prefetch record, with every run time it holds, newest first (ADR 0078 section 6). The
+    /// report holds `run_times` as an array of RFC 3339 strings, built here by hand.
+    fn prefetch_runs(name: &str, edition: Option<&str>, times: &[&str]) -> Observation {
+        let mut fields = BTreeMap::from([
+            ("name".to_owned(), serde_json::Value::from(name)),
+            ("run_times".to_owned(), serde_json::json!(times)),
+            ("last_run".to_owned(), serde_json::Value::from(times[0])),
+            (
+                "recorded_runs".to_owned(),
+                serde_json::Value::from(times.len()),
+            ),
+        ]);
+        if let Some(edition) = edition {
+            fields.insert("fivem_edition".to_owned(), serde_json::Value::from(edition));
+        }
+        Observation {
+            collector: "prefetch".to_owned(),
+            fields,
+        }
+    }
+
+    /// One BAM, PCA or process record: a name, a time in `field`, and a path when it has one.
+    fn recorded(
+        collector: &str,
+        name: &str,
+        path: Option<&str>,
+        field: &str,
+        at: &str,
+    ) -> Observation {
+        let mut fields = BTreeMap::from([
+            ("name".to_owned(), serde_json::Value::from(name)),
+            (field.to_owned(), serde_json::Value::from(at)),
+        ]);
+        if let Some(path) = path {
+            fields.insert("path".to_owned(), serde_json::Value::from(path));
+        }
+        Observation {
+            collector: collector.to_owned(),
+            fields,
+        }
+    }
+
+    /// BAM's end for one of an edition's anchor names.
+    fn bam_end(name: &str, edition: &str, at: &str) -> Observation {
+        let mut observation = recorded("bam", name, None, "last_run", at);
+        observation
+            .fields
+            .insert("fivem_edition".to_owned(), serde_json::Value::from(edition));
+        observation
+    }
+
+    /// One Legacy session per run time Prefetch holds for `FiveM.exe`, and BAM's end when given.
+    fn legacy_sessions(times: &[&str], end: Option<&str>) -> Vec<Observation> {
+        let mut observations = vec![prefetch_runs("FiveM.exe", Some("legacy"), times)];
+        if let Some(end) = end {
+            observations.push(bam_end("FiveM.exe", "legacy", end));
+        }
+        observations
+    }
+
+    /// A report holding the observations, the bundle's FiveM selectors and the age declarations the
+    /// view reads. The scan ran on 2026-01-10T12:00:00Z (`session_report`).
+    fn game_report(observations: Vec<Observation>) -> Report {
+        let mut report = session_report(observations, &[]);
+        report.timeline_selectors =
+            FIVEM_SELECTORS
+                .iter()
+                .fold(BTreeMap::new(), |mut held, (collector, id)| {
+                    held.entry((*collector).to_owned())
+                        .or_insert_with(Vec::new)
+                        .push((*id).to_owned());
+                    held
+                });
+        report.age_fields = BTreeMap::from([
+            (
+                "prefetch".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Field {
+                        field: "entries".to_owned(),
+                    },
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+            (
+                "bam".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Field {
+                        field: "entries".to_owned(),
+                    },
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+            (
+                "pca".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Observations,
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+        ]);
+        report
+    }
+
+    fn latest_session<'a>(view: &'a GameWindows, edition: &str) -> &'a GameSession {
+        view.sessions
+            .iter()
+            .find(|session| session.edition == edition && session.latest)
+            .unwrap_or_else(|| panic!("no latest {edition} session"))
+    }
+
+    fn earlier_sessions<'a>(view: &'a GameWindows, edition: &str) -> Vec<&'a GameSession> {
+        view.sessions
+            .iter()
+            .filter(|session| session.edition == edition && !session.latest)
+            .collect()
+    }
+
+    fn game_candidate<'a>(view: &'a GameWindows, name: &str) -> &'a GameCandidate {
+        view.candidates
+            .iter()
+            .find(|candidate| candidate.name.eq_ignore_ascii_case(name))
+            .unwrap_or_else(|| panic!("no candidate {name}"))
+    }
+
+    /// b1: no record of a FiveM run: the view says there is no session and holds no candidate.
+    #[test]
+    fn b1_no_fivem_record_is_no_session_and_no_candidates() {
+        let report = game_report(vec![prefetch_runs(
+            "other.exe",
+            None,
+            &["2026-01-10T09:00:00Z"],
+        )]);
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert!(view.sessions.is_empty());
+        assert!(view.candidates.is_empty());
+        assert_eq!(view.counts.before, 0);
+        assert_eq!(view.counts.during, 0);
+        assert_eq!(view.counts.after, 0);
+        assert_eq!(view.counts.before_scan, 0);
+    }
+
+    /// b2: three runs Prefetch kept for `FiveM.exe` and BAM's end: the latest session has an end,
+    /// and the two earlier ones are start-only.
+    #[test]
+    fn b2_earlier_runs_are_start_only_sessions() {
+        let report = game_report(legacy_sessions(
+            &[GAME_START_3, GAME_START_2, GAME_START_1],
+            Some(GAME_END),
+        ));
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(view.sessions.len(), 3);
+        let latest = latest_session(&view, "legacy");
+        assert_eq!(latest.start, GAME_START_3);
+        assert_eq!(latest.end.as_deref(), Some(GAME_END));
+        let earlier = earlier_sessions(&view, "legacy");
+        assert_eq!(earlier.len(), 2);
+        assert!(earlier.iter().all(|session| session.end.is_none()));
+        let mut starts: Vec<&str> = earlier
+            .iter()
+            .map(|session| session.start.as_str())
+            .collect();
+        starts.sort_unstable();
+        assert_eq!(starts, vec![GAME_START_1, GAME_START_2]);
+    }
+
+    /// b3: a run ten minutes before each of three sessions is in each before window: T1 is true, and
+    /// R is 3 of 3 sessions found.
+    #[test]
+    fn b3_a_run_before_every_session_is_t1_and_r_of_three() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        observations.push(prefetch_runs(
+            "x.exe",
+            None,
+            &[
+                "2026-01-10T09:50:00Z",
+                "2026-01-10T08:50:00Z",
+                "2026-01-10T07:50:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.t1, TimeFact::True);
+        assert_eq!(candidate.near_sessions, NearSessions { near: 3, found: 3 });
+    }
+
+    /// b4: 45 minutes before every start is outside the 30-minute before window, so it is not a
+    /// candidate at all.
+    #[test]
+    fn b4_a_run_outside_every_window_is_not_a_candidate() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        observations.push(prefetch_runs(
+            "far.exe",
+            None,
+            &[
+                "2026-01-10T09:15:00Z",
+                "2026-01-10T08:15:00Z",
+                "2026-01-10T07:15:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert!(
+            view.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("far.exe"))
+        );
+    }
+
+    /// b5: a run only in the latest session's before window: T1 is true, but an earlier session has
+    /// no recorded end, so T2 is not known rather than false.
+    #[test]
+    fn b5_an_earlier_session_makes_t2_not_known() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        observations.push(prefetch_runs("x.exe", None, &["2026-01-10T09:50:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.t1, TimeFact::True);
+        assert_eq!(
+            candidate.t2,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::SessionEndNotRecorded,
+            }
+        );
+    }
+
+    /// b6: one session, the sources reach it, and the run is not during it: T2 is false.
+    #[test]
+    fn b6_t2_is_false_when_the_one_session_and_its_sources_cover_it() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("old.exe", None, &["2026-01-09T00:00:00Z"]));
+        observations.push(recorded(
+            "bam",
+            "old.exe",
+            None,
+            "last_run",
+            "2026-01-09T00:00:00Z",
+        ));
+        observations.push(prefetch_runs("x.exe", None, &["2026-01-10T09:50:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(game_candidate(&view, "x.exe").t2, TimeFact::False);
+    }
+
+    /// b7: GTA V's own executables never start a session, even with an edition and BAM's end.
+    #[test]
+    fn b7_gta_v_executables_never_start_a_session() {
+        let report = game_report(vec![
+            prefetch_runs("PlayGTAV.exe", Some("enhanced"), &["2026-01-10T09:00:00Z"]),
+            prefetch_runs("GTA5.exe", Some("legacy"), &["2026-01-10T08:00:00Z"]),
+            bam_end("PlayGTAV.exe", "enhanced", GAME_END),
+            bam_end("GTA5.exe", "legacy", GAME_END),
+        ]);
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert!(view.sessions.is_empty());
+        assert!(view.candidates.is_empty());
+    }
+
+    /// b8: SS mode shows no candidate name or path, and its per-window counts are Self mode's.
+    #[test]
+    fn b8_ss_mode_shows_per_window_counts_and_no_candidate_identity() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs(
+            "before-tool.exe",
+            None,
+            &["2026-01-10T09:50:00Z"],
+        ));
+        observations.push(recorded(
+            "bam",
+            "during-tool.exe",
+            Some(r"C:\Tools\During-Tool.exe"),
+            "last_run",
+            "2026-01-10T10:15:00Z",
+        ));
+        observations.push(prefetch_runs(
+            "after-tool.exe",
+            None,
+            &["2026-01-10T10:45:00Z"],
+        ));
+        observations.push(prefetch_runs(
+            "later-tool.exe",
+            None,
+            &["2026-01-10T11:30:00Z"],
+        ));
+        let report = game_report(observations);
+        let own = game_windows(&report, Mode::SelfCheck);
+        let ss = game_windows(&report, Mode::Ss);
+        assert_eq!(own.candidates.len(), 4);
+        assert_eq!(
+            own.counts,
+            WindowCounts {
+                before: 1,
+                during: 1,
+                after: 1,
+                before_scan: 1,
+            }
+        );
+        assert!(ss.candidates.is_empty());
+        assert_eq!(ss.sessions, own.sessions);
+        assert_eq!(ss.counts, own.counts);
+        let json = serde_json::to_string(&ss).unwrap();
+        for identity in [
+            "before-tool.exe",
+            "during-tool.exe",
+            "after-tool.exe",
+            "later-tool.exe",
+            r"C:\Tools\During-Tool.exe",
+        ] {
+            assert!(!json.contains(identity), "{json}");
+        }
+    }
+
+    /// b9: R descending, then the number of true T facts, then the earliest time. The second report
+    /// ties R and the number of true facts to show the earliest time deciding the order.
+    #[test]
+    fn b9_candidates_are_ordered_by_r_true_facts_then_earliest_time() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        // R = 3, T1 and T2 true.
+        observations.push(prefetch_runs(
+            "r-three-facts-two.exe",
+            None,
+            &[
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T09:50:00Z",
+                "2026-01-10T08:50:00Z",
+                "2026-01-10T07:50:00Z",
+            ],
+        ));
+        // R = 3, T1 true only.
+        observations.push(prefetch_runs(
+            "r-three-facts-one.exe",
+            None,
+            &[
+                "2026-01-10T09:50:00Z",
+                "2026-01-10T08:50:00Z",
+                "2026-01-10T07:50:00Z",
+            ],
+        ));
+        // R = 1, T2, T3 and T4 true: R keeps it last.
+        observations.push(prefetch_runs(
+            "r-one-facts-three.exe",
+            None,
+            &[
+                "2026-01-10T11:30:00Z",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T10:15:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let order: Vec<&str> = view
+            .candidates
+            .iter()
+            .map(|candidate| candidate.name.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            [
+                "r-three-facts-two.exe",
+                "r-three-facts-one.exe",
+                "r-one-facts-three.exe"
+            ]
+        );
+
+        // All three tie on R and on the number of true facts; the earliest time orders them.
+        let mut tied = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        tied.push(prefetch_runs("early.exe", None, &["2026-01-10T09:35:00Z"]));
+        tied.push(prefetch_runs("late.exe", None, &["2026-01-10T09:50:00Z"]));
+        tied.push(prefetch_runs("during.exe", None, &["2026-01-10T10:15:00Z"]));
+        let view = game_windows(&game_report(tied), Mode::SelfCheck);
+        let order: Vec<&str> = view
+            .candidates
+            .iter()
+            .map(|candidate| candidate.name.as_str())
+            .collect();
+        assert_eq!(order, ["early.exe", "late.exe", "during.exe"]);
+    }
+
+    /// b10: a run between the latest end and the scan's own time is in the before-the-scan window.
+    #[test]
+    fn b10_a_run_after_the_session_and_before_the_scan_is_t4() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("later.exe", None, &["2026-01-10T11:30:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(game_candidate(&view, "later.exe").t4, TimeFact::True);
+    }
+
+    /// b11: a Prefetch name joins the one path candidate whose file name is its own; with two such
+    /// paths it joins neither and stays a candidate by its name.
+    #[test]
+    fn b11_a_prefetch_name_joins_one_path_candidate_or_stays_its_own() {
+        let mut joined = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        joined.push(prefetch_runs("X.EXE", None, &["2026-01-10T09:50:00Z"]));
+        joined.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:55:00Z",
+        ));
+        let view = game_windows(&game_report(joined), Mode::SelfCheck);
+        assert_eq!(view.candidates.len(), 1);
+        assert_eq!(view.candidates[0].path.as_deref(), Some(r"C:\Tools\x.exe"));
+
+        let mut ambiguous = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        ambiguous.push(prefetch_runs("X.EXE", None, &["2026-01-10T09:50:00Z"]));
+        ambiguous.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:55:00Z",
+        ));
+        ambiguous.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"D:\Other\x.exe"),
+            "last_run",
+            "2026-01-10T09:56:00Z",
+        ));
+        let view = game_windows(&game_report(ambiguous), Mode::SelfCheck);
+        assert_eq!(view.candidates.len(), 3);
+        assert_eq!(
+            view.candidates
+                .iter()
+                .filter(|candidate| candidate.path.is_none())
+                .count(),
+            1
+        );
+        assert!(
+            view.candidates
+                .iter()
+                .any(|candidate| candidate.path.is_none()
+                    && candidate.name.eq_ignore_ascii_case("x.exe"))
+        );
+    }
+
+    /// c1 (control): Prefetch's trace age is later than the before window, so the missing before time
+    /// is not known, not false.
+    #[test]
+    fn c1_a_window_before_prefetchs_trace_age_is_not_known() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("during.exe", None, &["2026-01-10T10:15:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "during.exe");
+        assert_eq!(
+            candidate.t1,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::BeforeTraceAge {
+                    source: "prefetch".to_owned(),
+                },
+            }
+        );
+        assert_eq!(candidate.t2, TimeFact::True);
+    }
 }
