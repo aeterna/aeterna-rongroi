@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, RegistryData, SignatureCheck, SourceError};
+use rongroi_host::{Host, Platform, RegistryData, SignatureCheck, SourceError, is_refused_form};
 use rongroi_parsers::task;
 
 use crate::{Collector, Field, driver_service, failure, paths, prefetch};
@@ -615,7 +615,7 @@ impl<'h> Context<'h> {
                 continue;
             }
             let candidate = with_exe(&prefix.replace('/', "\\"));
-            if paths::is_refused_form(&candidate) {
+            if is_refused_form(&candidate) {
                 continue;
             }
             match self.file_exists(&candidate) {
@@ -689,7 +689,7 @@ impl<'h> Context<'h> {
 /// A resolved path, its separators read as `\`, unless it is a form this program refuses.
 fn checked(path: &str) -> Resolution {
     let path = path.replace('/', "\\");
-    if path.contains('"') || paths::is_refused_form(&path) {
+    if path.contains('"') || is_refused_form(&path) {
         Resolution::Unknown(UnmeasuredReason::ReadFailed)
     } else {
         Resolution::Path(path)

@@ -204,6 +204,46 @@ pub struct EntryTimes {
     pub modified: Option<jiff::Timestamp>,
 }
 
+/// Whether a path segment is `.` or `..` — never a real file or folder name, only a way to walk out
+/// of the folder the rest of the path names.
+pub fn is_unusable_segment(segment: &str) -> bool {
+    segment == "." || segment == ".."
+}
+
+/// Whether a drive-letter path is a form this program refuses to read as the file it appears to name
+/// (ADR 0048, R1; shared with `autostart` by ADR 0060): a `.` or `..` segment, a repeated or trailing
+/// separator (an empty segment), a segment ending in `.` or a space, a `:` past the drive (an
+/// alternate data stream), or `Documents and Settings` right after the drive — a junction to `Users`
+/// on current Windows.
+///
+/// The `:` rule covers the whole remainder after `X:`, whichever separator spells it, so a stream
+/// cannot be reached through a mixed spelling (ADR 0079 section 1). A path this refuses is never read.
+pub fn is_refused_form(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    if bytes.len() >= 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && path[2..].contains(':')
+    {
+        return true;
+    }
+    let mut segments = path.split('\\');
+    segments.next(); // the drive segment, e.g. `C:` — not checked here
+    for (index, segment) in segments.enumerate() {
+        if is_unusable_segment(segment)
+            || segment.is_empty()
+            || segment.ends_with(['.', ' '])
+            || segment.contains(':')
+        {
+            return true;
+        }
+        if index == 0 && segment.eq_ignore_ascii_case("Documents and Settings") {
+            return true;
+        }
+    }
+    false
+}
+
 /// Read-only access to the file system. Paths are absolute and Windows-style, e.g. `C:\Users\a\x.dll`.
 pub trait FilesystemSource {
     /// Lists what is directly inside `dir`; it never recurses.

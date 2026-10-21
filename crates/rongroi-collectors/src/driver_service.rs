@@ -19,7 +19,9 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{DirEntryInfo, Host, Platform, RegistryData, SourceError};
+use rongroi_host::{
+    DirEntryInfo, Host, Platform, RegistryData, SourceError, is_refused_form, is_unusable_segment,
+};
 
 use crate::{Collector, Field, paths, prefetch};
 
@@ -212,7 +214,7 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
         // The default path is built from the service key's own name, so a name that is itself a
         // separator, a `.`/`..` segment, or a data-stream name (R1: `a:b`) is an unknown form too —
         // nothing else here checks it.
-        if paths::is_unusable_segment(service) || service.contains(['\\', '/', ':']) {
+        if is_unusable_segment(service) || service.contains(['\\', '/', ':']) {
             return None;
         }
         format!(r"{root}\System32\drivers\{service}.sys")
@@ -244,8 +246,8 @@ pub fn resolve(image_path: &ImagePath, service: &str, system_root: &str) -> Opti
     let resolved = resolved.replace('/', "\\");
     // R1: a `.` or `..` segment (F1), a repeated or trailing separator, a segment ending in `.` or a
     // space, an alternate data stream, or `Documents and Settings` right after the drive are unknown
-    // forms (`paths::is_refused_form`, shared with `autostart` since ADR 0060).
-    if paths::is_refused_form(&resolved) {
+    // forms (`rongroi_host::is_refused_form`, shared with `autostart` since ADR 0060).
+    if is_refused_form(&resolved) {
         return None;
     }
     Some(resolved)
