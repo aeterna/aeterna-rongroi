@@ -8,7 +8,9 @@
 #![allow(clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use rongroi_collectors::bam::Bam;
 use rongroi_collectors::recorded_files::RecordedFiles;
@@ -33,7 +35,7 @@ fn recorded_files() -> Box<dyn Collector> {
     all()
         .into_iter()
         .find(|collector| collector.id() == "recorded_files")
-        .unwrap_or_else(|| panic!("no `recorded_files` collector is registered in all()"))
+        .unwrap()
 }
 
 /// A host whose three path sources are all readable: BAM holds `bam_paths`, PCA's launch dictionary
@@ -52,18 +54,18 @@ fn host(
     let mut yaml = String::from("platform: windows\nos_build: \"26100\"\n");
     yaml.push_str(env);
     yaml.push_str("registry:\n");
-    yaml.push_str(&format!(
-        "  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1\n"
-    ));
+    let _ = writeln!(
+        yaml,
+        "  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1"
+    );
     for path in bam_paths {
-        yaml.push_str(&format!(
-            "    '{path}':\n      content: '012345678901234567890123'\n"
-        ));
+        let _ = writeln!(
+            yaml,
+            "    '{path}':\n      content: '012345678901234567890123'"
+        );
     }
     yaml.push_str("filesystem:\n");
-    yaml.push_str(&format!(
-        "  '{PCA_DIR}':\n    - name: PcaAppLaunchDic.txt\n"
-    ));
+    let _ = writeln!(yaml, "  '{PCA_DIR}':\n    - name: PcaAppLaunchDic.txt");
     match pca_line {
         Some(line) => {
             yaml.push_str("      content: |\n        ");
@@ -73,9 +75,10 @@ fn host(
         None => yaml.push_str("      content: ''\n"),
     }
     for (dir, name) in files {
-        yaml.push_str(&format!(
-            "  '{dir}':\n    - name: '{name}'\n      content: 'fixture bytes'\n"
-        ));
+        let _ = writeln!(
+            yaml,
+            "  '{dir}':\n    - name: '{name}'\n      content: 'fixture bytes'"
+        );
     }
     yaml.push_str("processes:\n");
     yaml.push_str(processes);
@@ -90,16 +93,18 @@ fn bam_host(env: &str, values: &[(&str, &str)], files: &str) -> FixtureHost {
     let mut yaml = String::from("platform: windows\nos_build: \"26100\"\n");
     yaml.push_str(env);
     yaml.push_str("registry:\n");
-    yaml.push_str(&format!(
-        "  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1\n"
-    ));
+    let _ = writeln!(
+        yaml,
+        "  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1"
+    );
     for (path, value) in values {
-        yaml.push_str(&format!("    '{path}':\n      {value}\n"));
+        let _ = writeln!(yaml, "    '{path}':\n      {value}");
     }
     yaml.push_str("filesystem:\n");
-    yaml.push_str(&format!(
-        "  '{PCA_DIR}':\n    - name: PcaAppLaunchDic.txt\n      content: ''\n"
-    ));
+    let _ = writeln!(
+        yaml,
+        "  '{PCA_DIR}':\n    - name: PcaAppLaunchDic.txt\n      content: ''"
+    );
     yaml.push_str(files);
     yaml.push_str("processes:\n  - pid: 4\n    name: System\n");
     FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
@@ -109,7 +114,7 @@ fn bam_host(env: &str, values: &[(&str, &str)], files: &str) -> FixtureHost {
 /// a fixture can describe bytes YAML cannot hold. Built from the same fields the parser's own tests
 /// use: MZ, `PE\0\0`, one `.rsrc` section, and the four-level resource tree down to `RT_VERSION`.
 const PE_HEX: &str = concat!(
-    "4d5a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "4d5a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
     "000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000",
     "000000000000000000000000000000000000000000000000000000000000000050450000648601000000000000000000",
     "00000000e00000000b010000000000000000000000000000000000000000000000000000000000000000000000000000",
@@ -136,13 +141,21 @@ const PE_HEX: &str = concat!(
 /// The hash the fixture declares for [`PE_HEX`]; the collector reports what the host gives it.
 const PE_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 
-fn measured(run: &CollectorRun) -> (&[Observation], &BTreeMap<String, UnmeasuredReason>) {
-    match run {
-        CollectorRun::Measured {
-            observations, gaps, ..
-        } => (observations, gaps),
-        CollectorRun::Unmeasured { .. } => panic!("expected a measured run, got {run:?}"),
+fn measured_parts(
+    run: &CollectorRun,
+) -> Option<(&[Observation], &BTreeMap<String, UnmeasuredReason>)> {
+    if let CollectorRun::Measured {
+        observations, gaps, ..
+    } = run
+    {
+        Some((observations, gaps))
+    } else {
+        None
     }
+}
+
+fn measured(run: &CollectorRun) -> (&[Observation], &BTreeMap<String, UnmeasuredReason>) {
+    measured_parts(run).unwrap()
 }
 
 fn text<'a>(observation: &'a Observation, name: &str) -> Option<&'a str> {
@@ -160,12 +173,14 @@ fn flag(observation: &Observation, name: &str) -> Option<bool> {
 }
 
 fn observation_named<'a>(observations: &'a [Observation], name: &str) -> &'a Observation {
-    observations
-        .iter()
-        .find(|observation| {
-            text(observation, "name").is_some_and(|seen| seen.eq_ignore_ascii_case(name))
-        })
-        .unwrap_or_else(|| panic!("no observation named {name}: {observations:?}"))
+    let found = observations.iter().find(|observation| {
+        text(observation, "name").is_some_and(|seen| seen.eq_ignore_ascii_case(name))
+    });
+    assert!(
+        found.is_some(),
+        "no observation named {name}: {observations:?}"
+    );
+    found.unwrap()
 }
 
 /// (k1) The same file recorded by BAM and PCA in two cases is one observation, and both sources are
@@ -175,7 +190,7 @@ fn k1_the_same_file_in_bam_and_pca_in_different_case_is_one_observation() {
     let fixture = host(
         "env:\n  WinDir: 'C:\\Windows'\n  SystemDrive: 'C:'\n  SystemRoot: 'C:\\Windows'\n",
         &[r"C:\Program Files\Fixture\Shared.exe"],
-        Some(r"c:\program files\fixture\shared.exe|2026-09-12T10:23:46Z"),
+        Some(r"c:\program files\fixture\shared.exe|2026-09-12 10:23:46"),
         "  - pid: 4\n    name: System\n",
         &[(r"C:\Program Files\Fixture", "Shared.exe")],
     );
@@ -313,7 +328,7 @@ fn k3_a_present_file_is_read_and_the_root_flags_follow_the_environment() {
 /// One test-only rule, so that a scan has something to report the collector's tier on. No rule ships
 /// with this collector in C1.
 fn rule_on_recorded_files() -> Bundle {
-    let yaml = r#"
+    let yaml = r"
 id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
 title: Test rule for recorded_files
 description: A test-only rule so a scan reports the recorded_files collector's tier.
@@ -327,7 +342,7 @@ falsepositives:
   - A test fixture.
 author: aeterna-rongroi contributors
 date: 2026-10-21
-"#;
+";
     let json = serde_json::json!({
         "rules": [{
             "path": "recorded_files/test/consent/rule.yaml",
@@ -390,8 +405,7 @@ fn k4_the_collector_is_full_tier_and_a_standard_scan_reports_it_not_consented() 
 fn k5_a_recorded_pe_carries_its_content_identity_and_zone() {
     let path = r"C:\Users\fixtureuser\Downloads\downloaded.exe";
     let files = format!(
-        "  'C:\\Users\\fixtureuser\\Downloads':\n    - name: 'downloaded.exe'\n      content_hex: \"{}\"\n      sha256: \"{}\"\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\nHostUrl=https://dl.example.com/a/b.exe?t=1\\r\\n\"\n",
-        PE_HEX, PE_SHA256
+        "  'C:\\Users\\fixtureuser\\Downloads':\n    - name: 'downloaded.exe'\n      content_hex: \"{PE_HEX}\"\n      sha256: \"{PE_SHA256}\"\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\nHostUrl=https://dl.example.com/a/b.exe?t=1\\r\\n\"\n"
     );
     let fixture = bam_host(
         "env:\n  WinDir: 'C:\\Windows'\n  SystemDrive: 'C:'\n  SystemRoot: 'C:\\Windows'\n",
@@ -439,7 +453,7 @@ fn k5_a_recorded_pe_carries_its_content_identity_and_zone() {
 }
 
 /// (k6) The file limit is checked between paths in the order the collector reads them: the path
-/// nearest the newest FiveM record goes first, so the newest record's own path is read and the
+/// nearest the newest `FiveM` record goes first, so the newest record's own path is read and the
 /// others say the limit — not the clock — stopped them. The newest record here is `Newest.exe`, so
 /// a newest-first order would read that one instead.
 #[test]
@@ -539,4 +553,194 @@ fn k8_a_host_that_cannot_answer_makes_no_disappeared_claim() {
         None,
         "a host answer that is not `Ok` must not become a claim: {record:?}"
     );
+}
+
+/// (k9) A rejected or undelimited PCA line loses no parsed path: the launch entries the PCA collector
+/// itself emits are kept, the source is reported `partial`, and the rejected line's text never
+/// becomes a path (ADR 0079 amendment 7, Q3 M5 and M6).
+#[test]
+fn k9_rejected_pca_lines_keep_the_parsed_paths_and_gap_the_source_as_partial() {
+    let fixture = FixtureHost::from_yaml_str(
+        r#"
+platform: windows
+os_build: "26100"
+env:
+  WinDir: 'C:\Windows'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-0-0-0-1001':
+    Version: 1
+    SequenceNumber: 1
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      content: |
+        C:\Users\fixtureuser\Downloads\good.exe|2026-09-12 10:23:46
+        this line has no delimiter at all
+        C:\Users\fixtureuser\Downloads\second.exe|2026-13-45 99:99:99
+        |2026-09-12 10:23:46
+        C:\Users\fixtureuser\Downloads\last.exe|2026-09-12 11:00:00
+processes:
+  - pid: 4
+    name: System
+"#,
+        "inline",
+    )
+    .unwrap();
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    for name in ["good.exe", "last.exe"] {
+        assert!(
+            observations
+                .iter()
+                .any(|observation| text(observation, "name") == Some(name)),
+            "the parsed path {name} must survive the rejected lines: {observations:?}"
+        );
+    }
+    assert!(
+        observations.iter().all(|observation| !matches!(
+            text(observation, "name"),
+            Some("second.exe" | "this line has no delimiter at all")
+        )),
+        "a rejected line's text must never become a path: {observations:?}"
+    );
+    assert!(
+        gaps.values()
+            .all(|reason| *reason == UnmeasuredReason::Partial)
+    );
+    assert!(!gaps.is_empty(), "a partly read PCA file is a gap");
+}
+
+/// (k10) `not_on_this_os` is PCA's answer for a Windows that never kept these files, not a reason
+/// `recorded_files` reports, and PCA adds neither a path nor a gap when it says it (ADR 0030, Q3).
+#[test]
+fn k10_not_on_this_os_is_pca_only_and_adds_no_gap() {
+    let collector = recorded_files();
+    assert!(
+        !collector
+            .unmeasured_reasons()
+            .contains(&UnmeasuredReason::NotOnThisOs),
+        "recorded_files must not report PCA's not_on_this_os"
+    );
+
+    let fixture = FixtureHost::from_yaml_str(
+        &format!(
+            r#"platform: windows
+os_build: "19045"
+env:
+  WinDir: 'C:\Windows'
+registry:
+  '{BAM_KEY}':
+    Version: 1
+    SequenceNumber: 1
+filesystem:
+  'C:\Windows\appcompat\pca': []
+processes:
+  - pid: 4
+    name: System
+"#
+        ),
+        "inline",
+    )
+    .unwrap();
+
+    let run = collector.collect(&fixture);
+    let (observations, gaps) = measured(&run);
+    assert!(observations.is_empty(), "{observations:?}");
+    assert!(gaps.is_empty(), "{gaps:?}");
+}
+
+/// (k11) A run whose every source is unmeasured is `Unmeasured` with the first source's reason, not
+/// a `Measured` run with no observation (Q3 m4).
+#[test]
+fn k11_a_run_with_no_readable_source_is_unmeasured_with_the_first_reason() {
+    let fixture = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+    assert_eq!(
+        recorded_files().collect(&fixture),
+        CollectorRun::Unmeasured {
+            collector: "recorded_files".to_owned(),
+            reason: UnmeasuredReason::SourceAbsent,
+        }
+    );
+}
+
+/// (k12) The budget clock starts before the source reads: a source read that spends the budget
+/// leaves the identity reads with `budget_spent` (Q3 m1).
+#[test]
+fn k12_the_budget_clock_starts_before_the_source_reads() {
+    // A long process list is a source read that takes measurably longer than the budget, and it
+    // yields no path of its own, so the only path read is the PCA one.
+    let mut yaml = format!(
+        "platform: windows\nos_build: \"26100\"\nenv:\n  WinDir: 'C:\\Windows'\nregistry:\n  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1\nfilesystem:\n  'C:\\Windows\\appcompat\\pca':\n    - name: PcaAppLaunchDic.txt\n      content: |\n        C:\\Users\\fixtureuser\\Downloads\\after-source.exe|2026-09-12 10:23:46\n  'C:\\Users\\fixtureuser\\Downloads':\n    - name: after-source.exe\n      content: 'fixture bytes'\nprocesses:\n"
+    );
+    for pid in 0..40_000 {
+        let _ = writeln!(yaml, "  - pid: {pid}\n    name: System");
+    }
+    let fixture = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+
+    let run = RecordedFiles {
+        budget: Duration::from_millis(5),
+        ..RecordedFiles::default()
+    }
+    .collect(&fixture);
+    let (observations, _) = measured(&run);
+    let observation = observation_named(observations, "after-source.exe");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("budget_spent"),
+        "the source read must count against the budget: {observation:?}"
+    );
+}
+
+/// (k13) The newest-time anchor accepts each GTA V program name as well as `FiveM`'s, so the read
+/// order centres on the newest of either (Q3 m5).
+#[test]
+fn k13_the_ordering_anchor_accepts_the_gta_v_names() {
+    const NEAR: &str = r"C:\Users\fixtureuser\Downloads\Near.exe";
+    const NEWEST: &str = r"C:\Users\fixtureuser\Downloads\Newest.exe";
+    for name in [
+        "fivem.exe",
+        "fivem_b2699_gtaprocess.exe",
+        "gta5.exe",
+        "gta5_enhanced.exe",
+        "playgtav.exe",
+    ] {
+        let anchor = format!(r"C:\Program Files\Rockstar Games\Grand Theft Auto V\{name}");
+        let files = format!(
+            "  'C:\\Users\\fixtureuser\\Downloads':\n    - name: Near.exe\n      content: 'fixture bytes'\n    - name: Newest.exe\n      content: 'fixture bytes'\n  'C:\\Program Files\\Rockstar Games\\Grand Theft Auto V':\n    - name: '{name}'\n      content: 'fixture bytes'\n"
+        );
+        let fixture = bam_host(
+            "env:\n  WinDir: 'C:\\Windows'\n  SystemDrive: 'C:'\n  SystemRoot: 'C:\\Windows'\n",
+            &[
+                // The anchor at 2026-01-01T00:00:00Z, Near five minutes before it, Newest two hours
+                // after.
+                (anchor.as_str(), "content_hex: \"00008192b17adc01\""),
+                (NEAR, "content_hex: \"00a2b0dfb07adc01\""),
+                (NEWEST, "content_hex: \"00d00956c27adc01\""),
+            ],
+            &files,
+        );
+
+        let run = RecordedFiles {
+            file_limit: Some(1),
+            ..RecordedFiles::default()
+        }
+        .collect(&fixture);
+        let (observations, _) = measured(&run);
+        let anchor = observation_named(observations, name);
+        assert_eq!(
+            text(anchor, "identity_read"),
+            Some("read"),
+            "the newest {name} time must anchor the order: {anchor:?}"
+        );
+        for other in ["Near.exe", "Newest.exe"] {
+            let observation = observation_named(observations, other);
+            assert_eq!(
+                text(observation, "identity_read"),
+                Some("budget_spent"),
+                "{other} must not be read before the anchor: {observation:?}"
+            );
+        }
+    }
 }

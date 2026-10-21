@@ -12,10 +12,10 @@
 //!
 //! It is `full`: reading a file's bytes is beyond what a standard scan asks for (ADR 0052).
 //! `identity_read` says what happened to that read, and a `read` carries what the bytes, the hash, the
-//! signature and the `Zone.Identifier` stream say. Reads run nearest the newest `FiveM` time first,
-//! under a 90-second budget checked between files. An unreadable file is never a gap — the whole run
-//! is gapped only when one of its sources could not be read at all, and then with that source's
-//! reason.
+//! signature and the `Zone.Identifier` stream say. Reads run nearest the newest `FiveM` or GTA V time
+//! first, under a 90-second budget checked between files. An unreadable file is never a gap — the
+//! whole run is gapped only when one of its sources could not be read at all, and then with that
+//! source's reason.
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -43,10 +43,10 @@ pub const BUDGET: Duration = Duration::from_secs(90);
 ///
 /// `not_windows` is its own answer. The rest are what one of its sources gives when that source could
 /// not be read: this collector adds no vocabulary of its own, because a gap here means exactly what
-/// the same reason means in `bam`, `pca` or `process`.
-const REASONS: [UnmeasuredReason; 8] = [
+/// the same reason means in `bam`, `pca` or `process`. `not_on_this_os` is not here: PCA says it for a
+/// Windows that never kept these files, and PCA then contributes neither a path nor a gap.
+const REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::NotWindows,
-    UnmeasuredReason::NotOnThisOs,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::SourceAbsent,
@@ -175,14 +175,23 @@ impl Collector for RecordedFiles {
 
         let mut candidates: BTreeMap<String, Candidate> = BTreeMap::new();
         let mut source_gap = None;
+        let mut first_failure = None;
+        let mut measured_sources = 0_usize;
         let mut fivem_at: Option<Timestamp> = None;
+        // The budget covers the source reads too: a source that spends most of the 90 seconds leaves
+        // less for the identity reads that follow it (ADR 0079 amendment 7).
+        let started = Instant::now();
         for (source, paths) in [
             (Source::Bam, crate::bam::recorded_paths(host)),
             (Source::Pca, crate::pca::recorded_paths(host)),
             (Source::Process, crate::process::recorded_paths(host)),
         ] {
             match paths {
-                Ok(paths) => {
+                Ok((paths, partial)) => {
+                    measured_sources += 1;
+                    if let Some(reason) = partial {
+                        source_gap = source_gap.or(Some(reason));
+                    }
                     for recorded in paths {
                         if !is_drive_rooted(&recorded.path) {
                             continue;
@@ -198,10 +207,27 @@ impl Collector for RecordedFiles {
                         }
                     }
                 }
+                // PCA says this Windows never kept its files, so it contributes no path and no gap.
+                Err(UnmeasuredReason::NotOnThisOs) if matches!(source, Source::Pca) => {
+                    measured_sources += 1;
+                }
                 // One source that could not be read loses an unknown number of paths, so the whole
                 // run is a gap. The paths the other sources gave are still reported.
-                Err(reason) => source_gap = source_gap.or(Some(reason)),
+                Err(reason) => {
+                    first_failure = first_failure.or(Some(reason));
+                    source_gap = source_gap.or(Some(reason));
+                }
             }
+        }
+
+        // Nothing was read at all: a `Measured` run with no observation would say the machine had no
+        // such record, which is not what happened. The first source's reason is the run's answer,
+        // as it is in every collector that reads its sources in one order.
+        if measured_sources == 0 {
+            return CollectorRun::Unmeasured {
+                collector: ID.to_owned(),
+                reason: first_failure.unwrap_or(UnmeasuredReason::ReadFailed),
+            };
         }
 
         let mut ordered: Vec<Candidate> = candidates.into_values().collect();
@@ -209,7 +235,6 @@ impl Collector for RecordedFiles {
 
         let system_drive = system_drive(host);
         let system_root = system_root(host);
-        let started = Instant::now();
         let mut attempted = 0_usize;
         let observations = ordered
             .into_iter()
@@ -422,17 +447,24 @@ fn newest(left: Option<Timestamp>, right: Option<Timestamp>) -> Option<Timestamp
     }
 }
 
-/// Whether a recorded path names one of `FiveM`'s programs.
+/// Whether a recorded path names one of `FiveM`'s or GTA V's programs, the anchors the read order
+/// centres on.
 fn is_fivem_program(path: &str) -> bool {
     let Some(name) = file_name(path) else {
         return false;
     };
-    name == "fivem.exe" || (name.starts_with("fivem_b") && name.ends_with("_gtaprocess.exe"))
+    name == "fivem.exe"
+        || (name.starts_with("fivem_b") && name.ends_with("_gtaprocess.exe"))
+        || matches!(
+            name.as_str(),
+            "gta5.exe" | "gta5_enhanced.exe" | "playgtav.exe"
+        )
 }
 
-/// Nearest to the newest `FiveM` time first, newest first when there is none, and stable by path.
+/// Nearest to the newest `FiveM` or GTA V time first, newest first when there is none, and stable by
+/// path.
 ///
-/// A path with no time has no distance from the `FiveM` record, so it sorts after every path whose
+/// A path with no time has no distance from the anchor record, so it sorts after every path whose
 /// time is known rather than being read first on the strength of a missing answer.
 fn order(left: &Candidate, right: &Candidate, fivem_at: Option<Timestamp>) -> Ordering {
     let by_time = match fivem_at {

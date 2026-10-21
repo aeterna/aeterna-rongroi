@@ -297,9 +297,11 @@ impl Collector for Bam {
 /// observation carries, so the two collectors cannot disagree about which values are programs, which
 /// paths are emitted or when they ran. A status row that names neither a path nor a withheld path is
 /// an account key whose value names could not be listed: an unknown number of paths is missing, so
-/// the source is a gap for the whole run. A value that did not decode still names its program, so a
-/// partial run loses no path here.
-pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<RecordedPath>, UnmeasuredReason> {
+/// the source is a gap for the whole run and the paths that were read are returned beside it. A value
+/// that did not decode still names its program, so a partial run loses no path here.
+pub(crate) fn recorded_paths(
+    host: &dyn Host,
+) -> Result<(Vec<RecordedPath>, Option<UnmeasuredReason>), UnmeasuredReason> {
     match Bam.collect(host) {
         CollectorRun::Unmeasured { reason, .. } => Err(reason),
         CollectorRun::Measured {
@@ -310,14 +312,7 @@ pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<RecordedPath>, Unmea
                     && !observation.fields.contains_key("path")
                     && !observation.fields.contains_key("path_withheld")
             });
-            if lost_names {
-                return Err(gaps
-                    .values()
-                    .next()
-                    .copied()
-                    .unwrap_or(UnmeasuredReason::ReadFailed));
-            }
-            Ok(observations
+            let paths = observations
                 .iter()
                 .filter_map(|observation| {
                     let path = observation.fields.get("path")?.as_str()?.to_owned();
@@ -328,7 +323,14 @@ pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<RecordedPath>, Unmea
                         .and_then(|text| text.parse().ok());
                     Some(RecordedPath { path, at })
                 })
-                .collect())
+                .collect();
+            let gap = lost_names.then(|| {
+                gaps.values()
+                    .next()
+                    .copied()
+                    .unwrap_or(UnmeasuredReason::ReadFailed)
+            });
+            Ok((paths, gap))
         }
     }
 }

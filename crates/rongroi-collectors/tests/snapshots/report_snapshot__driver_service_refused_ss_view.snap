@@ -485,6 +485,7 @@ expression: view
     "prefetch",
     "bam",
     "pca",
+    "recorded_files",
     "usn"
   ],
   "trace_ages": {

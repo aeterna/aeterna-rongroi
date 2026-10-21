@@ -211,23 +211,28 @@ impl Collector for Pca {
 /// The program paths `PcaAppLaunchDic.txt` names, and when it recorded each, for `recorded_files`
 /// (ADR 0079 amendment 7).
 ///
-/// A line whose timestamp did not parse still names its program: the path is the text before the
-/// first `|`, as the parser defines it, and the time is the one the parser read when it read one.
-/// A rejected line with no such prefix leaves an unknown path, which is `partial`; a file that could
-/// not be read or is not PCA text leaves all of them, which is that reason. The general databases
+/// A rejected line contributes no path: its text normally holds a full user path, and only the
+/// lines the parser accepted name a launch the collector itself emits. Rejected lines still mean an
+/// unknown number of launches is missing, so the second value is `partial` when there were any; the
+/// paths that did parse are returned beside it. A file that could not be read or is not PCA text
+/// leaves all of them, which is that reason. On a Windows older than the build that keeps these
+/// files, their absence is `not_on_this_os` rather than an empty reading. The general databases
 /// contribute no paths, so their state says nothing here.
-pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<RecordedPath>, UnmeasuredReason> {
+pub(crate) fn recorded_paths(
+    host: &dyn Host,
+) -> Result<(Vec<RecordedPath>, Option<UnmeasuredReason>), UnmeasuredReason> {
     let Some(dir) = pca_dir(host) else {
         return Err(UnmeasuredReason::ReadFailed);
     };
     let path = format!(r"{dir}\{}", SOURCES[0].1);
     let bytes = match host.read_file(&path) {
         Ok(Some(bytes)) => bytes,
-        Ok(None) => return Ok(Vec::new()),
+        Ok(None) if predates_pca_files(host) => return Err(UnmeasuredReason::NotOnThisOs),
+        Ok(None) => return Ok((Vec::new(), None)),
         Err(error) => return Err(reason_for(host, &error)),
     };
     let file = pca::parse_app_launch_dic(&bytes).map_err(|_| UnmeasuredReason::ReadFailed)?;
-    let mut paths: Vec<RecordedPath> = file
+    let paths = file
         .entries
         .iter()
         .map(|entry| RecordedPath {
@@ -235,20 +240,8 @@ pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<RecordedPath>, Unmea
             at: Some(entry.last_run),
         })
         .collect();
-    let mut lost = false;
-    for rejected in &file.rejected {
-        match rejected.text.split_once('|') {
-            Some((path, _)) if !path.is_empty() => paths.push(RecordedPath {
-                path: path.to_owned(),
-                at: None,
-            }),
-            _ => lost = true,
-        }
-    }
-    if lost {
-        return Err(UnmeasuredReason::Partial);
-    }
-    Ok(paths)
+    let partial = (!file.rejected.is_empty()).then_some(UnmeasuredReason::Partial);
+    Ok((paths, partial))
 }
 
 /// Why none of PCA's three files was there, most specific answer first.
@@ -705,6 +698,31 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    /// The paths `recorded_files` takes are the launch entries this collector emits, never the text
+    /// of a rejected line, and a partly read file still returns the entries it did yield.
+    #[test]
+    fn recorded_paths_are_the_parsed_entries_and_rejected_lines_make_it_partial() {
+        let (paths, partial) = recorded_paths(&fixture("pca-malformed-lines")).unwrap();
+        assert_eq!(paths.len(), 2, "{paths:?}");
+        assert!(
+            paths
+                .iter()
+                .all(|path| path.path.ends_with("first.exe") || path.path.ends_with("third.exe")),
+            "{paths:?}"
+        );
+        assert_eq!(partial, Some(UnmeasuredReason::Partial));
+    }
+
+    /// A Windows older than the build that keeps the launch dictionary has never had it, which is
+    /// `not_on_this_os` and not an empty reading.
+    #[test]
+    fn a_windows_that_never_kept_the_launch_dictionary_answers_not_on_this_os() {
+        assert!(matches!(
+            recorded_paths(&fixture("pca-not-present")),
+            Err(UnmeasuredReason::NotOnThisOs)
+        ));
     }
 
     #[test]
