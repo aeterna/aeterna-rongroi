@@ -251,3 +251,25 @@ delegated-delivery rules; ADRs and documentation are written by the orchestrator
 - `xtask`: `check-rules` refuses a `match` on a `TimestampList` field.
 - Consent, `PRIVACY.md`, `docs/architecture.md` and `CONVENTIONS.md`'s glossary (**candidate**, **game
   window**, **fact**) change in the steps that introduce each part.
+
+## As built: P1 (2026-10-21)
+
+P1 shipped in workstream R-05: Prefetch's `run_times` and the data-only `view::game_windows`. There is no
+user interface or locale text yet; those come in P6. The build differs from the sections above in four
+places. Each is recorded here and is not a change of decision:
+
+1. **Joining a Prefetch record to a path (section 4).** No report holds Prefetch's loaded-file list yet;
+   it arrives with P3. Until then, a Prefetch record joins the one path candidate whose file name equals its
+   executable name, ignoring ASCII case. When there is no such path candidate, or more than one, the record
+   stays a candidate by its name. P3 replaces this with the join section 4 describes.
+2. **Where the refusal of `run_times` lives (section 6).** `rongroi_core::rules::validate` refuses a
+   `match` or `match_lists` entry that names `run_times`. It uses a list of such fields of its own, because
+   the core cannot see the collectors' field kinds. `cargo xtask check-rules` refuses any field the
+   collectors declare as `TimestampList`.
+3. **One session from close starts (section 2).** `FiveM.exe` and Legacy's game process start seconds
+   apart. Prefetch also writes a run seconds after a process started. Run times of one edition within ADR
+   0062's ten-minute margin of each other are therefore one session. An earlier session is one that starts
+   more than that margin before the latest start.
+4. **Facts with no history behind them (section 5).** A running process has no trace age. A fact that
+   rests on a `process` time is therefore "true" or "not known", never "false". When a candidate was seen
+   by several collectors, its fact is "false" only when every one of them covers the window.

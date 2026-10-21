@@ -353,6 +353,14 @@ fn check_operator(
     let key = operator
         .as_str()
         .map_or_else(|| field.to_owned(), |name| format!("{field}|{name}"));
+    // A list is not a value any operator can compare against, so the operator does not matter:
+    // every `match` that names one is refused, naming the rule and the field (ADR 0078 section 6).
+    if kind == FieldKind::TimestampList {
+        problems.push(format!(
+            "rules/{path}: `match` key `{key}` names `{field}`, which the `{collector}` collector emits as a list of timestamps; no comparison can match a list of timestamps (ADR 0078 section 6)"
+        ));
+        return;
+    }
     if operator.is_ordinal() {
         match kind {
             FieldKind::Number if !holds(value, serde_json::Value::is_number) => problems.push(format!(
@@ -362,7 +370,7 @@ fn check_operator(
                 "rules/{path}: `match` key `{key}` puts values in order, and the `{collector}` collector emits `{field}` as a timestamp, so the value must be an RFC 3339 timestamp such as `2026-09-13T00:00:00Z`"
             )),
             FieldKind::Number | FieldKind::Timestamp => {}
-            FieldKind::Text | FieldKind::Bool => problems.push(format!(
+            FieldKind::Text | FieldKind::Bool | FieldKind::TimestampList => problems.push(format!(
                 "rules/{path}: `match` key `{key}` puts values in order, which the `{collector}` collector's `{field}` cannot be: it emits {}. `gt`, `gte`, `lt` and `lte` need a number or a timestamp",
                 kind.as_str()
             )),
@@ -1174,6 +1182,24 @@ date: 2026-09-11
             .problems
     }
 
+    /// The field-kind gate on a rule and its `match_lists` data, without a fixture tree on disk:
+    /// the bundle loader expands the lists, then the vocabulary checks the fields the engine will
+    /// see. This is the same pair `check` runs for every rule.
+    fn checked_rule(rule_yaml: &str, data: &[(&str, &str)]) -> Vec<String> {
+        let mut rule: Rule = serde_saphyr::from_str(rule_yaml).expect("the rule parses");
+        let data: BTreeMap<String, String> = data
+            .iter()
+            .map(|(name, contents)| ((*name).to_owned(), (*contents).to_owned()))
+            .collect();
+        let mut problems = rongroi_core::rules::expand_match_lists(&mut rule, &data);
+        Vocabulary::of_this_build().check(
+            "prefetch/execution/example/rule.yaml",
+            &rule,
+            &mut problems,
+        );
+        problems
+    }
+
     /// Gate (6): an operator that is not one of ours. Accepting it would evaluate the rule as
     /// something other than what it says (ADR 0029).
     #[test]
@@ -1272,6 +1298,55 @@ date: 2026-09-11
             problems[0].contains("a rule on `prefetch` may not match `name`"),
             "{problems:?}"
         );
+    }
+
+    /// A list of timestamps is not a value a comparison can match: `check-rules` refuses every
+    /// `match` that names one, naming the rule and the field (ADR 0078 section 6).
+    #[test]
+    fn a_match_on_a_timestamp_list_field_is_rejected() {
+        let problems = checked_rule(
+            &prefetch_rule("  run_times: \"2025-12-30T00:00:00Z\"\n"),
+            &[],
+        );
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The same field reached through `match_lists`: it expands into `match`, so the refusal must
+    /// not depend on which of the two wrote it.
+    #[test]
+    fn a_match_lists_entry_for_a_timestamp_list_field_is_rejected() {
+        let rule = prefetch_rule("  run_count|gte: 1\n").replace(
+            "retention:",
+            "match_lists:\n  run_times: run_times.csv\nretention:",
+        );
+        let problems = checked_rule(
+            &rule,
+            &[("run_times.csv", "run_times\n2025-12-30T00:00:00Z\n")],
+        );
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The control: matching Prefetch's `last_run` is allowed, before and after the list joins it.
+    #[test]
+    fn a_match_on_prefetch_last_run_is_accepted() {
+        let problems = checked_rule(
+            &prefetch_rule("  last_run|lt: \"2026-09-13T00:00:00Z\"\n"),
+            &[],
+        );
+
+        assert!(problems.is_empty(), "{problems:?}");
     }
 
     /// Every field a collector declares carries a kind, so the first rule written for any of them

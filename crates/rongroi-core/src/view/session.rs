@@ -22,7 +22,7 @@ use crate::model::{Observation, Report, UnmeasuredReason};
 pub const MARGIN_SECONDS: i64 = 600;
 
 /// The editions, in the order their statements are shown.
-const EDITIONS: [&str; 2] = ["legacy", "enhanced"];
+pub(super) const EDITIONS: [&str; 2] = ["legacy", "enhanced"];
 
 /// The observation field `process`, `bam` and `prefetch` carry the edition in (ADR 0062).
 const EDITION_FIELD: &str = "fivem_edition";
@@ -288,7 +288,7 @@ pub(super) fn sessions(report: &Report) -> Vec<SessionStatement> {
         .collect()
 }
 
-fn text<'o>(observation: &'o Observation, field: &str) -> Option<&'o str> {
+pub(super) fn text<'o>(observation: &'o Observation, field: &str) -> Option<&'o str> {
     observation
         .fields
         .get(field)
@@ -302,7 +302,7 @@ fn timestamp(observation: &Observation, field: &str) -> Option<jiff::Timestamp> 
 /// The anchor name `name` is for `edition`, if it is one (ADR 0062 section 2, "Which names"): the
 /// client for both editions, Legacy's game process for Legacy. GTA V's own executables and `FiveM`'s
 /// other processes are not anchors.
-fn anchor_name(name: &str, edition: &str) -> Option<AnchorName> {
+pub(super) fn anchor_name(name: &str, edition: &str) -> Option<AnchorName> {
     let name = name.to_ascii_lowercase();
     if name == "fivem.exe" {
         Some(AnchorName::FivemExe)
@@ -371,6 +371,15 @@ struct Anchors {
     end: SessionEnd,
     end_time: Option<jiff::Timestamp>,
     running: bool,
+}
+
+/// One edition's latest session as ADR 0062 finds it: its start, and its end when BAM recorded one.
+pub(super) fn session_times(
+    report: &Report,
+    edition: &str,
+) -> Option<(jiff::Timestamp, Option<jiff::Timestamp>)> {
+    let anchors = session_anchors(report, edition).ok()?;
+    Some((anchors.start_time?, anchors.end_time))
 }
 
 fn session(report: &Report, edition: &str) -> Option<SessionStatement> {

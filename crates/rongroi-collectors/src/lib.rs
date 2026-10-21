@@ -49,6 +49,10 @@ pub enum FieldKind {
     Bool,
     /// A string holding one instant, written by `jiff::Timestamp::to_string` (RFC 3339, UTC).
     Timestamp,
+    /// A JSON array of such strings, newest first: every run time one record holds (ADR 0078
+    /// section 6). A list is not one value a comparison can ask about, so `check-rules` refuses a
+    /// rule that names a field of this kind.
+    TimestampList,
 }
 
 impl FieldKind {
@@ -59,6 +63,7 @@ impl FieldKind {
             Self::Number => "a number",
             Self::Bool => "a boolean",
             Self::Timestamp => "a timestamp",
+            Self::TimestampList => "a list of timestamps",
         }
     }
 }
@@ -126,6 +131,19 @@ impl Field {
             kind: FieldKind::Timestamp,
             sensitive: None,
             on_timeline: true,
+        }
+    }
+
+    /// A field carrying a list of instants as RFC 3339 text, newest first.
+    ///
+    /// It is declared off the timeline: the timeline does not grow by one entry per listed time.
+    /// The field is read for a named purpose only (ADR 0078 section 6).
+    pub const fn timestamp_list(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::TimestampList,
+            sensitive: None,
+            on_timeline: false,
         }
     }
 
@@ -413,6 +431,11 @@ mod tests {
                             FieldKind::Timestamp => {
                                 value.as_str().is_some_and(rongroi_core::rules::is_rfc3339)
                             }
+                            FieldKind::TimestampList => value.as_array().is_some_and(|times| {
+                                times.iter().all(|time| {
+                                    time.as_str().is_some_and(rongroi_core::rules::is_rfc3339)
+                                })
+                            }),
                         };
                         assert!(
                             ok,
