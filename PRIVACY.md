@@ -312,6 +312,14 @@ reasons are the ordinary state of an ordinary PC and none of them is a finding a
 The tool does **not** take screenshots, read browser history, access files unrelated to its collectors,
 or allow remote access.
 
+**Reading a file can update its last-access time.** The tool opens every file it reads for reading only,
+and it never changes a file's contents, its creation time or its last-write time. On a PC where Windows
+keeps last-access times up to date, which many Windows 11 PCs do, Windows records the read itself: a file
+this tool hashed or read shows the time of the scan as its last access. That was measured on a Windows 11
+PC for an ordinary read and for a downloaded file's `Zone.Identifier` stream (ADR 0079). A last-access time
+after a scan therefore says nothing about what the player did, and this tool never reads last-access times
+itself (ADR 0050).
+
 ## What leaves the machine
 
 - **aeterna-rongroi's own code sends nothing.** There is no network code; CI rejects dependencies and APIs
