@@ -55,15 +55,21 @@ pub const COLLECTOR_ORDER: [&str; 17] = [
     "usn",
 ];
 
-/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054, ADR 0060).
+/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054, ADR 0060,
+/// ADR 0078).
 ///
 /// A hosts line's address can name the player's own server; its kind, which `net_config` emits
 /// beside it as `address_kind`, is what separates a blocklist from a redirect and is what SS mode
 /// shows in its place (ADR 0054, owner decision 2). A scheduled task's path can carry an account SID,
 /// and a `Run` value's name is whatever the program chose, so `autostart`'s `entry` is withheld; the
 /// file it starts, its `path`, is shown and redacted like every path (ADR 0060, owner decision 3).
-pub const SS_WITHHELD_FIELDS: [(&str, &str); 2] =
-    [("net_config", "address"), ("autostart", "entry")];
+/// A Prefetch record's `run_times` is every run time the file still holds, which SS mode never lists
+/// (ADR 0078 section 9, amending ADR 0034 decision 2).
+pub const SS_WITHHELD_FIELDS: [(&str, &str); 3] = [
+    ("net_config", "address"),
+    ("autostart", "entry"),
+    ("prefetch", "run_times"),
+];
 
 /// What SS mode shows in place of a server identity the player did not agree to show (ADR 0052).
 pub const SERVER_IDENTITY_PLACEHOLDER: &str = "%SERVER_IDENTITY%";
@@ -2428,6 +2434,41 @@ mod tests {
         assert_eq!(own["entry"], r"\Updater-S-1-5-21-1-2-3-1001");
     }
 
+    /// A Prefetch observation's `run_times` never reaches an SS view, even on a match; Self mode
+    /// keeps the list (ADR 0078 section 9, amending ADR 0034 decision 2).
+    #[test]
+    fn ss_view_withholds_prefetch_run_times_and_self_keeps_them() {
+        let mut report = report();
+        report.evidence = vec![Evidence {
+            rule_id: "prefetch-file-read-only".to_owned(),
+            collector: "prefetch".to_owned(),
+            strength: Strength::Presence,
+            state: EvidenceState::Found {
+                observations: vec![Observation {
+                    collector: "prefetch".to_owned(),
+                    fields: BTreeMap::from([
+                        ("name".to_owned(), serde_json::Value::from("x.exe")),
+                        (
+                            "run_times".to_owned(),
+                            serde_json::json!(["2026-01-10T09:50:00Z", "2026-01-10T08:50:00Z"]),
+                        ),
+                    ]),
+                }],
+            },
+        }];
+        let fields = |view: &ReportView| match &view.evidence[0].state {
+            EvidenceState::Found { observations } => observations[0].fields.clone(),
+            state => panic!("expected a match, got {state:?}"),
+        };
+        let ss = fields(&for_mode(&report, Mode::Ss));
+        assert!(!ss.contains_key("run_times"), "{ss:?}");
+        let own = fields(&for_mode(&report, Mode::SelfCheck));
+        assert_eq!(
+            own["run_times"],
+            serde_json::json!(["2026-01-10T09:50:00Z", "2026-01-10T08:50:00Z"])
+        );
+    }
+
     #[test]
     fn ss_view_shows_found_and_posture_and_counts_the_rest() {
         let view = for_mode(&report(), Mode::Ss);
@@ -4289,8 +4330,8 @@ mod tests {
     // - `GameCandidate { name, path: Option<String>, t1, t2, t3, t4: TimeFact,
     //   near_sessions: NearSessions }`;
     // - `TimeFact::{True, False, NotKnown { reason: NotKnownReason }}`, with
-    //   `NotKnownReason::{SessionEndNotRecorded, BeforeTraceAge { source }}` (ADR 0078 sections 4 and
-    //   5, ADR 0061's trace ages);
+    //   `NotKnownReason::{SessionEndNotRecorded, ScanTimeNotRecorded, BeforeTraceAge { source }}`
+    //   (ADR 0078 sections 4 and 5, ADR 0061's trace ages);
     // - `NearSessions { near, found }` for R, a fact value rather than a score;
     // - `WindowCounts { before, during, after, before_scan }`, in both modes.
 
@@ -4300,12 +4341,20 @@ mod tests {
     const GAME_END: &str = "2026-01-10T10:30:00Z";
 
     /// One Prefetch record, with every run time it holds, newest first (ADR 0078 section 6). The
-    /// report holds `run_times` as an array of RFC 3339 strings, built here by hand.
+    /// report holds `run_times` as an array of RFC 3339 strings, built here by hand. Its `path` is
+    /// the `.pf` file the collector reads, never the program path, as the collector emits it.
     fn prefetch_runs(name: &str, edition: Option<&str>, times: &[&str]) -> Observation {
         let mut fields = BTreeMap::from([
             ("name".to_owned(), serde_json::Value::from(name)),
             ("run_times".to_owned(), serde_json::json!(times)),
             ("last_run".to_owned(), serde_json::Value::from(times[0])),
+            (
+                "path".to_owned(),
+                serde_json::Value::from(format!(
+                    r"C:\Windows\Prefetch\{}-1A2B3C4D.pf",
+                    name.to_ascii_uppercase()
+                )),
+            ),
             (
                 "recorded_runs".to_owned(),
                 serde_json::Value::from(times.len()),
@@ -4715,7 +4764,8 @@ mod tests {
     }
 
     /// b11: a Prefetch name joins the one path candidate whose file name is its own; with two such
-    /// paths it joins neither and stays a candidate by its name.
+    /// paths it joins neither and stays a candidate by its name, with no path (its `.pf` path is not
+    /// the program's).
     #[test]
     fn b11_a_prefetch_name_joins_one_path_candidate_or_stays_its_own() {
         let mut joined = legacy_sessions(&[GAME_START_3], Some(GAME_END));
@@ -4764,6 +4814,39 @@ mod tests {
         );
     }
 
+    /// b12: a record with no program path is a candidate of its own, never merged by name with
+    /// another, and a Prefetch record with no path candidate to join stays its own too.
+    #[test]
+    fn b12_a_record_without_a_path_is_its_own_candidate() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "ghost.exe",
+            None,
+            "last_run",
+            "2026-01-10T09:40:00Z",
+        ));
+        observations.push(recorded(
+            "bam",
+            "ghost.exe",
+            None,
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(prefetch_runs("ghost.exe", None, &["2026-01-10T09:45:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let ghosts: Vec<&GameCandidate> = view
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("ghost.exe"))
+            .collect();
+        assert_eq!(ghosts.len(), 3, "{ghosts:?}");
+        assert!(
+            ghosts.iter().all(|candidate| candidate.path.is_none()),
+            "{ghosts:?}"
+        );
+    }
+
     /// c1 (control): Prefetch's trace age is later than the before window, so the missing before time
     /// is not known, not false.
     #[test]
@@ -4781,5 +4864,22 @@ mod tests {
             }
         );
         assert_eq!(candidate.t2, TimeFact::True);
+    }
+
+    /// c2 (control): a report with no scan time makes the before-the-scan window not known for its
+    /// own reason, not because a session's end is missing.
+    #[test]
+    fn c2_a_missing_scan_time_has_its_own_not_known_reason() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("during.exe", None, &["2026-01-10T10:15:00Z"]));
+        let mut report = game_report(observations);
+        report.header.generated_at = "not-a-time".to_owned();
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "during.exe").t4,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::ScanTimeNotRecorded,
+            }
+        );
     }
 }

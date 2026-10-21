@@ -33,6 +33,8 @@ pub enum TimeFact {
 pub enum NotKnownReason {
     /// An earlier session has no recorded end, so its during and after windows are not known.
     SessionEndNotRecorded,
+    /// The report names no scan time, so the before-the-scan window is not known.
+    ScanTimeNotRecorded,
     /// The window is earlier than what the source still covers (ADR 0061's trace ages).
     BeforeTraceAge {
         /// The source whose records do not reach that far back.
@@ -282,6 +284,7 @@ fn gather(
 ) -> Vec<Candidate> {
     let mut paths: BTreeMap<String, Candidate> = BTreeMap::new();
     let mut names: BTreeMap<String, Candidate> = BTreeMap::new();
+    let mut standalone: Vec<Candidate> = Vec::new();
     let mut prefetch: Vec<Candidate> = Vec::new();
     for collector in ["prefetch", "bam", "pca", "process"] {
         for observation in observations_of(report, collector) {
@@ -295,20 +298,28 @@ fn gather(
             if times.is_empty() {
                 continue;
             }
+            // Prefetch's `path` is the `.pf` file, not the program it recorded: the record is
+            // path-less for joining and display (ADR 0078 section 4).
+            let path = if collector == "prefetch" {
+                None
+            } else {
+                session::text(observation, "path").map(str::to_owned)
+            };
             let candidate = Candidate {
                 name: name.to_owned(),
-                path: session::text(observation, "path").map(str::to_owned),
+                path,
                 times,
                 sources: BTreeSet::from([collector]),
             };
-            if collector == "prefetch" && candidate.path.is_none() {
+            if collector == "prefetch" {
                 prefetch.push(candidate);
             } else if let Some(path) = candidate.path.as_deref() {
                 let key = path.to_ascii_lowercase();
                 merge(&mut paths, key, candidate);
             } else {
-                let key = candidate.name.to_ascii_lowercase();
-                merge(&mut names, key, candidate);
+                // A record without a program path has nothing to join on, so it is a candidate of
+                // its own rather than one merged by name (ADR 0078 section 4).
+                standalone.push(candidate);
             }
         }
     }
@@ -337,6 +348,7 @@ fn gather(
     paths
         .into_values()
         .chain(names.into_values())
+        .chain(standalone)
         .filter(|candidate| hits_of(candidate, sessions, scan).any())
         .collect()
 }
@@ -492,7 +504,7 @@ fn fact(
                     continue;
                 };
                 let Some(scan) = scan else {
-                    unknown.get_or_insert(NotKnownReason::SessionEndNotRecorded);
+                    unknown.get_or_insert(NotKnownReason::ScanTimeNotRecorded);
                     continue;
                 };
                 let (from, to) = (end.as_second(), scan.as_second());
