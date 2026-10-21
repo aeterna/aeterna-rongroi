@@ -10,21 +10,34 @@
 //! [`crate::pca::recorded_paths`], [`crate::process::recorded_paths`]), keeps the drive-rooted ones
 //! only, and reports one observation per distinct path ignoring ASCII case (ADR 0079 amendment 7).
 //!
-//! It is `full`: reading a file's bytes is beyond what a standard scan asks for (ADR 0052). In C1 an
-//! observation says only whether those bytes arrived, as `identity_read`; the identity fields built
-//! from them come with the read budget in C2. An unreadable file is never a gap — the whole run is
-//! gapped only when one of its sources could not be read at all, and then with that source's reason.
+//! It is `full`: reading a file's bytes is beyond what a standard scan asks for (ADR 0052).
+//! `identity_read` says what happened to that read, and a `read` carries what the bytes, the hash, the
+//! signature and the `Zone.Identifier` stream say. Reads run nearest the newest `FiveM` time first,
+//! under a 90-second budget checked between files. An unreadable file is never a gap — the whole run
+//! is gapped only when one of its sources could not be read at all, and then with that source's
+//! reason.
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
+use jiff::Timestamp;
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, is_refused_form};
+use rongroi_host::{Host, Platform, SourceError, is_refused_form};
+use rongroi_parsers::content_kind::{self, FileKind};
+use rongroi_parsers::powershell_text::DownloadHost;
+use rongroi_parsers::{pe_version, zone_identifier};
 
 use crate::failure::read_failure;
 use crate::paths::{file_name, is_drive_rooted};
-use crate::{Collector, Field, ScanTier};
+use crate::{Collector, Field, ScanTier, SensitiveKind};
 
 const ID: &str = "recorded_files";
+
+/// How long this collector may spend reading file identities before the rest say `budget_spent`.
+///
+/// Checked between files. ADR 0079 amendment 7 sets it to the whole 90 seconds a full scan may add.
+pub const BUDGET: Duration = Duration::from_secs(90);
 
 /// Every reason this collector gives for not having looked (`Collector::unmeasured_reasons`).
 ///
@@ -47,17 +60,29 @@ const REASONS: [UnmeasuredReason; 8] = [
 /// A path is kept only when it begins with a drive letter, as `bam` and `pca` already keep theirs:
 /// that is the shape `rongroi_core::view::redact_profile_paths` can reach. The three source flags are
 /// always present, so a rule can ask which record pointed at the file. The two root flags are absent
-/// when the environment does not say what the system drive or root is. `identity_read` is present on
-/// every observation, including a standard scan's (ADR 0079 section 3).
-const FIELDS: [Field; 8] = [
+/// when the environment does not say what the system drive or root is. The identity fields follow
+/// `identity_read`: a `read` carries all that apply, a `too_large` still carries the hash and
+/// signature, and every other answer carries none (ADR 0079 section 3). `download_host` is the one
+/// sensitive field, behind its own SS-mode question (ADR 0064).
+const FIELDS: [Field; 18] = [
     Field::boolean("by_bam"),
     Field::boolean("by_pca"),
     Field::boolean("by_process"),
+    Field::text("content_kind"),
+    Field::text("download_host").sensitive(SensitiveKind::DownloadHost),
+    Field::boolean("embedded_pe"),
     Field::text("identity_read"),
     Field::text("name"),
     Field::boolean("on_system_drive"),
+    Field::text("original_filename"),
     Field::text("path"),
+    Field::text("sha256"),
+    Field::text("signature"),
+    Field::text("signer"),
+    Field::text("signer_cert_sha256"),
+    Field::boolean("trailing_data"),
     Field::boolean("under_system_root"),
+    Field::number("zone_id"),
 ];
 
 /// The source that recorded a path.
@@ -68,22 +93,25 @@ enum Source {
     Process,
 }
 
-/// One distinct path, and which of the three records named it.
+/// One distinct path, which of the three records named it, and the newest time any gave it.
 struct Candidate {
     /// The path as the first source that named it spelled it.
     path: String,
     by_bam: bool,
     by_pca: bool,
     by_process: bool,
+    /// The newest instant the sources recorded for this path, when any gave one.
+    at: Option<Timestamp>,
 }
 
 impl Candidate {
-    fn at(path: String) -> Self {
+    fn new(path: String) -> Self {
         Self {
             path,
             by_bam: false,
             by_pca: false,
             by_process: false,
+            at: None,
         }
     }
 
@@ -97,13 +125,26 @@ impl Candidate {
 }
 
 /// The `recorded_files` collector.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct RecordedFiles {
+    /// How long the identity reads may take before the remaining paths say `budget_spent`.
+    ///
+    /// Checked between files, as `autostart` checks its own budget (ADR 0079 amendment 7).
+    pub budget: Duration,
     /// How many files this run may read before the rest say `budget_spent`; `None` reads every one.
     ///
-    /// The discovery read this change adds reads every path. The identity read applies this limit
-    /// between files (ADR 0079 section 4).
+    /// A test-only limit, so that order is testable without a clock. The identity read applies it
+    /// between files, like the budget.
     pub file_limit: Option<usize>,
+}
+
+impl Default for RecordedFiles {
+    fn default() -> Self {
+        Self {
+            budget: BUDGET,
+            file_limit: None,
+        }
+    }
 }
 
 impl Collector for RecordedFiles {
@@ -134,6 +175,7 @@ impl Collector for RecordedFiles {
 
         let mut candidates: BTreeMap<String, Candidate> = BTreeMap::new();
         let mut source_gap = None;
+        let mut fivem_at: Option<Timestamp> = None;
         for (source, paths) in [
             (Source::Bam, crate::bam::recorded_paths(host)),
             (Source::Pca, crate::pca::recorded_paths(host)),
@@ -141,15 +183,19 @@ impl Collector for RecordedFiles {
         ] {
             match paths {
                 Ok(paths) => {
-                    for path in paths {
-                        if !is_drive_rooted(&path) {
+                    for recorded in paths {
+                        if !is_drive_rooted(&recorded.path) {
                             continue;
                         }
-                        let key = path.to_ascii_lowercase();
-                        candidates
+                        let key = recorded.path.to_ascii_lowercase();
+                        let candidate = candidates
                             .entry(key)
-                            .or_insert_with(|| Candidate::at(path))
-                            .mark(source);
+                            .or_insert_with(|| Candidate::new(recorded.path.clone()));
+                        candidate.mark(source);
+                        candidate.at = newest(candidate.at, recorded.at);
+                        if is_fivem_program(&recorded.path) {
+                            fivem_at = newest(fivem_at, recorded.at);
+                        }
                     }
                 }
                 // One source that could not be read loses an unknown number of paths, so the whole
@@ -158,11 +204,26 @@ impl Collector for RecordedFiles {
             }
         }
 
+        let mut ordered: Vec<Candidate> = candidates.into_values().collect();
+        ordered.sort_by(|left, right| order(left, right, fivem_at));
+
         let system_drive = system_drive(host);
         let system_root = system_root(host);
-        let observations = candidates
-            .into_values()
-            .map(|candidate| observation(host, &candidate, system_drive, system_root.as_deref()))
+        let started = Instant::now();
+        let mut attempted = 0_usize;
+        let observations = ordered
+            .into_iter()
+            .map(|candidate| {
+                let spent = started.elapsed() >= self.budget
+                    || self.file_limit.is_some_and(|limit| attempted >= limit);
+                let identity = if spent {
+                    Identity::alone("budget_spent")
+                } else {
+                    attempted += 1;
+                    identity(host, &candidate.path)
+                };
+                observation(&candidate, system_drive, system_root.as_deref(), identity)
+            })
             .collect();
         let gaps = source_gap.map(gaps).unwrap_or_default();
         CollectorRun::Measured {
@@ -184,10 +245,10 @@ fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
 /// One recorded file: its path and name, which records pointed at it, what the read of it did, and
 /// whether it lies on the system drive and under the system root.
 fn observation(
-    host: &dyn Host,
     candidate: &Candidate,
     system_drive: Option<u8>,
     system_root: Option<&str>,
+    identity: Identity,
 ) -> Observation {
     let mut fields = BTreeMap::new();
     if let Some(name) = file_name(&candidate.path) {
@@ -211,8 +272,9 @@ fn observation(
     );
     fields.insert(
         "identity_read".to_owned(),
-        serde_json::Value::from(identity_read(host, &candidate.path)),
+        serde_json::Value::from(identity.read),
     );
+    fields.extend(identity.fields);
     if let Some(drive) = system_drive {
         fields.insert(
             "on_system_drive".to_owned(),
@@ -231,20 +293,164 @@ fn observation(
     }
 }
 
+/// What one read came to: the word ADR 0079 section 3 gives it, and the identity fields it carries.
+struct Identity {
+    /// The value of `identity_read`.
+    read: &'static str,
+    /// The identity fields, empty for every answer but `read` and `too_large`.
+    fields: BTreeMap<String, serde_json::Value>,
+}
+
+impl Identity {
+    fn alone(read: &'static str) -> Self {
+        Self {
+            read,
+            fields: BTreeMap::new(),
+        }
+    }
+
+    fn read(host: &dyn Host, path: &str, bytes: &[u8]) -> Self {
+        let mut fields = BTreeMap::new();
+        insert_hash_and_signature(host, path, &mut fields);
+        insert_content(&mut fields, bytes);
+        insert_zone(host, path, &mut fields);
+        Self {
+            read: "read",
+            fields,
+        }
+    }
+}
+
 /// What happened to the read of one file, in the words ADR 0079 section 3 gives.
 ///
-/// A form this program refuses is not read at all. `read` means only that the bytes arrived; C2 adds
-/// what they say. A file that is gone or refused is never a gap: one file's absence says nothing
-/// about the paths the other records gave.
-fn identity_read(host: &dyn Host, path: &str) -> &'static str {
+/// A form this program refuses is not read at all. A file that is gone or refused is never a gap: one
+/// file's absence says nothing about the paths the other records gave.
+fn identity(host: &dyn Host, path: &str) -> Identity {
     if is_refused_form(path) {
-        return "refused_form";
+        return Identity::alone("refused_form");
     }
     match host.read_file(path) {
-        Ok(Some(_)) => "read",
-        Ok(None) => "missing",
-        Err(error) => read_failure(&error),
+        Ok(Some(bytes)) => Identity::read(host, path, &bytes),
+        Ok(None) => Identity::alone("missing"),
+        Err(error) => {
+            // A file over the size bound still has a hash and a signature, and ADR 0079 section 3
+            // keeps both beside `too_large` so a rule can still ask what the file was.
+            if matches!(error, SourceError::TooLarge { .. }) {
+                let mut fields = BTreeMap::new();
+                insert_hash_and_signature(host, path, &mut fields);
+                Identity {
+                    read: "too_large",
+                    fields,
+                }
+            } else {
+                Identity::alone(read_failure(&error))
+            }
+        }
     }
+}
+
+/// The hash and the signature of one file, as `fivem_dir` emits them.
+fn insert_hash_and_signature(
+    host: &dyn Host,
+    path: &str,
+    fields: &mut BTreeMap<String, serde_json::Value>,
+) {
+    if let Some(sha256) = crate::fivem_dir::file_sha256(host, path) {
+        fields.insert("sha256".to_owned(), serde_json::Value::from(sha256));
+    }
+    if let Ok(signature) = host.file_signature(path) {
+        crate::fivem_dir::insert_signature(fields, signature);
+    }
+}
+
+/// What the file's own bytes say about it (ADR 0078 section 8).
+fn insert_content(fields: &mut BTreeMap<String, serde_json::Value>, bytes: &[u8]) {
+    let Ok(description) = content_kind::parse(bytes) else {
+        return;
+    };
+    fields.insert(
+        "content_kind".to_owned(),
+        serde_json::Value::from(description.kind.as_str()),
+    );
+    if let Some(trailing) = description.trailing_data {
+        fields.insert(
+            "trailing_data".to_owned(),
+            serde_json::Value::from(trailing),
+        );
+    }
+    if let Some(embedded) = description.embedded_pe {
+        fields.insert("embedded_pe".to_owned(), serde_json::Value::from(embedded));
+    }
+    if matches!(
+        description.kind,
+        FileKind::PeExecutable | FileKind::PeDll | FileKind::PeDriver
+    ) && let Ok(Some(name)) = pe_version::original_filename(bytes)
+    {
+        fields.insert(
+            "original_filename".to_owned(),
+            serde_json::Value::from(name),
+        );
+    }
+}
+
+/// The zone and download host of one file, from its `Zone.Identifier` stream (ADR 0079 section 2).
+fn insert_zone(host: &dyn Host, path: &str, fields: &mut BTreeMap<String, serde_json::Value>) {
+    let Ok(Some(bytes)) = host.zone_identifier(path) else {
+        return;
+    };
+    let Ok(zone) = zone_identifier::parse(&bytes) else {
+        return;
+    };
+    if let Some(zone_id) = zone.zone_id {
+        fields.insert("zone_id".to_owned(), serde_json::Value::from(zone_id));
+    }
+    if let Some(download_host) = zone.host {
+        let host = match download_host {
+            DownloadHost::Name(name) => name,
+            DownloadHost::Address(kind) => kind.as_str().to_owned(),
+        };
+        fields.insert("download_host".to_owned(), serde_json::Value::from(host));
+    }
+}
+
+/// The newer of two recorded times, treating a missing time as older than every instant.
+fn newest(left: Option<Timestamp>, right: Option<Timestamp>) -> Option<Timestamp> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(if left >= right { left } else { right }),
+        (Some(at), None) | (None, Some(at)) => Some(at),
+        (None, None) => None,
+    }
+}
+
+/// Whether a recorded path names one of `FiveM`'s programs.
+fn is_fivem_program(path: &str) -> bool {
+    let Some(name) = file_name(path) else {
+        return false;
+    };
+    name == "fivem.exe" || (name.starts_with("fivem_b") && name.ends_with("_gtaprocess.exe"))
+}
+
+/// Nearest to the newest `FiveM` time first, newest first when there is none, and stable by path.
+///
+/// A path with no time has no distance from the `FiveM` record, so it sorts after every path whose
+/// time is known rather than being read first on the strength of a missing answer.
+fn order(left: &Candidate, right: &Candidate, fivem_at: Option<Timestamp>) -> Ordering {
+    let by_time = match fivem_at {
+        Some(center) => {
+            let distance = |at: Option<Timestamp>| {
+                at.map_or(u128::MAX, |at| {
+                    center.as_nanosecond().abs_diff(at.as_nanosecond())
+                })
+            };
+            distance(left.at).cmp(&distance(right.at))
+        }
+        None => right.at.cmp(&left.at),
+    };
+    by_time.then_with(|| {
+        left.path
+            .to_ascii_lowercase()
+            .cmp(&right.path.to_ascii_lowercase())
+    })
 }
 
 /// The system drive's uppercased letter, when the environment names one.

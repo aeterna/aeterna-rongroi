@@ -14,6 +14,19 @@
 /// What a path was replaced with when it is not a shape SS-mode redaction can reach.
 pub const UNREDACTABLE_FORM: &str = "unredactable_form";
 
+/// One program path a source recorded, with the newest time that source gave it.
+///
+/// `recorded_files` orders its reads by distance from the newest `FiveM` record, so each source hands
+/// back the time it already read for the path rather than letting the collector read the artifact a
+/// second time.
+#[derive(Debug, Clone)]
+pub(crate) struct RecordedPath {
+    /// The path exactly as the source spelled it.
+    pub(crate) path: String,
+    /// The newest instant this source recorded for the path, or `None` when it gave none.
+    pub(crate) at: Option<jiff::Timestamp>,
+}
+
 /// The last segment of a Windows path, lower-cased.
 ///
 /// Lower-cased so that `Cheat.exe` and `cheat.exe` reach a report, and a rule author, as one string.

@@ -386,13 +386,17 @@ struct FixtureQword {
     qword: u64,
 }
 
-/// The bytes of one `REG_BINARY` value. Neither `content:` nor `from:` describes a value that is
-/// there and whose bytes cannot be read, as a file entry with neither does (ADR 0019).
+/// The bytes of one `REG_BINARY` value. `content:`, `content_hex:` and `from:` are three ways of
+/// writing the same thing; a value with none of them describes one that is there and whose bytes
+/// cannot be read, as a file entry with none does (ADR 0019). `content_hex:` is how a fixture writes
+/// bytes YAML cannot hold, such as a `FILETIME`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureBinary {
     #[serde(default)]
     content: Option<String>,
+    #[serde(default)]
+    content_hex: Option<String>,
     #[serde(default)]
     from: Option<String>,
 }
@@ -762,7 +766,7 @@ fn resolve_value(
         RegistryValue::Qword(qword) => StoredData::Qword(qword.qword),
         RegistryValue::Binary(binary) => StoredData::Binary(resolve_content(
             binary.content,
-            None,
+            binary.content_hex,
             binary.from,
             &format!("registry value `{name}`"),
             origin,

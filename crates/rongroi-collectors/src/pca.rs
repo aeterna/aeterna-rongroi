@@ -36,7 +36,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::pca::{self, PcaLaunchEntry};
 
 use crate::failure::{read_failure, reason_for};
-use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::paths::{RecordedPath, UNREDACTABLE_FORM, file_name, is_drive_rooted};
 use crate::{Age, AgeCount, AgeRows, Collector, Field};
 
 /// Environment variable holding the Windows directory.
@@ -208,14 +208,15 @@ impl Collector for Pca {
     }
 }
 
-/// The program paths `PcaAppLaunchDic.txt` names, for `recorded_files` (ADR 0079 amendment 7).
+/// The program paths `PcaAppLaunchDic.txt` names, and when it recorded each, for `recorded_files`
+/// (ADR 0079 amendment 7).
 ///
-/// Only the path of a launch line matters here, so a line whose timestamp did not parse still names
-/// its program: the path is the text before the first `|`, as the parser defines it.
+/// A line whose timestamp did not parse still names its program: the path is the text before the
+/// first `|`, as the parser defines it, and the time is the one the parser read when it read one.
 /// A rejected line with no such prefix leaves an unknown path, which is `partial`; a file that could
 /// not be read or is not PCA text leaves all of them, which is that reason. The general databases
 /// contribute no paths, so their state says nothing here.
-pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<String>, UnmeasuredReason> {
+pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<RecordedPath>, UnmeasuredReason> {
     let Some(dir) = pca_dir(host) else {
         return Err(UnmeasuredReason::ReadFailed);
     };
@@ -226,15 +227,21 @@ pub(crate) fn recorded_paths(host: &dyn Host) -> Result<Vec<String>, UnmeasuredR
         Err(error) => return Err(reason_for(host, &error)),
     };
     let file = pca::parse_app_launch_dic(&bytes).map_err(|_| UnmeasuredReason::ReadFailed)?;
-    let mut paths: Vec<String> = file
+    let mut paths: Vec<RecordedPath> = file
         .entries
         .iter()
-        .map(|entry| entry.path.clone())
+        .map(|entry| RecordedPath {
+            path: entry.path.clone(),
+            at: Some(entry.last_run),
+        })
         .collect();
     let mut lost = false;
     for rejected in &file.rejected {
         match rejected.text.split_once('|') {
-            Some((path, _)) if !path.is_empty() => paths.push(path.to_owned()),
+            Some((path, _)) if !path.is_empty() => paths.push(RecordedPath {
+                path: path.to_owned(),
+                at: None,
+            }),
             _ => lost = true,
         }
     }
