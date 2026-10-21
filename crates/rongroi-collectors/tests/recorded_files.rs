@@ -2,18 +2,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! C1 acceptance tests for `recorded_files`: discovery and `identity_read` (ADR 0079 amendment 7).
+//! C1 and C2 acceptance tests for `recorded_files`: discovery, identity fields, budget and order,
+//! and `bam`'s presence check (ADR 0079 amendment 7).
 
 #![allow(clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use rongroi_collectors::bam::Bam;
+use rongroi_collectors::recorded_files::RecordedFiles;
 use rongroi_collectors::scan::{self, ScanContext};
 use rongroi_collectors::{Collector, all};
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::SelfIdentity;
-use rongroi_core::model::{CollectorRun, EvidenceState, Observation, ScanTier, UnmeasuredReason};
+use rongroi_core::model::{
+    CollectorRun, EvidenceState, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
+};
 use rongroi_core::provenance::Provenance;
 use rongroi_core::view;
 use rongroi_host::FixtureHost;
@@ -76,6 +81,60 @@ fn host(
     yaml.push_str(processes);
     FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
 }
+
+/// A host with the same three readable sources as [`host`], whose BAM key holds one value per
+/// `(path, value_yaml)`. `value_yaml` is the body written under the path key, so a test can give the
+/// value bytes with `content_hex:` — which is how a `FILETIME` reaches a fixture without a binary
+/// file. `files` is the YAML body under `filesystem:`.
+fn bam_host(env: &str, values: &[(&str, &str)], files: &str) -> FixtureHost {
+    let mut yaml = String::from("platform: windows\nos_build: \"26100\"\n");
+    yaml.push_str(env);
+    yaml.push_str("registry:\n");
+    yaml.push_str(&format!(
+        "  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1\n"
+    ));
+    for (path, value) in values {
+        yaml.push_str(&format!("    '{path}':\n      {value}\n"));
+    }
+    yaml.push_str("filesystem:\n");
+    yaml.push_str(&format!(
+        "  '{PCA_DIR}':\n    - name: PcaAppLaunchDic.txt\n      content: ''\n"
+    ));
+    yaml.push_str(files);
+    yaml.push_str("processes:\n  - pid: 4\n    name: System\n");
+    FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+}
+
+/// A PE32 executable carrying a version resource whose `OriginalFilename` is `loader.exe`, as hex so
+/// a fixture can describe bytes YAML cannot hold. Built from the same fields the parser's own tests
+/// use: MZ, `PE\0\0`, one `.rsrc` section, and the four-level resource tree down to `RT_VERSION`.
+const PE_HEX: &str = concat!(
+    "4d5a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000050450000648601000000000000000000",
+    "00000000e00000000b010000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000001000000000000000000000000000000000000000001000003001000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000002e72737263000000",
+    "300100000010000000020000000200000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100",
+    "100000001800008000000000000000000000000000000100010000003000008000000000000000000000000000000100",
+    "090400004800000058100000d80000000000000000000000d80034000000560053005f00560045005200530049004f00",
+    "4e005f0049004e0046004f0000000000bd04effe00000000000000000000000000000000000000000000000000000000",
+    "00000000000000000000000000000000000000007c000000010053007400720069006e006700460069006c0065004900",
+    "6e0066006f00000058000000010030003400300039003000340042003000000040000b0001004f007200690067006900",
+    "6e0061006c00460069006c0065006e0061006d00650000006c006f0061006400650072002e0065007800650000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "00000000000000000000000000000000",
+);
+
+/// The hash the fixture declares for [`PE_HEX`]; the collector reports what the host gives it.
+const PE_SHA256: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 
 fn measured(run: &CollectorRun) -> (&[Observation], &BTreeMap<String, UnmeasuredReason>) {
     match run {
@@ -321,5 +380,163 @@ fn k4_the_collector_is_full_tier_and_a_standard_scan_reports_it_not_consented() 
         ),
         "{:?}",
         evidence.state
+    );
+}
+
+/// (k5) A PE read from a path BAM recorded carries what its bytes say: `content_kind` and the
+/// version resource's `OriginalFilename`, beside the SHA-256 the host gave and the zone the
+/// `Zone.Identifier` stream names — `zone_id` and the reduced `download_host`, never the URL.
+#[test]
+fn k5_a_recorded_pe_carries_its_content_identity_and_zone() {
+    let path = r"C:\Users\fixtureuser\Downloads\downloaded.exe";
+    let files = format!(
+        "  'C:\\Users\\fixtureuser\\Downloads':\n    - name: 'downloaded.exe'\n      content_hex: \"{}\"\n      sha256: \"{}\"\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\nHostUrl=https://dl.example.com/a/b.exe?t=1\\r\\n\"\n",
+        PE_HEX, PE_SHA256
+    );
+    let fixture = bam_host(
+        "env:\n  WinDir: 'C:\\Windows'\n  SystemDrive: 'C:'\n  SystemRoot: 'C:\\Windows'\n",
+        &[(path, "content_hex: \"0000056936c0d501\"")],
+        &files,
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, _) = measured(&run);
+    let observation = observation_named(observations, "downloaded.exe");
+
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("read"),
+        "{observation:?}"
+    );
+    assert_eq!(
+        text(observation, "content_kind"),
+        Some("pe_executable"),
+        "{observation:?}"
+    );
+    assert_eq!(
+        text(observation, "original_filename"),
+        Some("loader.exe"),
+        "{observation:?}"
+    );
+    assert_eq!(
+        observation
+            .fields
+            .get("zone_id")
+            .and_then(serde_json::Value::as_u64),
+        Some(3),
+        "{observation:?}"
+    );
+    assert_eq!(
+        text(observation, "download_host"),
+        Some("dl.example.com"),
+        "{observation:?}"
+    );
+    assert_eq!(
+        text(observation, "sha256"),
+        Some(PE_SHA256),
+        "{observation:?}"
+    );
+}
+
+/// (k6) The file limit is checked between paths in the order the collector reads them: the path
+/// nearest the newest FiveM record goes first, so the newest record's own path is read and the
+/// others say the limit — not the clock — stopped them. The newest record here is `Newest.exe`, so
+/// a newest-first order would read that one instead.
+#[test]
+fn k6_the_file_limit_reads_the_path_nearest_the_newest_fivem_time_first() {
+    const FIVEM: &str = r"C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.exe";
+    const NEAR: &str = r"C:\Users\fixtureuser\Downloads\Near.exe";
+    const NEWEST: &str = r"C:\Users\fixtureuser\Downloads\Newest.exe";
+    let files = r"  'C:\Users\fixtureuser\AppData\Local\FiveM':
+    - name: FiveM.exe
+      content: 'fixture bytes'
+  'C:\Users\fixtureuser\Downloads':
+    - name: Near.exe
+      content: 'fixture bytes'
+    - name: Newest.exe
+      content: 'fixture bytes'
+";
+    let fixture = bam_host(
+        "env:\n  WinDir: 'C:\\Windows'\n  SystemDrive: 'C:'\n  SystemRoot: 'C:\\Windows'\n",
+        &[
+            // FiveM at 2026-01-01T00:00:00Z, Near five minutes before it, Newest two hours after.
+            (FIVEM, "content_hex: \"00008192b17adc01\""),
+            (NEAR, "content_hex: \"00a2b0dfb07adc01\""),
+            (NEWEST, "content_hex: \"00d00956c27adc01\""),
+        ],
+        files,
+    );
+
+    let run = RecordedFiles {
+        file_limit: Some(1),
+        ..RecordedFiles::default()
+    }
+    .collect(&fixture);
+    let (observations, _) = measured(&run);
+
+    let fivem = observation_named(observations, "FiveM.exe");
+    assert_eq!(
+        text(fivem, "identity_read"),
+        Some("read"),
+        "the path nearest the newest FiveM time must be the one read: {fivem:?}"
+    );
+    for name in ["Near.exe", "Newest.exe"] {
+        let observation = observation_named(observations, name);
+        assert_eq!(
+            text(observation, "identity_read"),
+            Some("budget_spent"),
+            "{name} must not be read after the limit: {observation:?}"
+        );
+    }
+    assert_eq!(
+        observations
+            .iter()
+            .filter(|observation| text(observation, "identity_read") == Some("read"))
+            .count(),
+        1,
+        "a limit of one must stop after one read: {observations:?}"
+    );
+}
+
+/// (k7) `download_host` is one of the fields SS mode asks about, so the collector must declare it
+/// as `SensitiveKind::DownloadHost` — the same kind `powershell_text` uses (ADR 0064, ADR 0079).
+#[test]
+fn k7_download_host_is_declared_as_a_download_host() {
+    let field = recorded_files()
+        .fields()
+        .iter()
+        .find(|field| field.name == "download_host")
+        .unwrap_or_else(|| panic!("recorded_files does not declare `download_host`"));
+    assert_eq!(
+        field.sensitive,
+        Some(SensitiveKind::DownloadHost),
+        "{field:?}"
+    );
+}
+
+/// (k8) BAM's presence check asks only the host. A host that cannot answer for an ephemeral path
+/// has not said the file is gone, so the observation carries no `disappeared_from_disk` field —
+/// neither a claim that it went nor a claim that it is still there (ADR 0079 amendment 7).
+#[test]
+fn k8_a_host_that_cannot_answer_makes_no_disappeared_claim() {
+    let path = r"C:\Users\fixtureuser\AppData\Local\Temp\gone-loader.exe";
+    let fixture = FixtureHost::from_yaml_str(
+        &format!(
+            "platform: windows\naccess_denied:\n  - '{path}'\nregistry:\n  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1\n    '{path}':\n      content: '012345678901234567890123'\n"
+        ),
+        "inline",
+    )
+    .unwrap();
+
+    let run = Bam.collect(&fixture);
+    let (observations, _) = measured(&run);
+    let record = observations
+        .iter()
+        .find(|observation| text(observation, "name") == Some("gone-loader.exe"))
+        .unwrap_or_else(|| panic!("BAM did not report the ephemeral path: {observations:?}"));
+    assert_eq!(
+        record.fields.get("disappeared_from_disk"),
+        None,
+        "a host answer that is not `Ok` must not become a claim: {record:?}"
     );
 }
