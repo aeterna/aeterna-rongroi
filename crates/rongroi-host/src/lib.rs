@@ -244,6 +244,28 @@ pub fn is_refused_form(path: &str) -> bool {
     false
 }
 
+/// The suffix a file's `Zone.Identifier` stream is reached by (ADR 0079 section 1).
+///
+/// A collector never joins it to a path itself: it asks [`FilesystemSource::zone_identifier`], which
+/// is the only way to read this one stream.
+pub const ZONE_IDENTIFIER_SUFFIX: &str = ":Zone.Identifier";
+
+/// The fixed reason a path in a form [`is_refused_form`] refuses is not read.
+///
+/// It names no part of the path: a refused form is answered the same way every time.
+const REFUSED_FORM_MESSAGE: &str = "refused path form";
+
+/// The path of the file's `Zone.Identifier` stream, or [`SourceError::Failed`] for a refused form.
+///
+/// The refusal runs before the suffix is joined, so no spelling of a path can reach a stream that
+/// [`is_refused_form`] refuses (ADR 0048, ADR 0079 section 1).
+pub fn zone_identifier_path(path: &str) -> Result<String, SourceError> {
+    if is_refused_form(path) {
+        return Err(SourceError::Failed(REFUSED_FORM_MESSAGE.to_owned()));
+    }
+    Ok(format!("{path}{ZONE_IDENTIFIER_SUFFIX}"))
+}
+
 /// Read-only access to the file system. Paths are absolute and Windows-style, e.g. `C:\Users\a\x.dll`.
 pub trait FilesystemSource {
     /// Lists what is directly inside `dir`; it never recurses.
@@ -269,6 +291,19 @@ pub trait FilesystemSource {
     /// The path must name a regular file; `list_dir` already says which entries are files. Anything
     /// else is an error rather than an answer.
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError>;
+
+    /// The bytes of the file's `Zone.Identifier` stream, at most [`MAX_STREAM_BYTES`] of them
+    /// (ADR 0079 section 1).
+    ///
+    /// `path` is the file's own path. A path in a form [`is_refused_form`] refuses is
+    /// [`SourceError::Failed`], and the refusal runs before [`ZONE_IDENTIFIER_SUFFIX`] is joined, so a
+    /// stream cannot be reached through such a spelling.
+    ///
+    /// `Ok(None)` means the file or its stream does not exist, the same fact
+    /// [`FilesystemSource::read_file`] reports for a file that is gone. A stream larger than the limit
+    /// is [`SourceError::TooLarge`]; nothing is truncated. The stream is opened for reading only, and
+    /// reading it can move the file's last-access time (ADR 0079, Measured).
+    fn zone_identifier(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError>;
 
     /// Whether the file at `path` carries the read-only attribute (ADR 0037).
     ///
@@ -831,6 +866,13 @@ pub fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
 /// size that costs a player's machine anything to refuse.
 pub const MAX_FILE_BYTES: usize = 64 * 1024 * 1024;
 
+/// Most bytes [`FilesystemSource::zone_identifier`] returns for one stream (ADR 0079 section 1).
+///
+/// A `Zone.Identifier` stream is a short INI text, so 64 KiB is far above anything Windows writes.
+/// Like [`MAX_FILE_BYTES`], the limit is this program's, and a larger stream is
+/// [`SourceError::TooLarge`] rather than a truncated one that would parse as damaged.
+pub const MAX_STREAM_BYTES: usize = 64 * 1024;
+
 /// Reads at most `limit` bytes from `reader`, or reports [`SourceError::TooLarge`].
 ///
 /// It reads one byte past the limit deliberately: that is what tells a file of exactly `limit` bytes,
@@ -973,6 +1015,12 @@ impl FilesystemSource for NonWindowsHost {
     }
 
     fn read_file(&self, _path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows file system on this platform".to_owned(),
+        ))
+    }
+
+    fn zone_identifier(&self, _path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows file system on this platform".to_owned(),
         ))
