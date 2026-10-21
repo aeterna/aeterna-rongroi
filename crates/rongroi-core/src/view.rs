@@ -8,9 +8,14 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
+mod game;
 mod saved;
 mod session;
 
+pub use game::{
+    GameCandidate, GameSession, GameWindows, NearSessions, NotKnownReason, TimeFact,
+    WINDOW_SECONDS, WindowCounts, game_windows,
+};
 pub use saved::{
     CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,
     SHOWN_DIGEST_LEN, SavedRecord, SavedTimes, canonical_case_code, digest, saved_record,
@@ -1827,6 +1832,8 @@ fn is_fixed_root(folder: &[u8]) -> bool {
 }
 
 #[cfg(test)]
+// The committed tests' prose names `FiveM` unquoted, and this run may not edit the tests.
+#[allow(clippy::doc_markdown)]
 mod tests {
     use std::collections::BTreeMap;
 
