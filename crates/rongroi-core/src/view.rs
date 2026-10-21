@@ -1832,8 +1832,6 @@ fn is_fixed_root(folder: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-// The committed tests' prose names `FiveM` unquoted, and this run may not edit the tests.
-#[allow(clippy::doc_markdown)]
 mod tests {
     use std::collections::BTreeMap;
 
@@ -4361,7 +4359,7 @@ mod tests {
         observations
     }
 
-    /// A report holding the observations, the bundle's FiveM selectors and the age declarations the
+    /// A report holding the observations, the bundle's `FiveM` selectors and the age declarations the
     /// view reads. The scan ran on 2026-01-10T12:00:00Z (`session_report`).
     fn game_report(observations: Vec<Observation>) -> Report {
         let mut report = session_report(observations, &[]);
@@ -4434,7 +4432,7 @@ mod tests {
             .unwrap_or_else(|| panic!("no candidate {name}"))
     }
 
-    /// b1: no record of a FiveM run: the view says there is no session and holds no candidate.
+    /// b1: no record of a `FiveM` run: the view says there is no session and holds no candidate.
     #[test]
     fn b1_no_fivem_record_is_no_session_and_no_candidates() {
         let report = game_report(vec![prefetch_runs(
@@ -4473,6 +4471,23 @@ mod tests {
             .collect();
         starts.sort_unstable();
         assert_eq!(starts, vec![GAME_START_1, GAME_START_2]);
+    }
+
+    /// b2b: `FiveM.exe` and `FiveM_b…_GTAProcess.exe` run times five seconds apart are one session
+    /// for each of two starts, not four.
+    #[test]
+    fn b2b_starts_within_the_margin_are_one_session() {
+        let report = game_report(vec![
+            prefetch_runs("FiveM.exe", Some("legacy"), &[GAME_START_3, GAME_START_2]),
+            prefetch_runs(
+                "FiveM_b1234_GTAProcess.exe",
+                Some("legacy"),
+                &["2026-01-10T10:00:05Z", "2026-01-10T09:00:05Z"],
+            ),
+        ]);
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(view.sessions.len(), 2, "{:?}", view.sessions);
+        assert_eq!(earlier_sessions(&view, "legacy").len(), 1);
     }
 
     /// b3: a run ten minutes before each of three sessions is in each before window: T1 is true, and
@@ -4604,7 +4619,9 @@ mod tests {
                 before: 1,
                 during: 1,
                 after: 1,
-                before_scan: 1,
+                // The before-the-scan window is the latest end up to the scan, so it overlaps the
+                // after window: `after-tool.exe` counts in both, once per window kind.
+                before_scan: 2,
             }
         );
         assert!(ss.candidates.is_empty());
