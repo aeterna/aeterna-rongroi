@@ -1105,7 +1105,7 @@ mod tests {
     // (q3) Each log has exactly one summary row, and every summary carries `rejected`.
 
     /// The summary rows of one log: the observations whose `log` is `log` and that carry `read`.
-    fn summaries_for(observations: &[Observation], log: &str) -> Vec<&Observation> {
+    fn summaries_for<'a>(observations: &'a [Observation], log: &str) -> Vec<&'a Observation> {
         observations
             .iter()
             .filter(|observation| {
