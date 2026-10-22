@@ -126,3 +126,17 @@ path = "fuzz_targets/fuzz_zone_identifier.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fuzz_userassist_entry"
+path = "fuzz_targets/fuzz_userassist_entry.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_userassist_name"
+path = "fuzz_targets/fuzz_userassist_name.rs"
+test = false
+doc = false
+bench = false

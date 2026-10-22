@@ -41,5 +41,6 @@ pub mod pe_version;
 pub mod powershell_text;
 pub mod prefetch;
 pub mod task;
+pub mod userassist;
 pub mod usn;
 pub mod zone_identifier;

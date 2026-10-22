@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! The files a program recorded by BAM, PCA or the process list ran from.
+//! The files a program recorded by BAM, PCA, the process list or `UserAssist` ran from.
 //!
 //! BAM and PCA record a program's path because it ran; the process list holds the path of an image
-//! that is running now. This collector gathers those paths through the same host calls and the same
-//! path logic their own collectors use ([`crate::bam::recorded_paths`],
-//! [`crate::pca::recorded_paths`], [`crate::process::recorded_paths`]), keeps the drive-rooted ones
-//! only, and reports one observation per distinct path ignoring ASCII case (ADR 0079 amendment 7).
+//! that is running now; `UserAssist` holds the path of a program Explorer opened through the shell.
+//! This collector gathers those paths through the same host calls and the same path logic their own
+//! collectors use ([`crate::bam::recorded_paths`], [`crate::pca::recorded_paths`],
+//! [`crate::process::recorded_paths`], [`crate::userassist::recorded_paths`]), keeps the drive-rooted
+//! ones only, and reports one observation per distinct path ignoring ASCII case (ADR 0079 amendment 7,
+//! ADR 0080 section 4).
 //!
 //! It is `full`: reading a file's bytes is beyond what a standard scan asks for (ADR 0052).
 //! `identity_read` says what happened to that read, and a `read` carries what the bytes, the hash, the
@@ -43,8 +45,9 @@ pub const BUDGET: Duration = Duration::from_secs(90);
 ///
 /// `not_windows` is its own answer. The rest are what one of its sources gives when that source could
 /// not be read: this collector adds no vocabulary of its own, because a gap here means exactly what
-/// the same reason means in `bam`, `pca` or `process`. `not_on_this_os` is not here: PCA says it for a
-/// Windows that never kept these files, and PCA then contributes neither a path nor a gap.
+/// the same reason means in `bam`, `pca`, `process` or `userassist`. `not_on_this_os` is not here:
+/// PCA says it for a Windows that never kept these files, and PCA then contributes neither a path nor
+/// a gap.
 const REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
@@ -58,16 +61,17 @@ const REASONS: [UnmeasuredReason; 7] = [
 /// Every field this collector can emit.
 ///
 /// A path is kept only when it begins with a drive letter, as `bam` and `pca` already keep theirs:
-/// that is the shape `rongroi_core::view::redact_profile_paths` can reach. The three source flags are
+/// that is the shape `rongroi_core::view::redact_profile_paths` can reach. The four source flags are
 /// always present, so a rule can ask which record pointed at the file. The two root flags are absent
 /// when the environment does not say what the system drive or root is. The identity fields follow
 /// `identity_read`: a `read` carries all that apply, a `too_large` still carries the hash and
 /// signature, and every other answer carries none (ADR 0079 section 3). `download_host` is the one
 /// sensitive field, behind its own SS-mode question (ADR 0064).
-const FIELDS: [Field; 18] = [
+const FIELDS: [Field; 19] = [
     Field::boolean("by_bam"),
     Field::boolean("by_pca"),
     Field::boolean("by_process"),
+    Field::boolean("by_userassist"),
     Field::text("content_kind"),
     Field::text("download_host").sensitive(SensitiveKind::DownloadHost),
     Field::boolean("embedded_pe"),
@@ -91,15 +95,18 @@ enum Source {
     Bam,
     Pca,
     Process,
+    UserAssist,
 }
 
-/// One distinct path, which of the three records named it, and the newest time any gave it.
+/// One distinct path, which of the four records named it, and the newest time any gave it.
+#[allow(clippy::struct_excessive_bools)]
 struct Candidate {
     /// The path as the first source that named it spelled it.
     path: String,
     by_bam: bool,
     by_pca: bool,
     by_process: bool,
+    by_userassist: bool,
     /// The newest instant the sources recorded for this path, when any gave one.
     at: Option<Timestamp>,
 }
@@ -111,6 +118,7 @@ impl Candidate {
             by_bam: false,
             by_pca: false,
             by_process: false,
+            by_userassist: false,
             at: None,
         }
     }
@@ -120,6 +128,7 @@ impl Candidate {
             Source::Bam => self.by_bam = true,
             Source::Pca => self.by_pca = true,
             Source::Process => self.by_process = true,
+            Source::UserAssist => self.by_userassist = true,
         }
     }
 }
@@ -185,6 +194,7 @@ impl Collector for RecordedFiles {
             (Source::Bam, crate::bam::recorded_paths(host)),
             (Source::Pca, crate::pca::recorded_paths(host)),
             (Source::Process, crate::process::recorded_paths(host)),
+            (Source::UserAssist, crate::userassist::recorded_paths(host)),
         ] {
             match paths {
                 Ok((paths, partial)) => {
@@ -210,6 +220,15 @@ impl Collector for RecordedFiles {
                 // PCA says this Windows never kept its files, so it contributes no path and no gap.
                 Err(UnmeasuredReason::NotOnThisOs) if matches!(source, Source::Pca) => {
                     measured_sources += 1;
+                }
+                // An absent `UserAssist` key holds no path, so no path can be missing from it: a
+                // measured source with no paths, not a gap (ADR 0080 section 4). It says nothing
+                // about what the account did. It does not by itself make a run whose every other
+                // source failed a measured one.
+                Err(UnmeasuredReason::SourceAbsent) if matches!(source, Source::UserAssist) => {
+                    if measured_sources > 0 {
+                        measured_sources += 1;
+                    }
                 }
                 // One source that could not be read loses an unknown number of paths, so the whole
                 // run is a gap. The paths the other sources gave are still reported.
@@ -294,6 +313,10 @@ fn observation(
     fields.insert(
         "by_process".to_owned(),
         serde_json::Value::from(candidate.by_process),
+    );
+    fields.insert(
+        "by_userassist".to_owned(),
+        serde_json::Value::from(candidate.by_userassist),
     );
     fields.insert(
         "identity_read".to_owned(),

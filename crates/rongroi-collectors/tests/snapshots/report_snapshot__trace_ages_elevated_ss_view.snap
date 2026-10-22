@@ -550,6 +550,10 @@ expression: view
         "reason": "access_denied"
       },
       {
+        "collector": "userassist",
+        "reason": "source_absent"
+      },
+      {
         "collector": "pci_device",
         "reason": "read_failed"
       },
@@ -616,6 +620,7 @@ expression: view
     "prefetch",
     "bam",
     "pca",
+    "userassist",
     "recorded_files",
     "usn"
   ],
@@ -791,6 +796,11 @@ expression: view
         "oldest": "2025-11-02T03:04:05Z",
         "days_before": 59,
         "count": 2
+      },
+      {
+        "collector": "userassist",
+        "state": "unmeasured",
+        "reason": "source_absent"
       },
       {
         "collector": "usn",

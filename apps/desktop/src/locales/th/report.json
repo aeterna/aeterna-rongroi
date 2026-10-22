@@ -105,6 +105,7 @@
     "prefetch": "Prefetch ของ Windows",
     "bam": "Background Activity Moderator (BAM)",
     "pca": "Program Compatibility Assistant",
+    "userassist": "โปรแกรมที่เปิดผ่าน shell ของ Windows (UserAssist)",
     "pci_device": "อุปกรณ์ PCI ที่ Windows จำไว้",
     "hid_device": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่นที่ Windows จำไว้",
     "windows_start": "Windows เริ่มทำงานแบบไหน",
@@ -192,6 +193,7 @@
       "prefetch": "อ่านไฟล์ Prefetch ได้ {{count}} ไฟล์",
       "bam": "{{count}} รายการ",
       "pca": "{{count}} รายการที่บันทึกการเปิดโปรแกรม",
+      "userassist": "{{count}} รายการ",
       "usn": "{{count}} record",
       "fivem_dir": "{{count}} ไฟล์",
       "enhanced_server_cache": "{{count}} โฟลเดอร์ของเซิร์ฟเวอร์"

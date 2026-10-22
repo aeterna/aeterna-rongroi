@@ -49,7 +49,7 @@ impl Role {
 /// The collectors whose records carry a program's name and nothing that identifies the program
 /// (ADR 0034). A `role: evidence` file on one of them may not match `name` or `path`; a timeline
 /// selector may (ADR 0051).
-pub const NAME_ONLY_COLLECTORS: [&str; 3] = ["bam", "pca", "prefetch"];
+pub const NAME_ONLY_COLLECTORS: [&str; 4] = ["bam", "pca", "prefetch", "userassist"];
 
 /// The fields [`NAME_ONLY_COLLECTORS`] carry that name a program.
 pub const NAMING_FIELDS: [&str; 2] = ["name", "path"];
@@ -1585,6 +1585,28 @@ date: 2026-09-15
         }
         let elsewhere = name_only("process", "evidence", "presence", "  name: fivem.exe\n");
         assert_eq!(problems_at("process", &elsewhere), Vec::<String>::new());
+    }
+
+    /// ADR 0034 as amended by ADR 0080: `userassist` is the fourth collector whose records carry a
+    /// program's name and nothing that identifies it, so an evidence rule on it may not match the
+    /// name or the path, and a timeline selector may. Written out rather than looped over
+    /// `NAME_ONLY_COLLECTORS`, so that this fails until the collector joins that list instead of
+    /// passing without ever having asked about it.
+    #[test]
+    fn only_a_timeline_selector_may_select_a_userassist_record_by_name() {
+        for block in ["  name: firefox.exe\n", "  path|endswith: \\firefox.exe\n"] {
+            let rule = name_only("userassist", "evidence", "execution", block);
+            let problems = problems_at("userassist", &rule);
+            assert_eq!(problems.len(), 1, "{block}: {problems:?}");
+            assert!(problems[0].contains("ADR 0034"), "{block}: {problems:?}");
+
+            let selector = name_only("userassist", "timeline", "context", block);
+            assert_eq!(
+                problems_at("userassist", &selector),
+                Vec::<String>::new(),
+                "{block}"
+            );
+        }
     }
 
     /// `run_times` is a list of times, not one value a comparison can ask about: the bundle loader

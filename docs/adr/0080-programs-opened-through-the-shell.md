@@ -186,3 +186,29 @@ the scan is the one signed in at the keyboard".
   `oldest_by_source` maps it; `COLLECTOR_ORDER` places it after `pca`.
 - CLI and desktop consent text, `CONSENT_WORDS`, `PRIVACY.md`, the locale name, `docs/architecture.md`.
 - No `HKEY_USERS` read, no new host method.
+
+## As built: P4 (2026-10-22)
+
+UserAssist shipped in workstream R-10: `rongroi_parsers::userassist`, the standard-tier `userassist`
+collector, its place in `NAME_ONLY_COLLECTORS`, the game-window view and `recorded_files`. The build
+differs from the sections above in these places:
+
+1. **Section 3's last paragraph is not true yet.** The view does not list each candidate's sources: they
+   are kept inside `view::game_windows` and not on the public `GameCandidate`. Showing them waits for the
+   display work of ADR 0078 step P6.
+2. **An app identity is a name with none of `\`, `/` and `:`.** A name with `/` or `:` that is not
+   drive-rooted, such as a URL, is withheld as `unredactable_form`, and only its last segment is kept as
+   `name`.
+3. **A key that cannot be read is a measured run with a gap**, as `bam` does it, not an `Unmeasured`
+   run: the account row and the status row say what was read. A shortcuts key that cannot be read leaves
+   `shortcuts` out, with a gap; an absent one counts zero. When one value cannot be read, `entries` is
+   gapped with the entry fields, because it is then a lower bound.
+4. **`recorded_files` and an absent key.** An absent UserAssist key holds no path, so no path can be
+   missing, and it is not a gap for `recorded_files`; it says nothing about what the account did.
+5. **Paths that look like escapes.** A known-folder path with `..` segments is refused by
+   `rongroi_host::is_refused_form` before it is emitted, and a name ending in a separator has no last
+   segment, so it has no `name`.
+6. **No seed corpus of its own.** The delegation wrapper cannot carry binary files (org-standards#72), so
+   `fuzz_userassist_entry` starts from BAM's binary values and `fuzz_userassist_name` from text fixtures.
+7. **The baseline** `baseline-consumer-win11` holds three ordinary entries and a session counter, so the
+   collector is measured there (crates/rongroi-collectors/AGENTS.md).

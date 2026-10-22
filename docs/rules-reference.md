@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 77 |
-| SHA-256 | `021e4776068b756d9248d76e4bfe4a1c58f803c7e42dc83b754a6baedb9e7c39` |
+| SHA-256 | `d8c3718e070009ed84681841dc9597f65fab71c1c2c18a185d2481e69221a36b` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.

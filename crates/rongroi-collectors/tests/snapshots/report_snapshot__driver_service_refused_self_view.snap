@@ -674,6 +674,10 @@ expression: view
         "reason": "read_failed"
       },
       {
+        "collector": "userassist",
+        "reason": "source_absent"
+      },
+      {
         "collector": "pci_device",
         "reason": "read_failed"
       },
@@ -712,6 +716,7 @@ expression: view
     "prefetch",
     "bam",
     "pca",
+    "userassist",
     "recorded_files",
     "usn"
   ],
@@ -831,6 +836,11 @@ expression: view
         "collector": "pca",
         "state": "unmeasured",
         "reason": "read_failed"
+      },
+      {
+        "collector": "userassist",
+        "state": "unmeasured",
+        "reason": "source_absent"
       },
       {
         "collector": "usn",

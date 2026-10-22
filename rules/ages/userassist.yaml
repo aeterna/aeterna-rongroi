@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# The ordinary retention of this source, shown under its trace-age rows (ADR 0061). Checked 2026-10-22.
+id: 193b0cca-e24a-4412-ae37-8c8aacc9c361
+collector: userassist
+retention: >-
+  Explorer keeps one value per program the account opened through the shell and rewrites it in place.
+  How long it keeps a value is not documented by Microsoft and has not been measured, so no number of
+  days is given here.
+documented: false
+references:
+  - docs/adr/0080-programs-opened-through-the-shell.md
+  - docs/adr/0061-how-old-the-traces-are.md

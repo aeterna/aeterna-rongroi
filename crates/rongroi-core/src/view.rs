@@ -35,7 +35,7 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 18] = [
+pub const COLLECTOR_ORDER: [&str; 19] = [
     "posture",
     "driver_service",
     "windows_start",
@@ -52,6 +52,7 @@ pub const COLLECTOR_ORDER: [&str; 18] = [
     "prefetch",
     "bam",
     "pca",
+    "userassist",
     "recorded_files",
     "usn",
 ];
@@ -4457,6 +4458,16 @@ mod tests {
                     &[],
                 ),
             ),
+            (
+                "userassist".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Observations,
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
         ]);
         report
     }
@@ -4891,6 +4902,46 @@ mod tests {
             }
         );
         assert_eq!(candidate.t2, TimeFact::True);
+    }
+
+    /// v2: a `UserAssist`-only candidate is bounded by `UserAssist`'s trace age as a BAM candidate is
+    /// by BAM's: a before window older than its oldest entry is not known, while a time inside the
+    /// before window is true and a during window it does not hold is false (ADR 0080 section 3).
+    #[test]
+    fn u4_v2_a_userassist_only_candidate_is_bounded_by_its_trace_age() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "userassist",
+            "During-Tool.exe",
+            Some(r"C:\Tools\During-Tool.exe"),
+            "last_run",
+            "2026-01-10T10:15:00Z",
+        ));
+        observations.push(recorded(
+            "userassist",
+            "Before-Tool.exe",
+            Some(r"C:\Tools\Before-Tool.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+
+        // UserAssist's oldest entry is 09:50, later than the before window's 09:30 start, so the
+        // window is outside what UserAssist still covers.
+        let during = game_candidate(&view, "During-Tool.exe");
+        assert_eq!(
+            during.t1,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::BeforeTraceAge {
+                    source: "userassist".to_owned(),
+                },
+            }
+        );
+        assert_eq!(during.t2, TimeFact::True);
+
+        let before = game_candidate(&view, "Before-Tool.exe");
+        assert_eq!(before.t1, TimeFact::True);
+        assert_eq!(before.t2, TimeFact::False);
     }
 
     /// c2 (control): a report with no scan time makes the before-the-scan window not known for its
