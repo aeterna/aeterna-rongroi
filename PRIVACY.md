@@ -186,7 +186,19 @@ all**: an event's own text is where user names, PC names, addresses, account ide
 lines live, and none of it survives the step that reads the file. **One number is the exception** (ADR 0071):
 of the event Windows writes to its System log each time it starts, the tool reads `BootType`, which says
 whether that start followed a full shutdown or a Fast Startup one, and the time of the event. Nothing else of
-that event is read, and nothing of any other event.
+that event is read. **Four more kinds of event are read for a few named fields** (ADR 0081), and their text
+never reaches the report:
+- when a service or driver was installed (System log, 7045), whether it is a driver or a program, and a
+  **fingerprint** of its file's path — a SHA-256 of the path, which matches only the same path. The path,
+  the service's name and the account it runs as are not read;
+- when the clock was changed (System log, Kernel-General 1; Security log, 4616): the time before and after,
+  Windows' reason number, and whether a program in Windows' own folder made the change — never which
+  program. Changes under a minute are only counted;
+- for each file Code Integrity refused to load (3033), a fingerprint of its path after the drive, how many
+  times and when — never the file's name or the program that tried to load it.
+A fingerprint is not a secret: anyone who already has a path can compute it, and the same file gives the
+same fingerprint in every report, so two reports of the same file can be matched by it. SS mode shows it.
+Nothing of any other event is read.
 A log the tool could not read — because Windows refused it, because it is larger than the tool will open,
 or because the tool's own time limit ran out — is **named in the report as one it could not read**, rather
 than passed over in silence. A log the tool never opened at all, because that time limit was already gone

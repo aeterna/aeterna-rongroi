@@ -216,3 +216,43 @@ refused, a fingerprint of its path that matches only the same path — never a p
   `event_fields` after `windows_start`.
 - CLI and desktop consent text, `CONSENT_WORDS`, `PRIVACY.md`, the locale name, `docs/architecture.md`.
 - ADR 0059's selector for 3033 and 3077 is unchanged.
+
+## As built: P4 (2026-10-22)
+
+The event fields shipped in workstream R-11: `rongroi_parsers::evtx::{system_fields, security_fields,
+refused_images}`, `rongroi_core::digest`, the standard-tier `event_fields` collector, and in the game-window
+view an install's time on a matching candidate, unmatched installs counted per window, a Code Integrity
+note, and the clock line. The build differs from the sections above, or settles what they left open, in
+these places:
+
+1. **`ServiceType` is text.** 7045 writes `kernel mode driver`, `user mode service` and so on (measured on
+   the PC above), not the numbers 1 and 2 that section 2 names. `kind` is `driver` for `kernel mode driver`
+   and `file system driver`, `program` for `user mode service`, and absent for any other text.
+2. **A 4616 carries no `reason` and no `by`.** Section 1 reads only its times; section 3's "listed the same
+   way" means as an observation with `changed_at`, `old_time` and `new_time`.
+3. **An install's time does not feed the facts.** Section 4 places a matching install in the windows; it is
+   shown on the candidate as `installed_at` and is not one of the times T1 to T4, R or the ordering read,
+   so ordering by installs waits for the lab baseline, as section 4 says.
+4. **The digest helper and the threshold live in `rongroi-core`** (`rongroi_core::digest`), not in the
+   collectors: the view needs them, and the core does not depend on the collectors.
+5. **No ages declaration.** The clock line's "not known" uses `System.evtx`'s trace age from `evtx`
+   (ADR 0061), so `event_fields` declares none.
+6. **The `read` words** are those `rongroi_core::view` already reads for `evtx` (`read`, `access_denied`,
+   `budget_exhausted`, …), so a refused Security log reads as `not_admin` on a token known not to be
+   elevated.
+7. **No baseline host reads it.** The only `.evtx` fixture is a LanguagePack log, and the delegation
+   wrapper cannot carry binary files (org-standards#72); its found cases are tested on the parser's output.
+8. **The clock line's span and its lines.** When the latest session has no recorded end, the span runs to
+   the scan, or, when the scan time is not known, to the end of that session's after window. One change
+   that both the System and Security logs record is one line: lines are kept once per pair of old and new
+   times, the earliest record first. Two changes with neither time readable therefore show as one line.
+   `old_time` and `new_time` are parsed and shown again, as `installed_at` is.
+9. **A rejected record makes the history "not known".** Each log's summary row carries `rejected`, the
+   records its reader refused; the history is known only when the System summary has none, since a refused
+   record may hold a change.
+10. **Unmatched installs** count, per window their time falls in, the installs whose path digest matches
+    no candidate's path, not every install on the PC; an install whose path did not resolve has no digest
+    and matches nothing.
+11. **Who changed the clock** reads the process path after its volume with the collector's own helper,
+    the same rule `rongroi_core::digest::volume_path_digest` uses; the two are kept apart because the
+    collector compares folders and never hashes the path.
