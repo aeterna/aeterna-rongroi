@@ -1534,3 +1534,230 @@ mod powershell_tests {
         assert!(!out.entries[0].complete);
     }
 }
+
+#[cfg(test)]
+mod system_tests {
+    use evtx::SerializedEvtxRecord;
+    use jiff::Timestamp;
+    use serde_json::{Value, json};
+
+    use super::{audit_clock_change, kernel_clock_change, refused_image, service_install};
+
+    /// A record as `records_json_value` renders one: `System` with a `Computer` field, and an
+    /// `EventData` in the shape the provider gives it. The `Computer` text must never reach a result.
+    fn rendered(
+        provider: &str,
+        channel: &str,
+        event_id: u32,
+        data: &Value,
+    ) -> SerializedEvtxRecord<Value> {
+        SerializedEvtxRecord {
+            event_record_id: 9,
+            timestamp: Timestamp::from_second(1_791_000_000).unwrap_or(Timestamp::UNIX_EPOCH),
+            data: json!({ "Event": {
+                "System": {
+                    "Provider": { "#attributes": { "Name": provider } },
+                    "EventID": event_id, "Level": 4, "Channel": channel,
+                    "Computer": "WORKSTATION-7"
+                },
+                "EventData": data.clone()
+            }}),
+        }
+    }
+
+    fn at(text: &str) -> Timestamp {
+        text.parse().expect("a test timestamp")
+    }
+
+    /// (e1) A 7045 is an install with its `ImagePath`, `ServiceType` and time. `ServiceName`,
+    /// `AccountName` and `Computer` are not read, so none of their text reaches the result.
+    #[test]
+    fn e1_a_service_install_keeps_its_image_path_type_and_time() {
+        let data = json!({
+            "ServiceName": "SECRET-SVC-NAME",
+            "ImagePath": "C:\\Windows\\System32\\drivers\\exampledrv.sys",
+            "ServiceType": "kernel mode driver",
+            "StartType": 3,
+            "AccountName": "ACCT-SECRET-ALEX"
+        });
+        let install = service_install(&rendered("Service Control Manager", "System", 7045, &data))
+            .expect("a 7045 from the Service Control Manager is an install");
+        assert_eq!(
+            install.image_path.as_deref(),
+            Some("C:\\Windows\\System32\\drivers\\exampledrv.sys")
+        );
+        assert_eq!(install.service_type.as_deref(), Some("kernel mode driver"));
+        assert_eq!(install.written.as_second(), 1_791_000_000);
+        let shown = format!("{install:?}");
+        for secret in ["SECRET-SVC-NAME", "ACCT-SECRET-ALEX", "WORKSTATION-7"] {
+            assert!(!shown.contains(secret), "{secret} reached {shown}");
+        }
+    }
+
+    /// (e2) Kernel-General 1 gives both times and the reason. An empty `ProcessName` is `None`; a
+    /// real one is kept. `Computer` never reaches the result.
+    #[test]
+    fn e2_a_kernel_clock_change_keeps_times_reason_and_a_real_process_only() {
+        let without_process = json!({
+            "OldTime": "2026-10-01T10:00:00.000Z",
+            "NewTime": "2026-10-01T10:05:00.000Z",
+            "Reason": 2,
+            "ProcessName": ""
+        });
+        let change = kernel_clock_change(&rendered(
+            "Microsoft-Windows-Kernel-General",
+            "System",
+            1,
+            &without_process,
+        ))
+        .expect("a Kernel-General 1 is a clock change");
+        assert_eq!(change.old_time, Some(at("2026-10-01T10:00:00Z")));
+        assert_eq!(change.new_time, Some(at("2026-10-01T10:05:00Z")));
+        assert_eq!(change.reason, Some(2));
+        assert_eq!(change.process, None);
+        assert!(!format!("{change:?}").contains("WORKSTATION-7"));
+
+        let with_process = json!({
+            "OldTime": "2026-10-01T10:00:00.000Z",
+            "NewTime": "2026-10-01T10:05:00.000Z",
+            "Reason": 2,
+            "ProcessName": "\\Device\\HarddiskVolume3\\Windows\\System32\\svchost.exe"
+        });
+        let change = kernel_clock_change(&rendered(
+            "Microsoft-Windows-Kernel-General",
+            "System",
+            1,
+            &with_process,
+        ))
+        .expect("a Kernel-General 1 is a clock change");
+        assert_eq!(
+            change.process.as_deref(),
+            Some("\\Device\\HarddiskVolume3\\Windows\\System32\\svchost.exe")
+        );
+        assert!(!format!("{change:?}").contains("WORKSTATION-7"));
+    }
+
+    /// (e3) A 4616 gives both times, and neither reason nor process, whatever the record holds.
+    /// `SubjectUserName`, `ProcessName` and `Computer` never reach the result.
+    #[test]
+    fn e3_a_security_clock_change_keeps_only_its_two_times() {
+        let data = json!({
+            "PreviousTime": "2026-10-01T10:00:00.000Z",
+            "NewTime": "2026-10-01T10:05:00.000Z",
+            "SubjectUserName": "ACCT-SECRET-ALEX",
+            "ProcessName": "C:\\Users\\alex\\PROC-SECRET.exe"
+        });
+        let change = audit_clock_change(&rendered(
+            "Microsoft-Windows-Security-Auditing",
+            "Security",
+            4616,
+            &data,
+        ))
+        .expect("a 4616 on Security is a clock change");
+        assert_eq!(change.old_time, Some(at("2026-10-01T10:00:00Z")));
+        assert_eq!(change.new_time, Some(at("2026-10-01T10:05:00Z")));
+        assert_eq!(change.reason, None);
+        assert_eq!(change.process, None);
+        let shown = format!("{change:?}");
+        for secret in ["ACCT-SECRET-ALEX", "PROC-SECRET", "WORKSTATION-7"] {
+            assert!(!shown.contains(secret), "{secret} reached {shown}");
+        }
+    }
+
+    /// (e4) A 3033 is an image with its file name. `ProcessNameBuffer` and `Computer` never reach
+    /// the result.
+    #[test]
+    fn e4_a_refused_image_keeps_its_file_name_only() {
+        let data = json!({
+            "FileNameBuffer": "\\Device\\HarddiskVolume3\\Temp\\exampleimage.dll",
+            "ProcessNameBuffer": "\\Device\\HarddiskVolume3\\PROC-SECRET-BUFFER.exe"
+        });
+        let image = refused_image(&rendered(
+            "Microsoft-Windows-CodeIntegrity",
+            "Microsoft-Windows-CodeIntegrity/Operational",
+            3033,
+            &data,
+        ))
+        .expect("a 3033 is a refused image");
+        assert_eq!(
+            image.file_name.as_deref(),
+            Some("\\Device\\HarddiskVolume3\\Temp\\exampleimage.dll")
+        );
+        let shown = format!("{image:?}");
+        for secret in ["PROC-SECRET-BUFFER", "WORKSTATION-7"] {
+            assert!(!shown.contains(secret), "{secret} reached {shown}");
+        }
+    }
+
+    /// (e5) Only the exact (provider, channel, id) triple counts. Each exact triple is `Some` first,
+    /// so the `None` cases are not passing because a helper returns nothing at all.
+    #[test]
+    fn e5_only_the_exact_triple_counts() {
+        let data = json!({
+            "ImagePath": "C:\\Windows\\System32\\drivers\\exampledrv.sys",
+            "OldTime": "2026-10-01T10:00:00.000Z",
+            "NewTime": "2026-10-01T10:05:00.000Z",
+            "PreviousTime": "2026-10-01T10:00:00.000Z",
+            "FileNameBuffer": "\\Device\\HarddiskVolume3\\Temp\\exampleimage.dll"
+        });
+
+        assert!(
+            service_install(&rendered("Service Control Manager", "System", 7045, &data)).is_some()
+        );
+        assert!(
+            service_install(&rendered("Some-Other-Provider", "System", 7045, &data)).is_none()
+        );
+
+        assert!(
+            kernel_clock_change(&rendered("Microsoft-Windows-Kernel-General", "System", 1, &data))
+                .is_some()
+        );
+        assert!(
+            kernel_clock_change(&rendered(
+                "Microsoft-Windows-Kernel-General",
+                "System",
+                12,
+                &data
+            ))
+            .is_none()
+        );
+
+        assert!(
+            refused_image(&rendered(
+                "Microsoft-Windows-CodeIntegrity",
+                "Microsoft-Windows-CodeIntegrity/Operational",
+                3033,
+                &data
+            ))
+            .is_some()
+        );
+        assert!(
+            refused_image(&rendered(
+                "Microsoft-Windows-CodeIntegrity",
+                "Microsoft-Windows-CodeIntegrity/Operational",
+                3077,
+                &data
+            ))
+            .is_none()
+        );
+
+        assert!(
+            audit_clock_change(&rendered(
+                "Microsoft-Windows-Security-Auditing",
+                "Security",
+                4616,
+                &data
+            ))
+            .is_some()
+        );
+        assert!(
+            audit_clock_change(&rendered(
+                "Microsoft-Windows-Security-Auditing",
+                "System",
+                4616,
+                &data
+            ))
+            .is_none()
+        );
+    }
+}
