@@ -12,15 +12,18 @@ use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use rongroi_core::digest::{CLOCK_CHANGE_THRESHOLD, path_digest};
 use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
 use rongroi_parsers::evtx::{
-    CodeIntegrityFields, SecurityFields, SystemFields, refused_images, security_fields,
-    system_fields,
+    ClockChange, CodeIntegrityFields, SecurityFields, ServiceInstall, SystemFields, refused_images,
+    security_fields, system_fields,
 };
 use serde_json::Value;
 
+use crate::autostart::{Context, Resolution};
+use crate::driver_service::{self, ImagePath};
 use crate::evtx::{LOGS_RELATIVE_PATH, SYSTEM_ROOT};
 use crate::failure::{read_failure, reason_for};
 use crate::{Collector, Field, ScanTier};
@@ -36,6 +39,9 @@ const SYSTEM: &str = "system";
 const CODE_INTEGRITY: &str = "code_integrity";
 /// The Security audit of a clock change.
 const SECURITY: &str = "security";
+
+/// The folders whose programs change the clock as Windows does, after the process path's volume.
+const WINDOWS_CLOCK_FOLDERS: [&str; 2] = [r"\Windows\System32\", r"\Windows\SysWOW64\"];
 
 const SYSTEM_LOG: &str = "System.evtx";
 const CODE_INTEGRITY_LOG: &str = "Microsoft-Windows-CodeIntegrity%4Operational.evtx";
@@ -137,7 +143,6 @@ impl Collector for EventFields {
         match read_log(host, &dir, SYSTEM, SYSTEM_LOG, system_fields) {
             Read::Parsed(fields) => {
                 any_read = true;
-                observations.push(summary(SYSTEM, READ));
                 observations.extend(system_observations(host, &fields, &root));
             }
             Read::Unread { read, reason } => {
@@ -306,14 +311,186 @@ fn unmeasured(reason: UnmeasuredReason) -> CollectorRun {
     }
 }
 
-/// The observations of `System.evtx`. Filled by E3b; the parameters are the signature the tests call.
+/// The observations of `System.evtx`: its summary, one per service install and one per clock change.
 fn system_observations(
     host: &dyn Host,
     fields: &SystemFields,
     system_root: &str,
 ) -> Vec<Observation> {
-    let _ = (host, fields, system_root);
-    Vec::new()
+    let context = Context::new(host, system_root.to_owned());
+    let mut observations =
+        Vec::with_capacity(fields.installs.len() + fields.clock_changes.len() + 1);
+    let mut unresolved_installs = 0_u64;
+
+    for install in &fields.installs {
+        let mut observation = BTreeMap::new();
+        observation.insert(DISCRIMINATOR.to_owned(), Value::from(SYSTEM));
+        observation.insert(
+            "installed_at".to_owned(),
+            Value::from(install.written.to_string()),
+        );
+        if let Some(kind) = install_kind(install.service_type.as_deref()) {
+            observation.insert("kind".to_owned(), Value::from(kind));
+        }
+        match resolved_install_path(&context, install, system_root)
+            .and_then(|path| path_digest(&path))
+        {
+            Some(digest) => {
+                observation.insert("path_digest".to_owned(), Value::from(digest));
+            }
+            None => unresolved_installs += 1,
+        }
+        observations.push(Observation {
+            collector: ID.to_owned(),
+            fields: observation,
+        });
+    }
+
+    let mut small = Vec::new();
+    let mut unreadable = 0_u64;
+    for change in &fields.clock_changes {
+        let (Some(old), Some(new)) = (change.old_time, change.new_time) else {
+            unreadable += 1;
+            continue;
+        };
+        let delta = new.duration_since(old);
+        if delta.abs() >= CLOCK_CHANGE_THRESHOLD {
+            observations.push(clock_change_observation(change, old, new));
+        } else {
+            small.push(change.written);
+        }
+    }
+
+    let mut summary = summary(SYSTEM, READ);
+    summary.fields.insert(
+        "unresolved_installs".to_owned(),
+        Value::from(unresolved_installs),
+    );
+    summary.fields.insert(
+        "small_clock_changes".to_owned(),
+        Value::from(small.len() as u64),
+    );
+    summary.fields.insert(
+        "unreadable_clock_changes".to_owned(),
+        Value::from(unreadable),
+    );
+    if let Some(first) = small.iter().min() {
+        summary
+            .fields
+            .insert("small_first".to_owned(), Value::from(first.to_string()));
+    }
+    if let Some(last) = small.iter().max() {
+        summary
+            .fields
+            .insert("small_last".to_owned(), Value::from(last.to_string()));
+    }
+    observations.insert(0, summary);
+    observations
+}
+
+/// The kind of service an install registered, as its `ServiceType` text says (ASCII case ignored).
+fn install_kind(service_type: Option<&str>) -> Option<&'static str> {
+    let service_type = service_type?;
+    if service_type.eq_ignore_ascii_case("kernel mode driver")
+        || service_type.eq_ignore_ascii_case("file system driver")
+    {
+        Some("driver")
+    } else if service_type.eq_ignore_ascii_case("user mode service") {
+        Some("program")
+    } else {
+        None
+    }
+}
+
+/// The file an install's `ImagePath` names, in drive-letter form, when it resolves.
+fn resolved_install_path(
+    context: &Context<'_>,
+    install: &ServiceInstall,
+    system_root: &str,
+) -> Option<String> {
+    let text = install.image_path.as_deref()?;
+    // An empty path is not resolved: a driver's default is built from its service name, which this
+    // collector does not read (ADR 0081 section 2).
+    if text.trim_matches([' ', '\t']).is_empty() {
+        return None;
+    }
+    if install_kind(install.service_type.as_deref()) == Some("driver")
+        && let Some(path) =
+            driver_service::resolve(&ImagePath::Text(text.to_owned()), "", system_root)
+    {
+        return Some(path);
+    }
+    match context.resolve_command_line(text, false) {
+        Resolution::Path(path) => Some(path),
+        Resolution::Missing | Resolution::Unknown(_) => None,
+    }
+}
+
+/// One clock change at or over the threshold: when, both times, the reason when known, and the
+/// category of the process that made it — never the process's name (ADR 0081 section 3).
+fn clock_change_observation(
+    change: &ClockChange,
+    old: jiff::Timestamp,
+    new: jiff::Timestamp,
+) -> Observation {
+    let mut fields = BTreeMap::new();
+    fields.insert(DISCRIMINATOR.to_owned(), Value::from(SYSTEM));
+    fields.insert(
+        "changed_at".to_owned(),
+        Value::from(change.written.to_string()),
+    );
+    fields.insert("old_time".to_owned(), Value::from(old.to_string()));
+    fields.insert("new_time".to_owned(), Value::from(new.to_string()));
+    if let Some(reason) = change.reason {
+        fields.insert("reason".to_owned(), Value::from(reason));
+    }
+    fields.insert(
+        "by".to_owned(),
+        Value::from(clock_changed_by(change.process.as_deref())),
+    );
+    Observation {
+        collector: ID.to_owned(),
+        fields,
+    }
+}
+
+/// Who changed the clock, as a category: `windows` under `System32` or `SysWOW64`, `none` when no
+/// process is named, `other` otherwise (ADR 0081 section 3).
+fn clock_changed_by(process: Option<&str>) -> &'static str {
+    let Some(process) = process else {
+        return "none";
+    };
+    let after_volume = after_volume(process);
+    if WINDOWS_CLOCK_FOLDERS.iter().any(|folder| {
+        after_volume
+            .get(..folder.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(folder))
+    }) {
+        "windows"
+    } else {
+        "other"
+    }
+}
+
+/// A path after its `\Device\HarddiskVolumeN` or `X:` volume, or the path unchanged when it names no
+/// volume.
+fn after_volume(path: &str) -> &str {
+    const DEVICE: &str = r"\Device\HarddiskVolume";
+    if path
+        .get(..DEVICE.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(DEVICE))
+    {
+        let rest = &path[DEVICE.len()..];
+        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+        if digits > 0 && rest[digits..].starts_with('\\') {
+            return &rest[digits..];
+        }
+    }
+    let bytes = path.as_bytes();
+    if bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' {
+        return &path[2..];
+    }
+    path
 }
 
 /// The observations of the Code Integrity log. Filled by E4.
@@ -335,7 +512,8 @@ mod tests {
     use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
     use rongroi_host::{FixtureHost, NonWindowsHost};
     use rongroi_parsers::evtx::{
-        ClockChange, CodeIntegrityFields, ImageRefusal, SecurityFields, ServiceInstall, SystemFields,
+        ClockChange, CodeIntegrityFields, ImageRefusal, SecurityFields, ServiceInstall,
+        SystemFields,
     };
     use serde_json::Value;
 
@@ -358,7 +536,12 @@ mod tests {
     }
 
     /// A clock change whose new time is `new`, with the old time `old` when it is readable.
-    fn clock(old: Option<i64>, new: i64, process: Option<&str>, reason: Option<u32>) -> ClockChange {
+    fn clock(
+        old: Option<i64>,
+        new: i64,
+        process: Option<&str>,
+        reason: Option<u32>,
+    ) -> ClockChange {
         ClockChange {
             written: at(new),
             old_time: old.map(at),
@@ -475,7 +658,10 @@ mod tests {
             Value::from("program")
         );
         let json = serde_json::to_string(&observations).unwrap();
-        assert!(!json.to_ascii_lowercase().contains("user mode service"), "{json}");
+        assert!(
+            !json.to_ascii_lowercase().contains("user mode service"),
+            "{json}"
+        );
     }
 
     // (f2) Clock changes: the threshold, the category `by`, and no process name ever emitted.
@@ -523,7 +709,12 @@ mod tests {
     #[test]
     fn f2c_two_hour_change_by_a_user_program_is_by_other_and_names_no_one() {
         let process = r"\Device\HarddiskVolume3\Users\bob\t.exe";
-        let system = system_with(vec![clock(Some(START), START + 7200, Some(process), Some(2))]);
+        let system = system_with(vec![clock(
+            Some(START),
+            START + 7200,
+            Some(process),
+            Some(2),
+        )]);
         let observations = system_observations(&windows_host(), &system, ROOT);
         let changes = clocks_of(&observations);
         assert_eq!(changes.len(), 1);
@@ -680,12 +871,24 @@ mod tests {
 
         assert_eq!(x.fields["log"], Value::from("code_integrity"));
         assert_eq!(x.fields["events"], Value::from(3));
-        assert_eq!(x.fields["first_seen"], Value::from(at(START + 5).to_string()));
-        assert_eq!(x.fields["last_seen"], Value::from(at(START + 50).to_string()));
+        assert_eq!(
+            x.fields["first_seen"],
+            Value::from(at(START + 5).to_string())
+        );
+        assert_eq!(
+            x.fields["last_seen"],
+            Value::from(at(START + 50).to_string())
+        );
         assert_eq!(y.fields["log"], Value::from("code_integrity"));
         assert_eq!(y.fields["events"], Value::from(1));
-        assert_eq!(y.fields["first_seen"], Value::from(at(START + 100).to_string()));
-        assert_eq!(y.fields["last_seen"], Value::from(at(START + 100).to_string()));
+        assert_eq!(
+            y.fields["first_seen"],
+            Value::from(at(START + 100).to_string())
+        );
+        assert_eq!(
+            y.fields["last_seen"],
+            Value::from(at(START + 100).to_string())
+        );
         assert_eq!(
             summary_of(&observations).fields["unresolved_images"],
             Value::from(0)
@@ -725,7 +928,12 @@ mod tests {
     #[test]
     fn f5a_two_hour_security_change_is_one_observation_with_both_times_and_no_reason_or_by() {
         let process = r"\Device\HarddiskVolume3\Users\bob\t.exe";
-        let security = security_with(vec![clock(Some(START), START + 7200, Some(process), Some(2))]);
+        let security = security_with(vec![clock(
+            Some(START),
+            START + 7200,
+            Some(process),
+            Some(2),
+        )]);
         let observations = security_observations(&security);
         let changes = clocks_of(&observations);
         assert_eq!(changes.len(), 1, "{observations:?}");
@@ -735,7 +943,10 @@ mod tests {
             change.fields["changed_at"],
             Value::from(at(START + 7200).to_string())
         );
-        assert_eq!(change.fields["old_time"], Value::from(at(START).to_string()));
+        assert_eq!(
+            change.fields["old_time"],
+            Value::from(at(START).to_string())
+        );
         assert_eq!(
             change.fields["new_time"],
             Value::from(at(START + 7200).to_string())
