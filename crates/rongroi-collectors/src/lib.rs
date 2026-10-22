@@ -9,6 +9,7 @@ pub mod autostart;
 pub mod bam;
 pub mod defender_exclusion;
 pub mod driver_service;
+pub mod event_fields;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
