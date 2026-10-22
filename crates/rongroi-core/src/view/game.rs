@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     TraceAgeState, observations_of, redact_profile_paths, scan_time, session, time_of, trace_ages,
 };
+use crate::digest::{path_digest, volume_path_digest};
 use crate::model::{Mode, Observation, Report};
 
 /// How far before a session's start and after its end a window reaches (ADR 0078 section 3).
@@ -122,6 +123,13 @@ pub struct GameCandidate {
     pub i5: IdentityFact,
     /// R: how many sessions' windows hold one of its times.
     pub near_sessions: NearSessions,
+    /// When the System log recorded an install of this file, as a note: it moves no time fact, no
+    /// order and no count (ADR 0081 section 4).
+    #[serde(default)]
+    pub installed_at: Vec<String>,
+    /// Whether the code-integrity log refused this file's image (ADR 0081 section 4).
+    #[serde(default)]
+    pub refused_by_code_integrity: bool,
 }
 impl GameCandidate {
     /// The candidate as SS mode shows it: its path redacted as evidence rows are (ADR 0049).
@@ -145,6 +153,16 @@ pub struct WindowCounts {
     /// Candidates with a time in the before-the-scan window.
     pub before_scan: usize,
 }
+/// How many installs with no matching candidate have a time in each window (ADR 0081 section 4).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InstallCounts {
+    /// Installs with a time in a before window.
+    pub before: usize,
+    /// Installs with a time in a during window.
+    pub during: usize,
+    /// Installs with a time in an after window.
+    pub after: usize,
+}
 /// The programs Windows recorded near a `FiveM` session (ADR 0078). With no session, every list is
 /// empty and every count is zero.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -155,6 +173,9 @@ pub struct GameWindows {
     pub candidates: Vec<GameCandidate>,
     /// How many candidates each window holds, in both modes.
     pub counts: WindowCounts,
+    /// Installs with no matching candidate, by the window their time falls in (ADR 0081 section 4).
+    #[serde(default)]
+    pub unmatched_installs: InstallCounts,
 }
 
 /// The game-windows view for `mode` (ADR 0078): every candidate in Self mode; in SS mode only those
@@ -167,6 +188,8 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
     let scan = scan_time(report);
     let candidates = gather(report, &sessions, scan);
     let counts = counts_of(&candidates, &sessions, scan);
+    let events = EventRecords::of(report);
+    let unmatched_installs = unmatched_installs_of(&candidates, &events, &sessions, scan);
     let found = sessions.len();
     let oldest = oldest_by_source(report);
     let files = RecordedFiles::of(report);
@@ -179,10 +202,10 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
                 .map(|time| time.as_second())
                 .min()
                 .unwrap_or(i64::MAX);
-            (
-                with_facts(&candidate, &sessions, scan, &oldest, found, &files),
-                earliest,
-            )
+            let mut facts = with_facts(&candidate, &sessions, scan, &oldest, found, &files);
+            facts.installed_at = events.installed_at(&candidate);
+            facts.refused_by_code_integrity = events.refuses(&candidate);
+            (facts, earliest)
         })
         .collect();
     shown.sort_by(|(left, left_time), (right, right_time)| {
@@ -204,7 +227,96 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
         sessions: sessions.iter().map(game_session).collect(),
         candidates,
         counts,
+        unmatched_installs,
     }
+}
+
+/// The `event_fields` records the view joins to candidates: System-log installs and code-integrity
+/// refusals (ADR 0081 section 4). Installs never become candidates.
+struct EventRecords {
+    /// Each System-log install with a time: the path digest it carried, when it carried one, and
+    /// the time.
+    installs: Vec<(Option<String>, jiff::Timestamp)>,
+    /// The volume path digests of the images the code-integrity log refused.
+    refused: BTreeSet<String>,
+}
+impl EventRecords {
+    /// Every install and refused image the report's `event_fields` observations hold.
+    fn of(report: &Report) -> Self {
+        let mut installs = Vec::new();
+        let mut refused = BTreeSet::new();
+        for observation in observations_of(report, "event_fields") {
+            match session::text(observation, "log") {
+                Some("system") => {
+                    if let Some(time) = time_of(observation, "installed_at").and_then(parse_time) {
+                        let digest = session::text(observation, "path_digest").map(str::to_owned);
+                        installs.push((digest, time));
+                    }
+                }
+                Some("code_integrity") => {
+                    if let Some(digest) = session::text(observation, "volume_path_digest") {
+                        refused.insert(digest.to_owned());
+                    }
+                }
+                _ => {}
+            }
+        }
+        Self { installs, refused }
+    }
+    /// The install times whose path digest is `candidate`'s, as text, in time order.
+    fn installed_at(&self, candidate: &Candidate) -> Vec<String> {
+        let Some(digest) = candidate.path.as_deref().and_then(path_digest) else {
+            return Vec::new();
+        };
+        let mut times: Vec<jiff::Timestamp> = self
+            .installs
+            .iter()
+            .filter(|(install, _)| install.as_deref() == Some(digest.as_str()))
+            .map(|(_, time)| *time)
+            .collect();
+        times.sort_unstable();
+        times.dedup();
+        times.into_iter().map(|time| time.to_string()).collect()
+    }
+    /// Whether the code-integrity log refused `candidate`'s image, by its volume path digest.
+    fn refuses(&self, candidate: &Candidate) -> bool {
+        candidate
+            .path
+            .as_deref()
+            .and_then(volume_path_digest)
+            .is_some_and(|digest| self.refused.contains(&digest))
+    }
+}
+
+/// How many installs match no candidate's path digest, by the window their time falls in
+/// (ADR 0081 section 4). An install without a digest matches nothing.
+fn unmatched_installs_of(
+    candidates: &[Candidate],
+    events: &EventRecords,
+    sessions: &[TimedSession],
+    scan: Option<jiff::Timestamp>,
+) -> InstallCounts {
+    let known: BTreeSet<String> = candidates
+        .iter()
+        .filter_map(|candidate| candidate.path.as_deref().and_then(path_digest))
+        .collect();
+    let mut counts = InstallCounts::default();
+    for (digest, time) in &events.installs {
+        if digest.as_ref().is_some_and(|digest| known.contains(digest)) {
+            continue;
+        }
+        let mut hit = Hits::default();
+        for session in sessions {
+            let hits = hits(session, *time, scan);
+            hit.before |= hits.before;
+            hit.during |= hits.during;
+            hit.after |= hits.after;
+        }
+        counts.before += usize::from(hit.before);
+        counts.during += usize::from(hit.during);
+        counts.after += usize::from(hit.after);
+    }
+    counts
 }
 /// A session with the times its windows are measured from.
 struct TimedSession {
@@ -810,6 +922,8 @@ fn with_facts(
         i4,
         i5,
         near_sessions: NearSessions { near, found },
+        installed_at: Vec::new(),
+        refused_by_code_integrity: false,
     }
 }
 /// Whether `kind`'s windows hold one of the candidate's times; else not known when a window or the
