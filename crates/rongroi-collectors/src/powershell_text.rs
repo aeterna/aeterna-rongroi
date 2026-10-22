@@ -188,7 +188,7 @@ fn observation<const N: usize>(fields: [(&str, Value); N]) -> Observation {
 /// `unknown` when either SID could not be read. The history is always that of the account this
 /// program runs as, and after a restart with another administrator's password that is the other
 /// administrator (ADR 0064, "Amendment"). Neither SID is reported.
-fn history_account(host: &dyn Host) -> &'static str {
+pub(crate) fn history_account(host: &dyn Host) -> &'static str {
     let Ok(own) = host.account_sid() else {
         return "unknown";
     };

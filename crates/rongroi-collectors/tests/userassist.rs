@@ -5,7 +5,7 @@
 //! U2 acceptance tests for the `userassist` collector: names, paths, the account row and the
 //! outcomes (ADR 0080 sections 1 and 2, owner decisions 1–3 and 5).
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::panic, clippy::expect_used)]
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
