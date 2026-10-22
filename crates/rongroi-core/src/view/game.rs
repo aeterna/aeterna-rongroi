@@ -972,3 +972,179 @@ fn counts_of(
     }
     counts
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::*;
+    use crate::model::{Observation, UnmatchedGroup};
+
+    fn at(text: &str) -> jiff::Timestamp {
+        text.parse()
+            .unwrap_or_else(|error| panic!("{text}: {error}"))
+    }
+
+    /// A BAM record of one program and the time it ran.
+    fn bam(name: &str, path: &str, last_run: &str) -> Observation {
+        Observation {
+            collector: "bam".to_owned(),
+            fields: BTreeMap::from([
+                ("name".to_owned(), serde_json::Value::from(name)),
+                ("path".to_owned(), serde_json::Value::from(path)),
+                ("last_run".to_owned(), serde_json::Value::from(last_run)),
+            ]),
+        }
+    }
+
+    /// A `UserAssist` entry: a name and, when Explorer recorded one, a time and a path or the reason
+    /// the path is withheld (ADR 0080 owner decisions 1 and 3).
+    fn userassist(
+        name: &str,
+        last_run: Option<&str>,
+        path: Option<&str>,
+        path_withheld: Option<&str>,
+    ) -> Observation {
+        let mut fields = BTreeMap::from([("name".to_owned(), serde_json::Value::from(name))]);
+        if let Some(last_run) = last_run {
+            fields.insert("last_run".to_owned(), serde_json::Value::from(last_run));
+        }
+        if let Some(path) = path {
+            fields.insert("path".to_owned(), serde_json::Value::from(path));
+        }
+        if let Some(path_withheld) = path_withheld {
+            fields.insert(
+                "path_withheld".to_owned(),
+                serde_json::Value::from(path_withheld),
+            );
+        }
+        Observation {
+            collector: "userassist".to_owned(),
+            fields,
+        }
+    }
+
+    /// A report holding only unmatched observations, which is how the view reads every record.
+    fn report_of(observations: Vec<Observation>) -> Report {
+        serde_json::from_value(serde_json::json!({
+            "header": {
+                "schema_version": 1,
+                "provenance": {
+                    "official": false,
+                    "version": "0.0.0-test",
+                    "commit": null,
+                    "exe_sha256": null
+                },
+                "rules_bundle": {
+                    "schema_version": 1,
+                    "sha256": "0".repeat(64),
+                    "rule_count": 0
+                },
+                "platform": "windows",
+                "os_build": null,
+                "elevated": false,
+                "generated_at": "2026-01-10T12:00:00Z"
+            },
+            "evidence": [],
+            "unmatched": [UnmatchedGroup {
+                collector: "test".to_owned(),
+                observations,
+            }]
+        }))
+        .unwrap()
+    }
+
+    /// One latest Legacy session from 10:00 to 10:30, so 09:50 is in its before window and 10:15
+    /// during it.
+    fn session() -> TimedSession {
+        TimedSession {
+            edition: "legacy".to_owned(),
+            start: at("2026-01-10T10:00:00Z"),
+            end: Some(at("2026-01-10T10:30:00Z")),
+            latest: true,
+        }
+    }
+
+    fn candidate<'a>(candidates: &'a [Candidate], name: &str) -> &'a Candidate {
+        candidates
+            .iter()
+            .find(|candidate| candidate.name.eq_ignore_ascii_case(name))
+            .unwrap_or_else(|| {
+                panic!(
+                    "no candidate {name}: {}",
+                    candidates
+                        .iter()
+                        .map(|candidate| candidate.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })
+    }
+
+    /// v1: a `UserAssist` entry with a path joins a BAM record of the same path in another case; one
+    /// without a path stays a candidate of its own; an entry that carries no `last_run` is not a
+    /// candidate at all (ADR 0080 sections 3 and 4).
+    #[test]
+    fn u4_v1_userassist_joins_by_path_and_an_entry_without_a_time_is_no_candidate() {
+        let report = report_of(vec![
+            bam("Shared.exe", r"C:\Tools\Shared.exe", "2026-01-10T09:50:00Z"),
+            userassist(
+                "SHARED.EXE",
+                Some("2026-01-10T10:15:00Z"),
+                Some(r"c:\tools\shared.exe"),
+                None,
+            ),
+            userassist(
+                "Only.exe",
+                Some("2026-01-10T10:15:00Z"),
+                Some(r"C:\Tools\Only.exe"),
+                None,
+            ),
+            userassist(
+                "CitizenFX.FiveM.Client",
+                Some("2026-01-10T10:15:00Z"),
+                None,
+                Some("app_id"),
+            ),
+            userassist("Never.exe", None, Some(r"C:\Tools\Never.exe"), None),
+        ]);
+
+        let candidates = gather(&report, &[session()], None);
+
+        let shared: Vec<&Candidate> = candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("shared.exe"))
+            .collect();
+        assert_eq!(
+            shared.len(),
+            1,
+            "{}",
+            shared
+                .iter()
+                .map(|candidate| candidate.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        assert_eq!(shared[0].sources, BTreeSet::from(["bam", "userassist"]));
+
+        let only = candidate(&candidates, "Only.exe");
+        assert_eq!(only.path.as_deref(), Some(r"C:\Tools\Only.exe"));
+        assert_eq!(only.sources, BTreeSet::from(["userassist"]));
+
+        let app = candidate(&candidates, "CitizenFX.FiveM.Client");
+        assert_eq!(app.path, None, "{}", app.name);
+        assert_eq!(app.sources, BTreeSet::from(["userassist"]));
+
+        assert!(
+            candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("Never.exe")),
+            "{}",
+            candidates
+                .iter()
+                .map(|candidate| candidate.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+}

@@ -744,3 +744,168 @@ fn k13_the_ordering_anchor_accepts_the_gta_v_names() {
         }
     }
 }
+
+/// The key Explorer's `UserAssist` entries are read from (ADR 0080 section 1).
+const USERASSIST_COUNT_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count";
+
+/// 2020-01-01T00:00:00Z as a `FILETIME`, old enough that these fixtures do not disturb the order.
+const USERASSIST_FILETIME: u64 = 132_223_104_000_000_000;
+
+/// ROT13 over ASCII letters only, the form Explorer stores a value name in.
+fn rot13(text: &str) -> String {
+    text.chars()
+        .map(|character| match character {
+            'a'..='z' => (((character as u8 - b'a' + 13) % 26) + b'a') as char,
+            'A'..='Z' => (((character as u8 - b'A' + 13) % 26) + b'A') as char,
+            other => other,
+        })
+        .collect()
+}
+
+/// A 72-byte `UserAssist` entry with `filetime` at offset 60, as hex so a fixture can hold it. Offset
+/// 4 is non-zero so that a test can see it never reaches an observation.
+fn userassist_entry_hex() -> String {
+    let mut bytes = [0_u8; 72];
+    bytes[4..8].copy_from_slice(&7_u32.to_le_bytes());
+    bytes[60..68].copy_from_slice(&USERASSIST_FILETIME.to_le_bytes());
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
+/// A host whose BAM, PCA and process sources are readable, plus a `UserAssist` `Count` key holding
+/// one entry per path when `userassist_paths` is `Some`. `Some(&[])` is an empty key; `None` is the
+/// key absent, which is a count of zero rather than a gap (ADR 0080 section 4).
+fn userassist_host(
+    bam_paths: &[&str],
+    processes: &str,
+    userassist_paths: Option<&[&str]>,
+    files: &[(&str, &str)],
+) -> FixtureHost {
+    let mut yaml = String::from(
+        "platform: windows\nos_build: \"26100\"\nenv:\n  WinDir: 'C:\\Windows'\n  SystemDrive: 'C:'\n  SystemRoot: 'C:\\Windows'\nregistry:\n",
+    );
+    let _ = writeln!(
+        yaml,
+        "  '{BAM_KEY}':\n    Version: 1\n    SequenceNumber: 1"
+    );
+    for path in bam_paths {
+        let _ = writeln!(
+            yaml,
+            "    '{path}':\n      content: '012345678901234567890123'"
+        );
+    }
+    if let Some(paths) = userassist_paths {
+        let _ = writeln!(yaml, "  '{USERASSIST_COUNT_KEY}':");
+        let entry = userassist_entry_hex();
+        for path in paths {
+            let _ = writeln!(
+                yaml,
+                "    '{}':\n      content_hex: \"{entry}\"",
+                rot13(path)
+            );
+        }
+    }
+    let _ = writeln!(
+        yaml,
+        "filesystem:\n  '{PCA_DIR}':\n    - name: PcaAppLaunchDic.txt\n      content: ''"
+    );
+    for (dir, name) in files {
+        let _ = writeln!(
+            yaml,
+            "  '{dir}':\n    - name: '{name}'\n      content: 'fixture bytes'"
+        );
+    }
+    yaml.push_str("processes:\n");
+    yaml.push_str(processes);
+    FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+}
+
+/// (r1a) A path only `UserAssist` holds is one observation, flagged `by_userassist` and by none of
+/// the three older sources (ADR 0080 section 4).
+#[test]
+fn u4_r1_a_path_only_userassist_holds_is_an_observation() {
+    const PATH: &str = r"C:\Users\fixtureuser\Downloads\u4-only.exe";
+    let fixture = userassist_host(
+        &[],
+        "  - pid: 4\n    name: System\n",
+        Some(&[PATH]),
+        &[(r"C:\Users\fixtureuser\Downloads", "u4-only.exe")],
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(gaps.is_empty(), "{gaps:?}");
+    assert_eq!(observations.len(), 1, "{observations:?}");
+    let observation = &observations[0];
+    assert_eq!(text(observation, "path"), Some(PATH), "{observation:?}");
+    assert_eq!(
+        flag(observation, "by_userassist"),
+        Some(true),
+        "{observation:?}"
+    );
+    for name in ["by_bam", "by_pca", "by_process"] {
+        assert_eq!(flag(observation, name), Some(false), "{observation:?}");
+    }
+}
+
+/// (r1b) The same path in BAM and `UserAssist`, in different ASCII case, is one observation naming
+/// both sources (ADR 0080 section 4).
+#[test]
+fn u4_r1_a_path_in_bam_and_userassist_names_both_sources() {
+    const BAM_PATH: &str = r"C:\Users\fixtureuser\Downloads\u4-both.exe";
+    const USERASSIST_PATH: &str = r"c:\users\fixtureuser\downloads\U4-BOTH.EXE";
+    let fixture = userassist_host(
+        &[BAM_PATH],
+        "  - pid: 4\n    name: System\n",
+        Some(&[USERASSIST_PATH]),
+        &[(r"C:\Users\fixtureuser\Downloads", "u4-both.exe")],
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(gaps.is_empty(), "{gaps:?}");
+    assert_eq!(observations.len(), 1, "{observations:?}");
+    let observation = &observations[0];
+    assert_eq!(flag(observation, "by_bam"), Some(true), "{observation:?}");
+    assert_eq!(
+        flag(observation, "by_userassist"),
+        Some(true),
+        "{observation:?}"
+    );
+    assert_eq!(flag(observation, "by_pca"), Some(false), "{observation:?}");
+    assert_eq!(
+        flag(observation, "by_process"),
+        Some(false),
+        "{observation:?}"
+    );
+}
+
+/// (r1c) A host with no `UserAssist` key is a source that holds nothing, not a gap, and its absence
+/// does not hide the paths another source gave (ADR 0080 section 4).
+#[test]
+fn u4_r1_an_absent_userassist_key_adds_no_gap() {
+    const PATH: &str = r"C:\Users\fixtureuser\Downloads\u4-bam-only.exe";
+    let fixture = userassist_host(
+        &[PATH],
+        "  - pid: 4\n    name: System\n",
+        None,
+        &[(r"C:\Users\fixtureuser\Downloads", "u4-bam-only.exe")],
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(gaps.is_empty(), "{gaps:?}");
+    let observation = observation_named(observations, "u4-bam-only.exe");
+    assert_eq!(flag(observation, "by_bam"), Some(true), "{observation:?}");
+    assert_eq!(
+        flag(observation, "by_userassist"),
+        Some(false),
+        "{observation:?}"
+    );
+}
