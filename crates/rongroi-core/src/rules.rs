@@ -1587,6 +1587,28 @@ date: 2026-09-15
         assert_eq!(problems_at("process", &elsewhere), Vec::<String>::new());
     }
 
+    /// ADR 0034 as amended by ADR 0080: `userassist` is the fourth collector whose records carry a
+    /// program's name and nothing that identifies it, so an evidence rule on it may not match the
+    /// name or the path, and a timeline selector may. Written out rather than looped over
+    /// `NAME_ONLY_COLLECTORS`, so that this fails until the collector joins that list instead of
+    /// passing without ever having asked about it.
+    #[test]
+    fn only_a_timeline_selector_may_select_a_userassist_record_by_name() {
+        for block in ["  name: firefox.exe\n", "  path|endswith: \\firefox.exe\n"] {
+            let rule = name_only("userassist", "evidence", "execution", block);
+            let problems = problems_at("userassist", &rule);
+            assert_eq!(problems.len(), 1, "{block}: {problems:?}");
+            assert!(problems[0].contains("ADR 0034"), "{block}: {problems:?}");
+
+            let selector = name_only("userassist", "timeline", "context", block);
+            assert_eq!(
+                problems_at("userassist", &selector),
+                Vec::<String>::new(),
+                "{block}"
+            );
+        }
+    }
+
     /// `run_times` is a list of times, not one value a comparison can ask about: the bundle loader
     /// refuses a `match` that names it, as it refuses name and path on a name-only record
     /// (ADR 0078 section 6).

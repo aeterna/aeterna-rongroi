@@ -1297,6 +1297,20 @@ mod tests {
         }
     }
 
+    /// ADR 0080 section 5: a scan that reads UserAssist says so before it starts, in both languages,
+    /// so a player agrees to the programs their account opened through the shell and to the times
+    /// Windows keeps for them.
+    #[test]
+    fn consent_names_userassist_in_both_languages() {
+        for lang in [Lang::En, Lang::Th] {
+            let question = consent(lang);
+            assert!(
+                question.contains("UserAssist"),
+                "UserAssist missing from {question}"
+            );
+        }
+    }
+
     /// A full scan's two questions name what ADR 0064's collector reads, that no command is kept, and the
     /// separate answer for a website's name; the standard scan's question names none of it.
     #[test]
