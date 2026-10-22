@@ -163,6 +163,36 @@ pub struct InstallCounts {
     /// Installs with a time in an after window.
     pub after: usize,
 }
+/// One clock change the event logs recorded inside the compared span (ADR 0081 section 3). It says
+/// when the change happened and the clock's times either side of it, never why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockLine {
+    /// When the change happened, as the log holds it.
+    pub changed_at: String,
+    /// The clock's time before the change, when the record held one.
+    pub old_time: Option<String>,
+    /// The clock's time after the change, when the record held one.
+    pub new_time: Option<String>,
+}
+/// Whether the System log reaches back to the compared span's start, so an absent clock change
+/// there would show as absent (ADR 0081 section 3).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClockHistory {
+    /// The System log was read and its oldest record is at or before the span's start.
+    Known,
+    /// The System log was not read, was gapped, or its oldest record falls inside the span.
+    #[default]
+    NotKnown,
+}
+/// The clock changes inside the compared span and whether the history before them is known.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockTrust {
+    /// Every clock change inside the span, oldest first; a note that moves no fact, order or count.
+    pub changes: Vec<ClockLine>,
+    /// Whether the logs reach back far enough to say the span holds every change.
+    pub history: ClockHistory,
+}
 /// The programs Windows recorded near a `FiveM` session (ADR 0078). With no session, every list is
 /// empty and every count is zero.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,6 +206,10 @@ pub struct GameWindows {
     /// Installs with no matching candidate, by the window their time falls in (ADR 0081 section 4).
     #[serde(default)]
     pub unmatched_installs: InstallCounts,
+    /// Clock changes inside the compared span, and whether the clock history is known (ADR 0081
+    /// section 3). A note: it moves no candidate, order or count.
+    #[serde(default)]
+    pub clock: ClockTrust,
 }
 
 /// The game-windows view for `mode` (ADR 0078): every candidate in Self mode; in SS mode only those
@@ -228,6 +262,91 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
         candidates,
         counts,
         unmatched_installs,
+        clock: clock_of(report, &sessions),
+    }
+}
+
+/// The clock changes inside the compared span, and whether the history before them is known
+/// (ADR 0081 section 3). The span runs from the earliest before-window's start to the latest
+/// after-window's end, so a change there is a line even when no candidate sits beside it.
+fn clock_of(report: &Report, sessions: &[TimedSession]) -> ClockTrust {
+    let Some(span_start) = sessions
+        .iter()
+        .map(|session| session.start.as_second().saturating_sub(WINDOW_SECONDS))
+        .min()
+    else {
+        return ClockTrust::default();
+    };
+    let span_end = sessions
+        .iter()
+        .map(|session| match session.end.filter(|_| session.latest) {
+            Some(end) => end.as_second().saturating_add(WINDOW_SECONDS),
+            None => session.start.as_second(),
+        })
+        .max()
+        .unwrap_or(span_start);
+    let mut changes: Vec<(jiff::Timestamp, ClockLine)> = Vec::new();
+    for observation in observations_of(report, "event_fields") {
+        let Some(text) = time_of(observation, "changed_at") else {
+            continue;
+        };
+        let Some(changed) = parse_time(text) else {
+            continue;
+        };
+        if changed.as_second() < span_start || changed.as_second() > span_end {
+            continue;
+        }
+        changes.push((
+            changed,
+            ClockLine {
+                changed_at: text.to_owned(),
+                old_time: session::text(observation, "old_time").map(str::to_owned),
+                new_time: session::text(observation, "new_time").map(str::to_owned),
+            },
+        ));
+    }
+    changes.sort_by_key(|(changed, _)| *changed);
+    ClockTrust {
+        changes: changes.into_iter().map(|(_, line)| line).collect(),
+        history: clock_history(report, span_start),
+    }
+}
+
+/// Whether the System log's history reaches back to `span_start`: the System place was read, not
+/// gapped, and the System log's oldest record is at or before the span's start (ADR 0081 section 3).
+fn clock_history(report: &Report, span_start: i64) -> ClockHistory {
+    let system_read = observations_of(report, "event_fields")
+        .into_iter()
+        .any(|observation| {
+            session::text(observation, "log") == Some("system")
+                && session::text(observation, "read") == Some("read")
+        });
+    // A gap on the whole `event_fields` run, or on its System place, means the place was not read.
+    let gapped = report.unmeasured_sources.iter().any(|source| {
+        source.collector == "event_fields"
+            && matches!(source.place.as_deref(), None | Some("system"))
+    });
+    let oldest_reaches_span = trace_ages(report, Mode::SelfCheck)
+        .rows
+        .iter()
+        .any(|row| {
+            let oldest = match &row.state {
+                TraceAgeState::Measured {
+                    oldest: Some(text), ..
+                } => parse_time(text),
+                _ => None,
+            };
+            row.collector == "evtx"
+                && row
+                    .subject
+                    .as_deref()
+                    .is_some_and(|subject| subject.eq_ignore_ascii_case("System.evtx"))
+                && oldest.is_some_and(|oldest| oldest.as_second() <= span_start)
+        });
+    if system_read && !gapped && oldest_reaches_span {
+        ClockHistory::Known
+    } else {
+        ClockHistory::NotKnown
     }
 }
 
