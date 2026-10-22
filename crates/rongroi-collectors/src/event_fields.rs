@@ -8,6 +8,326 @@
 //! Integrity and Security logs are read and summarised here; their observations come with ADR 0081
 //! section 4. Each log is parsed once, on its own thread, within its own limit (ADR 0024).
 
+use std::collections::BTreeMap;
+use std::sync::mpsc;
+use std::time::Duration;
+
+use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
+use rongroi_host::{Host, Platform};
+use rongroi_parsers::error::ParseError;
+use rongroi_parsers::evtx::{
+    CodeIntegrityFields, SecurityFields, SystemFields, refused_images, security_fields,
+    system_fields,
+};
+use serde_json::Value;
+
+use crate::evtx::{LOGS_RELATIVE_PATH, SYSTEM_ROOT};
+use crate::failure::{read_failure, reason_for};
+use crate::{Collector, Field, ScanTier};
+
+const ID: &str = "event_fields";
+
+/// The field that says which log an observation is about.
+const DISCRIMINATOR: &str = "log";
+
+/// The disk's clock and its service installs.
+const SYSTEM: &str = "system";
+/// Code Integrity's record of an image it refused.
+const CODE_INTEGRITY: &str = "code_integrity";
+/// The Security audit of a clock change.
+const SECURITY: &str = "security";
+
+const SYSTEM_LOG: &str = "System.evtx";
+const CODE_INTEGRITY_LOG: &str = "Microsoft-Windows-CodeIntegrity%4Operational.evtx";
+const SECURITY_LOG: &str = "Security.evtx";
+
+/// Value of `read` for a log that was parsed.
+const READ: &str = "read";
+/// Value of `read` for a log whose file was not there.
+const ABSENT: &str = "absent";
+/// Value of `read` for a log whose parse ran out of time.
+const BUDGET_EXHAUSTED: &str = "budget_exhausted";
+/// Value of `read` for a log whose bytes could not be parsed or whose parse did not run.
+const FAILED: &str = "failed";
+
+/// How long one log may take to parse (ADR 0081 section 1).
+///
+/// A limit per log rather than for all three: one slow log must not take the others' time, and a
+/// parse that does not return cannot be cancelled, so each log gets its own thread (ADR 0024).
+pub const LOG_BUDGET: Duration = Duration::from_secs(20);
+
+/// Every field this collector can emit, sorted by name.
+const FIELDS: [Field; 21] = [
+    Field::text("by"),
+    Field::timestamp("changed_at"),
+    Field::number("events"),
+    Field::timestamp("first_seen"),
+    Field::timestamp("installed_at"),
+    Field::text("kind"),
+    Field::timestamp("last_seen"),
+    Field::text("log"),
+    Field::timestamp("new_time").off_timeline(),
+    Field::timestamp("old_time").off_timeline(),
+    Field::text("path_digest"),
+    Field::text("read"),
+    Field::number("reason"),
+    Field::number("rejected"),
+    Field::number("small_clock_changes"),
+    Field::timestamp("small_first").off_timeline(),
+    Field::timestamp("small_last").off_timeline(),
+    Field::number("unreadable_clock_changes"),
+    Field::number("unresolved_images"),
+    Field::number("unresolved_installs"),
+    Field::text("volume_path_digest"),
+];
+
+/// Every reason this collector gives for not having looked at a log.
+const REASONS: [UnmeasuredReason; 6] = [
+    UnmeasuredReason::NotWindows,
+    UnmeasuredReason::NotAdmin,
+    UnmeasuredReason::AccessDenied,
+    UnmeasuredReason::SourceAbsent,
+    UnmeasuredReason::BudgetSpent,
+    UnmeasuredReason::ReadFailed,
+];
+
+/// The three Event Log payload fields ADR 0081 reads.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct EventFields;
+
+impl Collector for EventFields {
+    fn id(&self) -> &'static str {
+        ID
+    }
+
+    fn fields(&self) -> &'static [Field] {
+        &FIELDS
+    }
+
+    fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
+        &REASONS
+    }
+
+    fn discriminator(&self) -> Option<&'static str> {
+        Some(DISCRIMINATOR)
+    }
+
+    fn tier(&self) -> ScanTier {
+        ScanTier::Standard
+    }
+
+    fn collect(&self, host: &dyn Host) -> CollectorRun {
+        if host.platform() != Platform::Windows {
+            return unmeasured(UnmeasuredReason::NotWindows);
+        }
+        let Some(root) = host
+            .env_var(SYSTEM_ROOT)
+            .map(|root| root.trim_end_matches(['\\', '/']).to_owned())
+            .filter(|root| !root.is_empty())
+        else {
+            return unmeasured(UnmeasuredReason::ReadFailed);
+        };
+        let dir = format!(r"{root}\{LOGS_RELATIVE_PATH}");
+
+        let mut observations = Vec::new();
+        let mut discriminator_gaps = Vec::new();
+        let mut first_failure = None;
+        let mut any_read = false;
+
+        match read_log(host, &dir, SYSTEM, SYSTEM_LOG, system_fields) {
+            Read::Parsed(fields) => {
+                any_read = true;
+                observations.push(summary(SYSTEM, READ));
+                observations.extend(system_observations(host, &fields, &root));
+            }
+            Read::Unread { read, reason } => {
+                first_failure.get_or_insert(reason);
+                observations.push(summary(SYSTEM, read));
+                discriminator_gaps.push(place_gaps(SYSTEM, reason));
+            }
+        }
+        match read_log(
+            host,
+            &dir,
+            CODE_INTEGRITY,
+            CODE_INTEGRITY_LOG,
+            refused_images,
+        ) {
+            Read::Parsed(fields) => {
+                any_read = true;
+                observations.push(summary(CODE_INTEGRITY, READ));
+                observations.extend(code_integrity_observations(&fields));
+            }
+            Read::Unread { read, reason } => {
+                first_failure.get_or_insert(reason);
+                observations.push(summary(CODE_INTEGRITY, read));
+                discriminator_gaps.push(place_gaps(CODE_INTEGRITY, reason));
+            }
+        }
+        match read_log(host, &dir, SECURITY, SECURITY_LOG, security_fields) {
+            Read::Parsed(fields) => {
+                any_read = true;
+                observations.push(summary(SECURITY, READ));
+                observations.extend(security_observations(&fields));
+            }
+            Read::Unread { read, reason } => {
+                first_failure.get_or_insert(reason);
+                observations.push(summary(SECURITY, read));
+                discriminator_gaps.push(place_gaps(SECURITY, reason));
+            }
+        }
+
+        // All three logs unread: there is no measurement to report, only the first log's reason, as
+        // the order in ADR 0081 makes it the one that explains the run.
+        match first_failure {
+            Some(reason) if !any_read => unmeasured(reason),
+            _ => CollectorRun::Measured {
+                collector: ID.to_owned(),
+                observations,
+                gaps: BTreeMap::new(),
+                discriminator_gaps,
+            },
+        }
+    }
+}
+
+/// What reading one log produced.
+enum Read<T> {
+    /// The log was read and parsed.
+    Parsed(T),
+    /// The log was not read, with the word its summary carries and the reason its place gaps with.
+    Unread {
+        read: &'static str,
+        reason: UnmeasuredReason,
+    },
+}
+
+/// Reads and parses one log. The summary and the gap are the caller's to place, so this can stay
+/// generic over the three readers.
+fn read_log<T: Send + 'static>(
+    host: &dyn Host,
+    dir: &str,
+    log: &'static str,
+    file: &str,
+    parse: fn(&[u8]) -> Result<T, ParseError>,
+) -> Read<T> {
+    let path = format!(r"{dir}\{file}");
+    let bytes = match host.read_file(&path) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => {
+            return Read::Unread {
+                read: ABSENT,
+                reason: UnmeasuredReason::SourceAbsent,
+            };
+        }
+        Err(error) => {
+            return Read::Unread {
+                read: read_failure(&error),
+                reason: reason_for(host, &error),
+            };
+        }
+    };
+    match parse_within(bytes, LOG_BUDGET, parse, log) {
+        Parsed::Done(Ok(fields)) => Read::Parsed(fields),
+        Parsed::Done(Err(_)) | Parsed::Unavailable => Read::Unread {
+            read: FAILED,
+            reason: UnmeasuredReason::ReadFailed,
+        },
+        Parsed::OutOfBudget => Read::Unread {
+            read: BUDGET_EXHAUSTED,
+            reason: UnmeasuredReason::BudgetSpent,
+        },
+    }
+}
+
+/// What one call to a parser produced, or why it produced nothing.
+enum Parsed<T> {
+    /// The parser returned, with fields or with a reason the bytes are not that log.
+    Done(Result<T, ParseError>),
+    /// The limit ran out before the parse returned.
+    OutOfBudget,
+    /// No thread was given, or the one given stopped without answering.
+    Unavailable,
+}
+
+/// Parses on a thread of its own and waits at most `within`, as `windows_start` does (ADR 0024).
+fn parse_within<T: Send + 'static>(
+    bytes: Vec<u8>,
+    within: Duration,
+    parse: fn(&[u8]) -> Result<T, ParseError>,
+    log: &'static str,
+) -> Parsed<T> {
+    if within.is_zero() {
+        return Parsed::OutOfBudget;
+    }
+    let (answer, result) = mpsc::channel();
+    let worker = std::thread::Builder::new()
+        .name(format!("{log}-parse"))
+        .spawn(move || {
+            let _ = answer.send(parse(&bytes));
+        });
+    if worker.is_err() {
+        return Parsed::Unavailable;
+    }
+    match result.recv_timeout(within) {
+        Ok(parsed) => Parsed::Done(parsed),
+        Err(mpsc::RecvTimeoutError::Timeout) => Parsed::OutOfBudget,
+        Err(mpsc::RecvTimeoutError::Disconnected) => Parsed::Unavailable,
+    }
+}
+
+/// The summary observation of one log: its place and whether it was read.
+fn summary(log: &'static str, read: &'static str) -> Observation {
+    let mut fields = BTreeMap::new();
+    fields.insert(DISCRIMINATOR.to_owned(), Value::from(log));
+    fields.insert("read".to_owned(), Value::from(read));
+    Observation {
+        collector: ID.to_owned(),
+        fields,
+    }
+}
+
+/// The gaps of one unread log, for its place only (ADR 0044).
+fn place_gaps(log: &'static str, reason: UnmeasuredReason) -> DiscriminatorGaps {
+    DiscriminatorGaps {
+        discriminator: DISCRIMINATOR.to_owned(),
+        value: Value::from(log),
+        gaps: FIELDS
+            .iter()
+            .map(|field| (field.name.to_owned(), reason))
+            .collect(),
+    }
+}
+
+fn unmeasured(reason: UnmeasuredReason) -> CollectorRun {
+    CollectorRun::Unmeasured {
+        collector: ID.to_owned(),
+        reason,
+    }
+}
+
+/// The observations of `System.evtx`. Filled by E3b; the parameters are the signature the tests call.
+fn system_observations(
+    host: &dyn Host,
+    fields: &SystemFields,
+    system_root: &str,
+) -> Vec<Observation> {
+    let _ = (host, fields, system_root);
+    Vec::new()
+}
+
+/// The observations of the Code Integrity log. Filled by E4.
+fn code_integrity_observations(fields: &CodeIntegrityFields) -> Vec<Observation> {
+    let _ = fields;
+    Vec::new()
+}
+
+/// The observations of `Security.evtx`. Filled by E4.
+fn security_observations(fields: &SecurityFields) -> Vec<Observation> {
+    let _ = fields;
+    Vec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use jiff::Timestamp;
@@ -44,7 +364,7 @@ mod tests {
             old_time: old.map(at),
             new_time: Some(at(new)),
             reason,
-            process_name: process.map(str::to_owned),
+            process: process.map(str::to_owned),
         }
     }
 
@@ -351,11 +671,11 @@ mod tests {
         let y_digest = volume_path_digest(r"\Device\HarddiskVolume5\Tools\y.dll").unwrap();
         let x = refusals
             .iter()
-            .find(|observation| observation.fields["volume_path_digest"] == Value::from(x_digest.clone()))
+            .find(|observation| observation.fields["volume_path_digest"] == x_digest.clone())
             .expect("one observation for x.dll");
         let y = refusals
             .iter()
-            .find(|observation| observation.fields["volume_path_digest"] == Value::from(y_digest.clone()))
+            .find(|observation| observation.fields["volume_path_digest"] == y_digest.clone())
             .expect("one observation for y.dll");
 
         assert_eq!(x.fields["log"], Value::from("code_integrity"));
