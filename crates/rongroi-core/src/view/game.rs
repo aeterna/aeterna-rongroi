@@ -651,7 +651,7 @@ fn gather(
     let mut paths: BTreeMap<String, Candidate> = BTreeMap::new();
     let mut standalone: Vec<Candidate> = Vec::new();
     let mut prefetch: Vec<Candidate> = Vec::new();
-    for collector in ["prefetch", "bam", "pca", "process"] {
+    for collector in ["prefetch", "bam", "pca", "process", "userassist"] {
         for observation in observations_of(report, collector) {
             let Some(name) = session::text(observation, "name") else {
                 continue;
@@ -928,6 +928,7 @@ fn oldest_by_source(report: &Report) -> BTreeMap<&'static str, Option<jiff::Time
             "prefetch" => "prefetch",
             "bam" => "bam",
             "pca" => "pca",
+            "userassist" => "userassist",
             _ => continue,
         };
         let time = match row.state {

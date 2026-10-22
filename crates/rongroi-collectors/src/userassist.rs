@@ -27,7 +27,7 @@ use rongroi_parsers::filetime::to_timestamp;
 use rongroi_parsers::userassist::{UserAssistEntry, decode_name, parse_entry};
 
 use crate::failure::{read_failure, reason_for};
-use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::paths::{RecordedPath, UNREDACTABLE_FORM, file_name, is_drive_rooted};
 use crate::powershell_text::history_account;
 use crate::{Age, AgeCount, AgeRows, Collector, Field};
 
@@ -189,6 +189,53 @@ impl Collector for UserAssist {
             observations,
             gaps,
             discriminator_gaps: Vec::new(),
+        }
+    }
+}
+
+/// The program paths `UserAssist` recorded, and when Explorer last ran each, for `recorded_files`
+/// (ADR 0080 section 4).
+///
+/// This runs the same collection [`UserAssist::collect`] does and keeps the `path` and `last_run` each
+/// entry observation carries, so the two collectors cannot disagree about which paths are emitted or
+/// when they ran. An entry that names no path — an app identity, or a path withheld for another
+/// reason — contributes nothing: there is nothing for `recorded_files` to join or read. A status row
+/// that names neither a path nor a withheld path is a value whose bytes did not arrive: an unknown
+/// number of paths is missing, so the source is a gap for the whole run and the paths that were read
+/// are returned beside it. A key that is absent is `source_absent`, which the caller reads as an
+/// account that opened nothing through the shell.
+pub(crate) fn recorded_paths(
+    host: &dyn Host,
+) -> Result<(Vec<RecordedPath>, Option<UnmeasuredReason>), UnmeasuredReason> {
+    match UserAssist.collect(host) {
+        CollectorRun::Unmeasured { reason, .. } => Err(reason),
+        CollectorRun::Measured {
+            observations, gaps, ..
+        } => {
+            let lost_names = observations.iter().any(|observation| {
+                observation.fields.contains_key("read")
+                    && !observation.fields.contains_key("path")
+                    && !observation.fields.contains_key("path_withheld")
+            });
+            let paths = observations
+                .iter()
+                .filter_map(|observation| {
+                    let path = observation.fields.get("path")?.as_str()?.to_owned();
+                    let at = observation
+                        .fields
+                        .get("last_run")
+                        .and_then(serde_json::Value::as_str)
+                        .and_then(|text| text.parse().ok());
+                    Some(RecordedPath { path, at })
+                })
+                .collect();
+            let gap = lost_names.then(|| {
+                gaps.values()
+                    .next()
+                    .copied()
+                    .unwrap_or(UnmeasuredReason::ReadFailed)
+            });
+            Ok((paths, gap))
         }
     }
 }
