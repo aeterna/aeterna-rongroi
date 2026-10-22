@@ -1314,6 +1314,51 @@ mod tests {
         }
     }
 
+    /// ADR 0081 section 5: the consent names the event fields that are read beyond what the event
+    /// logs' item says, in both languages, worded as the ADR gives them. A player agrees to the
+    /// fingerprint of a path and to nothing that shows the path itself.
+    #[test]
+    fn the_event_fields_are_named_in_both_languages() {
+        let en_item = "from four kinds of event in the System, Code Integrity and Security logs: when a service or driver was installed, when the clock was changed, from what time to what time, with Windows' reason number and whether a Windows program made the change, and, for a service's file and each file Code Integrity refused, a fingerprint of its path that matches only the same path — never a path or a name";
+        let th_item = "จาก event 4 ชนิดใน log ของ System, Code Integrity และ Security: เวลาที่มีการติดตั้ง service หรือ driver เวลาที่นาฬิกาถูกเปลี่ยน จากเวลาไหนเป็นเวลาไหน พร้อมหมายเลขเหตุผลของ Windows และว่าโปรแกรมของ Windows เป็นผู้เปลี่ยนหรือไม่ และสำหรับไฟล์ของ service และไฟล์ที่ Code Integrity ปฏิเสธ จะเก็บลายนิ้วมือ (fingerprint) ของ path ที่ตรงกับ path เดียวกันเท่านั้น — ไม่เก็บ path หรือชื่อ";
+        let en = consent(Lang::En);
+        assert!(en.contains("fingerprint"), "fingerprint missing from {en}");
+        assert!(en.contains("Code Integrity"), "Code Integrity missing from {en}");
+        assert!(
+            en.contains(en_item),
+            "the English event-field item is not worded as given: {en}"
+        );
+        assert!(
+            !en.contains("BootType is the one"),
+            "the old single-exception claim is still in {en}"
+        );
+        let th = consent(Lang::Th);
+        assert!(th.contains("fingerprint"), "fingerprint missing from {th}");
+        assert!(th.contains("Code Integrity"), "Code Integrity missing from {th}");
+        assert!(
+            th.contains(th_item),
+            "the Thai event-field item is not worded as given: {th}"
+        );
+    }
+
+    /// ADR 0081 section 5: the event-log item stops claiming that nothing but the event count is read.
+    /// The sentence that says the events are not read names its exceptions, `BootType` and the
+    /// fields in the item below, in both languages.
+    #[test]
+    fn the_event_log_item_names_its_exceptions_in_both_languages() {
+        for (lang, anchor) in [
+            (Lang::En, "not what the events say"),
+            (Lang::Th, "โดยไม่อ่านว่า event นั้นเขียนว่าอะไร"),
+        ] {
+            let question = consent(lang);
+            let line = question.lines().find(|line| line.contains(anchor)).unwrap_or("");
+            assert!(
+                line.contains("BootType"),
+                "the event-log item does not name `BootType` as an exception: {question}"
+            );
+        }
+    }
+
     /// A full scan's two questions name what ADR 0064's collector reads, that no command is kept, and the
     /// separate answer for a website's name; the standard scan's question names none of it.
     #[test]
