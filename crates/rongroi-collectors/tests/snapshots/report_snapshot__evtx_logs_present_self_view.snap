@@ -773,14 +773,8 @@ expression: view
           "collector": "event_fields",
           "fields": {
             "log": "security",
-            "read": "read"
-          }
-        },
-        {
-          "collector": "event_fields",
-          "fields": {
-            "log": "security",
             "read": "read",
+            "rejected": 0,
             "small_clock_changes": 0,
             "unreadable_clock_changes": 0
           }
