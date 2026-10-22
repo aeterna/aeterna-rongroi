@@ -166,6 +166,13 @@ written any other way can carry your account name with nothing to replace it, so
 than shown — and the report says it was withheld, rather than leaving you to notice it is missing. When
 the path is below one of FiveM's two program folders, the record also carries which one — `legacy` or
 `enhanced` — whether the path is shown or withheld (ADR 0062).
+Of Windows' **UserAssist** record it reads, for the account the scan runs as, which programs that
+account opened through Windows' shell — by double-clicking, from the Start menu or the taskbar — and when
+it last opened each (ADR 0080). A program another program started is not in that record. The path is
+reported only when it starts with a drive letter, as for the Background Activity Moderator; a program
+known by an app name rather than a path (for example a Store app) is reported by that name. Shortcuts are
+counted, never listed. Whether the account the scan ran as is the one signed in at the keyboard is said as
+`same` or `other`, by comparing two account IDs that are never put in the report.
 Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
 wrote them, the event number, the severity and the first and last time one was written — and, of each log
 itself, how far back it still reaches: the time and the record number of the oldest and the newest event
@@ -287,8 +294,8 @@ What a full scan reads today:
   unspecified. PowerShell itself leaves out of its history every line holding the words password, token,
   key or secret. Whether that history is the one of the account signed in at the keyboard is said as `same`
   or `other`, by comparing two account IDs that are never put in the report.
-- **The files of programs Windows recorded running** (ADR 0079): for each path BAM, the Program
-  Compatibility Assistant or the list of running programs names, the file at that path is read for what
+- **The files of programs Windows recorded running** (ADR 0079, ADR 0080): for each path BAM, the Program
+  Compatibility Assistant, UserAssist or the list of running programs names, the file at that path is read for what
   kind of content it holds (whether its bytes match its name, whether data trails its end, whether a
   program is hidden inside), its hash, its digital signature, the original file name in its version
   information, and its `Zone.Identifier` stream: the download zone Windows wrote on it and the name of the
