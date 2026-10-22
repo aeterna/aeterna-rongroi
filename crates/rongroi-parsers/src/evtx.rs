@@ -682,11 +682,8 @@ const SERVICE_INSTALL: (&str, &str, u32) = ("Service Control Manager", "System",
 const CLOCK_CHANGE_KERNEL: (&str, &str, u32) = ("Microsoft-Windows-Kernel-General", "System", 1);
 
 /// The Security audit record of a clock change, which is written only when that audit is on.
-const CLOCK_CHANGE_AUDIT: (&str, &str, u32) = (
-    "Microsoft-Windows-Security-Auditing",
-    "Security",
-    4616,
-);
+const CLOCK_CHANGE_AUDIT: (&str, &str, u32) =
+    ("Microsoft-Windows-Security-Auditing", "Security", 4616);
 
 /// The record of an image Code Integrity refused to load.
 const REFUSED_IMAGE: (&str, &str, u32) = (
@@ -808,10 +805,7 @@ pub fn refused_images(bytes: &[u8]) -> Result<CodeIntegrityFields, ParseError> {
     let rejected = for_each_record(bytes, |parsed| {
         refusals.extend(refused_image(parsed));
     })?;
-    Ok(CodeIntegrityFields {
-        refusals,
-        rejected,
-    })
+    Ok(CodeIntegrityFields { refusals, rejected })
 }
 
 /// Hands every record that parsed to `visit` and returns the rejections, the way [`records`] does, so
@@ -1987,13 +1981,16 @@ mod system_tests {
         assert!(
             service_install(&rendered("Service Control Manager", "System", 7045, &data)).is_some()
         );
-        assert!(
-            service_install(&rendered("Some-Other-Provider", "System", 7045, &data)).is_none()
-        );
+        assert!(service_install(&rendered("Some-Other-Provider", "System", 7045, &data)).is_none());
 
         assert!(
-            kernel_clock_change(&rendered("Microsoft-Windows-Kernel-General", "System", 1, &data))
-                .is_some()
+            kernel_clock_change(&rendered(
+                "Microsoft-Windows-Kernel-General",
+                "System",
+                1,
+                &data
+            ))
+            .is_some()
         );
         assert!(
             kernel_clock_change(&rendered(

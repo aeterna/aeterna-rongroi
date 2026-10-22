@@ -179,7 +179,8 @@ pub struct ClockLine {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClockHistory {
-    /// The System log was read and its oldest record is at or before the span's start.
+    /// The System log was read, holds no rejected record and its oldest record is at or before the
+    /// span's start.
     Known,
     /// The System log was not read, was gapped, or its oldest record falls inside the span.
     #[default]
@@ -277,10 +278,17 @@ fn clock_of(report: &Report, sessions: &[TimedSession]) -> ClockTrust {
     else {
         return ClockTrust::default();
     };
+    let scan = scan_time(report);
     let span_end = sessions
         .iter()
         .map(|session| match session.end.filter(|_| session.latest) {
             Some(end) => end.as_second().saturating_add(WINDOW_SECONDS),
+            // A latest session with no recorded end runs to the scan, or else as far as its after
+            // window reaches, so a change during it is not dropped (ADR 0081 section 3).
+            None if session.latest => match scan {
+                Some(scan) => scan.as_second(),
+                None => session.start.as_second().saturating_add(WINDOW_SECONDS),
+            },
             None => session.start.as_second(),
         })
         .max()
@@ -290,59 +298,74 @@ fn clock_of(report: &Report, sessions: &[TimedSession]) -> ClockTrust {
         let Some(text) = time_of(observation, "changed_at") else {
             continue;
         };
-        let Some(changed) = parse_time(text) else {
+        let Some(changed_time) = parse_time(text) else {
             continue;
         };
-        if changed.as_second() < span_start || changed.as_second() > span_end {
+        if changed_time.as_second() < span_start || changed_time.as_second() > span_end {
             continue;
         }
         changes.push((
-            changed,
+            changed_time,
             ClockLine {
                 changed_at: text.to_owned(),
-                old_time: session::text(observation, "old_time").map(str::to_owned),
-                new_time: session::text(observation, "new_time").map(str::to_owned),
+                old_time: clock_time(observation, "old_time"),
+                new_time: clock_time(observation, "new_time"),
             },
         ));
     }
-    changes.sort_by_key(|(changed, _)| *changed);
+    changes.sort_by_key(|(changed_time, _)| *changed_time);
+    // The System and Security logs both record one change, so it is one line for each pair of old and
+    // new times; the earliest record of it is kept.
+    let mut seen = BTreeSet::new();
+    changes.retain(|(_, line)| seen.insert((line.old_time.clone(), line.new_time.clone())));
     ClockTrust {
         changes: changes.into_iter().map(|(_, line)| line).collect(),
         history: clock_history(report, span_start),
     }
 }
 
+/// A clock time an `event_fields` record holds, read and shown as `installed_at` is: parsed, then
+/// rendered again; `None` when it does not parse (ADR 0081 section 3).
+fn clock_time(observation: &Observation, field: &str) -> Option<String> {
+    time_of(observation, field)
+        .and_then(parse_time)
+        .map(|time| time.to_string())
+}
+
 /// Whether the System log's history reaches back to `span_start`: the System place was read, not
-/// gapped, and the System log's oldest record is at or before the span's start (ADR 0081 section 3).
+/// gapped, holds no rejected record, and the System log's oldest record is at or before the span's
+/// start (ADR 0081 section 3).
 fn clock_history(report: &Report, span_start: i64) -> ClockHistory {
     let system_read = observations_of(report, "event_fields")
         .into_iter()
         .any(|observation| {
             session::text(observation, "log") == Some("system")
                 && session::text(observation, "read") == Some("read")
+                // A rejected record may hold a clock change the records read do not show.
+                && observation
+                    .fields
+                    .get("rejected")
+                    .is_none_or(|rejected| rejected.as_u64() == Some(0))
         });
     // A gap on the whole `event_fields` run, or on its System place, means the place was not read.
     let gapped = report.unmeasured_sources.iter().any(|source| {
         source.collector == "event_fields"
             && matches!(source.place.as_deref(), None | Some("system"))
     });
-    let oldest_reaches_span = trace_ages(report, Mode::SelfCheck)
-        .rows
-        .iter()
-        .any(|row| {
-            let oldest = match &row.state {
-                TraceAgeState::Measured {
-                    oldest: Some(text), ..
-                } => parse_time(text),
-                _ => None,
-            };
-            row.collector == "evtx"
-                && row
-                    .subject
-                    .as_deref()
-                    .is_some_and(|subject| subject.eq_ignore_ascii_case("System.evtx"))
-                && oldest.is_some_and(|oldest| oldest.as_second() <= span_start)
-        });
+    let oldest_reaches_span = trace_ages(report, Mode::SelfCheck).rows.iter().any(|row| {
+        let oldest = match &row.state {
+            TraceAgeState::Measured {
+                oldest: Some(text), ..
+            } => parse_time(text),
+            _ => None,
+        };
+        row.collector == "evtx"
+            && row
+                .subject
+                .as_deref()
+                .is_some_and(|subject| subject.eq_ignore_ascii_case("System.evtx"))
+            && oldest.is_some_and(|oldest| oldest.as_second() <= span_start)
+    });
     if system_read && !gapped && oldest_reaches_span {
         ClockHistory::Known
     } else {
@@ -1393,7 +1416,10 @@ mod tests {
             collector: collector.to_owned(),
             fields: BTreeMap::from([
                 ("name".to_owned(), serde_json::Value::from("FiveM.exe")),
-                ("fivem_edition".to_owned(), serde_json::Value::from("legacy")),
+                (
+                    "fivem_edition".to_owned(),
+                    serde_json::Value::from("legacy"),
+                ),
                 ("last_run".to_owned(), serde_json::Value::from(last_run)),
             ]),
         }
@@ -1431,10 +1457,7 @@ mod tests {
         Observation {
             collector: "event_fields".to_owned(),
             fields: BTreeMap::from([
-                (
-                    "log".to_owned(),
-                    serde_json::Value::from("code_integrity"),
-                ),
+                ("log".to_owned(), serde_json::Value::from("code_integrity")),
                 (
                     "volume_path_digest".to_owned(),
                     serde_json::Value::from(volume_digest),
@@ -1576,7 +1599,8 @@ mod tests {
     }
 
     /// `evtx`'s trace-age declaration as `scan::run` makes it: the oldest record of each log, counted
-    /// by its entries, one row per log.
+    /// by its entries, one row per log, and the logs the bundle reads listed first, `System.evtx`
+    /// among them (`scan.rs`'s `the_report_declares_ages_and_the_logs_the_bundle_reads`).
     fn evtx_ages() -> BTreeMap<String, AgeFields> {
         BTreeMap::from([(
             "evtx".to_owned(),
@@ -1590,7 +1614,7 @@ mod tests {
                 },
                 places: Vec::new(),
                 extra: Vec::new(),
-                first: Vec::new(),
+                first: vec!["System.evtx".to_owned()],
                 by_place: Vec::new(),
             },
         )])
@@ -1640,7 +1664,11 @@ mod tests {
 
         let windows = game_windows(&report, Mode::SelfCheck);
 
-        assert!(windows.clock.changes.is_empty(), "{:?}", windows.clock.changes);
+        assert!(
+            windows.clock.changes.is_empty(),
+            "{:?}",
+            windows.clock.changes
+        );
     }
 
     /// c1: with no session there is no span, so a clock change is no line (ADR 0081 section 3).
@@ -1655,7 +1683,140 @@ mod tests {
 
         let windows = game_windows(&report, Mode::SelfCheck);
 
-        assert!(windows.clock.changes.is_empty(), "{:?}", windows.clock.changes);
+        assert!(
+            windows.clock.changes.is_empty(),
+            "{:?}",
+            windows.clock.changes
+        );
+    }
+
+    /// c1: a latest session with no recorded end runs to the scan, so a change at 10:15 in a session
+    /// from 10:00, with the scan at 11:00, is one line (ADR 0081 section 3).
+    #[test]
+    fn c1_a_clock_change_during_a_session_with_no_recorded_end_is_a_line_up_to_the_scan() {
+        let mut report = report_of(vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            clock_change(
+                "system",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:45:00Z",
+            ),
+        ]);
+        report.header.generated_at = "2026-01-10T11:00:00Z".to_owned();
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(windows.sessions[0].end, None);
+        assert_eq!(
+            windows.clock.changes,
+            vec![ClockLine {
+                changed_at: "2026-01-10T10:15:00Z".to_owned(),
+                old_time: Some("2026-01-10T10:15:00Z".to_owned()),
+                new_time: Some("2026-01-10T10:45:00Z".to_owned()),
+            }]
+        );
+    }
+
+    /// c1: with no scan time and no recorded end, the span ends where the latest session's after window
+    /// does, half an hour after its start: a change at 10:15 is a line, one at 10:45 is not
+    /// (ADR 0081 section 3).
+    #[test]
+    fn c1_without_a_scan_time_a_session_with_no_recorded_end_ends_after_its_window() {
+        let mut report = report_of(vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            clock_change(
+                "system",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:45:00Z",
+            ),
+            clock_change(
+                "system",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T11:15:00Z",
+            ),
+        ]);
+        report.header.generated_at = "not a time".to_owned();
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(
+            windows.clock.changes,
+            vec![ClockLine {
+                changed_at: "2026-01-10T10:15:00Z".to_owned(),
+                old_time: Some("2026-01-10T10:15:00Z".to_owned()),
+                new_time: Some("2026-01-10T10:45:00Z".to_owned()),
+            }]
+        );
+    }
+
+    /// c1: the System and Security logs record one change between them, so it is one line; a change
+    /// with a different new time is a line of its own (ADR 0081 section 3).
+    #[test]
+    fn c1_the_same_change_in_the_system_and_security_logs_is_one_line() {
+        let report = clock_report(vec![
+            clock_change(
+                "system",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:45:00Z",
+            ),
+            clock_change(
+                "security",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T10:45:00Z",
+            ),
+            clock_change(
+                "security",
+                "2026-01-10T10:20:00Z",
+                "2026-01-10T10:20:00Z",
+                "2026-01-10T11:00:00Z",
+            ),
+        ]);
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(
+            windows.clock.changes,
+            vec![
+                ClockLine {
+                    changed_at: "2026-01-10T10:15:00Z".to_owned(),
+                    old_time: Some("2026-01-10T10:15:00Z".to_owned()),
+                    new_time: Some("2026-01-10T10:45:00Z".to_owned()),
+                },
+                ClockLine {
+                    changed_at: "2026-01-10T10:20:00Z".to_owned(),
+                    old_time: Some("2026-01-10T10:20:00Z".to_owned()),
+                    new_time: Some("2026-01-10T11:00:00Z".to_owned()),
+                },
+            ]
+        );
+    }
+
+    /// c1: a clock time that does not parse is no time, and one that does is shown as the view renders
+    /// times, in UTC to the second (ADR 0081 section 3).
+    #[test]
+    fn c1_a_clock_time_that_does_not_parse_is_no_time_and_one_that_does_is_rendered_again() {
+        let report = clock_report(vec![clock_change(
+            "system",
+            "2026-01-10T10:15:00Z",
+            "not a time",
+            "2026-01-10T11:45:00+01:00",
+        )]);
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(
+            windows.clock.changes,
+            vec![ClockLine {
+                changed_at: "2026-01-10T10:15:00Z".to_owned(),
+                old_time: None,
+                new_time: Some("2026-01-10T10:45:00Z".to_owned()),
+            }]
+        );
     }
 
     /// c2: with no `event_fields` run at all, the history is not known, even with the System log's
@@ -1689,12 +1850,12 @@ mod tests {
     }
 
     /// c2: the System place read and the System log's oldest record before the span is known; the
-    /// log's name is compared without case (ADR 0081 section 3).
+    /// log is found by the name `evtx` gives it, as the bundle lists it (ADR 0081 section 3).
     #[test]
     fn c2_system_read_and_oldest_record_before_the_span_makes_the_history_known() {
         let report = clock_report(vec![
             event_summary("system", "read"),
-            event_log("system.evtx", "2026-01-10T09:00:00Z"),
+            event_log("System.evtx", "2026-01-10T09:00:00Z"),
         ]);
 
         let windows = game_windows(&report, Mode::SelfCheck);
@@ -1709,6 +1870,41 @@ mod tests {
         let report = clock_report(vec![
             event_summary("system", "read"),
             event_log("System.evtx", "2026-01-10T09:30:00Z"),
+        ]);
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(windows.clock.history, ClockHistory::Known);
+    }
+
+    /// c2: a rejected record in the System log, a damaged chunk that may hold a clock change, makes the
+    /// history not known, even when the log reaches back far enough (ADR 0081 section 3).
+    #[test]
+    fn c2_a_rejected_record_in_the_system_log_makes_the_history_not_known() {
+        let mut summary = event_summary("system", "read");
+        summary
+            .fields
+            .insert("rejected".to_owned(), serde_json::Value::from(1));
+        let report = clock_report(vec![
+            summary,
+            event_log("System.evtx", "2026-01-10T09:00:00Z"),
+        ]);
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(windows.clock.history, ClockHistory::NotKnown);
+    }
+
+    /// c2: a System summary that counts no rejected record is as good as one that counts none at all.
+    #[test]
+    fn c2_a_system_summary_with_no_rejected_record_keeps_the_history_known() {
+        let mut summary = event_summary("system", "read");
+        summary
+            .fields
+            .insert("rejected".to_owned(), serde_json::Value::from(0));
+        let report = clock_report(vec![
+            summary,
+            event_log("System.evtx", "2026-01-10T09:00:00Z"),
         ]);
 
         let windows = game_windows(&report, Mode::SelfCheck);
@@ -1762,7 +1958,10 @@ mod tests {
             Mode::Ss,
         );
 
-        assert!(!without.candidates.is_empty(), "the candidate is in the session");
+        assert!(
+            !without.candidates.is_empty(),
+            "the candidate is in the session"
+        );
         assert_eq!(with.clock.changes.len(), 1);
         assert_eq!(with.sessions, without.sessions);
         assert_eq!(with.candidates, without.candidates);

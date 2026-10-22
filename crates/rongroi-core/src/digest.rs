@@ -17,10 +17,13 @@ pub const CLOCK_CHANGE_THRESHOLD: jiff::SignedDuration = jiff::SignedDuration::f
 
 /// Lowercase hex SHA-256 of `text`.
 fn sha256_hex(text: &str) -> String {
-    Sha256::digest(text.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    use std::fmt::Write as _;
+    let digest = Sha256::digest(text.as_bytes());
+    let mut hex = String::with_capacity(64);
+    for byte in &digest {
+        let _ = write!(hex, "{byte:02x}");
+    }
+    hex
 }
 
 /// Puts a path into one spelling: `/` becomes `\` and ASCII letters are lowercased, so the same
@@ -93,18 +96,23 @@ mod tests {
 
     /// Lowercase hex SHA-256 of `text`, computed independently of the code under test.
     fn sha256_hex_of(text: &str) -> String {
+        use std::fmt::Write as _;
         let mut hasher = Sha256::new();
         hasher.update(text.as_bytes());
-        hasher
-            .finalize()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect()
+        let digest = hasher.finalize();
+        let mut hex = String::new();
+        for byte in &digest {
+            let _ = write!(hex, "{byte:02x}");
+        }
+        hex
     }
 
     #[test]
     fn path_digest_d1_normalises_case_and_separators() {
-        assert_eq!(path_digest(r"C:\Tools\X.EXE"), path_digest("c:/tools/x.exe"));
+        assert_eq!(
+            path_digest(r"C:\Tools\X.EXE"),
+            path_digest("c:/tools/x.exe")
+        );
         assert_eq!(
             path_digest(r"C:\Tools\X.EXE"),
             Some(sha256_hex_of(r"c:\tools\x.exe"))
