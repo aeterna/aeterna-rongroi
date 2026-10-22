@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use rongroi_core::digest::{CLOCK_CHANGE_THRESHOLD, path_digest};
+use rongroi_core::digest::{CLOCK_CHANGE_THRESHOLD, path_digest, volume_path_digest};
 use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
@@ -493,16 +493,127 @@ fn after_volume(path: &str) -> &str {
     path
 }
 
-/// The observations of the Code Integrity log. Filled by E4.
+/// The observations of the Code Integrity log: one per refused image, grouped by the digest of its
+/// path after the volume, so the device spelling and the drive-letter spelling of one file are one
+/// row (ADR 0081 section 2). A refusal with no digest is counted in the summary, never named.
 fn code_integrity_observations(fields: &CodeIntegrityFields) -> Vec<Observation> {
-    let _ = fields;
-    Vec::new()
+    let mut groups: BTreeMap<String, RefusalGroup> = BTreeMap::new();
+    let mut unresolved_images = 0_u64;
+
+    for refusal in &fields.refusals {
+        match refusal.file_name.as_deref().and_then(volume_path_digest) {
+            Some(digest) => {
+                let group = groups.entry(digest).or_insert_with(|| RefusalGroup {
+                    events: 0,
+                    first_seen: refusal.written,
+                    last_seen: refusal.written,
+                });
+                group.events += 1;
+                group.first_seen = group.first_seen.min(refusal.written);
+                group.last_seen = group.last_seen.max(refusal.written);
+            }
+            None => unresolved_images += 1,
+        }
+    }
+
+    let mut observations = Vec::with_capacity(groups.len() + 1);
+    for (digest, group) in groups {
+        let mut fields = BTreeMap::new();
+        fields.insert(DISCRIMINATOR.to_owned(), Value::from(CODE_INTEGRITY));
+        fields.insert("volume_path_digest".to_owned(), Value::from(digest));
+        fields.insert("events".to_owned(), Value::from(group.events));
+        fields.insert(
+            "first_seen".to_owned(),
+            Value::from(group.first_seen.to_string()),
+        );
+        fields.insert(
+            "last_seen".to_owned(),
+            Value::from(group.last_seen.to_string()),
+        );
+        observations.push(Observation {
+            collector: ID.to_owned(),
+            fields,
+        });
+    }
+
+    let mut summary = summary(CODE_INTEGRITY, READ);
+    summary.fields.insert(
+        "unresolved_images".to_owned(),
+        Value::from(unresolved_images),
+    );
+    observations.insert(0, summary);
+    observations
 }
 
-/// The observations of `Security.evtx`. Filled by E4.
+/// What one refused image's digest has been seen doing: how many refusals, from when to when.
+struct RefusalGroup {
+    events: u64,
+    first_seen: jiff::Timestamp,
+    last_seen: jiff::Timestamp,
+}
+
+/// The observations of `Security.evtx`: one per clock change at or over the threshold, with both
+/// times only (ADR 0081 section 1 reads no reason and no process from a 4616). Smaller changes and
+/// unreadable ones are counted in the summary.
 fn security_observations(fields: &SecurityFields) -> Vec<Observation> {
-    let _ = fields;
-    Vec::new()
+    let mut observations = Vec::with_capacity(fields.clock_changes.len() + 1);
+    let mut small = Vec::new();
+    let mut unreadable = 0_u64;
+
+    for change in &fields.clock_changes {
+        let (Some(old), Some(new)) = (change.old_time, change.new_time) else {
+            unreadable += 1;
+            continue;
+        };
+        if new.duration_since(old).abs() >= CLOCK_CHANGE_THRESHOLD {
+            observations.push(security_clock_change_observation(change, old, new));
+        } else {
+            small.push(change.written);
+        }
+    }
+
+    let mut summary = summary(SECURITY, READ);
+    summary.fields.insert(
+        "small_clock_changes".to_owned(),
+        Value::from(small.len() as u64),
+    );
+    summary.fields.insert(
+        "unreadable_clock_changes".to_owned(),
+        Value::from(unreadable),
+    );
+    if let Some(first) = small.iter().min() {
+        summary
+            .fields
+            .insert("small_first".to_owned(), Value::from(first.to_string()));
+    }
+    if let Some(last) = small.iter().max() {
+        summary
+            .fields
+            .insert("small_last".to_owned(), Value::from(last.to_string()));
+    }
+    observations.insert(0, summary);
+    observations
+}
+
+/// One Security clock change: when and both times. No `reason` and no `by`, which a 4616 does not
+/// carry (ADR 0081 section 1).
+fn security_clock_change_observation(
+    change: &ClockChange,
+    old: jiff::Timestamp,
+    new: jiff::Timestamp,
+) -> Observation {
+    let mut fields = BTreeMap::new();
+    fields.insert(DISCRIMINATOR.to_owned(), Value::from(SECURITY));
+    fields.insert(
+        "changed_at".to_owned(),
+        Value::from(change.written.to_string()),
+    );
+    fields.insert("old_time".to_owned(), Value::from(old.to_string()));
+    fields.insert("new_time".to_owned(), Value::from(new.to_string()));
+    Observation {
+        collector: ID.to_owned(),
+        fields,
+    }
 }
 
 #[cfg(test)]
