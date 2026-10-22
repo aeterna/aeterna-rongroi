@@ -5,8 +5,9 @@
 //! Three payload fields read from three Event Logs near a game session (ADR 0081, sections 1 to 3).
 //!
 //! `System.evtx` gives the service installs (7045) and the clock changes (Kernel-General 1). The Code
-//! Integrity and Security logs are read and summarised here; their observations come with ADR 0081
-//! section 4. Each log is parsed once, on its own thread, within its own limit (ADR 0024).
+//! Integrity and Security logs give the refused images (3033) and the clock changes (4616). Each log
+//! has one summary observation, placed by its own function. Each log is parsed once, on its own
+//! thread, within its own limit (ADR 0024).
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;
@@ -160,7 +161,6 @@ impl Collector for EventFields {
         ) {
             Read::Parsed(fields) => {
                 any_read = true;
-                observations.push(summary(CODE_INTEGRITY, READ));
                 observations.extend(code_integrity_observations(&fields));
             }
             Read::Unread { read, reason } => {
@@ -172,7 +172,6 @@ impl Collector for EventFields {
         match read_log(host, &dir, SECURITY, SECURITY_LOG, security_fields) {
             Read::Parsed(fields) => {
                 any_read = true;
-                observations.push(summary(SECURITY, READ));
                 observations.extend(security_observations(&fields));
             }
             Read::Unread { read, reason } => {
@@ -363,6 +362,10 @@ fn system_observations(
 
     let mut summary = summary(SYSTEM, READ);
     summary.fields.insert(
+        "rejected".to_owned(),
+        Value::from(fields.rejected.len() as u64),
+    );
+    summary.fields.insert(
         "unresolved_installs".to_owned(),
         Value::from(unresolved_installs),
     );
@@ -538,6 +541,10 @@ fn code_integrity_observations(fields: &CodeIntegrityFields) -> Vec<Observation>
 
     let mut summary = summary(CODE_INTEGRITY, READ);
     summary.fields.insert(
+        "rejected".to_owned(),
+        Value::from(fields.rejected.len() as u64),
+    );
+    summary.fields.insert(
         "unresolved_images".to_owned(),
         Value::from(unresolved_images),
     );
@@ -573,6 +580,10 @@ fn security_observations(fields: &SecurityFields) -> Vec<Observation> {
     }
 
     let mut summary = summary(SECURITY, READ);
+    summary.fields.insert(
+        "rejected".to_owned(),
+        Value::from(fields.rejected.len() as u64),
+    );
     summary.fields.insert(
         "small_clock_changes".to_owned(),
         Value::from(small.len() as u64),
@@ -622,9 +633,10 @@ mod tests {
     use rongroi_core::digest::{path_digest, volume_path_digest};
     use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
     use rongroi_host::{FixtureHost, NonWindowsHost};
+    use rongroi_parsers::error::ParseError;
     use rongroi_parsers::evtx::{
-        ClockChange, CodeIntegrityFields, ImageRefusal, SecurityFields, ServiceInstall,
-        SystemFields,
+        ClockChange, CodeIntegrityFields, ImageRefusal, RejectedRecord, SecurityFields,
+        ServiceInstall, SystemFields,
     };
     use serde_json::Value;
 
@@ -1087,6 +1099,156 @@ mod tests {
         assert_eq!(
             summary.fields["small_last"],
             Value::from(at(START + 10).to_string())
+        );
+    }
+
+    // (q3) Each log has exactly one summary row, and every summary carries `rejected`.
+
+    /// The summary rows of one log: the observations whose `log` is `log` and that carry `read`.
+    fn summaries_for(observations: &[Observation], log: &str) -> Vec<&Observation> {
+        observations
+            .iter()
+            .filter(|observation| {
+                observation.fields.get("log") == Some(&Value::from(log))
+                    && observation.fields.contains_key("read")
+            })
+            .collect()
+    }
+
+    fn rejected_record() -> RejectedRecord {
+        RejectedRecord {
+            chunk_number: Some(1),
+            record_id: None,
+            reason: ParseError::Truncated {
+                expected: 8,
+                found: 7,
+            },
+        }
+    }
+
+    /// The header block of an Event Log with no chunks in it: what a log is once it has been cleared.
+    fn empty_log() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 4096];
+        bytes[..8].copy_from_slice(b"ElfFile\0");
+        bytes[32..36].copy_from_slice(&128_u32.to_le_bytes());
+        bytes[36..38].copy_from_slice(&1_u16.to_le_bytes());
+        bytes[38..40].copy_from_slice(&3_u16.to_le_bytes());
+        bytes[40..42].copy_from_slice(&4096_u16.to_le_bytes());
+        bytes
+    }
+
+    /// A Windows host whose Event Logs folder holds `logs`, each file given its bytes.
+    fn host_with_logs(logs: &[(&str, Vec<u8>)]) -> FixtureHost {
+        let mut yaml = String::from(
+            "platform: windows\nelevated: true\nenv:\n  SystemRoot: 'C:\\Windows'\nfilesystem:\n  \
+             'C:\\Windows\\System32\\winevt\\Logs':\n",
+        );
+        for (name, bytes) in logs {
+            let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+            yaml.push_str(&format!("    - name: '{name}'\n      content_hex: '{hex}'\n"));
+        }
+        FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+    }
+
+    /// Q3 Major 1: a parsed Code Integrity or Security log with no records gives one summary row, not two.
+    /// The caller used to push a summary of its own on top of the one the observation function places.
+    #[test]
+    fn q3_1_a_parsed_log_with_no_records_has_exactly_one_summary_row_through_collect() {
+        let host = host_with_logs(&[
+            (CODE_INTEGRITY_LOG, empty_log()),
+            (SECURITY_LOG, empty_log()),
+        ]);
+        let observations = match EventFields.collect(&host) {
+            CollectorRun::Measured { observations, .. } => observations,
+            other => panic!("expected a measured run, found {other:?}"),
+        };
+
+        let code_integrity = observations
+            .iter()
+            .filter(|observation| {
+                observation.fields.get("log") == Some(&Value::from(CODE_INTEGRITY))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(code_integrity.len(), 1, "{observations:?}");
+        assert_eq!(code_integrity[0].fields["read"], Value::from("read"));
+        assert_eq!(code_integrity[0].fields["unresolved_images"], Value::from(0));
+
+        let security = observations
+            .iter()
+            .filter(|observation| observation.fields.get("log") == Some(&Value::from(SECURITY)))
+            .collect::<Vec<_>>();
+        assert_eq!(security.len(), 1, "{observations:?}");
+        assert_eq!(security[0].fields["read"], Value::from("read"));
+        assert_eq!(security[0].fields["small_clock_changes"], Value::from(0));
+    }
+
+    /// Q3 Major 1 through the pure functions: a log with no records is one summary row, read and empty.
+    #[test]
+    fn q3_1_pure_code_integrity_and_security_with_no_records_are_one_summary_row_each() {
+        let code_integrity = code_integrity_observations(&code_integrity_with(Vec::new()));
+        let rows = summaries_for(&code_integrity, CODE_INTEGRITY);
+        assert_eq!(rows.len(), 1, "{code_integrity:?}");
+        assert_eq!(rows[0].fields["read"], Value::from("read"));
+        assert_eq!(rows[0].fields["unresolved_images"], Value::from(0));
+
+        let security = security_observations(&security_with(Vec::new()));
+        let rows = summaries_for(&security, SECURITY);
+        assert_eq!(rows.len(), 1, "{security:?}");
+        assert_eq!(rows[0].fields["read"], Value::from("read"));
+        assert_eq!(rows[0].fields["small_clock_changes"], Value::from(0));
+    }
+
+    /// Q3 Major 2: the System summary says how many records the reader rejected, 0 when none.
+    #[test]
+    fn q3_2_system_summary_carries_rejected_as_zero_when_none_and_the_count_when_some() {
+        let none = system_observations(&windows_host(), &system_with(Vec::new()), ROOT);
+        assert_eq!(
+            summaries_for(&none, SYSTEM)[0].fields.get("rejected"),
+            Some(&Value::from(0))
+        );
+
+        let mut system = system_with(Vec::new());
+        system.rejected = vec![rejected_record(), rejected_record()];
+        let some = system_observations(&windows_host(), &system, ROOT);
+        assert_eq!(
+            summaries_for(&some, SYSTEM)[0].fields.get("rejected"),
+            Some(&Value::from(2))
+        );
+    }
+
+    /// Q3 Major 2: the Code Integrity summary says how many records the reader rejected, 0 when none.
+    #[test]
+    fn q3_2_code_integrity_summary_carries_rejected_as_zero_when_none_and_the_count_when_some() {
+        let none = code_integrity_observations(&code_integrity_with(Vec::new()));
+        assert_eq!(
+            summaries_for(&none, CODE_INTEGRITY)[0].fields.get("rejected"),
+            Some(&Value::from(0))
+        );
+
+        let mut code_integrity = code_integrity_with(Vec::new());
+        code_integrity.rejected = vec![rejected_record(), rejected_record(), rejected_record()];
+        let some = code_integrity_observations(&code_integrity);
+        assert_eq!(
+            summaries_for(&some, CODE_INTEGRITY)[0].fields.get("rejected"),
+            Some(&Value::from(3))
+        );
+    }
+
+    /// Q3 Major 2: the Security summary says how many records the reader rejected, 0 when none.
+    #[test]
+    fn q3_2_security_summary_carries_rejected_as_zero_when_none_and_the_count_when_some() {
+        let none = security_observations(&security_with(Vec::new()));
+        assert_eq!(
+            summaries_for(&none, SECURITY)[0].fields.get("rejected"),
+            Some(&Value::from(0))
+        );
+
+        let mut security = security_with(Vec::new());
+        security.rejected = vec![rejected_record()];
+        let some = security_observations(&security);
+        assert_eq!(
+            summaries_for(&some, SECURITY)[0].fields.get("rejected"),
+            Some(&Value::from(1))
         );
     }
 }
