@@ -11,8 +11,9 @@
 //!
 //! A path is emitted only when `is_drive_rooted` holds and `is_refused_form` does not refuse it; a
 //! known-folder prefix is resolved from `Host::env_var`, never an OS call, and is withheld as
-//! `unresolved_known_folder` when its variable is missing. An app identity is emitted unchanged with
-//! `path_withheld: app_id`, and any other withheld path keeps only its last segment. The run count at
+//! `unresolved_known_folder` when its variable is missing. An app identity — a name with none of
+//! `\`, `/` and `:` — is emitted unchanged with `path_withheld: app_id`, and any other withheld path
+//! keeps only its last segment. The run count at
 //! offset 4 and the unparsed tail are never emitted (owner decision 5), and the shortcuts key is
 //! counted, never decoded (owner decision 2).
 //!
@@ -74,9 +75,9 @@ const FIELDS: [Field; 10] = [
     Field::number("skipped"),
 ];
 
-/// The fields that describe one program, as opposed to what the key held: a value whose bytes did
-/// not arrive gaps these and nothing else.
-const ENTRY_FIELDS: [&str; 4] = ["last_run", "name", "path", "path_withheld"];
+/// The fields a value whose bytes did not arrive leaves uncertain: the four that describe one
+/// program, and `entries`, whose count is then only a lower bound rather than what the key held.
+const ENTRY_FIELDS: [&str; 5] = ["entries", "last_run", "name", "path", "path_withheld"];
 
 /// The `userassist` collector.
 #[derive(Debug, Default, Clone, Copy)]
@@ -171,19 +172,23 @@ impl Collector for UserAssist {
         }
 
         // Never decoded: the names are `.lnk` paths, and a shortcut is not the program it started.
-        // A key that is not there contributes zero rather than making the whole run unmeasured.
-        let shortcuts = host
-            .value_names(SHORTCUT_KEY)
-            .ok()
-            .flatten()
-            .map_or(0, |names| names.len());
+        // A key that is not there contributes zero rather than making the whole run unmeasured; a key
+        // Windows would not list is a gap on the count, and the field is left out rather than
+        // reported as a zero.
+        let mut gaps = BTreeMap::new();
+        let shortcuts = match host.value_names(SHORTCUT_KEY) {
+            Ok(Some(names)) => Some(names.len()),
+            Ok(None) => Some(0),
+            Err(error) => {
+                gaps.insert("shortcuts".to_owned(), reason_for(host, &error));
+                None
+            }
+        };
         observations.push(account(&counts, shortcuts, history_account(host)));
 
-        let gaps = if partial {
-            entry_gaps(UnmeasuredReason::Partial)
-        } else {
-            BTreeMap::new()
-        };
+        if partial {
+            gaps.extend(entry_gaps(UnmeasuredReason::Partial));
+        }
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
@@ -305,8 +310,9 @@ fn location(host: &dyn Host, decoded: &str) -> Location {
             None => withheld(decoded, UNRESOLVED_KNOWN_FOLDER),
         };
     }
-    // No separator anywhere: it is an app identity, emitted as it was written.
-    if !decoded.contains('\\') {
+    // No path separator and no drive or scheme marker: it is an app identity, emitted as it was
+    // written.
+    if !decoded.contains(['\\', '/', ':']) {
         return Location {
             name: Some(decoded.to_owned()),
             path: None,
@@ -318,7 +324,10 @@ fn location(host: &dyn Host, decoded: &str) -> Location {
     if is_unresolved_folder(decoded) {
         withheld(decoded, UNRESOLVED_KNOWN_FOLDER)
     } else {
-        withheld(decoded, UNREDACTABLE_FORM)
+        // A URL's query is not part of its last path segment and may carry a token, so it is not
+        // kept either.
+        let path = decoded.split(['?', '#']).next().unwrap_or(decoded);
+        withheld(path, UNREDACTABLE_FORM)
     }
 }
 
@@ -421,7 +430,7 @@ struct Counts {
 }
 
 /// What the key held, how much of it was understood, and whose entries these are not.
-fn account(counts: &Counts, shortcuts: usize, account: &'static str) -> Observation {
+fn account(counts: &Counts, shortcuts: Option<usize>, account: &'static str) -> Observation {
     let mut fields = BTreeMap::new();
     fields.insert(
         "entries".to_owned(),
@@ -435,7 +444,9 @@ fn account(counts: &Counts, shortcuts: usize, account: &'static str) -> Observat
         "rejected".to_owned(),
         serde_json::Value::from(counts.rejected),
     );
-    fields.insert("shortcuts".to_owned(), serde_json::Value::from(shortcuts));
+    if let Some(shortcuts) = shortcuts {
+        fields.insert("shortcuts".to_owned(), serde_json::Value::from(shortcuts));
+    }
     fields.insert("account".to_owned(), serde_json::Value::from(account));
     Observation {
         collector: ID.to_owned(),

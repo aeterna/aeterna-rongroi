@@ -581,7 +581,7 @@ date: 2026-09-11
         assert_eq!(check_ages(&root).unwrap(), Vec::<String>::new());
     }
 
-    /// A tree with one age text for a collector that declares none, and none for the six that do.
+    /// A tree with one age text for a collector that declares none, and none for the seven that do.
     #[test]
     fn a_missing_or_unused_age_text_is_refused() {
         let tmp = TempRoot::new("ages");
@@ -590,11 +590,16 @@ date: 2026-09-11
             "id: 5b0b1f55-4d2c-4c3e-9d8a-7a6b5c4d3e2f\ncollector: posture\nretention: Now.\ndocumented: false\nreferences: [docs/adr/0011.md]\n",
         );
         let problems = check_ages(tmp.path()).unwrap();
-        assert_eq!(problems.len(), 7, "{problems:?}");
+        assert_eq!(problems.len(), 8, "{problems:?}");
         assert!(
             problems
                 .iter()
                 .any(|p| p.contains("`evtx` declares a trace age and has no"))
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("`userassist` declares a trace age and has no"))
         );
         assert!(
             problems

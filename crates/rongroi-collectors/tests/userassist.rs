@@ -56,7 +56,7 @@ fn entries(observations: &[Observation]) -> Vec<&Observation> {
 fn account(observations: &[Observation]) -> &Observation {
     observations
         .iter()
-        .find(|observation| observation.fields.contains_key("shortcuts"))
+        .find(|observation| observation.fields.contains_key("account"))
         .expect("every measured run has an account row")
 }
 
@@ -363,6 +363,12 @@ fn a6_absent_partial_and_not_windows_are_told_apart_and_the_tier_is_standard() {
         Some(&UnmeasuredReason::Partial),
         "{gaps:?}"
     );
+    // The count is a lower bound once one value could not be read, so it is gapped too.
+    assert_eq!(
+        gaps.get("entries"),
+        Some(&UnmeasuredReason::Partial),
+        "{gaps:?}"
+    );
     assert!(
         gaps.values()
             .all(|reason| *reason == UnmeasuredReason::Partial),
@@ -389,4 +395,64 @@ fn a6_absent_partial_and_not_windows_are_told_apart_and_the_tier_is_standard() {
     );
 
     assert_eq!(UserAssist.tier(), ScanTier::Standard);
+}
+
+/// (a7) A name carrying `/` or `:` that is not drive-rooted is not an app identity: it is a path
+/// redaction cannot reach, so only its last path segment is emitted. A URL is the case that matters
+/// most: neither its host nor a query token may reach a field (ADR 0080 section 1).
+#[test]
+fn a7_a_name_with_a_separator_but_no_drive_is_withheld_and_keeps_only_its_last_segment() {
+    let check = |decoded: &str, expected_name: &str, forbidden: &[&str]| {
+        let name = rot13(decoded);
+        let registry = count_key(&[(name.as_str(), entry_body(FILETIME_2020))]);
+        let host = host_with_registry(&registry, "", None, "windows");
+
+        let run = UserAssist.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+
+        let records = entries(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(text(records[0], "name"), Some(expected_name));
+        assert_eq!(text(records[0], "path"), None);
+        assert_eq!(text(records[0], "path_withheld"), Some("unredactable_form"));
+
+        let json = serde_json::to_string(&records).unwrap();
+        for word in forbidden {
+            assert!(
+                !json.contains(word),
+                "the withheld name leaked `{word}`: {json}"
+            );
+        }
+    };
+
+    check("https://host/page?token=abc", "page", &["host", "token"]);
+    check("bob/x.exe", "x.exe", &["bob"]);
+    check("file:x", "file:x", &[]);
+}
+
+/// (a8) A shortcuts key Windows refuses to list is a gap on `shortcuts`, not a count of zero: the
+/// field is left out of the account row, and the reason is the one `failure::reason_for` gives the
+/// same denial elsewhere. An absent key is still `shortcuts: 0` (a1).
+#[test]
+fn a8_an_unreadable_shortcuts_key_is_a_gap_and_its_field_is_omitted() {
+    let path = r"C:\Users\fixtureuser\Downloads\opened.exe";
+    let name = rot13(path);
+    let registry = count_key(&[(name.as_str(), entry_body(FILETIME_2020))]);
+    let yaml = format!(
+        "platform: windows\nelevated: false\naccess_denied:\n  - '{SHORTCUT_KEY}'\nregistry:\n{registry}"
+    );
+    let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+
+    let run = UserAssist.collect(&host);
+    let (observations, gaps) = measured(&run);
+    assert_eq!(
+        gaps.get("shortcuts"),
+        Some(&UnmeasuredReason::NotAdmin),
+        "{gaps:?}"
+    );
+
+    let account = account(observations);
+    assert_eq!(field(account, "shortcuts"), None);
+    assert_eq!(field(account, "entries"), Some(&1_u64.into()));
 }

@@ -221,9 +221,10 @@ impl Collector for RecordedFiles {
                 Err(UnmeasuredReason::NotOnThisOs) if matches!(source, Source::Pca) => {
                     measured_sources += 1;
                 }
-                // An absent `UserAssist` key says this account opened nothing through the shell: a
-                // measured source with no paths, not a gap (ADR 0080 section 4). It does not by
-                // itself make a run whose every other source failed a measured one.
+                // An absent `UserAssist` key holds no path, so no path can be missing from it: a
+                // measured source with no paths, not a gap (ADR 0080 section 4). It says nothing
+                // about what the account did. It does not by itself make a run whose every other
+                // source failed a measured one.
                 Err(UnmeasuredReason::SourceAbsent) if matches!(source, Source::UserAssist) => {
                     if measured_sources > 0 {
                         measured_sources += 1;
