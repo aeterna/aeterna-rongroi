@@ -979,6 +979,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
+    use crate::digest::{path_digest, volume_path_digest};
     use crate::model::{Observation, UnmatchedGroup};
 
     fn at(text: &str) -> jiff::Timestamp {
@@ -1147,5 +1148,154 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
+    }
+
+    /// A `FiveM` record of `collector` (Prefetch or BAM) with its time: the anchor name of the Legacy
+    /// edition, so the session runs from Prefetch's time to BAM's.
+    fn fivem_record(collector: &str, last_run: &str) -> Observation {
+        Observation {
+            collector: collector.to_owned(),
+            fields: BTreeMap::from([
+                ("name".to_owned(), serde_json::Value::from("FiveM.exe")),
+                ("fivem_edition".to_owned(), serde_json::Value::from("legacy")),
+                ("last_run".to_owned(), serde_json::Value::from(last_run)),
+            ]),
+        }
+    }
+
+    /// The records of one Legacy session from 10:00 to 10:30 and one BAM candidate that ran at 10:15.
+    fn base_records() -> Vec<Observation> {
+        vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            fivem_record("bam", "2026-01-10T10:30:00Z"),
+            bam("x.sys", r"C:\Tools\x.sys", "2026-01-10T10:15:00Z"),
+        ]
+    }
+
+    /// An install the event log recorded: its path digest when the record carried one.
+    fn install(log: &str, digest: Option<String>, installed_at: &str) -> Observation {
+        let mut fields = BTreeMap::from([
+            ("log".to_owned(), serde_json::Value::from(log)),
+            (
+                "installed_at".to_owned(),
+                serde_json::Value::from(installed_at),
+            ),
+        ]);
+        if let Some(digest) = digest {
+            fields.insert("path_digest".to_owned(), serde_json::Value::from(digest));
+        }
+        Observation {
+            collector: "event_fields".to_owned(),
+            fields,
+        }
+    }
+
+    /// A refused image the code-integrity log recorded, by its volume path digest.
+    fn refused_image(volume_digest: &str) -> Observation {
+        Observation {
+            collector: "event_fields".to_owned(),
+            fields: BTreeMap::from([
+                (
+                    "log".to_owned(),
+                    serde_json::Value::from("code_integrity"),
+                ),
+                (
+                    "volume_path_digest".to_owned(),
+                    serde_json::Value::from(volume_digest),
+                ),
+            ]),
+        }
+    }
+
+    fn digest_of(path: &str) -> String {
+        path_digest(path).unwrap_or_else(|| panic!("{path} has no path digest"))
+    }
+
+    fn volume_digest_of(path: &str) -> String {
+        volume_path_digest(path).unwrap_or_else(|| panic!("{path} has no volume path digest"))
+    }
+
+    fn shown<'a>(windows: &'a GameWindows, name: &str) -> &'a GameCandidate {
+        windows
+            .candidates
+            .iter()
+            .find(|candidate| candidate.name.eq_ignore_ascii_case(name))
+            .unwrap_or_else(|| panic!("no shown candidate {name}"))
+    }
+
+    /// h1: an install whose path digest equals a candidate's is shown on that candidate, and moves
+    /// neither its times, its facts nor its place in the view (ADR 0081 section 4).
+    #[test]
+    fn h1_install_with_the_candidates_path_digest_is_shown_on_it_and_moves_no_fact() {
+        let without = game_windows(&report_of(base_records()), Mode::SelfCheck);
+
+        let mut records = base_records();
+        records.push(install(
+            "system",
+            Some(digest_of(r"c:\tools\X.SYS")),
+            "2026-01-10T09:57:00Z",
+        ));
+        let with = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let installed: Vec<jiff::Timestamp> = shown(&with, "x.sys")
+            .installed_at
+            .iter()
+            .map(|text| at(text))
+            .collect();
+        assert_eq!(installed, vec![at("2026-01-10T09:57:00Z")]);
+        assert!(shown(&without, "x.sys").installed_at.is_empty());
+        assert_eq!(with.unmatched_installs, InstallCounts::default());
+
+        let mut stripped = with.candidates.clone();
+        for candidate in &mut stripped {
+            candidate.installed_at.clear();
+        }
+        assert_eq!(stripped, without.candidates);
+        assert_eq!(with.counts, without.counts);
+    }
+
+    /// h2: an install with no matching candidate is counted in the window it falls in, and the
+    /// candidate counts do not change (ADR 0081 section 4).
+    #[test]
+    fn h2_installs_without_a_matching_candidate_are_counted_per_window() {
+        let without = game_windows(&report_of(base_records()), Mode::SelfCheck);
+        assert_eq!(without.counts.during, 1, "the candidate is in the session");
+
+        let mut records = base_records();
+        // Another program's digest, three minutes before the session: before window.
+        records.push(install(
+            "system",
+            Some(digest_of(r"C:\Tools\other.sys")),
+            "2026-01-10T09:57:00Z",
+        ));
+        // No path digest, during the session: during window.
+        records.push(install("system", None, "2026-01-10T10:10:00Z"));
+        let with = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(
+            with.unmatched_installs,
+            InstallCounts {
+                before: 1,
+                during: 1,
+                after: 0,
+            }
+        );
+        assert_eq!(with.counts, without.counts);
+        assert!(shown(&with, "x.sys").installed_at.is_empty());
+    }
+
+    /// h3: a refused image sets the flag on the candidate whose volume path digest it carries and on
+    /// no other (ADR 0081 section 4).
+    #[test]
+    fn h3_refused_image_marks_only_the_candidate_with_its_volume_digest() {
+        let mut records = base_records();
+        records.push(bam("y.sys", r"C:\Tools\y.sys", "2026-01-10T10:20:00Z"));
+        records.push(refused_image(&volume_digest_of(
+            r"\Device\HarddiskVolume2\Tools\x.sys",
+        )));
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert!(shown(&windows, "x.sys").refused_by_code_integrity);
+        assert!(!shown(&windows, "y.sys").refused_by_code_integrity);
     }
 }
