@@ -9,6 +9,7 @@ pub mod autostart;
 pub mod bam;
 pub mod defender_exclusion;
 pub mod driver_service;
+pub mod event_fields;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
@@ -336,6 +337,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(recorded_files::RecordedFiles::default()),
         Box::new(usn::Usn::default()),
         Box::new(windows_start::WindowsStart),
+        Box::new(event_fields::EventFields),
     ]
 }
 

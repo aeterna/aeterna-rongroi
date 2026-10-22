@@ -509,6 +509,10 @@ expression: view
       {
         "collector": "windows_start",
         "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "reason": "source_absent"
       }
     ]
   },
@@ -516,6 +520,7 @@ expression: view
     "posture",
     "driver_service",
     "windows_start",
+    "event_fields",
     "pci_device",
     "hid_device",
     "autostart",

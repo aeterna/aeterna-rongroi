@@ -1074,7 +1074,7 @@ date: 2026-09-11
             ("service_disabled", &["prefetch"]),
             (
                 "budget_spent",
-                &["autostart", "driver_service", "evtx", "usn"],
+                &["autostart", "driver_service", "event_fields", "evtx", "usn"],
             ),
             ("not_attempted", &["evtx"]),
             ("other_volume", &["usn"]),

@@ -25,8 +25,12 @@ fuzz_target!(|data: &[u8]| {
     // target looks for is a panic, an abort or a hang — a hang included, because a chunk reader that
     // is told how many records to expect is exactly the shape that loops on a crafted file.
     let _ = rongroi_parsers::evtx::records(data);
-    // The two functions that read an event payload, one joining script block parts across records
-    // (ADR 0064) and one reading a number (ADR 0071): the same bytes, the same promise.
+    // The five functions that read more than the `System` block of a record: one joining script block
+    // parts across records (ADR 0064), one reading a number (ADR 0071), and three reading a few named
+    // fields each (ADR 0081). The same bytes, the same promise.
     let _ = rongroi_parsers::evtx::powershell_text(data);
     let _ = rongroi_parsers::evtx::windows_starts(data);
+    let _ = rongroi_parsers::evtx::system_fields(data);
+    let _ = rongroi_parsers::evtx::security_fields(data);
+    let _ = rongroi_parsers::evtx::refused_images(data);
 });

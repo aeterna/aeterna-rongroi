@@ -494,7 +494,7 @@ type Listing = Result<Option<BTreeSet<String>>, UnmeasuredReason>;
 
 /// What every place reads with: the host, `%SystemRoot%`, the variables, and the folder listings the
 /// command-line resolver has already made.
-struct Context<'h> {
+pub(crate) struct Context<'h> {
     host: &'h dyn Host,
     system_root: String,
     profiles_directory: Option<String>,
@@ -502,7 +502,7 @@ struct Context<'h> {
 }
 
 impl<'h> Context<'h> {
-    fn new(host: &'h dyn Host, system_root: String) -> Self {
+    pub(crate) fn new(host: &'h dyn Host, system_root: String) -> Self {
         Self {
             host,
             system_root,
@@ -584,7 +584,7 @@ impl<'h> Context<'h> {
     }
 
     /// The file a service's `ImagePath` or a `Run` value's command line names.
-    fn resolve_command_line(&self, text: &str, profile: bool) -> Resolution {
+    pub(crate) fn resolve_command_line(&self, text: &str, profile: bool) -> Resolution {
         let text = text.trim_matches([' ', '\t']);
         if let Some(rest) = text.strip_prefix('"') {
             let Some((quoted, _)) = rest.split_once('"') else {

@@ -109,6 +109,7 @@
     "pci_device": "PCI devices Windows remembers",
     "hid_device": "Mice, keyboards and other input devices Windows remembers",
     "windows_start": "How Windows started",
+    "event_fields": "Service installs, clock changes and refused files from the event logs",
     "usn": "NTFS change journal",
     "fivem_servers": "FiveM server cache folders (full scan)",
     "recorded_files": "Files of programs Windows recorded (full scan)"
