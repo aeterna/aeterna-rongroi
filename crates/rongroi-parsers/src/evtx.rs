@@ -48,6 +48,15 @@
 //! **A second, by ADR 0071:** [`windows_starts`] reads one number, `BootType`, of the one event Windows
 //! writes at each start, and no other value of that event or of any other.
 //!
+//! **Three more, by ADR 0081 section 1:** [`system_fields`], [`security_fields`] and [`refused_images`]
+//! read a few named fields of four events, each recognised by provider, channel and id together (ADR
+//! 0031): `ImagePath` and `ServiceType` of a service install (7045); `OldTime`, `NewTime`, `Reason` and
+//! `ProcessName` of a kernel clock change (Kernel-General 1); `PreviousTime` and `NewTime` of a Security
+//! clock change (4616); and `FileNameBuffer` of a refused image (`CodeIntegrity` 3033). The collector turns
+//! every text field these return into a digest or a category before anything is emitted. **Never read:**
+//! `ServiceName`, `AccountName`, `StartType`, `ProcessNameBuffer`, the policy fields, `SubjectUser*` and
+//! `Computer`.
+//!
 //! # The dependency's types stop here
 //!
 //! Binary XML, the chunk layout, the string tables and the recovery of records around a damaged chunk
@@ -658,6 +667,271 @@ fn windows_start(parsed: &SerializedEvtxRecord<Value>) -> Option<WindowsStart> {
     Some(WindowsStart {
         written: parsed.timestamp,
         boot_type,
+    })
+}
+
+// ---------------------------------------------------------------------------------------------------
+// What was installed, changed and refused, a few fields of four events (ADR 0081 section 1,
+// widening ADR 0018 for three more kinds of event)
+// ---------------------------------------------------------------------------------------------------
+
+/// The provider, channel and event id the Service Control Manager writes when a service is installed.
+const SERVICE_INSTALL: (&str, &str, u32) = ("Service Control Manager", "System", 7045);
+
+/// The kernel's record that the system clock was changed.
+const CLOCK_CHANGE_KERNEL: (&str, &str, u32) = ("Microsoft-Windows-Kernel-General", "System", 1);
+
+/// The Security audit record of a clock change, which is written only when that audit is on.
+const CLOCK_CHANGE_AUDIT: (&str, &str, u32) = (
+    "Microsoft-Windows-Security-Auditing",
+    "Security",
+    4616,
+);
+
+/// The record of an image Code Integrity refused to load.
+const REFUSED_IMAGE: (&str, &str, u32) = (
+    "Microsoft-Windows-CodeIntegrity",
+    "Microsoft-Windows-CodeIntegrity/Operational",
+    3033,
+);
+
+/// One service installation as [`system_fields`] reads it. **No service name or account is here.**
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceInstall {
+    /// When the record was written.
+    pub written: Timestamp,
+    /// The file the service runs, as the record spells it. `None` when the record has none.
+    pub image_path: Option<String>,
+    /// The service's type as text, e.g. `kernel mode driver`. `None` when the record has none.
+    pub service_type: Option<String>,
+}
+
+/// One clock change as [`system_fields`] or [`security_fields`] reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClockChange {
+    /// When the record was written.
+    pub written: Timestamp,
+    /// The clock before the change, when the record states it as an ISO 8601 time.
+    pub old_time: Option<Timestamp>,
+    /// The clock after the change, when the record states it as an ISO 8601 time.
+    pub new_time: Option<Timestamp>,
+    /// The kernel's reason number, exactly as the record holds it. Always `None` from the Security record.
+    pub reason: Option<u32>,
+    /// The process that changed the clock, when the kernel names one. Always `None` from the Security
+    /// record, and `None` from the kernel record when its field is empty.
+    pub process: Option<String>,
+}
+
+/// One refused image as [`refused_images`] reads it. **The process that tried to load it is not here.**
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageRefusal {
+    /// When the record was written.
+    pub written: Timestamp,
+    /// The image's file name as the record spells it. `None` when the record has none.
+    pub file_name: Option<String>,
+}
+
+/// What [`system_fields`] read from one log.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SystemFields {
+    /// One per service install, in the order the records were read.
+    pub installs: Vec<ServiceInstall>,
+    /// One per kernel clock change, in the order the records were read.
+    pub clock_changes: Vec<ClockChange>,
+    /// Chunks or records that did not parse, as [`records`] reports them.
+    pub rejected: Vec<RejectedRecord>,
+}
+
+/// What [`security_fields`] read from one log.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SecurityFields {
+    /// One per Security clock-change audit, in the order the records were read.
+    pub clock_changes: Vec<ClockChange>,
+    /// Chunks or records that did not parse, as [`records`] reports them.
+    pub rejected: Vec<RejectedRecord>,
+}
+
+/// What [`refused_images`] read from one log.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CodeIntegrityFields {
+    /// One per refused image, in the order the records were read.
+    pub refusals: Vec<ImageRefusal>,
+    /// Chunks or records that did not parse, as [`records`] reports them.
+    pub rejected: Vec<RejectedRecord>,
+}
+
+/// Reads the service installs and the kernel's clock changes of one log, and nothing else of any
+/// record (ADR 0081 section 1). `ServiceName`, `AccountName` and `StartType` are not read.
+///
+/// # Errors
+///
+/// As [`records`].
+pub fn system_fields(bytes: &[u8]) -> Result<SystemFields, ParseError> {
+    let mut installs = Vec::new();
+    let mut clock_changes = Vec::new();
+    let rejected = for_each_record(bytes, |parsed| {
+        installs.extend(service_install(parsed));
+        clock_changes.extend(kernel_clock_change(parsed));
+    })?;
+    Ok(SystemFields {
+        installs,
+        clock_changes,
+        rejected,
+    })
+}
+
+/// Reads the Security clock-change audits of one log, keeping their two times and nothing else of any
+/// record (ADR 0081 section 1). `SubjectUserName`, `ProcessName` and `Computer` are not read.
+///
+/// # Errors
+///
+/// As [`records`].
+pub fn security_fields(bytes: &[u8]) -> Result<SecurityFields, ParseError> {
+    let mut clock_changes = Vec::new();
+    let rejected = for_each_record(bytes, |parsed| {
+        clock_changes.extend(audit_clock_change(parsed));
+    })?;
+    Ok(SecurityFields {
+        clock_changes,
+        rejected,
+    })
+}
+
+/// Reads the images Code Integrity refused to load in one log, keeping each file name and nothing else
+/// of any record (ADR 0081 section 1). `ProcessNameBuffer` and `Computer` are not read.
+///
+/// # Errors
+///
+/// As [`records`].
+pub fn refused_images(bytes: &[u8]) -> Result<CodeIntegrityFields, ParseError> {
+    let mut refusals = Vec::new();
+    let rejected = for_each_record(bytes, |parsed| {
+        refusals.extend(refused_image(parsed));
+    })?;
+    Ok(CodeIntegrityFields {
+        refusals,
+        rejected,
+    })
+}
+
+/// Hands every record that parsed to `visit` and returns the rejections, the way [`records`] does, so
+/// that the three readers above read a file the same way and cannot drift apart.
+fn for_each_record(
+    bytes: &[u8],
+    mut visit: impl FnMut(&SerializedEvtxRecord<Value>),
+) -> Result<Vec<RejectedRecord>, ParseError> {
+    if bytes.len() < FILE_HEADER_LEN {
+        return Err(ParseError::Truncated {
+            expected: FILE_HEADER_LEN,
+            found: bytes.len(),
+        });
+    }
+    let mut parser = EvtxParser::from_read_seek(Cursor::new(bytes))
+        .map_err(|error| to_parse_error(&error, Stage::Header))?;
+    let mut rejected = Vec::new();
+    for outcome in parser.records_json_value() {
+        match outcome {
+            Ok(parsed) => visit(&parsed),
+            Err(error) => rejected.push(RejectedRecord {
+                chunk_number: failed_chunk(&error),
+                record_id: failed_record(&error),
+                reason: to_parse_error(&error, Stage::Record),
+            }),
+        }
+    }
+    Ok(rejected)
+}
+
+/// Whether a record's identity is the triple given: provider, channel and id together (ADR 0031).
+fn is_triple(identity: &EvtxRecord, (provider, channel, id): (&str, &str, u32)) -> bool {
+    identity.provider.as_deref() == Some(provider)
+        && identity.channel.as_deref() == Some(channel)
+        && identity.event_id == Some(id)
+}
+
+/// The `EventData` of a rendered record, where every payload field the readers below take lives.
+fn event_data(parsed: &SerializedEvtxRecord<Value>) -> Option<&Value> {
+    parsed
+        .data
+        .get("Event")
+        .and_then(|event| event.get("EventData"))
+}
+
+/// One named text field of `EventData`. An empty one is `None`, as an absent one is.
+fn data_text(data: Option<&Value>, name: &str) -> Option<String> {
+    data?
+        .get(name)
+        .map(scalar)
+        .and_then(text)
+        .filter(|value| !value.is_empty())
+}
+
+/// One named field of `EventData` read as an ISO 8601 time; `None` when it does not parse as one.
+fn data_time(data: Option<&Value>, name: &str) -> Option<Timestamp> {
+    data_text(data, name)?.parse().ok()
+}
+
+/// One named field of `EventData` read as a number that fits a `u32`; `None` otherwise.
+fn data_u32(data: Option<&Value>, name: &str) -> Option<u32> {
+    data?
+        .get(name)
+        .map(scalar)
+        .and_then(number)
+        .and_then(|value| u32::try_from(value).ok())
+}
+
+/// One service installation, from a 7045 on `System`.
+fn service_install(parsed: &SerializedEvtxRecord<Value>) -> Option<ServiceInstall> {
+    if !is_triple(&record(parsed), SERVICE_INSTALL) {
+        return None;
+    }
+    let data = event_data(parsed);
+    Some(ServiceInstall {
+        written: parsed.timestamp,
+        image_path: data_text(data, "ImagePath"),
+        service_type: data_text(data, "ServiceType"),
+    })
+}
+
+/// One clock change the kernel recorded, from a Kernel-General 1 on `System`.
+fn kernel_clock_change(parsed: &SerializedEvtxRecord<Value>) -> Option<ClockChange> {
+    if !is_triple(&record(parsed), CLOCK_CHANGE_KERNEL) {
+        return None;
+    }
+    let data = event_data(parsed);
+    Some(ClockChange {
+        written: parsed.timestamp,
+        old_time: data_time(data, "OldTime"),
+        new_time: data_time(data, "NewTime"),
+        reason: data_u32(data, "Reason"),
+        process: data_text(data, "ProcessName"),
+    })
+}
+
+/// One clock change the Security audit recorded, from a 4616 on `Security`. Its reason and process are
+/// not in the fields this reads, so both are `None` whatever the record holds.
+fn audit_clock_change(parsed: &SerializedEvtxRecord<Value>) -> Option<ClockChange> {
+    if !is_triple(&record(parsed), CLOCK_CHANGE_AUDIT) {
+        return None;
+    }
+    let data = event_data(parsed);
+    Some(ClockChange {
+        written: parsed.timestamp,
+        old_time: data_time(data, "PreviousTime"),
+        new_time: data_time(data, "NewTime"),
+        reason: None,
+        process: None,
+    })
+}
+
+/// One refused image, from a 3033 on the Code Integrity Operational channel.
+fn refused_image(parsed: &SerializedEvtxRecord<Value>) -> Option<ImageRefusal> {
+    if !is_triple(&record(parsed), REFUSED_IMAGE) {
+        return None;
+    }
+    Some(ImageRefusal {
+        written: parsed.timestamp,
+        file_name: data_text(event_data(parsed), "FileNameBuffer"),
     })
 }
 
@@ -1565,8 +1839,10 @@ mod system_tests {
         }
     }
 
+    /// A fixed instant to compare against. A text that does not parse becomes the epoch, which none of
+    /// the assertions expect, so a failure to parse still fails the test.
     fn at(text: &str) -> Timestamp {
-        text.parse().expect("a test timestamp")
+        text.parse().unwrap_or(Timestamp::UNIX_EPOCH)
     }
 
     /// (e1) A 7045 is an install with its `ImagePath`, `ServiceType` and time. `ServiceName`,
@@ -1580,8 +1856,11 @@ mod system_tests {
             "StartType": 3,
             "AccountName": "ACCT-SECRET-ALEX"
         });
-        let install = service_install(&rendered("Service Control Manager", "System", 7045, &data))
-            .expect("a 7045 from the Service Control Manager is an install");
+        let Some(install) =
+            service_install(&rendered("Service Control Manager", "System", 7045, &data))
+        else {
+            unreachable!("a 7045 from the Service Control Manager is an install");
+        };
         assert_eq!(
             install.image_path.as_deref(),
             Some("C:\\Windows\\System32\\drivers\\exampledrv.sys")
@@ -1604,13 +1883,14 @@ mod system_tests {
             "Reason": 2,
             "ProcessName": ""
         });
-        let change = kernel_clock_change(&rendered(
+        let Some(change) = kernel_clock_change(&rendered(
             "Microsoft-Windows-Kernel-General",
             "System",
             1,
             &without_process,
-        ))
-        .expect("a Kernel-General 1 is a clock change");
+        )) else {
+            unreachable!("a Kernel-General 1 is a clock change");
+        };
         assert_eq!(change.old_time, Some(at("2026-10-01T10:00:00Z")));
         assert_eq!(change.new_time, Some(at("2026-10-01T10:05:00Z")));
         assert_eq!(change.reason, Some(2));
@@ -1623,13 +1903,14 @@ mod system_tests {
             "Reason": 2,
             "ProcessName": "\\Device\\HarddiskVolume3\\Windows\\System32\\svchost.exe"
         });
-        let change = kernel_clock_change(&rendered(
+        let Some(change) = kernel_clock_change(&rendered(
             "Microsoft-Windows-Kernel-General",
             "System",
             1,
             &with_process,
-        ))
-        .expect("a Kernel-General 1 is a clock change");
+        )) else {
+            unreachable!("a Kernel-General 1 is a clock change");
+        };
         assert_eq!(
             change.process.as_deref(),
             Some("\\Device\\HarddiskVolume3\\Windows\\System32\\svchost.exe")
@@ -1647,13 +1928,14 @@ mod system_tests {
             "SubjectUserName": "ACCT-SECRET-ALEX",
             "ProcessName": "C:\\Users\\alex\\PROC-SECRET.exe"
         });
-        let change = audit_clock_change(&rendered(
+        let Some(change) = audit_clock_change(&rendered(
             "Microsoft-Windows-Security-Auditing",
             "Security",
             4616,
             &data,
-        ))
-        .expect("a 4616 on Security is a clock change");
+        )) else {
+            unreachable!("a 4616 on Security is a clock change");
+        };
         assert_eq!(change.old_time, Some(at("2026-10-01T10:00:00Z")));
         assert_eq!(change.new_time, Some(at("2026-10-01T10:05:00Z")));
         assert_eq!(change.reason, None);
@@ -1672,13 +1954,14 @@ mod system_tests {
             "FileNameBuffer": "\\Device\\HarddiskVolume3\\Temp\\exampleimage.dll",
             "ProcessNameBuffer": "\\Device\\HarddiskVolume3\\PROC-SECRET-BUFFER.exe"
         });
-        let image = refused_image(&rendered(
+        let Some(image) = refused_image(&rendered(
             "Microsoft-Windows-CodeIntegrity",
             "Microsoft-Windows-CodeIntegrity/Operational",
             3033,
             &data,
-        ))
-        .expect("a 3033 is a refused image");
+        )) else {
+            unreachable!("a 3033 is a refused image");
+        };
         assert_eq!(
             image.file_name.as_deref(),
             Some("\\Device\\HarddiskVolume3\\Temp\\exampleimage.dll")
