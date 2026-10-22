@@ -1149,9 +1149,7 @@ mod tests {
             for byte in bytes {
                 write!(hex, "{byte:02x}").unwrap();
             }
-            yaml.push_str(&format!(
-                "    - name: '{name}'\n      content_hex: '{hex}'\n"
-            ));
+            write!(yaml, "    - name: '{name}'\n      content_hex: '{hex}'\n").unwrap();
         }
         FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
     }
@@ -1166,7 +1164,9 @@ mod tests {
         ]);
         let observations = match EventFields.collect(&host) {
             CollectorRun::Measured { observations, .. } => observations,
-            other => panic!("expected a measured run, found {other:?}"),
+            other @ CollectorRun::Unmeasured { .. } => {
+                panic!("expected a measured run, found {other:?}")
+            }
         };
 
         let code_integrity = observations
