@@ -337,6 +337,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(recorded_files::RecordedFiles::default()),
         Box::new(usn::Usn::default()),
         Box::new(windows_start::WindowsStart),
+        Box::new(event_fields::EventFields),
     ]
 }
 

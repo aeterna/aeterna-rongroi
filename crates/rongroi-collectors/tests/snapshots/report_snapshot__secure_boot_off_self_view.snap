@@ -655,6 +655,10 @@ expression: view
       {
         "collector": "windows_start",
         "reason": "read_failed"
+      },
+      {
+        "collector": "event_fields",
+        "reason": "read_failed"
       }
     ]
   },
@@ -662,6 +666,7 @@ expression: view
     "posture",
     "driver_service",
     "windows_start",
+    "event_fields",
     "pci_device",
     "hid_device",
     "autostart",

@@ -395,7 +395,7 @@ expression: view
     "not_found": 4,
     "unmeasured_expected": 21,
     "unmeasured_unexpected": 0,
-    "unmatched": 14
+    "unmatched": 18
   },
   "timeline": {
     "entries": [
@@ -506,6 +506,16 @@ expression: view
       {
         "collector": "windows_start",
         "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "place": "system",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "place": "code_integrity",
+        "reason": "source_absent"
       }
     ]
   },
@@ -513,6 +523,7 @@ expression: view
     "posture",
     "driver_service",
     "windows_start",
+    "event_fields",
     "pci_device",
     "hid_device",
     "autostart",

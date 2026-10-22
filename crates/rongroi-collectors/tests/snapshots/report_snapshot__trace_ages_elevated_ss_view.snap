@@ -353,7 +353,7 @@ expression: view
     "not_found": 13,
     "unmeasured_expected": 22,
     "unmeasured_unexpected": 0,
-    "unmatched": 39
+    "unmatched": 42
   },
   "timeline": {
     "entries": [
@@ -600,6 +600,16 @@ expression: view
         "collector": "usn",
         "place": "citizenfx",
         "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "place": "code_integrity",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "place": "security",
+        "reason": "source_absent"
       }
     ]
   },
@@ -607,6 +617,7 @@ expression: view
     "posture",
     "driver_service",
     "windows_start",
+    "event_fields",
     "pci_device",
     "hid_device",
     "autostart",
