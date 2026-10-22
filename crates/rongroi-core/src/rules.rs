@@ -49,7 +49,7 @@ impl Role {
 /// The collectors whose records carry a program's name and nothing that identifies the program
 /// (ADR 0034). A `role: evidence` file on one of them may not match `name` or `path`; a timeline
 /// selector may (ADR 0051).
-pub const NAME_ONLY_COLLECTORS: [&str; 3] = ["bam", "pca", "prefetch"];
+pub const NAME_ONLY_COLLECTORS: [&str; 4] = ["bam", "pca", "prefetch", "userassist"];
 
 /// The fields [`NAME_ONLY_COLLECTORS`] carry that name a program.
 pub const NAMING_FIELDS: [&str; 2] = ["name", "path"];

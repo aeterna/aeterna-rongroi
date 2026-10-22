@@ -346,6 +346,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - the programs running now and when each started, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
             \x20 - for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, and for Legacy's resource cache, its index folder's own times, how many files it holds and the latest of their times, never a file or folder name; these times can match two reports of this PC\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on, and for a running program or one of these records whose file is below FiveM's program folder, which edition's it was (Legacy or Enhanced), never the path\n\
+            \x20 - the programs this account opened through Windows' shell (UserAssist), and when it last opened each; whether the account that ran the scan is the one signed in at the keyboard\n\
             \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
             \x20 - whether a Prefetch or event log file is marked read-only\n\
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders, FiveM's plugin folders and the folder PowerShell keeps its command history in, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
@@ -370,6 +371,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - โปรแกรมที่กำลังรันอยู่และเวลาที่แต่ละตัวเริ่ม ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
             \x20 - โฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced: จำนวนไฟล์และโฟลเดอร์ย่อย ขนาดรวม และเวลาของไฟล์ที่เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced เวลาที่สร้างกับเวลาที่แก้ไขล่าสุด และจำนวนรายการข้างใน และสำหรับ resource cache ของ Legacy เวลาของโฟลเดอร์ดัชนีเอง จำนวนไฟล์ในนั้น และเวลาล่าสุดของไฟล์เหล่านั้น โดยไม่เก็บชื่อไฟล์หรือชื่อโฟลเดอร์ เวลาเหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่ และสำหรับโปรแกรมที่กำลังรันหรือบันทึกเหล่านี้ที่ไฟล์อยู่ใต้โฟลเดอร์โปรแกรมของ FiveM ว่าเป็นของ edition ไหน (Legacy หรือ Enhanced) โดยไม่แสดง path\n\
+            \x20 - โปรแกรมที่บัญชีนี้เปิดผ่าน shell ของ Windows (UserAssist) และเวลาที่เปิดครั้งล่าสุดของแต่ละโปรแกรม รวมถึงว่าบัญชีที่รันการสแกนเป็นบัญชีเดียวกับที่ลงชื่อเข้าใช้ที่หน้าเครื่องหรือไม่\n\
             \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
@@ -1230,6 +1232,7 @@ mod tests {
         ("prefetch", &["Prefetch"]),
         ("process", &[]),
         ("recorded_files", &["BAM", "hash", "90"]),
+        ("userassist", &["UserAssist"]),
         ("usn", &["change journal"]),
         ("windows_start", &["System", "Fast Startup"]),
     ];
@@ -1297,7 +1300,7 @@ mod tests {
         }
     }
 
-    /// ADR 0080 section 5: a scan that reads UserAssist says so before it starts, in both languages,
+    /// ADR 0080 section 5: a scan that reads `UserAssist` says so before it starts, in both languages,
     /// so a player agrees to the programs their account opened through the shell and to the times
     /// Windows keeps for them.
     #[test]

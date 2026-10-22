@@ -215,6 +215,11 @@ expression: "trace_ages_of(&report, Mode::Ss)"
         "count": 1
       },
       {
+        "collector": "userassist",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
         "collector": "usn",
         "place": "journal",
         "state": "unmeasured",

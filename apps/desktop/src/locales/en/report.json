@@ -105,6 +105,7 @@
     "prefetch": "Windows Prefetch",
     "bam": "Background Activity Moderator (BAM)",
     "pca": "Program Compatibility Assistant",
+    "userassist": "Programs opened through the Windows shell (UserAssist)",
     "pci_device": "PCI devices Windows remembers",
     "hid_device": "Mice, keyboards and other input devices Windows remembers",
     "windows_start": "How Windows started",
@@ -192,6 +193,7 @@
       "prefetch": "{{count}} Prefetch files read",
       "bam": "{{count}} entries",
       "pca": "{{count}} launch records",
+      "userassist": "{{count}} entries",
       "usn": "{{count}} records",
       "fivem_dir": "{{count}} files",
       "enhanced_server_cache": "{{count}} server folders"

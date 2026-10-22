@@ -326,6 +326,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(net_config::NetConfig),
         Box::new(os_image::OsImage),
         Box::new(pca::Pca),
+        Box::new(userassist::UserAssist),
         Box::new(pci_device::PciDevice),
         Box::new(hid_device::HidDevice),
         Box::new(posture::Posture),
@@ -530,7 +531,15 @@ mod tests {
         }
         assert_eq!(
             declared,
-            BTreeSet::from(["bam", "evtx", "fivem_dir", "pca", "prefetch", "usn"])
+            BTreeSet::from([
+                "bam",
+                "evtx",
+                "fivem_dir",
+                "pca",
+                "prefetch",
+                "usn",
+                "userassist"
+            ])
         );
     }
 
