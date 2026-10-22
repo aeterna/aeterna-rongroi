@@ -1139,12 +1139,16 @@ mod tests {
 
     /// A Windows host whose Event Logs folder holds `logs`, each file given its bytes.
     fn host_with_logs(logs: &[(&str, Vec<u8>)]) -> FixtureHost {
+        use std::fmt::Write as _;
         let mut yaml = String::from(
             "platform: windows\nelevated: true\nenv:\n  SystemRoot: 'C:\\Windows'\nfilesystem:\n  \
              'C:\\Windows\\System32\\winevt\\Logs':\n",
         );
         for (name, bytes) in logs {
-            let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+            let mut hex = String::new();
+            for byte in bytes {
+                write!(hex, "{byte:02x}").unwrap();
+            }
             yaml.push_str(&format!(
                 "    - name: '{name}'\n      content_hex: '{hex}'\n"
             ));
