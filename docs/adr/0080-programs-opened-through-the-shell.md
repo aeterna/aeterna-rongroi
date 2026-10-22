@@ -1,6 +1,7 @@
 # ADR 0080 — Programs opened through the shell (UserAssist)
 
-- Status: proposed — five owner questions below; nothing is built
+- Status: accepted — the owner decided the five questions below on 2026-10-22, each as recommended;
+  nothing is built
 - Date: 2026-10-22
 - Related: ADR 0022 (reading registry values), ADR 0034 (Prefetch, BAM and PCA carry no identity), ADR 0038
   (whose `HKCU` a scan reads), ADR 0044 (gaps for one place), ADR 0048 (refused path forms), ADR 0051
@@ -146,6 +147,14 @@ the scan is the one signed in at the keyboard".
    read of one registry key in a full scan. Alternative: later, with P6.
 5. **The run count** ADR 0078 section 7 item 1 asked for. Recommended: **not emitted**, as measured above.
    Alternative: emit it, with the measurement in `PRIVACY.md` and the field's description.
+
+## Owner decisions (2026-10-22, each as recommended)
+
+1. **Tier:** standard.
+2. **Shortcuts GUID:** counted only.
+3. **App identities:** emitted as path-less entries.
+4. **`recorded_files`:** UserAssist is a fourth source, in the same change.
+5. **Run count:** not emitted (amends ADR 0078 section 7 item 1).
 
 ## Alternatives weighed
 

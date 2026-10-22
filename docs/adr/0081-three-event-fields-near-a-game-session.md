@@ -1,6 +1,7 @@
 # ADR 0081 — Three event fields read near a game session
 
-- Status: proposed — four owner questions below; nothing is built
+- Status: accepted — the owner decided the four questions below on 2026-10-22, each as recommended;
+  nothing is built
 - Date: 2026-10-22
 - Related: ADR 0018 (Event Log parsing; the payload is dropped), ADR 0031 (events identified by provider,
   channel and id together), ADR 0044 (gaps for one place), ADR 0048 (`driver_service` path resolution),
@@ -173,6 +174,13 @@ refused, a fingerprint of its path that matches only the same path — never a p
 4. **The 60-second threshold** (section 3, amends ADR 0078 section 5). Recommended: **60 seconds**, a core
    constant changed by a release, like ADR 0078's windows. Alternative: list every change and draw the line
    for each; on the measured PC that is 126 lines, 65 of them under a second.
+
+## Owner decisions (2026-10-22, each as recommended)
+
+1. **Paths as digests:** yes, `path_digest` for 7045 and `volume_path_digest` for 3033.
+2. **Who changed the clock:** the category `windows`, `none` or `other`; no name.
+3. **Tier:** standard.
+4. **Threshold:** 60 seconds, a core constant (amends ADR 0078 section 5).
 
 ## Alternatives weighed
 
