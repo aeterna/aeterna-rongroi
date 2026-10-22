@@ -1145,7 +1145,9 @@ mod tests {
         );
         for (name, bytes) in logs {
             let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
-            yaml.push_str(&format!("    - name: '{name}'\n      content_hex: '{hex}'\n"));
+            yaml.push_str(&format!(
+                "    - name: '{name}'\n      content_hex: '{hex}'\n"
+            ));
         }
         FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
     }
@@ -1171,7 +1173,10 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(code_integrity.len(), 1, "{observations:?}");
         assert_eq!(code_integrity[0].fields["read"], Value::from("read"));
-        assert_eq!(code_integrity[0].fields["unresolved_images"], Value::from(0));
+        assert_eq!(
+            code_integrity[0].fields["unresolved_images"],
+            Value::from(0)
+        );
 
         let security = observations
             .iter()
@@ -1221,7 +1226,9 @@ mod tests {
     fn q3_2_code_integrity_summary_carries_rejected_as_zero_when_none_and_the_count_when_some() {
         let none = code_integrity_observations(&code_integrity_with(Vec::new()));
         assert_eq!(
-            summaries_for(&none, CODE_INTEGRITY)[0].fields.get("rejected"),
+            summaries_for(&none, CODE_INTEGRITY)[0]
+                .fields
+                .get("rejected"),
             Some(&Value::from(0))
         );
 
@@ -1229,7 +1236,9 @@ mod tests {
         code_integrity.rejected = vec![rejected_record(), rejected_record(), rejected_record()];
         let some = code_integrity_observations(&code_integrity);
         assert_eq!(
-            summaries_for(&some, CODE_INTEGRITY)[0].fields.get("rejected"),
+            summaries_for(&some, CODE_INTEGRITY)[0]
+                .fields
+                .get("rejected"),
             Some(&Value::from(3))
         );
     }
