@@ -119,3 +119,10 @@ path = "fuzz_targets/fuzz_pe_version.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fuzz_zone_identifier"
+path = "fuzz_targets/fuzz_zone_identifier.rs"
+test = false
+doc = false
+bench = false

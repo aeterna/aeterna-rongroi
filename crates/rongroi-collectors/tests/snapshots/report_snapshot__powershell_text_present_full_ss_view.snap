@@ -603,6 +603,7 @@ expression: "view::for_mode(&report, Mode::Ss)"
     "prefetch",
     "bam",
     "pca",
+    "recorded_files",
     "usn"
   ],
   "trace_ages": {

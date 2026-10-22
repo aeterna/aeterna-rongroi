@@ -223,7 +223,8 @@ jobs:
                    fuzz/corpus/fuzz_pca_general fuzz/corpus/fuzz_filetime \
                    fuzz/corpus/fuzz_prefetch fuzz/corpus/fuzz_evtx fuzz/corpus/fuzz_usn \
                    fuzz/corpus/fuzz_task fuzz/corpus/fuzz_powershell_text \
-                   fuzz/corpus/fuzz_content_kind fuzz/corpus/fuzz_pe_version
+                   fuzz/corpus/fuzz_content_kind fuzz/corpus/fuzz_pe_version \
+                   fuzz/corpus/fuzz_zone_identifier
           run_target() {
             local target=$1; local corpus=$2; shift 2
             cargo +nightly fuzz run "$target" "$corpus" "$@" -- -max_total_time=30 -timeout=10
@@ -246,6 +247,9 @@ jobs:
             run_target fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx
             run_target fuzz_task fuzz/corpus/fuzz_task fixtures/parsers/task
             run_target fuzz_pe_version fuzz/corpus/fuzz_pe_version fixtures/parsers/bam fixtures/prefetch
+            # zone_identifier has no fixture directory either; a Zone.Identifier stream is short INI text,
+            # so it starts from the repository's text fixtures.
+            run_target fuzz_zone_identifier fuzz/corpus/fuzz_zone_identifier fixtures/parsers/powershell-text fixtures/parsers/task
           ) &
           pid2=$!
 

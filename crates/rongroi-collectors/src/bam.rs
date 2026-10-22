@@ -48,7 +48,7 @@ use rongroi_parsers::bam::{self, BamEntry};
 use rongroi_parsers::error::ParseError;
 
 use crate::failure::{read_failure, reason_for};
-use crate::paths::{UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::paths::{RecordedPath, UNREDACTABLE_FORM, file_name, is_drive_rooted};
 use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition};
 
 /// The key holding one subkey per user account that BAM has recorded anything for.
@@ -290,6 +290,51 @@ impl Collector for Bam {
     }
 }
 
+/// The program paths BAM recorded, and when it last recorded each, for `recorded_files`
+/// (ADR 0079 amendment 7).
+///
+/// This runs the same collection [`Bam::collect`] does and keeps the `path` and `last_run` each
+/// observation carries, so the two collectors cannot disagree about which values are programs, which
+/// paths are emitted or when they ran. A status row that names neither a path nor a withheld path is
+/// an account key whose value names could not be listed: an unknown number of paths is missing, so
+/// the source is a gap for the whole run and the paths that were read are returned beside it. A value
+/// that did not decode still names its program, so a partial run loses no path here.
+pub(crate) fn recorded_paths(
+    host: &dyn Host,
+) -> Result<(Vec<RecordedPath>, Option<UnmeasuredReason>), UnmeasuredReason> {
+    match Bam.collect(host) {
+        CollectorRun::Unmeasured { reason, .. } => Err(reason),
+        CollectorRun::Measured {
+            observations, gaps, ..
+        } => {
+            let lost_names = observations.iter().any(|observation| {
+                observation.fields.contains_key("read")
+                    && !observation.fields.contains_key("path")
+                    && !observation.fields.contains_key("path_withheld")
+            });
+            let paths = observations
+                .iter()
+                .filter_map(|observation| {
+                    let path = observation.fields.get("path")?.as_str()?.to_owned();
+                    let at = observation
+                        .fields
+                        .get("last_run")
+                        .and_then(serde_json::Value::as_str)
+                        .and_then(|text| text.parse().ok());
+                    Some(RecordedPath { path, at })
+                })
+                .collect();
+            let gap = lost_names.then(|| {
+                gaps.values()
+                    .next()
+                    .copied()
+                    .unwrap_or(UnmeasuredReason::ReadFailed)
+            });
+            Ok((paths, gap))
+        }
+    }
+}
+
 /// Whether `name` is one of an account key's own two values ([`ACCOUNT_METADATA`]).
 ///
 /// `Some(true)` when the name is one of the two and the value reads as a number; `None` when the name
@@ -365,22 +410,15 @@ pub fn is_ephemeral_candidate(host: &dyn Host, path: &str) -> bool {
 }
 
 /// Whether the target executable no longer exists on disk (ADR 0034).
+///
+/// Only a host answer is a claim: `Ok(Some)` is still there, `Ok(None)` is gone, and an `Err` means
+/// this program was not told, so the observation carries no `disappeared_from_disk` field at all
+/// (ADR 0079 amendment 7).
 fn target_disappeared_from_disk(host: &dyn Host, path: &str) -> bool {
     if !is_ephemeral_candidate(host, path) {
         return false;
     }
-    if is_drive_rooted(path) {
-        match host.times(path) {
-            Ok(Some(_)) => false,
-            Ok(None) => true,
-            Err(_) => !std::path::Path::new(path).exists(),
-        }
-    } else {
-        match host.times(path) {
-            Ok(None) => true,
-            Ok(Some(_)) | Err(_) => false,
-        }
-    }
+    matches!(host.times(path), Ok(None))
 }
 
 /// One program BAM recorded, from one registry value that decoded.

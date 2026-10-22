@@ -13,8 +13,8 @@ mod saved;
 mod session;
 
 pub use game::{
-    GameCandidate, GameSession, GameWindows, NearSessions, NotKnownReason, TimeFact,
-    WINDOW_SECONDS, WindowCounts, game_windows,
+    GameCandidate, GameSession, GameWindows, IdentityFact, IdentityNotKnownReason, NearSessions,
+    NotKnownReason, TimeFact, WINDOW_SECONDS, WindowCounts, game_windows,
 };
 pub use saved::{
     CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,
@@ -35,7 +35,7 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 17] = [
+pub const COLLECTOR_ORDER: [&str; 18] = [
     "posture",
     "driver_service",
     "windows_start",
@@ -52,6 +52,7 @@ pub const COLLECTOR_ORDER: [&str; 17] = [
     "prefetch",
     "bam",
     "pca",
+    "recorded_files",
     "usn",
 ];
 
@@ -4905,6 +4906,621 @@ mod tests {
             game_candidate(&view, "during.exe").t4,
             TimeFact::NotKnown {
                 reason: NotKnownReason::ScanTimeNotRecorded,
+            }
+        );
+    }
+
+    // ---- ADR 0078 section 5 and ADR 0079: a candidate's file identity ----
+    //
+    // A candidate with a program path joins the `recorded_files` observation of that path, ignoring
+    // ASCII case. The observation's `identity_read` and `signature` become I1 and I2. Each identity
+    // fact is `IdentityFact::{True, False, NotKnown { reason }}`, and I3 and I4 wait for F2 while I5
+    // waits for its own ADR (ADR 0079 section 5), so all three are deferred for now.
+
+    /// One `recorded_files` observation as that collector emits it (ADR 0079 amendment 7): the path,
+    /// its file name, what happened to the read, and any identity fields the read produced.
+    fn recorded_file(
+        path: &str,
+        identity_read: Option<&str>,
+        extra: &[(&str, serde_json::Value)],
+    ) -> Observation {
+        let name = path.rsplit(['\\', '/']).next().unwrap_or(path);
+        let mut fields = BTreeMap::from([
+            ("path".to_owned(), serde_json::Value::from(path)),
+            ("name".to_owned(), serde_json::Value::from(name)),
+        ]);
+        if let Some(identity_read) = identity_read {
+            fields.insert(
+                "identity_read".to_owned(),
+                serde_json::Value::from(identity_read),
+            );
+        }
+        for (field, value) in extra {
+            fields.insert((*field).to_owned(), value.clone());
+        }
+        Observation {
+            collector: "recorded_files".to_owned(),
+            fields,
+        }
+    }
+
+    /// f1: a candidate joins the `recorded_files` observation of its path ignoring ASCII case.
+    /// `missing` makes I1 true and leaves I2 not known because the file was not read; a `read` one
+    /// makes I1 false. With the collector run but no observation for the path, I1 is not known for
+    /// that reason.
+    #[test]
+    fn f1_a_candidate_joins_its_recorded_file_and_i1_follows_identity_read() {
+        const PATH: &str = r"C:\Tools\X.EXE";
+
+        let mut missing = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        missing.push(recorded(
+            "bam",
+            "x.exe",
+            Some(PATH),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        missing.push(recorded_file(r"c:\tools\x.exe", Some("missing"), &[]));
+        let view = game_windows(&game_report(missing), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.i1, IdentityFact::True);
+        assert_eq!(
+            candidate.i2,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+
+        let mut read = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        read.push(recorded(
+            "bam",
+            "x.exe",
+            Some(PATH),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        read.push(recorded_file(
+            r"c:\tools\x.exe",
+            Some("read"),
+            &[("signature", serde_json::json!("valid"))],
+        ));
+        let view = game_windows(&game_report(read), Mode::SelfCheck);
+        assert_eq!(game_candidate(&view, "x.exe").i1, IdentityFact::False);
+
+        let mut absent = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        absent.push(recorded(
+            "bam",
+            "x.exe",
+            Some(PATH),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        absent.push(recorded_file(
+            r"C:\Other\y.exe",
+            Some("read"),
+            &[("signature", serde_json::json!("valid"))],
+        ));
+        let view = game_windows(&game_report(absent), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "x.exe").i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoObservationForPath,
+            }
+        );
+    }
+
+    /// f2: I2 is true for an invalid or absent signature and false for a valid one; a signature that
+    /// could not be checked offline is not known, for its own reason.
+    #[test]
+    fn f2_i2_follows_the_signature_that_was_read() {
+        for (signature, expected) in [
+            ("invalid", IdentityFact::True),
+            ("no_embedded_signature", IdentityFact::True),
+            ("valid", IdentityFact::False),
+            (
+                "unverifiable_offline",
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Unverifiable,
+                },
+            ),
+        ] {
+            let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+            observations.push(recorded(
+                "bam",
+                "signed.exe",
+                Some(r"C:\Tools\signed.exe"),
+                "last_run",
+                "2026-01-10T09:50:00Z",
+            ));
+            observations.push(recorded_file(
+                r"C:\Tools\signed.exe",
+                Some("read"),
+                &[("signature", serde_json::json!(signature))],
+            ));
+            let view = game_windows(&game_report(observations), Mode::SelfCheck);
+            let candidate = game_candidate(&view, "signed.exe");
+            assert_eq!(candidate.i1, IdentityFact::False, "{signature}");
+            assert_eq!(candidate.i2, expected, "{signature}");
+        }
+    }
+
+    /// f3: a standard scan does not run `recorded_files`, so I1 and I2 are not known for that
+    /// reason; I3 and I4 wait for F2 and I5 for its own ADR, so those three are deferred.
+    #[test]
+    fn f3_a_standard_scan_leaves_every_identity_fact_not_known_with_its_reason() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        for fact in [&candidate.i1, &candidate.i2] {
+            assert_eq!(
+                *fact,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::RecordedFilesNotRun,
+                }
+            );
+        }
+        for fact in [&candidate.i3, &candidate.i4, &candidate.i5] {
+            assert_eq!(
+                *fact,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                }
+            );
+        }
+    }
+
+    /// f4: an `identity_read` other than `read` or `missing` says the file was not read, so I1 is
+    /// not known rather than false. The path here is one the collector's budget reached too late.
+    #[test]
+    fn f4_a_budget_spent_path_leaves_i1_not_known() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "late.exe",
+            Some(r"C:\Tools\late.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(
+            r"C:\Tools\late.exe",
+            Some("budget_spent"),
+            &[],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "late.exe").i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+    }
+
+    /// f5: the order counts R (near at least two sessions) and I1 to I4 true before the true T
+    /// facts. A candidate whose file is gone has one identity fact and comes before a Prefetch-only
+    /// candidate with three true T facts; the Prefetch record has no program path, so its identity
+    /// facts are not known for that reason.
+    #[test]
+    fn f5_identity_facts_outrank_time_facts_in_the_order() {
+        let mut observations = legacy_sessions(&[GAME_START_3, GAME_START_2], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "gone.exe",
+            Some(r"C:\Tools\gone.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(r"C:\Tools\gone.exe", Some("missing"), &[]));
+        observations.push(prefetch_runs(
+            "time-only.exe",
+            None,
+            &[
+                "2026-01-10T11:30:00Z",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T10:15:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+
+        let gone = game_candidate(&view, "gone.exe");
+        assert_eq!(gone.i1, IdentityFact::True);
+        assert_eq!(
+            gone.i2,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+        assert_eq!(gone.near_sessions, NearSessions { near: 1, found: 2 });
+        for fact in [&gone.i3, &gone.i4, &gone.i5] {
+            assert_eq!(
+                *fact,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                }
+            );
+        }
+
+        let time_only = game_candidate(&view, "time-only.exe");
+        assert_eq!(
+            time_only.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoPath,
+            }
+        );
+
+        let order: Vec<&str> = view
+            .candidates
+            .iter()
+            .map(|candidate| candidate.name.as_str())
+            .collect();
+        assert_eq!(order, ["gone.exe", "time-only.exe"]);
+    }
+
+    // ---- ADR 0078 section 5 and ADR 0079: I3, I4 and the SS list ----
+
+    /// One BAM record and the `recorded_files` observation of the same path, read, carrying
+    /// `extra`'s identity fields (ADR 0079 amendment 7).
+    fn identified_candidate(
+        name: &str,
+        path: &str,
+        extra: &[(&'static str, serde_json::Value)],
+    ) -> Vec<Observation> {
+        vec![
+            recorded("bam", name, Some(path), "last_run", "2026-01-10T09:50:00Z"),
+            recorded_file(path, Some("read"), extra),
+        ]
+    }
+
+    /// The identity fields a `read` leaves for I3 and I4: the content kind, the version resource's
+    /// name, a valid signature, and where the file lives.
+    fn identity_fields(
+        content_kind: &str,
+        original_filename: Option<&str>,
+        on_system_drive: bool,
+        under_system_root: bool,
+    ) -> Vec<(&'static str, serde_json::Value)> {
+        let mut fields = vec![
+            ("content_kind", serde_json::json!(content_kind)),
+            ("signature", serde_json::json!("valid")),
+            ("on_system_drive", serde_json::json!(on_system_drive)),
+            ("under_system_root", serde_json::json!(under_system_root)),
+        ];
+        if let Some(original_filename) = original_filename {
+            fields.push(("original_filename", serde_json::json!(original_filename)));
+        }
+        fields
+    }
+
+    /// f6: I3 is true when a recorded name contradicts what ran or what the file is. A Prefetch-only
+    /// `banner.png` was recorded running with an extension that is not an executable's; `x.png.exe`
+    /// has a double extension; a bidi control in the name hides its extension; `svchost.exe` outside
+    /// `%SystemRoot%` is a Windows file name where Windows does not keep it. `tool.exe` whose
+    /// `OriginalFilename` is `TOOL.EXE` only differs in ASCII case, so it is false.
+    #[test]
+    fn f6_i3_is_true_when_the_name_contradicts_what_ran_or_what_the_file_is() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("banner.png", None, &["2026-01-10T09:50:00Z"]));
+        observations.extend(identified_candidate(
+            "tool.exe",
+            r"C:\Tools\tool.exe",
+            &identity_fields("pe_executable", Some("TOOL.EXE"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "x.png.exe",
+            r"C:\Tools\x.png.exe",
+            &identity_fields("pe_executable", Some("x.png.exe"), true, false),
+        ));
+        let bidi_name = "a\u{202E}gnp.exe";
+        let bidi_path = "C:\\Tools\\a\u{202E}gnp.exe";
+        observations.extend(identified_candidate(
+            bidi_name,
+            bidi_path,
+            &identity_fields("pe_executable", Some(bidi_name), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "svchost.exe",
+            r"C:\Tools\svchost.exe",
+            &identity_fields("pe_executable", Some("svchost.exe"), true, false),
+        ));
+
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let banner = game_candidate(&view, "banner.png");
+        assert!(banner.path.is_none(), "Prefetch emits no program path");
+        assert_eq!(
+            banner.i3,
+            IdentityFact::True,
+            "a non-executable name recorded running"
+        );
+        assert_eq!(
+            game_candidate(&view, "tool.exe").i3,
+            IdentityFact::False,
+            "OriginalFilename differing only in ASCII case"
+        );
+        assert_eq!(
+            game_candidate(&view, "x.png.exe").i3,
+            IdentityFact::True,
+            "a double extension ending in an executable one"
+        );
+        assert_eq!(
+            game_candidate(&view, bidi_name).i3,
+            IdentityFact::True,
+            "a bidi control in the name"
+        );
+        assert_eq!(
+            game_candidate(&view, "svchost.exe").i3,
+            IdentityFact::True,
+            "a Windows file name outside %SystemRoot%"
+        );
+    }
+
+    /// f7: I4 is true under Temp or Downloads; anywhere else is not known yet, because another drive
+    /// and other writable folders arrive with later work (ADR 0078 section 5).
+    #[test]
+    fn f7_i4_is_true_under_temp_or_downloads_and_not_known_otherwise() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "temp.exe",
+            r"C:\Users\fixtureuser\AppData\Local\Temp\temp.exe",
+            &identity_fields("pe_executable", Some("temp.exe"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "portable.exe",
+            r"D:\Tools\portable.exe",
+            &identity_fields("pe_executable", Some("portable.exe"), false, false),
+        ));
+        observations.extend(identified_candidate(
+            "installed.exe",
+            r"C:\Program Files\Tool\installed.exe",
+            &identity_fields("pe_executable", Some("installed.exe"), true, false),
+        ));
+
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "temp.exe").i4,
+            IdentityFact::True,
+            "a path under \\AppData\\Local\\Temp\\"
+        );
+        for name in ["portable.exe", "installed.exe"] {
+            assert_eq!(
+                game_candidate(&view, name).i4,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                },
+                "{name}"
+            );
+        }
+    }
+
+    /// f8: SS mode lists a candidate with a true identity fact, its path redacted as rows are, and
+    /// counts a candidate with none; Self mode lists both. The listed candidate is on the Desktop, so
+    /// I4 is not known yet and its I3 alone puts it in the SS list.
+    #[test]
+    fn f8_ss_lists_only_candidates_with_an_identity_fact_and_redacts_their_paths() {
+        const RAW: &str = r"C:\Users\fixtureuser\Desktop\x.png.exe";
+        const REDACTED: &str = r"%USERPROFILE%\Desktop\x.png.exe";
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "x.png.exe",
+            RAW,
+            &identity_fields("pe_executable", Some("x.png.exe"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "plain.exe",
+            r"C:\Tools\plain.exe",
+            &identity_fields("pe_executable", Some("plain.exe"), true, false),
+        ));
+        let report = game_report(observations);
+
+        let own = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(own.candidates.len(), 2);
+        assert!(
+            own.candidates
+                .iter()
+                .any(|candidate| candidate.path.as_deref() == Some(RAW)),
+            "Self mode shows the unredacted path: {:?}",
+            own.candidates
+        );
+
+        let ss = game_windows(&report, Mode::Ss);
+        assert_eq!(ss.candidates.len(), 1, "{:?}", ss.candidates);
+        let listed = &ss.candidates[0];
+        assert_eq!(listed.name, "x.png.exe");
+        assert_eq!(listed.path.as_deref(), Some(REDACTED));
+        assert_eq!(listed.i3, IdentityFact::True);
+        assert_eq!(
+            listed.i4,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::Deferred,
+            },
+            "the Desktop is not I4"
+        );
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("plain.exe")),
+            "{:?}",
+            ss.candidates
+        );
+        assert_eq!(ss.counts, own.counts);
+        assert_eq!(ss.counts.before, 2, "the plain candidate is counted");
+    }
+
+    /// f9: a missing file leaves I2 not known because it was not read; a file too large to read still
+    /// makes I1 false and reads I2 from its signature field, and an absent field is not known.
+    #[test]
+    fn f9_i2_follows_what_the_read_established_and_missing_is_not_read() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "gone.exe",
+            Some(r"C:\Tools\gone.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(r"C:\Tools\gone.exe", Some("missing"), &[]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let gone = game_candidate(&view, "gone.exe");
+        assert_eq!(gone.i1, IdentityFact::True);
+        assert_eq!(
+            gone.i2,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+
+        for (signature, expected) in [
+            (Some("invalid"), IdentityFact::True),
+            (Some("valid"), IdentityFact::False),
+            (
+                None,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::NotRead,
+                },
+            ),
+        ] {
+            let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+            observations.push(recorded(
+                "bam",
+                "large.exe",
+                Some(r"C:\Tools\large.exe"),
+                "last_run",
+                "2026-01-10T09:50:00Z",
+            ));
+            let extra: Vec<(&str, serde_json::Value)> = signature
+                .map(|signature| ("signature", serde_json::json!(signature)))
+                .into_iter()
+                .collect();
+            observations.push(recorded_file(
+                r"C:\Tools\large.exe",
+                Some("too_large"),
+                &extra,
+            ));
+            let view = game_windows(&game_report(observations), Mode::SelfCheck);
+            let large = game_candidate(&view, "large.exe");
+            assert_eq!(large.i1, IdentityFact::False, "{signature:?}");
+            assert_eq!(large.i2, expected, "{signature:?}");
+        }
+    }
+
+    /// f10: I3's double extension needs a document, media or archive extension before the program's;
+    /// a dotted stem such as `Battle.net.exe` or `vc_redist.x64.exe` is not one.
+    #[test]
+    fn f10_i3_double_extension_is_only_a_mask_extension_before_a_program_one() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for (name, path) in [
+            ("Battle.net.exe", r"C:\Tools\Battle.net.exe"),
+            (
+                "vc_redist.x64.exe",
+                r"C:\Program Files\Tool\vc_redist.x64.exe",
+            ),
+            ("photo.png.exe", r"C:\Tools\photo.png.exe"),
+            ("invoice.pdf.scr", r"C:\Tools\invoice.pdf.scr"),
+        ] {
+            observations.extend(identified_candidate(
+                name,
+                path,
+                &identity_fields("pe_executable", Some(name), true, false),
+            ));
+        }
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        for name in ["Battle.net.exe", "vc_redist.x64.exe"] {
+            assert_eq!(
+                game_candidate(&view, name).i3,
+                IdentityFact::False,
+                "{name}"
+            );
+        }
+        for name in ["photo.png.exe", "invoice.pdf.scr"] {
+            assert_eq!(game_candidate(&view, name).i3, IdentityFact::True, "{name}");
+        }
+    }
+
+    /// f11: a recorded name with no extension is not by itself an I3 contradiction — a packaged-app
+    /// name has none — while a name whose extension is not a program's still is.
+    #[test]
+    fn f11_i3_does_not_treat_a_name_without_an_extension_as_a_contradiction() {
+        const PACKAGED: &str = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
+        const PACKAGED_NO_BANG: &str = "Microsoft.WindowsCalculator_8wekyb3d8bbwe";
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for name in [PACKAGED, PACKAGED_NO_BANG, "cheat.png"] {
+            observations.push(prefetch_runs(name, None, &["2026-01-10T09:50:00Z"]));
+        }
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        for name in [PACKAGED, PACKAGED_NO_BANG] {
+            assert_eq!(
+                game_candidate(&view, name).i3,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                },
+                "{name}"
+            );
+        }
+        assert_eq!(
+            game_candidate(&view, "cheat.png").i3,
+            IdentityFact::True,
+            "a non-program extension recorded running"
+        );
+    }
+
+    /// f12: I4 is known true only under Temp or Downloads; another drive and Program Files are not
+    /// known yet, and a candidate with no path has nothing to judge.
+    #[test]
+    fn f12_i4_is_known_only_under_temp_or_downloads() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for (name, path, on_system_drive) in [
+            (
+                "temp.exe",
+                r"C:\Users\fixtureuser\AppData\Local\Temp\temp.exe",
+                true,
+            ),
+            (
+                "downloaded.exe",
+                r"C:\Users\fixtureuser\Downloads\downloaded.exe",
+                true,
+            ),
+            ("portable.exe", r"D:\Tools\portable.exe", false),
+            (
+                "installed.exe",
+                r"C:\Program Files\Tool\installed.exe",
+                true,
+            ),
+        ] {
+            observations.extend(identified_candidate(
+                name,
+                path,
+                &identity_fields("pe_executable", Some(name), on_system_drive, false),
+            ));
+        }
+        observations.push(recorded(
+            "bam",
+            "no-path.exe",
+            None,
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        for name in ["temp.exe", "downloaded.exe"] {
+            assert_eq!(game_candidate(&view, name).i4, IdentityFact::True, "{name}");
+        }
+        for name in ["portable.exe", "installed.exe"] {
+            assert_eq!(
+                game_candidate(&view, name).i4,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                },
+                "{name}"
+            );
+        }
+        assert_eq!(
+            game_candidate(&view, "no-path.exe").i4,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoPath,
             }
         );
     }

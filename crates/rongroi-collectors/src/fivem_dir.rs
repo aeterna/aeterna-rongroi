@@ -827,7 +827,7 @@ fn file_observations(
 ///
 /// The file is still reported with its path. `gaps` describes the whole run, so a single unreadable
 /// file must not land there, and a fabricated hash is never an option.
-fn file_sha256(host: &dyn Host, path: &str) -> Option<String> {
+pub(crate) fn file_sha256(host: &dyn Host, path: &str) -> Option<String> {
     lowercase_digest(&host.file_sha256(path).ok()?)
 }
 
@@ -837,7 +837,10 @@ fn file_sha256(host: &dyn Host, path: &str) -> Option<String> {
 /// could not be read carries no `sha256`. A signer is reported only beside a certificate hash of the
 /// shape `allow` compares; a live host that returned anything else reported a signature this program
 /// cannot identify, which is not `valid`.
-fn insert_signature(fields: &mut BTreeMap<String, serde_json::Value>, signature: SignatureCheck) {
+pub(crate) fn insert_signature(
+    fields: &mut BTreeMap<String, serde_json::Value>,
+    signature: SignatureCheck,
+) {
     let state = match signature {
         SignatureCheck::Valid {
             signer,

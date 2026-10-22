@@ -32,7 +32,7 @@ cargo +nightly fuzz run fuzz_bam fuzz/corpus/fuzz_bam fixtures/parsers/bam -- -m
 ```
 
 The targets are `fuzz_bam`, `fuzz_pca_app_launch`, `fuzz_pca_general`, `fuzz_filetime`, `fuzz_prefetch`
-(which seeds from `fixtures/prefetch/` and `fixtures/parsers/prefetch/`), `fuzz_evtx` (from `fixtures/evtx/`), `fuzz_usn` (from `fixtures/parsers/usn/`), `fuzz_task`, `fuzz_powershell_text`, and `fuzz_content_kind` and `fuzz_pe_version`, which have no fixture directory of their own and seed from the others (ADR 0078). The seed corpus is the fixture directory the L0 tests read, and it
+(which seeds from `fixtures/prefetch/` and `fixtures/parsers/prefetch/`), `fuzz_evtx` (from `fixtures/evtx/`), `fuzz_usn` (from `fixtures/parsers/usn/`), `fuzz_task`, `fuzz_powershell_text`, and `fuzz_content_kind`, `fuzz_pe_version` and `fuzz_zone_identifier`, which have no fixture directory of their own and seed from the others (ADR 0078, ADR 0079). The seed corpus is the fixture directory the L0 tests read, and it
 comes **second** because libFuzzer writes what it finds to the first directory — the fixtures are an input,
 never an output. A crashing input is saved under
 `fuzz/artifacts/`; reproduce it with `cargo +nightly fuzz run <target> <that file>`.

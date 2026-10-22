@@ -386,13 +386,17 @@ struct FixtureQword {
     qword: u64,
 }
 
-/// The bytes of one `REG_BINARY` value. Neither `content:` nor `from:` describes a value that is
-/// there and whose bytes cannot be read, as a file entry with neither does (ADR 0019).
+/// The bytes of one `REG_BINARY` value. `content:`, `content_hex:` and `from:` are three ways of
+/// writing the same thing; a value with none of them describes one that is there and whose bytes
+/// cannot be read, as a file entry with none does (ADR 0019). `content_hex:` is how a fixture writes
+/// bytes YAML cannot hold, such as a `FILETIME`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureBinary {
     #[serde(default)]
     content: Option<String>,
+    #[serde(default)]
+    content_hex: Option<String>,
     #[serde(default)]
     from: Option<String>,
 }
@@ -427,9 +431,12 @@ struct StoredKey {
 /// absent `sha256` describes a file whose hash cannot be read, which a collector must report by
 /// omitting the field.
 ///
-/// Its bytes are written one of two ways, and never both: `content:` holds them inline as text, and
-/// `from:` names a file under `fixtures/`, relative to the directory holding this `host.yaml`. An
-/// entry with neither describes a file that is listed and whose bytes cannot be read (ADR 0019).
+/// Its bytes are written one of three ways, and never two: `content:` holds them inline as text,
+/// `content_hex:` holds them inline as hex text, and `from:` names a file under `fixtures/`, relative
+/// to the directory holding this `host.yaml`. An entry with none describes a file that is listed and
+/// whose bytes cannot be read (ADR 0019).
+///
+/// `zone_identifier:` holds the file's `Zone.Identifier` stream inline as text (ADR 0079 section 1).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FixtureFile {
@@ -443,7 +450,11 @@ struct FixtureFile {
     #[serde(default)]
     content: Option<String>,
     #[serde(default)]
+    content_hex: Option<String>,
+    #[serde(default)]
     from: Option<String>,
+    #[serde(default)]
+    zone_identifier: Option<String>,
     #[serde(default)]
     read_only: Option<bool>,
     /// What the listing reports as the entry's size (ADR 0050). A directory has none.
@@ -542,6 +553,8 @@ struct FixtureEntry {
     directory: bool,
     /// The file's bytes. `None` describes a file that exists and cannot be read.
     content: Option<Vec<u8>>,
+    /// The file's `Zone.Identifier` stream, when the fixture wrote one (ADR 0079 section 1).
+    zone_identifier: Option<Vec<u8>>,
     /// Whether the file carries the read-only attribute. `None` describes a fixture that never said,
     /// which is not the same as saying it does not (ADR 0037).
     read_only: Option<bool>,
@@ -569,25 +582,63 @@ fn split_parent(path: &str) -> (&str, &str) {
         .map_or(("", path), |index| (&path[..index], &path[index + 1..]))
 }
 
+/// Decodes hex text into the bytes it spells. `what` names the entry in an error message.
+fn decode_hex(hex: &str, what: &str, origin: &str) -> Result<Vec<u8>, FixtureError> {
+    let fail = |message: String| FixtureError::Parse {
+        path: origin.to_owned(),
+        message,
+    };
+    if !hex.len().is_multiple_of(2) {
+        return Err(fail(format!(
+            "{what} has `content_hex:` with an odd number of digits"
+        )));
+    }
+    let mut bytes = Vec::with_capacity(hex.len() / 2);
+    for pair in hex.as_bytes().as_chunks::<2>().0 {
+        let digits = std::str::from_utf8(pair)
+            .ok()
+            .filter(|digits| digits.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .ok_or_else(|| {
+                fail(format!(
+                    "{what} has `content_hex:` with a character that is not a hex digit"
+                ))
+            })?;
+        let byte = u8::from_str_radix(digits, 16)
+            .map_err(|_| fail(format!("{what} has `content_hex:` that is not hex")))?;
+        bytes.push(byte);
+    }
+    Ok(bytes)
+}
+
 /// Reads the bytes a fixture described, resolving a `from:` now rather than later.
 ///
-/// `content:` and `from:` are two ways of writing the same thing, so an entry that uses both is
-/// rejected instead of one of them being picked: a fixture that says two things about one entry is a
-/// fixture whose reader has to guess. `what` names the entry in an error message.
+/// `content:`, `content_hex:` and `from:` are three ways of writing the same thing, so an entry that
+/// uses more than one is rejected instead of one of them being picked: a fixture that says two things
+/// about one entry is a fixture whose reader has to guess. `what` names the entry in an error message.
 fn resolve_content(
     content: Option<String>,
+    content_hex: Option<String>,
     from: Option<String>,
     what: &str,
     origin: &str,
     base: Option<&Path>,
 ) -> Result<Option<Vec<u8>>, FixtureError> {
-    match (content, from) {
-        (Some(_), Some(_)) => Err(FixtureError::Parse {
+    let written = usize::from(content.is_some())
+        + usize::from(content_hex.is_some())
+        + usize::from(from.is_some());
+    if written > 1 {
+        return Err(FixtureError::Parse {
             path: origin.to_owned(),
-            message: format!("{what} uses both `content:` and `from:`; it must use one"),
-        }),
-        (Some(inline), None) => Ok(Some(inline.into_bytes())),
-        (None, Some(relative)) => {
+            message: format!(
+                "{what} uses more than one of `content:`, `content_hex:` and `from:`; it must use one"
+            ),
+        });
+    }
+    match (content, content_hex, from) {
+        // Only one of the three can be present here; the count above refused the rest.
+        (Some(inline), _, _) => Ok(Some(inline.into_bytes())),
+        (None, Some(hex), _) => Ok(Some(decode_hex(&hex, what, origin)?)),
+        (None, None, Some(relative)) => {
             let Some(base) = base else {
                 return Err(FixtureError::Parse {
                     path: origin.to_owned(),
@@ -605,7 +656,7 @@ fn resolve_content(
                 }
             })?))
         }
-        (None, None) => Ok(None),
+        (None, None, None) => Ok(None),
     }
 }
 
@@ -617,11 +668,13 @@ fn resolve_file(
 ) -> Result<FixtureEntry, FixtureError> {
     let content = resolve_content(
         described.content,
+        described.content_hex,
         described.from,
         &format!("file `{}`", described.name),
         origin,
         base,
     )?;
+    let zone_identifier = described.zone_identifier.map(String::into_bytes);
     let signature = described
         .signature
         .map(|signature| resolve_signature(signature, &described.name, origin))
@@ -643,6 +696,7 @@ fn resolve_file(
         signature,
         directory: described.directory,
         content,
+        zone_identifier,
         read_only: described.read_only,
         size: described.size,
         created,
@@ -712,6 +766,7 @@ fn resolve_value(
         RegistryValue::Qword(qword) => StoredData::Qword(qword.qword),
         RegistryValue::Binary(binary) => StoredData::Binary(resolve_content(
             binary.content,
+            binary.content_hex,
             binary.from,
             &format!("registry value `{name}`"),
             origin,
@@ -1407,9 +1462,9 @@ impl FilesystemSource for FixtureHost {
     /// The bytes the fixture wrote for that file, through the same limit a live host applies.
     ///
     /// A file the fixture never listed does not exist, which is `Ok(None)`. A file it listed without
-    /// `content:` or `from:` exists and cannot be read, which is the per-file failure `sha256` already
-    /// models the same way — not `Unsupported`, which is reserved for a whole block the fixture never
-    /// described.
+    /// `content:`, `content_hex:` or `from:` exists and cannot be read, which is the per-file failure
+    /// `sha256` already models the same way — not `Unsupported`, which is reserved for a whole block
+    /// the fixture never described.
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         self.windows_filesystem()?;
         let normalised = normalise_path(path);
@@ -1432,6 +1487,31 @@ impl FilesystemSource for FixtureHost {
             .as_ref()
             .ok_or_else(|| SourceError::Failed(format!("no content recorded for {path}")))?;
         crate::read_bounded(content.as_slice(), crate::MAX_FILE_BYTES).map(Some)
+    }
+
+    /// The stream the fixture wrote under `zone_identifier:` for that file (ADR 0079 section 1).
+    ///
+    /// The refusal runs before the fixture is looked up, so a refused form is `Failed` even when it
+    /// would normalise to a file that carries a stream (ADR 0048). A file the fixture never listed,
+    /// or one that wrote no stream, is `Ok(None)`: a missing file and a missing stream are the same
+    /// answer. A stream over the limit is refused as the live host refuses it.
+    fn zone_identifier(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        crate::zone_identifier_path(path)?;
+        self.windows_filesystem()?;
+        let normalised = normalise_path(path);
+        let (dir, name) = split_parent(&normalised);
+        if self.is_denied(&normalised) || self.is_denied(dir) {
+            return Err(SourceError::AccessDenied);
+        }
+        let Some(stream) = self.filesystem.get(dir).and_then(|files| {
+            files
+                .iter()
+                .find(|file| file.name.eq_ignore_ascii_case(name))
+                .and_then(|file| file.zone_identifier.as_ref())
+        }) else {
+            return Ok(None);
+        };
+        crate::read_bounded(stream.as_slice(), crate::MAX_STREAM_BYTES).map(Some)
     }
 
     /// What the fixture wrote under `read_only:` for that file, behind the same access checks
@@ -2271,6 +2351,81 @@ processes:
             host.read_file(r"C:\Users\fixtureuser\AppData\Local\Example\cache"),
             Err(SourceError::Failed(_))
         ));
+    }
+
+    /// The stream is a property of one file: what the fixture wrote, absent for a file that wrote
+    /// none, and absent for a file the fixture never listed (ADR 0079 section 1).
+    #[test]
+    fn the_zone_identifier_stream_is_the_one_the_fixture_wrote() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: downloaded.exe\n      content: x\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\n\"\n    - name: local.exe\n      content: x\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.zone_identifier(r"C:\p\downloaded.exe"),
+            Ok(Some(b"[ZoneTransfer]\r\nZoneId=3\r\n".to_vec()))
+        );
+        assert_eq!(host.zone_identifier(r"C:\p\local.exe"), Ok(None));
+        assert_eq!(host.zone_identifier(r"C:\p\absent.exe"), Ok(None));
+    }
+
+    /// The refusal runs before the suffix is joined and before the fixture is looked up: a refused
+    /// form is `Failed` even when normalising it would reach a file that carries a stream (ADR 0048).
+    #[test]
+    fn a_refused_path_fails_before_its_stream_is_looked_up() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: downloaded.exe\n      content: x\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\n\"\n",
+            "inline",
+        )
+        .unwrap();
+        assert!(matches!(
+            host.zone_identifier(r"C:\p\..\p\downloaded.exe"),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// Exactly the limit is read whole and one byte more is refused whole, never truncated; a host
+    /// on another platform has no streams to read (ADR 0079 section 1).
+    #[test]
+    fn a_stream_over_the_limit_is_too_large_and_another_platform_is_unsupported() {
+        let limit = crate::MAX_STREAM_BYTES;
+        assert_eq!(limit, 64 * 1024);
+        let at_limit = "a".repeat(limit);
+        let over_limit = "a".repeat(limit + 1);
+        let host = FixtureHost::from_yaml_str(
+            &format!(
+                "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: at-limit.bin\n      zone_identifier: \"{at_limit}\"\n    - name: over-limit.bin\n      zone_identifier: \"{over_limit}\"\n"
+            ),
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.zone_identifier(r"C:\p\at-limit.bin"),
+            Ok(Some(at_limit.into_bytes()))
+        );
+        assert_eq!(
+            host.zone_identifier(r"C:\p\over-limit.bin"),
+            Err(SourceError::TooLarge { limit })
+        );
+        assert!(matches!(
+            crate::NonWindowsHost.zone_identifier(r"C:\p\at-limit.bin"),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// Hex is how a fixture describes bytes a YAML file cannot hold, such as a PE's header.
+    #[test]
+    fn content_hex_is_the_bytes_the_fixture_wrote() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nfilesystem:\n  'C:\\p':\n    - name: pe.bin\n      content_hex: \"4d5a00ff\"\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.read_file(r"C:\p\pe.bin"),
+            Ok(Some(vec![0x4d, 0x5a, 0x00, 0xff]))
+        );
     }
 
     #[test]

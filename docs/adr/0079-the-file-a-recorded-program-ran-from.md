@@ -231,3 +231,45 @@ section 1 says.
      (section 6). A rule written on it later follows the ordinary SS rules for evidence.
    - Its run-wide gaps are those of its sources: a registry or process list it could not read. A file it
      could not read is never a gap; `identity_read` says why.
+
+## As built: P3 (2026-10-21)
+
+P3 shipped in workstream R-08: `FilesystemSource::zone_identifier`, `rongroi_parsers::zone_identifier`, the
+full-tier collector `recorded_files`, and identity facts I1 to I4 in the game-windows view. The build
+differs from this ADR and from ADR 0078 section 5 in these places:
+
+1. **Autostart paths are not read.** Amendment 7 names four sources. `autostart` resolves its paths inside
+   its own collection and hashes the files there, so sharing it would read every autostart file twice. Only
+   `bam`, `pca` and `process` feed `recorded_files`, and there is no `by_autostart` field.
+2. **PCA gives only the paths it parsed.** A line PCA's own parser rejects names no path for
+   `recorded_files`, and a rejected line does not drop the good ones: they are kept, beside a `partial` gap.
+   When PCA does not exist on this Windows (`not_on_this_os`), it adds no paths and no gap, so that reason
+   keeps one owner (ADR 0030).
+3. **Order.** The anchor is the newest time any source gave a FiveM or GTA V program. The budget clock
+   starts before the source reads, so those reads count against the 90 seconds.
+4. **Facts that were not established are "not known".** A file that is gone is I1 true and I2 not known,
+   because it was not read. A `too_large` file keeps I2 from its signature. A signature that could not be
+   checked offline is not known (`unverifiable`), never true.
+5. **I3 is narrower than ADR 0078 section 5's words.** A double extension is a document, media or archive
+   extension before the program's (`photo.png.exe`), not any dot (`Battle.net.exe`). A name with no
+   extension at all, as a packaged app's name in BAM, is not a contradiction; `cheat.png` recorded running
+   is.
+6. **I4 is Temp and Downloads only.** The report does not know which drive is removable or which folder the
+   account can write, and another fixed drive holds ordinary game libraries. I4 is true for a path under a
+   `Temp` or `Downloads` folder, and not known otherwise. Removable drives and other writable folders wait
+   for their own evidence.
+7. **`download_host` is collected but not shown.** The game-windows view does not display it, so its SS
+   question changes nothing on screen until P6 adds the display; `PRIVACY.md` and the full-scan consent text
+   name the read from P3 on.
+8. **Section 6's `SS_WITHHELD_FIELDS` bullet is superseded by amendment 7.** `bam`, `pca` and `process` emit
+   no identity field, so there is nothing to withhold for them; `recorded_files` emits no rule match in SS
+   mode, and its only sensitive field is `download_host`.
+9. **Known limits, not fixed in P3.** The three sources are read a second time by `recorded_files`, and the
+   process list is a second snapshot that can differ from `process`'s. Each file is opened up to four times
+   (bytes, hash, signature, stream), so a file replaced between them can give a hash and a content kind of
+   different bytes. The hash of a `too_large` file reads the whole file, and the budget is checked only
+   between files, so one very large file can overrun it. An unreadable or unparsable stream leaves no
+   marker beside an absent one. `ZoneId=+3` parses as 3.
+10. **The fixture host** gained `content_hex:` for registry binaries and file contents, and
+    `zone_identifier:` for a file's stream, because a patch from the delegation wrapper cannot carry binary
+    fixtures.

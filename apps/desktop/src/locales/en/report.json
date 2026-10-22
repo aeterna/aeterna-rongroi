@@ -109,7 +109,8 @@
     "hid_device": "Mice, keyboards and other input devices Windows remembers",
     "windows_start": "How Windows started",
     "usn": "NTFS change journal",
-    "fivem_servers": "FiveM server cache folders (full scan)"
+    "fivem_servers": "FiveM server cache folders (full scan)",
+    "recorded_files": "Files of programs Windows recorded (full scan)"
   },
   "group_count": {
     "found": "{{count}} found",
