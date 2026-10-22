@@ -11,10 +11,12 @@
 #[cfg(test)]
 mod tests {
     use jiff::Timestamp;
-    use rongroi_core::digest::path_digest;
+    use rongroi_core::digest::{path_digest, volume_path_digest};
     use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
     use rongroi_host::{FixtureHost, NonWindowsHost};
-    use rongroi_parsers::evtx::{ClockChange, ServiceInstall, SystemFields};
+    use rongroi_parsers::evtx::{
+        ClockChange, CodeIntegrityFields, ImageRefusal, SecurityFields, ServiceInstall, SystemFields,
+    };
     use serde_json::Value;
 
     use super::*;
@@ -305,5 +307,144 @@ mod tests {
         }
         assert_eq!(field("changed_at").kind, FieldKind::Timestamp);
         assert!(field("changed_at").on_timeline);
+    }
+
+    // (f4) Refused images (Code Integrity 3033): one observation per volume-path digest, so a device path and
+    // a drive-letter path to the same file are one row; a name with no digest is only counted.
+
+    /// A 3033 that refused `file_name` at `seconds`; `None` when the event carried no file name.
+    fn refusal(seconds: i64, file_name: Option<&str>) -> ImageRefusal {
+        ImageRefusal {
+            written: at(seconds),
+            file_name: file_name.map(str::to_owned),
+        }
+    }
+
+    fn code_integrity_with(refusals: Vec<ImageRefusal>) -> CodeIntegrityFields {
+        CodeIntegrityFields {
+            refusals,
+            rejected: Vec::new(),
+        }
+    }
+
+    /// The observations that describe a refused image, the only kind with `volume_path_digest`.
+    fn refusals_of(observations: &[Observation]) -> Vec<&Observation> {
+        observations
+            .iter()
+            .filter(|observation| observation.fields.contains_key("volume_path_digest"))
+            .collect()
+    }
+
+    #[test]
+    fn f4a_refusals_of_one_file_under_two_spellings_are_one_observation_per_digest() {
+        let code_integrity = code_integrity_with(vec![
+            refusal(START + 5, Some(r"\Device\HarddiskVolume5\Tools\x.dll")),
+            refusal(START + 20, Some(r"D:\Tools\X.DLL")),
+            refusal(START + 50, Some(r"D:\Tools\X.DLL")),
+            refusal(START + 100, Some(r"\Device\HarddiskVolume5\Tools\y.dll")),
+        ]);
+        let observations = code_integrity_observations(&code_integrity);
+        let refusals = refusals_of(&observations);
+        assert_eq!(refusals.len(), 2, "{observations:?}");
+
+        let x_digest = volume_path_digest(r"\Device\HarddiskVolume5\Tools\x.dll").unwrap();
+        let y_digest = volume_path_digest(r"\Device\HarddiskVolume5\Tools\y.dll").unwrap();
+        let x = refusals
+            .iter()
+            .find(|observation| observation.fields["volume_path_digest"] == Value::from(x_digest.clone()))
+            .expect("one observation for x.dll");
+        let y = refusals
+            .iter()
+            .find(|observation| observation.fields["volume_path_digest"] == Value::from(y_digest.clone()))
+            .expect("one observation for y.dll");
+
+        assert_eq!(x.fields["log"], Value::from("code_integrity"));
+        assert_eq!(x.fields["events"], Value::from(3));
+        assert_eq!(x.fields["first_seen"], Value::from(at(START + 5).to_string()));
+        assert_eq!(x.fields["last_seen"], Value::from(at(START + 50).to_string()));
+        assert_eq!(y.fields["log"], Value::from("code_integrity"));
+        assert_eq!(y.fields["events"], Value::from(1));
+        assert_eq!(y.fields["first_seen"], Value::from(at(START + 100).to_string()));
+        assert_eq!(y.fields["last_seen"], Value::from(at(START + 100).to_string()));
+        assert_eq!(
+            summary_of(&observations).fields["unresolved_images"],
+            Value::from(0)
+        );
+
+        let json = serde_json::to_string(&observations).unwrap();
+        assert!(!json.to_ascii_lowercase().contains("x.dll"), "{json}");
+        assert!(!json.contains("Tools"), "{json}");
+    }
+
+    #[test]
+    fn f4b_a_refusal_with_no_digest_is_counted_as_unresolved_and_its_name_is_not_emitted() {
+        for file_name in [Some("x.dll"), None] {
+            let code_integrity = code_integrity_with(vec![refusal(START, file_name)]);
+            let observations = code_integrity_observations(&code_integrity);
+            assert!(refusals_of(&observations).is_empty(), "{observations:?}");
+            assert_eq!(
+                summary_of(&observations).fields["unresolved_images"],
+                Value::from(1)
+            );
+            let json = serde_json::to_string(&observations).unwrap();
+            assert!(!json.to_ascii_lowercase().contains("x.dll"), "{json}");
+            assert!(!json.contains("Tools"), "{json}");
+        }
+    }
+
+    // (f5) Security clock changes (4616): a change at or over the threshold is drawn with both times and no
+    // reason and no `by`; a smaller one is only counted.
+
+    fn security_with(clock_changes: Vec<ClockChange>) -> SecurityFields {
+        SecurityFields {
+            clock_changes,
+            rejected: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn f5a_two_hour_security_change_is_one_observation_with_both_times_and_no_reason_or_by() {
+        let process = r"\Device\HarddiskVolume3\Users\bob\t.exe";
+        let security = security_with(vec![clock(Some(START), START + 7200, Some(process), Some(2))]);
+        let observations = security_observations(&security);
+        let changes = clocks_of(&observations);
+        assert_eq!(changes.len(), 1, "{observations:?}");
+        let change = changes[0];
+        assert_eq!(change.fields["log"], Value::from("security"));
+        assert_eq!(
+            change.fields["changed_at"],
+            Value::from(at(START + 7200).to_string())
+        );
+        assert_eq!(change.fields["old_time"], Value::from(at(START).to_string()));
+        assert_eq!(
+            change.fields["new_time"],
+            Value::from(at(START + 7200).to_string())
+        );
+        assert!(!change.fields.contains_key("reason"), "{change:?}");
+        assert!(!change.fields.contains_key("by"), "{change:?}");
+        assert_eq!(
+            summary_of(&observations).fields["small_clock_changes"],
+            Value::from(0)
+        );
+        let json = serde_json::to_string(&observations).unwrap();
+        assert!(!json.contains("bob"), "{json}");
+        assert!(!json.contains("t.exe"), "{json}");
+    }
+
+    #[test]
+    fn f5b_ten_second_security_change_is_counted_as_small_and_not_drawn() {
+        let security = security_with(vec![clock(Some(START), START + 10, None, None)]);
+        let observations = security_observations(&security);
+        assert!(clocks_of(&observations).is_empty(), "{observations:?}");
+        let summary = summary_of(&observations);
+        assert_eq!(summary.fields["small_clock_changes"], Value::from(1));
+        assert_eq!(
+            summary.fields["small_first"],
+            Value::from(at(START + 10).to_string())
+        );
+        assert_eq!(
+            summary.fields["small_last"],
+            Value::from(at(START + 10).to_string())
+        );
     }
 }
