@@ -10,6 +10,7 @@
 
 pub mod ages;
 pub mod bundle;
+pub mod digest;
 pub mod engine;
 pub mod model;
 pub mod provenance;
