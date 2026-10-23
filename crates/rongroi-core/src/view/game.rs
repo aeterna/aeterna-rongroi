@@ -76,6 +76,12 @@ pub enum IdentityNotKnownReason {
     /// The fields I3 or I4 needs were not read, or I5 arrives with later work (ADR 0078 section 5,
     /// ADR 0079 section 5).
     Deferred,
+    /// No Prefetch record of the program carries `loaded_outside`, or it says
+    /// `loaded_outside_unknown` (ADR 0082 section 5).
+    NotCounted,
+    /// An earlier session's end is never known, so no record can be placed in it (ADR 0082
+    /// section 5).
+    EarlierSession,
 }
 /// How many sessions' windows hold one of a candidate's times, out of the sessions found (R).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +102,13 @@ pub struct GameSession {
     pub end: Option<String>,
     /// Whether this is ADR 0062's latest session of its edition.
     pub latest: bool,
+    /// L1: the records that feed this session loaded a file from outside (ADR 0082 section 5).
+    #[serde(default = "not_counted")]
+    pub l1: IdentityFact,
+    /// The files the records feeding this session loaded from outside, summed; `None` when none of
+    /// them carries the count. A count only: no name (ADR 0082 section 5).
+    #[serde(default)]
+    pub loaded_outside: Option<u64>,
 }
 /// One program Windows recorded with a time in a game window (ADR 0078 section 4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,6 +135,10 @@ pub struct GameCandidate {
     pub i4: IdentityFact,
     /// I5: the change journal holds its rename or deletion (deferred, ADR 0079 section 5).
     pub i5: IdentityFact,
+    /// L1: it loaded a file with an executable's extension from outside Windows, Program Files and
+    /// FiveM's folders (ADR 0082 section 5).
+    #[serde(default = "not_counted")]
+    pub l1: IdentityFact,
     /// R: how many sessions' windows hold one of its times.
     pub near_sessions: NearSessions,
     /// When the System log recorded an install of this file, as a note: it moves no time fact, no
@@ -259,8 +276,13 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
             Mode::Ss => None,
         })
         .collect();
+    let loads = session_loads(report, &sessions);
     GameWindows {
-        sessions: sessions.iter().map(game_session).collect(),
+        sessions: sessions
+            .iter()
+            .zip(loads)
+            .map(|(session, (l1, loaded_outside))| game_session(session, l1, loaded_outside))
+            .collect(),
         candidates,
         counts,
         unmatched_installs,
@@ -475,6 +497,8 @@ struct Candidate {
     times: Vec<jiff::Timestamp>,
     /// The collectors that recorded one of its times.
     sources: BTreeSet<&'static str>,
+    /// The L1 fact of each Prefetch record it was made from or joined (ADR 0082 section 5).
+    l1: Vec<IdentityFact>,
 }
 /// The `recorded_files` observations by path, ignoring ASCII case (ADR 0079 amendment 7).
 struct RecordedFiles<'r> {
@@ -569,6 +593,44 @@ fn signature_fact(observation: &Observation) -> IdentityFact {
 fn deferred() -> IdentityFact {
     IdentityFact::NotKnown {
         reason: IdentityNotKnownReason::Deferred,
+    }
+}
+/// L1 when no record counts the files it loaded from outside (ADR 0082 section 5). It is also what
+/// a view saved before L1 existed reads as.
+fn not_counted() -> IdentityFact {
+    IdentityFact::NotKnown {
+        reason: IdentityNotKnownReason::NotCounted,
+    }
+}
+/// The files a Prefetch record loaded from outside, when its count is present and not marked
+/// unknown (ADR 0082 section 5).
+fn loaded_outside_of(observation: &Observation) -> Option<u64> {
+    if observation.fields.contains_key("loaded_outside_unknown") {
+        return None;
+    }
+    observation
+        .fields
+        .get("loaded_outside")
+        .and_then(serde_json::Value::as_u64)
+}
+/// L1 of one Prefetch record: true when it loaded a file from outside, false when it loaded none,
+/// else not counted (ADR 0082 section 5).
+fn l1_of(observation: &Observation) -> IdentityFact {
+    match loaded_outside_of(observation) {
+        Some(0) => IdentityFact::False,
+        Some(_) => IdentityFact::True,
+        None => not_counted(),
+    }
+}
+/// Combines the L1 facts of the records one candidate or session was made from: true if any is
+/// true, false if all are false and there is one, else not counted (ADR 0082 section 5).
+fn combined_l1(facts: &[IdentityFact]) -> IdentityFact {
+    if facts.contains(&IdentityFact::True) {
+        IdentityFact::True
+    } else if !facts.is_empty() && facts.iter().all(|fact| *fact == IdentityFact::False) {
+        IdentityFact::False
+    } else {
+        not_counted()
     }
 }
 /// Document, media and archive extensions a file can wear before a program's, for I3's double
@@ -773,19 +835,74 @@ fn path_under_temp_or_downloads(path: &str) -> bool {
     }
     false
 }
-/// Whether `candidate` has a true identity fact among I1 to I4, which SS mode lists it for
-/// (ADR 0078 section 9). I5 is not computed yet (ADR 0079 section 5).
+/// Whether `candidate` has a true identity fact among I1 to I4 or L1, which SS mode lists it for
+/// (ADR 0078 section 9, as amended by ADR 0082 section 5). I5 is not computed yet (ADR 0079
+/// section 5).
 fn has_identity_fact(candidate: &GameCandidate) -> bool {
-    [&candidate.i1, &candidate.i2, &candidate.i3, &candidate.i4]
-        .into_iter()
-        .any(|fact| *fact == IdentityFact::True)
+    [
+        &candidate.i1,
+        &candidate.i2,
+        &candidate.i3,
+        &candidate.i4,
+        &candidate.l1,
+    ]
+    .into_iter()
+    .any(|fact| *fact == IdentityFact::True)
 }
-fn game_session(session: &TimedSession) -> GameSession {
+/// Each session's L1 and loaded-outside count, in `sessions`' order (ADR 0082 section 5). A
+/// Prefetch record with a `fivem_edition` feeds the latest session of that edition when one of its
+/// run times is in the session's span; an earlier session's end is never known, so no record is
+/// placed in it.
+fn session_loads(report: &Report, sessions: &[TimedSession]) -> Vec<(IdentityFact, Option<u64>)> {
+    let tagged: Vec<&Observation> = observations_of(report, "prefetch")
+        .into_iter()
+        .filter(|observation| session::text(observation, "fivem_edition").is_some())
+        .collect();
+    sessions
+        .iter()
+        .map(|session| {
+            if !session.latest {
+                let reason = IdentityNotKnownReason::EarlierSession;
+                return (IdentityFact::NotKnown { reason }, None);
+            }
+            let fed: Vec<&Observation> = tagged
+                .iter()
+                .copied()
+                .filter(|observation| {
+                    session::text(observation, "fivem_edition") == Some(session.edition.as_str())
+                        && run_times(observation)
+                            .into_iter()
+                            .any(|time| within(session, time))
+                })
+                .collect();
+            let facts: Vec<IdentityFact> = fed.iter().copied().map(l1_of).collect();
+            let loaded_outside = fed
+                .iter()
+                .copied()
+                .filter_map(loaded_outside_of)
+                .reduce(u64::saturating_add);
+            (combined_l1(&facts), loaded_outside)
+        })
+        .collect()
+}
+/// Whether `time` is in `session`'s span: from its start, and up to its end when it has one
+/// (ADR 0082 section 5).
+fn within(session: &TimedSession, time: jiff::Timestamp) -> bool {
+    let at = time.as_second();
+    at >= session.start.as_second() && session.end.is_none_or(|end| at <= end.as_second())
+}
+fn game_session(
+    session: &TimedSession,
+    l1: IdentityFact,
+    loaded_outside: Option<u64>,
+) -> GameSession {
     GameSession {
         edition: session.edition.clone(),
         start: session.start.to_string(),
         end: session.end.map(|end| end.to_string()),
         latest: session.latest,
+        l1,
+        loaded_outside,
     }
 }
 /// ADR 0062's latest session of each edition, then that edition's other Prefetch run times as
@@ -925,6 +1042,11 @@ fn gather(
                 path,
                 times,
                 sources: BTreeSet::from([collector]),
+                l1: if collector == "prefetch" {
+                    vec![l1_of(observation)]
+                } else {
+                    Vec::new()
+                },
             };
             if collector == "prefetch" {
                 prefetch.push(candidate);
@@ -956,6 +1078,7 @@ fn gather(
                 if let Some(candidate) = paths.get_mut(&key) {
                     candidate.times.extend(record.times);
                     candidate.sources.extend(record.sources);
+                    candidate.l1.extend(record.l1);
                 }
             }
             _ => standalone.push(record),
@@ -1053,6 +1176,7 @@ fn with_facts(
         i3,
         i4,
         i5,
+        l1: combined_l1(&candidate.l1),
         near_sessions: NearSessions { near, found },
         installed_at: Vec::new(),
         refused_by_code_integrity: false,
@@ -1187,14 +1311,21 @@ fn oldest_by_source(report: &Report) -> BTreeMap<&'static str, Option<jiff::Time
     }
     oldest
 }
-/// How many of R (near at least two sessions) and I1 to I4 are true, for the view's ordering
-/// (ADR 0078 section 5). I5 waits for its own ADR (ADR 0079 section 5).
+/// How many of R (near at least two sessions), I1 to I4 and L1 are true, for the view's ordering
+/// (ADR 0078 section 5, as amended by ADR 0082 section 5). I5 waits for its own ADR (ADR 0079
+/// section 5).
 fn identity_rank(candidate: &GameCandidate) -> usize {
     usize::from(candidate.near_sessions.near >= 2)
-        + [&candidate.i1, &candidate.i2, &candidate.i3, &candidate.i4]
-            .into_iter()
-            .filter(|fact| **fact == IdentityFact::True)
-            .count()
+        + [
+            &candidate.i1,
+            &candidate.i2,
+            &candidate.i3,
+            &candidate.i4,
+            &candidate.l1,
+        ]
+        .into_iter()
+        .filter(|fact| **fact == IdentityFact::True)
+        .count()
 }
 /// How many of T1 to T4 are true, for the view's ordering (ADR 0078 section 5).
 fn true_facts(candidate: &GameCandidate) -> usize {
