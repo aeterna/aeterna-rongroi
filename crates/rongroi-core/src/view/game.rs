@@ -118,9 +118,9 @@ pub enum FileRead {
     Read,
     /// The file is no longer at its path.
     Missing,
-    /// The file is too large to read; its size and signature field were read.
+    /// The file is over 64 MiB; only its hash and signature were read.
     TooLarge,
-    /// The file is there, but the read was denied.
+    /// Windows did not allow the file to be read.
     AccessDenied,
     /// The read did not finish, or the observation says nothing about it.
     Failed,
@@ -158,16 +158,17 @@ pub struct FileDetails {
     /// The version resource's `OriginalFilename`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub original_filename: Option<String>,
-    /// The host a PowerShell command downloaded the file from; SS mode masks it (ADR 0064).
+    /// The host the file's `Zone.Identifier` stream names, the website it was downloaded from; SS
+    /// mode shows `%DOWNLOAD_HOST%` unless the player agreed (ADR 0064).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub download_host: Option<String>,
-    /// Whether bytes follow the end of the file's image.
+    /// Whether bytes follow the end of the file's format, decided for PNG, JPEG, GIF and zip only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trailing_data: Option<bool>,
-    /// Whether the file holds a PE image past its first one.
+    /// Whether a PE image sits inside a file that is not itself a PE.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub embedded_pe: Option<bool>,
-    /// The zone identifier the file was marked with, when it fits a `u32`.
+    /// The `ZoneId` of the file's `Zone.Identifier` stream, when it fits a `u32`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub zone_id: Option<u32>,
 }

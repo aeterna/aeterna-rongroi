@@ -5721,7 +5721,11 @@ mod tests {
         let view = game_windows(&game_report(observations), Mode::SelfCheck);
 
         for (name, _, read) in cases {
-            assert_eq!(view_file(&view, name).read, read, "{name}");
+            assert_eq!(
+                game_candidate(&view, name).file.as_ref().map(|file| file.read),
+                Some(read),
+                "{name}"
+            );
         }
         assert_eq!(
             game_candidate(&view, "missing.exe").file,
@@ -5922,7 +5926,7 @@ mod tests {
             "i2": {"fact": "false"},
             "i3": {"fact": "false"},
             "i4": {"fact": "false"},
-            "i5": {"fact": "not_known", "reason": "deferred"},
+            "i5": {"fact": "not_known", "reason": {"reason": "deferred"}},
             "near_sessions": {"near": 1, "found": 1},
         });
         let read: GameCandidate =
