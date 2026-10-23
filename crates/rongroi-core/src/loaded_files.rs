@@ -51,14 +51,20 @@ mod tests {
             "RUNDLL32.EXE",
             "regsvr32.exe",
         ] {
-            assert!(counts_loaded_files(name), "{name} should count as a loaded file");
+            assert!(
+                counts_loaded_files(name),
+                "{name} should count as a loaded file"
+            );
         }
     }
 
     #[test]
     fn counts_loaded_files_rejects_other_names() {
         for name in ["cmd.exe", "rundll32.dll", "fivem.exe.bak", ""] {
-            assert!(!counts_loaded_files(name), "{name:?} should not count as a loaded file");
+            assert!(
+                !counts_loaded_files(name),
+                "{name:?} should not count as a loaded file"
+            );
         }
     }
 
@@ -77,7 +83,10 @@ mod tests {
     #[test]
     fn has_pe_extension_rejects_names_without_a_pe_extension() {
         for name in ["x.png", "x", "x.dll.png", r"folder.dll\file", "a."] {
-            assert!(!has_pe_extension(name), "{name:?} should not have a PE extension");
+            assert!(
+                !has_pe_extension(name),
+                "{name:?} should not have a PE extension"
+            );
         }
     }
 
@@ -85,7 +94,9 @@ mod tests {
     fn pe_extensions_keeps_its_ten_values_in_order() {
         assert_eq!(
             PE_EXTENSIONS,
-            ["exe", "dll", "sys", "scr", "com", "cpl", "ocx", "drv", "efi", "mui"]
+            [
+                "exe", "dll", "sys", "scr", "com", "cpl", "ocx", "drv", "efi", "mui"
+            ]
         );
     }
 

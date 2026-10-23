@@ -462,10 +462,7 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
     if counts_loaded_files(&record.executable) {
         match loaded_outside(&record.loaded_files) {
             Ok(count) => {
-                fields.insert(
-                    "loaded_outside".to_owned(),
-                    serde_json::Value::from(count),
-                );
+                fields.insert("loaded_outside".to_owned(), serde_json::Value::from(count));
             }
             Err(word) => {
                 fields.insert(
