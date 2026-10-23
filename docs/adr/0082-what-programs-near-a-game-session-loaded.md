@@ -25,8 +25,9 @@ What the code holds today (`dev` at `38d590c`):
   path: `fivem_edition::of_prefetch`, the edition of the executable's own entry.
 - `fivem_edition::of_path` knows FiveM's two program folders: `%LOCALAPPDATA%\FiveM\` (Legacy) and
   `%LOCALAPPDATA%\FiveM for GTAV Enhanced\` (Enhanced).
-- `view::game` has `PE_EXTENSIONS`, the ten extensions I3 treats as an executable's (`exe`, `dll`, `sys`,
-  `scr`, `com`, `cpl`, `ocx`, `drv`, `efi`, `mui`).
+- `view::game` has `PE_EXTENSIONS`, the ten extensions a PE image may have, under which I3 does not call PE
+  content a contradiction (`exe`, `dll`, `sys`, `scr`, `com`, `cpl`, `ocx`, `drv`, `efi`, `mui`). This ADR
+  calls them "an executable's extension".
 - The anchors of a session are `FiveM.exe` and, for Legacy, `FiveM_b…_GTAProcess.exe`
   (`session::anchor_name`). `GTA5.exe`, `GTA5_Enhanced.exe` and `PlayGTAV.exe` are neither anchors nor
   candidates (`game::is_timeline_name`). SS mode lists a candidate by name when one of I1–I4 is true
@@ -79,8 +80,9 @@ count is not emitted and `loaded_outside` is replaced by `loaded_outside_unknown
 
 On the `prefetch` observation of each record in section 1:
 
-- `loaded_outside`: how many outside entries have an extension in `PE_EXTENSIONS`. That list moves to one
-  place both crates use (one list, one name).
+- `loaded_outside`: how many outside entries have an extension in `PE_EXTENSIONS`. The list becomes public in
+  `rongroi-core` (which `rongroi-collectors` already depends on), and both the view and the collector read it:
+  one list, one name.
 
 Nothing else of `loaded_files` is emitted: no path, file name, extension or volume.
 
@@ -152,7 +154,7 @@ read are the same.
 | Count every file outside Windows and Program Files, as ADR 0078 step P5 wrote it | 6–31 per ordinary `FiveM.exe`, and 57–189 more inside FiveM's folders |
 | Treat the program's own folder as expected | A folder holding the program says nothing about the other files in it |
 | Treat `\Windows\` on any volume as expected | The record's `ntdll.dll` entry names its system volume without a host call |
-| A new list of executable extensions | `PE_EXTENSIONS` already says what I3 treats as an executable's; two lists would drift |
+| A new list of executable extensions | `PE_EXTENSIONS` already lists the extensions a PE image may have; two lists would drift |
 | Emit the outside entries' paths, redacted | ADR 0021: the redactor cannot reach `\VOLUME{…}` paths, and a list of loaded files describes what is on the PC |
 
 ## What is unverified
