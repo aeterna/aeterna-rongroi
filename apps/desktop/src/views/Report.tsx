@@ -22,6 +22,7 @@ import type {
 } from "../types";
 import { AiExportButton } from "./AiExportButton";
 import { EvidenceRow } from "./EvidenceRow";
+import { GameWindowsSection } from "./GameWindows";
 import { HumanSummary } from "./HumanSummary";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
@@ -286,6 +287,9 @@ export function Report({ mode, options, saved, onBack }: Props) {
         {/* After the evidence and apart from it: the times this view may show, in order (ADR 0051). */}
         {/* Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3). */}
         <CrossSource statements={view.cross_source ?? []} />
+
+        {/* Directly after the latest-session statement, in both modes; absent with no session (ADR 0078). */}
+        <GameWindowsSection view={view} mode={mode} />
 
         <Timeline timeline={view.timeline} texts={texts} />
 

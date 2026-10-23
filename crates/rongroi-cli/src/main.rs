@@ -4,6 +4,7 @@
 
 //! `aeterna-rongroi-cli`: scan this PC and print evidence. Never prints a verdict.
 
+mod game_windows;
 mod output;
 mod trace_ages;
 

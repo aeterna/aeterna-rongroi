@@ -427,5 +427,78 @@
     "causes_title": "Common benign causes for this result:",
     "unmeasured_causes_title": "Technical reasons why this could not be measured:",
     "tamper_causes_title": "Technical forensic observations:"
+  },
+  "game": {
+    "title": "Programs recorded near a game session",
+    "experimental": "experimental",
+    "intro": "Windows records when programs run. These are the programs with a recorded time in the 30 minutes before a session, during it, in the 30 minutes after it, or between it and this scan. Being listed says nothing on its own: most are ordinary programs.",
+    "order": "Ordered by how many facts about the file hold, then by time. The order counts facts; it is not a judgement of any program.",
+    "windows_unmeasured": "The 30-minute windows have not yet been measured on many ordinary gaming PCs.",
+    "ss_rule": "SS mode names a program only when a fact about its file holds; other programs are counted per window.",
+    "ss_counts": "Other programs, not named: {{list}}",
+    "more": "+ {{count}} more",
+    "window": {
+      "before": "30 min before",
+      "during": "during",
+      "after": "30 min after",
+      "before_scan": "before this scan"
+    },
+    "session": {
+      "latest": "(latest)",
+      "earlier": "earlier session, began {{at}}",
+      "l1": "loaded from outside the usual folders: {{count}} files",
+      "l1_label": "Loaded from outside the usual folders"
+    },
+    "fact": {
+      "t1": "recorded in the 30 minutes before a session",
+      "t2": "recorded during a session",
+      "t3": "recorded in the 30 minutes after a session",
+      "t4": "recorded between the session and this scan",
+      "r": "near {{near}} of {{found}} sessions",
+      "i1": "its file is no longer at the recorded path",
+      "i2": "no embedded signature that verifies",
+      "i3": "its name does not match what the file is",
+      "i4": "it ran from Temp or Downloads",
+      "l1": "it loaded a program file from outside the usual folders",
+      "l1_false": "of the files Prefetch recorded for it, none with a program's extension is outside Windows, Program Files and FiveM's folders"
+    },
+    "cause": {
+      "t1": "chat, launchers, recording and GPU tools started before playing",
+      "t2": "overlays, recording tools, a browser",
+      "t3": "anything opened after the game",
+      "t4": "the program a server's staff asked the player to open",
+      "r": "a program the player opens every time they play",
+      "i1": "a self-deleting installer, Storage Sense, a removed USB drive",
+      "i2": "open-source tools, mods, catalog-signed Windows files",
+      "i3": "updaters that keep an executable as .tmp or .dat, renamed portable tools",
+      "i4": "anything downloaded and run",
+      "l1": "an add-on, overlay or codec installed in a user folder"
+    },
+    "value": {
+      "false": "no (within what was read)"
+    },
+    "nk": {
+      "session_end_not_recorded": "not known: the session's end is not recorded",
+      "scan_time_not_recorded": "not known: the scan's time is not recorded",
+      "before_trace_age": "not known: {{source}} does not reach back that far",
+      "recorded_files_not_run": "not known: a standard scan does not read the file",
+      "no_observation_for_path": "not known: the file at this path was not read",
+      "not_read": "not known: the file could not be read",
+      "unverifiable": "not known: the signature cannot be checked offline",
+      "no_path": "not known: no path was recorded for it",
+      "deferred": "not known: this version does not read it yet",
+      "not_counted": "not known: no Prefetch record counted the files it loaded",
+      "earlier_session": "not known: an earlier session's end is never recorded"
+    },
+    "clock": {
+      "changed": "The clock was changed at {{at}}{{detail}}; times before and after may not be on the same clock.",
+      "detail": " (from {{old}} to {{new}})",
+      "not_known": "Whether the clock was changed is not known: the System event log does not reach back to the compared span, or could not be read."
+    },
+    "note": {
+      "installed": "Windows recorded an install of this file at {{at}}.",
+      "code_integrity": "Code Integrity refused a file at the same path on some drive.",
+      "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed."
+    }
   }
 }

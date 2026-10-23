@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
-import type { ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
+import type { GameWindows, ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
 import { COPIED_FOR_MS } from "./views/CodeLink";
 
 // Vitest runs with apps/desktop as the working directory.
@@ -1292,5 +1292,230 @@ describe("App", () => {
       "Please analyze this PC Forensics / FiveM inspection report",
     );
     expect(aiButton.textContent).toContain("Copied!");
+  });
+
+  // ADR 0078 (P6, decisions 3–7): the game-window section sits directly after the latest-session
+  // statement, in both modes. Its facts and ordinary causes come from the core; the test host is
+  // synthetic — no person's name, host name or SID appears in it.
+  function gameWindows(overrides: Partial<GameWindows> = {}): GameWindows {
+    return {
+      sessions: [
+        {
+          edition: "legacy",
+          start: "2025-12-31T20:00:00Z",
+          end: "2025-12-31T21:30:00Z",
+          latest: true,
+          l1: { fact: "true" },
+          loaded_outside: 2,
+        },
+      ],
+      candidates: [
+        {
+          name: "overlay-helper.exe",
+          path: "C:\\Tools\\overlay-helper.exe",
+          t1: { fact: "false" },
+          t2: { fact: "true" },
+          t3: { fact: "false" },
+          t4: { fact: "false" },
+          i1: { fact: "true" },
+          i2: { fact: "false" },
+          i3: { fact: "false" },
+          i4: { fact: "true" },
+          i5: { fact: "false" },
+          near_sessions: { near: 1, found: 1 },
+        },
+      ],
+      counts: { before: 1, during: 2, after: 0, before_scan: 4 },
+      unnamed: { before: 0, during: 1, after: 0, before_scan: 3 },
+      clock: { changes: [], history: "known" },
+      ...overrides,
+    };
+  }
+
+  it("shows the game-window section with its facts, causes and window counts in Self mode", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Programs recorded near a game session")).toBeTruthy();
+    expect(screen.getByText("experimental")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "its file is no longer at the recorded path (a self-deleting installer, Storage Sense, a removed USB drive)",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("it ran from Temp or Downloads (anything downloaded and run)"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("recorded during a session (overlays, recording tools, a browser)"),
+    ).toBeTruthy();
+    expect(screen.getByText("30 min before · 1")).toBeTruthy();
+    expect(screen.getByText("during · 2")).toBeTruthy();
+    expect(screen.getByText("30 min after · 0")).toBeTruthy();
+    expect(screen.getByText("before this scan · 4")).toBeTruthy();
+  });
+
+  it("shows a clock change with its old and new times, and says when the clock history is not known", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        clock: {
+          changes: [
+            {
+              changed_at: "2026-01-02T03:04:05Z",
+              old_time: "2026-01-02T03:00:00Z",
+              new_time: "2026-01-02T03:04:00Z",
+            },
+          ],
+          history: "known",
+        },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "The clock was changed at 2026-01-02T03:04:05Z (from 2026-01-02T03:00:00Z to 2026-01-02T03:04:00Z); times before and after may not be on the same clock.",
+      ),
+    ).toBeTruthy();
+    cleanup();
+
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({ clock: { changes: [], history: "not_known" } }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "Whether the clock was changed is not known: the System event log does not reach back to the compared span, or could not be read.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows whether the latest session loaded files from outside the usual folders", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("loaded from outside the usual folders: 2 files")).toBeTruthy();
+    cleanup();
+
+    const [latest] = gameWindows().sessions;
+    if (!latest) throw new Error("the test view has no session");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        sessions: [{ ...latest, l1: { fact: "false" }, loaded_outside: null }],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "of the files Prefetch recorded for it, none with a program's extension is outside Windows, Program Files and FiveM's folders",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("loaded from outside the usual folders: 2 files")).toBeNull();
+  });
+
+  it("says a time fact that is not known, with its reason, in Self mode", async () => {
+    const [candidate] = gameWindows().candidates;
+    if (!candidate) throw new Error("the test view has no candidate");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        candidates: [
+          {
+            ...candidate,
+            t1: {
+              fact: "not_known",
+              reason: { reason: "before_trace_age", source: "prefetch" },
+            },
+            t4: { fact: "not_known", reason: { reason: "scan_time_not_recorded" } },
+          },
+        ],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "recorded in the 30 minutes before a session: not known: prefetch does not reach back that far",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "recorded between the session and this scan: not known: the scan's time is not recorded",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("gives an earlier session's start once, in its began line", async () => {
+    const [latest] = gameWindows().sessions;
+    if (!latest) throw new Error("the test view has no session");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        sessions: [
+          latest,
+          { edition: "legacy", start: "2026-10-18T19:00:00Z", end: null, latest: false },
+        ],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("earlier session, began 2026-10-18T19:00:00Z")).toBeTruthy();
+    const section = screen.getByText("Programs recorded near a game session").closest("section");
+    if (!section) throw new Error("the game-window section is not rendered");
+    const occurrences = (section.textContent ?? "").split("2026-10-18T19:00:00Z").length - 1;
+    expect(occurrences).toBe(1);
+  });
+
+  it("shows the SS rule and the unnamed counts, and no window chips, in SS mode", async () => {
+    viewOverride = { ...ssView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(
+      await screen.findByText(
+        "SS mode names a program only when a fact about its file holds; other programs are counted per window.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Other programs, not named: 30 min before 0 · during 1 · 30 min after 0 · before this scan 3",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("30 min before · 1")).toBeNull();
+    expect(screen.queryByText("during · 2")).toBeNull();
+    expect(screen.queryByText("30 min after · 0")).toBeNull();
+    expect(screen.queryByText("before this scan · 4")).toBeNull();
+  });
+
+  it("shows no game-window section when the report carries none", async () => {
+    expect(selfView).not.toHaveProperty("game_windows");
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Overview Summary")).toBeTruthy();
+    expect(screen.queryByText("Programs recorded near a game session")).toBeNull();
+    expect(screen.queryByText("experimental")).toBeNull();
+  });
+
+  it("shows the game-window title in Thai", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(await screen.findByText("โปรแกรมที่ถูกบันทึกไว้ใกล้ช่วงเล่นเกม")).toBeTruthy();
+  });
+
+  it("shows the first words of the SS paragraph on the consent screen in English", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    expect(
+      await screen.findByText(
+        /In SS mode, programs recorded near your last game session are named only when/,
+      ),
+    ).toBeTruthy();
   });
 });
