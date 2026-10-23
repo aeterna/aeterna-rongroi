@@ -1287,4 +1287,183 @@ mod tests {
             );
         }
     }
+
+    /// The device prefix of the system volume, as Prefetch writes it in a string table (ADR 0082).
+    const SYSTEM: &str = r"\VOLUME{01d0000000000000-aaaaaaaa}";
+    /// The device prefix of a second volume on the same machine.
+    const OTHER: &str = r"\VOLUME{01d0000000000000-bbbbbbbb}";
+
+    /// `ntdll.dll` in `\Windows\System32` on the given volume: the entry that names the system volume.
+    fn ntdll_on(volume: &str) -> String {
+        format!(r"{volume}\WINDOWS\SYSTEM32\NTDLL.DLL")
+    }
+
+    /// A record for `executable` that loaded `loaded_files` and nothing else.
+    fn record_loading(executable: &str, loaded_files: Vec<String>) -> PrefetchRecord {
+        PrefetchRecord {
+            scca_version: 30,
+            executable: executable.to_owned(),
+            run_count: 1,
+            last_runs: Vec::new(),
+            volumes: Vec::new(),
+            loaded_files,
+        }
+    }
+
+    /// A library in a user's profile on the system volume is outside what Windows put there; the
+    /// system volume's own `ntdll.dll` is not.
+    #[test]
+    fn a_profile_library_on_the_system_volume_is_outside() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\TEMP\X.DLL"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(1));
+    }
+
+    /// Rest below `\Windows\`, `\Program Files\` and `\Program Files (x86)\` on the system volume is
+    /// expected, whatever the case of the folder names.
+    #[test]
+    fn the_windows_and_program_folders_of_the_system_volume_are_expected() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\Windows\System32\x.dll"),
+            format!(r"{SYSTEM}\Program Files\A\b.dll"),
+            format!(r"{SYSTEM}\Program Files (x86)\A\c.ocx"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(0));
+    }
+
+    /// The same folder on another volume is not the system's: a `\Windows\` elsewhere is outside.
+    #[test]
+    fn a_windows_folder_on_another_volume_is_outside() {
+        let loaded = vec![ntdll_on(SYSTEM), format!(r"{OTHER}\Windows\x.dll")];
+        assert_eq!(loaded_outside(&loaded), Ok(1));
+    }
+
+    /// Both `FiveM` program folders are expected on any volume, because the whole entry is below one.
+    #[test]
+    fn the_fivem_program_folders_are_expected_on_any_volume() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\FIVEM\FIVEM.APP\x.dll"),
+            format!(r"{OTHER}\Users\V\AppData\Local\FiveM for GTAV Enhanced\y.dll"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(0));
+    }
+
+    /// Only entries with an executable extension are counted: a picture and an ini file outside the
+    /// expected folders are not.
+    #[test]
+    fn outside_entries_without_an_executable_extension_are_not_counted() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\DOWNLOADS\a.png"),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\x.ini"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(0));
+    }
+
+    /// Without exactly one system volume there is no answer: none, two different ones, and an empty
+    /// list are all `no_system_volume`, while two entries naming the same volume in another case agree.
+    #[test]
+    fn no_single_system_volume_gives_the_unknown_word() {
+        assert_eq!(
+            loaded_outside(&[format!(r"{SYSTEM}\Windows\x.dll")]),
+            Err("no_system_volume")
+        );
+        assert_eq!(
+            loaded_outside(&[ntdll_on(SYSTEM), ntdll_on(OTHER)]),
+            Err("no_system_volume")
+        );
+        assert_eq!(loaded_outside(&[]), Err("no_system_volume"));
+        assert_eq!(
+            loaded_outside(&[
+                ntdll_on(SYSTEM),
+                format!(r"{SYSTEM}\Windows\System32\ntdll.dll"),
+            ]),
+            Ok(0)
+        );
+    }
+
+    /// NTFS metadata (`\$`) and entries with no volume prefix are skipped, not counted as outside.
+    #[test]
+    fn ntfs_metadata_and_unprefixed_entries_are_skipped() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\$MFT"),
+            r"C:\x.dll".to_owned(),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(0));
+    }
+
+    /// The program's own executable is not special: outside the expected folders it is counted.
+    #[test]
+    fn the_programs_own_executable_is_counted_when_it_is_outside() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\STEAMLIBRARY\GAME\PLAYGTAV.EXE"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(1));
+    }
+
+    /// The count appears only for an executable that passes `counts_loaded_files`, and the unknown word
+    /// only in place of it. Neither appears for another executable, and never both.
+    #[test]
+    fn the_observation_carries_the_count_or_the_unknown_word() {
+        let outside = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\TEMP\X.DLL"),
+        ];
+
+        let counted = execution(
+            r"C:\Windows\Prefetch\RUNDLL32.EXE-12345678.pf",
+            &record_loading("RUNDLL32.EXE", outside.clone()),
+            None,
+        );
+        assert_eq!(field(&counted, "loaded_outside"), Some(&1_u64.into()));
+        assert_eq!(field(&counted, "loaded_outside_unknown"), None);
+
+        let not_counted = execution(
+            r"C:\Windows\Prefetch\CMD.EXE-D269B812.pf",
+            &record_loading("CMD.EXE", outside),
+            None,
+        );
+        assert_eq!(field(&not_counted, "loaded_outside"), None);
+        assert_eq!(field(&not_counted, "loaded_outside_unknown"), None);
+
+        let unknown = execution(
+            r"C:\Windows\Prefetch\FIVEM.EXE-11111111.pf",
+            &record_loading("FIVEM.EXE", vec![format!(r"{SYSTEM}\Windows\x.dll")]),
+            None,
+        );
+        assert_eq!(
+            text(&unknown, "loaded_outside_unknown"),
+            Some("no_system_volume")
+        );
+        assert_eq!(field(&unknown, "loaded_outside"), None);
+    }
+
+    /// **Nothing `loaded_files` holds is emitted.** The count is a number, and the observation's `Debug`
+    /// text — the form a report's diagnostics take — carries no entry's path, name or volume identifier.
+    #[test]
+    fn no_loaded_path_or_volume_identifier_reaches_the_observation() {
+        let observation = execution(
+            r"C:\Windows\Prefetch\RUNDLL32.EXE-12345678.pf",
+            &record_loading(
+                "RUNDLL32.EXE",
+                vec![
+                    ntdll_on(SYSTEM),
+                    format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\TEMP\X.DLL"),
+                ],
+            ),
+            None,
+        );
+        let debug = format!("{observation:?}");
+        for withheld in ["TEMP", "X.DLL", "aaaaaaaa", "VOLUME"] {
+            assert!(!debug.contains(withheld), "{withheld} in {debug}");
+        }
+        // The count is there, so this is not passing only because nothing was emitted.
+        assert_eq!(field(&observation, "loaded_outside"), Some(&1_u64.into()));
+    }
 }
