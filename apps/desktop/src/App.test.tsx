@@ -11,7 +11,14 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
-import type { GameWindows, ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
+import type {
+  GameCandidate,
+  GameWindows,
+  ReportHeader,
+  ReportView,
+  RuleText,
+  UnmeasuredReason,
+} from "./types";
 import { COPIED_FOR_MS } from "./views/CodeLink";
 
 // Vitest runs with apps/desktop as the working directory.
@@ -1516,6 +1523,160 @@ describe("App", () => {
       await screen.findByText(
         /In SS mode, programs recorded near your last game session are named only when/,
       ),
+    ).toBeTruthy();
+  });
+
+  // ADR 0078 (P6b): each candidate's file details sit in a closed <details> under its card, opened by
+  // a click on "File details". The hashes are synthetic (a repeated pattern, 64 hex characters), and
+  // the signer and host are invented: no real person's or machine's name appears here.
+  const FILE_SHA256 = "0123456789abcdef".repeat(4);
+  const CERT_SHA256 = "fedcba9876543210".repeat(4);
+
+  /** The game-window view with the file-detail fields set on its one candidate. */
+  function withFile(fields: Partial<GameCandidate>): GameWindows {
+    const [candidate] = gameWindows().candidates;
+    if (!candidate) throw new Error("the test view has no candidate");
+    return gameWindows({ candidates: [{ ...candidate, ...fields }] });
+  }
+
+  /** Opens the candidate's "File details" and returns the <details> element that holds them. */
+  async function openFileDetails(): Promise<HTMLElement> {
+    fireEvent.click(await screen.findByText("File details"));
+    const details = screen.getByText("File details").closest("details");
+    if (!details) throw new Error("the file details are not a <details> element");
+    return details;
+  }
+
+  it("folds a candidate's file details under its card and shows each line in Self mode", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        recorded_by: ["prefetch", "bam"],
+        file: {
+          read: "read",
+          sha256: FILE_SHA256,
+          signature: "no_embedded_signature",
+          content_kind: "pe_executable",
+          trailing_data: true,
+          embedded_pe: false,
+          original_filename: "helper.exe",
+          zone_id: 3,
+          download_host: "files.example.net",
+        },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const summary = await screen.findByText("File details");
+    expect(summary.closest("details")?.open).toBe(false);
+    const details = await openFileDetails();
+    expect(details.open).toBe(true);
+    expect(FILE_SHA256).toHaveLength(64);
+    expect(
+      screen.getByText("Recorded by: Windows Prefetch, Background Activity Moderator (BAM)"),
+    ).toBeTruthy();
+    expect(screen.getByText(FILE_SHA256)).toBeTruthy();
+    expect(screen.getByText("No embedded signature")).toBeTruthy();
+    expect(screen.getByText("What the bytes are: a program (PE)")).toBeTruthy();
+    expect(screen.getByText("It has data after the end of its format.")).toBeTruthy();
+    expect(screen.getByText("Name in its version information: helper.exe")).toBeTruthy();
+    expect(screen.getByText("Download zone Windows recorded: the Internet (3)")).toBeTruthy();
+    expect(screen.getByText("Downloaded from: files.example.net")).toBeTruthy();
+    expect(screen.queryByText("It holds a program (PE) inside.")).toBeNull();
+  });
+
+  it("says a file is no longer at its path, and that a standard scan does not read it", async () => {
+    viewOverride = { ...selfView, game_windows: withFile({ file: { read: "missing" } }) };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const missing = await openFileDetails();
+    expect(
+      screen.getByText("The file is no longer at this path, so it was not read."),
+    ).toBeTruthy();
+    expect(missing.textContent).not.toContain("SHA-256");
+    cleanup();
+
+    viewOverride = { ...selfView, game_windows: withFile({ file: { read: "not_run" } }) };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const notRun = await openFileDetails();
+    expect(screen.getByText("A standard scan does not read the file.")).toBeTruthy();
+    expect(notRun.textContent).not.toContain("SHA-256");
+  });
+
+  it("shows a zone it does not name by its number, and a signer with its certificate hash", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({ file: { read: "read", zone_id: 7 } }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await openFileDetails();
+    expect(screen.getByText("Download zone Windows recorded: zone 7")).toBeTruthy();
+    cleanup();
+
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        file: { read: "read", signer: "Example Signer Ltd", signer_cert_sha256: CERT_SHA256 },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await openFileDetails();
+    expect(screen.getByText("Signer: Example Signer Ltd")).toBeTruthy();
+    expect(screen.getByText(CERT_SHA256)).toBeTruthy();
+  });
+
+  it("shows the download host as the core gives it, the placeholder included, in SS mode", async () => {
+    viewOverride = {
+      ...ssView,
+      game_windows: withFile({
+        recorded_by: ["bam"],
+        file: { read: "read", download_host: "%DOWNLOAD_HOST%" },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    await openFileDetails();
+    expect(screen.getByText("Downloaded from: %DOWNLOAD_HOST%")).toBeTruthy();
+  });
+
+  it("shows no file details for a candidate that carries neither file nor recorded_by", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Programs recorded near a game session")).toBeTruthy();
+    expect(screen.queryByText("File details")).toBeNull();
+  });
+
+  it("shows a file's kind in Thai, inside the file details", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({ file: { read: "read", content_kind: "pe_executable" } }),
+    };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    await openFileDetails();
+    expect(screen.getByText("ตัวไฟล์เป็น: โปรแกรม (PE)")).toBeTruthy();
+  });
+
+  it("adds the file-details sentence to the SS consent in English", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    expect(
+      await screen.findByText(/For a program it names, it also shows the file's details/),
+    ).toBeTruthy();
+  });
+
+  it("adds the file-details sentence to the SS consent in Thai", async () => {
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจระหว่างแชร์หน้าจอ (โหมด SS)"));
+    expect(
+      await screen.findByText(/สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย/),
     ).toBeTruthy();
   });
 });
