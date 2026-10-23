@@ -5593,6 +5593,346 @@ mod tests {
         );
     }
 
+    // ---- ADR 0078 step P6b and ADR 0079 section 3: a candidate's sources and file details ----
+    //
+    // A candidate lists the collectors that recorded one of its times, in the order `gather` reads
+    // them. Its `file` holds what `recorded_files` read of its path, from the same join as I1 and I2,
+    // so `file.read` and I1's not-known reason always agree. Evidence only, never a verdict.
+
+    const SHA256: &str = "5e0c9b7d3a1f8e42c6b0d9a7f3e1c5b8d2a4f6e0c9b7d3a1f8e42c6b0d9a7f3e";
+
+    /// The details of a file that was not read: no field copied, only what the read was.
+    fn bare(read: FileRead) -> FileDetails {
+        FileDetails {
+            read,
+            sha256: None,
+            signature: None,
+            signer: None,
+            signer_cert_sha256: None,
+            content_kind: None,
+            original_filename: None,
+            download_host: None,
+            trailing_data: None,
+            embedded_pe: None,
+            zone_id: None,
+        }
+    }
+
+    /// The file details of the candidate named `name` in `view`'s game windows.
+    fn view_file<'a>(view: &'a ReportView, name: &str) -> &'a FileDetails {
+        let windows = view
+            .game_windows
+            .as_ref()
+            .unwrap_or_else(|| panic!("no game windows"));
+        game_candidate(windows, name)
+            .file
+            .as_ref()
+            .unwrap_or_else(|| panic!("no file details for {name}"))
+    }
+
+    /// d1: a BAM candidate joins the `read` file of its path ignoring ASCII case, and its details
+    /// are the fields that file carried; a signer the file does not carry is absent.
+    #[test]
+    fn d1_a_candidate_carries_the_details_of_the_file_it_joins() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\X.EXE"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(
+            r"c:\tools\x.exe",
+            Some("read"),
+            &[
+                ("sha256", serde_json::json!(SHA256)),
+                ("signature", serde_json::json!("no_embedded_signature")),
+                ("content_kind", serde_json::json!("pe_executable")),
+                ("trailing_data", serde_json::json!(false)),
+                ("embedded_pe", serde_json::json!(false)),
+                ("original_filename", serde_json::json!("helper.exe")),
+                ("zone_id", serde_json::json!(3)),
+                ("download_host", serde_json::json!("files.example.net")),
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.recorded_by, vec!["bam"]);
+        assert_eq!(
+            candidate.file,
+            Some(FileDetails {
+                read: FileRead::Read,
+                sha256: Some(SHA256.to_owned()),
+                signature: Some("no_embedded_signature".to_owned()),
+                signer: None,
+                signer_cert_sha256: None,
+                content_kind: Some("pe_executable".to_owned()),
+                original_filename: Some("helper.exe".to_owned()),
+                download_host: Some("files.example.net".to_owned()),
+                trailing_data: Some(false),
+                embedded_pe: Some(false),
+                zone_id: Some(3),
+            })
+        );
+    }
+
+    /// d2: `identity_read` gives `file.read`, and a missing file carries no details. A field is
+    /// copied only when it is present with its JSON type, and a zone id that does not fit is absent.
+    #[test]
+    fn d2_identity_read_gives_the_file_read_and_copies_only_fields_of_their_type() {
+        let cases: [(&str, Option<&str>, FileRead); 8] = [
+            ("missing.exe", Some("missing"), FileRead::Missing),
+            ("large.exe", Some("too_large"), FileRead::TooLarge),
+            ("denied.exe", Some("access_denied"), FileRead::AccessDenied),
+            ("failed.exe", Some("failed"), FileRead::Failed),
+            ("refused.exe", Some("refused_form"), FileRead::RefusedForm),
+            ("late.exe", Some("budget_spent"), FileRead::BudgetSpent),
+            ("unlabelled.exe", None, FileRead::Failed),
+            ("odd.exe", Some("read"), FileRead::Read),
+        ];
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for (name, identity_read, _) in cases {
+            let path = format!(r"C:\Tools\{name}");
+            observations.push(recorded(
+                "bam",
+                name,
+                Some(path.as_str()),
+                "last_run",
+                "2026-01-10T09:50:00Z",
+            ));
+            let extra = match name {
+                "large.exe" => vec![
+                    ("sha256", serde_json::json!(SHA256)),
+                    ("signature", serde_json::json!("valid")),
+                ],
+                // Wrong JSON types and a zone id past `u32::MAX` are absent, not an error.
+                "odd.exe" => vec![
+                    ("sha256", serde_json::json!(7)),
+                    ("signature", serde_json::json!(["valid"])),
+                    ("trailing_data", serde_json::json!("false")),
+                    ("signer", serde_json::json!(["fixture"])),
+                    ("zone_id", serde_json::json!(4_294_967_296_u64)),
+                ],
+                _ => Vec::new(),
+            };
+            observations.push(recorded_file(&path, identity_read, &extra));
+        }
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+
+        for (name, _, read) in cases {
+            assert_eq!(view_file(&view, name).read, read, "{name}");
+        }
+        assert_eq!(
+            game_candidate(&view, "missing.exe").file,
+            Some(bare(FileRead::Missing)),
+            "a missing file has no details"
+        );
+        assert_eq!(
+            game_candidate(&view, "large.exe").file,
+            Some(FileDetails {
+                sha256: Some(SHA256.to_owned()),
+                signature: Some("valid".to_owned()),
+                ..bare(FileRead::TooLarge)
+            })
+        );
+        assert_eq!(
+            game_candidate(&view, "odd.exe").file,
+            Some(bare(FileRead::Read)),
+            "a field of the wrong JSON type, or a zone id that does not fit, is not copied"
+        );
+    }
+
+    /// d3: a candidate with no read says why, and the reason agrees with I1's not-known reason for
+    /// the same report: no `recorded_files` run, no program path, or no observation for the path.
+    #[test]
+    fn d3_no_read_says_why_and_agrees_with_i1() {
+        let mut not_run = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        not_run.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(not_run), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.file, Some(bare(FileRead::NotRun)));
+        assert_eq!(
+            candidate.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::RecordedFilesNotRun,
+            }
+        );
+
+        let mut no_path = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        no_path.push(prefetch_runs(
+            "time-only.exe",
+            None,
+            &["2026-01-10T09:50:00Z"],
+        ));
+        let view = game_windows(&game_report(no_path), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "time-only.exe");
+        assert_eq!(candidate.file, Some(bare(FileRead::NoPath)));
+        assert_eq!(
+            candidate.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoPath,
+            }
+        );
+
+        let mut no_observation = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        no_observation.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        no_observation.push(recorded_file(
+            r"C:\Other\y.exe",
+            Some("read"),
+            &[("signature", serde_json::json!("valid"))],
+        ));
+        let view = game_windows(&game_report(no_observation), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.file, Some(bare(FileRead::NoObservation)));
+        assert_eq!(
+            candidate.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoObservationForPath,
+            }
+        );
+    }
+
+    /// d4: a candidate lists each collector that recorded one of its times once, in the order
+    /// `gather` reads them (prefetch, bam, pca, process, userassist), not alphabetically. A
+    /// Prefetch-only candidate lists Prefetch.
+    #[test]
+    fn d4_recorded_by_lists_each_collector_once_in_gather_order() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "userassist",
+            "pair.exe",
+            Some(r"C:\Tools\pair.exe"),
+            "last_run",
+            "2026-01-10T09:40:00Z",
+        ));
+        for at in ["2026-01-10T09:35:00Z", "2026-01-10T09:55:00Z"] {
+            observations.push(recorded(
+                "bam",
+                "pair.exe",
+                Some(r"C:\Tools\pair.exe"),
+                "last_run",
+                at,
+            ));
+        }
+        observations.push(recorded(
+            "userassist",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:40:00Z",
+        ));
+        observations.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:35:00Z",
+        ));
+        observations.push(prefetch_runs("x.exe", None, &["2026-01-10T09:45:00Z"]));
+        observations.push(prefetch_runs(
+            "time-only.exe",
+            None,
+            &["2026-01-10T09:50:00Z"],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "pair.exe").recorded_by,
+            vec!["bam", "userassist"]
+        );
+        assert_eq!(
+            game_candidate(&view, "x.exe").recorded_by,
+            vec!["prefetch", "bam", "userassist"]
+        );
+        assert_eq!(
+            game_candidate(&view, "time-only.exe").recorded_by,
+            vec!["prefetch"]
+        );
+    }
+
+    /// d5: in SS mode a candidate's download host is the placeholder unless the player agreed to
+    /// show it, and it is the real host in Self mode; its file's hash is shown in both modes
+    /// (ADR 0079 section 6). The candidate is under Downloads, so SS mode names it.
+    #[test]
+    fn d5_ss_mode_masks_the_download_host_unless_the_player_agreed() {
+        const HOST: &str = "files.example.net";
+        const PATH: &str = r"C:\Users\fixtureuser\Downloads\saved.exe";
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "saved.exe",
+            PATH,
+            &[
+                ("sha256", serde_json::json!(SHA256)),
+                ("download_host", serde_json::json!(HOST)),
+            ],
+        ));
+        let mut report = game_report(observations);
+        report.sensitive_fields = BTreeMap::from([(
+            "recorded_files".to_owned(),
+            BTreeMap::from([("download_host".to_owned(), SensitiveKind::DownloadHost)]),
+        )]);
+
+        let hidden = for_mode_with(&report, Mode::Ss, SsOptions::default());
+        let file = view_file(&hidden, "saved.exe");
+        assert_eq!(file.download_host.as_deref(), Some("%DOWNLOAD_HOST%"));
+        assert_eq!(file.sha256.as_deref(), Some(SHA256));
+
+        let agreed = for_mode_with(
+            &report,
+            Mode::Ss,
+            SsOptions {
+                download_host: true,
+                ..SsOptions::default()
+            },
+        );
+        let file = view_file(&agreed, "saved.exe");
+        assert_eq!(file.download_host.as_deref(), Some(HOST));
+        assert_eq!(file.sha256.as_deref(), Some(SHA256));
+
+        let own = for_mode(&report, Mode::SelfCheck);
+        let file = view_file(&own, "saved.exe");
+        assert_eq!(file.download_host.as_deref(), Some(HOST));
+        assert_eq!(file.sha256.as_deref(), Some(SHA256));
+    }
+
+    /// d6: a candidate saved before this change, with neither `recorded_by` nor `file`, reads with
+    /// no sources and no details; one with no details serializes with no `file` key.
+    #[test]
+    fn d6_a_candidate_saved_before_the_details_reads_empty_and_writes_no_file_key() {
+        let saved = serde_json::json!({
+            "name": "x.exe",
+            "path": r"C:\Tools\x.exe",
+            "t1": {"fact": "true"},
+            "t2": {"fact": "false"},
+            "t3": {"fact": "false"},
+            "t4": {"fact": "false"},
+            "i1": {"fact": "true"},
+            "i2": {"fact": "false"},
+            "i3": {"fact": "false"},
+            "i4": {"fact": "false"},
+            "i5": {"fact": "not_known", "reason": "deferred"},
+            "near_sessions": {"near": 1, "found": 1},
+        });
+        let read: GameCandidate =
+            serde_json::from_value(saved).expect("a candidate saved before the details reads");
+        assert!(read.recorded_by.is_empty(), "{:?}", read.recorded_by);
+        assert_eq!(read.file, None);
+        let json = serde_json::to_value(&read).expect("a candidate serializes");
+        assert!(json.get("file").is_none(), "{json}");
+    }
+
     /// A Prefetch record that loaded `count` files from outside, as L1 reads it (ADR 0082 section 5).
     fn with_loaded_outside_count(mut observation: Observation, count: u64) -> Observation {
         observation
