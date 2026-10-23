@@ -1,6 +1,7 @@
 # ADR 0082 — What programs near a game session loaded
 
-- Status: proposed — four owner questions below; nothing is built
+- Status: accepted — the owner decided the four questions below on 2026-10-23, each as recommended;
+  nothing is built
 - Date: 2026-10-23
 - Related: ADR 0021 (the Prefetch collector; `loaded_files` and `volumes` are withheld), ADR 0052 (scan
   tiers), ADR 0062 (FiveM sessions and editions), ADR 0078 (programs recorded near a game session, sections
@@ -146,6 +147,14 @@ read are the same.
    new full-tier budget and an amendment of ADR 0078 section 8, and found nothing on the measured PC.
    Alternative: build it in this step as a new full-tier collector with 30 seconds of its own (the full
    scan's file reads grow from 90 to 120 seconds, amending ADR 0079 owner decision 1 and amendment 7).
+
+## Owner decisions (2026-10-23, each as recommended)
+
+1. **Count in a standard scan:** yes, `loaded_outside` on the `prefetch` observation.
+2. **The Enhanced game process feeds the Enhanced session's row:** yes; it is not an anchor.
+3. **L1 lists a name in SS mode and counts in the ordering:** yes, like I1–I4 (amends ADR 0078 sections 5
+   and 9).
+4. **The content read is left to a later step:** yes.
 
 ## Alternatives weighed
 
