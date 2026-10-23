@@ -1303,6 +1303,34 @@ mod tests {
         }
     }
 
+    /// ADR 0078, P6 decision 6 (2026-10-23): the consent says, after the paragraph that names what the
+    /// report shows, how SS mode treats the programs recorded near a game session, in both languages.
+    #[test]
+    fn consent_says_how_ss_mode_treats_programs_near_a_game_session() {
+        let en = consent(Lang::En);
+        assert!(
+            en.contains("In SS mode, programs recorded near your last game session are named only when"),
+            "{en}"
+        );
+        assert!(
+            en.contains(
+                "The name of a Run value or a scheduled task is not shown. In SS mode, programs recorded near your last game session are named only when a fact about the file holds: it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders. Other programs are counted, not named."
+            ),
+            "{en}"
+        );
+        let th = consent(Lang::Th);
+        assert!(
+            th.contains("ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุด"),
+            "{th}"
+        );
+        assert!(
+            th.contains(
+                "จะไม่แสดง ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุดจะแสดงชื่อเฉพาะเมื่อมีข้อเท็จจริงด้านตัวไฟล์เป็นจริง ได้แก่ ไฟล์ไม่อยู่ที่เดิมแล้ว ไม่มีลายเซ็นที่ตรวจผ่าน ชื่อไม่ตรงกับสิ่งที่ไฟล์เป็น รันจาก Temp หรือ Downloads หรือโหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น"
+            ),
+            "{th}"
+        );
+    }
+
     /// ADR 0080 section 5: a scan that reads `UserAssist` says so before it starts, in both languages,
     /// so a player agrees to the programs their account opened through the shell and to the times
     /// Windows keeps for them.
