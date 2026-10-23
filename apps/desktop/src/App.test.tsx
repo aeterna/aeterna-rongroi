@@ -1675,9 +1675,7 @@ describe("App", () => {
     await i18n.changeLanguage("th");
     render(<App />);
     fireEvent.click(await screen.findByText("ตรวจระหว่างแชร์หน้าจอ (โหมด SS)"));
-    expect(
-      await screen.findByText(/สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย/)).toBeTruthy();
   });
 
   // ADR 0078 (P6b), owner's wording of 2026-10-23: the download-host option names both sources. The

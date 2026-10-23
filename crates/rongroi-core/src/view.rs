@@ -5722,7 +5722,10 @@ mod tests {
 
         for (name, _, read) in cases {
             assert_eq!(
-                game_candidate(&view, name).file.as_ref().map(|file| file.read),
+                game_candidate(&view, name)
+                    .file
+                    .as_ref()
+                    .map(|file| file.read),
                 Some(read),
                 "{name}"
             );
