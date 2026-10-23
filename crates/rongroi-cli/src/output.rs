@@ -1339,6 +1339,26 @@ mod tests {
         );
     }
 
+    /// ADR 0078, P6b decision 4 (2026-10-23): one sentence follows the SS paragraph in both languages,
+    /// so the player agrees to the file details a named program gets, and to the website only apart.
+    #[test]
+    fn consent_says_what_file_details_ss_mode_shows_for_a_named_program() {
+        let en = consent(Lang::En);
+        assert!(
+            en.contains(
+                "Other programs are counted, not named. For a program it names, it also shows the file's details: its hash, signature and signer, what kind of file it is, the name in its version information, and its download zone. The website it came from is shown only if you agree to show websites."
+            ),
+            "{en}"
+        );
+        let th = consent(Lang::Th);
+        assert!(
+            th.contains(
+                "โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย ได้แก่ hash ลายเซ็นและผู้เซ็น ชนิดของไฟล์ ชื่อในข้อมูลเวอร์ชัน และโซนดาวน์โหลด ส่วนชื่อเว็บที่ดาวน์โหลดแสดงเฉพาะเมื่อคุณยินยอมให้แสดงชื่อเว็บ"
+            ),
+            "{th}"
+        );
+    }
+
     /// ADR 0080 section 5: a scan that reads `UserAssist` says so before it starts, in both languages,
     /// so a player agrees to the programs their account opened through the shell and to the times
     /// Windows keeps for them.

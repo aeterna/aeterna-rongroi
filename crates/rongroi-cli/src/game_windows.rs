@@ -283,8 +283,8 @@ fn identity_reason(reason: &IdentityNotKnownReason) -> &'static str {
 mod tests {
     use rongroi_core::model::Mode;
     use rongroi_core::view::{
-        GameCandidate, GameSession, GameWindows, IdentityFact, IdentityNotKnownReason,
-        NearSessions, NotKnownReason, TimeFact, WindowCounts,
+        FileDetails, FileRead, GameCandidate, GameSession, GameWindows, IdentityFact,
+        IdentityNotKnownReason, NearSessions, NotKnownReason, TimeFact, WindowCounts,
     };
 
     use super::section;
@@ -330,6 +330,8 @@ mod tests {
             near_sessions: NearSessions { near: 1, found: 1 },
             installed_at: Vec::new(),
             refused_by_code_integrity: false,
+            file: None,
+            recorded_by: Vec::new(),
         }
     }
 
@@ -558,6 +560,149 @@ mod tests {
         );
     }
 
+    /// A SHA-256 as the view holds it: 64 hex characters.
+    const SHA256: &str = "5e0c9b7d3a1f8e42c6b0d9a7f3e1c5b8d2a4f6e0c9b7d3a1f8e42c6b0d9a7f3e";
+
+    /// The details of a file that was not read: no field copied, only what the read was.
+    fn bare(read: FileRead) -> FileDetails {
+        FileDetails {
+            read,
+            sha256: None,
+            signature: None,
+            signer: None,
+            signer_cert_sha256: None,
+            content_kind: None,
+            original_filename: None,
+            download_host: None,
+            trailing_data: None,
+            embedded_pe: None,
+            zone_id: None,
+        }
+    }
+
+    /// One session, and one candidate in a game window with the given file details and the collectors
+    /// that recorded it.
+    fn view_with_one_file(file: Option<FileDetails>, recorded_by: &[&str]) -> GameWindows {
+        let mut shown = candidate("helper.exe", Some("C:\\Tools\\helper.exe"));
+        shown.t2 = TimeFact::True;
+        shown.file = file;
+        shown.recorded_by = recorded_by.iter().map(|source| (*source).to_owned()).collect();
+        GameWindows {
+            sessions: vec![legacy_session()],
+            candidates: vec![shown],
+            ..GameWindows::default()
+        }
+    }
+
+    /// (P6b c1) Self mode, English: a candidate's file details follow its own lines, under a "File
+    /// details" heading, each on its own line at six spaces and in the order the desktop shows them.
+    #[test]
+    fn file_details_print_under_the_candidate_in_order() {
+        let file = FileDetails {
+            sha256: Some(SHA256.to_owned()),
+            signature: Some("no_embedded_signature".to_owned()),
+            content_kind: Some("pe_executable".to_owned()),
+            trailing_data: Some(true),
+            embedded_pe: Some(false),
+            original_filename: Some("helper.exe".to_owned()),
+            zone_id: Some(3),
+            download_host: Some("files.example.net".to_owned()),
+            ..bare(FileRead::Read)
+        };
+        let view = view_with_one_file(Some(file), &["prefetch", "bam"]);
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        let lines = [
+            "    File details".to_owned(),
+            "      Recorded by: Windows Prefetch, Background Activity Moderator (BAM)".to_owned(),
+            format!("      SHA-256: {SHA256}"),
+            "      No embedded signature".to_owned(),
+            "      What the bytes are: a program (PE)".to_owned(),
+            "      It has data after the end of its format.".to_owned(),
+            "      Name in its version information: helper.exe".to_owned(),
+            "      Download zone Windows recorded: the Internet (3)".to_owned(),
+            "      Downloaded from: files.example.net".to_owned(),
+        ];
+        let mut previous = text.find("· recorded during a session");
+        assert!(previous.is_some(), "the candidate's own fact is missing in\n{text}");
+        for line in &lines {
+            assert!(
+                text.lines().any(|shown| shown == line.as_str()),
+                "missing {line:?} in\n{text}"
+            );
+            let at = text.find(line.as_str());
+            assert!(
+                at > previous,
+                "{line:?} is out of order, or before the candidate's own lines, in\n{text}"
+            );
+            previous = at;
+        }
+        assert!(
+            !text.contains("It holds a program (PE) inside."),
+            "embedded_pe is false, yet its line is printed in\n{text}"
+        );
+    }
+
+    /// (P6b c2) A file that was not read says why, and prints no hash: a hash line for a file that
+    /// was never read would be a value the program did not measure.
+    #[test]
+    fn a_file_that_was_not_read_says_why_and_prints_no_hash() {
+        let missing = view_with_one_file(Some(bare(FileRead::Missing)), &["bam"]);
+        let text = section(Some(&missing), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.lines()
+                .any(|line| line == "      The file is no longer at this path, so it was not read."),
+            "{text}"
+        );
+        assert!(!text.contains("SHA-256"), "{text}");
+
+        let not_run = view_with_one_file(Some(bare(FileRead::NotRun)), &["bam"]);
+        let text = section(Some(&not_run), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.lines()
+                .any(|line| line == "      A standard scan does not read the file."),
+            "{text}"
+        );
+        assert!(!text.contains("SHA-256"), "{text}");
+    }
+
+    /// (P6b c3) A zone the Windows names do not cover is printed by its number, and a candidate with
+    /// neither file details nor a collector has no file details heading at all.
+    #[test]
+    fn an_unnamed_zone_is_printed_by_number_and_no_file_has_no_heading() {
+        let file = FileDetails {
+            zone_id: Some(7),
+            ..bare(FileRead::Read)
+        };
+        let view = view_with_one_file(Some(file), &[]);
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.lines()
+                .any(|line| line == "      Download zone Windows recorded: zone 7"),
+            "{text}"
+        );
+
+        let bare_view = view_with_one_file(None, &[]);
+        let text = section(Some(&bare_view), Mode::SelfCheck, Lang::En);
+        assert!(!text.contains("File details"), "{text}");
+    }
+
+    /// (P6b c4) Thai: the file details heading and the kind of file are in Thai.
+    #[test]
+    fn thai_names_the_file_details_and_the_kind_of_file() {
+        let file = FileDetails {
+            content_kind: Some("pe_executable".to_owned()),
+            ..bare(FileRead::Read)
+        };
+        let view = view_with_one_file(Some(file), &["prefetch"]);
+        let text = section(Some(&view), Mode::SelfCheck, Lang::Th);
+        assert!(text.lines().any(|line| line == "    รายละเอียดไฟล์"), "{text}");
+        assert!(
+            text.lines()
+                .any(|line| line == "      ตัวไฟล์เป็น: โปรแกรม (PE)"),
+            "{text}"
+        );
+    }
+
     /// The text at the dotted `key` in a locale file, or `None`. Read from the file itself, not through
     /// `Words`, which falls back to English and would hide a key missing from Thai.
     fn own_text(locale: &str, key: &str) -> Option<String> {
@@ -621,6 +766,49 @@ mod tests {
             "session.session",
             "session.edition.legacy",
             "session.edition.enhanced",
+            "game.file.title",
+            "game.file.recorded_by",
+            "game.file.read.missing",
+            "game.file.read.too_large",
+            "game.file.read.access_denied",
+            "game.file.read.failed",
+            "game.file.read.refused_form",
+            "game.file.read.budget_spent",
+            "game.file.read.not_run",
+            "game.file.read.no_path",
+            "game.file.read.no_observation",
+            "game.file.sha256",
+            "game.file.signature.valid",
+            "game.file.signature.invalid",
+            "game.file.signature.no_embedded_signature",
+            "game.file.signature.unverifiable_offline",
+            "game.file.signer",
+            "game.file.signer_cert",
+            "game.file.kind.label",
+            "game.file.kind.pe_executable",
+            "game.file.kind.pe_dll",
+            "game.file.kind.pe_driver",
+            "game.file.kind.archive",
+            "game.file.kind.image",
+            "game.file.kind.script",
+            "game.file.kind.unknown",
+            "game.file.trailing_data",
+            "game.file.embedded_pe",
+            "game.file.original_filename",
+            "game.file.zone",
+            "game.file.zone_name.0",
+            "game.file.zone_name.1",
+            "game.file.zone_name.2",
+            "game.file.zone_name.3",
+            "game.file.zone_name.4",
+            "game.file.zone_other",
+            "game.file.download_host",
+            // The collectors a candidate's `recorded_by` line names (`collector.<id>`).
+            "collector.prefetch",
+            "collector.bam",
+            "collector.pca",
+            "collector.process",
+            "collector.userassist",
         ]
         .map(str::to_owned)
         .to_vec();
