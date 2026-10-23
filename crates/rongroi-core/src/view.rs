@@ -5576,4 +5576,151 @@ mod tests {
             }
         );
     }
+
+    /// A Prefetch record that loaded `count` files from outside, as L1 reads it (ADR 0082 section 5).
+    fn with_loaded_outside_count(mut observation: Observation, count: u64) -> Observation {
+        observation
+            .fields
+            .insert("loaded_outside".to_owned(), serde_json::Value::from(count));
+        observation
+    }
+
+    /// The report the ADR 0078 section 9 tests read: the Legacy session, a Prefetch `rundll32.exe`
+    /// that loaded a file from outside (true L1, so SS mode lists it), a Prefetch `plain.exe` and a
+    /// BAM `bam-only.exe` with no true identity fact (SS mode counts them without naming them). Each
+    /// candidate has times in more than one window.
+    fn unnamed_report() -> Report {
+        let mut observations = legacy_sessions(&[GAME_START_1], Some(GAME_END));
+        observations.push(with_loaded_outside_count(
+            prefetch_runs(
+                "rundll32.exe",
+                None,
+                &["2026-01-10T09:00:00Z", "2026-01-10T07:50:00Z"],
+            ),
+            1,
+        ));
+        observations.push(prefetch_runs(
+            "plain.exe",
+            None,
+            &[
+                "2026-01-10T11:30:00Z",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T07:40:00Z",
+            ],
+        ));
+        observations.push(recorded(
+            "bam",
+            "bam-only.exe",
+            Some(r"C:\Tools\bam-only.exe"),
+            "last_run",
+            "2026-01-10T09:30:00Z",
+        ));
+        game_report(observations)
+    }
+
+    /// a1: the view carries the game-windows view of its own mode, in both modes (ADR 0078 section 9).
+    #[test]
+    fn a1_the_view_carries_the_game_windows_of_its_mode() {
+        let report = unnamed_report();
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert_eq!(
+            own.game_windows,
+            Some(game_windows(&report, Mode::SelfCheck))
+        );
+        let ss = for_mode(&report, Mode::Ss);
+        assert_eq!(ss.game_windows, Some(game_windows(&report, Mode::Ss)));
+    }
+
+    /// a2: with no `FiveM` record the view has no game windows, and its JSON has no such key
+    /// (ADR 0078 section 2).
+    #[test]
+    fn a2_no_fivem_record_means_no_game_windows_in_the_view() {
+        let report = game_report(vec![prefetch_runs(
+            "other.exe",
+            None,
+            &["2026-01-10T09:00:00Z"],
+        )]);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let view = for_mode(&report, mode);
+            assert_eq!(view.game_windows, None, "{mode:?}");
+            let json = serde_json::to_value(&view).unwrap();
+            assert!(json.get("game_windows").is_none(), "{mode:?}: {json}");
+        }
+    }
+
+    /// a3: in SS mode, for each window, the candidates SS mode counts without naming plus the listed
+    /// candidates whose fact for that window is true equal the window's count (ADR 0078 section 9).
+    #[test]
+    fn a3_ss_unnamed_and_listed_true_facts_add_up_to_the_counts() {
+        let report = unnamed_report();
+        let own = game_windows(&report, Mode::SelfCheck);
+        let ss = game_windows(&report, Mode::Ss);
+        assert!(!ss.candidates.is_empty(), "SS mode lists no candidate");
+        assert!(
+            ss.candidates.len() < own.candidates.len(),
+            "SS mode lists every candidate"
+        );
+        // `plain.exe` has a time in the before window and no true identity fact, so it is unnamed.
+        assert_eq!(ss.unnamed.before, 1);
+        let listed = |fact: fn(&GameCandidate) -> &TimeFact| {
+            ss.candidates
+                .iter()
+                .filter(|candidate| *fact(candidate) == TimeFact::True)
+                .count()
+        };
+        let windows = [
+            (
+                "before",
+                ss.unnamed.before,
+                listed(|c| &c.t1),
+                ss.counts.before,
+            ),
+            (
+                "during",
+                ss.unnamed.during,
+                listed(|c| &c.t2),
+                ss.counts.during,
+            ),
+            (
+                "after",
+                ss.unnamed.after,
+                listed(|c| &c.t3),
+                ss.counts.after,
+            ),
+            (
+                "before_scan",
+                ss.unnamed.before_scan,
+                listed(|c| &c.t4),
+                ss.counts.before_scan,
+            ),
+        ];
+        for (window, unnamed, named, counted) in windows {
+            assert_eq!(unnamed + named, counted, "{window}");
+        }
+    }
+
+    /// a4: Self mode names every candidate, so its `unnamed` is zero in every window; a saved view
+    /// without `unnamed` reads as zero in every window (ADR 0078 section 9).
+    #[test]
+    fn a4_self_mode_has_no_unnamed_and_a_saved_view_without_it_reads_as_zero() {
+        let report = unnamed_report();
+        let own = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(own.unnamed.before, 0, "before");
+        assert_eq!(own.unnamed.during, 0, "during");
+        assert_eq!(own.unnamed.after, 0, "after");
+        assert_eq!(own.unnamed.before_scan, 0, "before_scan");
+
+        let ss = game_windows(&report, Mode::Ss);
+        let mut saved = serde_json::to_value(&ss).unwrap();
+        let removed = saved
+            .as_object_mut()
+            .and_then(|object| object.remove("unnamed"));
+        assert!(removed.is_some(), "no unnamed key to remove: {saved}");
+        let read: GameWindows = serde_json::from_value(saved).unwrap();
+        assert_eq!(read.unnamed.before, 0, "before");
+        assert_eq!(read.unnamed.during, 0, "during");
+        assert_eq!(read.unnamed.after, 0, "after");
+        assert_eq!(read.unnamed.before_scan, 0, "before_scan");
+        assert_eq!(read.counts, ss.counts);
+    }
 }
