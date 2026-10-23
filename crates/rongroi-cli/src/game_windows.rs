@@ -11,7 +11,7 @@ use std::fmt::Write as _;
 use rongroi_core::model::Mode;
 use rongroi_core::view::{
     ClockHistory, GameCandidate, GameSession, GameWindows, IdentityFact, IdentityNotKnownReason,
-    TimeFact, WindowCounts,
+    NotKnownReason, TimeFact, WindowCounts,
 };
 
 use crate::output::Lang;
@@ -98,15 +98,16 @@ pub fn section(view: Option<&GameWindows>, mode: Mode, lang: Lang) -> String {
 fn session_lines(out: &mut String, words: &Words, session: &GameSession) {
     let edition = words.get(&format!("session.edition.{}", session.edition), &[]);
     let _ = writeln!(out, "  {} {edition}", words.get("session.session", &[]));
-    match &session.end {
-        Some(end) => {
-            let _ = writeln!(out, "    {} – {end}", session.start);
-        }
-        None => {
-            let _ = writeln!(out, "    {}", session.start);
-        }
-    }
+    // An earlier session's start is in its "began" line; a span line would repeat it.
     if session.latest {
+        match &session.end {
+            Some(end) => {
+                let _ = writeln!(out, "    {} – {end}", session.start);
+            }
+            None => {
+                let _ = writeln!(out, "    {}", session.start);
+            }
+        }
         let _ = writeln!(out, "    {}", words.get("game.session.latest", &[]));
         let _ = writeln!(
             out,
@@ -202,13 +203,30 @@ fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
         ("t4", &candidate.t4),
     ];
     for (id, fact) in times {
-        if matches!(fact, TimeFact::True) {
-            let _ = writeln!(
-                out,
-                "    · {}  ({})",
-                words.get(&format!("game.fact.{id}"), &[]),
-                words.get(&format!("game.cause.{id}"), &[])
-            );
+        match fact {
+            TimeFact::True => {
+                let _ = writeln!(
+                    out,
+                    "    · {}  ({})",
+                    words.get(&format!("game.fact.{id}"), &[]),
+                    words.get(&format!("game.cause.{id}"), &[])
+                );
+            }
+            TimeFact::False => {}
+            TimeFact::NotKnown { reason } => {
+                let (key, source) = time_reason(reason);
+                let note = match source {
+                    Some(source) => {
+                        words.get(&format!("game.nk.{key}"), &[("source", source)])
+                    }
+                    None => words.get(&format!("game.nk.{key}"), &[]),
+                };
+                let _ = writeln!(
+                    out,
+                    "    ? {}: {note}",
+                    words.get(&format!("game.fact.{id}"), &[])
+                );
+            }
         }
     }
     // R is a count of sessions, so it is a fact only once a second session holds the same program.
@@ -239,6 +257,16 @@ fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
     }
 }
 
+/// The locale key's reason for a time fact that is not known (ADR 0078 section 5), and the source a
+/// `before_trace_age` names.
+fn time_reason(reason: &NotKnownReason) -> (&'static str, Option<&str>) {
+    match reason {
+        NotKnownReason::SessionEndNotRecorded => ("session_end_not_recorded", None),
+        NotKnownReason::ScanTimeNotRecorded => ("scan_time_not_recorded", None),
+        NotKnownReason::BeforeTraceAge { source } => ("before_trace_age", Some(source)),
+    }
+}
+
 /// The locale key's reason for a file identity fact that is not known (ADR 0079, ADR 0082).
 fn identity_reason(reason: &IdentityNotKnownReason) -> &'static str {
     match reason {
@@ -258,7 +286,7 @@ mod tests {
     use rongroi_core::model::Mode;
     use rongroi_core::view::{
         GameCandidate, GameSession, GameWindows, IdentityFact, IdentityNotKnownReason,
-        NearSessions, TimeFact, WindowCounts,
+        NearSessions, NotKnownReason, TimeFact, WindowCounts,
     };
 
     use super::section;
@@ -471,6 +499,67 @@ mod tests {
         );
     }
 
+    /// (c7) A time fact that is not known is printed as a `?` line with its reason, never left out: an
+    /// absent line would read as "no" (ADR 0078 section 5).
+    #[test]
+    fn a_not_known_time_fact_is_printed_with_its_reason() {
+        let mut shown = candidate("payload.exe", None);
+        shown.t4 = TimeFact::NotKnown {
+            reason: NotKnownReason::ScanTimeNotRecorded,
+        };
+        shown.t1 = TimeFact::NotKnown {
+            reason: NotKnownReason::BeforeTraceAge {
+                source: "prefetch".to_owned(),
+            },
+        };
+        let view = GameWindows {
+            sessions: vec![legacy_session()],
+            candidates: vec![shown],
+            ..GameWindows::default()
+        };
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        let before_trace_age = "    ? recorded in the 30 minutes before a session: not known: prefetch does not reach back that far";
+        let scan_time = "    ? recorded between the session and this scan: not known: the scan's time is not recorded";
+        assert!(
+            text.lines().any(|line| line == before_trace_age),
+            "missing {before_trace_age:?} in\n{text}"
+        );
+        assert!(
+            text.lines().any(|line| line == scan_time),
+            "missing {scan_time:?} in\n{text}"
+        );
+    }
+
+    /// (c8) An earlier session gives its start once, in its "began" line, not again in a span line.
+    #[test]
+    fn an_earlier_session_gives_its_start_once() {
+        let earlier = GameSession {
+            edition: "legacy".to_owned(),
+            start: "2026-10-18T19:00:00Z".to_owned(),
+            end: None,
+            latest: false,
+            l1: IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::EarlierSession,
+            },
+            loaded_outside: None,
+        };
+        let view = GameWindows {
+            sessions: vec![earlier, legacy_session()],
+            ..GameWindows::default()
+        };
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.lines()
+                .any(|line| line == "    earlier session, began 2026-10-18T19:00:00Z"),
+            "{text}"
+        );
+        assert_eq!(
+            text.matches("2026-10-18T19:00:00Z").count(),
+            1,
+            "the earlier session's start is printed more than once in\n{text}"
+        );
+    }
+
     /// The text at the dotted `key` in a locale file, or `None`. Read from the file itself, not through
     /// `Words`, which falls back to English and would hide a key missing from Thai.
     fn own_text(locale: &str, key: &str) -> Option<String> {
@@ -505,6 +594,9 @@ mod tests {
             "game.fact.t3",
             "game.fact.t4",
             "game.fact.r",
+            "game.nk.session_end_not_recorded",
+            "game.nk.scan_time_not_recorded",
+            "game.nk.before_trace_age",
             "game.cause.i1",
             "game.cause.i2",
             "game.cause.i3",

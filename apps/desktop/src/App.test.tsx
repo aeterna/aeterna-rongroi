@@ -1418,6 +1418,59 @@ describe("App", () => {
     expect(screen.queryByText("loaded from outside the usual folders: 2 files")).toBeNull();
   });
 
+  it("says a time fact that is not known, with its reason, in Self mode", async () => {
+    const [candidate] = gameWindows().candidates;
+    if (!candidate) throw new Error("the test view has no candidate");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        candidates: [
+          {
+            ...candidate,
+            t1: {
+              fact: "not_known",
+              reason: { reason: "before_trace_age", source: "prefetch" },
+            },
+            t4: { fact: "not_known", reason: { reason: "scan_time_not_recorded" } },
+          },
+        ],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "recorded in the 30 minutes before a session: not known: prefetch does not reach back that far",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "recorded between the session and this scan: not known: the scan's time is not recorded",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("gives an earlier session's start once, in its began line", async () => {
+    const [latest] = gameWindows().sessions;
+    if (!latest) throw new Error("the test view has no session");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        sessions: [
+          latest,
+          { edition: "legacy", start: "2026-10-18T19:00:00Z", end: null, latest: false },
+        ],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("earlier session, began 2026-10-18T19:00:00Z")).toBeTruthy();
+    const section = screen.getByText("Programs recorded near a game session").closest("section");
+    if (!section) throw new Error("the game-window section is not rendered");
+    const occurrences = (section.textContent ?? "").split("2026-10-18T19:00:00Z").length - 1;
+    expect(occurrences).toBe(1);
+  });
+
   it("shows the SS rule and the unnamed counts, and no window chips, in SS mode", async () => {
     viewOverride = { ...ssView, game_windows: gameWindows() };
     render(<App />);

@@ -37,14 +37,15 @@ export function GameWindowsSection({ view, mode }: { view: ReportView; mode: Mod
       <dl className="game-facts">
         {windows.sessions.map((session) => {
           const range = session.end ? `${session.start} – ${session.end}` : session.start;
+          // An earlier session's start is in its "began" line; its range would repeat it.
           const position = session.latest
-            ? t("game.session.latest")
+            ? `${range} ${t("game.session.latest")}`
             : t("game.session.earlier", { at: session.start });
           const key = `${session.edition}:${session.start}:${session.latest ? "latest" : "earlier"}`;
           return (
             <Fragment key={key}>
               <dt>{`${t("session.session")} ${t(`session.edition.${session.edition}`)}`}</dt>
-              <dd>{`${range} ${position}`}</dd>
+              <dd>{position}</dd>
               {session.latest && session.l1 && (
                 <>
                   <dt>{t("game.session.l1_label")}</dt>
@@ -134,6 +135,9 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
   const unknownFacts = identity.flatMap(([key, fact]) =>
     fact?.fact === "not_known" ? [{ key, reason: fact.reason.reason }] : [],
   );
+  const unknownTimes = times.flatMap(([key, fact]) =>
+    fact.fact === "not_known" ? [{ key, reason: fact.reason }] : [],
+  );
   const { near, found } = candidate.near_sessions;
   const installs = candidate.installed_at ?? [];
 
@@ -171,6 +175,13 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
         {unknownFacts.map(({ key, reason }) => (
           <li key={key} className="muted">
             {`${t(`game.fact.${key}`)}: ${t(`game.nk.${reason}`)}`}
+          </li>
+        ))}
+        {unknownTimes.map(({ key, reason }) => (
+          <li key={key} className="muted">
+            {`${t(`game.fact.${key}`)}: ${t(`game.nk.${reason.reason}`, {
+              source: reason.reason === "before_trace_age" ? reason.source : undefined,
+            })}`}
           </li>
         ))}
       </ul>
