@@ -467,3 +467,14 @@ names, with `download_host` as `%DOWNLOAD_HOST%` unless the player agreed to sho
 
 - ไทย: สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย ได้แก่ hash ลายเซ็นและผู้เซ็น ชนิดของไฟล์ ชื่อในข้อมูลเวอร์ชัน และโซนดาวน์โหลด ส่วนชื่อเว็บที่ดาวน์โหลดแสดงเฉพาะเมื่อคุณยินยอมให้แสดงชื่อเว็บ
 - English: For a program it names, it also shows the file's details: its hash, signature and signer, what kind of file it is, the name in its version information, and its download zone. The website it came from is shown only if you agree to show websites.
+
+**The download-host option (owner, 2026-10-23, as drafted).** ADR 0079 owner decision 4 puts a file's
+download host under ADR 0064's existing SS option, whose wording named PowerShell only. From P6b it names
+both:
+
+- Desktop, `common.json` `download_host`:
+  - ไทย: แสดงชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาด้วย ถ้าปิดไว้ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST%
+  - English: Also show the name of each website a PowerShell command, or a recorded program's file, was downloaded from. Off: each name is shown as %DOWNLOAD_HOST%.
+- CLI, `download_host_question`:
+  - ไทย: ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาหรือไม่ อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง ถ้าไม่ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST% [y/N]
+  - English: Show the person watching the name of each website a PowerShell command, or a recorded program's file, was downloaded from? Only the name is read, never the rest of the address or the command. If not, each name is shown as %DOWNLOAD_HOST%. [y/N]
