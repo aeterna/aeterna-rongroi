@@ -19,11 +19,14 @@
 //!
 //! A `.pf` file's string table is the sharpest privacy boundary in this program:
 //!
-//! - **`loaded_files` is withheld whole.** It is normally hundreds of paths, some of them under a
-//!   user's profile, and Prefetch writes them as `\VOLUME{…}\USERS\<account>\…` — a shape
-//!   `rongroi_core::view::redact_profile_paths` does not touch, because it has no drive letter. It is
-//!   also, on its own, a list of what a person has on their computer, which ADR 0014 already refused
-//!   to let redaction stand in for withholding.
+//! - **`loaded_files` is withheld whole, but one count is derived from it.** It is normally hundreds
+//!   of paths, some of them under a user's profile, and Prefetch writes them as
+//!   `\VOLUME{…}\USERS\<account>\…` — a shape `rongroi_core::view::redact_profile_paths` does not
+//!   touch, because it has no drive letter. It is also, on its own, a list of what a person has on
+//!   their computer, which ADR 0014 already refused to let redaction stand in for withholding. The
+//!   list is still never emitted. For the programs ADR 0082 names, `loaded_outside` is how many of
+//!   its executable files were loaded from outside Windows' and the installers' folders: a number,
+//!   with no path or name in it.
 //! - **`volumes` is withheld whole**, device path, serial number and creation time alike. A volume
 //!   serial is not a person's name, but it identifies one machine across two reports, no rule can
 //!   express a question about it, and the device path is the prefix of the list above.
@@ -48,6 +51,7 @@
 
 use std::collections::BTreeMap;
 
+use rongroi_core::loaded_files::{counts_loaded_files, has_pe_extension};
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
@@ -66,6 +70,14 @@ pub const SYSTEM_ROOT: &str = "SystemRoot";
 pub const PREFETCH_RELATIVE_PATH: &str = "Prefetch";
 /// Extension of the files Windows writes there, lower-cased for comparison.
 const PREFETCH_EXTENSION: &str = ".pf";
+/// The prefix of a device path in a string table, before the volume's identifier.
+const VOLUME_PREFIX: &str = r"\VOLUME{";
+/// The system library whose entry names the system volume: every Windows install has one.
+const SYSTEM_LIBRARY: &str = r"\Windows\System32\ntdll.dll";
+/// Folders on the system volume whose files Windows or an installer put there, as `rest` begins.
+const SYSTEM_FOLDERS: [&str; 3] = [r"\Windows\", r"\Program Files\", r"\Program Files (x86)\"];
+/// Why `loaded_outside` gives no count: there is no single system volume to compare entries with.
+const NO_SYSTEM_VOLUME: &str = "no_system_volume";
 
 /// The key holding the switch that decides whether Windows writes these files at all.
 pub const PREFETCH_PARAMETERS_KEY: &str =
@@ -100,7 +112,7 @@ const REASONS: [UnmeasuredReason; 8] = [
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
 /// the comment on [`Prefetch::collect`].
-const FIELDS: [Field; 18] = [
+const FIELDS: [Field; 20] = [
     Field::number("enable_prefetcher"),
     Field::number("entries"),
     Field::number("files"),
@@ -109,6 +121,8 @@ const FIELDS: [Field; 18] = [
     Field::boolean("intact"),
     Field::timestamp("last_run"),
     Field::text("loaded_files_withheld"),
+    Field::number("loaded_outside"),
+    Field::text("loaded_outside_unknown"),
     Field::text("name"),
     Field::text("path"),
     Field::text("read"),
@@ -127,9 +141,11 @@ const FIELDS: [Field; 18] = [
 /// all describe a folder this collector **did** read, so gapping `files`, `entries`, `rejected` or
 /// `intact` — which were measured — would claim it had not. The reasons that describe a folder
 /// nothing was read from keep gapping every field (ADR 0030).
-const RECORD_FIELDS: [&str; 8] = [
+const RECORD_FIELDS: [&str; 10] = [
     fivem_edition::FIELD,
     "last_run",
+    "loaded_outside",
+    "loaded_outside_unknown",
     "name",
     "path",
     "recorded_runs",
@@ -441,6 +457,24 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
             serde_json::Value::from(edition.as_str()),
         );
     }
+    // Only for the programs ADR 0082 names. The count is derived from `loaded_files`, and nothing
+    // else of that list reaches the observation.
+    if counts_loaded_files(&record.executable) {
+        match loaded_outside(&record.loaded_files) {
+            Ok(count) => {
+                fields.insert(
+                    "loaded_outside".to_owned(),
+                    serde_json::Value::from(count),
+                );
+            }
+            Err(word) => {
+                fields.insert(
+                    "loaded_outside_unknown".to_owned(),
+                    serde_json::Value::from(word),
+                );
+            }
+        }
+    }
     fields.insert(
         "run_count".to_owned(),
         serde_json::Value::from(record.run_count),
@@ -478,6 +512,71 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
         collector: ID.to_owned(),
         fields,
     }
+}
+
+/// How many of a program's loaded files are executable and sit outside the folders Windows and the
+/// installers use, or why there is no count.
+///
+/// Every entry's device prefix is compared with the system volume's, which is the one the system's
+/// own `ntdll.dll` is on. Without exactly one such volume the entries cannot be told apart by
+/// volume, so no count is given rather than a guess (ADR 0082 section 2). An entry with no device
+/// prefix, and NTFS metadata (`\$`), is not a file a program loaded and is skipped.
+fn loaded_outside(loaded_files: &[String]) -> Result<usize, &'static str> {
+    let mut system: Option<&str> = None;
+    for entry in loaded_files {
+        let Some((volume, rest)) = split_volume(entry) else {
+            continue;
+        };
+        if !rest.eq_ignore_ascii_case(SYSTEM_LIBRARY) {
+            continue;
+        }
+        match system {
+            None => system = Some(volume),
+            Some(known) if !known.eq_ignore_ascii_case(volume) => {
+                return Err(NO_SYSTEM_VOLUME);
+            }
+            Some(_) => {}
+        }
+    }
+    let system = system.ok_or(NO_SYSTEM_VOLUME)?;
+
+    let mut outside = 0;
+    for entry in loaded_files {
+        let Some((volume, rest)) = split_volume(entry) else {
+            continue;
+        };
+        if rest.starts_with(r"\$") {
+            continue;
+        }
+        // A `FiveM` program folder is expected on any volume, because it is the program's own.
+        let expected = (volume.eq_ignore_ascii_case(system) && in_system_folder(rest))
+            || fivem_edition::of_path(entry).is_some();
+        if !expected && has_pe_extension(entry) {
+            outside += 1;
+        }
+    }
+    Ok(outside)
+}
+
+/// Splits an entry `\VOLUME{…}\rest` into its device prefix and its rest, which keeps the backslash
+/// that follows the closing brace. `None` for an entry of any other shape.
+fn split_volume(entry: &str) -> Option<(&str, &str)> {
+    let head = entry.get(..VOLUME_PREFIX.len())?;
+    if !head.eq_ignore_ascii_case(VOLUME_PREFIX) {
+        return None;
+    }
+    let close = entry.find('}')?;
+    let volume = entry.get(..=close)?;
+    let rest = entry.get(close + 1..)?;
+    rest.starts_with('\\').then_some((volume, rest))
+}
+
+/// Whether `rest` lies below one of `SYSTEM_FOLDERS`, ignoring ASCII case.
+fn in_system_folder(rest: &str) -> bool {
+    SYSTEM_FOLDERS.iter().any(|folder| {
+        rest.get(..folder.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(folder))
+    })
 }
 
 /// What the folder held, how much of it decoded, and what this collector did not report.
