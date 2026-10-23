@@ -6,6 +6,252 @@
 //! a `FiveM` session, in Self and SS mode and in both languages. Its words are the desktop's locale
 //! files, read through the same loader as the trace-ages section.
 
+use std::fmt::Write as _;
+
+use rongroi_core::model::Mode;
+use rongroi_core::view::{
+    ClockHistory, GameCandidate, GameSession, GameWindows, IdentityFact, IdentityNotKnownReason,
+    TimeFact, WindowCounts,
+};
+
+use crate::output::Lang;
+use crate::trace_ages::Words;
+
+/// The game-window section (ADR 0078, P6 decisions 3 to 7): its title and intro, each session, the
+/// window counts, the clock and install notes, then each candidate with its facts. Nothing when there
+/// is no view.
+pub fn section(view: Option<&GameWindows>, mode: Mode, lang: Lang) -> String {
+    let Some(view) = view else {
+        return String::new();
+    };
+    let words = Words::new(lang);
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "\n{} ({})",
+        words.get("game.title", &[]),
+        words.get("game.experimental", &[])
+    );
+    let _ = writeln!(out, "{}", words.get("game.intro", &[]));
+    // SS mode says which programs it names and why, before any of them is listed.
+    if mode == Mode::Ss {
+        let _ = writeln!(out, "{}", words.get("game.ss_rule", &[]));
+    }
+    for session in &view.sessions {
+        session_lines(&mut out, &words, session);
+    }
+    // Self mode counts every candidate; SS mode counts only the programs it does not name.
+    let counts = match mode {
+        Mode::SelfCheck => window_line(&words, &view.counts),
+        Mode::Ss => words.get(
+            "game.ss_counts",
+            &[("list", &window_line(&words, &view.unnamed))],
+        ),
+    };
+    let _ = writeln!(out, "  {counts}");
+    let installs = &view.unmatched_installs;
+    for (window, count) in [
+        ("before", installs.before),
+        ("during", installs.during),
+        ("after", installs.after),
+    ] {
+        if count > 0 {
+            let note = words.get(
+                "game.note.unmatched_installs",
+                &[("count", &count.to_string())],
+            );
+            let _ = writeln!(
+                out,
+                "  {}: {note}",
+                words.get(&format!("game.window.{window}"), &[])
+            );
+        }
+    }
+    // A clock change is stated with both times only when both were recorded; the caveat is said once
+    // when the System log does not reach back far enough to show every change.
+    for change in &view.clock.changes {
+        let detail = match (&change.old_time, &change.new_time) {
+            (Some(old), Some(new)) => words.get("game.clock.detail", &[("old", old), ("new", new)]),
+            _ => String::new(),
+        };
+        let _ = writeln!(
+            out,
+            "  {}",
+            words.get(
+                "game.clock.changed",
+                &[("at", &change.changed_at), ("detail", &detail)],
+            )
+        );
+    }
+    if view.clock.history == ClockHistory::NotKnown {
+        let _ = writeln!(out, "  {}", words.get("game.clock.not_known", &[]));
+    }
+    let _ = writeln!(out, "  {}", words.get("game.order", &[]));
+    for candidate in &view.candidates {
+        candidate_lines(&mut out, &words, candidate);
+    }
+    out
+}
+
+/// A session's header, its span, and its marker: the latest one also says whether its L1 fact holds.
+fn session_lines(out: &mut String, words: &Words, session: &GameSession) {
+    let edition = words.get(&format!("session.edition.{}", session.edition), &[]);
+    let _ = writeln!(out, "  {} {edition}", words.get("session.session", &[]));
+    match &session.end {
+        Some(end) => {
+            let _ = writeln!(out, "    {} – {end}", session.start);
+        }
+        None => {
+            let _ = writeln!(out, "    {}", session.start);
+        }
+    }
+    if session.latest {
+        let _ = writeln!(out, "    {}", words.get("game.session.latest", &[]));
+        let _ = writeln!(
+            out,
+            "    {}: {}",
+            words.get("game.session.l1_label", &[]),
+            session_l1(words, session)
+        );
+    } else {
+        let _ = writeln!(
+            out,
+            "    {}",
+            words.get("game.session.earlier", &[("at", &session.start)])
+        );
+    }
+}
+
+/// The L1 value of a session: its count when the records loaded files from outside, else the fact or
+/// the reason it is not known.
+fn session_l1(words: &Words, session: &GameSession) -> String {
+    match (&session.l1, session.loaded_outside) {
+        (IdentityFact::True, Some(count)) => {
+            words.get("game.session.l1", &[("count", &count.to_string())])
+        }
+        (IdentityFact::True, None) => words.get("game.fact.l1", &[]),
+        (IdentityFact::False, _) => words.get("game.fact.l1_false", &[]),
+        (IdentityFact::NotKnown { reason }, _) => {
+            words.get(&format!("game.nk.{}", identity_reason(reason)), &[])
+        }
+    }
+}
+
+/// The four window counts on one line, in the order of the view, joined by " · ".
+fn window_line(words: &Words, counts: &WindowCounts) -> String {
+    let windows = [
+        ("before", counts.before),
+        ("during", counts.during),
+        ("after", counts.after),
+        ("before_scan", counts.before_scan),
+    ];
+    let mut line = String::new();
+    for (index, (window, count)) in windows.into_iter().enumerate() {
+        if index > 0 {
+            line.push_str(" · ");
+        }
+        let _ = write!(
+            line,
+            "{} {count}",
+            words.get(&format!("game.window.{window}"), &[])
+        );
+    }
+    line
+}
+
+/// A candidate's name and path, then one line per fact that is true or not known, then its notes.
+/// A false fact and I5 (deferred) are not listed: a line for them would say nothing about the file.
+fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
+    let _ = writeln!(out, "  {}", candidate.name);
+    if let Some(path) = &candidate.path {
+        let _ = writeln!(out, "    {path}");
+    }
+    let identities = [
+        ("i1", &candidate.i1),
+        ("i2", &candidate.i2),
+        ("i3", &candidate.i3),
+        ("i4", &candidate.i4),
+        ("l1", &candidate.l1),
+    ];
+    for (id, fact) in identities {
+        match fact {
+            IdentityFact::True => {
+                let _ = writeln!(
+                    out,
+                    "    ■ {}  ({})",
+                    words.get(&format!("game.fact.{id}"), &[]),
+                    words.get(&format!("game.cause.{id}"), &[])
+                );
+            }
+            IdentityFact::False => {}
+            IdentityFact::NotKnown { reason } => {
+                let _ = writeln!(
+                    out,
+                    "    ? {}: {}",
+                    words.get(&format!("game.fact.{id}"), &[]),
+                    words.get(&format!("game.nk.{}", identity_reason(reason)), &[])
+                );
+            }
+        }
+    }
+    let times = [
+        ("t1", &candidate.t1),
+        ("t2", &candidate.t2),
+        ("t3", &candidate.t3),
+        ("t4", &candidate.t4),
+    ];
+    for (id, fact) in times {
+        if matches!(fact, TimeFact::True) {
+            let _ = writeln!(
+                out,
+                "    · {}  ({})",
+                words.get(&format!("game.fact.{id}"), &[]),
+                words.get(&format!("game.cause.{id}"), &[])
+            );
+        }
+    }
+    // R is a count of sessions, so it is a fact only once a second session holds the same program.
+    let near = candidate.near_sessions;
+    if near.near >= 2 {
+        let _ = writeln!(
+            out,
+            "    · {}  ({})",
+            words.get(
+                "game.fact.r",
+                &[
+                    ("near", &near.near.to_string()),
+                    ("found", &near.found.to_string())
+                ],
+            ),
+            words.get("game.cause.r", &[])
+        );
+    }
+    for at in &candidate.installed_at {
+        let _ = writeln!(
+            out,
+            "    {}",
+            words.get("game.note.installed", &[("at", at)])
+        );
+    }
+    if candidate.refused_by_code_integrity {
+        let _ = writeln!(out, "    {}", words.get("game.note.code_integrity", &[]));
+    }
+}
+
+/// The locale key's reason for a file identity fact that is not known (ADR 0079, ADR 0082).
+fn identity_reason(reason: &IdentityNotKnownReason) -> &'static str {
+    match reason {
+        IdentityNotKnownReason::RecordedFilesNotRun => "recorded_files_not_run",
+        IdentityNotKnownReason::NoObservationForPath => "no_observation_for_path",
+        IdentityNotKnownReason::NotRead => "not_read",
+        IdentityNotKnownReason::Unverifiable => "unverifiable",
+        IdentityNotKnownReason::NoPath => "no_path",
+        IdentityNotKnownReason::Deferred => "deferred",
+        IdentityNotKnownReason::NotCounted => "not_counted",
+        IdentityNotKnownReason::EarlierSession => "earlier_session",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rongroi_core::model::Mode;
@@ -110,7 +356,10 @@ mod tests {
             ("before_scan", before_scan),
         ]
         .map(|(window, count)| {
-            format!("{} {count}", words.get(&format!("game.window.{window}"), &[]))
+            format!(
+                "{} {count}",
+                words.get(&format!("game.window.{window}"), &[])
+            )
         })
         .join(" · ")
     }
@@ -193,11 +442,7 @@ mod tests {
     /// (c5) A clock change with both times is stated with them, and the caveat follows it.
     #[test]
     fn a_clock_change_with_both_times_is_stated_with_them() {
-        let text = section(
-            Some(&view_with_a_clock_change()),
-            Mode::SelfCheck,
-            Lang::En,
-        );
+        let text = section(Some(&view_with_a_clock_change()), Mode::SelfCheck, Lang::En);
         assert!(
             text.contains(
                 "The clock was changed at 2026-10-22T20:30:00Z (from 2026-10-22T20:29:00Z to 2026-10-22T20:31:00Z); times before and after may not be on the same clock."
