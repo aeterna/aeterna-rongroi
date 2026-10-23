@@ -182,3 +182,26 @@ read are the same.
   `has_identity_fact` count it.
 - `PRIVACY.md`, `docs/architecture.md` (the `prefetch` row). No new collector, no consent change.
 - The parser is unchanged: `loaded_files` and `volumes` still leave it only into the collector.
+
+## As built: P5 (2026-10-23)
+
+P5 shipped in workstream R-12: `rongroi_core::loaded_files` (`PE_EXTENSIONS` and `is_timeline_name`
+moved there from the view, with `counts_loaded_files` and `has_pe_extension`), `loaded_outside` on the
+`prefetch` observation, and fact L1 on candidates and session rows. It differs from the sections above, or
+settles what they left open, in these places:
+
+1. **No entry is skipped for a leading `\$`** (section 2 said NTFS metadata at a volume's root is). A
+   review found that the skip also passed over files under `\$Recycle.Bin\` and any folder named with a
+   `$`. Metadata such as `\$MFT` has no executable extension, so it is never counted without a special
+   case. Entries with no `\VOLUME{…}\` prefix are still skipped.
+2. **A second `ntdll.dll` on another volume** makes the record's count unknown (section 2), so a program
+   that loaded such a copy has L1 "not known", not true. Every record measured had one.
+3. **A session row's count** is the sum over the feeding records that carry `loaded_outside`; L1 for the
+   row follows section 5's rule, so a row can show a sum beside "not known" when another feeding record
+   carries no count.
+4. **The new `IdentityNotKnownReason` values** are `not_counted` (no record carries the count, or it says
+   `loaded_outside_unknown`) and `earlier_session`. A saved view without `l1` reads as `not_counted`.
+5. **`fivem_edition::of_path` accepts the volume prefix as the segment before `AppData`**, so
+   `\VOLUME{…}\AppData\Local\FiveM\…` counts as FiveM's folder. Prefetch writes profiles as
+   `\USERS\<name>\AppData`, so this shape does not occur in practice.
+

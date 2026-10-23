@@ -155,7 +155,11 @@ identifies your PC. None of that is reported, in either mode.** Replacing your u
 paths would not help: the list itself is a description of what is on your PC, and this check has no use
 for it. The report says so, rather than leaving you to notice it is missing. The program's own entry in
 that list is read for one word only: when it is below one of FiveM's two program folders, which one —
-`legacy` or `enhanced` — and the entry itself is not reported (ADR 0062).
+`legacy` or `enhanced` — and the entry itself is not reported (ADR 0062). For FiveM, the game and its
+launcher, `rundll32.exe` and `regsvr32.exe` only, the list is also read for **one number**: how many of the
+files it names have a program's extension (`.dll`, `.exe` and the like) and are outside Windows, Program
+Files and FiveM's two program folders. Only that number is reported, in both modes; no path, file name or
+disk from the list is (ADR 0082).
 
 Of Windows' Background Activity Moderator it reads which programs ran and when. That record is kept
 **per user account**, and the account is named by a SID — an identifier of the account *and* of the
