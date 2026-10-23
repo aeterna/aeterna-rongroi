@@ -12,6 +12,7 @@ use super::{
     TraceAgeState, observations_of, redact_profile_paths, scan_time, session, time_of, trace_ages,
 };
 use crate::digest::{path_digest, volume_path_digest};
+use crate::loaded_files::{PE_EXTENSIONS, is_timeline_name};
 use crate::model::{Mode, Observation, Report};
 
 /// How far before a session's start and after its end a window reaches (ADR 0078 section 3).
@@ -570,11 +571,6 @@ fn deferred() -> IdentityFact {
         reason: IdentityNotKnownReason::Deferred,
     }
 }
-/// Extensions a PE image may have without its name contradicting its content (ADR 0078 section 5).
-const PE_EXTENSIONS: [&str; 10] = [
-    "exe", "dll", "sys", "scr", "com", "cpl", "ocx", "drv", "efi", "mui",
-];
-
 /// Document, media and archive extensions a file can wear before a program's, for I3's double
 /// extension (ADR 0078 section 5).
 const DISGUISE_EXTENSIONS: [&str; 24] = [
@@ -970,12 +966,6 @@ fn gather(
         .chain(standalone)
         .filter(|candidate| hits_of(candidate, sessions, scan).any())
         .collect()
-}
-/// The names the `FiveM` timeline selectors list (ADR 0051 section 4, first row).
-fn is_timeline_name(name: &str) -> bool {
-    let name = name.to_ascii_lowercase();
-    ["fivem.exe", "gta5.exe", "gta5_enhanced.exe", "playgtav.exe"].contains(&name.as_str())
-        || (name.starts_with("fivem_b") && name.ends_with("_gtaprocess.exe"))
 }
 fn merge(map: &mut BTreeMap<String, Candidate>, key: String, candidate: Candidate) {
     let times = candidate.times.clone();

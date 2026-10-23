@@ -6,6 +6,37 @@
 //! and the game-window view both read these names, so they share this module rather than keeping
 //! two copies that could drift apart.
 
+/// Extensions a PE image may have without its name contradicting its content (ADR 0078 section 5).
+pub const PE_EXTENSIONS: [&str; 10] = [
+    "exe", "dll", "sys", "scr", "com", "cpl", "ocx", "drv", "efi", "mui",
+];
+
+/// The names the `FiveM` timeline selectors list (ADR 0051 section 4, first row).
+pub fn is_timeline_name(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    ["fivem.exe", "gta5.exe", "gta5_enhanced.exe", "playgtav.exe"].contains(&name.as_str())
+        || (name.starts_with("fivem_b") && name.ends_with("_gtaprocess.exe"))
+}
+
+/// Whether a loaded file is one the shared list counts: a `FiveM` timeline name, or one of the two
+/// system programs that load libraries (ADR 0082 section 1). ASCII case is ignored.
+pub fn counts_loaded_files(name: &str) -> bool {
+    is_timeline_name(name)
+        || name.eq_ignore_ascii_case("rundll32.exe")
+        || name.eq_ignore_ascii_case("regsvr32.exe")
+}
+
+/// Whether the last path segment of `file_name` has one of `PE_EXTENSIONS` after its last dot, in
+/// ASCII case; a name with no dot has none (ADR 0082 section 3).
+pub fn has_pe_extension(file_name: &str) -> bool {
+    let file = file_name.rsplit(['\\', '/']).next().unwrap_or(file_name);
+    file.rsplit_once('.').is_some_and(|(_, extension)| {
+        PE_EXTENSIONS
+            .iter()
+            .any(|pe| extension.eq_ignore_ascii_case(pe))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
