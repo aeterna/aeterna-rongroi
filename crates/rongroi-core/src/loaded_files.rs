@@ -18,8 +18,9 @@ pub fn is_timeline_name(name: &str) -> bool {
         || (name.starts_with("fivem_b") && name.ends_with("_gtaprocess.exe"))
 }
 
-/// Whether a loaded file is one the shared list counts: a `FiveM` timeline name, or one of the two
-/// system programs that load libraries (ADR 0082 section 1). ASCII case is ignored.
+/// Whether a **program** (by its executable name) is one whose loaded files are counted: a `FiveM`
+/// timeline name, or one of the two system programs that load libraries (ADR 0082 section 1). It
+/// does not decide whether a loaded file is counted. ASCII case is ignored.
 pub fn counts_loaded_files(name: &str) -> bool {
     is_timeline_name(name)
         || name.eq_ignore_ascii_case("rundll32.exe")

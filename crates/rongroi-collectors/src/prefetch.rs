@@ -517,7 +517,8 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
 /// Every entry's device prefix is compared with the system volume's, which is the one the system's
 /// own `ntdll.dll` is on. Without exactly one such volume the entries cannot be told apart by
 /// volume, so no count is given rather than a guess (ADR 0082 section 2). An entry with no device
-/// prefix, and NTFS metadata (`\$`), is not a file a program loaded and is skipped.
+/// prefix is skipped. NTFS metadata such as `\$MFT` is not counted because it has no executable
+/// extension, so it needs no special case.
 fn loaded_outside(loaded_files: &[String]) -> Result<usize, &'static str> {
     let mut system: Option<&str> = None;
     for entry in loaded_files {
@@ -542,9 +543,6 @@ fn loaded_outside(loaded_files: &[String]) -> Result<usize, &'static str> {
         let Some((volume, rest)) = split_volume(entry) else {
             continue;
         };
-        if rest.starts_with(r"\$") {
-            continue;
-        }
         // A `FiveM` program folder is expected on any volume, because it is the program's own.
         let expected = (volume.eq_ignore_ascii_case(system) && in_system_folder(rest))
             || fivem_edition::of_path(entry).is_some();
@@ -1482,15 +1480,51 @@ mod tests {
         );
     }
 
-    /// NTFS metadata (`\$`) and entries with no volume prefix are skipped, not counted as outside.
+    /// NTFS metadata such as `\$MFT` has no executable extension and entries with no volume prefix
+    /// are skipped, while `$`-named folders such as the recycle bin are counted like any other folder.
     #[test]
     fn ntfs_metadata_and_unprefixed_entries_are_skipped() {
-        let loaded = vec![
+        let metadata = vec![
             ntdll_on(SYSTEM),
             format!(r"{SYSTEM}\$MFT"),
             r"C:\x.dll".to_owned(),
         ];
-        assert_eq!(loaded_outside(&loaded), Ok(0));
+        assert_eq!(loaded_outside(&metadata), Ok(0));
+
+        let recycle_bin = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\$Recycle.Bin\S-1-5-21-1\$R1.dll"),
+        ];
+        assert_eq!(loaded_outside(&recycle_bin), Ok(1));
+
+        let dollar_folder = vec![ntdll_on(SYSTEM), format!(r"{SYSTEM}\$x\evil.dll")];
+        assert_eq!(loaded_outside(&dollar_folder), Ok(1));
+    }
+
+    /// Volume and folder comparisons ignore ASCII case: the system volume written in lower case is
+    /// the same volume, and the system folders match in any case.
+    #[test]
+    fn volume_and_folder_comparisons_ignore_ascii_case() {
+        let lower = r"\volume{01d0000000000000-aaaaaaaa}";
+        assert_eq!(
+            loaded_outside(&[
+                ntdll_on(SYSTEM),
+                format!(r"{lower}\windows\system32\x.dll"),
+            ]),
+            Ok(0)
+        );
+        assert_eq!(
+            loaded_outside(&[
+                ntdll_on(SYSTEM),
+                format!(r"{lower}\WINDOWS\SYSTEM32\NTDLL.DLL"),
+            ]),
+            Ok(0)
+        );
+        let program_files = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\PROGRAM FILES (X86)\A\b.dll"),
+        ];
+        assert_eq!(loaded_outside(&program_files), Ok(0));
     }
 
     /// The program's own executable is not special: outside the expected folders it is counted.

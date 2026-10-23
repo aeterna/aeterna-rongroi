@@ -136,7 +136,7 @@ pub struct GameCandidate {
     /// I5: the change journal holds its rename or deletion (deferred, ADR 0079 section 5).
     pub i5: IdentityFact,
     /// L1: it loaded a file with an executable's extension from outside Windows, Program Files and
-    /// FiveM's folders (ADR 0082 section 5).
+    /// `FiveM`'s folders (ADR 0082 section 5).
     #[serde(default = "not_counted")]
     pub l1: IdentityFact,
     /// R: how many sessions' windows hold one of its times.
@@ -2156,7 +2156,7 @@ mod tests {
             .unwrap_or_else(|| panic!("no {edition} session, latest {latest}"))
     }
 
-    /// l1_c1: a Prefetch `rundll32.exe` record in the Legacy session with `loaded_outside` above zero
+    /// `l1_c1`: a Prefetch `rundll32.exe` record in the Legacy session with `loaded_outside` above zero
     /// has L1 true (ADR 0082 section 5).
     #[test]
     fn l1_c1_a_prefetch_record_with_loaded_outside_above_zero_is_l1_true() {
@@ -2171,7 +2171,7 @@ mod tests {
         assert_eq!(shown(&windows, "rundll32.exe").l1, IdentityFact::True);
     }
 
-    /// l1_c1: the same record with `loaded_outside` at zero has L1 false.
+    /// `l1_c1`: the same record with `loaded_outside` at zero has L1 false.
     #[test]
     fn l1_c1_a_prefetch_record_with_loaded_outside_zero_is_l1_false() {
         let mut records = base_records();
@@ -2185,7 +2185,7 @@ mod tests {
         assert_eq!(shown(&windows, "rundll32.exe").l1, IdentityFact::False);
     }
 
-    /// l1_c1: a Prefetch record with no `loaded_outside` field is not counted, so its L1 is not
+    /// `l1_c1`: a Prefetch record with no `loaded_outside` field is not counted, so its L1 is not
     /// known for that reason.
     #[test]
     fn l1_c1_a_prefetch_record_without_loaded_outside_is_not_counted() {
@@ -2202,7 +2202,7 @@ mod tests {
         );
     }
 
-    /// l1_c1: a Prefetch record that says its `loaded_outside` count is unknown is not counted, even
+    /// `l1_c1`: a Prefetch record that says its `loaded_outside` count is unknown is not counted, even
     /// when it also holds a count.
     #[test]
     fn l1_c1_a_prefetch_record_with_loaded_outside_unknown_is_not_counted() {
@@ -2223,7 +2223,7 @@ mod tests {
         );
     }
 
-    /// l1_c2: a candidate with no Prefetch record, here a BAM record alone, has L1 not known because it
+    /// `l1_c2`: a candidate with no Prefetch record, here a BAM record alone, has L1 not known because it
     /// is not counted (ADR 0082 section 5).
     #[test]
     fn l1_c2_a_bam_only_candidate_is_l1_not_counted() {
@@ -2237,7 +2237,7 @@ mod tests {
         );
     }
 
-    /// l1_c3: in SS mode a candidate with L1 true is listed by name, though none of its I1 to I4 facts
+    /// `l1_c3`: in SS mode a candidate with L1 true is listed by name, though none of its I1 to I4 facts
     /// is true (ADR 0082 section 5, which amends ADR 0078 section 9).
     #[test]
     fn l1_c3_in_ss_mode_an_l1_true_candidate_is_listed_by_name() {
@@ -2260,7 +2260,7 @@ mod tests {
         assert_eq!(shown(&ss, "rundll32.exe").l1, IdentityFact::True);
     }
 
-    /// l1_c3: the same candidate with `loaded_outside` at zero has L1 false, so SS mode does not list
+    /// `l1_c3`: the same candidate with `loaded_outside` at zero has L1 false, so SS mode does not list
     /// it, while Self mode still shows it.
     #[test]
     fn l1_c3_in_ss_mode_an_l1_false_candidate_is_not_listed() {
@@ -2289,7 +2289,7 @@ mod tests {
         );
     }
 
-    /// l1_c4: of two candidates equal in T1 to T4 and I1 to I4, the one with L1 true comes first, even
+    /// `l1_c4`: of two candidates equal in T1 to T4 and I1 to I4, the one with L1 true comes first, even
     /// though its time is later. Both records share a name so that their identity facts are the same.
     #[test]
     fn l1_c4_of_equal_candidates_the_one_with_l1_true_comes_first() {
@@ -2326,7 +2326,7 @@ mod tests {
         );
     }
 
-    /// l1_c5: a `FiveM.exe` Prefetch run at the Legacy session's start with `loaded_outside` above zero
+    /// `l1_c5`: a `FiveM.exe` Prefetch run at the Legacy session's start with `loaded_outside` above zero
     /// makes the latest Legacy session's L1 true, and its count is shown (ADR 0082 section 5).
     #[test]
     fn l1_c5_a_legacy_fivem_exe_run_with_loaded_outside_feeds_the_latest_legacy_session() {
@@ -2343,7 +2343,7 @@ mod tests {
         assert_eq!(legacy.loaded_outside, Some(1));
     }
 
-    /// l1_c5: the same run with `loaded_outside` at zero makes the Legacy session's L1 false, with a
+    /// `l1_c5`: the same run with `loaded_outside` at zero makes the Legacy session's L1 false, with a
     /// count of zero.
     #[test]
     fn l1_c5_a_legacy_fivem_exe_run_with_loaded_outside_zero_makes_the_session_l1_false() {
@@ -2360,7 +2360,7 @@ mod tests {
         assert_eq!(legacy.loaded_outside, Some(0));
     }
 
-    /// l1_c5: a `GTA5_Enhanced.exe` run tagged Enhanced, inside both editions' spans, feeds the latest
+    /// `l1_c5`: a `GTA5_Enhanced.exe` run tagged Enhanced, inside both editions' spans, feeds the latest
     /// Enhanced session and never the Legacy one (ADR 0082 section 5).
     #[test]
     fn l1_c5_an_enhanced_run_feeds_the_enhanced_session_and_never_the_legacy_one() {
@@ -2391,7 +2391,7 @@ mod tests {
         assert_eq!(legacy.loaded_outside, None);
     }
 
-    /// l1_c5: a Prefetch record with no `fivem_edition` feeds no session, even with its run time inside
+    /// `l1_c5`: a Prefetch record with no `fivem_edition` feeds no session, even with its run time inside
     /// both editions' spans and a count above zero (ADR 0082 section 5).
     #[test]
     fn l1_c5_a_prefetch_record_without_fivem_edition_feeds_no_session() {
@@ -2418,7 +2418,7 @@ mod tests {
         }
     }
 
-    /// l1_c6: a Legacy run after the latest session's recorded end does not feed it, so its L1 is not
+    /// `l1_c6`: a Legacy run after the latest session's recorded end does not feed it, so its L1 is not
     /// counted and its count is absent.
     #[test]
     fn l1_c6_a_record_after_the_latest_session_end_does_not_feed_it() {
@@ -2444,7 +2444,7 @@ mod tests {
         assert_eq!(legacy.loaded_outside, None);
     }
 
-    /// l1_c6: an earlier session's L1 is not known because an earlier session's end is never known, so
+    /// `l1_c6`: an earlier session's L1 is not known because an earlier session's end is never known, so
     /// no record can be placed in it, even one with a count above zero (ADR 0082 section 5).
     #[test]
     fn l1_c6_an_earlier_session_has_l1_not_known_for_its_earlier_session() {
@@ -2473,7 +2473,7 @@ mod tests {
         );
     }
 
-    /// l1_c7: a saved candidate and session written before L1 existed, with no `l1` and no
+    /// `l1_c7`: a saved candidate and session written before L1 existed, with no `l1` and no
     /// `loaded_outside`, still read, as not counted (ADR 0082 section 5).
     #[test]
     fn l1_c7_a_saved_view_without_l1_reads_as_not_counted() {
