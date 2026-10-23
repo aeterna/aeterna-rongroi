@@ -1970,4 +1970,427 @@ mod tests {
         assert_eq!(ss_with.counts, ss_without.counts);
         assert_eq!(ss_with.clock, with.clock);
     }
+
+    /// A Prefetch record of `name` with its run times and, when given, the `FiveM` edition it belongs
+    /// to (ADR 0082 section 5). Only its run times make it a candidate or feed a session.
+    fn prefetch(name: &str, fivem_edition: Option<&str>, run_times: &[&str]) -> Observation {
+        let mut fields = BTreeMap::from([
+            ("name".to_owned(), serde_json::Value::from(name)),
+            (
+                "run_times".to_owned(),
+                serde_json::Value::Array(
+                    run_times
+                        .iter()
+                        .map(|time| serde_json::Value::from(*time))
+                        .collect(),
+                ),
+            ),
+        ]);
+        if let Some(edition) = fivem_edition {
+            fields.insert("fivem_edition".to_owned(), serde_json::Value::from(edition));
+        }
+        Observation {
+            collector: "prefetch".to_owned(),
+            fields,
+        }
+    }
+
+    /// A `FiveM` anchor record of `collector` for `edition`: the `FiveM.exe` name and the time ADR 0062
+    /// reads from it (Prefetch's or BAM's `last_run`).
+    fn anchor(collector: &str, edition: &str, last_run: &str) -> Observation {
+        Observation {
+            collector: collector.to_owned(),
+            fields: BTreeMap::from([
+                ("name".to_owned(), serde_json::Value::from("FiveM.exe")),
+                ("fivem_edition".to_owned(), serde_json::Value::from(edition)),
+                ("last_run".to_owned(), serde_json::Value::from(last_run)),
+            ]),
+        }
+    }
+
+    /// `observation` with the count of files it loaded from outside Windows, Program Files and
+    /// `FiveM`'s folders (ADR 0082 section 5).
+    fn with_loaded_outside(mut observation: Observation, count: u64) -> Observation {
+        observation
+            .fields
+            .insert("loaded_outside".to_owned(), serde_json::Value::from(count));
+        observation
+    }
+
+    /// `observation` with the count marked as not known, so it carries no `loaded_outside` count.
+    fn with_loaded_outside_unknown(mut observation: Observation) -> Observation {
+        observation.fields.insert(
+            "loaded_outside_unknown".to_owned(),
+            serde_json::Value::from(true),
+        );
+        observation
+    }
+
+    /// The session of `edition`, the latest one or an earlier one, that the view shows.
+    fn shown_session<'a>(windows: &'a GameWindows, edition: &str, latest: bool) -> &'a GameSession {
+        windows
+            .sessions
+            .iter()
+            .find(|session| session.edition == edition && session.latest == latest)
+            .unwrap_or_else(|| panic!("no {edition} session, latest {latest}"))
+    }
+
+    /// l1_c1: a Prefetch `rundll32.exe` record in the Legacy session with `loaded_outside` above zero
+    /// has L1 true (ADR 0082 section 5).
+    #[test]
+    fn l1_c1_a_prefetch_record_with_loaded_outside_above_zero_is_l1_true() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch("rundll32.exe", None, &["2026-01-10T10:15:00Z"]),
+            2,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(shown(&windows, "rundll32.exe").l1, IdentityFact::True);
+    }
+
+    /// l1_c1: the same record with `loaded_outside` at zero has L1 false.
+    #[test]
+    fn l1_c1_a_prefetch_record_with_loaded_outside_zero_is_l1_false() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch("rundll32.exe", None, &["2026-01-10T10:15:00Z"]),
+            0,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(shown(&windows, "rundll32.exe").l1, IdentityFact::False);
+    }
+
+    /// l1_c1: a Prefetch record with no `loaded_outside` field is not counted, so its L1 is not
+    /// known for that reason.
+    #[test]
+    fn l1_c1_a_prefetch_record_without_loaded_outside_is_not_counted() {
+        let mut records = base_records();
+        records.push(prefetch("rundll32.exe", None, &["2026-01-10T10:15:00Z"]));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "rundll32.exe").l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotCounted,
+            }
+        );
+    }
+
+    /// l1_c1: a Prefetch record that says its `loaded_outside` count is unknown is not counted, even
+    /// when it also holds a count.
+    #[test]
+    fn l1_c1_a_prefetch_record_with_loaded_outside_unknown_is_not_counted() {
+        let mut records = base_records();
+        records.push(with_loaded_outside_unknown(prefetch(
+            "rundll32.exe",
+            None,
+            &["2026-01-10T10:15:00Z"],
+        )));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "rundll32.exe").l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotCounted,
+            }
+        );
+    }
+
+    /// l1_c2: a candidate with no Prefetch record, here a BAM record alone, has L1 not known because it
+    /// is not counted (ADR 0082 section 5).
+    #[test]
+    fn l1_c2_a_bam_only_candidate_is_l1_not_counted() {
+        let windows = game_windows(&report_of(base_records()), Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "x.sys").l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotCounted,
+            }
+        );
+    }
+
+    /// l1_c3: in SS mode a candidate with L1 true is listed by name, though none of its I1 to I4 facts
+    /// is true (ADR 0082 section 5, which amends ADR 0078 section 9).
+    #[test]
+    fn l1_c3_in_ss_mode_an_l1_true_candidate_is_listed_by_name() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch("rundll32.exe", None, &["2026-01-10T10:15:00Z"]),
+            2,
+        ));
+        let report = report_of(records);
+
+        let self_mode = game_windows(&report, Mode::SelfCheck);
+        let shown_self = shown(&self_mode, "rundll32.exe");
+        assert_ne!(shown_self.i1, IdentityFact::True);
+        assert_ne!(shown_self.i2, IdentityFact::True);
+        assert_ne!(shown_self.i3, IdentityFact::True);
+        assert_ne!(shown_self.i4, IdentityFact::True);
+
+        let ss = game_windows(&report, Mode::Ss);
+
+        assert_eq!(shown(&ss, "rundll32.exe").l1, IdentityFact::True);
+    }
+
+    /// l1_c3: the same candidate with `loaded_outside` at zero has L1 false, so SS mode does not list
+    /// it, while Self mode still shows it.
+    #[test]
+    fn l1_c3_in_ss_mode_an_l1_false_candidate_is_not_listed() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch("rundll32.exe", None, &["2026-01-10T10:15:00Z"]),
+            0,
+        ));
+        let report = report_of(records);
+
+        let self_mode = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(shown(&self_mode, "rundll32.exe").l1, IdentityFact::False);
+
+        let ss = game_windows(&report, Mode::Ss);
+
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("rundll32.exe")),
+            "{}",
+            ss.candidates
+                .iter()
+                .map(|candidate| candidate.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    /// l1_c4: of two candidates equal in T1 to T4 and I1 to I4, the one with L1 true comes first, even
+    /// though its time is later. Both records share a name so that their identity facts are the same.
+    #[test]
+    fn l1_c4_of_equal_candidates_the_one_with_l1_true_comes_first() {
+        let mut records = base_records();
+        records.push(prefetch("rundll32.exe", None, &["2026-01-10T10:10:00Z"]));
+        records.push(with_loaded_outside(
+            prefetch("rundll32.exe", None, &["2026-01-10T10:20:00Z"]),
+            2,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let rundll: Vec<&GameCandidate> = windows
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("rundll32.exe"))
+            .collect();
+        assert_eq!(rundll.len(), 2, "two rundll32.exe candidates");
+        let (first, second) = (rundll[0], rundll[1]);
+        assert_eq!(first.t1, second.t1);
+        assert_eq!(first.t2, second.t2);
+        assert_eq!(first.t3, second.t3);
+        assert_eq!(first.t4, second.t4);
+        assert_eq!(first.i1, second.i1);
+        assert_eq!(first.i2, second.i2);
+        assert_eq!(first.i3, second.i3);
+        assert_eq!(first.i4, second.i4);
+        assert_eq!(first.l1, IdentityFact::True);
+        assert_eq!(
+            second.l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotCounted,
+            }
+        );
+    }
+
+    /// l1_c5: a `FiveM.exe` Prefetch run at the Legacy session's start with `loaded_outside` above zero
+    /// makes the latest Legacy session's L1 true, and its count is shown (ADR 0082 section 5).
+    #[test]
+    fn l1_c5_a_legacy_fivem_exe_run_with_loaded_outside_feeds_the_latest_legacy_session() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+            1,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let legacy = shown_session(&windows, "legacy", true);
+        assert_eq!(legacy.l1, IdentityFact::True);
+        assert_eq!(legacy.loaded_outside, Some(1));
+    }
+
+    /// l1_c5: the same run with `loaded_outside` at zero makes the Legacy session's L1 false, with a
+    /// count of zero.
+    #[test]
+    fn l1_c5_a_legacy_fivem_exe_run_with_loaded_outside_zero_makes_the_session_l1_false() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+            0,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let legacy = shown_session(&windows, "legacy", true);
+        assert_eq!(legacy.l1, IdentityFact::False);
+        assert_eq!(legacy.loaded_outside, Some(0));
+    }
+
+    /// l1_c5: a `GTA5_Enhanced.exe` run tagged Enhanced, inside both editions' spans, feeds the latest
+    /// Enhanced session and never the Legacy one (ADR 0082 section 5).
+    #[test]
+    fn l1_c5_an_enhanced_run_feeds_the_enhanced_session_and_never_the_legacy_one() {
+        let mut records = base_records();
+        records.push(anchor("prefetch", "enhanced", "2026-01-10T10:00:00Z"));
+        records.push(anchor("bam", "enhanced", "2026-01-10T10:30:00Z"));
+        records.push(with_loaded_outside(
+            prefetch(
+                "GTA5_Enhanced.exe",
+                Some("enhanced"),
+                &["2026-01-10T10:15:00Z"],
+            ),
+            3,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let enhanced = shown_session(&windows, "enhanced", true);
+        assert_eq!(enhanced.l1, IdentityFact::True);
+        assert_eq!(enhanced.loaded_outside, Some(3));
+        let legacy = shown_session(&windows, "legacy", true);
+        assert_eq!(
+            legacy.l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotCounted,
+            }
+        );
+        assert_eq!(legacy.loaded_outside, None);
+    }
+
+    /// l1_c5: a Prefetch record with no `fivem_edition` feeds no session, even with its run time inside
+    /// both editions' spans and a count above zero (ADR 0082 section 5).
+    #[test]
+    fn l1_c5_a_prefetch_record_without_fivem_edition_feeds_no_session() {
+        let mut records = base_records();
+        records.push(anchor("prefetch", "enhanced", "2026-01-10T10:00:00Z"));
+        records.push(anchor("bam", "enhanced", "2026-01-10T10:30:00Z"));
+        records.push(with_loaded_outside(
+            prefetch("GTA5_Enhanced.exe", None, &["2026-01-10T10:15:00Z"]),
+            5,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        for edition in ["legacy", "enhanced"] {
+            let session = shown_session(&windows, edition, true);
+            assert_eq!(
+                session.l1,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::NotCounted,
+                },
+                "{edition}"
+            );
+            assert_eq!(session.loaded_outside, None, "{edition}");
+        }
+    }
+
+    /// l1_c6: a Legacy run after the latest session's recorded end does not feed it, so its L1 is not
+    /// counted and its count is absent.
+    #[test]
+    fn l1_c6_a_record_after_the_latest_session_end_does_not_feed_it() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch(
+                "FiveM_b2802_GTAProcess.exe",
+                Some("legacy"),
+                &["2026-01-10T10:45:00Z"],
+            ),
+            1,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let legacy = shown_session(&windows, "legacy", true);
+        assert_eq!(
+            legacy.l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotCounted,
+            }
+        );
+        assert_eq!(legacy.loaded_outside, None);
+    }
+
+    /// l1_c6: an earlier session's L1 is not known because an earlier session's end is never known, so
+    /// no record can be placed in it, even one with a count above zero (ADR 0082 section 5).
+    #[test]
+    fn l1_c6_an_earlier_session_has_l1_not_known_for_its_earlier_session() {
+        let mut records = base_records();
+        records.push(with_loaded_outside(
+            prefetch("FiveM.exe", Some("legacy"), &["2026-01-10T08:00:00Z"]),
+            1,
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let earlier = shown_session(&windows, "legacy", false);
+        assert_eq!(
+            earlier.l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::EarlierSession,
+            }
+        );
+        assert_eq!(earlier.loaded_outside, None);
+        let latest = shown_session(&windows, "legacy", true);
+        assert_eq!(
+            latest.l1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotCounted,
+            }
+        );
+    }
+
+    /// l1_c7: a saved candidate and session written before L1 existed, with no `l1` and no
+    /// `loaded_outside`, still read, as not counted (ADR 0082 section 5).
+    #[test]
+    fn l1_c7_a_saved_view_without_l1_reads_as_not_counted() {
+        let windows = game_windows(&report_of(base_records()), Mode::SelfCheck);
+        let mut saved = serde_json::to_value(&windows).unwrap();
+        for session in saved["sessions"].as_array_mut().unwrap() {
+            let object = session.as_object_mut().unwrap();
+            object.remove("l1");
+            object.remove("loaded_outside");
+        }
+        for candidate in saved["candidates"].as_array_mut().unwrap() {
+            candidate.as_object_mut().unwrap().remove("l1");
+        }
+
+        let read: GameWindows = serde_json::from_value(saved).unwrap();
+
+        assert!(!read.candidates.is_empty(), "the BAM candidate is saved");
+        assert!(!read.sessions.is_empty(), "the Legacy session is saved");
+        for candidate in &read.candidates {
+            assert_eq!(
+                candidate.l1,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::NotCounted,
+                },
+                "{}",
+                candidate.name
+            );
+        }
+        for session in &read.sessions {
+            assert_eq!(
+                session.l1,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::NotCounted,
+                },
+                "{}",
+                session.edition
+            );
+            assert_eq!(session.loaded_outside, None, "{}", session.edition);
+        }
+    }
 }
