@@ -10,8 +10,8 @@ use std::fmt::Write as _;
 
 use rongroi_core::model::Mode;
 use rongroi_core::view::{
-    ClockHistory, GameCandidate, GameSession, GameWindows, IdentityFact, IdentityNotKnownReason,
-    NotKnownReason, TimeFact, WindowCounts,
+    ClockHistory, FileRead, GameCandidate, GameSession, GameWindows, IdentityFact,
+    IdentityNotKnownReason, NotKnownReason, TimeFact, WindowCounts,
 };
 
 use crate::output::Lang;
@@ -252,6 +252,134 @@ fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
     }
     if candidate.refused_by_code_integrity {
         let _ = writeln!(out, "    {}", words.get("game.note.code_integrity", &[]));
+    }
+    // The file's details come last, under their own heading, after the facts above.
+    if candidate.file.is_some() || !candidate.recorded_by.is_empty() {
+        let _ = writeln!(out, "    {}", words.get("game.file.title", &[]));
+        file_lines(out, words, candidate);
+    }
+}
+
+/// A candidate's file details, one line each at six spaces: the collectors that recorded it, then what
+/// the read of its file found, in the order the desktop shows them (ADR 0078, P6b). `trailing_data` and
+/// `embedded_pe` are printed only when true, because each is decided for some kinds of file only.
+fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
+    if !candidate.recorded_by.is_empty() {
+        let sources: Vec<String> = candidate
+            .recorded_by
+            .iter()
+            .map(|source| words.get(&format!("collector.{source}"), &[]))
+            .collect();
+        let _ = writeln!(
+            out,
+            "      {}",
+            words.get("game.file.recorded_by", &[("sources", &sources.join(", "))])
+        );
+    }
+    let Some(file) = &candidate.file else {
+        return;
+    };
+    // A read that succeeded says nothing here; any other outcome says why no hash or kind follows.
+    let read = match file.read {
+        FileRead::Read => None,
+        FileRead::Missing => Some("missing"),
+        FileRead::TooLarge => Some("too_large"),
+        FileRead::AccessDenied => Some("access_denied"),
+        FileRead::Failed => Some("failed"),
+        FileRead::RefusedForm => Some("refused_form"),
+        FileRead::BudgetSpent => Some("budget_spent"),
+        FileRead::NotRun => Some("not_run"),
+        FileRead::NoPath => Some("no_path"),
+        FileRead::NoObservation => Some("no_observation"),
+    };
+    if let Some(read) = read {
+        let _ = writeln!(
+            out,
+            "      {}",
+            words.get(&format!("game.file.read.{read}"), &[])
+        );
+    }
+    if let Some(sha256) = &file.sha256 {
+        let _ = writeln!(
+            out,
+            "      {}: {sha256}",
+            words.get("game.file.sha256", &[])
+        );
+    }
+    if let Some(signature) = &file.signature {
+        let text = text_or_raw(
+            words,
+            &format!("game.file.signature.{signature}"),
+            signature,
+        );
+        let _ = writeln!(out, "      {text}");
+    }
+    if let Some(signer) = &file.signer {
+        let _ = writeln!(
+            out,
+            "      {}",
+            words.get("game.file.signer", &[("signer", signer)])
+        );
+    }
+    if let Some(cert) = &file.signer_cert_sha256 {
+        let _ = writeln!(
+            out,
+            "      {}: {cert}",
+            words.get("game.file.signer_cert", &[])
+        );
+    }
+    if let Some(kind) = &file.content_kind {
+        let text = text_or_raw(words, &format!("game.file.kind.{kind}"), kind);
+        let _ = writeln!(
+            out,
+            "      {}: {text}",
+            words.get("game.file.kind.label", &[])
+        );
+    }
+    if file.trailing_data == Some(true) {
+        let _ = writeln!(out, "      {}", words.get("game.file.trailing_data", &[]));
+    }
+    if file.embedded_pe == Some(true) {
+        let _ = writeln!(out, "      {}", words.get("game.file.embedded_pe", &[]));
+    }
+    if let Some(name) = &file.original_filename {
+        let _ = writeln!(
+            out,
+            "      {}",
+            words.get("game.file.original_filename", &[("name", name)])
+        );
+    }
+    // Windows names zones 0 to 4; any other number is printed as it is.
+    if let Some(zone) = file.zone_id {
+        let text = match zone {
+            0..=4 => words.get(
+                "game.file.zone",
+                &[(
+                    "zone",
+                    &words.get(&format!("game.file.zone_name.{zone}"), &[]),
+                )],
+            ),
+            _ => words.get("game.file.zone_other", &[("id", &zone.to_string())]),
+        };
+        let _ = writeln!(out, "      {text}");
+    }
+    if let Some(host) = &file.download_host {
+        let _ = writeln!(
+            out,
+            "      {}",
+            words.get("game.file.download_host", &[("host", host)])
+        );
+    }
+}
+
+/// The text at `key`, or `raw` itself when the locale has no key for it: a value this build does not
+/// name is still shown, never dropped.
+fn text_or_raw(words: &Words, key: &str, raw: &str) -> String {
+    let text = words.get(key, &[]);
+    if text.is_empty() {
+        raw.to_owned()
+    } else {
+        text
     }
 }
 
@@ -586,7 +714,10 @@ mod tests {
         let mut shown = candidate("helper.exe", Some("C:\\Tools\\helper.exe"));
         shown.t2 = TimeFact::True;
         shown.file = file;
-        shown.recorded_by = recorded_by.iter().map(|source| (*source).to_owned()).collect();
+        shown.recorded_by = recorded_by
+            .iter()
+            .map(|source| (*source).to_owned())
+            .collect();
         GameWindows {
             sessions: vec![legacy_session()],
             candidates: vec![shown],
@@ -623,7 +754,10 @@ mod tests {
             "      Downloaded from: files.example.net".to_owned(),
         ];
         let mut previous = text.find("· recorded during a session");
-        assert!(previous.is_some(), "the candidate's own fact is missing in\n{text}");
+        assert!(
+            previous.is_some(),
+            "the candidate's own fact is missing in\n{text}"
+        );
         for line in &lines {
             assert!(
                 text.lines().any(|shown| shown == line.as_str()),
@@ -695,7 +829,10 @@ mod tests {
         };
         let view = view_with_one_file(Some(file), &["prefetch"]);
         let text = section(Some(&view), Mode::SelfCheck, Lang::Th);
-        assert!(text.lines().any(|line| line == "    รายละเอียดไฟล์"), "{text}");
+        assert!(
+            text.lines().any(|line| line == "    รายละเอียดไฟล์"),
+            "{text}"
+        );
         assert!(
             text.lines()
                 .any(|line| line == "      ตัวไฟล์เป็น: โปรแกรม (PE)"),
