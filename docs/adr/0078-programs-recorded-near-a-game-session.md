@@ -290,3 +290,93 @@ yet; that is P3. The build differs from section 8 in three places:
 3. **No seed fixtures of their own.** The delegation wrapper cannot carry binary files in a patch. The two
    fuzz targets therefore start from the repository's other fixtures, and their tests build their bytes in
    code.
+
+## P6 decisions (2026-10-23, each as recommended)
+
+The owner decided seven questions on the design for step P6, each as recommended, and approved the text
+below as drafted.
+
+1. **Scope:** P6 is split. **P6a** shows `game_windows` in the desktop app and the CLI: sessions, windows,
+   candidates with their facts and ordinary causes, the clock line, the notes, counts per window, the
+   consent text and `PRIVACY.md`. **P6b** adds each candidate's file details that ADR 0079 and ADR 0080 left
+   to P6 (hash, signer, content kind, download host, which collectors recorded it).
+2. **O1 is not in P6**; no folding line is shown. It follows P6b, which brings the signer.
+3. **"Experimental":** a label on the heading and one line saying the 30-minute windows are not yet
+   measured on many PCs, until P7's lab replay measures them (section 3).
+4. **Placement:** directly after the latest-session statement (ADR 0062) in both front ends.
+5. **Consent:** the SS paragraph below is added to the consent screen (CLI and desktop), and the desktop's
+   full-scan item gains the CLI's recorded-files item word for word (`rongroi-cli` `full_reads`, third
+   item), so the two programs say the same thing. `PRIVACY.md`'s SS table gains a row (section 9).
+6. **One Thai suffix:** "(สแกนแบบ Full)" everywhere; `collector.recorded_files`'s "(สแกนเต็ม)" is changed.
+7. **The text is approved as drafted.** The keys live under `game.` in
+   `apps/desktop/src/locales/{th,en}/report.json`, which the CLI also reads. `{{…}}` is a value filled
+   in when shown. When no session is found, the view prints ADR 0061's existing statement and nothing else
+   (section 2).
+
+| key (`game.`…) | ไทย | English |
+|---|---|---|
+| `title` | โปรแกรมที่ถูกบันทึกไว้ใกล้ช่วงเล่นเกม | Programs recorded near a game session |
+| `experimental` | ทดลอง | experimental |
+| `intro` | Windows บันทึกเวลาที่โปรแกรมทำงานไว้ รายการนี้คือโปรแกรมที่มีเวลาบันทึกอยู่ใน 30 นาทีก่อนเริ่มเล่น ระหว่างเล่น 30 นาทีหลังเลิกเล่น หรือระหว่างเลิกเล่นจนถึงตอนสแกน การอยู่ในรายการไม่ได้บอกอะไรด้วยตัวเอง ส่วนใหญ่เป็นโปรแกรมปกติ | Windows records when programs run. These are the programs with a recorded time in the 30 minutes before a session, during it, in the 30 minutes after it, or between it and this scan. Being listed says nothing on its own: most are ordinary programs. |
+| `order` | เรียงตามจำนวนข้อเท็จจริงด้านตัวไฟล์ที่เป็นจริง แล้วตามเวลา การเรียงนี้นับข้อเท็จจริง ไม่ได้ตัดสินโปรแกรมใด | Ordered by how many facts about the file hold, then by time. The order counts facts; it is not a judgement of any program. |
+| `windows_unmeasured` | ช่วง 30 นาทียังไม่ได้ทดสอบกับเครื่องเล่นเกมทั่วไปหลายเครื่อง | The 30-minute windows have not yet been measured on many ordinary gaming PCs. |
+| `ss_rule` | โหมด SS แสดงชื่อเฉพาะโปรแกรมที่มีข้อเท็จจริงด้านตัวไฟล์เป็นจริง โปรแกรมอื่นแสดงเป็นจำนวนต่อช่วง | SS mode names a program only when a fact about its file holds; other programs are counted per window. |
+| `ss_counts` | โปรแกรมอื่นที่ไม่แสดงชื่อ: {{list}} | Other programs, not named: {{list}} |
+| `more` | + อีก {{count}} รายการ | + {{count}} more |
+| `window.before` | 30 นาทีก่อนเริ่ม | 30 min before |
+| `window.during` | ระหว่างเล่น | during |
+| `window.after` | 30 นาทีหลังจบ | 30 min after |
+| `window.before_scan` | ก่อนสแกน | before this scan |
+| `session.latest` | (ล่าสุด) | (latest) |
+| `session.earlier` | เซสชันก่อนหน้า เริ่ม {{at}} | earlier session, began {{at}} |
+| `fact.t1` | มีบันทึกใน 30 นาทีก่อนเริ่มเล่น | recorded in the 30 minutes before a session |
+| `cause.t1` | แชต ตัวเปิดเกม โปรแกรมอัดหน้าจอและโปรแกรมการ์ดจอที่เปิดก่อนเล่น | chat, launchers, recording and GPU tools started before playing |
+| `fact.t2` | มีบันทึกระหว่างเล่น | recorded during a session |
+| `cause.t2` | overlay โปรแกรมอัดหน้าจอ เบราว์เซอร์ | overlays, recording tools, a browser |
+| `fact.t3` | มีบันทึกใน 30 นาทีหลังเลิกเล่น | recorded in the 30 minutes after a session |
+| `cause.t3` | อะไรก็ได้ที่เปิดหลังเลิกเล่น | anything opened after the game |
+| `fact.t4` | มีบันทึกระหว่างเลิกเล่นจนถึงตอนสแกน | recorded between the session and this scan |
+| `cause.t4` | โปรแกรมที่ทีมงานเซิร์ฟเวอร์ขอให้ผู้เล่นเปิด | the program a server's staff asked the player to open |
+| `fact.r` | อยู่ใกล้ {{near}} จาก {{found}} เซสชัน | near {{near}} of {{found}} sessions |
+| `cause.r` | โปรแกรมที่ผู้เล่นเปิดทุกครั้งที่เล่น | a program the player opens every time they play |
+| `fact.i1` | ไม่พบไฟล์ที่ path ที่บันทึกไว้แล้ว | its file is no longer at the recorded path |
+| `cause.i1` | ตัวติดตั้งที่ลบตัวเอง Storage Sense ไดรฟ์ USB ที่ถอดออก | a self-deleting installer, Storage Sense, a removed USB drive |
+| `fact.i2` | ไม่มีลายเซ็นดิจิทัลที่ตรวจผ่าน | no embedded signature that verifies |
+| `cause.i2` | โปรแกรม open-source ม็อด ไฟล์ของ Windows ที่เซ็นแบบ catalog | open-source tools, mods, catalog-signed Windows files |
+| `fact.i3` | ชื่อไฟล์ไม่ตรงกับสิ่งที่ไฟล์เป็น | its name does not match what the file is |
+| `cause.i3` | ตัวอัปเดตที่เก็บโปรแกรมเป็น .tmp หรือ .dat โปรแกรมพกพาที่ถูกเปลี่ยนชื่อ | updaters that keep an executable as .tmp or .dat, renamed portable tools |
+| `fact.i4` | รันจาก Temp หรือ Downloads | it ran from Temp or Downloads |
+| `cause.i4` | อะไรก็ได้ที่ดาวน์โหลดแล้วเปิด | anything downloaded and run |
+| `fact.l1` | โหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ | it loaded a program file from outside the usual folders |
+| `cause.l1` | add-on, overlay หรือ codec ที่ติดตั้งไว้ในโฟลเดอร์ของผู้ใช้ | an add-on, overlay or codec installed in a user folder |
+| `fact.l1_false` | ในไฟล์ที่ Prefetch บันทึกไว้ ไม่มีไฟล์นามสกุลโปรแกรมอยู่นอก Windows, Program Files และโฟลเดอร์ของ FiveM | of the files Prefetch recorded for it, none with a program's extension is outside Windows, Program Files and FiveM's folders |
+| `session.l1` | โหลดไฟล์จากนอกโฟลเดอร์ปกติ: {{count}} ไฟล์ | loaded from outside the usual folders: {{count}} files |
+| `session.l1_label` | โหลดไฟล์จากนอกโฟลเดอร์ปกติ | Loaded from outside the usual folders |
+| `value.false` | ไม่ (ภายในสิ่งที่อ่านได้) | no (within what was read) |
+| `nk.session_end_not_recorded` | ไม่รู้: ไม่มีบันทึกว่าเซสชันจบเมื่อไร | not known: the session's end is not recorded |
+| `nk.scan_time_not_recorded` | ไม่รู้: ไม่มีบันทึกเวลาสแกน | not known: the scan's time is not recorded |
+| `nk.before_trace_age` | ไม่รู้: {{source}} ย้อนไปไม่ถึงช่วงนั้น | not known: {{source}} does not reach back that far |
+| `nk.recorded_files_not_run` | ไม่รู้: การสแกนแบบปกติไม่อ่านตัวไฟล์ | not known: a standard scan does not read the file |
+| `nk.no_observation_for_path` | ไม่รู้: ไม่ได้อ่านไฟล์ที่ path นี้ | not known: the file at this path was not read |
+| `nk.not_read` | ไม่รู้: อ่านไฟล์ไม่ได้ | not known: the file could not be read |
+| `nk.unverifiable` | ไม่รู้: ตรวจลายเซ็นแบบออฟไลน์ไม่ได้ | not known: the signature cannot be checked offline |
+| `nk.no_path` | ไม่รู้: ไม่มี path ที่บันทึกไว้ | not known: no path was recorded for it |
+| `nk.deferred` | ไม่รู้: เวอร์ชันนี้ยังไม่อ่าน | not known: this version does not read it yet |
+| `nk.not_counted` | ไม่รู้: ไม่มีบันทึก Prefetch ที่นับไฟล์ที่โหลด | not known: no Prefetch record counted the files it loaded |
+| `nk.earlier_session` | ไม่รู้: เซสชันก่อนหน้าไม่มีบันทึกเวลาจบ | not known: an earlier session's end is never recorded |
+| `clock.changed` | นาฬิกาเครื่องถูกเปลี่ยนเมื่อ {{at}}{{detail}} เวลาก่อนและหลังจุดนี้อาจไม่ได้อยู่บนนาฬิกาเดียวกัน | The clock was changed at {{at}}{{detail}}; times before and after may not be on the same clock. |
+| `clock.detail` |  (จาก {{old}} เป็น {{new}}) |  (from {{old}} to {{new}}) |
+| `clock.not_known` | ไม่รู้ว่านาฬิกาถูกเปลี่ยนหรือไม่ เพราะ event log ของ System ย้อนไปไม่ถึงช่วงที่เทียบ หรืออ่านไม่ได้ | Whether the clock was changed is not known: the System event log does not reach back to the compared span, or could not be read. |
+| `note.installed` | Windows บันทึกการติดตั้งไฟล์นี้เมื่อ {{at}} | Windows recorded an install of this file at {{at}}. |
+| `note.code_integrity` | Code Integrity เคยปฏิเสธไฟล์ที่ path เดียวกันบนไดรฟ์ใดไดรฟ์หนึ่ง | Code Integrity refused a file at the same path on some drive. |
+| `note.unmatched_installs` | มีการติดตั้ง service หรือ driver {{count}} รายการในช่วงนี้ ซึ่ง path ไม่ตรงกับโปรแกรมใดในรายการ | {{count}} service or driver installs in this window; their paths are not among the programs listed. |
+
+**Consent, SS paragraph:**
+
+- ไทย: ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุดจะแสดงชื่อเฉพาะเมื่อมีข้อเท็จจริงด้านตัวไฟล์เป็นจริง
+  ได้แก่ ไฟล์ไม่อยู่ที่เดิมแล้ว ไม่มีลายเซ็นที่ตรวจผ่าน ชื่อไม่ตรงกับสิ่งที่ไฟล์เป็น รันจาก Temp หรือ Downloads
+  หรือโหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น
+- English: In SS mode, programs recorded near your last game session are named only when a fact about the
+  file holds: it is no longer where it ran from, it has no signature that verifies, its name does not match
+  what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders.
+  Other programs are counted, not named.
