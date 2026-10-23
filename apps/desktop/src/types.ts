@@ -316,6 +316,88 @@ export interface Timeline {
  */
 export type RowBand = { state: "span"; from: string; to: string } | { state: "no_span" };
 
+/** A count per window around a game session (ADR 0078). */
+export interface WindowCounts {
+  before: number;
+  during: number;
+  after: number;
+  before_scan: number;
+}
+
+/** A time fact that may be unknown, with the reason it is unknown. */
+export type TimeFact =
+  | { fact: "true" }
+  | { fact: "false" }
+  | {
+      fact: "not_known";
+      reason:
+        | { reason: "session_end_not_recorded" }
+        | { reason: "scan_time_not_recorded" }
+        | { reason: "before_trace_age"; source: string };
+    };
+
+/** An identity fact about a file that may be unknown, with the reason it is unknown. */
+export type IdentityFact =
+  | { fact: "true" }
+  | { fact: "false" }
+  | {
+      fact: "not_known";
+      reason: {
+        reason:
+          | "recorded_files_not_run"
+          | "no_observation_for_path"
+          | "not_read"
+          | "unverifiable"
+          | "no_path"
+          | "deferred"
+          | "not_counted"
+          | "earlier_session";
+      };
+    };
+
+/** One FiveM or GTA V session, as the core found it (ADR 0062). */
+export interface GameSession {
+  edition: "legacy" | "enhanced";
+  start: string;
+  end?: string | null;
+  latest: boolean;
+  l1?: IdentityFact;
+  loaded_outside?: number | null;
+}
+
+/** A program recorded near a game session. Evidence only: no score, no verdict (ADR 0078). */
+export interface GameCandidate {
+  name: string;
+  path?: string | null;
+  t1: TimeFact;
+  t2: TimeFact;
+  t3: TimeFact;
+  t4: TimeFact;
+  i1: IdentityFact;
+  i2: IdentityFact;
+  i3: IdentityFact;
+  i4: IdentityFact;
+  i5: IdentityFact;
+  l1?: IdentityFact;
+  near_sessions: { near: number; found: number };
+  installed_at?: string[];
+  refused_by_code_integrity?: boolean;
+}
+
+/** The game-window section of the report (ADR 0078). Absent when no session was found. */
+export interface GameWindows {
+  sessions: GameSession[];
+  candidates: GameCandidate[];
+  counts: WindowCounts;
+  /** Per window, in SS mode: the counts with no names. */
+  unnamed?: WindowCounts;
+  unmatched_installs?: { before: number; during: number; after: number };
+  clock?: {
+    changes: { changed_at: string; old_time?: string | null; new_time?: string | null }[];
+    history: "known" | "not_known";
+  };
+}
+
 export interface ReportView {
   mode: Mode;
   header: ReportHeader;
@@ -340,6 +422,8 @@ export interface ReportView {
   trace_ages?: TraceAges;
   /** At most one cross-source statement; absent when its conditions do not hold (ADR 0061). */
   cross_source?: CrossSourceStatement[];
+  /** Absent when no game session was found; shown directly after the latest-session statement (ADR 0078). */
+  game_windows?: GameWindows;
   hidden: {
     not_found: number;
     unmeasured_expected: number;
