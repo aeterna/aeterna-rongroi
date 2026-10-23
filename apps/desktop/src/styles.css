@@ -1082,6 +1082,18 @@ details summary {
   margin: 0;
 }
 
+/* A candidate's file details, folded under its card. Hashes wrap and stay selectable, so a long one
+   does not widen the card and can be copied. */
+.game-file summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.game-file code {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 /* A found label carries the found mark (a square), so its state is not colour alone. */
 .game-label-found {
   display: flex;

@@ -365,6 +365,37 @@ export interface GameSession {
   loaded_outside?: number | null;
 }
 
+/** What `recorded_files` read of a candidate's file, or why it read none (ADR 0079 section 3). */
+export type FileRead =
+  | "read"
+  | "missing"
+  | "too_large"
+  | "access_denied"
+  | "failed"
+  | "refused_form"
+  | "budget_spent"
+  | "not_run"
+  | "no_path"
+  | "no_observation";
+
+/** What `recorded_files` read of a candidate's file, ADR 0079 section 3; evidence only. */
+export interface FileDetails {
+  read: FileRead;
+  sha256?: string;
+  /** The embedded signature's state, as the read named it. */
+  signature?: string;
+  signer?: string;
+  signer_cert_sha256?: string;
+  /** What the file is, by its content. */
+  content_kind?: string;
+  original_filename?: string;
+  /** The host a PowerShell command downloaded the file from; SS mode masks it (ADR 0064). */
+  download_host?: string;
+  trailing_data?: boolean;
+  embedded_pe?: boolean;
+  zone_id?: number;
+}
+
 /** A program recorded near a game session. Evidence only: no score, no verdict (ADR 0078). */
 export interface GameCandidate {
   name: string;
@@ -382,6 +413,10 @@ export interface GameCandidate {
   near_sessions: { near: number; found: number };
   installed_at?: string[];
   refused_by_code_integrity?: boolean;
+  /** The collectors that recorded one of its times, in the order the view reads them (ADR 0078 section 4). */
+  recorded_by?: string[];
+  /** What `recorded_files` read of its path; absent in a view saved before P6b (ADR 0079 section 3). */
+  file?: FileDetails;
 }
 
 /** The game-window section of the report (ADR 0078). Absent when no session was found. */

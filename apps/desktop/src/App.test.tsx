@@ -1679,4 +1679,28 @@ describe("App", () => {
       await screen.findByText(/สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย/),
     ).toBeTruthy();
   });
+
+  // ADR 0078 (P6b), owner's wording of 2026-10-23: the download-host option names both sources. The
+  // option is offered only after a full scan, so the header is set to one.
+  it("words the download-host option in full, in English and in Thai", async () => {
+    headerOverride = { ...selfView.header, scan_tier: "full" };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    expect(
+      screen.getByText(
+        "Also show the name of each website a PowerShell command, or a recorded program's file, was downloaded from. Off: each name is shown as %DOWNLOAD_HOST%.",
+      ),
+    ).toBeTruthy();
+    cleanup();
+
+    headerOverride = { ...selfView.header, scan_tier: "full" };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจระหว่างแชร์หน้าจอ (โหมด SS)"));
+    expect(
+      screen.getByText(
+        "แสดงชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาด้วย ถ้าปิดไว้ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST%",
+      ),
+    ).toBeTruthy();
+  });
 });

@@ -477,6 +477,53 @@
     "value": {
       "false": "no (within what was read)"
     },
+    "file": {
+      "title": "File details",
+      "recorded_by": "Recorded by: {{sources}}",
+      "read": {
+        "missing": "The file is no longer at this path, so it was not read.",
+        "too_large": "Larger than 64 MiB, so only its hash and signature were read.",
+        "access_denied": "Windows did not allow this file to be read.",
+        "failed": "The file could not be read.",
+        "refused_form": "Not read: this program does not read paths of this form.",
+        "budget_spent": "Not read: the 90 seconds for reading files ran out before this one.",
+        "not_run": "A standard scan does not read the file.",
+        "no_path": "No path was recorded, so there is no file to read.",
+        "no_observation": "The file at this path was not read."
+      },
+      "sha256": "SHA-256",
+      "signature": {
+        "valid": "Embedded signature: verifies",
+        "invalid": "Embedded signature: does not verify",
+        "no_embedded_signature": "No embedded signature",
+        "unverifiable_offline": "Embedded signature: cannot be checked offline"
+      },
+      "signer": "Signer: {{signer}}",
+      "signer_cert": "Signer certificate SHA-256",
+      "kind": {
+        "label": "What the bytes are",
+        "pe_executable": "a program (PE)",
+        "pe_dll": "a DLL (PE)",
+        "pe_driver": "a driver (PE)",
+        "archive": "an archive (zip, 7z, rar, gzip, cab)",
+        "image": "an image (png, jpeg, gif, bmp, webp, ico)",
+        "script": "text, such as a script",
+        "unknown": "none of the kinds this program knows"
+      },
+      "trailing_data": "It has data after the end of its format.",
+      "embedded_pe": "It holds a program (PE) inside.",
+      "original_filename": "Name in its version information: {{name}}",
+      "zone": "Download zone Windows recorded: {{zone}}",
+      "zone_name": {
+        "0": "this computer (0)",
+        "1": "local intranet (1)",
+        "2": "trusted sites (2)",
+        "3": "the Internet (3)",
+        "4": "restricted sites (4)"
+      },
+      "zone_other": "zone {{id}}",
+      "download_host": "Downloaded from: {{host}}"
+    },
     "nk": {
       "session_end_not_recorded": "not known: the session's end is not recorded",
       "scan_time_not_recorded": "not known: the scan's time is not recorded",
