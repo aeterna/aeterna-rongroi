@@ -135,7 +135,9 @@ read are the same.
    full scan only.
 2. **The Enhanced game process feeds the Enhanced session's row** (section 5). Recommended: **yes** — FiveM
    starts it from its own game cache, so its `fivem_edition` is Enhanced; it stays out of the anchors, so
-   ADR 0062 decision 11 is unchanged. Alternative: anchors only (`FiveM.exe`, and Legacy's game process).
+   ADR 0062 decision 11 is unchanged. ADR 0062 measured that its Prefetch file was not rewritten during a
+   session, so it may fall in no session and add nothing. Alternative: anchors only (`FiveM.exe`, and
+   Legacy's game process).
 3. **L1 lists a name in SS mode and counts in the ordering** (section 5). Recommended: **yes**, like I1–I4.
    Alternative: a label only, outside `has_identity_fact` and `identity_rank`.
 4. **Leave the content read to a later step** (section 4). Recommended: **yes** — it brings a drive map, a
