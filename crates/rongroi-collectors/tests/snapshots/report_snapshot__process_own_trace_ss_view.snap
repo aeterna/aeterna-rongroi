@@ -660,5 +660,44 @@ expression: view
         "cleanup"
       ]
     }
-  ]
+  ],
+  "game_windows": {
+    "sessions": [
+      {
+        "edition": "legacy",
+        "start": "2026-09-10T18:04:12Z",
+        "end": null,
+        "latest": true,
+        "l1": {
+          "fact": "not_known",
+          "reason": {
+            "reason": "not_counted"
+          }
+        },
+        "loaded_outside": null
+      }
+    ],
+    "candidates": [],
+    "counts": {
+      "before": 0,
+      "during": 0,
+      "after": 0,
+      "before_scan": 0
+    },
+    "unnamed": {
+      "before": 0,
+      "during": 0,
+      "after": 0,
+      "before_scan": 0
+    },
+    "unmatched_installs": {
+      "before": 0,
+      "during": 0,
+      "after": 0
+    },
+    "clock": {
+      "changes": [],
+      "history": "not_known"
+    }
+  }
 }
