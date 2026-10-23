@@ -1507,10 +1507,7 @@ mod tests {
     fn volume_and_folder_comparisons_ignore_ascii_case() {
         let lower = r"\volume{01d0000000000000-aaaaaaaa}";
         assert_eq!(
-            loaded_outside(&[
-                ntdll_on(SYSTEM),
-                format!(r"{lower}\windows\system32\x.dll"),
-            ]),
+            loaded_outside(&[ntdll_on(SYSTEM), format!(r"{lower}\windows\system32\x.dll"),]),
             Ok(0)
         );
         assert_eq!(
