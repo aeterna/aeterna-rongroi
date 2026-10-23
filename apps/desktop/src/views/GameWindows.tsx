@@ -35,13 +35,14 @@ export function GameWindowsSection({ view, mode }: { view: ReportView; mode: Mod
       {!self && <p>{t("game.ss_rule")}</p>}
 
       <dl className="game-facts">
-        {windows.sessions.map((session, index) => {
+        {windows.sessions.map((session) => {
           const range = session.end ? `${session.start} – ${session.end}` : session.start;
           const position = session.latest
             ? t("game.session.latest")
             : t("game.session.earlier", { at: session.start });
+          const key = `${session.edition}:${session.start}:${session.latest ? "latest" : "earlier"}`;
           return (
-            <Fragment key={`${session.edition}:${session.start}:${index}`}>
+            <Fragment key={key}>
               <dt>{`${t("session.session")} ${t(`session.edition.${session.edition}`)}`}</dt>
               <dd>{`${range} ${position}`}</dd>
               {session.latest && session.l1 && (
@@ -106,8 +107,8 @@ export function GameWindowsSection({ view, mode }: { view: ReportView; mode: Mod
       <p className="muted">{t("game.order")}</p>
       <p className="muted">{t("game.windows_unmeasured")}</p>
 
-      {windows.candidates.map((candidate, index) => (
-        <CandidateCard key={`${candidate.name}:${index}`} candidate={candidate} />
+      {windows.candidates.map((candidate) => (
+        <CandidateCard key={JSON.stringify(candidate)} candidate={candidate} />
       ))}
     </section>
   );

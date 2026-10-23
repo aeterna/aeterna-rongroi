@@ -1400,7 +1400,8 @@ describe("App", () => {
     expect(await screen.findByText("loaded from outside the usual folders: 2 files")).toBeTruthy();
     cleanup();
 
-    const latest = gameWindows().sessions[0];
+    const [latest] = gameWindows().sessions;
+    if (!latest) throw new Error("the test view has no session");
     viewOverride = {
       ...selfView,
       game_windows: gameWindows({
