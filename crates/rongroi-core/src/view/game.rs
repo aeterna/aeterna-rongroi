@@ -222,6 +222,10 @@ pub struct GameWindows {
     pub candidates: Vec<GameCandidate>,
     /// How many candidates each window holds, in both modes.
     pub counts: WindowCounts,
+    /// The programs SS mode counts rather than names (ADR 0078 section 9): how many of the
+    /// candidates it does not list have a time in each window. Zero in Self mode.
+    #[serde(default)]
+    pub unnamed: WindowCounts,
     /// Installs with no matching candidate, by the window their time falls in (ADR 0081 section 4).
     #[serde(default)]
     pub unmatched_installs: InstallCounts,
@@ -268,12 +272,19 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
             .then_with(|| left_time.cmp(right_time))
     });
     let profiles = report.header.profiles_directory.as_deref();
-    let candidates = shown
+    let mut unnamed = WindowCounts::default();
+    let candidates: Vec<GameCandidate> = shown
         .into_iter()
         .filter_map(|(candidate, _)| match mode {
             Mode::SelfCheck => Some(candidate),
             Mode::Ss if has_identity_fact(&candidate) => Some(candidate.redacted(profiles)),
-            Mode::Ss => None,
+            Mode::Ss => {
+                unnamed.before += usize::from(candidate.t1 == TimeFact::True);
+                unnamed.during += usize::from(candidate.t2 == TimeFact::True);
+                unnamed.after += usize::from(candidate.t3 == TimeFact::True);
+                unnamed.before_scan += usize::from(candidate.t4 == TimeFact::True);
+                None
+            }
         })
         .collect();
     let loads = session_loads(report, &sessions);
@@ -285,6 +296,7 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
             .collect(),
         candidates,
         counts,
+        unnamed,
         unmatched_installs,
         clock: clock_of(report, &sessions),
     }

@@ -13,8 +13,9 @@ mod saved;
 mod session;
 
 pub use game::{
-    GameCandidate, GameSession, GameWindows, IdentityFact, IdentityNotKnownReason, NearSessions,
-    NotKnownReason, TimeFact, WINDOW_SECONDS, WindowCounts, game_windows,
+    ClockHistory, ClockLine, ClockTrust, GameCandidate, GameSession, GameWindows, IdentityFact,
+    IdentityNotKnownReason, InstallCounts, NearSessions, NotKnownReason, TimeFact, WINDOW_SECONDS,
+    WindowCounts, game_windows,
 };
 pub use saved::{
     CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,
@@ -236,6 +237,12 @@ pub struct ReportView {
     /// own folders (ADR 0062), at most one per edition. Not evidence and never counted. Additive.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cross_source: Vec<CrossSourceStatement>,
+    /// The programs Windows recorded near the latest `FiveM` session, beside the ADR 0061 statement
+    /// above (ADR 0078 P6 decision 4). In SS mode the same filter as the rest of the view applies:
+    /// only listed candidates are named, the others are counted (ADR 0078 section 9). Absent when
+    /// no session was found. Additive; the report schema stays at 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game_windows: Option<GameWindows>,
 }
 
 /// The span one row's count is for (ADR 0047, amendment of 2026-09-30, decision 3).
@@ -449,6 +456,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             row_bands: row_bands(report, &report.evidence),
             trace_ages: trace_ages_of(report, mode),
             cross_source: cross_source_of(report),
+            game_windows: game_windows_of(report, mode),
         },
         Mode::Ss => {
             let machine_root = report
@@ -502,9 +510,17 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 row_bands,
                 trace_ages: trace_ages_of(report, mode),
                 cross_source: cross_source_of(report),
+                game_windows: game_windows_of(report, mode),
             }
         }
     }
+}
+
+/// The game-windows view of `mode`, or nothing when no `FiveM` session was found: the ADR 0061
+/// statement is then all there is to show (ADR 0078 section 2).
+fn game_windows_of(report: &Report, mode: Mode) -> Option<GameWindows> {
+    let view = game_windows(report, mode);
+    (!view.sessions.is_empty()).then_some(view)
 }
 
 /// How far back each source reaches on this PC, beside when parts of this PC were set up (ADR 0061).
