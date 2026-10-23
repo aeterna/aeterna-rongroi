@@ -13,9 +13,9 @@ mod saved;
 mod session;
 
 pub use game::{
-    ClockHistory, ClockLine, ClockTrust, GameCandidate, GameSession, GameWindows, IdentityFact,
-    IdentityNotKnownReason, InstallCounts, NearSessions, NotKnownReason, TimeFact, WINDOW_SECONDS,
-    WindowCounts, game_windows,
+    ClockHistory, ClockLine, ClockTrust, FileDetails, FileRead, GameCandidate, GameSession,
+    GameWindows, IdentityFact, IdentityNotKnownReason, InstallCounts, NearSessions, NotKnownReason,
+    TimeFact, WINDOW_SECONDS, WindowCounts, game_windows,
 };
 pub use saved::{
     CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,

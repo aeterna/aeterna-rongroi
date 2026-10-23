@@ -110,6 +110,67 @@ pub struct GameSession {
     #[serde(default)]
     pub loaded_outside: Option<u64>,
 }
+/// What `recorded_files` read of a candidate's file, or why it read none (ADR 0079 section 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileRead {
+    /// The file was read.
+    Read,
+    /// The file is no longer at its path.
+    Missing,
+    /// The file is too large to read; its size and signature field were read.
+    TooLarge,
+    /// The file is there, but the read was denied.
+    AccessDenied,
+    /// The read did not finish, or the observation says nothing about it.
+    Failed,
+    /// The read refused the file's form, so its fields were not read.
+    RefusedForm,
+    /// The collector's budget ran out before it reached the file.
+    BudgetSpent,
+    /// `recorded_files` did not run, as on a standard scan.
+    NotRun,
+    /// The candidate has no program path, as a Prefetch-only one does, so nothing was joined.
+    NoPath,
+    /// `recorded_files` ran but holds no observation for the candidate's path.
+    NoObservation,
+}
+/// What `recorded_files` read of a candidate's file, ADR 0079 section 3; evidence only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileDetails {
+    /// Whether the file was read, or why it was not.
+    pub read: FileRead,
+    /// The file's SHA-256, when the read carried it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    /// The embedded signature's state, as the read named it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// The name of the signer, when the signature carried one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer: Option<String>,
+    /// The SHA-256 of the signer's certificate, when the signature carried one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer_cert_sha256: Option<String>,
+    /// What the file is, by its content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_kind: Option<String>,
+    /// The version resource's `OriginalFilename`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_filename: Option<String>,
+    /// The host a PowerShell command downloaded the file from; SS mode masks it (ADR 0064).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_host: Option<String>,
+    /// Whether bytes follow the end of the file's image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trailing_data: Option<bool>,
+    /// Whether the file holds a PE image past its first one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedded_pe: Option<bool>,
+    /// The zone identifier the file was marked with, when it fits a `u32`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zone_id: Option<u32>,
+}
 /// One program Windows recorded with a time in a game window (ADR 0078 section 4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameCandidate {
@@ -148,6 +209,14 @@ pub struct GameCandidate {
     /// Whether the code-integrity log refused this file's image (ADR 0081 section 4).
     #[serde(default)]
     pub refused_by_code_integrity: bool,
+    /// The collectors that recorded one of its times, each once, in the order `gather` reads them
+    /// (ADR 0078 section 4).
+    #[serde(default)]
+    pub recorded_by: Vec<String>,
+    /// What `recorded_files` read of its path (ADR 0079 section 3). Always set by `game_windows`;
+    /// absent only in a view saved before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<FileDetails>,
 }
 impl GameCandidate {
     /// The candidate as SS mode shows it: its path redacted as evidence rows are (ADR 0049).
@@ -512,6 +581,16 @@ struct Candidate {
     /// The L1 fact of each Prefetch record it was made from or joined (ADR 0082 section 5).
     l1: Vec<IdentityFact>,
 }
+/// Why a candidate has no `recorded_files` observation of its path to join (ADR 0079 section 3).
+#[derive(Clone, Copy)]
+enum Unjoined {
+    /// The candidate has no program path, as a Prefetch-only candidate does.
+    NoPath,
+    /// `recorded_files` did not run, as on a standard scan.
+    NotRun,
+    /// `recorded_files` ran and holds no observation for the path.
+    NoObservation,
+}
 /// The `recorded_files` observations by path, ignoring ASCII case (ADR 0079 amendment 7).
 struct RecordedFiles<'r> {
     by_path: BTreeMap<String, &'r Observation>,
@@ -553,15 +632,50 @@ impl<'r> RecordedFiles<'r> {
         ]
     }
 
+    /// Why `candidate` has no observation of its path to join: no path, no run, or no observation.
+    fn unjoined(&self, candidate: &Candidate) -> Unjoined {
+        if candidate.path.is_none() {
+            Unjoined::NoPath
+        } else if self.ran {
+            Unjoined::NoObservation
+        } else {
+            Unjoined::NotRun
+        }
+    }
+
+    /// What `recorded_files` read of `candidate`'s path, from the same join as I1 and I2, or why it
+    /// read nothing (ADR 0079 section 3).
+    fn details(&self, candidate: &Candidate) -> FileDetails {
+        let Some(observation) = self.joined(candidate) else {
+            let read = match self.unjoined(candidate) {
+                Unjoined::NoPath => FileRead::NoPath,
+                Unjoined::NotRun => FileRead::NotRun,
+                Unjoined::NoObservation => FileRead::NoObservation,
+            };
+            return unread(read);
+        };
+        FileDetails {
+            read: file_read_of(observation),
+            sha256: text_of(observation, "sha256"),
+            signature: text_of(observation, "signature"),
+            signer: text_of(observation, "signer"),
+            signer_cert_sha256: text_of(observation, "signer_cert_sha256"),
+            content_kind: text_of(observation, "content_kind"),
+            original_filename: text_of(observation, "original_filename"),
+            download_host: text_of(observation, "download_host"),
+            trailing_data: flag_of(observation, "trailing_data"),
+            embedded_pe: flag_of(observation, "embedded_pe"),
+            zone_id: zone_id_of(observation),
+        }
+    }
+
     /// I1 and I2 for `candidate`, from the `recorded_files` observation of its path.
     fn time_and_signature_facts(&self, candidate: &Candidate) -> (IdentityFact, IdentityFact) {
         let Some(observation) = self.joined(candidate) else {
-            let reason = if candidate.path.is_none() {
-                IdentityNotKnownReason::NoPath
-            } else if self.ran {
-                IdentityNotKnownReason::NoObservationForPath
-            } else {
-                IdentityNotKnownReason::RecordedFilesNotRun
+            let reason = match self.unjoined(candidate) {
+                Unjoined::NoPath => IdentityNotKnownReason::NoPath,
+                Unjoined::NotRun => IdentityNotKnownReason::RecordedFilesNotRun,
+                Unjoined::NoObservation => IdentityNotKnownReason::NoObservationForPath,
             };
             let fact = IdentityFact::NotKnown { reason };
             return (fact.clone(), fact);
@@ -586,6 +700,54 @@ impl<'r> RecordedFiles<'r> {
     }
 }
 
+/// What `observation`'s `identity_read` says the read of its file was. An absent or unrecognised
+/// word is a read that did not finish (ADR 0079 section 3).
+fn file_read_of(observation: &Observation) -> FileRead {
+    match session::text(observation, "identity_read") {
+        Some("read") => FileRead::Read,
+        Some("missing") => FileRead::Missing,
+        Some("too_large") => FileRead::TooLarge,
+        Some("access_denied") => FileRead::AccessDenied,
+        Some("refused_form") => FileRead::RefusedForm,
+        Some("budget_spent") => FileRead::BudgetSpent,
+        _ => FileRead::Failed,
+    }
+}
+/// The details of a file that was not read: the read, and no field.
+fn unread(read: FileRead) -> FileDetails {
+    FileDetails {
+        read,
+        sha256: None,
+        signature: None,
+        signer: None,
+        signer_cert_sha256: None,
+        content_kind: None,
+        original_filename: None,
+        download_host: None,
+        trailing_data: None,
+        embedded_pe: None,
+        zone_id: None,
+    }
+}
+/// `field` of `observation` as text, when it is present and a string.
+fn text_of(observation: &Observation, field: &str) -> Option<String> {
+    session::text(observation, field).map(str::to_owned)
+}
+/// `field` of `observation` as a flag, when it is present and a boolean.
+fn flag_of(observation: &Observation, field: &str) -> Option<bool> {
+    observation
+        .fields
+        .get(field)
+        .and_then(serde_json::Value::as_bool)
+}
+/// The zone identifier `observation` holds, when it is a number that fits a `u32`.
+fn zone_id_of(observation: &Observation) -> Option<u32> {
+    observation
+        .fields
+        .get("zone_id")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|zone| u32::try_from(zone).ok())
+}
 /// I2: false for a valid signature, true for an invalid or missing one, not known otherwise.
 fn signature_fact(observation: &Observation) -> IdentityFact {
     match session::text(observation, "signature") {
@@ -1021,6 +1183,19 @@ fn hits_of(
     }
     total
 }
+/// The collectors `gather` reads, in the order it reads them. A candidate lists the collectors that
+/// recorded one of its times in this order, not alphabetically (ADR 0078 section 4).
+const GATHER_ORDER: [&str; 5] = ["prefetch", "bam", "pca", "process", "userassist"];
+
+/// The collectors that recorded one of `candidate`'s times, each once, in `GATHER_ORDER`.
+fn recorded_by_of(candidate: &Candidate) -> Vec<String> {
+    GATHER_ORDER
+        .into_iter()
+        .filter(|collector| candidate.sources.contains(collector))
+        .map(str::to_owned)
+        .collect()
+}
+
 /// The candidates of every record with a time in a known window (ADR 0078 section 4).
 fn gather(
     report: &Report,
@@ -1030,7 +1205,7 @@ fn gather(
     let mut paths: BTreeMap<String, Candidate> = BTreeMap::new();
     let mut standalone: Vec<Candidate> = Vec::new();
     let mut prefetch: Vec<Candidate> = Vec::new();
-    for collector in ["prefetch", "bam", "pca", "process", "userassist"] {
+    for collector in GATHER_ORDER {
         for observation in observations_of(report, collector) {
             let Some(name) = session::text(observation, "name") else {
                 continue;
@@ -1192,6 +1367,8 @@ fn with_facts(
         near_sessions: NearSessions { near, found },
         installed_at: Vec::new(),
         refused_by_code_integrity: false,
+        recorded_by: recorded_by_of(candidate),
+        file: Some(files.details(candidate)),
     }
 }
 /// Whether `kind`'s windows hold one of the candidate's times; else not known when a window or the
