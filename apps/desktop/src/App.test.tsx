@@ -11,13 +11,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
-import type {
-  GameWindows,
-  ReportHeader,
-  ReportView,
-  RuleText,
-  UnmeasuredReason,
-} from "./types";
+import type { GameWindows, ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
 import { COPIED_FOR_MS } from "./views/CodeLink";
 
 // Vitest runs with apps/desktop as the working directory.

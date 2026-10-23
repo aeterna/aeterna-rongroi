@@ -446,7 +446,7 @@
     "session": {
       "latest": "(latest)",
       "earlier": "earlier session, began {{at}}",
-      "l1":"loaded from outside the usual folders: {{count}} files",
+      "l1": "loaded from outside the usual folders: {{count}} files",
       "l1_label": "Loaded from outside the usual folders"
     },
     "fact": {
