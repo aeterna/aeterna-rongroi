@@ -380,3 +380,24 @@ below as drafted.
   file holds: it is no longer where it ran from, it has no signature that verifies, its name does not match
   what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders.
   Other programs are counted, not named.
+
+## As built: P6a (2026-10-23)
+
+P6a shipped in workstream R-13. `ReportView` carries `game_windows` in both modes. It is built in
+`rongroi-core::view` for the mode being shown, and it is absent when the report holds no game session. The
+desktop app shows the section after the cross-source statements. The CLI prints it after the latest-session
+statement. Both use only the keys in the table above. The build fills in four things that the decisions
+above leave open:
+
+1. **The unnamed counts are counted in core.** `GameWindows.unnamed` holds, per window, the candidates
+   that SS mode does not name. Both front ends print that number and never count it themselves. The
+   privacy decision therefore stays in core (hard rule 5). In Self mode the counts are zero, and both
+   front ends show the per-window chips instead.
+2. **Not-known facts are written out.** A time fact or an identity fact that is not known is shown as
+   "fact: not known: reason", using the `nk.*` keys. A fact that does not hold is left out. A false fact
+   and an unknown fact therefore never look the same.
+3. **An earlier session is shown once.** For a session that is not the latest, the front ends show only
+   `session.earlier`, which already carries the session's start. Its end is never recorded.
+4. **I5 is not shown.** Core does not compute it yet (ADR 0079 section 5), so it is always "not known:
+   this version does not read it yet". It does not decide whether SS mode names a program. The approved
+   table has no key for it. It comes to the reader when core computes it.
