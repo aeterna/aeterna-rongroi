@@ -87,6 +87,7 @@ pub fn section(view: Option<&GameWindows>, mode: Mode, lang: Lang) -> String {
         let _ = writeln!(out, "  {}", words.get("game.clock.not_known", &[]));
     }
     let _ = writeln!(out, "  {}", words.get("game.order", &[]));
+    let _ = writeln!(out, "  {}", words.get("game.windows_unmeasured", &[]));
     for candidate in &view.candidates {
         candidate_lines(&mut out, &words, candidate);
     }
@@ -451,6 +452,25 @@ mod tests {
         );
     }
 
+    /// Self mode, English: the not-yet-measured line is printed right after the order line, so the
+    /// reader meets the caveat before the candidates.
+    #[test]
+    fn the_windows_unmeasured_line_follows_the_order_line() {
+        let text = section(Some(&view_with_one_candidate()), Mode::SelfCheck, Lang::En);
+        let unmeasured =
+            "The 30-minute windows have not yet been measured on many ordinary gaming PCs.";
+        let order_at = text
+            .lines()
+            .position(|line| line.contains("Ordered by how many facts about the file hold"));
+        let unmeasured_at = text.lines().position(|line| line.trim() == unmeasured);
+        assert!(order_at.is_some(), "no order line in\n{text}");
+        assert!(unmeasured_at.is_some(), "no unmeasured line in\n{text}");
+        assert!(
+            unmeasured_at > order_at,
+            "the unmeasured line comes before the order line in\n{text}"
+        );
+    }
+
     /// The text at the dotted `key` in a locale file, or `None`. Read from the file itself, not through
     /// `Words`, which falls back to English and would hide a key missing from Thai.
     fn own_text(locale: &str, key: &str) -> Option<String> {
@@ -507,6 +527,7 @@ mod tests {
             "game.clock.detail",
             "game.clock.not_known",
             "game.order",
+            "game.windows_unmeasured",
             "session.session",
             "session.edition.legacy",
             "session.edition.enhanced",
