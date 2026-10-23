@@ -216,9 +216,7 @@ fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
             TimeFact::NotKnown { reason } => {
                 let (key, source) = time_reason(reason);
                 let note = match source {
-                    Some(source) => {
-                        words.get(&format!("game.nk.{key}"), &[("source", source)])
-                    }
+                    Some(source) => words.get(&format!("game.nk.{key}"), &[("source", source)]),
                     None => words.get(&format!("game.nk.{key}"), &[]),
                 };
                 let _ = writeln!(
