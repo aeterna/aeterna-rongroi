@@ -1,6 +1,7 @@
 # ADR 0083 — Programs signed by a known publisher
 
-- Status: proposed — five owner questions below; nothing is built
+- Status: accepted — the owner decided the five questions below on 2026-10-24, each as recommended, and
+  approved the text as drafted; nothing is built
 - Date: 2026-10-24
 - Related: ADR 0035 (offline signature checking; a signer's name is not an identity), ADR 0036 (certificate
   pins and their expiry), ADR 0061 section 4 (no ranking), ADR 0078 (programs recorded near a game session,
@@ -40,7 +41,7 @@ Two things about such a list are known without measuring:
 How many candidates an ordinary evening produces, and how many of them a list would fold, is not measured.
 That is step P7's baseline (ADR 0078, "Order of work").
 
-## Decision (proposed)
+## Decision
 
 ### 1. A list of its own: `rules/known-publishers.csv`
 
@@ -125,6 +126,15 @@ never a required check.
 | `fold.line` | โปรแกรม {{count}} รายการที่เซ็นโดยผู้ผลิตที่รู้จัก | {{count}} programs signed by a known publisher |
 | `fold.note` | พับไว้เพราะมีลายเซ็นที่ตรวจผ่านด้วยใบรับรองที่อยู่ในรายชื่อผู้ผลิตที่รู้จักของโปรแกรมนี้ และไม่มีข้อเท็จจริงด้านตัวไฟล์ข้อใดเป็นจริง การถูกพับไม่ได้บอกอะไรด้วยตัวเอง | Folded: a valid signature with a certificate in this program's list of known publishers, and no fact about the file holds. Being folded says nothing on its own. |
 | `fact.o1` | เซ็นโดยผู้ผลิตที่รู้จัก: {{product}} | signed by a known publisher: {{product}} |
+
+## Owner decisions (2026-10-24, each as recommended)
+
+1. **The list:** a new list, `rules/known-publishers.csv` (section 1).
+2. **When to fold:** only when none of I1, I3, I4 and L1 holds (section 2).
+3. **The first rows:** the probe on the owner's PC, and the owner picks the publishers (section 5).
+4. **The display:** last, under one closed line, with full cards inside, in Self mode only, the same in both
+   front ends (sections 3 and 4).
+5. **The text:** the table under the owner questions, as drafted.
 
 ## Alternatives weighed
 
