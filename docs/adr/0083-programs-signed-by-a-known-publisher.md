@@ -38,7 +38,7 @@ Two things about such a list are known without measuring:
   program from the first read of the list.
 
 How many candidates an ordinary evening produces, and how many of them a list would fold, is not measured.
-That is step P7's baseline (ADR 0078 section 3).
+That is step P7's baseline (ADR 0078, "Order of work").
 
 ## Decision (proposed)
 
@@ -49,7 +49,11 @@ the publisher names it), `not_before`, `not_after`, `measured_on`, and `source` 
 version). It follows the same rule as the pins: a row is a measurement from a file the publisher released,
 never from memory, and a renewed certificate adds a row beside the old one.
 
-- It is built into the rules bundle, so the core reads it. The bundle's hash changes when a row changes.
+- It is built into the rules bundle, so the core reads it. Today the bundle carries only `rule.yaml` files
+  and the CSV files beside them (`source_tree::data_beside`), and `RawBundle` has no place for a list at the
+  root of `rules/`, which is why `certificate-pins.csv` never reaches the core. This change adds that place:
+  one field on the bundle, and one entry in the source-tree walk. The bundle's hash changes when a row
+  changes.
 - `cargo xtask check-rules` checks it on every pull request: 64 lowercase hex characters, no repeated
   certificate, no empty field, dates that parse.
 - `rules/certificate-pins.csv` stays as it is, for rules only. The two lists answer different questions:
@@ -67,17 +71,19 @@ therefore never hides a file that has another fact about it.
 
 ### 3. What the reader sees
 
-- Folded candidates leave the ordered list and come last, under one line, "N programs signed by a known
-  publisher" (ADR 0078 section 5), with a note that being folded says nothing on its own.
+- In Self mode, folded candidates leave the ordered list and come last, under one line, "N programs signed
+  by a known publisher" (ADR 0078 section 5), with a note that being folded says nothing on its own.
 - The desktop app shows that line as a closed `<details>`; opening it shows each folded candidate's card,
   as an unfolded one is shown. The CLI prints the line, then the folded candidates' cards under it.
 - Folding changes no count: each folded candidate still counts in its windows.
 
 ### 4. SS mode
 
-A folded candidate has no identity fact, so SS mode never names it (ADR 0078 section 9). It stays in the
-per-window counts of programs SS mode does not name. O1 therefore changes nothing in SS mode, and neither
-the consent text nor `PRIVACY.md` changes.
+A folded candidate has no identity fact, so SS mode never names it (ADR 0078 section 9). It is dropped
+before the view is shown, as now, and stays in the per-window counts of programs SS mode does not name.
+SS mode therefore shows no folded line and no folded card. Section 3 is Self mode only. O1 changes nothing
+in SS mode, and neither the consent text nor `PRIVACY.md` changes. A candidate SS mode does name has an
+identity fact, so it is never folded, and in SS mode it shows O1 as one of its lines, like any other fact.
 
 ### 5. The first rows
 
@@ -92,7 +98,8 @@ public facts.
 
 The view cannot tell when a file was signed. When a publisher renews its certificate, its newer releases
 stop folding until a row for the new certificate is measured. They are then shown unfolded, which is the
-safe direction. The monthly certificate workflow also reports rows within 90 days of `not_after`. It is
+safe direction. The monthly certificate workflow also reports rows within 90 days of `not_after`. For
+that, `cargo xtask check-pin-expiry`, which today reads only `certificate-pins.csv`, reads this list too. It is
 never a required check.
 
 ## Owner questions
