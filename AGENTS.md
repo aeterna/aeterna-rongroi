@@ -56,6 +56,12 @@ see [`SECURITY.md`](SECURITY.md). Do not write bypass details into issues, PRs, 
 7. **Every source file carries an SPDX header** (`reuse lint`). No zero-width or bidi control
    characters anywhere (`cargo xtask check-unicode`).
 8. **One name per idea.** Use the glossary in `CONVENTIONS.md`; grep before naming anything new.
+9. **Nothing vouches for a program, a file or a PC.** No logic folds, hides, moves down, greys out,
+   labels as trusted or known, or leaves out of the report anything because it is on a list of known-good
+   publishers, certificates, hashes, names or paths. A cheat can be signed with a stolen key or disguised
+   as a familiar program, and a list that vouched for it would be false. Counting facts that hold, SS-mode
+   privacy (rule 5) and a fact such as "the signature is valid" are not vouching. A fold or "known good"
+   list in a design is refused at review (owner, 2026-10-24; ADR 0083 withdrawn).
 
 ## Commands
 

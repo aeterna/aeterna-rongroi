@@ -1,7 +1,7 @@
 # ADR 0083 — Programs signed by a known publisher
 
-- Status: accepted — the owner decided the five questions below on 2026-10-24, each as recommended, and
-  approved the text as drafted; nothing is built
+- Status: withdrawn — the owner cancelled O1 on 2026-10-24, after the probe of section 5; nothing was
+  built (see "Withdrawn" at the end)
 - Date: 2026-10-24
 - Related: ADR 0035 (offline signature checking; a signer's name is not an identity), ADR 0036 (certificate
   pins and their expiry), ADR 0061 section 4 (no ranking), ADR 0078 (programs recorded near a game session,
@@ -160,3 +160,20 @@ never a required check.
 - O1 becomes the first fact that moves a candidate in the order, and only downwards, into the folded line.
   ADR 0061 section 4 still forbids any number, colour scale or verdict word. The folded line counts
   programs; it does not judge them.
+
+## Withdrawn (2026-10-24)
+
+The owner cancelled O1 after reading the probe's table, for three reasons:
+
+1. **A list of known publishers vouches for programs.** Folding a program because its certificate is on a
+   list says that the program is ordinary. A cheat signed with a stolen or leaked key of a listed publisher,
+   or one disguised as a familiar program, would then be folded. The list would vouch for it, and the
+   vouching would be false.
+2. **Little use.** How long the candidate list is on an ordinary gaming PC is not measured (step P7). Any
+   fold would only shorten a list whose length nobody has seen to be a problem.
+3. **A list that never ends.** Certificates are renewed every one to three years, Microsoft's every year.
+   The probe found 49 certificates on one PC, six of them Microsoft's.
+
+The rule this leaves behind is `AGENTS.md`, hard rule 9: nothing in this program vouches for a program, a
+file or a PC. ADR 0078's O1 is withdrawn with this ADR. The probe's output named programs on the owner's
+PC and was never added to this repository.

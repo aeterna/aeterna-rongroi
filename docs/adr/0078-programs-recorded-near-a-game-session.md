@@ -104,13 +104,13 @@ ordinary causes, fixed strings in the locale files, printed with it.
 | identity | **I5** the change journal holds a rename or deletion of it inside a window (ADR 0047) | updates, the Recycle Bin, antivirus quarantine |
 | around | **C1** a Code Integrity 3033 or 3077, or a Defender 1116, recorded inside a window | the 476 refused DLLs one ordinary PC held (ADR 0059) |
 | around | **C2** a log-clearing record (ADR 0031) inside the "before the scan" window | Disk Cleanup and clean-up programs |
-| quiet | **O1** a valid signature whose certificate is in `rules/certificate-pins.csv` | (folds the candidate, below) |
+| quiet | ~~**O1** a valid signature whose certificate is in `rules/certificate-pins.csv`~~ (withdrawn 2026-10-24, ADR 0083) | — |
 
 I3's name-shape checks are facts about one name in the view, not rules: they make no evidence row, and a
 rename that avoids every shape leaves I3 false, which the text says.
 
-**What the reader sees** is the facts as labels on each candidate, never a sum. Candidates with O1 are
-folded into one line, "N programs signed by a known publisher", which opens to the list.
+**What the reader sees** is the facts as labels on each candidate, never a sum. No candidate is folded,
+hidden or moved because of who published it (O1 withdrawn, amendment of 2026-10-24).
 
 **Ordering (amends ADR 0061 section 4).** Candidates are ordered by how many of R and I1 to I5 are true,
 then by how many of T1 to T4, then by the earliest recorded time. ADR 0061 section 4 forbade any ranking;
@@ -498,3 +498,10 @@ show them as the P6b decisions above describe. The build fills in four things th
    text.
 4. **Hash lines read the same.** Both front ends print `SHA-256: <hash>` and
    `Signer certificate SHA-256: <hash>`, with the colon after the label from the table.
+
+## Amendment (2026-10-24): O1 withdrawn
+
+The owner cancelled O1, the fold of candidates signed with a known publisher's certificate (ADR 0083,
+"Withdrawn"). Section 5 keeps its row struck through so the history stays readable. No candidate is
+folded, hidden or moved because of who published it. The order stays the one section 5 describes: by
+how many facts about the file hold. That counts facts and vouches for nothing (`AGENTS.md`, hard rule 9).
