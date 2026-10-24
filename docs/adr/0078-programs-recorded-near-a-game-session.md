@@ -478,3 +478,23 @@ both:
 - CLI, `download_host_question`:
   - ไทย: ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาหรือไม่ อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง ถ้าไม่ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST% [y/N]
   - English: Show the person watching the name of each website a PowerShell command, or a recorded program's file, was downloaded from? Only the name is read, never the rest of the address or the command. If not, each name is shown as %DOWNLOAD_HOST%. [y/N]
+
+## As built: P6b (2026-10-24)
+
+P6b shipped in workstream R-14. Each `GameCandidate` now carries `recorded_by` and `file`, and both front ends
+show them as the P6b decisions above describe. The build fills in four things those decisions leave open:
+
+1. **One join, one reason.** `file.read` comes from the same join as I1 and I2, and the same three-way
+   choice applies when nothing joins: no path, a standard scan, or no observation for the path. The
+   facts and the details can therefore never disagree. An `identity_read` that is absent or unknown is
+   read as `failed`.
+2. **Order of the sources.** `recorded_by` follows the order in which the view reads the collectors
+   (Prefetch, BAM, PCA, process, UserAssist), not the alphabet. One constant holds that order for both.
+3. **The CLI replaces control characters.** The game-window section is the first place the CLI prints
+   text from the player's files and from Windows' records as it is: names, paths, the signer, the
+   version-information name, the download host, and a signature or content kind it has no words for.
+   Every control character in that text is printed as U+FFFD, so a newline cannot forge a line and an
+   escape sequence cannot drive the terminal. The desktop app is not affected, because React escapes
+   text.
+4. **Hash lines read the same.** Both front ends print `SHA-256: <hash>` and
+   `Signer certificate SHA-256: <hash>`, with the colon after the label from the table.
