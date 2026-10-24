@@ -147,8 +147,8 @@ services, 2 `Run` values and 87 task actions in 82 task files, 34 files hashed, 
 is written as the path the collector resolved, quoted, and each `ServiceDll` as its resolved path, with
 `Type` 16, or 32 beside a `ServiceDll`; each task file holds only the kinds of its triggers, whether it is
 enabled and its commands, quoted. The files outside the Windows folder are described with the hash and
-signature the runner reported; those inside it are not described, so since ADR 0084 their rows carry
-`file_unread`; a file the runner did not have (Edge's updater) is not described, so it
+signature the runner reported; those inside it are not described with a hash, so since ADR 0084 a row
+whose file is listed without one carries `file_unread`, and one whose file is not listed reads as missing; a file the runner did not have (Edge's updater) is not described, so it
 reads as missing there too. Two things are not the runner's: the eight services `os_image` reads keep the
 `Start` measured on the Windows 11 PC this baseline otherwise describes (three differ from the runner's),
 and the account SIDs in four task names are replaced with an invented one. The autostart rule is `found`
