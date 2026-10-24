@@ -20,9 +20,10 @@
 //!   for this place alone (owner decision 9).
 //!
 //! **Arguments are never reported**, nor whether there were any: a command line is read only to find
-//! where the program's path ends (ADR 0060, section 4). A file under `%SystemRoot%` is reported by its
-//! path alone; every other file is hashed and its embedded signature checked, under a 30-second budget
-//! of its own (section 7, option B).
+//! where the program's path ends (ADR 0060, section 4). Every file is hashed and its embedded signature
+//! checked: the files outside `%SystemRoot%` under a 30-second budget of their own (section 7, option B),
+//! the files under `%SystemRoot%` after them under a second budget (ADR 0084). A file under
+//! `%SystemRoot%` that is not read says why on its row, `file_unread`, and is not a gap of its place.
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -92,9 +93,10 @@ pub const PROFILE_VARIABLES: [&str; 5] = ["USERPROFILE", "APPDATA", "LOCALAPPDAT
 /// The fields that describe the file an entry names.
 const FILE_GAP_FIELDS: [&str; 2] = ["sha256", "signature"];
 
-static FIELDS: [Field; 17] = [
+static FIELDS: [Field; 18] = [
     Field::boolean("enabled"),
     Field::text("entry"),
+    Field::text("file_unread"),
     Field::text("hive"),
     Field::text("location"),
     Field::text("path"),
@@ -123,14 +125,20 @@ static REASONS: [UnmeasuredReason; 5] = [
 /// Reads what Windows starts by itself.
 #[derive(Debug, Clone, Copy)]
 pub struct Autostart {
-    /// How long hashing and signature checks may take before the remaining files are left with
-    /// `budget_spent`.
+    /// How long hashing and signature checks may take on the files outside `%SystemRoot%` before the
+    /// remaining ones are left with `budget_spent`.
     pub budget: Duration,
+    /// How long hashing and signature checks may take on the files under `%SystemRoot%`, after the
+    /// others (ADR 0084). A file this budget does not reach says so on its row, `file_unread`.
+    pub windows_budget: Duration,
 }
 
 impl Default for Autostart {
     fn default() -> Self {
-        Self { budget: BUDGET }
+        Self {
+            budget: BUDGET,
+            windows_budget: BUDGET,
+        }
     }
 }
 
@@ -200,10 +208,12 @@ impl Autostart {
                 );
                 match entry.file {
                     Resolution::Path(path) => {
-                        fields.insert(
-                            "path_kind".to_owned(),
-                            serde_json::Value::from(context.path_kind(&path)),
-                        );
+                        let kind = context.path_kind(&path);
+                        // A file under `%SystemRoot%` that is not read is said on its row, not as a gap
+                        // of its place: no rule asks about it there, so no answer may turn `unmeasured`
+                        // over it (ADR 0084).
+                        let windows = kind == "windows";
+                        fields.insert("path_kind".to_owned(), serde_json::Value::from(kind));
                         match files.get(&path.to_ascii_lowercase()) {
                             Some(FileState::Described { sha256, signature }) => {
                                 fields.insert(
@@ -212,15 +222,21 @@ impl Autostart {
                                 );
                                 match signature {
                                     Ok(check) => insert_signature(&mut fields, check.clone()),
+                                    Err(reason) if windows => {
+                                        insert_file_unread(&mut fields, *reason);
+                                    }
                                     Err(reason) => note(&mut gaps, "signature", *reason),
                                 }
+                            }
+                            Some(FileState::Failed(reason)) if windows => {
+                                insert_file_unread(&mut fields, *reason);
                             }
                             Some(FileState::Failed(reason)) => {
                                 for field in FILE_GAP_FIELDS {
                                     note(&mut gaps, field, *reason);
                                 }
                             }
-                            // Under `%SystemRoot%` (not read by design), or not there.
+                            // Not there: a registration left behind, not a gap (ADR 0048).
                             Some(FileState::Missing) | None => {}
                         }
                         fields.insert("path".to_owned(), serde_json::Value::from(path));
@@ -277,46 +293,55 @@ impl Autostart {
         }
     }
 
-    /// Hashes and checks every file outside `%SystemRoot%` once, however many entries name it, the
-    /// files of entries that start by themselves first, until the budget is spent.
+    /// Hashes and checks every file once, however many entries name it: the files outside `%SystemRoot%`
+    /// first, the files of entries that start by themselves before the rest, until the budget is spent;
+    /// then the files under `%SystemRoot%`, in the same order, under their own budget (ADR 0084).
     fn describe_files(
         &self,
         context: &Context<'_>,
         places: &[Place; 3],
     ) -> HashMap<String, FileState> {
-        let mut first = Vec::new();
-        let mut then = Vec::new();
-        let mut seen = BTreeSet::new();
-        for pass in [true, false] {
-            for entry in places.iter().flat_map(|place| &place.entries) {
-                let Resolution::Path(path) = &entry.file else {
-                    continue;
-                };
-                if entry.starts_by_itself != pass
-                    || context.path_kind(path) == "windows"
-                    || !seen.insert(path.to_ascii_lowercase())
-                {
-                    continue;
-                }
-                if pass {
-                    first.push(path.clone());
-                } else {
-                    then.push(path.clone());
-                }
-            }
-        }
-        let started = Instant::now();
         let mut files = HashMap::new();
-        for path in first.into_iter().chain(then) {
-            let state = if started.elapsed() >= self.budget {
-                FileState::Failed(UnmeasuredReason::BudgetSpent)
-            } else {
-                describe_file(context.host, &path)
-            };
-            files.insert(path.to_ascii_lowercase(), state);
+        for (windows, budget) in [(false, self.budget), (true, self.windows_budget)] {
+            let started = Instant::now();
+            for path in ordered_files(context, places, windows) {
+                let state = if started.elapsed() >= budget {
+                    FileState::Failed(UnmeasuredReason::BudgetSpent)
+                } else {
+                    describe_file(context.host, &path)
+                };
+                files.insert(path.to_ascii_lowercase(), state);
+            }
         }
         files
     }
+}
+
+/// The files of one kind, each once, in the order they are described: those of entries that start by
+/// themselves first, then the rest. `windows` picks the files under `%SystemRoot%`.
+fn ordered_files(context: &Context<'_>, places: &[Place; 3], windows: bool) -> Vec<String> {
+    let mut first = Vec::new();
+    let mut then = Vec::new();
+    let mut seen = BTreeSet::new();
+    for pass in [true, false] {
+        for entry in places.iter().flat_map(|place| &place.entries) {
+            let Resolution::Path(path) = &entry.file else {
+                continue;
+            };
+            if entry.starts_by_itself != pass
+                || (context.path_kind(path) == "windows") != windows
+                || !seen.insert(path.to_ascii_lowercase())
+            {
+                continue;
+            }
+            if pass {
+                first.push(path.clone());
+            } else {
+                then.push(path.clone());
+            }
+        }
+    }
+    first.into_iter().chain(then).collect()
 }
 
 /// What hashing and checking one file came to.
@@ -396,6 +421,12 @@ fn insert_signature(fields: &mut BTreeMap<String, serde_json::Value>, signature:
         SignatureCheck::UnverifiableOffline => "unverifiable_offline",
     };
     fields.insert("signature".to_owned(), serde_json::Value::from(state));
+}
+
+/// Why a file under `%SystemRoot%` was not read, on its row (ADR 0084). The reason's `as_str` name, never
+/// a gap of the place.
+fn insert_file_unread(fields: &mut BTreeMap<String, serde_json::Value>, reason: UnmeasuredReason) {
+    fields.insert("file_unread".to_owned(), serde_json::Value::from(reason.as_str()));
 }
 
 fn lowercase_digest(digest: &str) -> Option<String> {

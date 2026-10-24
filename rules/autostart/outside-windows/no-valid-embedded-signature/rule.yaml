@@ -10,8 +10,9 @@ description: >-
   either none at all, or one that does not verify. The row shows where the entry is registered, the file's
   path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads
   here as having no embedded signature, because this program does not read catalogs. Files under the
-  Windows folder are not checked at all, and a program that starts from inside Program Files is not
-  shown by this rule. Arguments are never read, so this does not say what the program is given to run.
+  Windows folder are checked after the others and are shown among the unmatched rows, but this rule does
+  not ask about them. A program that starts from inside Program Files is not shown by this rule.
+  Arguments are never read, so this does not say what the program is given to run.
   This says a program is set to start without being asked; it does not say what the program does, who
   installed it, or that it ever ran.
 status: experimental
