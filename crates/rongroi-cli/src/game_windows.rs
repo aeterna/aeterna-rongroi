@@ -164,9 +164,9 @@ fn window_line(words: &Words, counts: &WindowCounts) -> String {
 /// A candidate's name and path, then one line per fact that is true or not known, then its notes.
 /// A false fact and I5 (deferred) are not listed: a line for them would say nothing about the file.
 fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
-    let _ = writeln!(out, "  {}", candidate.name);
+    let _ = writeln!(out, "  {}", without_controls(&candidate.name));
     if let Some(path) = &candidate.path {
-        let _ = writeln!(out, "    {path}");
+        let _ = writeln!(out, "    {}", without_controls(path));
     }
     let identities = [
         ("i1", &candidate.i1),
@@ -315,10 +315,11 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
         let _ = writeln!(out, "      {text}");
     }
     if let Some(signer) = &file.signer {
+        let signer = without_controls(signer);
         let _ = writeln!(
             out,
             "      {}",
-            words.get("game.file.signer", &[("signer", signer)])
+            words.get("game.file.signer", &[("signer", &signer)])
         );
     }
     if let Some(cert) = &file.signer_cert_sha256 {
@@ -343,13 +344,14 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
         let _ = writeln!(out, "      {}", words.get("game.file.embedded_pe", &[]));
     }
     if let Some(name) = &file.original_filename {
+        let name = without_controls(name);
         let _ = writeln!(
             out,
             "      {}",
-            words.get("game.file.original_filename", &[("name", name)])
+            words.get("game.file.original_filename", &[("name", &name)])
         );
     }
-    // Windows names zones 0 to 4; any other number is printed as it is.
+    // Windows names zones 0 to 4; any other number is printed as `zone <n>` under the same label.
     if let Some(zone) = file.zone_id {
         let text = match zone {
             0..=4 => words.get(
@@ -359,17 +361,30 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
                     &words.get(&format!("game.file.zone_name.{zone}"), &[]),
                 )],
             ),
-            _ => words.get("game.file.zone_other", &[("id", &zone.to_string())]),
+            _ => {
+                let other = words.get("game.file.zone_other", &[("id", &zone.to_string())]);
+                words.get("game.file.zone", &[("zone", &other)])
+            }
         };
         let _ = writeln!(out, "      {text}");
     }
     if let Some(host) = &file.download_host {
+        let host = without_controls(host);
         let _ = writeln!(
             out,
             "      {}",
-            words.get("game.file.download_host", &[("host", host)])
+            words.get("game.file.download_host", &[("host", &host)])
         );
     }
+}
+
+/// A value from the player's file or Windows' records, with every control character replaced by U+FFFD:
+/// a newline or an escape sequence there could forge a line or drive the terminal it is printed to.
+fn without_controls(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| if c.is_control() { '\u{FFFD}' } else { c })
+        .collect()
 }
 
 /// The text at `key`, or `raw` itself when the locale has no key for it: a value this build does not
@@ -377,7 +392,7 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
 fn text_or_raw(words: &Words, key: &str, raw: &str) -> String {
     let text = words.get(key, &[]);
     if text.is_empty() {
-        raw.to_owned()
+        without_controls(raw)
     } else {
         text
     }
@@ -818,6 +833,64 @@ mod tests {
         let bare_view = view_with_one_file(None, &[]);
         let text = section(Some(&bare_view), Mode::SelfCheck, Lang::En);
         assert!(!text.contains("File details"), "{text}");
+    }
+
+    /// (c8) A newline in a file's original filename is printed as U+FFFD, so it cannot forge the
+    /// signature line that would otherwise follow the file's details.
+    #[test]
+    fn a_newline_in_the_original_filename_is_printed_as_replacement() {
+        let file = FileDetails {
+            original_filename: Some("x\n      Embedded signature: verifies".to_owned()),
+            ..bare(FileRead::Read)
+        };
+        let view = view_with_one_file(Some(file), &[]);
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        let expected =
+            "      Name in its version information: x\u{FFFD}      Embedded signature: verifies";
+        assert_eq!(
+            text.lines().filter(|line| *line == expected).count(),
+            1,
+            "the filename is not on exactly one line in\n{text}"
+        );
+        assert!(
+            !text
+                .lines()
+                .any(|line| line == "      Embedded signature: verifies"),
+            "the filename forged the signature line in\n{text}"
+        );
+    }
+
+    /// (c9) An escape sequence in a signer's name is printed as U+FFFD, so it cannot drive the
+    /// terminal it is printed to.
+    #[test]
+    fn an_escape_sequence_in_the_signer_is_printed_as_replacement() {
+        let file = FileDetails {
+            signer: Some("\u{1b}[31mEvil".to_owned()),
+            ..bare(FileRead::Read)
+        };
+        let view = view_with_one_file(Some(file), &[]);
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.lines()
+                .any(|line| line == "      Signer: \u{FFFD}[31mEvil"),
+            "{text}"
+        );
+    }
+
+    /// (c10) A carriage return in a candidate's name is printed as U+FFFD.
+    #[test]
+    fn a_carriage_return_in_the_candidate_name_is_printed_as_replacement() {
+        let shown = candidate("bad\rname", None);
+        let view = GameWindows {
+            sessions: vec![legacy_session()],
+            candidates: vec![shown],
+            ..GameWindows::default()
+        };
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.lines().any(|line| line == "  bad\u{FFFD}name"),
+            "{text}"
+        );
     }
 
     /// (P6b c4) Thai: the file details heading and the kind of file are in Thai.
