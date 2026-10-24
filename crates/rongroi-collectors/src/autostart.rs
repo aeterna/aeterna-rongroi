@@ -1157,7 +1157,8 @@ mod tests {
             Some("1111111111111111111111111111111111111111111111111111111111111111")
         );
 
-        // A shared-process service is described by its `ServiceDll`, under `%SystemRoot%`: path only.
+        // A shared-process service is described by its `ServiceDll`, under `%SystemRoot%`. That file is
+        // checked too, but this fixture records no hash for it: the row says it was not read.
         let dll = by(observations, "service", "SharedSvc");
         assert_eq!(dll.fields["service_dll"], true);
         assert_eq!(dll.fields["trigger_start"], true);
@@ -1166,6 +1167,7 @@ mod tests {
         assert_eq!(text(dll, "path_kind"), Some("windows"));
         assert!(!dll.fields.contains_key("sha256"));
         assert!(!dll.fields.contains_key("signature"));
+        assert_eq!(text(dll, "file_unread"), Some("read_failed"));
 
         let disabled = by(observations, "service", "DisabledSvc");
         assert_eq!(disabled.fields["starts_by_itself"], false);
@@ -1316,6 +1318,7 @@ mod tests {
     fn a_spent_budget_leaves_every_file_unhashed_and_outranks_everything() {
         let run = Autostart {
             budget: Duration::ZERO,
+            windows_budget: Duration::ZERO,
         }
         .collect(&fixture("autostart-forms"));
         let (observations, places) = measured(&run);
@@ -1328,6 +1331,152 @@ mod tests {
         assert_eq!(
             places[0].gaps.get("signature"),
             Some(&UnmeasuredReason::BudgetSpent)
+        );
+    }
+
+    #[test]
+    fn a_windows_folder_file_is_hashed_and_checked() {
+        let sha = "0123456789abcdef".repeat(4);
+        let cert = "abcdef0123456789".repeat(4);
+        let host = inline(&format!(
+            "{ENV}registry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinSvc':\n    Type: 16\n    Start: 2\n    ImagePath: 'C:\\Windows\\System32\\x.exe'\nfilesystem:\n  'C:\\Windows\\System32':\n    - name: x.exe\n      sha256: '{sha}'\n      signature:\n        state: valid\n        signer: Microsoft Windows\n        signer_cert_sha256: '{cert}'\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart::default().collect(&host);
+        let (observations, places) = measured(&run);
+        let svc = by(observations, "service", "WinSvc");
+        assert_eq!(text(svc, "path_kind"), Some("windows"));
+        assert_eq!(text(svc, "sha256"), Some(sha.as_str()));
+        assert_eq!(text(svc, "signature"), Some("valid"));
+        assert_eq!(text(svc, "signer"), Some("Microsoft Windows"));
+        assert_eq!(text(svc, "signer_cert_sha256"), Some(cert.as_str()));
+        assert!(!svc.fields.contains_key("file_unread"));
+        assert_eq!(
+            place_gaps(places, "service").and_then(|gaps| gaps.get("sha256")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_windows_folder_file_the_second_budget_misses_says_so_on_its_row() {
+        let sha = "0123456789abcdef".repeat(4);
+        let cert = "abcdef0123456789".repeat(4);
+        let host = inline(&format!(
+            "{ENV}registry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinSvc':\n    Type: 16\n    Start: 2\n    ImagePath: 'C:\\Windows\\System32\\x.exe'\nfilesystem:\n  'C:\\Windows\\System32':\n    - name: x.exe\n      sha256: '{sha}'\n      signature:\n        state: valid\n        signer: Microsoft Windows\n        signer_cert_sha256: '{cert}'\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart {
+            budget: BUDGET,
+            windows_budget: Duration::ZERO,
+        }
+        .collect(&host);
+        let (observations, places) = measured(&run);
+        let svc = by(observations, "service", "WinSvc");
+        assert_eq!(text(svc, "file_unread"), Some("budget_spent"));
+        assert!(!svc.fields.contains_key("sha256"));
+        assert!(!svc.fields.contains_key("signature"));
+        assert_eq!(
+            place_gaps(places, "service").and_then(|gaps| gaps.get("sha256")),
+            None
+        );
+        assert_eq!(
+            place_gaps(places, "service").and_then(|gaps| gaps.get("signature")),
+            None
+        );
+    }
+
+    #[test]
+    fn the_first_budget_still_makes_place_gaps() {
+        let sha = "0123456789abcdef".repeat(4);
+        let cert = "abcdef0123456789".repeat(4);
+        let host = inline(&format!(
+            "{ENV}registry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinSvc':\n    Type: 16\n    Start: 2\n    ImagePath: 'C:\\Windows\\System32\\x.exe'\n  'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run':\n    Vendor: 'C:\\Vendor\\run.exe'\nfilesystem:\n  'C:\\Windows\\System32':\n    - name: x.exe\n      sha256: '{sha}'\n      signature:\n        state: valid\n        signer: Microsoft Windows\n        signer_cert_sha256: '{cert}'\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart {
+            budget: Duration::ZERO,
+            windows_budget: BUDGET,
+        }
+        .collect(&host);
+        let (observations, places) = measured(&run);
+        // The file outside the Windows folder is not hashed: its place says so, as before.
+        let vendor = by(observations, "entry", "Vendor");
+        assert_eq!(text(vendor, "path_kind"), Some("other"));
+        assert!(!vendor.fields.contains_key("sha256"));
+        assert_eq!(
+            place_gaps(places, "run").and_then(|gaps| gaps.get("sha256")),
+            Some(&UnmeasuredReason::BudgetSpent)
+        );
+        assert_eq!(
+            place_gaps(places, "run").and_then(|gaps| gaps.get("signature")),
+            Some(&UnmeasuredReason::BudgetSpent)
+        );
+        // The file under the Windows folder is still hashed, and is no gap.
+        let svc = by(observations, "service", "WinSvc");
+        assert_eq!(text(svc, "sha256"), Some(sha.as_str()));
+        assert_eq!(text(svc, "signature"), Some("valid"));
+        assert_eq!(
+            place_gaps(places, "service").and_then(|gaps| gaps.get("sha256")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_refused_windows_file_is_not_a_place_gap() {
+        let sha = "0123456789abcdef".repeat(4);
+        let cert = "abcdef0123456789".repeat(4);
+        let host = inline(&format!(
+            "{ENV}access_denied: ['C:\\Windows\\System32\\y.exe']\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinSvc':\n    Type: 16\n    Start: 2\n    ImagePath: 'C:\\Windows\\System32\\y.exe'\nfilesystem:\n  'C:\\Windows\\System32':\n    - name: y.exe\n      sha256: '{sha}'\n      signature:\n        state: valid\n        signer: Microsoft Windows\n        signer_cert_sha256: '{cert}'\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart::default().collect(&host);
+        let (observations, places) = measured(&run);
+        let svc = by(observations, "service", "WinSvc");
+        assert_eq!(text(svc, "file_unread"), Some("access_denied"));
+        assert!(!svc.fields.contains_key("sha256"));
+        assert!(!svc.fields.contains_key("signature"));
+        assert_eq!(
+            place_gaps(places, "service").and_then(|gaps| gaps.get("sha256")),
+            None
+        );
+        assert_eq!(
+            place_gaps(places, "service").and_then(|gaps| gaps.get("signature")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_rule_about_other_files_is_not_found_when_the_windows_budget_is_spent() {
+        use rongroi_core::bundle::Bundle;
+        use rongroi_core::engine::evaluate_rule;
+        use rongroi_core::model::EvidenceState;
+
+        // Rule 72820eaf asks only about files outside the Windows folder, so a file under it that the
+        // second budget did not reach must not turn its answer into `unmeasured`.
+        let rule = Bundle::embedded()
+            .unwrap()
+            .rules()
+            .iter()
+            .find(|sourced| sourced.rule.id == "72820eaf-1469-4ea7-bb0f-17f145d26dfc")
+            .unwrap()
+            .rule
+            .clone();
+        let sha = "1".repeat(64);
+        let cert = "abcdef0123456789".repeat(4);
+        let host = inline(&format!(
+            "{ENV}registry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\VendorSvc':\n    Type: 16\n    Start: 2\n    ImagePath: 'C:\\Vendor\\signed.exe'\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinSvc':\n    Type: 16\n    Start: 2\n    ImagePath: 'C:\\Windows\\System32\\x.exe'\nfilesystem:\n  'C:\\Vendor':\n    - name: signed.exe\n      sha256: '{sha}'\n      signature:\n        state: valid\n        signer: Vendor Ltd\n        signer_cert_sha256: '{cert}'\n  'C:\\Windows\\System32':\n    - name: x.exe\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart {
+            budget: BUDGET,
+            windows_budget: Duration::ZERO,
+        }
+        .collect(&host);
+        let (observations, _) = measured(&run);
+        assert_eq!(
+            text(by(observations, "service", "WinSvc"), "file_unread"),
+            Some("budget_spent")
+        );
+        let evidence = evaluate_rule(&rule, &[run]);
+        assert!(
+            matches!(evidence.state, EvidenceState::NotFound { .. }),
+            "{:?}",
+            evidence.state
         );
     }
 
