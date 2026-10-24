@@ -1,7 +1,8 @@
 # ADR 0084 — Rule 9 applied to what is already built
 
 - Status: accepted — the owner ordered the five fixes below on 2026-10-24, each as recommended after an
-  audit; the new text in the table is drafted and waits for the owner at G1; nothing is built
+  audit; the new text in the table is drafted and waits for the owner at G1. The documents this ADR amends
+  change in the same pull request; the code is not built yet
 - Date: 2026-10-24
 - Related: `AGENTS.md` hard rules 3 ("Evidence, never a verdict"), 6 and 9 ("Nothing vouches for a program,
   a file or a PC"), ADR 0009, ADR 0014 (unmatched observations), ADR 0045 (the report in layers), ADR 0060
@@ -65,37 +66,47 @@ The audit found these were not vouching:
 - the ADR 0078 ordering (it counts facts)
 - L1 (ADR 0082). L1 counts loaded files outside Windows, Program Files and FiveM's folders. It
   establishes one fact, a count, and leaves out no record and no row: the files inside those folders were
-  never listed in the first place (ADR 0021).
+  never listed in the first place (ADR 0021). L1 is counted only for `FiveM.exe`, the game process,
+  `rundll32.exe` and `regsvr32.exe`, chosen by name. That choice says whose loaded files are worth counting;
+  it withholds a fact from other programs but vouches for none, and a program renamed to one of those names
+  gets the count, not a pass.
 
 ## Decision
 
 ### 1. The overview states counts, not a verdict
 
 - The banner says what the scan lists.
-  - With evidence of strength `tamper`, it keeps its tamper sentence.
+  - With evidence of strength `tamper`, it shows a new tamper sentence (below).
   - With more than five checks unmeasured, it keeps its rights sentence.
   - Otherwise it shows the existing line "Evidence only. This report cannot prove that a PC is clean."
   - The dead proxy branch and its key are removed.
 - The history card:
-  - With tamper evidence, it keeps its tamper badge and text.
+  - With tamper evidence, it shows the new tamper badge and text (below).
   - Otherwise its badge is the existing "not found" state word, and its text is a new sentence that this
     is within what was read and that how far back each source reaches is below.
-- The findings card keeps its count. Its badge shows only with tamper evidence. Otherwise its text is the
-  existing line "found — each one lists ordinary things that also produce it".
+- The findings card keeps its count. Its badge shows only with tamper evidence. Otherwise its text is a new
+  line, "Each one lists the ordinary things that also produce it". (`summary.found` says nearly the same,
+  but it is already the tally's label on the same screen.)
 - The horizon timeline:
   - Its badge is the tamper badge, the rights badge, or a new neutral badge, "No log clearing found in what
     was read".
-  - "Event Logs recorded continuously" becomes "Oldest event log record".
+  - The first step's number is the days since Windows was installed or, when that is not known, since the
+    last boot (`trace_ages` anchors `install_date`, `boot_time`). It is not an event log record. So "Event
+    Logs recorded continuously" becomes "Windows installed" or "Last boot", whichever anchor gave the number.
   - "Offline Sealed" becomes "This scan".
-- Two English strings whose Thai already reads right change to match it:
-  - The heading over a finding's causes, "Common benign causes for this result:", becomes "Ordinary things
-    that also produce this:" (Thai "เรื่องปกติที่ทำให้เกิดผลแบบนี้").
-  - The tamper text "Observations indicate intentional history alteration or wiping" names an intent the
-    scan cannot see. It becomes a fact about the trace (Thai "พบข้อสังเกตที่มีลักษณะเป็นการลบหรือตัดทอน
-    ประวัติ").
+- **The tamper texts say what all eleven tamper rules share.** Strength `tamper` is not only a cleared log or
+  a reset change journal. It is also a read-only event log or Prefetch file, an event log that is not the
+  file Windows writes to, a deletion in `DigitalEntitlements`, and a PowerShell command that cleared a log
+  or told Microsoft Defender to look away. The banner says "Event Log cleared or USN Reset" for all of them,
+  and the badges say "Tamper Detected" and "History Wiped or Truncated". The new texts say that evidence of
+  strength `tamper` was found, that what came before it may not be visible, and that each one is listed
+  below.
+- The English heading over a finding's causes, "Common benign causes for this result:", becomes "Ordinary
+  things that also produce this:", as its Thai already reads ("เรื่องปกติที่ทำให้เกิดผลแบบนี้").
 - The keys `reassurance_benign`, `reassurance_proxy`, `history_clean_badge`, `history_clean_desc`,
-  `obs_benign_badge`, `obs_benign_desc`, `badge_continuous`, `badge_short` and `fivem_session_text` are
-  removed.
+  `obs_benign_badge`, `obs_benign_desc`, `badge_continuous`, `badge_short`, `step_history_start_sub` and
+  `fivem_session_text` are removed.
+- The desktop test that pins the old AI prompt (`App.test.tsx`) changes with it.
 
 ### 2. The AI export asks for causes, not a verdict
 
@@ -103,14 +114,15 @@ The prompt moves into the locale files, `ai_export.prompt.*`. It asks for the or
 other possible causes of each observation, and for what the unmeasured checks leave unknown. It ends with
 "Do not conclude that this PC is clean or that it was used to cheat: the report is evidence, not a
 verdict." The machine and scan data it carries do not change, and neither does the masking of user names
-and paths.
+and paths. The one exception is the Thai data line "ความต่อเนื่องของ Event Logs", which repeats the overview's
+"continuous" claim and changes with it.
 
 ### 3. Names do not keep a record out of the candidates (amends ADR 0078 section 4)
 
 `gather` no longer skips a record because of its name. A `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`,
 `PlayGTAV.exe` or `FiveM_b…_GTAProcess.exe` record is a candidate like any other, with its facts and its
 windows.
-- Sessions are still found from the same records (ADR 0062). `is_timeline_name` keeps its other use, which
+- Sessions are still found from the same records (ADR 0062), by `session::session_times`, not by `gather`. `is_timeline_name` keeps its other use, which
   is choosing whose loaded files Prefetch counts (ADR 0082).
 - The genuine game and FiveM will now appear as candidates, recorded during the session (T2). That is the
   cost: about two to five more candidates on every report that has a session.
@@ -119,7 +131,7 @@ windows.
 ### 4. Files under `%SystemRoot%` are checked too (amends ADR 0060 decision 5)
 
 The `autostart` collector hashes and signature-checks every file it reports.
-- Files outside `%SystemRoot%` keep their 30 s budget, nearest first.
+- Files outside `%SystemRoot%` keep their 30 s budget and order: entries that start by themselves first.
 - Files under `%SystemRoot%` are checked afterwards, under a second 30 s budget of their own.
 - A file under `%SystemRoot%` that cannot be read, or that the second budget does not reach, does not become
   a gap of its place.
@@ -129,8 +141,16 @@ The `autostart` collector hashes and signature-checks every file it reports.
   - Instead, the row carries a new text field, `file_unread`, holding the reason (`budget_spent`,
     `access_denied`, `read_failed`). The row says the file was not read, and no rule's answer changes.
   - Files outside `%SystemRoot%` keep today's place gaps exactly.
-- A catalog-signed Windows file reads as having no embedded signature. This is a fact the row has always
-  stated, and the rule's text already says so.
+  - The engine does not read `file_unread`. Today no rule can be misled: the one rule that asks about
+    `signature` rules out `%SystemRoot%`, and the one rule with `signature|exists: false` is on
+    `fivem_dir`. So that no later rule can be, `check-rules` refuses an `autostart` rule with an absence
+    condition (`exists: false`) on `sha256`, `signature`, `signer` or `signer_cert_sha256` whose `path_kind`
+    condition does not leave out `windows` (ADR 0029, ADR 0044).
+  - `file_unread` is shown in both modes, as `signature` is. It names a reason, not the PC.
+- A catalog-signed Windows file reads as having no embedded signature. About 200 rows under `%SystemRoot%`
+  will now say "No embedded signature" where they said nothing (ADR 0060 measured 178 of 205 and 201 of 230
+  service DLLs). That is a fact, and the label already says "embedded" and never "unsigned" (`CONVENTIONS.md`,
+  `signature`). The rule's text already says catalogs are not read.
 - The rule keeps its path condition (`program_data`, `user_profile`, `other`). Rows under `%SystemRoot%` and
   Program Files now carry the same facts as every other row in the unmatched list. A rule that narrows its
   question leaves out no row (ADR 0014).
@@ -142,7 +162,11 @@ The `autostart` collector hashes and signature-checks every file it reports.
   - the rule's description, in `rule.yaml` and `rules/i18n/th.yaml`, with `docs/rules-reference*.md`
     regenerated from them
   - the screenshare guides (`docs/screenshare-guide.md`, `.th.md`)
-  - the fixture notes (`fixtures/hosts/PROVENANCE.md`)
+  - the fixture notes (`fixtures/hosts/PROVENANCE.md`) and `docs/architecture.md`
+  - the description of the rule's negative test (`tests/negative/signed-disabled-or-in-program-files.json`)
+  - the consent text in the command-line program (`crates/rongroi-cli/src/output.rs`), English and Thai
+- The `autostart` tests that pin the old behaviour change with it: the one that says a `windows` file has no
+  `sha256`, and the baseline counts of hashed files.
 - Recorded host fixtures stay as they were captured. A new capture carries the new facts.
 
 ### 5. `allow` narrows a question; it never lists good software
@@ -151,6 +175,11 @@ Hard rule 6's second sentence becomes: "`allow` may only name what a rule expect
 what differs from it, by hash or certificate and never by file name. It never lists software as known
 good (rule 9)." The one entry that exists does exactly that, and stays. ADR 0009's "starter allow-list" is
 withdrawn by an amendment there.
+
+The same wording changes wherever `allow` is described as excluding legitimate software: `rules/AGENTS.md`,
+the doc comments on `allow` in `crates/rongroi-core/src/rules.rs`, and the label the rules reference prints
+over an `allow` block (`xtask/src/rules_reference.rs`), "Legitimate software excluded (`allow`)" in English
+and "ซอฟต์แวร์ที่ถูกต้องซึ่งยกเว้นไว้ (`allow`)" in Thai. That label becomes "What the rule expects (`allow`)".
 
 The in-scope list in `AGENTS.md`'s purpose boundary says "reducing false positives (allow-listing legitimate
 software by hash or signer)". It becomes "reducing false positives (narrowing what a rule asks, and naming the
@@ -162,14 +191,21 @@ ordinary causes of what it finds)".
 |---|---|---|
 | `glance.history_not_found_desc` | ไม่พบบันทึกการล้าง log หรือการ reset change journal ในสิ่งที่อ่านได้ แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหนอยู่ด้านล่าง | No record of a log being cleared or of the change journal being reset was found in what was read. How far back each source reaches is below. |
 | `horizon_timeline.badge_not_found` | ไม่พบการล้าง log ในสิ่งที่อ่านได้ | No log clearing found in what was read |
-| `horizon_timeline.step_history_start_sub` | record เก่าสุดของ event log | Oldest event log record |
+| `horizon_timeline.step_history_start_sub_install` (new) | ติดตั้ง Windows | Windows installed |
+| `horizon_timeline.step_history_start_sub_boot` (new) | เปิดเครื่องล่าสุด | Last boot |
+| `glance.obs_found_desc` (new) | แต่ละข้อมีรายการสิ่งปกติที่ทำให้เกิดผลแบบเดียวกัน | Each one lists the ordinary things that also produce it |
+| `hero_note.reassurance_tamper` | พบ {{count}} ข้อระดับ tamper คือร่องรอยว่ามีบางอย่างเปลี่ยนสิ่งที่ Windows บันทึก หรือสิ่งที่การสแกนอ่าน สิ่งที่อยู่ก่อนหน้านั้นอาจมองไม่เห็น แต่ละข้ออยู่ด้านล่าง | {{count}} found of strength tamper: traces that something changed what Windows records or what a scan reads. What came before may not be visible. Each one is listed below. |
+| `glance.history_tamper_badge`, `glance.obs_tamper_badge`, `horizon_timeline.badge_broken` | พบหลักฐานระดับ tamper | Tamper evidence found |
+| `glance.history_tamper_desc` | สิ่งที่อยู่ก่อนหน้านั้นอาจมองไม่เห็น แต่ละข้ออยู่ด้านล่าง | What came before it may not be visible. Each one is listed below. |
+| `glance.obs_tamper_desc` | บางข้อเป็นระดับ tamper | Some of them are of strength tamper. |
 | `horizon_timeline.step_current_scan_sub` | การสแกนนี้ | This scan |
 | `human_findings.causes_title` | (unchanged) เรื่องปกติที่ทำให้เกิดผลแบบนี้: | Ordinary things that also produce this: |
-| `glance.obs_tamper_desc` | (unchanged) พบข้อสังเกตที่มีลักษณะเป็นการลบหรือตัดทอนประวัติ | A log was cleared or the change journal was reset; what came before cannot be seen |
 | `ai_export.prompt.intro` | ช่วยอธิบายรายงานตรวจเครื่องจาก aeterna-rongroi v{{version}} ข้างล่างนี้ ตามข้อเท็จจริงทางเทคนิค | Please explain this PC check report from aeterna-rongroi v{{version}}, from its technical facts. |
 | `ai_export.prompt.questions` | 1. ข้อสังเกตที่พบแต่ละข้อ อะไรที่เป็นสาเหตุปกติ และมีสาเหตุอื่นใดได้อีก 2. รายการที่ยังไม่ได้วัด ทำให้อะไรยังไม่รู้ 3. สรุปสั้น ๆ 3 บรรทัด อย่าสรุปว่าเครื่องนี้สะอาดหรือใช้โกง: รายงานนี้เป็นหลักฐาน ไม่ใช่คำตัดสิน | 1. For each observation, what ordinary causes produce it, and what other causes could? 2. What do the unmeasured checks leave unknown? 3. A three-line summary. Do not conclude that this PC is clean or that it was used to cheat: the report is evidence, not a verdict. |
 | consent (`autostart`) | พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง SHA-256 และลายเซ็น (Authenticode) | with the file each one starts — where it is, its SHA-256 and signature (Authenticode) |
 | rule `72820eaf` description, the sentence "Files under the Windows folder are not checked at all" | ไฟล์ในโฟลเดอร์ Windows ถูกตรวจหลังไฟล์อื่น และแสดงในรายการที่ไม่เข้า rule แต่ rule นี้ไม่ถามถึงมัน | Files under the Windows folder are checked after the others and are shown among the unmatched rows, but this rule does not ask about them. |
+| AI export, Thai data line (`ความต่อเนื่องของ Event Logs`) | ประวัติการเล่น FiveM และแต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน ตามรายงานบนหน้าจอ | (no English line) |
+| rules reference label over `allow` | สิ่งที่ rule คาดไว้ (`allow`) | What the rule expects (`allow`) |
 | screenshare guide, the same sentence | ไฟล์ในโฟลเดอร์ Windows ถูกตรวจหลังไฟล์อื่น ถ้าเวลาไม่พอจะบอกว่าไม่ได้อ่าน | Files in the Windows folder are checked after the others; one the time does not reach says it was not read. |
 
 The data blocks of the AI prompt (machine, scan, observations, unmeasured count) keep their current
