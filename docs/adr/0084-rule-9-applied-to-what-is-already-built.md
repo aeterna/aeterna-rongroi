@@ -1,7 +1,7 @@
 # ADR 0084 — Rule 9 applied to what is already built
 
 - Status: accepted — the owner ordered the five fixes below on 2026-10-24, each as recommended after an
-  audit; the new text in the table is drafted and waits for the owner at G1. The documents this ADR amends
+  audit; the owner approved the text in the table as drafted on 2026-10-24 (G1). The documents this ADR amends
   change in the same pull request; the code is not built yet
 - Date: 2026-10-24
 - Related: `AGENTS.md` hard rules 3 ("Evidence, never a verdict"), 6 and 9 ("Nothing vouches for a program,
@@ -185,7 +185,7 @@ The in-scope list in `AGENTS.md`'s purpose boundary says "reducing false positiv
 software by hash or signer)". It becomes "reducing false positives (narrowing what a rule asks, and naming the
 ordinary causes of what it finds)".
 
-## Text (drafted; the owner approves it at G1)
+## Text (approved by the owner at G1, 2026-10-24)
 
 | Key | ไทย | English |
 |---|---|---|
