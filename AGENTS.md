@@ -21,7 +21,7 @@ below applies to every contributor, human or AI.
 
 **In scope — help with this:**
 - detecting cheat traces and risky machine posture; new collectors and rules
-- reducing false positives (allow-listing legitimate software by hash or signer)
+- reducing false positives (narrowing what a rule asks, and naming the ordinary causes of what it finds)
 - tests, fixtures, fuzzing, documentation, translations, accessibility, performance
 - privacy improvements (redaction, data minimisation, clearer consent)
 
@@ -52,7 +52,8 @@ see [`SECURITY.md`](SECURITY.md). Do not write bypass details into issues, PRs, 
 5. **Privacy lives in the core.** SS-mode filtering and path redaction happen in
    `rongroi-core::view`, never only in the UI.
 6. **Rules with `status: test` or `stable` need a positive and a negative fixture.**
-   `allow` entries are by hash or signer — never by file name.
+   `allow` may only name what a rule expects, so that the rule reports what differs from it, by hash or
+   certificate and never by file name. It never lists software as known good (rule 9, ADR 0084).
 7. **Every source file carries an SPDX header** (`reuse lint`). No zero-width or bidi control
    characters anywhere (`cargo xtask check-unicode`).
 8. **One name per idea.** Use the glossary in `CONVENTIONS.md`; grep before naming anything new.

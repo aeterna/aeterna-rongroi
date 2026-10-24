@@ -87,6 +87,12 @@ The audit found these were not vouching:
     was read".
   - "Event Logs recorded continuously" becomes "Oldest event log record".
   - "Offline Sealed" becomes "This scan".
+- Two English strings whose Thai already reads right change to match it:
+  - The heading over a finding's causes, "Common benign causes for this result:", becomes "Ordinary things
+    that also produce this:" (Thai "เรื่องปกติที่ทำให้เกิดผลแบบนี้").
+  - The tamper text "Observations indicate intentional history alteration or wiping" names an intent the
+    scan cannot see. It becomes a fact about the trace (Thai "พบข้อสังเกตที่มีลักษณะเป็นการลบหรือตัดทอน
+    ประวัติ").
 - The keys `reassurance_benign`, `reassurance_proxy`, `history_clean_badge`, `history_clean_desc`,
   `obs_benign_badge`, `obs_benign_desc`, `badge_continuous`, `badge_short` and `fivem_session_text` are
   removed.
@@ -114,8 +120,15 @@ windows.
 
 The `autostart` collector hashes and signature-checks every file it reports.
 - Files outside `%SystemRoot%` keep their 30 s budget, nearest first.
-- Files under `%SystemRoot%` are checked afterwards, under a second 30 s budget of their own. One that the
-  budget does not reach says `budget_spent`, as other unread files do.
+- Files under `%SystemRoot%` are checked afterwards, under a second 30 s budget of their own.
+- A file under `%SystemRoot%` that cannot be read, or that the second budget does not reach, does not become
+  a gap of its place.
+  - A place gap on `sha256` or `signature` turns every rule that asks about those fields there `unmeasured`
+    when nothing matched (`engine.rs`, ADR 0044). The one rule that asks today rules out `%SystemRoot%`, so
+    such a gap would hide a measured answer behind a file it never asks about.
+  - Instead, the row carries a new text field, `file_unread`, holding the reason (`budget_spent`,
+    `access_denied`, `read_failed`). The row says the file was not read, and no rule's answer changes.
+  - Files outside `%SystemRoot%` keep today's place gaps exactly.
 - A catalog-signed Windows file reads as having no embedded signature. This is a fact the row has always
   stated, and the rule's text already says so.
 - The rule keeps its path condition (`program_data`, `user_profile`, `other`). Rows under `%SystemRoot%` and
@@ -151,6 +164,8 @@ ordinary causes of what it finds)".
 | `horizon_timeline.badge_not_found` | ไม่พบการล้าง log ในสิ่งที่อ่านได้ | No log clearing found in what was read |
 | `horizon_timeline.step_history_start_sub` | record เก่าสุดของ event log | Oldest event log record |
 | `horizon_timeline.step_current_scan_sub` | การสแกนนี้ | This scan |
+| `human_findings.causes_title` | (unchanged) เรื่องปกติที่ทำให้เกิดผลแบบนี้: | Ordinary things that also produce this: |
+| `glance.obs_tamper_desc` | (unchanged) พบข้อสังเกตที่มีลักษณะเป็นการลบหรือตัดทอนประวัติ | A log was cleared or the change journal was reset; what came before cannot be seen |
 | `ai_export.prompt.intro` | ช่วยอธิบายรายงานตรวจเครื่องจาก aeterna-rongroi v{{version}} ข้างล่างนี้ ตามข้อเท็จจริงทางเทคนิค | Please explain this PC check report from aeterna-rongroi v{{version}}, from its technical facts. |
 | `ai_export.prompt.questions` | 1. ข้อสังเกตที่พบแต่ละข้อ อะไรที่เป็นสาเหตุปกติ และมีสาเหตุอื่นใดได้อีก 2. รายการที่ยังไม่ได้วัด ทำให้อะไรยังไม่รู้ 3. สรุปสั้น ๆ 3 บรรทัด อย่าสรุปว่าเครื่องนี้สะอาดหรือใช้โกง: รายงานนี้เป็นหลักฐาน ไม่ใช่คำตัดสิน | 1. For each observation, what ordinary causes produce it, and what other causes could? 2. What do the unmeasured checks leave unknown? 3. A three-line summary. Do not conclude that this PC is clean or that it was used to cheat: the report is evidence, not a verdict. |
 | consent (`autostart`) | พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง SHA-256 และลายเซ็น (Authenticode) | with the file each one starts — where it is, its SHA-256 and signature (Authenticode) |
