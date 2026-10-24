@@ -216,7 +216,8 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
             )}
             {file?.sha256 !== undefined && (
               <li className="muted">
-                {`${t("game.file.sha256")}: `}<code>{file.sha256}</code>
+                {`${t("game.file.sha256")}: `}
+                <code>{file.sha256}</code>
               </li>
             )}
             {file?.signature !== undefined && (
@@ -229,7 +230,8 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
             )}
             {file?.signer_cert_sha256 !== undefined && (
               <li className="muted">
-                {`${t("game.file.signer_cert")}: `}<code>{file.signer_cert_sha256}</code>
+                {`${t("game.file.signer_cert")}: `}
+                <code>{file.signer_cert_sha256}</code>
               </li>
             )}
             {file?.content_kind !== undefined && (
