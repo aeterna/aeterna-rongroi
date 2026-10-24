@@ -12,7 +12,7 @@ use super::{
     TraceAgeState, observations_of, redact_profile_paths, scan_time, session, time_of, trace_ages,
 };
 use crate::digest::{path_digest, volume_path_digest};
-use crate::loaded_files::{PE_EXTENSIONS, is_timeline_name};
+use crate::loaded_files::PE_EXTENSIONS;
 use crate::model::{Mode, Observation, Report};
 
 /// How far before a session's start and after its end a window reaches (ADR 0078 section 3).
@@ -1197,7 +1197,10 @@ fn recorded_by_of(candidate: &Candidate) -> Vec<String> {
         .collect()
 }
 
-/// The candidates of every record with a time in a known window (ADR 0078 section 4).
+/// The candidates of every record with a time in a known window (ADR 0078 section 4). No name keeps a
+/// record out: a `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` or
+/// `FiveM_b…_GTAProcess.exe` record is a candidate like any other (ADR 0084 decision 3). Sessions are
+/// still found from the same records by `session::session_times` (ADR 0062).
 fn gather(
     report: &Report,
     sessions: &[TimedSession],
@@ -1211,9 +1214,6 @@ fn gather(
             let Some(name) = session::text(observation, "name") else {
                 continue;
             };
-            if is_timeline_name(name) {
-                continue;
-            }
             let times = times_of(collector, observation);
             if times.is_empty() {
                 continue;
@@ -1829,7 +1829,10 @@ mod tests {
     #[test]
     fn h2_installs_without_a_matching_candidate_are_counted_per_window() {
         let without = game_windows(&report_of(base_records()), Mode::SelfCheck);
-        assert_eq!(without.counts.during, 1, "the candidate is in the session");
+        assert_eq!(
+            without.counts.during, 2,
+            "the BAM candidate and BAM's FiveM anchor are in the session"
+        );
 
         let mut records = base_records();
         // Another program's digest, three minutes before the session: before window.
