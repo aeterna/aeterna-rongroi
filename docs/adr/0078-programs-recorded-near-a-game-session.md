@@ -401,3 +401,100 @@ above leave open:
 4. **I5 is not shown.** Core does not compute it yet (ADR 0079 section 5), so it is always "not known:
    this version does not read it yet". It does not decide whether SS mode names a program. The approved
    table has no key for it. It comes to the reader when core computes it.
+
+## P6b decisions (2026-10-23, each as recommended)
+
+The owner decided five questions on step P6b, each as recommended, and approved the text below as drafted.
+
+1. **Placement:** the desktop app folds a candidate's details under its card ("File details", opened by a
+   click), as an evidence row folds its technical details. The CLI prints them indented under the
+   candidate every time.
+2. **Hashes in full:** `sha256` and `signer_cert_sha256` are shown as all 64 hex characters, in the
+   monospace face, selectable.
+3. **Sources:** every candidate says which collectors recorded it ("Recorded by: …"), in the order the view
+   reads them (Prefetch, BAM, PCA, process, UserAssist), named with the collectors' existing names. This
+   closes ADR 0080 "As built: P4" item 1.
+4. **Consent:** one sentence is added after the SS paragraph of the P6 decisions, in both front ends.
+5. **Text:** the keys below, under `game.file.*` in `apps/desktop/src/locales/{en,th}/report.json`, which
+   the CLI reads too. `trailing_data` and `embedded_pe` are shown only when true, because each is decided
+   for some file kinds only (ADR 0079 "As built: P2" item 2).
+
+What SS mode shows was decided by ADR 0079 section 6 and is unchanged: the details of a candidate SS mode
+names, with `download_host` as `%DOWNLOAD_HOST%` unless the player agreed to show download hosts
+(ADR 0064). Candidates SS mode does not name are dropped whole, as in P6a.
+
+| Key | ไทย | English |
+|---|---|---|
+| `title` | รายละเอียดไฟล์ | File details |
+| `recorded_by` | บันทึกโดย: {{sources}} | Recorded by: {{sources}} |
+| `read.missing` | ไม่มีไฟล์ที่ path นี้แล้ว จึงไม่ได้อ่าน | The file is no longer at this path, so it was not read. |
+| `read.too_large` | ไฟล์ใหญ่กว่า 64 MiB จึงอ่านแค่ hash และลายเซ็น | Larger than 64 MiB, so only its hash and signature were read. |
+| `read.access_denied` | Windows ไม่ให้อ่านไฟล์นี้ | Windows did not allow this file to be read. |
+| `read.failed` | อ่านไฟล์ไม่ได้ | The file could not be read. |
+| `read.refused_form` | ไม่ได้อ่าน: โปรแกรมนี้ไม่อ่าน path รูปแบบนี้ | Not read: this program does not read paths of this form. |
+| `read.budget_spent` | ไม่ได้อ่าน: เวลาอ่านไฟล์ 90 วินาทีหมดก่อนถึงไฟล์นี้ | Not read: the 90 seconds for reading files ran out before this one. |
+| `read.not_run` | การสแกนแบบปกติไม่อ่านตัวไฟล์ | A standard scan does not read the file. |
+| `read.no_path` | ไม่มี path ที่บันทึกไว้ จึงไม่มีไฟล์ให้อ่าน | No path was recorded, so there is no file to read. |
+| `read.no_observation` | ไม่ได้อ่านไฟล์ที่ path นี้ | The file at this path was not read. |
+| `sha256` | SHA-256 | SHA-256 |
+| `signature.valid` | ลายเซ็นในไฟล์: ตรวจผ่าน | Embedded signature: verifies |
+| `signature.invalid` | ลายเซ็นในไฟล์: ตรวจไม่ผ่าน | Embedded signature: does not verify |
+| `signature.no_embedded_signature` | ไม่มีลายเซ็นในไฟล์ | No embedded signature |
+| `signature.unverifiable_offline` | ลายเซ็นในไฟล์: ตรวจแบบออฟไลน์ไม่ได้ | Embedded signature: cannot be checked offline |
+| `signer` | ผู้เซ็น: {{signer}} | Signer: {{signer}} |
+| `signer_cert` | SHA-256 ของใบรับรองผู้เซ็น | Signer certificate SHA-256 |
+| `kind.label` | ตัวไฟล์เป็น | What the bytes are |
+| `kind.pe_executable` | โปรแกรม (PE) | a program (PE) |
+| `kind.pe_dll` | DLL (PE) | a DLL (PE) |
+| `kind.pe_driver` | ไดรเวอร์ (PE) | a driver (PE) |
+| `kind.archive` | ไฟล์บีบอัด (zip, 7z, rar, gzip, cab) | an archive (zip, 7z, rar, gzip, cab) |
+| `kind.image` | รูปภาพ (png, jpeg, gif, bmp, webp, ico) | an image (png, jpeg, gif, bmp, webp, ico) |
+| `kind.script` | ข้อความ เช่นสคริปต์ | text, such as a script |
+| `kind.unknown` | ไม่ใช่ชนิดที่โปรแกรมนี้รู้จัก | none of the kinds this program knows |
+| `trailing_data` | มีข้อมูลต่อท้ายหลังจุดจบของรูปแบบไฟล์ | It has data after the end of its format. |
+| `embedded_pe` | มีโปรแกรม (PE) อยู่ข้างใน | It holds a program (PE) inside. |
+| `original_filename` | ชื่อในข้อมูลเวอร์ชันของไฟล์: {{name}} | Name in its version information: {{name}} |
+| `zone` | โซนที่ Windows บันทึกตอนดาวน์โหลด: {{zone}} | Download zone Windows recorded: {{zone}} |
+| `zone_name.0` | เครื่องนี้ (0) | this computer (0) |
+| `zone_name.1` | อินทราเน็ต (1) | local intranet (1) |
+| `zone_name.2` | เว็บที่เชื่อถือ (2) | trusted sites (2) |
+| `zone_name.3` | อินเทอร์เน็ต (3) | the Internet (3) |
+| `zone_name.4` | เว็บที่ถูกจำกัด (4) | restricted sites (4) |
+| `zone_other` | โซน {{id}} | zone {{id}} |
+| `download_host` | ดาวน์โหลดจาก: {{host}} | Downloaded from: {{host}} |
+
+**Consent, sentence added to the SS paragraph:**
+
+- ไทย: สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย ได้แก่ hash ลายเซ็นและผู้เซ็น ชนิดของไฟล์ ชื่อในข้อมูลเวอร์ชัน และโซนดาวน์โหลด ส่วนชื่อเว็บที่ดาวน์โหลดแสดงเฉพาะเมื่อคุณยินยอมให้แสดงชื่อเว็บ
+- English: For a program it names, it also shows the file's details: its hash, signature and signer, what kind of file it is, the name in its version information, and its download zone. The website it came from is shown only if you agree to show websites.
+
+**The download-host option (owner, 2026-10-23, as drafted).** ADR 0079 owner decision 4 puts a file's
+download host under ADR 0064's existing SS option, whose wording named PowerShell only. From P6b it names
+both:
+
+- Desktop, `common.json` `download_host`:
+  - ไทย: แสดงชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาด้วย ถ้าปิดไว้ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST%
+  - English: Also show the name of each website a PowerShell command, or a recorded program's file, was downloaded from. Off: each name is shown as %DOWNLOAD_HOST%.
+- CLI, `download_host_question`:
+  - ไทย: ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาหรือไม่ อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง ถ้าไม่ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST% [y/N]
+  - English: Show the person watching the name of each website a PowerShell command, or a recorded program's file, was downloaded from? Only the name is read, never the rest of the address or the command. If not, each name is shown as %DOWNLOAD_HOST%. [y/N]
+
+## As built: P6b (2026-10-24)
+
+P6b shipped in workstream R-14. Each `GameCandidate` now carries `recorded_by` and `file`, and both front ends
+show them as the P6b decisions above describe. The build fills in four things those decisions leave open:
+
+1. **One join, one reason.** `file.read` comes from the same join as I1 and I2, and the same three-way
+   choice applies when nothing joins: no path, a standard scan, or no observation for the path. The
+   facts and the details can therefore never disagree. An `identity_read` that is absent or unknown is
+   read as `failed`.
+2. **Order of the sources.** `recorded_by` follows the order in which the view reads the collectors
+   (Prefetch, BAM, PCA, process, UserAssist), not the alphabet. One constant holds that order for both.
+3. **The CLI replaces control characters.** The game-window section is the first place the CLI prints
+   text from the player's files and from Windows' records as it is: names, paths, the signer, the
+   version-information name, the download host, and a signature or content kind it has no words for.
+   Every control character in that text is printed as U+FFFD, so a newline cannot forge a line and an
+   escape sequence cannot drive the terminal. The desktop app is not affected, because React escapes
+   text.
+4. **Hash lines read the same.** Both front ends print `SHA-256: <hash>` and
+   `Signer certificate SHA-256: <hash>`, with the colon after the label from the table.

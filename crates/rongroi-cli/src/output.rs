@@ -258,12 +258,13 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
              %ACCOUNT_IDENTIFIER% [y/N] "
         }
         (Lang::En, "download_host_question") => {
-            "Show the person watching the name of each website a PowerShell command downloaded from? \
-             Only the name is read, never the rest of the address or the command. If not, each name is \
-             shown as %DOWNLOAD_HOST%. [y/N] "
+            "Show the person watching the name of each website a PowerShell command, or a recorded \
+             program's file, was downloaded from? Only the name is read, never the rest of the address \
+             or the command. If not, each name is shown as %DOWNLOAD_HOST%. [y/N] "
         }
         (Lang::Th, "download_host_question") => {
-            "ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell ดาวน์โหลดจากมาหรือไม่ อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง \
+            "ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาหรือไม่ \
+             อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง \
              ถ้าไม่ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST% [y/N] "
         }
         _ => "",
@@ -362,7 +363,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
             \x20 - when parts of this PC were set up, as dates and never times: when this Windows installation was installed or last feature-upgraded, the earliest installation date Windows Setup kept and how many it kept, when the Windows drive's change journal, its root folder and its $Recycle.Bin were created, and when FiveM's program folders were created; these dates can match two reports of this PC\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; the first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as suspicious, never what the script said; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. With --case-code, the output also holds every PCI and input device above (model numbers and times, no names) and the case code. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown. In SS mode, programs recorded near your last game session are named only when a fact about the file holds: it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders. Other programs are counted, not named.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; the first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as suspicious, never what the script said; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. With --case-code, the output also holds every PCI and input device above (model numbers and times, no names) and the case code. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown. In SS mode, programs recorded near your last game session are named only when a fact about the file holds: it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders. Other programs are counted, not named. For a program it names, it also shows the file's details: its hash, signature and signer, what kind of file it is, the name in its version information, and its download zone. The website it came from is shown only if you agree to show websites.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
@@ -388,7 +389,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
             \x20 - ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร เป็นวันที่ ไม่ใช่เวลา: Windows ชุดนี้ติดตั้งหรืออัปเกรด feature ครั้งล่าสุดเมื่อไร วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้และเก็บไว้กี่รายการ change journal ของไดรฟ์ Windows, root ของไดรฟ์ และ $Recycle.Bin ถูกสร้างเมื่อไร และโฟลเดอร์โปรแกรมของ FiveM ถูกสร้างเมื่อไร วันที่เหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Windows PowerShell บันทึก script block ที่ PowerShell เองตั้งธงว่าน่าสงสัย โดยไม่บอกว่า script เขียนว่าอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ถ้าใช้ --case-code ผลที่ออกมาจะมีอุปกรณ์ PCI และอุปกรณ์อินพุตทุกตัวข้างต้น (หมายเลขรุ่นและเวลา ไม่มีชื่อ) และรหัสคดีด้วย ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุดจะแสดงชื่อเฉพาะเมื่อมีข้อเท็จจริงด้านตัวไฟล์เป็นจริง ได้แก่ ไฟล์ไม่อยู่ที่เดิมแล้ว ไม่มีลายเซ็นที่ตรวจผ่าน ชื่อไม่ตรงกับสิ่งที่ไฟล์เป็น รันจาก Temp หรือ Downloads หรือโหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Windows PowerShell บันทึก script block ที่ PowerShell เองตั้งธงว่าน่าสงสัย โดยไม่บอกว่า script เขียนว่าอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ถ้าใช้ --case-code ผลที่ออกมาจะมีอุปกรณ์ PCI และอุปกรณ์อินพุตทุกตัวข้างต้น (หมายเลขรุ่นและเวลา ไม่มีชื่อ) และรหัสคดีด้วย ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุดจะแสดงชื่อเฉพาะเมื่อมีข้อเท็จจริงด้านตัวไฟล์เป็นจริง ได้แก่ ไฟล์ไม่อยู่ที่เดิมแล้ว ไม่มีลายเซ็นที่ตรวจผ่าน ชื่อไม่ตรงกับสิ่งที่ไฟล์เป็น รันจาก Temp หรือ Downloads หรือโหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย ได้แก่ hash ลายเซ็นและผู้เซ็น ชนิดของไฟล์ ชื่อในข้อมูลเวอร์ชัน และโซนดาวน์โหลด ส่วนชื่อเว็บที่ดาวน์โหลดแสดงเฉพาะเมื่อคุณยินยอมให้แสดงชื่อเว็บ\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
@@ -1336,6 +1337,41 @@ mod tests {
                 "จะไม่แสดง ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุดจะแสดงชื่อเฉพาะเมื่อมีข้อเท็จจริงด้านตัวไฟล์เป็นจริง ได้แก่ ไฟล์ไม่อยู่ที่เดิมแล้ว ไม่มีลายเซ็นที่ตรวจผ่าน ชื่อไม่ตรงกับสิ่งที่ไฟล์เป็น รันจาก Temp หรือ Downloads หรือโหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น"
             ),
             "{th}"
+        );
+    }
+
+    /// ADR 0078, P6b decision 4 (2026-10-23): one sentence follows the SS paragraph in both languages,
+    /// so the player agrees to the file details a named program gets, and to the website only apart.
+    #[test]
+    fn consent_says_what_file_details_ss_mode_shows_for_a_named_program() {
+        let en = consent(Lang::En);
+        assert!(
+            en.contains(
+                "Other programs are counted, not named. For a program it names, it also shows the file's details: its hash, signature and signer, what kind of file it is, the name in its version information, and its download zone. The website it came from is shown only if you agree to show websites."
+            ),
+            "{en}"
+        );
+        let th = consent(Lang::Th);
+        assert!(
+            th.contains(
+                "โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย ได้แก่ hash ลายเซ็นและผู้เซ็น ชนิดของไฟล์ ชื่อในข้อมูลเวอร์ชัน และโซนดาวน์โหลด ส่วนชื่อเว็บที่ดาวน์โหลดแสดงเฉพาะเมื่อคุณยินยอมให้แสดงชื่อเว็บ"
+            ),
+            "{th}"
+        );
+    }
+
+    /// ADR 0079 owner decision 4 (2026-10-23): the download-host question names a recorded program's
+    /// file as well as a PowerShell command, worded as the ADR gives it, in both languages.
+    #[test]
+    fn the_download_host_question_names_a_recorded_programs_file() {
+        assert_eq!(
+            sensitive_question(Lang::En, SensitiveKind::DownloadHost),
+            "Show the person watching the name of each website a PowerShell command, or a recorded program's file, was downloaded from? Only the name is read, never the rest of the address or the command. If not, each name is shown as %DOWNLOAD_HOST%. [y/N] "
+        );
+        let th = sensitive_question(Lang::Th, SensitiveKind::DownloadHost);
+        assert!(
+            th.contains("หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้"),
+            "the Thai question does not name a recorded program's file: {th}"
         );
     }
 

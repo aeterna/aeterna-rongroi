@@ -140,6 +140,8 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
   );
   const { near, found } = candidate.near_sessions;
   const installs = candidate.installed_at ?? [];
+  const file = candidate.file;
+  const recordedBy = candidate.recorded_by ?? [];
 
   return (
     <article className="game-candidate">
@@ -196,6 +198,75 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
             <li className="muted">{t("game.note.code_integrity")}</li>
           )}
         </ul>
+      )}
+      {(recordedBy.length > 0 || file) && (
+        // Closed until clicked, as an evidence row's technical details are (ADR 0078, P6b decision 1).
+        <details className="game-file">
+          <summary>{t("game.file.title")}</summary>
+          <ul className="game-notes">
+            {recordedBy.length > 0 && (
+              <li className="muted">
+                {t("game.file.recorded_by", {
+                  sources: recordedBy.map((id) => t(`collector.${id}`)).join(", "),
+                })}
+              </li>
+            )}
+            {file && file.read !== "read" && (
+              <li className="muted">{t(`game.file.read.${file.read}`)}</li>
+            )}
+            {file?.sha256 !== undefined && (
+              <li className="muted">
+                {`${t("game.file.sha256")}: `}
+                <code>{file.sha256}</code>
+              </li>
+            )}
+            {file?.signature !== undefined && (
+              <li className="muted">
+                {t(`game.file.signature.${file.signature}`, { defaultValue: file.signature })}
+              </li>
+            )}
+            {file?.signer !== undefined && (
+              <li className="muted">{t("game.file.signer", { signer: file.signer })}</li>
+            )}
+            {file?.signer_cert_sha256 !== undefined && (
+              <li className="muted">
+                {`${t("game.file.signer_cert")}: `}
+                <code>{file.signer_cert_sha256}</code>
+              </li>
+            )}
+            {file?.content_kind !== undefined && (
+              <li className="muted">
+                {`${t("game.file.kind.label")}: ${t(`game.file.kind.${file.content_kind}`, {
+                  defaultValue: file.content_kind,
+                })}`}
+              </li>
+            )}
+            {file?.trailing_data === true && (
+              <li className="muted">{t("game.file.trailing_data")}</li>
+            )}
+            {file?.embedded_pe === true && <li className="muted">{t("game.file.embedded_pe")}</li>}
+            {file?.original_filename !== undefined && (
+              <li className="muted">
+                {t("game.file.original_filename", { name: file.original_filename })}
+              </li>
+            )}
+            {file?.zone_id !== undefined && (
+              <li className="muted">
+                {t("game.file.zone", {
+                  zone:
+                    file.zone_id <= 4
+                      ? t(`game.file.zone_name.${file.zone_id}`)
+                      : t("game.file.zone_other", { id: file.zone_id }),
+                })}
+              </li>
+            )}
+            {file?.download_host !== undefined && (
+              <li className="muted">
+                {t("game.file.download_host", { host: file.download_host })}
+              </li>
+            )}
+          </ul>
+        </details>
       )}
     </article>
   );
