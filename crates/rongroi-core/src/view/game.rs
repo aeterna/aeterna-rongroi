@@ -2704,4 +2704,131 @@ mod tests {
             assert_eq!(session.loaded_outside, None, "{}", session.edition);
         }
     }
+
+    /// ADR 0084 decision 3: a record named like an anchor is a candidate like any other, whatever
+    /// its path; here a BAM record named `FiveM.exe` ran from Downloads.
+    #[test]
+    fn t_renamed_anchor_name_is_a_candidate() {
+        let path = r"C:\Users\x\Downloads\FiveM.exe";
+        let mut records = base_records();
+        records.push(bam("FiveM.exe", path, "2026-01-10T10:15:00Z"));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let renamed = windows
+            .candidates
+            .iter()
+            .find(|candidate| candidate.path.as_deref() == Some(path))
+            .unwrap_or_else(|| panic!("no candidate at {path}"));
+        assert_eq!(renamed.name, "FiveM.exe");
+        assert_eq!(renamed.t2, TimeFact::True);
+    }
+
+    /// ADR 0084 decision 3: the `FiveM.exe` records that anchor a session are candidates too, and
+    /// finding the session does not change.
+    #[test]
+    fn t_anchor_record_is_also_a_candidate() {
+        let mut records = base_records();
+        // A real Prefetch record carries `run_times` beside `last_run`, and those times are what
+        // make it a candidate like any other Prefetch record (ADR 0078 section 6).
+        for record in &mut records {
+            if record.collector == "prefetch" {
+                record.fields.insert(
+                    "run_times".to_owned(),
+                    serde_json::json!(["2026-01-10T10:00:00Z"]),
+                );
+            }
+        }
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let legacy = shown_session(&windows, "legacy", true);
+        assert_eq!(legacy.start, "2026-01-10T10:00:00Z");
+        assert_eq!(legacy.end.as_deref(), Some("2026-01-10T10:30:00Z"));
+
+        let anchors: Vec<&GameCandidate> = windows
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("FiveM.exe"))
+            .collect();
+        assert_eq!(
+            anchors.len(),
+            2,
+            "both anchor records are candidates: {}",
+            windows
+                .candidates
+                .iter()
+                .map(|candidate| candidate.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        assert!(
+            anchors
+                .iter()
+                .any(|candidate| candidate.recorded_by == vec!["prefetch".to_owned()])
+        );
+        assert!(
+            anchors
+                .iter()
+                .any(|candidate| candidate.recorded_by == vec!["bam".to_owned()])
+        );
+    }
+
+    /// ADR 0084 decision 3: a Prefetch record named `GTA5.exe` inside the window is a candidate like
+    /// any other, not only a timeline anchor.
+    #[test]
+    fn t_gta_process_name_is_a_candidate() {
+        let mut records = base_records();
+        records.push(prefetch("GTA5.exe", None, &["2026-01-10T10:15:00Z"]));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let gta = shown(&windows, "GTA5.exe");
+        assert_eq!(gta.path, None);
+        assert_eq!(gta.recorded_by, vec!["prefetch".to_owned()]);
+        assert_eq!(gta.t2, TimeFact::True);
+    }
+
+    /// ADR 0084 decision 3: SS mode names a `FiveM.exe` candidate only when an identity fact holds.
+    /// Without one it is counted with the unnamed candidates, as every other candidate is.
+    #[test]
+    fn t_ss_mode_names_anchor_only_with_identity_fact() {
+        let mut records = base_records();
+        records.push(bam("FiveM.exe", r"C:\Tools\FiveM.exe", "2026-01-10T10:15:00Z"));
+        records.push(bam("Other.exe", r"C:\Tools\Other.exe", "2026-01-10T10:15:00Z"));
+        let report = report_of(records);
+
+        let self_mode = game_windows(&report, Mode::SelfCheck);
+        let fivem = self_mode
+            .candidates
+            .iter()
+            .find(|candidate| candidate.path.as_deref() == Some(r"C:\Tools\FiveM.exe"))
+            .unwrap_or_else(|| panic!("no FiveM.exe candidate at its path"));
+        assert!(!has_identity_fact(fivem), "{}", fivem.name);
+
+        let expected = self_mode
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.t2 == TimeFact::True && !has_identity_fact(candidate))
+            .count();
+        let ss = game_windows(&report, Mode::Ss);
+
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("FiveM.exe")),
+            "{}",
+            ss.candidates
+                .iter()
+                .map(|candidate| candidate.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("Other.exe")),
+            "Other.exe is unnamed too"
+        );
+        assert_eq!(ss.unnamed.during, expected);
+    }
 }
