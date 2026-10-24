@@ -55,7 +55,9 @@ afterEach(() => {
   if (originalClipboardDescriptor) {
     Object.defineProperty(navigator, "clipboard", originalClipboardDescriptor);
   } else {
-    (navigator as { clipboard?: unknown }).clipboard = undefined;
+    // jsdom had no own `navigator.clipboard` before the stub. The stub is configurable, so removing
+    // it reveals the native accessor again; assigning `undefined` would throw on the read-only property.
+    Reflect.deleteProperty(navigator, "clipboard");
   }
 });
 
