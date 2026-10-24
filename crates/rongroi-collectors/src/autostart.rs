@@ -426,7 +426,10 @@ fn insert_signature(fields: &mut BTreeMap<String, serde_json::Value>, signature:
 /// Why a file under `%SystemRoot%` was not read, on its row (ADR 0084). The reason's `as_str` name, never
 /// a gap of the place.
 fn insert_file_unread(fields: &mut BTreeMap<String, serde_json::Value>, reason: UnmeasuredReason) {
-    fields.insert("file_unread".to_owned(), serde_json::Value::from(reason.as_str()));
+    fields.insert(
+        "file_unread".to_owned(),
+        serde_json::Value::from(reason.as_str()),
+    );
 }
 
 fn lowercase_digest(digest: &str) -> Option<String> {

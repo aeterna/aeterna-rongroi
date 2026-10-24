@@ -2796,8 +2796,16 @@ mod tests {
     #[test]
     fn t_ss_mode_names_anchor_only_with_identity_fact() {
         let mut records = base_records();
-        records.push(bam("FiveM.exe", r"C:\Tools\FiveM.exe", "2026-01-10T10:15:00Z"));
-        records.push(bam("Other.exe", r"C:\Tools\Other.exe", "2026-01-10T10:15:00Z"));
+        records.push(bam(
+            "FiveM.exe",
+            r"C:\Tools\FiveM.exe",
+            "2026-01-10T10:15:00Z",
+        ));
+        records.push(bam(
+            "Other.exe",
+            r"C:\Tools\Other.exe",
+            "2026-01-10T10:15:00Z",
+        ));
         let report = report_of(records);
 
         let self_mode = game_windows(&report, Mode::SelfCheck);

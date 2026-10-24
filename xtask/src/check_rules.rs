@@ -204,7 +204,10 @@ fn leaves_out_windows(rule: &Rule) -> bool {
         };
         plain
             && named.is_some_and(|kinds| {
-                !kinds.is_empty() && kinds.iter().all(|kind| !kind.eq_ignore_ascii_case("windows"))
+                !kinds.is_empty()
+                    && kinds
+                        .iter()
+                        .all(|kind| !kind.eq_ignore_ascii_case("windows"))
             })
     })
 }

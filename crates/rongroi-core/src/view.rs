@@ -4789,7 +4789,16 @@ mod tests {
             .iter()
             .map(|candidate| candidate.name.as_str())
             .collect();
-        assert_eq!(order, ["early.exe", "late.exe", "FiveM.exe", "during.exe", "FiveM.exe"]);
+        assert_eq!(
+            order,
+            [
+                "early.exe",
+                "late.exe",
+                "FiveM.exe",
+                "during.exe",
+                "FiveM.exe"
+            ]
+        );
     }
 
     /// b10: a run between the latest end and the scan's own time is in the before-the-scan window.
@@ -5243,7 +5252,10 @@ mod tests {
             .iter()
             .map(|candidate| candidate.name.as_str())
             .collect();
-        assert_eq!(order, ["gone.exe", "time-only.exe", "FiveM.exe", "FiveM.exe"]);
+        assert_eq!(
+            order,
+            ["gone.exe", "time-only.exe", "FiveM.exe", "FiveM.exe"]
+        );
     }
 
     // ---- ADR 0078 section 5 and ADR 0079: I3, I4 and the SS list ----
