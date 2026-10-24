@@ -51,11 +51,11 @@ export function AiExportButton({ view, header, texts }: Props) {
         ? `${header.boot_time.booted_at} (${Math.round(header.boot_time.seconds_since_boot / 3600)}h ago)`
         : "Unmeasured";
 
-    const promptRaw = isThai
-      ? `ฉันต้องการให้คุณช่วยวิเคราะห์รายงานการตรวจเครื่อง (PC Forensics / FiveM Check) จากโปรแกรม aeterna-rongroi v${header.provenance.version}
-โปรดวิเคราะห์ข้อเท็จจริงอย่างเป็นกลาง โดยอ้างอิงจากหลักฐานทางเทคนิค และแยกแยะระหว่าง "พฤติกรรมการใช้งานทั่วไป (Benign)" กับ "พฤติกรรมที่น่าสงสัย (Suspicious / Tampering)"
+    const intro = t("ai_export.prompt.intro", { version: header.provenance.version });
+    const questions = t("ai_export.prompt.questions");
 
-นี่คือข้อมูลผลการสแกนของฉัน:
+    const dataBlocks = isThai
+      ? `นี่คือข้อมูลผลการสแกนของฉัน:
 --------------------------------------------------
 [ข้อมูลเครื่อง & สถานะการสแกน]
 - ระบบปฏิบัติการ: ${[header.platform, header.os_build].filter(Boolean).join(" ")} (${header.elevated ? "Administrator" : "Standard User"})
@@ -67,17 +67,9 @@ ${foundSummary || "ไม่พบข้อสังเกตใดๆ"}
 
 [ข้อมูลขอบเขตประวัติ & FiveM]
 - จำนวนรายการที่ยังไม่ได้วัด: ${unmeasuredItems.length} ข้อ
-- ประวัติการเล่น FiveM และความต่อเนื่องของ Event Logs ตามรายงานบนหน้าจอ
---------------------------------------------------
-
-คำถามที่อยากให้คุณช่วยสรุป:
-1. เครื่องนี้มีแนวโน้มเป็นการใช้งานของบุคคลทั่วไป หรือมีข้อบ่งชี้ว่าดัดแปลงเกม/ใช้โปรแกรมโกง/ลบประวัติเครื่องหรือไม่?
-2. ข้อสังเกตที่พบแต่ละข้อ อธิบายสาเหตุทางเทคนิคได้อย่างไรบ้าง?
-3. สรุปคำแนะนำสั้นๆ 3 บรรทัด แบบกระชับและเข้าใจง่าย`
-      : `Please analyze this PC Forensics / FiveM inspection report from aeterna-rongroi v${header.provenance.version}.
-Provide a neutral, technical analysis distinguishing between benign everyday usage and suspicious or tampering indicators.
-
-Inspection Report Data:
+- ประวัติการเล่น FiveM และแต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน ตามรายงานบนหน้าจอ
+--------------------------------------------------`
+      : `Inspection Report Data:
 --------------------------------------------------
 [Machine & Scan Context]
 - OS: ${[header.platform, header.os_build].filter(Boolean).join(" ")} (${header.elevated ? "Administrator" : "Standard User"})
@@ -89,12 +81,9 @@ ${foundSummary || "None"}
 
 [History Horizon Context]
 - Unmeasured checks: ${unmeasuredItems.length}
---------------------------------------------------
+--------------------------------------------------`;
 
-Questions:
-1. Does this machine reflect ordinary user patterns, or are there indications of game tampering, cheating, or anti-forensics?
-2. How can each observed finding be explained technically?
-3. Provide a concise 3-line summary.`;
+    const promptRaw = `${intro}\n\n${dataBlocks}\n\n${questions}`;
 
     const cleanPrompt = sanitizeAiPrompt(promptRaw);
 

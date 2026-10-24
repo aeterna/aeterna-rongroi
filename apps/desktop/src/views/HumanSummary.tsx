@@ -23,21 +23,16 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
   const foundItems = view.evidence.filter((e) => e.state === "found");
   const unmeasuredItems = view.evidence.filter((e) => e.state === "unmeasured");
 
-  const hasTamper = foundItems.some((e) => e.strength === "tamper");
-  const hasProxyDll = foundItems.some(
-    (e) => e.collector.includes("fivem_dir") && e.rule_id.includes("proxy"),
-  );
+  const tamperCount = foundItems.filter((e) => e.strength === "tamper").length;
+  const hasTamper = tamperCount > 0;
   const unmeasuredCount = view.listed.unmeasured;
 
-  // Hero note banner text
-  let heroDesc = t("hero_note.reassurance_benign", { count: foundItems.length });
+  // Hero note banner text: counts, not a verdict (ADR 0084 decision 1).
+  let heroDesc = t("common:footer.evidence_only");
   let heroAlertClass = "";
   if (hasTamper) {
-    heroDesc = t("hero_note.reassurance_tamper");
+    heroDesc = t("hero_note.reassurance_tamper", { count: tamperCount });
     heroAlertClass = "warning";
-  } else if (hasProxyDll) {
-    heroDesc = t("hero_note.reassurance_proxy");
-    heroAlertClass = "alert";
   } else if (unmeasuredCount > 5) {
     heroDesc = t("hero_note.reassurance_unmeasured", { count: unmeasuredCount });
     heroAlertClass = "alert";
@@ -235,14 +230,14 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
               <span>{t("glance.history_title")}</span>
             </span>
             <span className={`glance-badge ${hasTamper ? "badge-red" : "badge-gray"}`}>
-              {hasTamper ? t("glance.history_tamper_badge") : t("glance.history_clean_badge")}
+              {hasTamper ? t("glance.history_tamper_badge") : t("state.not_found")}
             </span>
           </div>
           <div className="glance-value">
-            {hasTamper ? t("glance.history_tamper_badge") : t("glance.history_clean_badge")}
+            {hasTamper ? t("glance.history_tamper_badge") : t("state.not_found")}
           </div>
           <div className="glance-text">
-            {hasTamper ? t("glance.history_tamper_desc") : t("glance.history_clean_desc")}
+            {hasTamper ? t("glance.history_tamper_desc") : t("glance.history_not_found_desc")}
           </div>
         </div>
 
@@ -267,9 +262,9 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
               </svg>
               <span>{t("glance.obs_title")}</span>
             </span>
-            <span className={`glance-badge ${hasTamper ? "badge-red" : "badge-orange"}`}>
-              {hasTamper ? t("glance.obs_tamper_badge") : t("glance.obs_benign_badge")}
-            </span>
+            {hasTamper && (
+              <span className="glance-badge badge-red">{t("glance.obs_tamper_badge")}</span>
+            )}
           </div>
           <div className="glance-value">
             {foundItems.length} {t("state.found")}
@@ -279,7 +274,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
               ? t("glance.obs_tamper_desc")
               : unmeasuredCount > 5
                 ? t("glance.obs_unmeasured_desc")
-                : t("glance.obs_benign_desc")}
+                : t("glance.obs_found_desc")}
           </div>
         </div>
       </div>
