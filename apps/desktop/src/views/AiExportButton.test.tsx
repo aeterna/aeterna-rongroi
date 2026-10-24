@@ -97,13 +97,7 @@ describe("AI export prompt in Thai", () => {
   it("does not repeat the continuous-history claim or ask whether the PC is benign", async () => {
     await i18n.changeLanguage("th");
     const prompt = copyPrompt("คัดลอกส่งให้ AI สรุปวิเคราะห์");
-    const forbidden = [
-      "ความต่อเนื่อง",
-      "benign",
-      "Benign",
-      "ordinary user patterns",
-      "บุคคลทั่วไป",
-    ];
+    const forbidden = ["ความต่อเนื่อง", "benign", "Benign", "ordinary user patterns", "บุคคลทั่วไป"];
     for (const word of forbidden) {
       expect(prompt).not.toContain(word);
     }
