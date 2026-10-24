@@ -389,7 +389,10 @@ export interface FileDetails {
   /** What the file is, by its content. */
   content_kind?: string;
   original_filename?: string;
-  /** The host a PowerShell command downloaded the file from; SS mode masks it (ADR 0064). */
+  /**
+   * The website the file's `Zone.Identifier` stream names; SS mode shows `%DOWNLOAD_HOST%` unless
+   * the player agreed (ADR 0064).
+   */
   download_host?: string;
   trailing_data?: boolean;
   embedded_pe?: boolean;

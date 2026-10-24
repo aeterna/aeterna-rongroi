@@ -1539,10 +1539,10 @@ describe("App", () => {
     return gameWindows({ candidates: [{ ...candidate, ...fields }] });
   }
 
-  /** Opens the candidate's "File details" and returns the <details> element that holds them. */
-  async function openFileDetails(): Promise<HTMLElement> {
-    fireEvent.click(await screen.findByText("File details"));
-    const details = screen.getByText("File details").closest("details");
+  /** Opens the file details by their summary text and returns the <details> element. */
+  async function openFileDetails(summaryText = "File details"): Promise<HTMLDetailsElement> {
+    fireEvent.click(await screen.findByText(summaryText));
+    const details = screen.getByText(summaryText).closest("details");
     if (!details) throw new Error("the file details are not a <details> element");
     return details;
   }
@@ -1568,7 +1568,7 @@ describe("App", () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Check my own PC"));
     const summary = await screen.findByText("File details");
-    expect(summary.closest("details")?.open).toBe(false);
+    expect(summary.closest<HTMLDetailsElement>("details")?.open).toBe(false);
     const details = await openFileDetails();
     expect(details.open).toBe(true);
     expect(FILE_SHA256).toHaveLength(64);
@@ -1659,7 +1659,7 @@ describe("App", () => {
     await i18n.changeLanguage("th");
     render(<App />);
     fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
-    await openFileDetails();
+    await openFileDetails("รายละเอียดไฟล์");
     expect(screen.getByText("ตัวไฟล์เป็น: โปรแกรม (PE)")).toBeTruthy();
   });
 
