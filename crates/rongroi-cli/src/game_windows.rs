@@ -279,20 +279,7 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
     let Some(file) = &candidate.file else {
         return;
     };
-    // A read that succeeded says nothing here; any other outcome says why no hash or kind follows.
-    let read = match file.read {
-        FileRead::Read => None,
-        FileRead::Missing => Some("missing"),
-        FileRead::TooLarge => Some("too_large"),
-        FileRead::AccessDenied => Some("access_denied"),
-        FileRead::Failed => Some("failed"),
-        FileRead::RefusedForm => Some("refused_form"),
-        FileRead::BudgetSpent => Some("budget_spent"),
-        FileRead::NotRun => Some("not_run"),
-        FileRead::NoPath => Some("no_path"),
-        FileRead::NoObservation => Some("no_observation"),
-    };
-    if let Some(read) = read {
+    if let Some(read) = read_key(file.read) {
         let _ = writeln!(
             out,
             "      {}",
@@ -351,22 +338,8 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
             words.get("game.file.original_filename", &[("name", &name)])
         );
     }
-    // Windows names zones 0 to 4; any other number is printed as `zone <n>` under the same label.
     if let Some(zone) = file.zone_id {
-        let text = match zone {
-            0..=4 => words.get(
-                "game.file.zone",
-                &[(
-                    "zone",
-                    &words.get(&format!("game.file.zone_name.{zone}"), &[]),
-                )],
-            ),
-            _ => {
-                let other = words.get("game.file.zone_other", &[("id", &zone.to_string())]);
-                words.get("game.file.zone", &[("zone", &other)])
-            }
-        };
-        let _ = writeln!(out, "      {text}");
+        let _ = writeln!(out, "      {}", zone_text(words, zone));
     }
     if let Some(host) = &file.download_host {
         let host = without_controls(host);
@@ -375,6 +348,40 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
             "      {}",
             words.get("game.file.download_host", &[("host", &host)])
         );
+    }
+}
+
+/// The locale key's suffix for a read outcome that says why no hash or kind follows it
+/// (`game.file.read.*`), or `None` when the read succeeded and so says nothing here.
+fn read_key(read: FileRead) -> Option<&'static str> {
+    match read {
+        FileRead::Read => None,
+        FileRead::Missing => Some("missing"),
+        FileRead::TooLarge => Some("too_large"),
+        FileRead::AccessDenied => Some("access_denied"),
+        FileRead::Failed => Some("failed"),
+        FileRead::RefusedForm => Some("refused_form"),
+        FileRead::BudgetSpent => Some("budget_spent"),
+        FileRead::NotRun => Some("not_run"),
+        FileRead::NoPath => Some("no_path"),
+        FileRead::NoObservation => Some("no_observation"),
+    }
+}
+
+/// The zone line's text: Windows names zones 0 to 4, so those are printed by name; any other number
+/// is printed as `zone <n>` under the same label.
+fn zone_text(words: &Words, zone: u32) -> String {
+    if (0..=4).contains(&zone) {
+        words.get(
+            "game.file.zone",
+            &[(
+                "zone",
+                &words.get(&format!("game.file.zone_name.{zone}"), &[]),
+            )],
+        )
+    } else {
+        let other = words.get("game.file.zone_other", &[("id", &zone.to_string())]);
+        words.get("game.file.zone", &[("zone", &other)])
     }
 }
 
@@ -923,105 +930,107 @@ mod tests {
             .map(str::to_owned)
     }
 
+    /// Every locale key the check below tests (c6): the `game.*` keys this module uses, the session
+    /// keys it shares with the trace ages, and the collectors a candidate's `recorded_by` line names.
+    const KEYS: &[&str] = &[
+        "game.title",
+        "game.experimental",
+        "game.intro",
+        "game.ss_rule",
+        "game.session.latest",
+        "game.session.earlier",
+        "game.session.l1_label",
+        "game.session.l1",
+        "game.fact.l1_false",
+        "game.fact.i1",
+        "game.fact.i2",
+        "game.fact.i3",
+        "game.fact.i4",
+        "game.fact.l1",
+        "game.fact.t1",
+        "game.fact.t2",
+        "game.fact.t3",
+        "game.fact.t4",
+        "game.fact.r",
+        "game.nk.session_end_not_recorded",
+        "game.nk.scan_time_not_recorded",
+        "game.nk.before_trace_age",
+        "game.cause.i1",
+        "game.cause.i2",
+        "game.cause.i3",
+        "game.cause.i4",
+        "game.cause.l1",
+        "game.cause.t1",
+        "game.cause.t2",
+        "game.cause.t3",
+        "game.cause.t4",
+        "game.cause.r",
+        "game.window.before",
+        "game.window.during",
+        "game.window.after",
+        "game.window.before_scan",
+        "game.ss_counts",
+        "game.note.unmatched_installs",
+        "game.note.installed",
+        "game.note.code_integrity",
+        "game.clock.changed",
+        "game.clock.detail",
+        "game.clock.not_known",
+        "game.order",
+        "game.windows_unmeasured",
+        "session.session",
+        "session.edition.legacy",
+        "session.edition.enhanced",
+        "game.file.title",
+        "game.file.recorded_by",
+        "game.file.read.missing",
+        "game.file.read.too_large",
+        "game.file.read.access_denied",
+        "game.file.read.failed",
+        "game.file.read.refused_form",
+        "game.file.read.budget_spent",
+        "game.file.read.not_run",
+        "game.file.read.no_path",
+        "game.file.read.no_observation",
+        "game.file.sha256",
+        "game.file.signature.valid",
+        "game.file.signature.invalid",
+        "game.file.signature.no_embedded_signature",
+        "game.file.signature.unverifiable_offline",
+        "game.file.signer",
+        "game.file.signer_cert",
+        "game.file.kind.label",
+        "game.file.kind.pe_executable",
+        "game.file.kind.pe_dll",
+        "game.file.kind.pe_driver",
+        "game.file.kind.archive",
+        "game.file.kind.image",
+        "game.file.kind.script",
+        "game.file.kind.unknown",
+        "game.file.trailing_data",
+        "game.file.embedded_pe",
+        "game.file.original_filename",
+        "game.file.zone",
+        "game.file.zone_name.0",
+        "game.file.zone_name.1",
+        "game.file.zone_name.2",
+        "game.file.zone_name.3",
+        "game.file.zone_name.4",
+        "game.file.zone_other",
+        "game.file.download_host",
+        // The collectors a candidate's `recorded_by` line names (`collector.<id>`).
+        "collector.prefetch",
+        "collector.bam",
+        "collector.pca",
+        "collector.process",
+        "collector.userassist",
+    ];
+
     /// (c6) Every `game.*` key this module uses, and the session keys it shares with the trace ages, is
     /// a non-empty string in both locale files.
     #[test]
     fn every_key_this_section_uses_is_in_both_languages() {
-        let mut keys: Vec<String> = [
-            "game.title",
-            "game.experimental",
-            "game.intro",
-            "game.ss_rule",
-            "game.session.latest",
-            "game.session.earlier",
-            "game.session.l1_label",
-            "game.session.l1",
-            "game.fact.l1_false",
-            "game.fact.i1",
-            "game.fact.i2",
-            "game.fact.i3",
-            "game.fact.i4",
-            "game.fact.l1",
-            "game.fact.t1",
-            "game.fact.t2",
-            "game.fact.t3",
-            "game.fact.t4",
-            "game.fact.r",
-            "game.nk.session_end_not_recorded",
-            "game.nk.scan_time_not_recorded",
-            "game.nk.before_trace_age",
-            "game.cause.i1",
-            "game.cause.i2",
-            "game.cause.i3",
-            "game.cause.i4",
-            "game.cause.l1",
-            "game.cause.t1",
-            "game.cause.t2",
-            "game.cause.t3",
-            "game.cause.t4",
-            "game.cause.r",
-            "game.window.before",
-            "game.window.during",
-            "game.window.after",
-            "game.window.before_scan",
-            "game.ss_counts",
-            "game.note.unmatched_installs",
-            "game.note.installed",
-            "game.note.code_integrity",
-            "game.clock.changed",
-            "game.clock.detail",
-            "game.clock.not_known",
-            "game.order",
-            "game.windows_unmeasured",
-            "session.session",
-            "session.edition.legacy",
-            "session.edition.enhanced",
-            "game.file.title",
-            "game.file.recorded_by",
-            "game.file.read.missing",
-            "game.file.read.too_large",
-            "game.file.read.access_denied",
-            "game.file.read.failed",
-            "game.file.read.refused_form",
-            "game.file.read.budget_spent",
-            "game.file.read.not_run",
-            "game.file.read.no_path",
-            "game.file.read.no_observation",
-            "game.file.sha256",
-            "game.file.signature.valid",
-            "game.file.signature.invalid",
-            "game.file.signature.no_embedded_signature",
-            "game.file.signature.unverifiable_offline",
-            "game.file.signer",
-            "game.file.signer_cert",
-            "game.file.kind.label",
-            "game.file.kind.pe_executable",
-            "game.file.kind.pe_dll",
-            "game.file.kind.pe_driver",
-            "game.file.kind.archive",
-            "game.file.kind.image",
-            "game.file.kind.script",
-            "game.file.kind.unknown",
-            "game.file.trailing_data",
-            "game.file.embedded_pe",
-            "game.file.original_filename",
-            "game.file.zone",
-            "game.file.zone_name.0",
-            "game.file.zone_name.1",
-            "game.file.zone_name.2",
-            "game.file.zone_name.3",
-            "game.file.zone_name.4",
-            "game.file.zone_other",
-            "game.file.download_host",
-            // The collectors a candidate's `recorded_by` line names (`collector.<id>`).
-            "collector.prefetch",
-            "collector.bam",
-            "collector.pca",
-            "collector.process",
-            "collector.userassist",
-        ]
-        .map(str::to_owned)
-        .to_vec();
+        let mut keys: Vec<String> = KEYS.iter().copied().map(str::to_owned).collect();
         // The reasons a candidate's or a session's identity fact can be not known for, as the view
         // names them (ADR 0078 section 5, ADR 0079, ADR 0082 section 5).
         for reason in [
