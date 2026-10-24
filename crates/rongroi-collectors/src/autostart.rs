@@ -1390,6 +1390,28 @@ mod tests {
         );
     }
 
+    /// ADR 0084: a file under `%SystemRoot%` whose hash was read but whose signature check failed
+    /// says so on its row, `file_unread`, and is not a gap of its place. A fixture marks the check
+    /// as failed by writing `sha256:` without a `signature:`.
+    #[test]
+    fn a_windows_file_whose_signature_check_fails_says_so_on_its_row() {
+        let sha = "0123456789abcdef".repeat(4);
+        let host = inline(&format!(
+            "{ENV}registry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\WinSvc':\n    Type: 16\n    Start: 2\n    ImagePath: 'C:\\Windows\\System32\\z.exe'\nfilesystem:\n  'C:\\Windows\\System32':\n    - name: z.exe\n      sha256: '{sha}'\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart::default().collect(&host);
+        let (observations, places) = measured(&run);
+        let svc = by(observations, "service", "WinSvc");
+        assert_eq!(text(svc, "sha256"), Some(sha.as_str()));
+        assert_eq!(text(svc, "file_unread"), Some("read_failed"));
+        assert!(!svc.fields.contains_key("signature"));
+        assert!(
+            place_gaps(places, "service")
+                .is_none_or(|gaps| !gaps.contains_key("signature") && !gaps.contains_key("sha256")),
+            "{places:?}"
+        );
+    }
+
     #[test]
     fn a_windows_folder_file_the_second_budget_misses_says_so_on_its_row() {
         let sha = "0123456789abcdef".repeat(4);

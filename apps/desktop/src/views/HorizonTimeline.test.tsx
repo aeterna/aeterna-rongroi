@@ -60,6 +60,30 @@ describe("HorizonTimeline first step", () => {
     expect(screen.queryByText("Event Logs recorded continuously")).toBeNull();
   });
 
+  // ADR 0084 decision 1: the install date is the anchor whichever order the collector listed the
+  // two in.
+  it("prefers the install date even when it is listed after the boot time", () => {
+    const view = viewWithAnchors([
+      { anchor: "boot_time", state: "measured", on: "2025-12-28", days_before: 3 },
+      { anchor: "install_date", state: "measured", on: "2025-10-21", days_before: 72 },
+    ]);
+    const { container } = render(<HorizonTimeline view={view} header={view.header} />);
+    const firstStep = container.querySelector(".timeline-step");
+    expect(firstStep?.querySelector(".timeline-sub")?.textContent).toBe("Windows installed");
+    expect(firstStep?.querySelector(".timeline-tag")?.textContent).toBe("72d");
+  });
+
+  it("shows no anchor days when neither the install date nor the boot time is known", () => {
+    const view = viewWithAnchors([
+      { anchor: "boot_time", state: "unmeasured", reason: "source_absent" },
+      { anchor: "install_date", state: "unmeasured", reason: "source_absent" },
+    ]);
+    const { container } = render(<HorizonTimeline view={view} header={view.header} />);
+    const firstStep = container.querySelector(".timeline-step");
+    expect(firstStep?.querySelector(".timeline-tag")?.textContent).toBe("-");
+    expect(firstStep?.querySelector(".timeline-sub")).toBeNull();
+  });
+
   it("says Last boot when only the boot time is known", () => {
     const view = viewWithAnchors([
       { anchor: "install_date", state: "unmeasured", reason: "source_absent" },
