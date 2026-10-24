@@ -1296,7 +1296,7 @@ describe("App", () => {
     });
     expect(clipboardWrites.length).toBeGreaterThan(0);
     expect(clipboardWrites[0]).toContain(
-      "Please analyze this PC Forensics / FiveM inspection report",
+      "Please explain this PC check report from aeterna-rongroi v",
     );
     expect(aiButton.textContent).toContain("Copied!");
   });

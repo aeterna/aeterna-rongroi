@@ -219,3 +219,9 @@ through the DevTools port on 127.0.0.1 and captured from the page alone: both ty
 the two weights the window uses), `backdrop-filter` applies, nothing scrolls sideways at 960×760, the
 consent answers stay at the bottom of the window while the list scrolls, and no console errors. The two
 answers were 260 and 210 pixels wide, sized by their labels; they now share one width.
+
+## Amendment (2026-10-24) — the overview states counts, not a verdict
+
+The overview's banner, cards and time horizon no longer say "benign", "no wiping", "continuous" or "sealed".
+They show the tamper or rights text when either applies, and otherwise "Evidence only. This report cannot
+prove that a PC is clean." with a "not found within what was read" history card (ADR 0084 decision 1).

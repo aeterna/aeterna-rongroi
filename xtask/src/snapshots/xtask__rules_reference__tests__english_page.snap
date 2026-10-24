@@ -94,7 +94,7 @@ What is in the folder now.
 - Overlays and graphics tools that ship unsigned plugins
 - \- A line that starts like a list item
 
-**Legitimate software excluded (`allow`)**
+**What the rule expects (`allow`)**
 
 - the file whose SHA-256 is `0000000000000000000000000000000000000000000000000000000000000000`
 - files signed with the certificate whose SHA-256 is `1111111111111111111111111111111111111111111111111111111111111111`

@@ -4690,12 +4690,15 @@ mod tests {
         let report = game_report(observations);
         let own = game_windows(&report, Mode::SelfCheck);
         let ss = game_windows(&report, Mode::Ss);
-        assert_eq!(own.candidates.len(), 4);
+        // The two FiveM.exe anchors are candidates since ADR 0084: Prefetch's run is at the
+        // session's start and BAM's end at its end, so both are in the during window. Neither has
+        // a path, so SS mode counts them unnamed.
+        assert_eq!(own.candidates.len(), 6);
         assert_eq!(
             own.counts,
             WindowCounts {
                 before: 1,
-                during: 1,
+                during: 3,
                 after: 1,
                 // The before-the-scan window is the latest end up to the scan, so it overlaps the
                 // after window: `after-tool.exe` counts in both, once per window kind.
@@ -4760,16 +4763,22 @@ mod tests {
             .iter()
             .map(|candidate| candidate.name.as_str())
             .collect();
+        // The two FiveM.exe anchors are candidates since ADR 0084. Neither is near two sessions and
+        // each has one true T fact, so both sort after r-one-facts-three, which has three.
         assert_eq!(
             order,
             [
                 "r-three-facts-two.exe",
                 "r-three-facts-one.exe",
-                "r-one-facts-three.exe"
+                "r-one-facts-three.exe",
+                "FiveM.exe",
+                "FiveM.exe",
             ]
         );
 
-        // All three tie on R and on the number of true facts; the earliest time orders them.
+        // All three tie on R and on the number of true facts; the earliest time orders them. The
+        // two FiveM.exe anchors are candidates since ADR 0084, at 10:00 and 10:30, so they sort in
+        // among the others by time, not at the end.
         let mut tied = legacy_sessions(&[GAME_START_3], Some(GAME_END));
         tied.push(prefetch_runs("early.exe", None, &["2026-01-10T09:35:00Z"]));
         tied.push(prefetch_runs("late.exe", None, &["2026-01-10T09:50:00Z"]));
@@ -4780,7 +4789,16 @@ mod tests {
             .iter()
             .map(|candidate| candidate.name.as_str())
             .collect();
-        assert_eq!(order, ["early.exe", "late.exe", "during.exe"]);
+        assert_eq!(
+            order,
+            [
+                "early.exe",
+                "late.exe",
+                "FiveM.exe",
+                "during.exe",
+                "FiveM.exe"
+            ]
+        );
     }
 
     /// b10: a run between the latest end and the scan's own time is in the before-the-scan window.
@@ -4806,8 +4824,10 @@ mod tests {
             "last_run",
             "2026-01-10T09:55:00Z",
         ));
+        // The two FiveM.exe anchors are candidates since ADR 0084, so the joined name is one of
+        // three. It sorts first: its run is earliest, and the anchors' runs are later.
         let view = game_windows(&game_report(joined), Mode::SelfCheck);
-        assert_eq!(view.candidates.len(), 1);
+        assert_eq!(view.candidates.len(), 3);
         assert_eq!(view.candidates[0].path.as_deref(), Some(r"C:\Tools\x.exe"));
 
         let mut ambiguous = legacy_sessions(&[GAME_START_3], Some(GAME_END));
@@ -4826,14 +4846,17 @@ mod tests {
             "last_run",
             "2026-01-10T09:56:00Z",
         ));
+        // The two FiveM.exe anchors are candidates since ADR 0084, with no path. The two x.exe
+        // paths and the X.EXE record make three more candidates, and the no-path count holds
+        // X.EXE and the anchors.
         let view = game_windows(&game_report(ambiguous), Mode::SelfCheck);
-        assert_eq!(view.candidates.len(), 3);
+        assert_eq!(view.candidates.len(), 5);
         assert_eq!(
             view.candidates
                 .iter()
                 .filter(|candidate| candidate.path.is_none())
                 .count(),
-            1
+            3
         );
         assert!(
             view.candidates
@@ -5222,12 +5245,17 @@ mod tests {
             }
         );
 
+        // The two FiveM.exe anchors are candidates since ADR 0084. They have no identity fact and
+        // their runs are not near two sessions, so they come after the two above, in time order.
         let order: Vec<&str> = view
             .candidates
             .iter()
             .map(|candidate| candidate.name.as_str())
             .collect();
-        assert_eq!(order, ["gone.exe", "time-only.exe"]);
+        assert_eq!(
+            order,
+            ["gone.exe", "time-only.exe", "FiveM.exe", "FiveM.exe"]
+        );
     }
 
     // ---- ADR 0078 section 5 and ADR 0079: I3, I4 and the SS list ----
@@ -5386,7 +5414,9 @@ mod tests {
         let report = game_report(observations);
 
         let own = game_windows(&report, Mode::SelfCheck);
-        assert_eq!(own.candidates.len(), 2);
+        // The two FiveM.exe anchors are candidates since ADR 0084. They have no identity fact, so
+        // SS mode does not list them and counts them unnamed.
+        assert_eq!(own.candidates.len(), 4);
         assert!(
             own.candidates
                 .iter()

@@ -414,7 +414,8 @@ Three things to know about the rule on what starts by itself (ADR 0060):
   account identifier. The service name, the file and whether it starts by itself are shown.
 - **It says what is set to start, not what it runs.** The arguments a program is given are never read, so
   a Windows program that runs a script (`cmd`, `powershell`, `rundll32`) is shown as that Windows program.
-  Files in the Windows folder are not checked at all. A scan without administrator rights cannot read the
+  Files in the Windows folder are checked after the others; one the time does not reach says it was not
+  read. A scan without administrator rights cannot read the
   task files, and says so once above the evidence.
 
 Two things to know about the Defender-exclusion rule (ADR 0060):

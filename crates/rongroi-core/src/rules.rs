@@ -82,8 +82,9 @@ impl Status {
     }
 }
 
-/// Legitimate software excluded from a rule. Identified by the file's hash or by the certificate that
-/// signed it, never by a name — of the file or of the signer (ADR 0035).
+/// What a rule expects, so that it reports what differs from it. Identified by the file's hash or by the
+/// certificate that signed it, never by a name — of the file or of the signer (ADR 0035). It never
+/// lists software as known good (ADR 0084).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Allow {
@@ -310,7 +311,7 @@ pub struct Rule {
     /// `startswith` included (ADR 0029).
     #[serde(default)]
     pub cased: BTreeSet<String>,
-    /// Legitimate software excluded from matching.
+    /// What the rule expects, by hash or certificate: a file that carries one is not a match (ADR 0084).
     #[serde(default)]
     pub allow: Vec<Allow>,
     /// How far back the source can see, in words for the user.

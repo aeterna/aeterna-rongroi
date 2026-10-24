@@ -505,3 +505,10 @@ The owner cancelled O1, the fold of candidates signed with a known publisher's c
 "Withdrawn"). Section 5 keeps its row struck through so the history stays readable. No candidate is
 folded, hidden or moved because of who published it. The order stays the one section 5 describes: by
 how many facts about the file hold. That counts facts and vouches for nothing (`AGENTS.md`, hard rule 9).
+
+## Amendment (2026-10-24): names no longer keep a record out
+
+Section 4 left out of the candidates every record named `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`,
+`PlayGTAV.exe` or `FiveM_b…_GTAProcess.exe`, whatever its path, so a program renamed to one of them was never
+a candidate. Since ADR 0084 decision 3 they are candidates like any other program. Sessions are still found
+from the same records (ADR 0062).

@@ -97,9 +97,9 @@ read only to find where the program's file ends, because arguments are where a t
 address is passed to a program. (The one place this program reads any command, PowerShell's, is a full
 scan's, and it keeps only what kinds of words it held — [below](#a-full-scan-reads-more-and-only-if-you-agree-before-it-starts).) Of a task it also never reads who made it, its description, its working
 folder or the account it runs as into the report; the account is compared with the one running this
-scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file **outside the Windows
-folder** it reads a SHA-256 and what Windows says about its embedded signature, as for FiveM's files;
-files inside the Windows folder are reported by their path alone. The list names software you
+scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file it reads a SHA-256 and what Windows
+says about its embedded signature, as for FiveM's files — files inside the Windows folder too, after the
+others (ADR 0084); one the time does not reach says so on its row. The list names software you
 installed — launchers, chat apps, peripheral and RGB utilities — because they set themselves to start.
 
 **In SS mode, the name of a `Run` value and of a scheduled task is never shown**: a task's name can

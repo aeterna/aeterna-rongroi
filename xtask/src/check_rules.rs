@@ -81,6 +81,7 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
     let mut fixture_count = 0;
     for sourced in bundle.rules() {
         vocabulary.check(&sourced.path, &sourced.rule, &mut problems);
+        check_file_absence(&sourced.path, &sourced.rule, &mut problems);
         let rule_folder = rules_dir.join(sourced.path.trim_end_matches("rule.yaml"));
         let tests_dir = rule_folder.join("tests");
         let positive = json_files(&tests_dir.join("positive"))?;
@@ -141,6 +142,73 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         rule_count: bundle.rules().len(),
         fixture_count,
         language_count: bundle.languages().len(),
+    })
+}
+
+/// The `autostart` fields a file under `%SystemRoot%` that was not read has no value for: it says
+/// `file_unread` instead, and is no gap of its place (ADR 0084).
+const UNREAD_FILE_FIELDS: [&str; 4] = ["sha256", "signature", "signer", "signer_cert_sha256"];
+
+/// Rejects an `autostart` rule that asks for one of [`UNREAD_FILE_FIELDS`] to be absent (`exists:
+/// false`) unless it also has a `path_kind` condition that names only kinds other than `windows`. A
+/// file under `%SystemRoot%` that was not read is `not_found` on that field and not a gap, so such a
+/// rule would say "looked for, not there" about a file nobody read (ADR 0084, ADR 0029).
+fn check_file_absence(path: &str, rule: &Rule, problems: &mut Vec<String>) {
+    if rule.collector != "autostart" {
+        return;
+    }
+    let absent: Vec<&str> = rule
+        .conditions()
+        .filter_map(|(key, value)| match key {
+            MatchKey::Known {
+                field,
+                operator: Operator::Exists,
+            } if value == &serde_json::Value::Bool(false)
+                && UNREAD_FILE_FIELDS.contains(&field) =>
+            {
+                Some(field)
+            }
+            _ => None,
+        })
+        .collect();
+    if absent.is_empty() || leaves_out_windows(rule) {
+        return;
+    }
+    let names = absent
+        .iter()
+        .map(|field| format!("`{field}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    problems.push(format!(
+        "rules/{path}: `match` asks for {names} to be absent, but a file under `%SystemRoot%` that was not read carries `file_unread`, not a gap, so this would say `not_found` about a file nobody read; add a `path_kind` condition that leaves out `windows` (ADR 0084)"
+    ));
+}
+
+/// Whether the rule has a `path_kind` condition, written as a plain value or a list, that names only
+/// kinds other than `windows`.
+fn leaves_out_windows(rule: &Rule) -> bool {
+    rule.conditions().any(|(key, value)| {
+        let plain = matches!(
+            key,
+            MatchKey::Known {
+                field: "path_kind",
+                operator: Operator::Equals,
+            }
+        );
+        let named: Option<Vec<&str>> = match value {
+            serde_json::Value::String(kind) => Some(vec![kind.as_str()]),
+            serde_json::Value::Array(items) => {
+                items.iter().map(serde_json::Value::as_str).collect()
+            }
+            _ => None,
+        };
+        plain
+            && named.is_some_and(|kinds| {
+                !kinds.is_empty()
+                    && kinds
+                        .iter()
+                        .all(|kind| !kind.eq_ignore_ascii_case("windows"))
+            })
     })
 }
 
@@ -1372,5 +1440,67 @@ date: 2026-09-11
                 collector.id()
             );
         }
+    }
+
+    /// An `autostart` rule with the `match` block under test, under `outside-windows`. `experimental`
+    /// needs no fixtures, so the `match` is the only thing the test asks about.
+    fn autostart_rule(match_block: &str) -> String {
+        format!(
+            "id: 5d3e8a21-7c4b-4f96-b1a0-2e8c6d9f0a13\ntitle: t\ndescription: d\nstatus: experimental\ncollector: autostart\nstrength: posture\nmatch:\n{match_block}retention: What autostart still holds.\nfalsepositives: [x]\nauthor: a\ndate: 2026-10-24\n"
+        )
+    }
+
+    /// The problems `check` reports for one such rule.
+    fn autostart_problems(label: &str, match_block: &str) -> Vec<String> {
+        let tmp = TempRoot::new(label);
+        let dir = tmp.path().join("rules/autostart/outside-windows/example");
+        write(&dir.join("rule.yaml"), &autostart_rule(match_block));
+        write_empty_tests_dir(&dir);
+        check(tmp.path())
+            .expect("check-rules should run to completion")
+            .problems
+    }
+
+    /// ADR 0084 decision 4: a file under `%SystemRoot%` that was not read has no value for the file
+    /// fields and no gap either, so asking for one of them to be absent would say `not_found` about a
+    /// file nobody read. Refused unless the rule also leaves `windows` out of `path_kind`.
+    #[test]
+    fn an_autostart_absence_of_a_file_field_is_refused_when_windows_is_not_left_out() {
+        for (label, match_block) in [
+            (
+                "absent-sha256-no-kind",
+                "  starts_by_itself: true\n  sha256|exists: false\n",
+            ),
+            (
+                "absent-signature-windows",
+                "  starts_by_itself: true\n  signature|exists: false\n  path_kind: windows\n",
+            ),
+            (
+                "absent-signer-any-kind",
+                "  signer|exists: false\n  path_kind|exists: true\n",
+            ),
+        ] {
+            let problems = autostart_problems(label, match_block);
+            assert_eq!(problems.len(), 1, "{match_block}: {problems:?}");
+            assert!(
+                problems[0].contains("autostart/outside-windows/example/rule.yaml"),
+                "{problems:?}"
+            );
+            assert!(problems[0].contains("file_unread"), "{problems:?}");
+        }
+    }
+
+    /// The control: an absence of a file field is accepted once `path_kind` leaves `windows` out, and
+    /// an absence of a field that is not a file's is never the guard's business.
+    #[test]
+    fn an_autostart_absence_is_accepted_when_the_rule_leaves_windows_out() {
+        let problems = autostart_problems(
+            "absent-outside-windows",
+            "  starts_by_itself: true\n  signer|exists: false\n  path_kind: [program_data, user_profile, other]\n",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+
+        let problems = autostart_problems("absent-service", "  service|exists: false\n");
+        assert!(problems.is_empty(), "{problems:?}");
     }
 }

@@ -12,11 +12,25 @@ and the project uses [Semantic Versioning](https://semver.org/).
   another chat shows a card with a picture.
 - The landing page's FAQ is also in its JSON-LD as a `FAQPage`; a test fails when the eight questions on the page
   and in the JSON-LD differ.
+- `file_unread` on an `autostart` row: why a file under the Windows folder was not hashed or checked (ADR 0084).
 - `llms.txt` on the landing page's site (llmstxt.org): what the tool does and does not do, and links to the README,
   guides and the key ADRs. `cargo xtask site` fills its version, date and rule and selector counts from the
   published release, as it does for the pages.
 
 ### Changed
+- Nothing in the report vouches for a program, a file or a PC (hard rule 9, ADR 0084):
+  - The overview no longer says "benign", "No Wiping Found", "Continuous History" or "Offline Sealed". With
+    no tamper evidence it says "Evidence only. This report cannot prove that a PC is clean." and that no log
+    clearing was found in what was read. The tamper texts say that evidence of strength tamper was found,
+    not that a log was cleared, because only some of the eleven tamper rules are about a cleared log.
+  - "Copy for AI Analysis" asks for each observation's ordinary and other causes and what the unmeasured
+    checks leave unknown, and tells the AI not to conclude that the PC is clean or was used to cheat.
+  - A program named `FiveM.exe`, `GTA5.exe`, `GTA5_Enhanced.exe`, `PlayGTAV.exe` or `FiveM_b…_GTAProcess.exe`
+    is a game-window candidate like any other, wherever it is; before, the name alone kept it out.
+  - `autostart` hashes and signature-checks files under the Windows folder too, after the others and under a
+    second 30-second budget. The consent text says so. Many Windows files read "No embedded signature",
+    because Windows signs them through catalogs, which this program does not read.
+  - The rules reference labels an `allow` block "What the rule expects", not "Legitimate software excluded".
 - The first three rules are `stable`: a PCI device no longer present, a PCI device with no driver (problem
   code 28), and an input device no longer present. Each was seen `found` on the lab virtual machine (ADR 0070,
   ADR 0072), is measured on a client Windows build and is confronted by a baseline — the three conditions of

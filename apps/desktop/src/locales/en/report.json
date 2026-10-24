@@ -371,45 +371,44 @@
   },
   "hero_note": {
     "title": "Scan Overview for this PC",
-    "reassurance_benign": "No FiveM game file modifications or history wiping detected. Found {{count}} common observations, which are typical behaviors of GPU/fan software, Discord, scripts, and temp installers.",
-    "reassurance_tamper": "System history clearing detected (Event Log cleared or USN Reset), preventing full retrospective verification before that point.",
-    "reassurance_proxy": "Unsigned foreign DLL detected in FiveM.app folder alongside driver load block events.",
+    "reassurance_tamper": "{{count}} found of strength tamper: traces that something changed what Windows records or what a scan reads. What came before may not be visible. Each one is listed below.",
     "reassurance_unmeasured": "This scan ran with standard user rights. {{count}} deep checks could not be measured. Running as Administrator is recommended."
   },
   "horizon_timeline": {
     "title": "Forensic Time Horizon",
-    "badge_continuous": "Continuous History · No Wiping Detected",
-    "badge_broken": "History Wiped or Truncated",
-    "badge_short": "Continuous History (New OS)",
+    "badge_not_found": "No log clearing found in what was read",
+    "badge_broken": "Tamper evidence found",
     "badge_unmeasured": "Partial Coverage · Limited Rights",
     "step_history_start": "History Origin",
-    "step_history_start_sub": "Event Logs recorded continuously",
+    "step_history_start_sub_install": "Windows installed",
+    "step_history_start_sub_boot": "Last boot",
     "step_boot_time": "Last Boot",
     "step_fivem_session": "Last FiveM Play",
     "step_current_scan": "Current Scan",
-    "step_current_scan_sub": "Offline Sealed"
+    "step_current_scan_sub": "This scan"
   },
   "glance": {
     "fivem_title": "Recent FiveM Session",
     "history_title": "History Continuity",
     "obs_title": "Findings Overview",
-    "fivem_session_text": "Session duration {{duration}}, exited normally",
     "fivem_none_text": "No recent FiveM sessions recorded in the inspected horizon",
-    "history_clean_badge": "No Wiping Found",
-    "history_tamper_badge": "History Interrupted",
-    "history_clean_desc": "Event Logs continuous, no audit log clearing or USN truncation anomalies",
-    "history_tamper_desc": "Event log clearing or USN reset detected, interrupting retrospective timeline",
-    "obs_benign_badge": "Benign Patterns",
-    "obs_tamper_badge": "Tamper Detected",
+    "history_tamper_badge": "Tamper evidence found",
+    "history_not_found_desc": "No record of a log being cleared or of the change journal being reset was found in what was read. How far back each source reaches is below.",
+    "history_tamper_desc": "What came before it may not be visible. Each one is listed below.",
+    "obs_tamper_badge": "Tamper evidence found",
     "obs_unmeasured_badge": "{{count}} Unmeasured",
-    "obs_benign_desc": "Explainable by standard background tools and software",
-    "obs_tamper_desc": "Observations indicate intentional history alteration or wiping",
-    "obs_unmeasured_desc": "Requires Administrator rights to measure fully"
+    "obs_tamper_desc": "Some of them are of strength tamper.",
+    "obs_unmeasured_desc": "Requires Administrator rights to measure fully",
+    "obs_found_desc": "Each one lists the ordinary things that also produce it"
   },
   "ai_export": {
     "button_label": "Copy for AI Analysis",
     "copied_label": "Copied!",
-    "toast_message": "Prompt copied for AI analysis! (Usernames and private paths masked)"
+    "toast_message": "Prompt copied for AI analysis! (Usernames and private paths masked)",
+    "prompt": {
+      "intro": "Please explain this PC check report from aeterna-rongroi v{{version}}, from its technical facts.",
+      "questions": "1. For each observation, what ordinary causes produce it, and what other causes could? 2. What do the unmeasured checks leave unknown? 3. A three-line summary. Do not conclude that this PC is clean or that it was used to cheat: the report is evidence, not a verdict."
+    }
   },
   "human_findings": {
     "section_title": "Observations Found",
@@ -424,7 +423,7 @@
     "search_placeholder": "Search findings...",
     "show_causes": "View causes ▾",
     "hide_causes": "View causes ▴",
-    "causes_title": "Common benign causes for this result:",
+    "causes_title": "Ordinary things that also produce this:",
     "unmeasured_causes_title": "Technical reasons why this could not be measured:",
     "tamper_causes_title": "Technical forensic observations:"
   },
