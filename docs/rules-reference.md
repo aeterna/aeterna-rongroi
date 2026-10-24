@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 77 |
-| SHA-256 | `d8c3718e070009ed84681841dc9597f65fab71c1c2c18a185d2481e69221a36b` |
+| SHA-256 | `f8194b3e7299807c919d53c1a528f4883b5b52fa046479ad7f70dc95e1a1ef78` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -164,7 +164,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 **About this check**
 
-Windows is set to start this program by itself — as a service that starts with the PC or on a trigger, a Run or RunOnce value at sign-in, or an enabled scheduled task with a trigger — and its file is outside the Windows folder and Program Files, and carries no embedded signature Windows trusts: either none at all, or one that does not verify. The row shows where the entry is registered, the file's path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads here as having no embedded signature, because this program does not read catalogs. Files under the Windows folder are not checked at all, and a program that starts from inside Program Files is not shown by this rule. Arguments are never read, so this does not say what the program is given to run. This says a program is set to start without being asked; it does not say what the program does, who installed it, or that it ever ran.
+Windows is set to start this program by itself — as a service that starts with the PC or on a trigger, a Run or RunOnce value at sign-in, or an enabled scheduled task with a trigger — and its file is outside the Windows folder and Program Files, and carries no embedded signature Windows trusts: either none at all, or one that does not verify. The row shows where the entry is registered, the file's path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads here as having no embedded signature, because this program does not read catalogs. Files under the Windows folder are checked after the others and are shown among the unmatched rows, but this rule does not ask about them. A program that starts from inside Program Files is not shown by this rule. Arguments are never read, so this does not say what the program is given to run. This says a program is set to start without being asked; it does not say what the program does, who installed it, or that it ever ran.
 
 **Matches when all of these hold for one observation**
 
@@ -593,7 +593,7 @@ The file as it was when the scan ran. It says nothing about the file at any earl
 - A FiveM.exe that has not updated since before 2026-07-21, when the certificate this rule knows became valid. A signature made before then was made with an earlier certificate. FiveM updates itself, so this is most likely a player who has not launched FiveM since
 - A beta or test build of the client signed with a different certificate. Nothing was measured about those
 
-**Legitimate software excluded (`allow`)**
+**What the rule expects (`allow`)**
 
 - files signed with the certificate whose SHA-256 is `65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f`
 
