@@ -238,9 +238,9 @@ ADR 0078 "As built: P7", with the replay run and the build's bundle hash.
 
 **5. What `replay.sh` changes.** With `full: true` it runs `rongroi.exe scan --full --json` and answers the
 consent question with `yes` on standard input; without it, nothing changes. ADR 0052 section 3 says a script
-gets the standard scan, and its owner decision 2 is "no bypass for scripts". This field therefore needs the
-owner's exception for the lab machine, which belongs to no person and is thrown away after each scan (asked
-2026-10-27). Until the owner answers, no scenario sets it.
+gets the standard scan, and its owner decision 2 is "no bypass for scripts". The owner made one exception for
+this script on this machine, which belongs to no person and is thrown away after each scan (ADR 0052,
+"Amendment (2026-10-27)"); the question is still asked, and the CLI is unchanged.
 
 **6. What these scenarios do not show.** P7's baseline, the candidates of an ordinary evening, which is
 measured on a real gaming PC and recorded in ADR 0078, not replayed; the windows after a session and before

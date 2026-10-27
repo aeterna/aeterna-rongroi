@@ -524,7 +524,7 @@ from the same records (ADR 0062).
 
 ## P7 decisions (2026-10-27, each as recommended)
 
-The owner decided three questions on step P7 on 2026-10-27, each as recommended.
+The owner decided four questions on step P7 on 2026-10-27, each as recommended.
 
 1. **The view keeps its `experimental` wording in 0.13.0.** Section 3 ties that wording to measuring the
    30-minute windows, and the approved text says they "have not yet been measured on many ordinary gaming
@@ -547,3 +547,6 @@ The owner decided three questions on step P7 on 2026-10-27, each as recommended.
    UserAssist or the process list also recorded it. Mapping a volume to its drive letter is the drive map
    ADR 0082 section 4 left for later; it needs its own ADR because a mapped path must be redacted as every
    other path is.
+4. **The lab may run full scans.** The downloaded-file scenario needs a full scan, so the owner made one
+   exception to ADR 0052's decision 2 for `lab/replay.sh` on the lab machine (ADR 0052, "Amendment
+   (2026-10-27)").
