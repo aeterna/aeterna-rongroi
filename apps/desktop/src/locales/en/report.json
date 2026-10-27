@@ -188,6 +188,7 @@
     "days_before_one": "{{count}} day",
     "days_before_other": "{{count}} days",
     "oldest": "oldest {{at}}, {{days}} before this scan",
+    "oldest_after_scan": "oldest {{at}}, later than this scan's own time",
     "holds_nothing": "holds nothing with a time",
     "count": {
       "evtx": "{{count}} records",

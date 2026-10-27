@@ -188,6 +188,7 @@
     "days_before_one": "{{count}} วัน",
     "days_before_other": "{{count}} วัน",
     "oldest": "เก่าสุด {{at}} ({{days}}ก่อนสแกน)",
+    "oldest_after_scan": "เก่าสุด {{at}} (ใหม่กว่าเวลาของการสแกนนี้เอง)",
     "holds_nothing": "ไม่มีรายการที่มีเวลา",
     "count": {
       "evtx": "{{count}} record",

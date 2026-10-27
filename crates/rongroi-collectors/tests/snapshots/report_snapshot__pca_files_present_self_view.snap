@@ -878,7 +878,6 @@ expression: view
         "collector": "pca",
         "state": "measured",
         "oldest": "2026-01-02T03:04:05Z",
-        "days_before": -2,
         "count": 3
       },
       {
