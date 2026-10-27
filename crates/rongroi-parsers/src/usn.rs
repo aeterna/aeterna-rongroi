@@ -312,8 +312,9 @@ fn name_bytes(record: &[u8], major_version: u16) -> Result<&[u8], ParseError> {
 /// Whether a record's name is `target`, ignoring ASCII case only.
 fn same_name(record_name: &[u8], target: &[u16]) -> bool {
     record_name
-        .chunks_exact(2)
-        .filter_map(|pair| pair.first_chunk::<2>())
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|unit| fold_ascii_case(u16::from_le_bytes(*unit)))
         .eq(target.iter().map(|&unit| fold_ascii_case(unit)))
 }
@@ -522,7 +523,7 @@ mod tests {
         record[40..44].copy_from_slice(&reason.to_le_bytes());
         record[56..58].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
         record[58..60].copy_from_slice(&u16::try_from(V2_FIXED_LEN).unwrap().to_le_bytes());
-        for (slot, unit) in record[V2_FIXED_LEN..].chunks_exact_mut(2).zip(name) {
+        for (slot, unit) in record[V2_FIXED_LEN..].as_chunks_mut::<2>().0.iter_mut().zip(name) {
             slot.copy_from_slice(&unit.to_le_bytes());
         }
         record
@@ -541,7 +542,7 @@ mod tests {
         record[56..60].copy_from_slice(&reason.to_le_bytes());
         record[72..74].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
         record[74..76].copy_from_slice(&u16::try_from(V3_FIXED_LEN).unwrap().to_le_bytes());
-        for (slot, unit) in record[V3_FIXED_LEN..].chunks_exact_mut(2).zip(name) {
+        for (slot, unit) in record[V3_FIXED_LEN..].as_chunks_mut::<2>().0.iter_mut().zip(name) {
             slot.copy_from_slice(&unit.to_le_bytes());
         }
         record
