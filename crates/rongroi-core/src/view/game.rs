@@ -3471,13 +3471,18 @@ mod tests {
     fn i5_in_ss_mode_a_candidate_not_named_shows_no_journal_time() {
         let time = "2026-01-10T08:17:23Z";
         let mut records = base_records();
-        records.push(journaled(
-            r"C:\Tools\x.sys",
-            whole_journal(&[time], &[], &[], "2026-01-10T07:00:00Z"),
-        ));
+        records.push(bam("Probe.exe", r"C:\Tools\Probe.exe", "2026-01-10T10:15:00Z"));
+        // The file reads as present with a valid signature, so I1 and I2 are false. Its name is
+        // an executable's, so I3 is not true. Its one journal time is before every window, so I5
+        // is false too.
+        let mut journal = whole_journal(&[time], &[], &[], "2026-01-10T07:00:00Z");
+        journal.push(("identity_read", "read".into()));
+        journal.push(("signature", "valid".into()));
+        records.push(journaled(r"C:\Tools\Probe.exe", journal));
         let report = report_of(records);
 
         let self_mode = game_windows(&report, Mode::SelfCheck);
+        assert!(!has_identity_fact(shown(&self_mode, "Probe.exe")));
         let self_text = serde_json::to_string(&self_mode)
             .unwrap_or_else(|error| panic!("the Self view serialises: {error}"));
         assert!(self_text.contains(time), "the time shows in Self mode");
@@ -3486,7 +3491,7 @@ mod tests {
         assert!(
             ss.candidates
                 .iter()
-                .all(|candidate| !candidate.name.eq_ignore_ascii_case("x.sys"))
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("Probe.exe"))
         );
         let text = serde_json::to_string(&ss)
             .unwrap_or_else(|error| panic!("the SS view serialises: {error}"));
