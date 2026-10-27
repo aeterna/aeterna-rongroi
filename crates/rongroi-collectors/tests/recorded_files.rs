@@ -19,7 +19,7 @@ use rongroi_collectors::{Collector, all};
 use rongroi_core::bundle::Bundle;
 use rongroi_core::engine::SelfIdentity;
 use rongroi_core::model::{
-    CollectorRun, EvidenceState, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
+    CollectorRun, EvidenceState, Mode, Observation, ScanTier, SensitiveKind, UnmeasuredReason,
 };
 use rongroi_core::provenance::Provenance;
 use rongroi_core::view;
@@ -743,6 +743,45 @@ fn k13_the_ordering_anchor_accepts_the_gta_v_names() {
             );
         }
     }
+}
+
+/// (k14) An observation no rule matched is listed in Self mode and only counted in SS mode: Self mode
+/// shows the file and its download host, SS mode shows neither and counts the observation in
+/// `hidden.unmatched` (the same check `bam_entries_present_ss_view` makes for `bam`).
+#[test]
+fn k14_an_unmatched_recorded_file_is_listed_in_self_mode_and_only_counted_in_ss_mode() {
+    let path = r"C:\Users\fixtureuser\Downloads\downloaded.exe";
+    let files = format!(
+        "  'C:\\Users\\fixtureuser\\Downloads':\n    - name: 'downloaded.exe'\n      content_hex: \"{PE_HEX}\"\n      sha256: \"{PE_SHA256}\"\n      zone_identifier: \"[ZoneTransfer]\\r\\nZoneId=3\\r\\nHostUrl=https://dl.example.com/a/b.exe?t=1\\r\\n\"\n"
+    );
+    let fixture = bam_host(
+        "env:\n  WinDir: 'C:\\Windows'\n  SystemDrive: 'C:'\n  SystemRoot: 'C:\\Windows'\n",
+        &[(path, "content_hex: \"0000056936c0d501\"")],
+        &files,
+    );
+
+    let report = scan::run(
+        &fixture,
+        &Bundle::embedded().unwrap(),
+        ScanContext {
+            provenance: Provenance::from_parts(None, "0.0.0-test", None, None),
+            generated_at: "2026-01-01T00:00:00Z".to_owned(),
+            self_identity: SelfIdentity::default(),
+            tier: ScanTier::Full,
+        },
+    );
+
+    let self_view = view::for_mode(&report, Mode::SelfCheck);
+    let self_json = serde_json::to_string(&self_view).unwrap();
+    assert!(self_json.contains("downloaded.exe"), "{self_json}");
+    assert!(self_json.contains("dl.example.com"), "{self_json}");
+
+    let ss_view = view::for_mode(&report, Mode::Ss);
+    let ss_json = serde_json::to_string(&ss_view).unwrap();
+    for leaked in ["downloaded.exe", "fixtureuser", "dl.example.com", "loader.exe", PE_SHA256] {
+        assert!(!ss_json.contains(leaked), "{leaked} reached the SS view: {ss_json}");
+    }
+    assert!(ss_view.hidden.unmatched > 0);
 }
 
 /// The key Explorer's `UserAssist` entries are read from (ADR 0080 section 1).
