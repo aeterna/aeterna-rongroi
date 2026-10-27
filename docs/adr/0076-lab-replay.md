@@ -177,3 +177,67 @@ current as that build's rules bundle, whose hash every scan carries in `header.r
 3. **The first batch** is `defender_exclusion`, `autostart`, `evtx`, `net_config` and `posture` (§6.2);
    `fivem_dir`, most of whose rules are `unconfronted`, moves to the second batch.
 4. **GitHub runners: not yet.** Revisit after the first batch (Alternatives).
+
+## Amendment (2026-10-27): scenarios for the game-window view (ADR 0078 step P7)
+
+ADR 0078 step P7 asks lab replay to show the game-window view's facts on a real Windows. That view is not a
+rule: it has no id and no `found`. This amendment extends the scenario format for it. The owner decided the
+shape on 2026-10-27 (ADR 0078, "P7 decisions").
+
+**What four probes on the lab machine showed** (2026-10-27, build of `dev` at `508ab46`, not kept in this
+repository):
+
+- Prefetch wrote no file for a program named `FiveM.exe` under `%LOCALAPPDATA%\FiveM\`, whether it was an
+  Arm64 copy of a Windows program or the x64 build of this repository under emulation, run at once after
+  sign-in or four minutes later. Prefetch was on (`EnablePrefetcher` 3) and wrote files for other programs in
+  the same minutes. Why it skipped this one was not established.
+- BAM recorded both copies. A session's start comes from Prefetch or from a running process (ADR 0062), so a
+  session that has ended has no start on this machine, and the view is not computed.
+- With the inert `FiveM.exe` still running when the scan reads, the session has a start (the process) and
+  no end ("still running"), and the view is computed: 55 candidates, all in the window before the session.
+  Only that window can be shown here; the windows during and after a session, and before the scan, need an
+  end, which this machine does not leave.
+
+**1. Where game-window scenarios live.** `lab/scenarios/game_windows/<name>/`. `game_windows` names the view,
+not a collector; it is the one folder under `lab/scenarios/` that is not a collector's.
+
+**2. How a scenario makes a session.** `setup.ps1` copies Windows' own `ping.exe` to
+`%LOCALAPPDATA%\FiveM\FiveM.exe` and starts it so that it is still running when the scan reads, as a player's
+game is during a screenshare. It is inert: it pings this machine, which has no network. A scenario puts its
+own trace in place before that start, so the trace falls in the window before the session.
+
+**3. Three new fields in `expect.yaml`**, each optional:
+
+```yaml
+full: true                 # the scan is a full scan; replay answers the consent question with `yes`
+game_windows:              # the view must exist, and hold each candidate below
+  - name: helper.exe       # a candidate's file name, compared without ASCII case
+    facts:                 # only the facts listed are checked
+      t1: true             # true | false | not_known | not_known:<reason>
+      i1: not_known:no_path
+clock_changed: true        # the view's clock line lists at least one change
+```
+
+- `found` may be empty when `game_windows` or `clock_changed` is given; a scenario still expects something.
+- A fact key is one of `t1`–`t4`, `i1`–`i5` and `l1`, as the view names them. `not_known:<reason>` is the
+  view's reason word (`no_path`, `recorded_files_not_run`, …). An unknown key, value or reason is refused, as
+  an unknown field is.
+- Candidate checks run on the scenario's scan only. The control scan has no running `FiveM.exe`, so it has no
+  view to compare with; a candidate the control would also hold is the machine's, and a scenario names only
+  a candidate its own `setup.ps1` made.
+
+**4. The ledger.** `rules/measured.csv` is one row per rule (ADR 0074 §1), and a view result is not a rule.
+`lab-check` prints ledger rows for `found` and `not_found` rules only. A game-window result is recorded in
+ADR 0078 "As built: P7", with the replay run and the build's bundle hash.
+
+**5. What `replay.sh` changes.** With `full: true` it runs `rongroi.exe scan --full --json` and answers the
+consent question with `yes` on standard input; without it, nothing changes. The question still runs, as it
+must for any full scan (ADR 0052); only the answer is given by the script, on a machine that belongs to no
+person.
+
+**6. What these scenarios do not show.** The windows after a session and before the scan; anything that
+needs Prefetch to record the game or another program, such as fact L1 (Prefetch's loaded-file list), so the
+scenario of a DLL appended to an image and loaded by `rundll32.exe` is not written (ADR 0078, "P7
+decisions", item 2; it is not a rule, so `rules/not-replayable.csv` has no row for it); and identity facts
+for a program known only from BAM or Prefetch, whose paths are not drive-rooted (ADR 0078, "P7 decisions",
+item 3).

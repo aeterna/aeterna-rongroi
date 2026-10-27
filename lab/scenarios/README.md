@@ -2,7 +2,8 @@
 
 One folder per scenario, under the collector it is about: `lab/scenarios/<collector>/<name>/`. A scenario
 puts **one trace** on the lab virtual machine and says which rules must read it
-([ADR 0076](../../docs/adr/0076-lab-replay.md) §1).
+([ADR 0076](../../docs/adr/0076-lab-replay.md) §1). Scenarios for the game-window view, which is not a rule,
+live under `lab/scenarios/game_windows/<name>/` (ADR 0076, "Amendment (2026-10-27)").
 
 | File | What it holds |
 |---|---|
@@ -18,10 +19,21 @@ found:                 # at least one rule id; each must read `found`
 not_found:             # optional; neighbouring rules that must stay `not_found`
   - 00000000-0000-4000-8000-000000000001
 restart: false         # optional; true restarts Windows once between setup.ps1 and the scan
+full: false            # optional; true makes the scan a full scan, and replay answers its question with yes
+game_windows:          # optional; the game-window view must exist and hold each candidate listed
+  - name: helper.exe   # a candidate's file name, without ASCII case
+    facts:             # only the facts listed are checked: t1-t4, i1-i5, l1
+      t1: true         # true | false | not_known | not_known:<reason>
+clock_changed: false   # optional; true means the view's clock line lists at least one change
 ```
 
+`found` may be empty when `game_windows` or `clock_changed` is given. A game-window scenario makes its session
+with an inert `FiveM.exe` (a copy of Windows' `ping.exe` in `%LOCALAPPDATA%\FiveM\`) that is still running when
+the scan reads, because the lab machine's Prefetch does not record it; only the window before the session can
+be shown. `lab-check` writes ledger rows for rules only; a game-window result goes into ADR 0078 "As built: P7".
+
 Rule ids are the `id` in each `rule.yaml`. `cargo xtask lab-check` refuses an unknown field, an empty
-`found`, an id listed twice, and an id that is not in the rules bundle. Set `restart: true` only for a
+`found` with neither `game_windows` nor `clock_changed`, an id listed twice, and an id that is not in the rules bundle. Set `restart: true` only for a
 setting Windows reads at boot, such as test signing.
 
 ## What `setup.ps1` may do (ADR 0076 §2)
