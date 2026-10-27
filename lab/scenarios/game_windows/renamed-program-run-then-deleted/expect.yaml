@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+# BAM records helper.exe's run in the window before the session. Its path is the \Device\HarddiskVolumeN\ shape
+# that bam withholds, so I1 is not known for want of a path (ADR 0078, "P7 decisions" item 3).
+found: []
+game_windows:
+  - name: helper.exe
+    facts:
+      t1: true
+      i1: not_known:no_path

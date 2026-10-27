@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+# The scan is full so that recorded_files reads the file at the path the process list gives it, and its
+# Zone.Identifier stream (ADR 0079). The file is still there, so I1 is false; Downloads is a folder the account
+# can write, so I4 is true.
+found: []
+full: true
+game_windows:
+  - name: tool.exe
+    facts:
+      t1: true
+      i1: false
+      i4: true

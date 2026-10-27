@@ -5,6 +5,9 @@
 //! Tests for `cargo xtask lab-check`.
 
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
+
+use serde_json::{Value, json};
 
 use super::*;
 
@@ -334,4 +337,396 @@ fn is_date_accepts_real_calendar_dates_and_refuses_the_rest() {
     for (text, want) in cases {
         assert_eq!(is_date(text), want, "is_date({text:?})");
     }
+}
+
+/// A scan JSON with `evidence` rows for `states` and the given `game_windows` value (`null` for none).
+fn scan_with_game_windows(states: &[(&str, &str)], game_windows: &Value) -> String {
+    let rows: Vec<Value> = states
+        .iter()
+        .map(|(id, state)| json!({"rule_id": id, "state": state}))
+        .collect();
+    json!({
+        "header": {"os_build": "26300", "elevated": true},
+        "evidence": rows,
+        "game_windows": game_windows,
+    })
+    .to_string()
+}
+
+/// A `game_windows` value with the given candidates and `changes` clock change entries.
+fn game_windows_value(candidates: &[Value], changes: usize) -> Value {
+    let change = json!({"from": "2026-10-27T20:00:00Z", "to": "2026-10-27T20:05:00Z"});
+    json!({
+        "candidates": candidates,
+        "clock": {"changes": vec![change; changes]},
+    })
+}
+
+/// One candidate as the scan writes it: `path` and `recorded_by` beside the facts `t1` (as given) and
+/// `i1` (not known for `i1_reason`), each fact a field of the candidate itself.
+fn candidate_json(name: &str, t1: &str, i1_reason: &str) -> Value {
+    json!({
+        "name": name,
+        "path": null,
+        "recorded_by": ["bam"],
+        "t1": {"fact": t1},
+        "i1": {"fact": "not_known", "reason": {"reason": i1_reason}},
+    })
+}
+
+/// A scan with no evidence, the given candidates and clock changes, parsed.
+fn read_windows_scan(candidates: &[Value], changes: usize) -> Scan {
+    parse_scan(&scan_with_game_windows(
+        &[],
+        &game_windows_value(candidates, changes),
+    ))
+    .expect("the scan parses")
+}
+
+/// The `game_windows` block of an `expect.yaml`, one entry per `(name, facts)`.
+fn windows_yaml(entries: &[(&str, &[(&str, &str)])]) -> String {
+    let mut text = String::from("game_windows:\n");
+    for (name, facts) in entries {
+        let _ = writeln!(text, "  - name: \"{name}\"");
+        let _ = writeln!(text, "    facts:");
+        for (key, value) in *facts {
+            let _ = writeln!(text, "      {key}: \"{value}\"");
+        }
+    }
+    text
+}
+
+/// An `expect.yaml` with an empty `found` and the given `game_windows` entries, parsed.
+fn expect_windows(entries: &[(&str, &[(&str, &str)])]) -> Expect {
+    parse_expect(&format!("found: []\n{}", windows_yaml(entries))).expect("the expect parses")
+}
+
+#[test]
+fn an_expect_with_only_game_windows_is_accepted() {
+    let expect = expect_windows(&[("helper.exe", &[("t1", "true")])]);
+    assert!(validate_expect(&expect, &known_ids(&[])).is_ok());
+}
+
+#[test]
+fn an_expect_with_nothing_expected_is_refused() {
+    let expect = parse_expect("found: []\n").expect("an empty expect parses");
+    let err = validate_expect(&expect, &known_ids(&[]))
+        .expect_err("an expect with nothing expected is refused");
+    let message = err.to_string();
+    for word in ["found", "game_windows", "clock_changed"] {
+        assert!(message.contains(word), "{message}");
+    }
+}
+
+#[test]
+fn an_unknown_fact_key_is_refused() {
+    let expect = expect_windows(&[("helper.exe", &[("t5", "true")])]);
+    let err = validate_expect(&expect, &known_ids(&[]))
+        .expect_err("a fact key outside t1-t4, i1-i5, l1 is refused");
+    let message = err.to_string();
+    assert!(message.contains("t5"), "{message}");
+}
+
+#[test]
+fn an_unknown_fact_value_is_refused() {
+    for value in ["maybe", "not_known:", "not_known:No-Path"] {
+        let expect = expect_windows(&[("helper.exe", &[("i1", value)])]);
+        let err = validate_expect(&expect, &known_ids(&[]))
+            .expect_err("a fact value outside true, false, not_known[:reason] is refused");
+        let message = err.to_string();
+        assert!(message.contains(value), "{value:?}: {message}");
+    }
+}
+
+#[test]
+fn a_candidate_named_twice_is_refused() {
+    let expect = expect_windows(&[
+        ("Helper.EXE", &[("t1", "true")]),
+        ("helper.exe", &[("t1", "false")]),
+    ]);
+    let err = validate_expect(&expect, &known_ids(&[]))
+        .expect_err("a candidate name repeated without regard to ASCII case is refused");
+    let message = err.to_string().to_ascii_lowercase();
+    assert!(message.contains("helper.exe"), "{message}");
+}
+
+#[test]
+fn an_empty_candidate_name_is_refused() {
+    let expect = expect_windows(&[("", &[("t1", "true")])]);
+    assert!(validate_expect(&expect, &known_ids(&[])).is_err());
+}
+
+#[test]
+fn full_and_clock_changed_parse() {
+    let expect = parse_expect(&format!(
+        "found:\n  - {FOUND}\nfull: true\nclock_changed: true\n"
+    ))
+    .expect("full and clock_changed parse");
+    assert!(expect.full);
+    assert_eq!(expect.clock_changed, Some(true));
+    assert!(validate_expect(&expect, &known_ids(&[FOUND])).is_ok());
+    assert!(!expect_both().full);
+    assert_eq!(expect_both().clock_changed, None);
+}
+
+#[test]
+fn an_unknown_field_inside_a_candidate_is_refused() {
+    let text = "found: []\ngame_windows:\n  - name: \"helper.exe\"\n    facts:\n      t1: \"true\"\n    colour: \"red\"\n";
+    assert!(parse_expect(text).is_err());
+}
+
+#[test]
+fn a_candidate_fact_that_holds_passes() {
+    let expect = expect_windows(&[("helper.exe", &[("t1", "true"), ("i1", "not_known:no_path")])]);
+    let scan = read_windows_scan(&[candidate_json("Helper.EXE", "true", "no_path")], 0);
+    let report = check(&expect, &scan, None);
+    assert_eq!(report.ok, 2, "{:?}", report.lines);
+    assert_eq!(report.failed, 0, "{:?}", report.lines);
+    assert!(
+        report
+            .lines
+            .contains(&"ok    fact       helper.exe t1".to_owned())
+    );
+    assert!(
+        report
+            .lines
+            .contains(&"ok    fact       helper.exe i1".to_owned())
+    );
+}
+
+#[test]
+fn a_bare_not_known_matches_any_reason() {
+    let expect = expect_windows(&[("helper.exe", &[("i1", "not_known")])]);
+    let scan = read_windows_scan(&[candidate_json("Helper.EXE", "true", "no_path")], 0);
+    let report = check(&expect, &scan, None);
+    assert_eq!(
+        report,
+        Report {
+            lines: vec!["ok    fact       helper.exe i1".to_owned()],
+            ok: 1,
+            failed: 0,
+        }
+    );
+}
+
+#[test]
+fn a_fact_that_differs_fails_and_names_what_the_scan_read() {
+    let scan = read_windows_scan(&[candidate_json("Helper.EXE", "true", "no_path")], 0);
+
+    let expect = expect_windows(&[("helper.exe", &[("t1", "false")])]);
+    let report = check(&expect, &scan, None);
+    assert_eq!(
+        report,
+        Report {
+            lines: vec!["FAIL  fact       helper.exe t1 read true".to_owned()],
+            ok: 0,
+            failed: 1,
+        }
+    );
+
+    let expect = expect_windows(&[("helper.exe", &[("i1", "not_known:recorded_files_not_run")])]);
+    let report = check(&expect, &scan, None);
+    assert_eq!(
+        report,
+        Report {
+            lines: vec!["FAIL  fact       helper.exe i1 read not_known:no_path".to_owned()],
+            ok: 0,
+            failed: 1,
+        }
+    );
+}
+
+#[test]
+fn a_missing_candidate_fails() {
+    let expect = expect_windows(&[("other.exe", &[("t1", "true"), ("i1", "not_known")])]);
+    let scan = read_windows_scan(&[candidate_json("Helper.EXE", "true", "no_path")], 0);
+    let report = check(&expect, &scan, None);
+    assert_eq!(report.failed, 1, "{:?}", report.lines);
+    assert_eq!(report.lines.len(), 1, "{:?}", report.lines);
+    assert!(
+        report.lines[0].starts_with("FAIL  candidate"),
+        "{:?}",
+        report.lines
+    );
+    assert!(
+        report.lines[0].ends_with(" not a candidate"),
+        "{:?}",
+        report.lines
+    );
+}
+
+#[test]
+fn a_scan_with_no_view_fails() {
+    let no_view = [scan(&[], true), scan_with_game_windows(&[], &Value::Null)];
+    let expect = expect_windows(&[("helper.exe", &[("t1", "true"), ("i1", "not_known")])]);
+    for text in no_view {
+        let scan = parse_scan(&text).expect("the scan parses");
+        let report = check(&expect, &scan, None);
+        assert_eq!(report.failed, 1, "{:?}", report.lines);
+        assert_eq!(report.lines.len(), 1, "{:?}", report.lines);
+        assert!(
+            report.lines[0].starts_with("FAIL  view"),
+            "{:?}",
+            report.lines
+        );
+        assert!(
+            report.lines[0].ends_with(" no game-window view in the scan"),
+            "{:?}",
+            report.lines
+        );
+    }
+}
+
+#[test]
+fn two_candidates_of_one_name_pass_when_either_holds_every_fact() {
+    let expect = expect_windows(&[("helper.exe", &[("t1", "true"), ("i1", "not_known:no_path")])]);
+    let scan = read_windows_scan(
+        &[
+            candidate_json("Helper.EXE", "false", "no_path"),
+            candidate_json("Helper.EXE", "true", "no_path"),
+        ],
+        0,
+    );
+    let report = check(&expect, &scan, None);
+    assert_eq!(report.ok, 2, "{:?}", report.lines);
+    assert_eq!(report.failed, 0, "{:?}", report.lines);
+}
+
+#[test]
+fn two_candidates_of_one_name_do_not_mix_their_facts() {
+    let expect = expect_windows(&[("helper.exe", &[("t1", "true"), ("i1", "not_known:no_path")])]);
+    let scan = read_windows_scan(
+        &[
+            candidate_json("Helper.EXE", "true", "recorded_files_not_run"),
+            candidate_json("Helper.EXE", "false", "no_path"),
+        ],
+        0,
+    );
+    let report = check(&expect, &scan, None);
+    assert_eq!(report.ok, 1, "{:?}", report.lines);
+    assert_eq!(report.failed, 1, "{:?}", report.lines);
+    assert!(
+        report.lines.contains(
+            &"FAIL  fact       helper.exe i1 read not_known:recorded_files_not_run".to_owned()
+        ),
+        "{:?}",
+        report.lines
+    );
+}
+
+#[test]
+fn a_candidate_fact_of_the_wrong_shape_is_an_error_naming_it() {
+    let text = scan_with_game_windows(
+        &[],
+        &game_windows_value(&[json!({"name": "Helper.EXE", "t1": {"nope": "x"}})], 0),
+    );
+    let err = parse_scan(&text).expect_err("a fact object of the wrong shape is refused");
+    let message = format!("{err:#}");
+    assert!(message.contains("Helper.EXE"), "{message}");
+    assert!(message.contains("t1"), "{message}");
+}
+
+#[test]
+fn candidate_keys_that_are_not_facts_are_ignored() {
+    let candidate = json!({
+        "name": "Helper.EXE",
+        "path": null,
+        "near_sessions": {"near": 1, "found": 1},
+        "recorded_by": ["bam"],
+        "file": {"read": "no_path"},
+        "installed_at": null,
+        "t1": {"fact": "true"},
+    });
+    let expect = expect_windows(&[("helper.exe", &[("t1", "true")])]);
+    let scan = read_windows_scan(&[candidate], 0);
+    let report = check(&expect, &scan, None);
+    assert_eq!(report.ok, 1, "{:?}", report.lines);
+    assert_eq!(report.failed, 0, "{:?}", report.lines);
+    assert!(
+        report
+            .lines
+            .contains(&"ok    fact       helper.exe t1".to_owned()),
+        "{:?}",
+        report.lines
+    );
+}
+
+#[test]
+fn clock_changed_true_needs_a_change() {
+    let expect = parse_expect("found: []\nclock_changed: true\n").expect("the expect parses");
+    let changed = read_windows_scan(&[], 1);
+    assert_eq!(
+        check(&expect, &changed, None),
+        Report {
+            lines: vec!["ok    clock      changes".to_owned()],
+            ok: 1,
+            failed: 0,
+        }
+    );
+    let unchanged = read_windows_scan(&[], 0);
+    assert_eq!(
+        check(&expect, &unchanged, None),
+        Report {
+            lines: vec!["FAIL  clock      changes read 0".to_owned()],
+            ok: 0,
+            failed: 1,
+        }
+    );
+}
+
+#[test]
+fn clock_changed_false_needs_none() {
+    let expect = parse_expect("found: []\nclock_changed: false\n").expect("the expect parses");
+    let unchanged = read_windows_scan(&[], 0);
+    assert_eq!(
+        check(&expect, &unchanged, None),
+        Report {
+            lines: vec!["ok    clock      changes".to_owned()],
+            ok: 1,
+            failed: 0,
+        }
+    );
+    let changed = read_windows_scan(&[], 1);
+    assert_eq!(
+        check(&expect, &changed, None),
+        Report {
+            lines: vec!["FAIL  clock      changes read 1".to_owned()],
+            ok: 0,
+            failed: 1,
+        }
+    );
+}
+
+#[test]
+fn game_window_expectations_add_no_ledger_row() {
+    let expect = parse_expect(&format!(
+        "found:\n  - {FOUND}\n{}",
+        windows_yaml(&[("helper.exe", &[("t1", "true")])])
+    ))
+    .expect("the expect parses");
+    let text = scan_with_game_windows(
+        &[(FOUND, "found")],
+        &game_windows_value(&[candidate_json("Helper.EXE", "true", "no_path")], 0),
+    );
+    let scan = parse_scan(&text).expect("the scan parses");
+    let report = check(&expect, &scan, None);
+    assert_eq!(report.failed, 0, "{:?}", report.lines);
+    let rows = ledger_rows(&expect, &scan, "lab/scenarios/x (run r)", "2026-10-18");
+    assert_eq!(
+        rows,
+        vec![format!(
+            "{FOUND},lab-vm-arm64,26300,client,arm64,elevated,found,lab/scenarios/x (run r),2026-10-18"
+        )]
+    );
+}
+
+#[test]
+fn a_scan_without_game_windows_still_parses() {
+    let parsed = parse_scan(&scan(&[(FOUND, "found")], true)).expect("the scan parses");
+    assert!(parsed.game_windows.is_none());
+    assert_eq!(parsed.clock_changes, 0);
+    assert_eq!(parsed.state(FOUND), "found");
+
+    let null = parse_scan(&scan_with_game_windows(&[], &Value::Null)).expect("the scan parses");
+    assert!(null.game_windows.is_none());
 }
