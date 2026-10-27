@@ -202,7 +202,10 @@ mod tests {
             "It also reads the Windows drive's change journal, to find when any of those files was deleted or renamed. File names in the journal are compared on this PC and never kept.",
             "และอ่าน change journal ของไดรฟ์ Windows เพื่อดูว่าไฟล์เหล่านั้นเคยถูกลบหรือเปลี่ยนชื่อเมื่อไร ชื่อไฟล์ใน journal ถูกเทียบบนเครื่องนี้เท่านั้นและไม่ถูกเก็บไว้",
         ] {
-            assert!(FULL_TEXT.contains(sentence), "{sentence} missing from FULL_TEXT");
+            assert!(
+                FULL_TEXT.contains(sentence),
+                "{sentence} missing from FULL_TEXT"
+            );
         }
     }
 }

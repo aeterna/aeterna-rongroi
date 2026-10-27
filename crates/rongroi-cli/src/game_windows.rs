@@ -355,7 +355,9 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
         ("game.file.journal.renamed_to", &file.journal_renamed_to),
     ];
     for (key, times) in journal {
-        let Some(times) = times.as_ref().filter(|times| !times.is_empty()) else { continue };
+        let Some(times) = times.as_ref().filter(|times| !times.is_empty()) else {
+            continue;
+        };
         let mut line = words.get(key, &[("times", &times.join(", "))]);
         if file.journal_more == Some(true) {
             line.push(' ');
@@ -1017,7 +1019,10 @@ mod tests {
             text.lines().any(|shown| shown == line),
             "missing {line:?} in\n{text}"
         );
-        assert!(!text.contains(" usn "), "the raw source id is printed in\n{text}");
+        assert!(
+            !text.contains(" usn "),
+            "the raw source id is printed in\n{text}"
+        );
     }
 
     /// (i5 c4) A deletion list is printed with its times, joined by ", ", and a list cut at the cap

@@ -723,9 +723,10 @@ impl<'r> RecordedFiles<'r> {
             .flatten();
         let times: Vec<jiff::Timestamp> = deleted.into_iter().chain(renamed).collect();
         let latest: Vec<&TimedSession> = sessions.iter().filter(|session| session.latest).collect();
-        if latest.iter().any(|session| {
-            times.iter().any(|time| hits(session, *time, scan).any())
-        }) {
+        if latest
+            .iter()
+            .any(|session| times.iter().any(|time| hits(session, *time, scan).any()))
+        {
             return IdentityFact::True;
         }
         // Without a recorded end the during, after and before-the-scan windows are not known; the
