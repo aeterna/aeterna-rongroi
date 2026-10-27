@@ -938,4 +938,47 @@ mod tests {
             Some(UnmeasuredReason::Partial)
         );
     }
+
+    /// One version 2 record of 64 bytes, written at `written`, whose name is `fx`.
+    fn usn_record(written: u64) -> Vec<u8> {
+        let mut record = vec![0_u8; 64];
+        record[0..4].copy_from_slice(&64_u32.to_le_bytes());
+        record[4..6].copy_from_slice(&2_u16.to_le_bytes());
+        record[16..24].copy_from_slice(&5_u64.to_le_bytes());
+        record[32..40].copy_from_slice(&written.to_le_bytes());
+        record[40..44].copy_from_slice(&0x8000_0000_u32.to_le_bytes());
+        record[56..58].copy_from_slice(&4_u16.to_le_bytes());
+        record[58..60].copy_from_slice(&60_u16.to_le_bytes());
+        record[60..64].copy_from_slice(&[b'f', 0, b'x', 0]);
+        record
+    }
+
+    /// A journal buffer holding exactly `record`, after the eight-byte next USN.
+    fn usn_buffer(record: &[u8]) -> Vec<u8> {
+        let mut bytes = 0_u64.to_le_bytes().to_vec();
+        bytes.extend_from_slice(record);
+        bytes
+    }
+
+    /// When the first buffer holds no timed record, `journal_from` is the oldest time of the first
+    /// buffer that has one, not nothing (ADR 0086 section 3). The first buffer's only record has a time
+    /// the parser cannot give, so the first buffer is untimed and the second buffer sets it.
+    #[test]
+    fn j2_journal_from_is_taken_from_the_first_buffer_with_a_timed_record() {
+        let untimed = usn_buffer(&usn_record(u64::MAX));
+        let timed = usn_buffer(&usn_record(134_337_654_000_000_000));
+        let expected: Timestamp = "2026-09-13T09:30:00Z"
+            .parse()
+            .expect("a valid timestamp literal");
+
+        let parsed = parse_buffer(&untimed).expect("a buffer holding its next USN");
+        assert_eq!(parsed.records.len(), 1);
+        assert_eq!(parsed.records[0].written, None);
+
+        let mut scan = JournalScan::new(&[]);
+        scan.add(&untimed);
+        assert_eq!(scan.from, None, "an untimed buffer must not set journal_from");
+        scan.add(&timed);
+        assert_eq!(scan.from, Some(expected));
+    }
 }

@@ -1814,35 +1814,6 @@ fn j2_journal_from_is_the_first_record_time_when_the_journal_runs_to_two_buffers
     );
 }
 
-/// (j2-20) When the first buffer holds no timed record, `journal_from` is the oldest time of the first
-/// buffer that has one, not nothing (ADR 0086 section 3). The first 500 records carry a time the
-/// parser cannot give, so the first buffer is untimed and the deletion in the second buffer sets it.
-#[test]
-fn j2_journal_from_is_taken_from_the_first_buffer_with_a_timed_record() {
-    let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
-        &[(r"C:\Tools", 1)],
-        &[],
-        &[
-            r"{ reasons: [close], count: 500, first: '9999-12-31T23:59:59Z' }",
-            DELETE_HELPER,
-        ],
-        "",
-    );
-
-    let run = recorded_files().collect(&fixture);
-    let (observations, gaps) = measured(&run);
-
-    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
-    assert_matched(
-        observation_named(observations, "helper.exe"),
-        &["2026-09-13T09:30:00Z"],
-        &[],
-        &[],
-        "2026-09-13T09:30:00Z",
-    );
-}
-
 /// (j2-21) A path at a drive root, `C:\root.exe`, is matched by the root folder. The root is answered
 /// with NTFS's root directory record, number 5, so the `folders:` entry for `C:\` carries 5 too; the
 /// deletion's parent is that entry (ADR 0086 section 2).
