@@ -550,3 +550,31 @@ The owner decided four questions on step P7 on 2026-10-27, each as recommended.
 4. **The lab may run full scans.** The downloaded-file scenario needs a full scan, so the owner made one
    exception to ADR 0052's decision 2 for `lab/replay.sh` on the lab machine (ADR 0052, "Amendment
    (2026-10-27)").
+
+## As built: P7, lab part (2026-10-27)
+
+Lab replay of the game-window view (ADR 0076, "Amendment (2026-10-27)"): `cargo xtask lab-check` reads the
+`game_windows`, `clock_changed` and `full` fields, and `lab/replay.sh` runs a full scan for `full: true`. Three
+scenarios under `lab/scenarios/game_windows/`, replayed on the lab machine (Windows 11 build 26300, Arm64)
+with the x64 build of `dev` at `508ab46` (rules bundle `fc86daf8…`), against one control replay:
+
+| Scenario | Expected | Result |
+|---|---|---|
+| `renamed-program-run-then-deleted` | `helper.exe`: T1 true; I1 not known, no path | 2 ok, 0 failed |
+| `downloaded-program-with-its-zone` (full scan) | `tool.exe`: T1 true; I1 false; I4 true | 3 ok, 0 failed |
+| `clock-changed-before-the-session` | the clock line lists a change | 1 ok, 0 failed |
+
+What the replays showed beyond what the scenarios check:
+
+1. **The downloaded program's file details** carried `zone_id` 3 and the download host, as section 8 and ADR
+   0079 describe, and two more identity facts held: I2 (the copy carries no embedded signature) and I3 (the version resource names `ping.exe`, the file is `tool.exe`).
+2. **One program, two candidates.** BAM also recorded `tool.exe`, under the `\Device\HarddiskVolumeN\…`
+   form it withholds, so the view listed a second `tool.exe` with no path and its identity facts not known
+   (P7 decisions, item 3). `lab-check` passes a name when any candidate of that name holds every listed fact.
+3. **The clock line listed one change of two.** The scenario moved the clock five minutes forward, then back;
+   the view listed only the change back. Why the forward change is missing was not established.
+4. **Windows started Game Bar** on the lab machine when a program named `FiveM.exe` ran, in the probes and in
+   every scenario. Game Bar's programs are candidates in the window before the session like any other.
+
+The baseline on an ordinary gaming PC (the rest of P7) is the owner's run, recorded here when it is in; the
+view keeps its `experimental` wording either way (P7 decisions, item 1).
