@@ -3665,9 +3665,10 @@ mod tests {
             .unwrap();
         for observation in &mut fivem.observations {
             if observation.fields.contains_key("latest_modified_at") {
-                observation
-                    .fields
-                    .insert("latest_modified_at".to_owned(), json!("2026-01-11T06:00:00Z"));
+                observation.fields.insert(
+                    "latest_modified_at".to_owned(),
+                    json!("2026-01-11T06:00:00Z"),
+                );
             }
         }
         let records = records(&report);
