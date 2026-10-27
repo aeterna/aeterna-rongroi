@@ -1,7 +1,7 @@
 # คู่มือตรวจเครื่องระหว่างแชร์หน้าจอ
 
 สำหรับแอดมินเซิร์ฟเวอร์ที่ตรวจเครื่องผู้เล่นผ่านการแชร์หน้าจอ (SS หรือที่เรียกกันว่าเช็คโปร/ตรวจโปร) และสำหรับผู้เล่นที่ถูกตรวจ ใช้กับ aeterna-rongroi
-**0.12.0** · Read in English: [screenshare-guide.md](screenshare-guide.md)
+**0.13.0** · Read in English: [screenshare-guide.md](screenshare-guide.md)
 
 > ⚠️ **ยังเป็นรุ่นทดลอง (pre-alpha)** รุ่น 0.11.0 มี rule 77 ตัว และ 72 ตัวยังเป็น `experimental` อย่าแบนใครเพราะสิ่งที่
 > โปรแกรมนี้แสดง และอย่าใช้มันยืนยันว่าใครไม่ผิด
@@ -71,7 +71,7 @@ rule ใหม่ในรุ่น 0.3.0 อีกสี่ตัวก็อ�
   แล้วเปิดใหม่ด้วยสิทธิ์นั้น และเริ่มสแกนใหม่ทั้งหมด ปุ่มนี้ขึ้นเฉพาะตอนที่การสแกนรอบนั้นไม่มีสิทธิ์ผู้ดูแลระบบ
 - **CLI:** เปิด **Command Prompt แบบ Run as administrator** (Start → พิมพ์ `cmd` → **Run as administrator**) ไปที่โฟลเดอร์
   ที่โหลดไฟล์มาด้วย `cd /d "<โฟลเดอร์>"` แล้วสแกนในหน้าต่างนั้น (ข้อ 4) ใช้ Command Prompt แทน PowerShell ด้วยเหตุผลในข้อ 2
-  `--elevate` จะสแกนใน **หน้าต่าง console ใหม่** แทน รุ่น 0.3.0 เปิดหน้าต่างนั้นค้างไว้จนกว่าจะกด Enter (ยังไม่ได้วัดซ้ำในรุ่น 0.4.0 ซึ่งงาน full scan ไปแตะโค้ดส่วนนั้น และในรุ่น 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2, 0.9.0, 0.10.0, 0.11.0 กับ 0.12.0)
+  `--elevate` จะสแกนใน **หน้าต่าง console ใหม่** แทน รุ่น 0.3.0 เปิดหน้าต่างนั้นค้างไว้จนกว่าจะกด Enter (ยังไม่ได้วัดซ้ำในรุ่น 0.4.0 ซึ่งงาน full scan ไปแตะโค้ดส่วนนั้น และในรุ่น 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2, 0.9.0, 0.10.0, 0.11.0, 0.12.0 กับ 0.13.0)
   ([ADR 0012](adr/0012-elevation-relaunch.md)) แต่รายงานจาก `--elevate` จะอยู่ในหน้าต่างนั้น และไม่เข้าไฟล์ที่ redirect ด้วย `>`
   ถ้าใช้รุ่น 0.2.0 อย่าใช้ `--elevate` เพราะ Windows ปิดหน้าต่างนั้นทันทีที่สแกนเสร็จ รายงานหายไปพร้อมหน้าต่าง
   (วัดบนเครื่อง Windows 11 จริง)
@@ -89,7 +89,7 @@ rule ใหม่ในรุ่น 0.3.0 อีกสี่ตัวก็อ�
 **CLI** (ใน Command Prompt จากข้อ 3):
 
 ```bat
-.\aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode ss --lang th
+.\aeterna-rongroi-cli-0.13.0-windows-x64.exe scan --mode ss --lang th
 ```
 
 โปรแกรมจะถาม `ดำเนินการต่อ? [y/N]` และ **ผู้เล่น** เป็นคนตอบ
@@ -103,7 +103,7 @@ rule ใหม่ในรุ่น 0.3.0 อีกสี่ตัวก็อ�
 ### ส่วนหัว
 
 ```
-aeterna-rongroi 0.12.0
+aeterna-rongroi 0.13.0
 build ทางการ
 mode: ss · windows <build> · สิทธิ์ผู้ดูแลระบบ · rules: <n> (<bundle hash>)
 exe sha256: <hash>
@@ -447,12 +447,12 @@ change journal ครอบคลุม และแหล่งไหนอ่�
 - **CLI** ทำแบบเดียวกันด้วย `--case-code` โดย standard output คือไฟล์รายงาน และ SHA-256 แสดงบนจอเหนือมัน:
 
   ```bat
-  .\aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
+  .\aeterna-rongroi-cli-0.13.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
   ```
 - **CLI** เขียนมุมมองโหมด SS ออกเป็น JSON ได้ โดยซ่อนข้อมูลแบบเดียวกับบนจอ:
 
   ```bat
-  .\aeterna-rongroi-cli-0.12.0-windows-x64.exe scan --mode ss --json > report.json
+  .\aeterna-rongroi-cli-0.13.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
   คำถามขอความยินยอมยังขึ้นบนจอ ผู้เล่นตอบบนจอได้ และไฟล์มีแค่ JSON ให้รันจาก Command Prompt ที่เปิดด้วยสิทธิ์ผู้ดูแลระบบ
