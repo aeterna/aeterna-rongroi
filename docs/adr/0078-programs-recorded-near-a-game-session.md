@@ -521,3 +521,32 @@ Section 4 left out of the candidates every record named `FiveM.exe`, `GTA5.exe`,
 `PlayGTAV.exe` or `FiveM_b…_GTAProcess.exe`, whatever its path, so a program renamed to one of them was never
 a candidate. Since ADR 0084 decision 3 they are candidates like any other program. Sessions are still found
 from the same records (ADR 0062).
+
+## P7 decisions (2026-10-27, each as recommended)
+
+The owner decided four questions on step P7 on 2026-10-27, each as recommended.
+
+1. **The view keeps its `experimental` wording in 0.13.0.** Section 3 ties that wording to measuring the
+   30-minute windows, and the approved text says they "have not yet been measured on many ordinary gaming
+   PCs". A virtual machine with no real play measures no window width, and one PC's evening is not many.
+   P7's results are recorded as the first PC; the wording goes when more than one is measured.
+2. **Lab scenarios use a session whose game is still running** (ADR 0076, "Amendment (2026-10-27)"). On the
+   lab machine Prefetch wrote no file for `FiveM.exe`, so a session that has ended has no start there; a
+   running `FiveM.exe` gives the start, and only the window before the session can be shown. Three
+   scenarios: a renamed program run before the session and deleted while it runs (it shows the program as a
+   candidate, and that I1 cannot be shown for it, item 3); a downloaded file with its `Zone.Identifier`
+   stream; a clock change, made with Windows' own setting, whose event is the trace (nothing is
+   back-dated). The fourth, a DLL appended to an image and loaded by
+   `rundll32.exe`, needs Prefetch's loaded-file list for fact L1 and is not written.
+3. **A program known only from BAM or Prefetch has no path, and the drive map is its own ADR after 0.13.0.**
+   Measured on the lab machine (Windows 11 build 26300): BAM names a program as
+   `\Device\HarddiskVolumeN\…`, which ADR 0023 had left unverified, and Prefetch's string table uses
+   `\VOLUME{…}\…`. Neither is drive-rooted, so `bam` and `prefetch` withhold the path (SS mode cannot redact
+   that shape), `recorded_files` never reads such a file, and the candidate's identity facts I1 to I4 are
+   "not known: no path". A program run and then deleted, the case I1 is for, gets a path only when PCA,
+   UserAssist or the process list also recorded it. Mapping a volume to its drive letter is the drive map
+   ADR 0082 section 4 left for later; it needs its own ADR because a mapped path must be redacted as every
+   other path is.
+4. **The lab may run full scans.** The downloaded-file scenario needs a full scan, so the owner made one
+   exception to ADR 0052's decision 2 for `lab/replay.sh` on the lab machine (ADR 0052, "Amendment
+   (2026-10-27)").
