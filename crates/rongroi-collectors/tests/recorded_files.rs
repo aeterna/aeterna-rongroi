@@ -1265,9 +1265,9 @@ fn helper_deletion_host(top: &str, extra: &str) -> FixtureHost {
 }
 
 /// Asserts each of the six journal fields is gapped with `reason` (ADR 0086 section 4).
-fn assert_journal_gapped(gaps: &BTreeMap<String, UnmeasuredReason>, reason: &UnmeasuredReason) {
+fn assert_journal_gapped(gaps: &BTreeMap<String, UnmeasuredReason>, reason: UnmeasuredReason) {
     for field in JOURNAL_FIELDS {
-        assert_eq!(gaps.get(field), Some(reason), "{field}: {gaps:?}");
+        assert_eq!(gaps.get(field), Some(&reason), "{field}: {gaps:?}");
     }
 }
 
@@ -1353,7 +1353,7 @@ fn j2_a_journal_that_is_not_active_gaps_the_six_fields_as_source_absent() {
     let (observations, gaps) = measured(&run);
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
-    assert_journal_gapped(gaps, &UnmeasuredReason::SourceAbsent);
+    assert_journal_gapped(gaps, UnmeasuredReason::SourceAbsent);
     assert_no_journal_field(observations);
     let observation = observation_named(observations, "helper.exe");
     assert_eq!(
@@ -1373,7 +1373,7 @@ fn j2_a_refused_journal_on_an_elevated_host_gaps_the_six_fields_as_access_denied
     let (observations, gaps) = measured(&run);
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
-    assert_journal_gapped(gaps, &UnmeasuredReason::AccessDenied);
+    assert_journal_gapped(gaps, UnmeasuredReason::AccessDenied);
     assert_no_journal_field(observations);
     let observation = observation_named(observations, "helper.exe");
     assert_eq!(
@@ -1394,7 +1394,7 @@ fn j2_a_journal_that_changed_while_read_is_partial_and_lists_nothing() {
     let (observations, gaps) = measured(&run);
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
-    assert_journal_gapped(gaps, &UnmeasuredReason::Partial);
+    assert_journal_gapped(gaps, UnmeasuredReason::Partial);
     let observation = observation_named(observations, "helper.exe");
     assert_eq!(
         text(observation, "journal_match"),
@@ -1426,7 +1426,7 @@ fn j2_a_journal_read_the_journal_budget_stops_is_budget_spent() {
     let (observations, gaps) = measured(&run);
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
-    assert_journal_gapped(gaps, &UnmeasuredReason::BudgetSpent);
+    assert_journal_gapped(gaps, UnmeasuredReason::BudgetSpent);
     let observation = observation_named(observations, "helper.exe");
     assert_eq!(
         observation.fields.get("journal_deleted"),
@@ -1538,4 +1538,20 @@ fn j2_the_journal_fields_are_declared_with_their_kinds() {
     assert_eq!(format!("{:?}", declared("journal_from").kind), "Timestamp");
     assert_eq!(format!("{:?}", declared("journal_match").kind), "Text");
     assert_eq!(format!("{:?}", declared("journal_more").kind), "Bool");
+}
+
+/// (j2-16) `journal_from` is off the timeline too: it repeats the oldest record time `usn` already
+/// puts on the timeline, and a journal gap on a timeline field would leave `recorded_files` among the
+/// timeline's unmeasured sources on every scan without a journal (ADR 0086 section 6).
+#[test]
+fn j2_journal_from_is_declared_off_the_timeline() {
+    let fields = recorded_files().fields();
+    let field = fields
+        .iter()
+        .find(|field| field.name == "journal_from")
+        .unwrap_or_else(|| panic!("recorded_files does not declare `journal_from`"));
+    assert!(
+        !field.on_timeline,
+        "journal_from must not put the oldest record time on the timeline a second time"
+    );
 }

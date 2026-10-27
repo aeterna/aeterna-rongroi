@@ -82,8 +82,11 @@ const REASONS: [UnmeasuredReason; 8] = [
 /// sensitive field, behind its own SS-mode question (ADR 0064).
 ///
 /// The journal fields (ADR 0086 section 3) are present only when the journal was read. `journal_match`
-/// and `journal_from` are on every path that read gives them for; the three time lists are kept off the
-/// timeline, as `run_times` is, and `journal_more` says that one of them was cut.
+/// is on every path that read gives it for. All four time fields are kept off the timeline, as
+/// `run_times` is: the three lists hold up to eight times each, and `journal_from` repeats the oldest
+/// record time `usn` already puts on the timeline, so a journal gap on any of them would leave
+/// `recorded_files` in the timeline's unmeasured sources on every scan without a journal (ADR 0086
+/// section 6). `journal_more` says that one of the lists was cut.
 const FIELDS: [Field; 25] = [
     Field::boolean("by_bam"),
     Field::boolean("by_pca"),
@@ -94,7 +97,7 @@ const FIELDS: [Field; 25] = [
     Field::boolean("embedded_pe"),
     Field::text("identity_read"),
     Field::timestamp_list("journal_deleted").off_timeline(),
-    Field::timestamp("journal_from"),
+    Field::timestamp("journal_from").off_timeline(),
     Field::text("journal_match"),
     Field::boolean("journal_more"),
     Field::timestamp_list("journal_renamed_from").off_timeline(),
