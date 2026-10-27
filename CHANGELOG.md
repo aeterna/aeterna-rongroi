@@ -16,6 +16,57 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `llms.txt` on the landing page's site (llmstxt.org): what the tool does and does not do, and links to the README,
   guides and the key ADRs. `cargo xtask site` fills its version, date and rule and selector counts from the
   published release, as it does for the pages.
+- A game-window view, marked experimental, in the desktop app and the CLI (ADR 0078): after the latest-session
+  statement, it lists the programs Windows recorded running in the 30 minutes before a FiveM session, during
+  it, in the 30 minutes after it, and between its end and the scan, with the facts about each (recorded in
+  which window, near how many sessions, its file no longer where it ran from, no verifiable signature, a name
+  that contradicts its content, a path under a folder the account can write, loaded files outside the expected
+  folders) and the ordinary causes of each. The facts are labels, never a score, a colour or a verdict; the list is
+  ordered by how many identity facts hold, and its heading says that is a count, not a judgement. A fact that
+  is not known says why, so it never looks like one that does not hold; an earlier session shows only its start.
+  In SS mode the view names only the programs with an identity fact and counts the rest per window; Self mode
+  shows all of them. A candidate's file details fold under its card: SHA-256 and signer certificate in full,
+  content kind, the name in its version information, the download zone and website, and which collectors
+  recorded it. Both consent screens say what the view reads, and the desktop's full-scan list now carries the
+  CLI's recorded-files item.
+- `recorded_files`, a new `full` collector (ADR 0079, ADR 0080): for each drive-rooted path that BAM, the Program
+  Compatibility Assistant, UserAssist or the process list recorded, it reads the file for its content kind (whether
+  its bytes match its name, whether data trails its end, whether a program is inside), SHA-256, signature,
+  the original file name in its version information, and its `Zone.Identifier` stream (the download zone and
+  the website's name; the rest of the address and the page that linked to it are dropped). Files are read
+  nearest the last FiveM or GTA V time first, for up to 90 seconds. A file that cannot be read says why on its
+  own row instead of making a gap for the whole run. Reading a file, including that stream, can move its
+  last-access time on a PC that keeps one; this was measured and `PRIVACY.md` says so.
+- `userassist`, a new `standard` collector (ADR 0080): which programs the account the scan runs as opened through
+  Windows' shell, and when it last opened each. Paths are reported as BAM's are; an app name is reported as
+  that name; shortcuts are counted, never listed; whether that account is the one signed in at the keyboard is
+  said as `same` or `other`.
+- `event_fields`, a new `standard` collector (ADR 0081): from four kinds of event it reads named fields only.
+  A service or driver install (System 7045): when, whether it is a driver, and a SHA-256 fingerprint of its
+  path (not the path, name or account). A clock change (Kernel-General 1, Security 4616): the times before and
+  after, the reason number and whether a program in Windows' own folder made it; changes under a minute are
+  only counted. A file Code Integrity refused (3033): a fingerprint of its path after the drive, how many times
+  and when. A fingerprint matches only the same path, and SS mode shows it.
+- `prefetch` emits `run_times` (every run time the file holds, at most eight, newest first) and, for the game,
+  `rundll32.exe` and `regsvr32.exe` only, `loaded_outside` (ADR 0078, ADR 0082): how many files with a program's
+  extension its loaded-file list names outside Windows, Program Files and FiveM's program folders. Only the
+  number is reported, in both modes, never a path or a name. With no system volume to compare with it says
+  `loaded_outside_unknown`.
+- Parsers for a file's content kind, the original file name in a PE version resource, the `Zone.Identifier` text
+  and UserAssist entries, each with fuzz targets; `fuzz_evtx` also covers the three event readers.
+- `cargo xtask coverage` writes `docs/coverage.md`, a table of what is known about each rule (checks, baseline,
+  trace ages, measurements), and `rules/measured.csv` is the ledger of where each was seen on which machine
+  (ADR 0074). CI runs `cargo xtask coverage --check`; a gap never fails it. `docs/rules-authoring.md` says what
+  `stable` needs.
+- Lab replay (ADR 0076): `lab/replay.sh` boots a throwaway copy of the maintainer's Windows virtual machine with no
+  network, runs one scenario from `lab/scenarios/`, scans and checks the scan, and `cargo xtask lab-check`
+  compares a scan with a scenario's `expect.yaml` and prints the ledger rows. Seven scenarios are in, with
+  their ledger rows.
+- A weekly workflow, `windows watch` (ADR 0075), scans each GitHub Windows image and compares only the shape of the
+  report (build, rule states, collector field names; no values, paths or counts) with `fixtures/watch/`. It is
+  never a required check.
+- An advisory `provenance` job on pull requests reports commits that lack the project's attribution lines; it
+  never fails a pull request.
 
 ### Changed
 - Nothing in the report vouches for a program, a file or a PC (hard rule 9, ADR 0084):
@@ -39,6 +90,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Three more rules are `stable`: Windows PowerShell's and PowerShell 7's script block logging turned off by a
   machine policy, and an event log file set read-only. Each was seen `found` in a lab replay (ADR 0076,
   `lab/scenarios/`), is measured on a client Windows build and is confronted by a baseline.
+- A pull request that changes only documentation, the site or text skips the Rust compile and tests, and one
+  that does not touch parsers, fixtures, fuzz or the lockfile skips the fuzz smoke run; a promotion from `dev` to
+  `main` passes at once.
 
 ## [0.12.0] - 2026-10-17
 
