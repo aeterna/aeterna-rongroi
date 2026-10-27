@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use rongroi_core::model::Mode;
 use rongroi_core::view::{
-    ClockHistory, FileRead, GameCandidate, GameSession, GameWindows, IdentityFact,
+    ClockHistory, FileDetails, FileRead, GameCandidate, GameSession, GameWindows, IdentityFact,
     IdentityNotKnownReason, NotKnownReason, TimeFact, WindowCounts,
 };
 
@@ -348,6 +348,11 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
             words.get("game.file.download_host", &[("host", &host)])
         );
     }
+    journal_lines(out, words, file);
+}
+
+/// The change-journal lines of a file, one per kind of match, with its times (ADR 0086).
+fn journal_lines(out: &mut String, words: &Words, file: &FileDetails) {
     // Each non-empty kind of journal match lists its times; a list cut at the cap says so after them.
     let journal = [
         ("game.file.journal.deleted", &file.journal_deleted),
