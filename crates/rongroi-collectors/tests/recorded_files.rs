@@ -1053,8 +1053,16 @@ fn assert_matched(
     renamed_to: &[&str],
     from: &str,
 ) {
-    assert_eq!(text(observation, "journal_match"), Some("matched"), "{observation:?}");
-    assert_eq!(times(observation, "journal_deleted"), Some(deleted.to_vec()), "{observation:?}");
+    assert_eq!(
+        text(observation, "journal_match"),
+        Some("matched"),
+        "{observation:?}"
+    );
+    assert_eq!(
+        times(observation, "journal_deleted"),
+        Some(deleted.to_vec()),
+        "{observation:?}"
+    );
     assert_eq!(
         times(observation, "journal_renamed_from"),
         Some(renamed_from.to_vec()),
@@ -1065,22 +1073,43 @@ fn assert_matched(
         Some(renamed_to.to_vec()),
         "{observation:?}"
     );
-    assert_eq!(flag(observation, "journal_more"), Some(false), "{observation:?}");
-    assert_eq!(text(observation, "journal_from"), Some(from), "{observation:?}");
+    assert_eq!(
+        flag(observation, "journal_more"),
+        Some(false),
+        "{observation:?}"
+    );
+    assert_eq!(
+        text(observation, "journal_from"),
+        Some(from),
+        "{observation:?}"
+    );
 }
 
 /// Asserts a path the journal did not match: `journal_match` says `reason`, no list and no
 /// `journal_more` is emitted, and `journal_from` is `from` (ADR 0086 section 3).
 fn assert_unmatched(observation: &Observation, reason: &str, from: &str) {
-    assert_eq!(text(observation, "journal_match"), Some(reason), "{observation:?}");
-    for name in ["journal_deleted", "journal_renamed_from", "journal_renamed_to", "journal_more"] {
+    assert_eq!(
+        text(observation, "journal_match"),
+        Some(reason),
+        "{observation:?}"
+    );
+    for name in [
+        "journal_deleted",
+        "journal_renamed_from",
+        "journal_renamed_to",
+        "journal_more",
+    ] {
         assert_eq!(
             observation.fields.get(name),
             None,
             "{name} must not be emitted: {observation:?}"
         );
     }
-    assert_eq!(text(observation, "journal_from"), Some(from), "{observation:?}");
+    assert_eq!(
+        text(observation, "journal_from"),
+        Some(from),
+        "{observation:?}"
+    );
 }
 
 /// (j2-1) A file BAM recorded that is gone, in a folder whose journal holds its deletion, is
@@ -1089,10 +1118,18 @@ fn assert_unmatched(observation: &Observation, reason: &str, from: &str) {
 #[test]
 fn j2_a_gone_file_whose_deletion_the_journal_holds_is_matched_as_deleted() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Tools\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
-        &[r"{ parent: 'C:\Tools', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T09:30:00Z' }"],
+        &[
+            r"{ parent: 'C:\Tools', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T09:30:00Z' }",
+        ],
         "",
     );
 
@@ -1101,8 +1138,18 @@ fn j2_a_gone_file_whose_deletion_the_journal_holds_is_matched_as_deleted() {
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
     let observation = observation_named(observations, "helper.exe");
-    assert_eq!(text(observation, "identity_read"), Some("missing"), "{observation:?}");
-    assert_matched(observation, &["2026-09-13T09:30:00Z"], &[], &[], "2026-09-13T09:30:00Z");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("missing"),
+        "{observation:?}"
+    );
+    assert_matched(
+        observation,
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T09:30:00Z",
+    );
 }
 
 /// (j2-2) An old-name rename record matches a target by its parent folder and its name, ignoring
@@ -1110,10 +1157,18 @@ fn j2_a_gone_file_whose_deletion_the_journal_holds_is_matched_as_deleted() {
 #[test]
 fn j2_a_rename_away_from_the_name_in_the_parent_folder_is_matched_as_renamed_from() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Tools\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
-        &[r"{ parent: 'C:\Tools', reasons: [rename_old_name, close], name: HELPER.EXE, first: '2026-09-14T10:00:00Z' }"],
+        &[
+            r"{ parent: 'C:\Tools', reasons: [rename_old_name, close], name: HELPER.EXE, first: '2026-09-14T10:00:00Z' }",
+        ],
         "",
     );
 
@@ -1122,7 +1177,13 @@ fn j2_a_rename_away_from_the_name_in_the_parent_folder_is_matched_as_renamed_fro
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
     let observation = observation_named(observations, "helper.exe");
-    assert_matched(observation, &[], &["2026-09-14T10:00:00Z"], &[], "2026-09-14T10:00:00Z");
+    assert_matched(
+        observation,
+        &[],
+        &["2026-09-14T10:00:00Z"],
+        &[],
+        "2026-09-14T10:00:00Z",
+    );
 }
 
 /// (j2-3) A new-name rename record matches a target the same way, and lists under
@@ -1130,10 +1191,18 @@ fn j2_a_rename_away_from_the_name_in_the_parent_folder_is_matched_as_renamed_fro
 #[test]
 fn j2_a_rename_to_the_name_in_the_parent_folder_is_matched_as_renamed_to() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Tools\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
-        &[r"{ parent: 'C:\Tools', reasons: [rename_new_name, close], name: HELPER.EXE, first: '2026-09-14T10:00:01Z' }"],
+        &[
+            r"{ parent: 'C:\Tools', reasons: [rename_new_name, close], name: HELPER.EXE, first: '2026-09-14T10:00:01Z' }",
+        ],
         "",
     );
 
@@ -1142,7 +1211,13 @@ fn j2_a_rename_to_the_name_in_the_parent_folder_is_matched_as_renamed_to() {
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
     let observation = observation_named(observations, "helper.exe");
-    assert_matched(observation, &[], &[], &["2026-09-14T10:00:01Z"], "2026-09-14T10:00:01Z");
+    assert_matched(
+        observation,
+        &[],
+        &[],
+        &["2026-09-14T10:00:01Z"],
+        "2026-09-14T10:00:01Z",
+    );
 }
 
 /// (j2-4) A record whose own file reference is the target's matches it under any name, even when its
@@ -1164,7 +1239,9 @@ fn j2_a_rename_of_a_file_that_still_exists_is_matched_by_its_own_reference() {
             (r"C:\Users\fixtureuser\Downloads", 3),
         ],
         &[],
-        &[r"{ parent: 'C:\Users\fixtureuser\Downloads', file: 'C:\Tools\helper.exe', reasons: [rename_old_name, close], name: other.exe, first: '2026-09-14T10:00:00Z' }"],
+        &[
+            r"{ parent: 'C:\Users\fixtureuser\Downloads', file: 'C:\Tools\helper.exe', reasons: [rename_old_name, close], name: other.exe, first: '2026-09-14T10:00:00Z' }",
+        ],
         "",
     );
 
@@ -1173,8 +1250,18 @@ fn j2_a_rename_of_a_file_that_still_exists_is_matched_by_its_own_reference() {
 
     assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
     let observation = observation_named(observations, "helper.exe");
-    assert_eq!(text(observation, "identity_read"), Some("read"), "{observation:?}");
-    assert_matched(observation, &[], &["2026-09-14T10:00:00Z"], &[], "2026-09-14T10:00:00Z");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("read"),
+        "{observation:?}"
+    );
+    assert_matched(
+        observation,
+        &[],
+        &["2026-09-14T10:00:00Z"],
+        &[],
+        "2026-09-14T10:00:00Z",
+    );
 }
 
 /// (j2-5) A path on another drive letter than the system volume is `other_volume`: the journal of
@@ -1183,10 +1270,18 @@ fn j2_a_rename_of_a_file_that_still_exists_is_matched_by_its_own_reference() {
 #[test]
 fn j2_a_path_on_another_drive_is_other_volume_and_lists_nothing() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"D:\Tools\outside.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"D:\Tools\outside.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
-        &[r"{ parent: 'C:\Tools', reasons: [file_delete, close], name: outside.exe, first: '2026-09-13T09:30:00Z' }"],
+        &[
+            r"{ parent: 'C:\Tools', reasons: [file_delete, close], name: outside.exe, first: '2026-09-13T09:30:00Z' }",
+        ],
         "",
     );
 
@@ -1203,10 +1298,18 @@ fn j2_a_path_on_another_drive_is_other_volume_and_lists_nothing() {
 #[test]
 fn j2_a_file_in_a_folder_on_another_volume_is_other_volume_and_lists_nothing() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Junction\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Junction\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1), (r"C:\Junction", 2)],
         &[r"C:\Junction"],
-        &[r"{ parent: 'C:\Junction', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T09:30:00Z' }"],
+        &[
+            r"{ parent: 'C:\Junction', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T09:30:00Z' }",
+        ],
         "",
     );
 
@@ -1224,10 +1327,18 @@ fn j2_a_file_in_a_folder_on_another_volume_is_other_volume_and_lists_nothing() {
 #[test]
 fn j2_a_file_in_a_folder_the_journal_does_not_name_is_folder_unknown() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Unlisted\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Unlisted\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
-        &[r"{ parent: 'C:\Tools', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T09:30:00Z' }"],
+        &[
+            r"{ parent: 'C:\Tools', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T09:30:00Z' }",
+        ],
         "",
     );
 
@@ -1298,7 +1409,13 @@ fn j2_a_list_keeps_the_eight_newest_times_newest_first_and_says_more_were_cut() 
         .collect();
     let record_refs: Vec<&str> = records.iter().map(String::as_str).collect();
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Tools\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
         &record_refs,
@@ -1335,7 +1452,11 @@ fn j2_a_list_keeps_the_eight_newest_times_newest_first_and_says_more_were_cut() 
         Some(Vec::new()),
         "{observation:?}"
     );
-    assert_eq!(flag(observation, "journal_more"), Some(true), "{observation:?}");
+    assert_eq!(
+        flag(observation, "journal_more"),
+        Some(true),
+        "{observation:?}"
+    );
     assert_eq!(
         text(observation, "journal_from"),
         Some("2026-09-13T00:00:00Z"),
@@ -1401,7 +1522,11 @@ fn j2_a_journal_that_changed_while_read_is_partial_and_lists_nothing() {
         Some("matched"),
         "{observation:?}"
     );
-    for field in ["journal_deleted", "journal_renamed_from", "journal_renamed_to"] {
+    for field in [
+        "journal_deleted",
+        "journal_renamed_from",
+        "journal_renamed_to",
+    ] {
         assert_eq!(observation.fields.get(field), None, "{observation:?}");
     }
     assert_eq!(flag(observation, "journal_more"), None, "{observation:?}");
@@ -1513,7 +1638,10 @@ fn j2_no_journal_name_reaches_the_run() {
         "2026-09-13T09:30:00Z",
     );
     let json = serde_json::to_string(&run).unwrap();
-    assert!(!json.contains("secret"), "a journal name reached the run: {json}");
+    assert!(
+        !json.contains("secret"),
+        "a journal name reached the run: {json}"
+    );
 }
 
 /// (j2-15) The three lists are timestamp lists kept off the timeline, as `run_times` is (ADR 0086
@@ -1527,7 +1655,11 @@ fn j2_the_journal_fields_are_declared_with_their_kinds() {
             .find(|field| field.name == name)
             .unwrap_or_else(|| panic!("recorded_files does not declare `{name}`"))
     };
-    for name in ["journal_deleted", "journal_renamed_from", "journal_renamed_to"] {
+    for name in [
+        "journal_deleted",
+        "journal_renamed_from",
+        "journal_renamed_to",
+    ] {
         let field = declared(name);
         assert_eq!(format!("{:?}", field.kind), "TimestampList", "{name}");
         assert!(
