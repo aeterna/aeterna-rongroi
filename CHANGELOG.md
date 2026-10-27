@@ -13,6 +13,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Names in the journal are compared inside the parser and never kept; no name, USN or file number is reported.
   The read has its own 30-second budget, and a journal that could not be read gaps only these six fields. The
   game-window view does not show this yet (ADR 0086 step J3).
+- The game-window view's identity fact I5 (ADR 0086): after a full scan, whether the change journal recorded a
+  program's file being deleted or renamed in a window of the latest session, with its ordinary causes (updates, the
+  Recycle Bin, antivirus quarantine); otherwise why it is not known (the journal could not be read, the file is on
+  another drive or its folder could not be identified, or the journal does not reach back to the window). It counts
+  in the ordering and names a program in SS mode, like I1 to I4. A program's file details list the journal's times.
+  The full-scan consent says the journal is read for these files, and that names in it are compared on the PC and
+  never kept.
 
 ## [0.13.0] - 2026-10-27
 

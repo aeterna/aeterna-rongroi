@@ -322,8 +322,8 @@ What a full scan reads today:
   **The Windows drive's change journal is read once more** (ADR 0086), for up to 30 seconds, before any of
   those files: each record in the folder of one of those files is compared, by name, with that file's name,
   or by the file's own number with that file. For a match, only whether it was a deletion or a rename and
-  when are kept. No other name in the journal is kept, and no journal or file number is reported. A file on
-  another drive is not looked for.
+  when are kept, and those times are shown with the file's details. No other name in the journal is kept, and
+  no journal or file number is reported. A file on another drive is not looked for.
 
 A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
 reads a browser's history, a messenger's storage, or anything that holds a password or a token.
@@ -384,7 +384,7 @@ itself (ADR 0050).
 | When parts of this PC were set up (dates) | shown | shown — [below](#how-far-back-the-traces-reach) |
 | How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |
 | Each FiveM edition's last session beside its folders | shown | shown — [below](#how-far-back-the-traces-reach) |
-| Programs recorded near a game session (ADR 0078) | every program with a recorded time in the 30 minutes before a FiveM session, during it, the 30 minutes after it, or between it and the scan, with its facts and their ordinary causes, which of Windows' records recorded it, and, after a full scan, its file's details (hash, signature and signer, what kind of file it is, the name in its version information, its download zone and the website it came from); your user name is hidden in paths | **named only when a fact about its file holds** (it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, it loaded a program file from outside the usual folders, or the change journal recorded it being deleted or renamed near the latest session), with the same facts and file details, the website shown as `%DOWNLOAD_HOST%` unless you agree to show websites (ADR 0064); every other program is **a count per window**. Before ADR 0078, SS mode showed no Prefetch, BAM or Program Compatibility Assistant record by name (ADR 0034) |
+| Programs recorded near a game session (ADR 0078) | every program with a recorded time in the 30 minutes before a FiveM session, during it, the 30 minutes after it, or between it and the scan, with its facts and their ordinary causes, which of Windows' records recorded it, and, after a full scan, its file's details (hash, signature and signer, what kind of file it is, the name in its version information, its download zone and the website it came from, and when the change journal recorded it deleted or renamed); your user name is hidden in paths | **named only when a fact about its file holds** (it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, it loaded a program file from outside the usual folders, or the change journal recorded it being deleted or renamed near the latest session), with the same facts and file details, the website shown as `%DOWNLOAD_HOST%` unless you agree to show websites (ADR 0064); every other program is **a count per window**. Before ADR 0078, SS mode showed no Prefetch, BAM or Program Compatibility Assistant record by name (ADR 0034) |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
 
 ### The timeline

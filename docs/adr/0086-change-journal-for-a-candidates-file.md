@@ -1,7 +1,8 @@
 # ADR 0086 — The change journal for a candidate's file
 
 - Status: accepted — the owner decided the seven questions in "Owner decisions" on 2026-10-27, each as
-  recommended. J1 and J2 are built ("As built: J1, J2"); J3 to J5 are not
+  recommended. J1 and J2 are built ("As built: J1, J2"), J4 is measured ("Measured: J4"), J3 is built and waits
+  for the owner's G1 on section 6's text ("As built: J3"); J5 is not built
 - Date: 2026-10-27
 - Related: ADR 0021 (no identifier that names one file across two reports), ADR 0044 (gaps), ADR 0047 (the
   change journal, and "The privacy problem"), ADR 0052 (full scan), ADR 0061 (trace ages), ADR 0062 (the
@@ -394,3 +395,28 @@ What this shows:
    asked about it. Reading I5 back for a renamed and deleted program needs an interactive run: the lab replay
    (step J5) or the owner's PC. On the lab machine the scenario's program is known only from BAM, whose path is
    withheld until ADR 0087's drive map, so its I5 is "not known: no path" today.
+
+## As built: J3 (2026-10-28, waiting for the owner's G1 on section 6's text)
+
+I5 is computed in `rongroi_core::view::game` for the latest session of each edition, with the windows the time
+facts use (before `[start − 30 min, start)`, during `[start, end]`, after `(end, end + 30 min]`, before the scan
+`(end, scan]`). Where it differs from or adds to section 5:
+
+1. **The view reads the journal's state from the fields, not from gaps**, because a report carries no per-field
+   gaps for the view: no `journal_match` is `journal_not_read`; `matched` with no `journal_deleted` (a read that
+   was not whole) is `journal_not_read` too.
+2. **A cut list moves the journal's start.** `journal_more` says a list kept its newest eight and dropped older
+   times. So when it is set, the start the false check uses is the later of `journal_from` and the oldest time a
+   full list kept; a window before that is `before_trace_age`, never false.
+3. **False needs every window known.** With a latest session whose end is not recorded, a time in its before window
+   still makes I5 true, but I5 is never false: `session_end_not_recorded`. Section 5's "the earliest of those
+   windows that is known" is read this way, the stricter reading.
+4. **`scan_time_not_recorded`** is a reason section 5 did not list: with no scan time the before-the-scan window is
+   not known, as for T4. It comes after `session_end_not_recorded`.
+5. **Text.** Section 6's keys, word for word, in both languages, plus `cross_source.source.usn` ("NTFS change
+   journal") for the `before_trace_age` source and `game.file.journal.more` ("+ more" / "+ มีอีก"), which section
+   6 did not write. The CLI and the desktop show "+ more" after each list that is not empty when `journal_more`
+   is set. The consent sentence is word for word in the CLI and the full-scan dialog (present tense); the desktop's
+   after-the-scan summary (`consent.full_reads`), which is written in the past tense, says the same in the past
+   tense.
+6. `PRIVACY.md`'s SS row and full-scan list name the journal's times among a named program's file details.
