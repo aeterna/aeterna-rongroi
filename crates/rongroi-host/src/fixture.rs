@@ -5,6 +5,7 @@
 //! A fake machine described in `fixtures/hosts/<name>/host.yaml`. See `fixtures/hosts/PROVENANCE.md`.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::TryFromIntError;
 use std::path::Path;
 
 use serde::Deserialize;
@@ -855,6 +856,13 @@ struct FixtureUsnRecords {
     first: Option<String>,
     #[serde(default)]
     last: Option<String>,
+    /// The record's own file name. Absent, it is `fx`, the name every record had before ADR 0086.
+    #[serde(default)]
+    name: Option<String>,
+    /// A folder under `folders:` whose identifier becomes the record's own file reference, so that a
+    /// record of that file can be matched by it (ADR 0086). Absent, the reference is zero.
+    #[serde(default)]
+    file: Option<String>,
 }
 
 fn default_usn_major() -> u16 {
@@ -948,30 +956,45 @@ fn filetime_of(text: &str, origin: &str) -> Result<u64, FixtureError> {
     })
 }
 
-fn encode_record(major: u16, parent: FileId, written: u64, reason: u32) -> Vec<u8> {
+/// Encodes one record. `name` is the file name as UTF-16LE bytes, placed at the name offset; the record
+/// length is the fixed part plus the name, padded with zeros to a multiple of 8 (ADR 0086). `own` is the
+/// file's own reference, zero when absent.
+fn encode_record(
+    major: u16,
+    parent: FileId,
+    own: Option<FileId>,
+    written: u64,
+    reason: u32,
+    name: &[u8],
+) -> Result<Vec<u8>, TryFromIntError> {
+    // The fixed part of each version's record, and where its file name length sits; the name offset
+    // follows the length, and the name starts right after the fixed part.
+    let (fixed, name_length_at) = if major == 2 { (60, 56) } else { (76, 72) };
+    let length = (fixed + name.len()).next_multiple_of(8);
+    let mut record = vec![0u8; length];
+    record[0..4].copy_from_slice(&u32::try_from(length)?.to_le_bytes());
+    record[4..6].copy_from_slice(&major.to_le_bytes());
+    record[name_length_at..name_length_at + 2]
+        .copy_from_slice(&u16::try_from(name.len())?.to_le_bytes());
+    record[name_length_at + 2..name_length_at + 4]
+        .copy_from_slice(&u16::try_from(fixed)?.to_le_bytes());
+    record[fixed..fixed + name.len()].copy_from_slice(name);
     if major == 2 {
-        let mut record = vec![0u8; 64];
-        record[0..4].copy_from_slice(&64u32.to_le_bytes());
-        record[4..6].copy_from_slice(&2u16.to_le_bytes());
+        if let Some(own) = own {
+            record[8..16].copy_from_slice(&own.index_64.to_le_bytes());
+        }
         record[16..24].copy_from_slice(&parent.index_64.to_le_bytes());
         record[32..40].copy_from_slice(&written.to_le_bytes());
         record[40..44].copy_from_slice(&reason.to_le_bytes());
-        record[56..58].copy_from_slice(&4u16.to_le_bytes());
-        record[58..60].copy_from_slice(&60u16.to_le_bytes());
-        record[60..64].copy_from_slice(&[b'f', 0, b'x', 0]);
-        record
     } else {
-        let mut record = vec![0u8; 80];
-        record[0..4].copy_from_slice(&80u32.to_le_bytes());
-        record[4..6].copy_from_slice(&major.to_le_bytes());
+        if let Some(own) = own {
+            record[8..24].copy_from_slice(&own.id_128);
+        }
         record[24..40].copy_from_slice(&parent.id_128);
         record[48..56].copy_from_slice(&written.to_le_bytes());
         record[56..60].copy_from_slice(&reason.to_le_bytes());
-        record[72..74].copy_from_slice(&4u16.to_le_bytes());
-        record[74..76].copy_from_slice(&76u16.to_le_bytes());
-        record[76..80].copy_from_slice(&[b'f', 0, b'x', 0]);
-        record
     }
+    Ok(record)
 }
 
 /// Turns `folders:` and `other_volume_folders:` into identifiers, rejecting an
@@ -1016,69 +1039,110 @@ fn resolve_usn_folders(
         .collect())
 }
 
-fn resolve_usn_journal(
-    described: FixtureUsnJournal,
+/// Encodes one record group, in the order its records sit in the journal. The group's parent and file
+/// must be under `folders:`, its version 2 or 3, and its `last` no earlier than its `first`.
+fn group_records(
+    group: &FixtureUsnRecords,
+    folders: &BTreeMap<String, FileId>,
     origin: &str,
-) -> Result<StoredUsnJournal, FixtureError> {
-    let folders = resolve_usn_folders(&described, origin)?;
-    let mut records = Vec::new();
-    for group in described.records {
-        let parent = match &group.parent {
-            None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
-            Some(path) => {
+) -> Result<Vec<Vec<u8>>, FixtureError> {
+    let parent = match &group.parent {
+        None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
+        Some(path) => *folders
+            .get(&normalise_path(path))
+            .ok_or_else(|| FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal record parent `{path}` is not under `folders:`"),
+            })?,
+    };
+    let own = match &group.file {
+        None => None,
+        Some(path) => {
+            Some(
                 *folders
                     .get(&normalise_path(path))
                     .ok_or_else(|| FixtureError::Parse {
                         path: origin.to_owned(),
                         message: format!(
-                            "usn_journal record parent `{path}` is not under `folders:`"
+                            "usn_journal record file `{path}` is not under `folders:`"
                         ),
-                    })?
-            }
+                    })?,
+            )
+        }
+    };
+    if group.major != 2 && group.major != 3 {
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!("usn_journal major version {} is not 2 or 3", group.major),
+        });
+    }
+    let name: Vec<u8> = group
+        .name
+        .as_deref()
+        .unwrap_or("fx")
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let reason = group
+        .reasons
+        .iter()
+        .fold(0u32, |flags, reason| flags | reason.flag());
+    let first = group
+        .first
+        .as_deref()
+        .map(|text| filetime_of(text, origin))
+        .transpose()?
+        .unwrap_or(133_000_000_000_000_000);
+    let last = group
+        .last
+        .as_deref()
+        .map(|text| filetime_of(text, origin))
+        .transpose()?
+        .unwrap_or(first);
+    if last < first {
+        let first_text = group.first.as_deref().unwrap_or("<default>");
+        let last_text = group.last.as_deref().unwrap_or("<default>");
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
+            ),
+        });
+    }
+    let span = last.saturating_sub(first);
+    let steps = u64::from(group.count.saturating_sub(1)).max(1);
+    let mut records = Vec::new();
+    for index in 0..group.count {
+        let written = first + span / steps * u64::from(index);
+        let written = if index + 1 == group.count {
+            last
+        } else {
+            written
         };
-        if group.major != 2 && group.major != 3 {
-            return Err(FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!("usn_journal major version {} is not 2 or 3", group.major),
-            });
-        }
-        let reason = group
-            .reasons
-            .iter()
-            .fold(0u32, |flags, reason| flags | reason.flag());
-        let first = group
-            .first
-            .as_deref()
-            .map(|text| filetime_of(text, origin))
-            .transpose()?
-            .unwrap_or(133_000_000_000_000_000);
-        let last = group
-            .last
-            .as_deref()
-            .map(|text| filetime_of(text, origin))
-            .transpose()?
-            .unwrap_or(first);
-        if last < first {
-            let first_text = group.first.as_deref().unwrap_or("<default>");
-            let last_text = group.last.as_deref().unwrap_or("<default>");
-            return Err(FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!(
-                    "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
-                ),
-            });
-        }
-        let span = last.saturating_sub(first);
-        let steps = u64::from(group.count.saturating_sub(1)).max(1);
-        for index in 0..group.count {
-            let written = first + span / steps * u64::from(index);
-            let written = if index + 1 == group.count {
-                last
-            } else {
-                written
-            };
-            records.push(encode_record(group.major, parent, written, reason));
-        }
+        let record =
+            encode_record(group.major, parent, own, written, reason, &name).map_err(|_| {
+                FixtureError::Parse {
+                    path: origin.to_owned(),
+                    // The name's length is the reason; the name itself is not echoed into the message.
+                    message: format!(
+                        "usn_journal record name of {} UTF-16 bytes is longer than 65535",
+                        name.len()
+                    ),
+                }
+            })?;
+        records.push(record);
+    }
+    Ok(records)
+}
+
+fn resolve_usn_journal(
+    described: &FixtureUsnJournal,
+    origin: &str,
+) -> Result<StoredUsnJournal, FixtureError> {
+    let folders = resolve_usn_folders(described, origin)?;
+    let mut records = Vec::new();
+    for group in &described.records {
+        records.extend(group_records(group, &folders, origin)?);
     }
     let first_usn: i64 = if described.trimmed { 4096 } else { 0 };
     let mut buffers = Vec::new();
@@ -1242,7 +1306,7 @@ impl FixtureHost {
                 .transpose()?,
             usn_journal: file
                 .usn_journal
-                .map(|journal| resolve_usn_journal(journal, origin))
+                .map(|journal| resolve_usn_journal(&journal, origin))
                 .transpose()?,
         })
     }
@@ -3097,6 +3161,238 @@ usn_journal:
         assert!(
             error.to_string().contains("other_volume_folders"),
             "{error}"
+        );
+    }
+
+    /// The UTF-16LE bytes NTFS stores a file name as.
+    fn utf16le(text: &str) -> Vec<u8> {
+        text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+    }
+
+    /// ADR 0086: a `name:` is the record's file name, UTF-16LE at the name offset. A version 3 record
+    /// with a 10-character name is 76 + 20 bytes, already a multiple of 8.
+    #[test]
+    fn a_usn_record_can_carry_a_name_in_version_3() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: 'Helper.exe'\n",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let record = &buffers[0][8..];
+        assert_eq!(record.len(), 96);
+        assert_eq!(u32::from_le_bytes(record[0..4].try_into().unwrap()), 96);
+        assert_eq!(u16::from_le_bytes(record[72..74].try_into().unwrap()), 20);
+        assert_eq!(u16::from_le_bytes(record[74..76].try_into().unwrap()), 76);
+        assert_eq!(&record[76..96], utf16le("Helper.exe").as_slice());
+    }
+
+    /// ADR 0086: a version 2 name of 3 characters is 6 bytes, so the record is 60 + 6 = 66 bytes,
+    /// padded with two zero bytes to 72.
+    #[test]
+    fn an_odd_length_name_is_padded_to_a_multiple_of_8_in_version_2() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - major: 2\n      reasons: [file_delete]\n      name: 'abc'\n",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let record = &buffers[0][8..];
+        assert_eq!(record.len(), 72);
+        assert_eq!(u32::from_le_bytes(record[0..4].try_into().unwrap()), 72);
+        assert_eq!(u16::from_le_bytes(record[56..58].try_into().unwrap()), 6);
+        assert_eq!(u16::from_le_bytes(record[58..60].try_into().unwrap()), 60);
+        assert_eq!(&record[60..66], utf16le("abc").as_slice());
+        assert_eq!(&record[66..72], &[0u8; 6]);
+    }
+
+    /// ADR 0086: a `file:` naming a folder under `folders:` makes that folder's identifier the record's
+    /// own file reference: `id_128` at 8..24 in version 3, `index_64` at 8..16 in version 2. The path is
+    /// spelled in another case to show it is matched the way `folders:` is. The record's `parent:` is
+    /// the folder that holds the file, so the parent field must hold that folder and not the file; a
+    /// record with no `file:` leaves the own-reference field zero.
+    #[test]
+    fn a_record_for_a_file_carries_its_identifier_as_its_own_reference() {
+        let yaml = |major: u16, file: Option<&str>| {
+            let file_line = file.map_or(String::new(), |path| format!("      file: '{path}'\n"));
+            format!(
+                "platform: windows\nusn_journal:\n  folders:\n    'C:\\Tools': 3\n    'C:\\Tools\\Helper.exe': 9\n  records:\n    - major: {major}\n      parent: 'C:\\Tools'\n      reasons: [file_create]\n{file_line}"
+            )
+        };
+        let folder = |host: &FixtureHost| host.file_id(r"C:\Tools").unwrap().unwrap();
+        let helper = |host: &FixtureHost| host.file_id(r"C:\Tools\Helper.exe").unwrap().unwrap();
+
+        // Version 3: the file's own reference at 8..24, the parent folder's at 24..40.
+        let version_3 =
+            FixtureHost::from_yaml_str(&yaml(3, Some(r"c:\tools\helper.exe")), "inline").unwrap();
+        let (own, parent) = (helper(&version_3), folder(&version_3));
+        assert_eq!(own.index_64, 9);
+        assert_eq!(parent.index_64, 3);
+        let (read, buffers) = read_all(&version_3, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..24], &own.id_128);
+        assert_eq!(&record[24..40], &parent.id_128);
+        assert_ne!(&record[24..40], &own.id_128);
+
+        // Version 2: the file's own reference at 8..16, the parent folder's at 16..24.
+        let version_2 =
+            FixtureHost::from_yaml_str(&yaml(2, Some(r"c:\tools\helper.exe")), "inline").unwrap();
+        let (own, parent) = (helper(&version_2), folder(&version_2));
+        let (read, buffers) = read_all(&version_2, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(
+            u64::from_le_bytes(record[8..16].try_into().unwrap()),
+            own.index_64
+        );
+        assert_eq!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            parent.index_64
+        );
+        assert_ne!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            own.index_64
+        );
+
+        // No `file:`: version 3 leaves 8..24 zero and version 2 leaves 8..16 zero, while the parent
+        // is still the folder.
+        let version_3 = FixtureHost::from_yaml_str(&yaml(3, None), "inline").unwrap();
+        let (read, buffers) = read_all(&version_3, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..24], &[0u8; 16]);
+        assert_eq!(&record[24..40], &folder(&version_3).id_128);
+
+        let version_2 = FixtureHost::from_yaml_str(&yaml(2, None), "inline").unwrap();
+        let (read, buffers) = read_all(&version_2, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..16], &[0u8; 8]);
+        assert_eq!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            folder(&version_2).index_64
+        );
+    }
+
+    /// ADR 0086: a name of 'é😀' is 2 bytes for the BMP character and 4 for the surrogate pair, so its
+    /// `FileNameLength` is 6 and the version 3 record is 76 + 6 = 82, padded with zeros to 88.
+    #[test]
+    fn a_usn_record_name_with_non_ascii_and_non_bmp_characters_is_utf16le_and_padded() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: 'é😀'\n",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let record = &buffers[0][8..];
+        assert_eq!(record.len(), 88);
+        assert_eq!(u32::from_le_bytes(record[0..4].try_into().unwrap()), 88);
+        assert_eq!(u16::from_le_bytes(record[72..74].try_into().unwrap()), 6);
+        assert_eq!(u16::from_le_bytes(record[74..76].try_into().unwrap()), 76);
+        assert_eq!(&record[76..82], utf16le("é😀").as_slice());
+        assert_eq!(&record[82..88], &[0u8; 6]);
+    }
+
+    /// ADR 0086: a name whose UTF-16 form does not fit the 16-bit `FileNameLength` is refused when the
+    /// fixture loads. The message gives the encoded length and not the name, so a long name is not
+    /// echoed back into an error.
+    #[test]
+    fn a_usn_record_name_too_long_for_its_length_field_is_refused_without_echoing_it() {
+        let name = "Probe".repeat(8000);
+        let yaml = format!(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: '{name}'\n"
+        );
+        let error = FixtureHost::from_yaml_str(&yaml, "inline").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid fixture host inline: usn_journal record name of 80000 UTF-16 bytes is longer than 65535"
+        );
+        assert!(!error.to_string().contains("Probe"), "{error}");
+    }
+
+    /// ADR 0086: a `file:` path that no `folders:` entry describes has no identifier to give, so it is
+    /// rejected like a `parent:` that is not under `folders:`.
+    #[test]
+    fn a_record_file_that_is_not_under_folders_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+usn_journal:
+  folders:
+    'C:\Windows\Prefetch': 7
+  records:
+    - reasons: [file_create]
+      file: 'C:\Elsewhere\Helper.exe'
+",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(
+            error.to_string().contains("is not under `folders:`"),
+            "{error}"
+        );
+    }
+
+    /// ADR 0086: records of different lengths share one buffer, and the Next USN at the head of the
+    /// buffer is `first_usn` plus the sum of the record lengths. The walk below reads each record's own
+    /// length, so it also checks that the lengths the encoder wrote match the bytes it wrote.
+    #[test]
+    fn a_buffer_of_mixed_record_lengths_has_the_sum_of_its_lengths_as_next_usn() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+usn_journal:
+  trimmed: true
+  folders:
+    'C:\Tools\Helper.exe': 9
+  records:
+    - reasons: [close]
+      count: 2
+    - reasons: [file_delete]
+      name: 'Helper.exe'
+      file: 'C:\Tools\Helper.exe'
+    - major: 2
+      reasons: [rename_old_name]
+      name: 'abc'
+",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let bytes = &buffers[0];
+
+        let first_usn = 4096i64;
+        let next_usn = i64::from_le_bytes(bytes[0..8].try_into().unwrap());
+        let mut lengths = Vec::new();
+        let mut offset = 8;
+        while offset < bytes.len() {
+            let length = usize::try_from(u32::from_le_bytes(
+                bytes[offset..offset + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            lengths.push(length);
+            offset += length;
+        }
+        assert_eq!(lengths, vec![80, 80, 96, 72]);
+        assert_eq!(offset, bytes.len());
+        let total = i64::try_from(lengths.iter().sum::<usize>()).unwrap();
+        assert_eq!(next_usn, first_usn + total);
+
+        // The first two records are the default `fx` name, as before `name:` existed.
+        assert_eq!(&bytes[8 + 76..8 + 80], utf16le("fx").as_slice());
+        assert_eq!(
+            &bytes[8 + 160 + 76..8 + 160 + 96],
+            utf16le("Helper.exe").as_slice()
         );
     }
 }
