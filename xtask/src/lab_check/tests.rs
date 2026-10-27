@@ -361,14 +361,15 @@ fn game_windows_value(candidates: Vec<Value>, changes: usize) -> Value {
     })
 }
 
-/// One candidate as the scan writes it: `t1` as a plain fact, `i1` not known for `i1_reason`.
+/// One candidate as the scan writes it: `path` and `recorded_by` beside the facts `t1` (as given) and
+/// `i1` (not known for `i1_reason`), each fact a field of the candidate itself.
 fn candidate_json(name: &str, t1: &str, i1_reason: &str) -> Value {
     json!({
         "name": name,
-        "facts": {
-            "t1": {"fact": t1},
-            "i1": {"fact": "not_known", "reason": {"reason": i1_reason}},
-        },
+        "path": null,
+        "recorded_by": ["bam"],
+        "t1": {"fact": t1},
+        "i1": {"fact": "not_known", "reason": {"reason": i1_reason}},
     })
 }
 
@@ -603,7 +604,7 @@ fn a_candidate_fact_of_the_wrong_shape_is_an_error_naming_it() {
     let text = scan_with_game_windows(
         &[],
         game_windows_value(
-            vec![json!({"name": "Helper.EXE", "facts": {"t1": {"nope": "x"}}})],
+            vec![json!({"name": "Helper.EXE", "t1": {"nope": "x"}})],
             0,
         ),
     );
@@ -611,6 +612,31 @@ fn a_candidate_fact_of_the_wrong_shape_is_an_error_naming_it() {
     let message = format!("{err:#}");
     assert!(message.contains("Helper.EXE"), "{message}");
     assert!(message.contains("t1"), "{message}");
+}
+
+#[test]
+fn candidate_keys_that_are_not_facts_are_ignored() {
+    let candidate = json!({
+        "name": "Helper.EXE",
+        "path": null,
+        "near_sessions": {"near": 1, "found": 1},
+        "recorded_by": ["bam"],
+        "file": {"read": "no_path"},
+        "installed_at": null,
+        "t1": {"fact": "true"},
+    });
+    let expect = expect_windows(&[("helper.exe", &[("t1", "true")])]);
+    let scan = read_windows_scan(vec![candidate], 0);
+    let report = check(&expect, &scan, None);
+    assert_eq!(report.ok, 1, "{:?}", report.lines);
+    assert_eq!(report.failed, 0, "{:?}", report.lines);
+    assert!(
+        report
+            .lines
+            .contains(&"ok    fact       helper.exe t1".to_owned()),
+        "{:?}",
+        report.lines
+    );
 }
 
 #[test]
