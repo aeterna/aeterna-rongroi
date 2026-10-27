@@ -3,7 +3,7 @@
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.13.0] - 2026-10-27
 
 ### Added
 - The landing page's footer and the README link the AETERNA Game Discord (https://discord.gg/eZ8CNrGe2b), a plain link; questions
@@ -62,6 +62,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   network, runs one scenario from `lab/scenarios/`, scans and checks the scan, and `cargo xtask lab-check`
   compares a scan with a scenario's `expect.yaml` and prints the ledger rows. Seven scenarios are in, with
   their ledger rows.
+- Lab replay also checks the game-window view (ADR 0076, amendment of 2026-10-27): a scenario's `expect.yaml`
+  can list a candidate's facts and a clock change, a scenario can ask for a full scan on the lab machine only
+  (ADR 0052, amendment of 2026-10-27), and three scenarios under `lab/scenarios/game_windows/` show a renamed
+  program run before a session, a downloaded program with its zone, and a clock change.
 - A weekly workflow, `windows watch` (ADR 0075), scans each GitHub Windows image and compares only the shape of the
   report (build, rule states, collector field names; no values, paths or counts) with `fixtures/watch/`. It is
   never a required check.
