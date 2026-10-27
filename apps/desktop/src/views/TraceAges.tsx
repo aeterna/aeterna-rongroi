@@ -167,6 +167,9 @@ function RowLine({ row }: { row: TraceAge }) {
   const parts: string[] = [];
   if (row.oldest && row.days_before !== undefined) {
     parts.push(t("trace_ages.oldest", { at: row.oldest, days: days(t, row.days_before) }));
+  } else if (row.oldest) {
+    // Later than the scan: the time is shown, and no day count is made up for it.
+    parts.push(t("trace_ages.oldest_after_scan", { at: row.oldest }));
   } else {
     parts.push(t("trace_ages.holds_nothing"));
   }

@@ -602,7 +602,7 @@ pub enum TraceAgeState {
         /// The oldest time it still holds, as the report holds it; absent when it holds none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         oldest: Option<String>,
-        /// Whole days between the oldest time and the scan.
+        /// Whole days between the oldest time and the scan; absent when that time is after the scan.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         days_before: Option<i64>,
         /// How much it holds.
@@ -665,7 +665,7 @@ pub struct FivemSide {
     /// The UTC date `FiveM`'s log, crash and cache folders were last written.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folders_written: Option<String>,
-    /// Whole days between that write and the scan.
+    /// Whole days between that write and the scan; absent when that write is after the scan.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folders_days_before: Option<i64>,
     /// How many Enhanced server cache folders there are.
@@ -767,9 +767,13 @@ fn scan_time(report: &Report) -> Option<jiff::Timestamp> {
     report.header.generated_at.parse().ok()
 }
 
-/// Whole days from `earlier` to `later`, rounded down.
-fn days_between(later: jiff::Timestamp, earlier: jiff::Timestamp) -> i64 {
-    (later.as_second() - earlier.as_second()).div_euclid(86_400)
+/// Whole days from `earlier` to `later`, rounded down; `None` when `earlier` is after `later`. A
+/// negative count would read as a real number of days before the scan, so it is never given.
+fn days_between(later: jiff::Timestamp, earlier: jiff::Timestamp) -> Option<i64> {
+    if earlier > later {
+        return None;
+    }
+    Some((later.as_second() - earlier.as_second()).div_euclid(86_400))
 }
 
 fn utc_date(time: jiff::Timestamp) -> String {
@@ -1154,7 +1158,7 @@ fn measure(
         oldest: oldest_time.map(|(_, text)| text.to_owned()),
         days_before: oldest_time
             .zip(scan)
-            .map(|((time, _), scan)| days_between(scan, time)),
+            .and_then(|((time, _), scan)| days_between(scan, time)),
         count,
         extra: beside,
     }
@@ -1271,7 +1275,7 @@ fn fivem_side(
         FivemSide {
             editions,
             folders_written: folders.map(utc_date),
-            folders_days_before: folders.map(|time| days_between(scan, time)),
+            folders_days_before: folders.and_then(|time| days_between(scan, time)),
             server_folders,
             servers_written: servers.map(utc_date),
         },
@@ -1327,10 +1331,14 @@ fn source_line(
             count,
             ..
         }) => match oldest.parse::<jiff::Timestamp>() {
-            Ok(oldest) if oldest < t => SourceLineKind::NoEntry {
-                entries: count,
-                oldest: utc_date(oldest),
-                days_before: days_between(scan, oldest),
+            // An oldest time after the scan gives no day count, so the line could not show it.
+            Ok(oldest) if oldest < t => match days_between(scan, oldest) {
+                Some(days_before) => SourceLineKind::NoEntry {
+                    entries: count,
+                    oldest: utc_date(oldest),
+                    days_before,
+                },
+                None => SourceLineKind::CouldNotShow { entries: count },
             },
             _ => SourceLineKind::CouldNotShow { entries: count },
         },
@@ -3592,6 +3600,110 @@ mod tests {
                     },
                 },
             ]
+        );
+    }
+
+    /// Whole days back from the scan; no count at all for a time after it.
+    #[test]
+    fn days_between_gives_no_count_for_a_time_after_the_scan() {
+        let at = |text: &str| text.parse::<jiff::Timestamp>().unwrap();
+        assert_eq!(
+            days_between(at("2026-01-11T00:00:00Z"), at("2026-01-12T00:00:00Z")),
+            None
+        );
+        assert_eq!(
+            days_between(at("2026-01-11T00:00:00Z"), at("2026-01-11T00:00:00Z")),
+            Some(0)
+        );
+        assert_eq!(
+            days_between(at("2026-01-12T00:00:00Z"), at("2026-01-11T00:00:00Z")),
+            Some(1)
+        );
+    }
+
+    /// A time after the scan has no whole days before it: the row keeps the oldest time it holds and
+    /// shows no day count, where a negative one would mean nothing. The rows are the same as before.
+    #[test]
+    fn a_trace_age_after_the_scan_keeps_its_oldest_time_and_no_day_count() {
+        use serde_json::json;
+        let mut report = aged_report();
+        for observation in prefetch_group(&mut report) {
+            if observation.fields.contains_key("last_run") {
+                observation
+                    .fields
+                    .insert("last_run".to_owned(), json!("2026-01-11T06:00:00Z"));
+            }
+        }
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        let before = trace_ages(&aged_report(), Mode::SelfCheck);
+        assert_eq!(
+            state_of_row(&ages, "prefetch", None),
+            &TraceAgeState::Measured {
+                oldest: Some("2026-01-11T06:00:00Z".to_owned()),
+                days_before: None,
+                count: 2,
+                extra: BTreeMap::from([("enable_prefetcher".to_owned(), serde_json::json!(3))]),
+            }
+        );
+        assert_eq!(ages.rows.len(), before.rows.len());
+        assert_eq!(
+            for_mode(&report, Mode::SelfCheck).evidence,
+            for_mode(&aged_report(), Mode::SelfCheck).evidence
+        );
+    }
+
+    /// `FiveM`'s folders written after the scan keep their date and show no day count; the statement
+    /// still says what it can about Prefetch.
+    #[test]
+    fn fivem_folders_written_after_the_scan_have_no_day_count() {
+        use serde_json::json;
+        let mut report = aged_report();
+        let fivem = report
+            .unmatched
+            .iter_mut()
+            .find(|group| group.collector == "fivem_dir")
+            .unwrap();
+        for observation in &mut fivem.observations {
+            if observation.fields.contains_key("latest_modified_at") {
+                observation
+                    .fields
+                    .insert("latest_modified_at".to_owned(), json!("2026-01-11T06:00:00Z"));
+            }
+        }
+        let records = records(&report);
+        let [statement] = records.as_slice() else {
+            panic!("{records:?}");
+        };
+        assert_eq!(
+            statement.fivem.folders_written.as_deref(),
+            Some("2026-01-11")
+        );
+        assert_eq!(statement.fivem.folders_days_before, None);
+    }
+
+    /// A source whose oldest time is after the scan, but before `FiveM`'s last write, could not show
+    /// it: not a "no entry" line with a negative day count.
+    #[test]
+    fn a_source_whose_oldest_time_is_after_the_scan_could_not_show_it() {
+        use serde_json::json;
+        let mut report = aged_report();
+        for observation in prefetch_group(&mut report) {
+            if observation.fields.contains_key("last_run") {
+                observation
+                    .fields
+                    .insert("last_run".to_owned(), json!("2026-01-10T18:00:00Z"));
+            }
+        }
+        // FiveM's last write is after the scan too, so Prefetch's oldest is before it: the case
+        // NoEntry's own guard does not cover.
+        assert_eq!(
+            source_line(
+                &report,
+                "prefetch",
+                "2026-01-11T00:00:00Z".parse().unwrap(),
+                scan_time(&report).unwrap()
+            ),
+            SourceLineKind::CouldNotShow { entries: 2 }
         );
     }
 
