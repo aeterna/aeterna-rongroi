@@ -1791,7 +1791,13 @@ processes:
 #[test]
 fn j2_journal_from_is_the_first_record_time_when_the_journal_runs_to_two_buffers() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Tools\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
         &[
@@ -1848,7 +1854,13 @@ fn j2_a_path_at_a_drive_root_is_matched_by_the_root_folder() {
 #[test]
 fn j2_a_path_recorded_with_slashes_is_matched_like_backslashes() {
     let fixture = with_usn_journal(
-        host_yaml(SYSTEM_ENV, &["C:/Tools/helper.exe"], None, SYSTEM_PROCESS, &[]),
+        host_yaml(
+            SYSTEM_ENV,
+            &["C:/Tools/helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[],
+        ),
         &[(r"C:\Tools", 1)],
         &[],
         &[DELETE_HELPER],

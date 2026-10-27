@@ -977,7 +977,10 @@ mod tests {
 
         let mut scan = JournalScan::new(&[]);
         scan.add(&untimed);
-        assert_eq!(scan.from, None, "an untimed buffer must not set journal_from");
+        assert_eq!(
+            scan.from, None,
+            "an untimed buffer must not set journal_from"
+        );
         scan.add(&timed);
         assert_eq!(scan.from, Some(expected));
     }
