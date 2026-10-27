@@ -1,7 +1,7 @@
 # ADR 0086 — The change journal for a candidate's file
 
-- Status: proposed — the owner decides the questions in "Owner decisions" below; nothing is built. The
-  owner has already decided that 0.13.0 ships this ADR only, and the code follows after 0.13.0 ("Order of
+- Status: accepted — the owner decided the seven questions in "Owner decisions" on 2026-10-27, each as
+  recommended; nothing is built. 0.13.0 ships this ADR only, and the code follows after 0.13.0 ("Order of
   work")
 - Date: 2026-10-27
 - Related: ADR 0021 (no identifier that names one file across two reports), ADR 0044 (gaps), ADR 0047 (the
@@ -50,7 +50,7 @@ journal would reach the "before the scan" window when the scan follows the sessi
 rarely reach the "before" window. This ADR therefore designs I5 to say "not known" whenever the journal
 does not reach a window, and never "no". How often I5 can be answered on other PCs is not measured.
 
-## Decision (proposed)
+## Decision
 
 ### 1. The match runs in `recorded_files`, once, in a full scan
 
@@ -289,6 +289,9 @@ before the consent screen says so (ADR 0078 section 9).
      a clean-up made just before the scan would not, alone, name a program to the reviewer.
 7. **D7, text.** Approve section 6 at J3's G1, when the code exists to show it (**recommended**), or now as
    drafted.
+
+**Decided (2026-10-27).** The owner chose every recommended option: D1 (a), D2 (a), D3 (a), D4 (a), D5 (a),
+D6 (a) and D7 (approve section 6's text at J3's G1). Step J0 is done; J1 starts after 0.13.0.
 
 ## Alternatives weighed
 
