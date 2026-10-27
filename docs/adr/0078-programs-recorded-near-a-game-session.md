@@ -533,8 +533,10 @@ The owner decided three questions on step P7 on 2026-10-27, each as recommended.
 2. **Lab scenarios use a session whose game is still running** (ADR 0076, "Amendment (2026-10-27)"). On the
    lab machine Prefetch wrote no file for `FiveM.exe`, so a session that has ended has no start there; a
    running `FiveM.exe` gives the start, and only the window before the session can be shown. Three
-   scenarios: a renamed program run before the session and then deleted; a downloaded file with its
-   `Zone.Identifier` stream; a clock change. The fourth, a DLL appended to an image and loaded by
+   scenarios: a renamed program run before the session and deleted while it runs (it shows the program as a
+   candidate, and that I1 cannot be shown for it, item 3); a downloaded file with its `Zone.Identifier`
+   stream; a clock change, made with Windows' own setting, whose event is the trace (nothing is
+   back-dated). The fourth, a DLL appended to an image and loaded by
    `rundll32.exe`, needs Prefetch's loaded-file list for fact L1 and is not written.
 3. **A program known only from BAM or Prefetch has no path, and the drive map is its own ADR after 0.13.0.**
    Measured on the lab machine (Windows 11 build 26300): BAM names a program as

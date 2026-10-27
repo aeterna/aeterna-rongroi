@@ -204,7 +204,10 @@ not a collector; it is the one folder under `lab/scenarios/` that is not a colle
 **2. How a scenario makes a session.** `setup.ps1` copies Windows' own `ping.exe` to
 `%LOCALAPPDATA%\FiveM\FiveM.exe` and starts it so that it is still running when the scan reads, as a player's
 game is during a screenshare. It is inert: it pings this machine, which has no network. A scenario puts its
-own trace in place before that start, so the trace falls in the window before the session.
+own trace in place before that start, so the trace falls in the window before the session. A copy of a
+Windows program is not "a test program built from this repository", so this amends §2: a scenario may also
+copy one of Windows' own programs under another name, to stand for a program of that name, as long as
+what it does is inert. Probe 4 measured that the copy keeps running with the lab's loopback-only network.
 
 **3. Three new fields in `expect.yaml`**, each optional:
 
@@ -223,19 +226,25 @@ clock_changed: true        # the view's clock line lists at least one change
   view's reason word (`no_path`, `recorded_files_not_run`, …). An unknown key, value or reason is refused, as
   an unknown field is.
 - Candidate checks run on the scenario's scan only. The control scan has no running `FiveM.exe`, so it has no
-  view to compare with; a candidate the control would also hold is the machine's, and a scenario names only
-  a candidate its own `setup.ps1` made.
+  view, and §1's control check cannot guard a candidate. Instead a scenario names only a candidate its own
+  `setup.ps1` made, under a name Windows itself does not use (`helper.exe`, `tool.exe`).
+- Which values a key can take: `t2`–`t4` are `not_known:session_end_not_recorded` while the game runs, and
+  `i4` is never `false` (it is true or not known). A reason that carries more than a word, such as
+  `before_trace_age` with its source, is matched on its word only.
 
 **4. The ledger.** `rules/measured.csv` is one row per rule (ADR 0074 §1), and a view result is not a rule.
 `lab-check` prints ledger rows for `found` and `not_found` rules only. A game-window result is recorded in
 ADR 0078 "As built: P7", with the replay run and the build's bundle hash.
 
 **5. What `replay.sh` changes.** With `full: true` it runs `rongroi.exe scan --full --json` and answers the
-consent question with `yes` on standard input; without it, nothing changes. The question still runs, as it
-must for any full scan (ADR 0052); only the answer is given by the script, on a machine that belongs to no
-person.
+consent question with `yes` on standard input; without it, nothing changes. ADR 0052 section 3 says a script
+gets the standard scan, and its owner decision 2 is "no bypass for scripts". This field therefore needs the
+owner's exception for the lab machine, which belongs to no person and is thrown away after each scan (asked
+2026-10-27). Until the owner answers, no scenario sets it.
 
-**6. What these scenarios do not show.** The windows after a session and before the scan; anything that
+**6. What these scenarios do not show.** P7's baseline, the candidates of an ordinary evening, which is
+measured on a real gaming PC and recorded in ADR 0078, not replayed; the windows after a session and before
+the scan; anything that
 needs Prefetch to record the game or another program, such as fact L1 (Prefetch's loaded-file list), so the
 scenario of a DLL appended to an image and loaded by `rundll32.exe` is not written (ADR 0078, "P7
 decisions", item 2; it is not a rule, so `rules/not-replayable.csv` has no row for it); and identity facts
