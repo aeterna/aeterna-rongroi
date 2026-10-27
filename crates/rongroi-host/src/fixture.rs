@@ -1123,9 +1123,10 @@ fn group_records(
             encode_record(group.major, parent, own, written, reason, &name).map_err(|_| {
                 FixtureError::Parse {
                     path: origin.to_owned(),
+                    // The name's length is the reason; the name itself is not echoed into the message.
                     message: format!(
-                        "usn_journal record name `{}` is too long",
-                        group.name.as_deref().unwrap_or("fx")
+                        "usn_journal record name of {} UTF-16 bytes is longer than 65535",
+                        name.len()
                     ),
                 }
             })?;
@@ -3211,31 +3212,100 @@ usn_journal:
 
     /// ADR 0086: a `file:` naming a folder under `folders:` makes that folder's identifier the record's
     /// own file reference: `id_128` at 8..24 in version 3, `index_64` at 8..16 in version 2. The path is
-    /// spelled in another case to show it is matched the way `folders:` is.
+    /// spelled in another case to show it is matched the way `folders:` is. The record's `parent:` is
+    /// the folder that holds the file, so the parent field must hold that folder and not the file; a
+    /// record with no `file:` leaves the own-reference field zero.
     #[test]
     fn a_record_for_a_file_carries_its_identifier_as_its_own_reference() {
-        let yaml = |major: u16| {
+        let yaml = |major: u16, file: Option<&str>| {
+            let file_line = file.map_or(String::new(), |path| format!("      file: '{path}'\n"));
             format!(
-                "platform: windows\nusn_journal:\n  folders:\n    'C:\\Tools\\Helper.exe': 9\n  records:\n    - major: {major}\n      reasons: [file_create]\n      file: 'c:\\tools\\helper.exe'\n"
+                "platform: windows\nusn_journal:\n  folders:\n    'C:\\Tools': 3\n    'C:\\Tools\\Helper.exe': 9\n  records:\n    - major: {major}\n      parent: 'C:\\Tools'\n      reasons: [file_create]\n{file_line}"
             )
         };
-        let expected = |host: &FixtureHost| host.file_id(r"C:\Tools\Helper.exe").unwrap().unwrap();
+        let folder = |host: &FixtureHost| host.file_id(r"C:\Tools").unwrap().unwrap();
+        let helper = |host: &FixtureHost| host.file_id(r"C:\Tools\Helper.exe").unwrap().unwrap();
 
-        let version_3 = FixtureHost::from_yaml_str(&yaml(3), "inline").unwrap();
-        let identifier = expected(&version_3);
-        assert_eq!(identifier.index_64, 9);
+        // Version 3: the file's own reference at 8..24, the parent folder's at 24..40.
+        let version_3 =
+            FixtureHost::from_yaml_str(&yaml(3, Some(r"c:\tools\helper.exe")), "inline").unwrap();
+        let (own, parent) = (helper(&version_3), folder(&version_3));
+        assert_eq!(own.index_64, 9);
+        assert_eq!(parent.index_64, 3);
         let (read, buffers) = read_all(&version_3, 'C');
         assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
-        assert_eq!(&buffers[0][8 + 8..8 + 24], &identifier.id_128);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..24], &own.id_128);
+        assert_eq!(&record[24..40], &parent.id_128);
+        assert_ne!(&record[24..40], &own.id_128);
 
-        let version_2 = FixtureHost::from_yaml_str(&yaml(2), "inline").unwrap();
-        let identifier = expected(&version_2);
+        // Version 2: the file's own reference at 8..16, the parent folder's at 16..24.
+        let version_2 =
+            FixtureHost::from_yaml_str(&yaml(2, Some(r"c:\tools\helper.exe")), "inline").unwrap();
+        let (own, parent) = (helper(&version_2), folder(&version_2));
         let (read, buffers) = read_all(&version_2, 'C');
         assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(u64::from_le_bytes(record[8..16].try_into().unwrap()), own.index_64);
+        assert_eq!(u64::from_le_bytes(record[16..24].try_into().unwrap()), parent.index_64);
+        assert_ne!(u64::from_le_bytes(record[16..24].try_into().unwrap()), own.index_64);
+
+        // No `file:`: version 3 leaves 8..24 zero and version 2 leaves 8..16 zero, while the parent
+        // is still the folder.
+        let version_3 = FixtureHost::from_yaml_str(&yaml(3, None), "inline").unwrap();
+        let (read, buffers) = read_all(&version_3, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..24], &[0u8; 16]);
+        assert_eq!(&record[24..40], &folder(&version_3).id_128);
+
+        let version_2 = FixtureHost::from_yaml_str(&yaml(2, None), "inline").unwrap();
+        let (read, buffers) = read_all(&version_2, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..16], &[0u8; 8]);
         assert_eq!(
-            u64::from_le_bytes(buffers[0][8 + 8..8 + 16].try_into().unwrap()),
-            identifier.index_64
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            folder(&version_2).index_64
         );
+    }
+
+    /// ADR 0086: a name of 'é😀' is 2 bytes for the BMP character and 4 for the surrogate pair, so its
+    /// `FileNameLength` is 6 and the version 3 record is 76 + 6 = 82, padded with zeros to 88.
+    #[test]
+    fn a_usn_record_name_with_non_ascii_and_non_bmp_characters_is_utf16le_and_padded() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: 'é😀'\n",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let record = &buffers[0][8..];
+        assert_eq!(record.len(), 88);
+        assert_eq!(u32::from_le_bytes(record[0..4].try_into().unwrap()), 88);
+        assert_eq!(u16::from_le_bytes(record[72..74].try_into().unwrap()), 6);
+        assert_eq!(u16::from_le_bytes(record[74..76].try_into().unwrap()), 76);
+        assert_eq!(&record[76..82], utf16le("é😀").as_slice());
+        assert_eq!(&record[82..88], &[0u8; 6]);
+    }
+
+    /// ADR 0086: a name whose UTF-16 form does not fit the 16-bit `FileNameLength` is refused when the
+    /// fixture loads. The message gives the encoded length and not the name, so a long name is not
+    /// echoed back into an error.
+    #[test]
+    fn a_usn_record_name_too_long_for_its_length_field_is_refused_without_echoing_it() {
+        let name = "Probe".repeat(8000);
+        let yaml = format!(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: '{name}'\n"
+        );
+        let error = FixtureHost::from_yaml_str(&yaml, "inline").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid fixture host inline: usn_journal record name of 80000 UTF-16 bytes is longer than 65535"
+        );
+        assert!(!error.to_string().contains("Probe"), "{error}");
     }
 
     /// ADR 0086: a `file:` path that no `folders:` entry describes has no identifier to give, so it is
