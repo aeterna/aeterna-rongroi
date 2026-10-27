@@ -5248,8 +5248,8 @@ mod tests {
         }
     }
 
-    /// f3: a standard scan does not run `recorded_files`, so I1 and I2 are not known for that
-    /// reason; I3 and I4 wait for F2 and I5 for its own ADR, so those three are deferred.
+    /// f3: a standard scan does not run `recorded_files`, so I1, I2 and I5 are not known for that
+    /// reason; I3 and I4 wait for F2, so those two are deferred.
     #[test]
     fn f3_a_standard_scan_leaves_every_identity_fact_not_known_with_its_reason() {
         let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
@@ -5262,7 +5262,7 @@ mod tests {
         ));
         let view = game_windows(&game_report(observations), Mode::SelfCheck);
         let candidate = game_candidate(&view, "x.exe");
-        for fact in [&candidate.i1, &candidate.i2] {
+        for fact in [&candidate.i1, &candidate.i2, &candidate.i5] {
             assert_eq!(
                 *fact,
                 IdentityFact::NotKnown {
@@ -5270,7 +5270,7 @@ mod tests {
                 }
             );
         }
-        for fact in [&candidate.i3, &candidate.i4, &candidate.i5] {
+        for fact in [&candidate.i3, &candidate.i4] {
             assert_eq!(
                 *fact,
                 IdentityFact::NotKnown {
@@ -5341,7 +5341,7 @@ mod tests {
             }
         );
         assert_eq!(gone.near_sessions, NearSessions { near: 1, found: 2 });
-        for fact in [&gone.i3, &gone.i4, &gone.i5] {
+        for fact in [&gone.i3, &gone.i4] {
             assert_eq!(
                 *fact,
                 IdentityFact::NotKnown {
@@ -5349,6 +5349,12 @@ mod tests {
                 }
             );
         }
+        assert_eq!(
+            gone.i5,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::JournalNotRead,
+            }
+        );
 
         let time_only = game_candidate(&view, "time-only.exe");
         assert_eq!(
