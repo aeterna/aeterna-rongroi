@@ -512,6 +512,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   reaches you, its SHA-256 must start with the 16 characters you noted; if it does not, it is not the report
   you watched. The match shows only that the file is what was on screen, not that the screen was honest
   (ADR 0040).
+- **The record also carries three times**: when the scan **started** (`scan_started_at`), when it
+  **finished** (`scan_finished_at`) and when the file was **saved** (`saved_at`). Read them against the call
+  you were on. A scan that finished before the session you are asking about is a scan of a different moment,
+  whatever the rows say. They are what the program wrote about itself, like the **official build** line and the
+  SHA-256 above: a modified program can write any time it likes, and a clock set wrong writes the wrong time
+  into a genuine scan. Read them as a question to ask, not as an answer.
 - **The CLI** does the same with `--case-code`: standard output is the record and the SHA-256 is printed
   above it on the screen:
 
@@ -532,6 +538,10 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   0.2.0, first run the SS-mode scan from §4 without `--json`, so the player answers on screen; if they
   agree, run the command above with `--yes` added. It is a second scan, so a running-program list can
   differ slightly from the one on screen.
+- **The device list** (`devices`: every PCI and input device, model numbers and times, never names or serial
+  numbers — ADR 0069, ADR 0072) is the one part of the record that describes **the machine itself**, so it
+  is the one thing you can hold beside what the player told you they play on. It is not an identity: two
+  machines can carry the same models, and a virtual machine has a list of its own.
 - A file the player sends to staff becomes the server's responsibility, including how long it is
   kept ([PRIVACY.md](../PRIVACY.md)).
 
