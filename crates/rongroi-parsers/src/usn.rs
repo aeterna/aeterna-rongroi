@@ -10,10 +10,14 @@
 //! `USN_RECORD_V3`. Of each record this module keeps four things: its major version, the reference
 //! number of the folder it is in, when it was written and why.
 //!
-//! **The file name is never read.** The journal names every file changed on the volume while it
-//! retains, and nothing downstream needs a name (ADR 0047, "The privacy problem"). Neither is the
-//! record's own file reference number or its USN kept: both identify one file on one machine across
+//! **[`parse_buffer`] never reads a file name.** The journal names every file changed on the volume
+//! while it retains, and nothing downstream needs a name (ADR 0047, "The privacy problem"). Neither is
+//! the record's own file reference number or its USN kept: both identify one file on one machine across
 //! two reports, which is what ADR 0021 declined to emit.
+//!
+//! [`match_buffer`] is the one exception, and it amends ADR 0047 Question 3 (ADR 0086). It reads a
+//! name only to compare it with a name the caller already holds, and it returns no name, USN or file
+//! reference: a match is a target index, a change kind and a time.
 //!
 //! A version 4 record carries extents and no time or name, and is only written when range tracking is
 //! on; it is counted and skipped. A major version this module does not know stops the buffer, because
@@ -37,6 +41,14 @@ const RECORD_HEADER_LEN: usize = 8;
 const V2_FIXED_LEN: usize = 60;
 /// A version 3 record up to the end of `FileNameOffset`.
 const V3_FIXED_LEN: usize = 76;
+/// A version 2 record's `FileNameLength`, a `u16`.
+const V2_NAME_LENGTH_AT: usize = 56;
+/// A version 2 record's `FileNameOffset`, a `u16`.
+const V2_NAME_OFFSET_AT: usize = 58;
+/// A version 3 record's `FileNameLength`, a `u16`.
+const V3_NAME_LENGTH_AT: usize = 72;
+/// A version 3 record's `FileNameOffset`, a `u16`.
+const V3_NAME_OFFSET_AT: usize = 74;
 /// Records are aligned on this many bytes from the start of the buffer.
 const ALIGNMENT: usize = 8;
 
@@ -102,37 +114,157 @@ pub struct UsnBuffer {
 /// [`ParseError::Truncated`] when the buffer is shorter than the eight-byte USN every buffer begins
 /// with. Every other defect is reported in [`UsnBuffer::damage`] with the records before it kept.
 pub fn parse_buffer(bytes: &[u8]) -> Result<UsnBuffer, ParseError> {
+    let mut parsed = UsnBuffer {
+        next_usn: header_usn(bytes)?,
+        records: Vec::new(),
+        skipped_version_4: 0,
+        damage: None,
+    };
+    let damage = walk(bytes, |_, step| {
+        match step {
+            Step::Record(record) => parsed.records.push(record),
+            Step::SkippedVersion4 => parsed.skipped_version_4 += 1,
+        }
+        Ok(())
+    });
+    parsed.damage = damage;
+    Ok(parsed)
+}
+
+/// A file the caller wants changes for. Built by the caller from `FileId`s; this crate keeps no name
+/// (ADR 0086, section 2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchTarget {
+    /// The caller's own index for this target; returned with each match.
+    pub index: usize,
+    /// The folder the file is in. A version 2 record's parent is compared with this.
+    pub parent_index_64: u64,
+    /// The folder the file is in. A version 3 record's parent is compared with this.
+    pub parent_id_128: [u8; 16],
+    /// The file's own identifiers, when the file still exists. `None` when it is gone.
+    pub file: Option<(u64, [u8; 16])>,
+    /// The file's name (last path segment) as UTF-16 code units.
+    pub name: Vec<u16>,
+}
+
+/// Which change a matching record recorded (ADR 0086, section 2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ChangeKind {
+    /// `REASON_FILE_DELETE`
+    Deleted,
+    /// `REASON_RENAME_OLD_NAME`
+    RenamedFrom,
+    /// `REASON_RENAME_NEW_NAME`
+    RenamedTo,
+}
+
+/// One match: an index, a kind and a time only. Never a name, a USN or a file reference (ADR 0086,
+/// section 2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JournalMatch {
+    /// The `index` of the target that matched.
+    pub target: usize,
+    /// The change the record recorded.
+    pub kind: ChangeKind,
+    /// `TimeStamp` of the record, as `UsnRecord::written`.
+    pub written: Option<Timestamp>,
+}
+
+/// One buffer's matches (ADR 0086, section 2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UsnMatches {
+    /// As `UsnBuffer::next_usn`.
+    pub next_usn: i64,
+    /// In buffer order; within one record, in `ChangeKind` order.
+    pub matches: Vec<JournalMatch>,
+    /// As `UsnBuffer::damage`: matches before a damaged record are kept.
+    pub damage: Option<ParseError>,
+}
+
+/// Finds the records in one output buffer that delete or rename one of `targets` (ADR 0086, section 2).
+///
+/// Only a record whose `Reason` holds `REASON_FILE_DELETE`, `REASON_RENAME_OLD_NAME` or
+/// `REASON_RENAME_NEW_NAME` is compared. It matches a target when its parent is the target's parent
+/// and its name is the target's name, ignoring ASCII case only; or when the target has a file
+/// reference and the record's own file reference is that one. The walk is the one `parse_buffer`
+/// makes, with the same damage handling.
+///
+/// # Errors
+///
+/// `ParseError::Truncated` when the buffer is shorter than `HEADER_LEN`, as `parse_buffer`.
+pub fn match_buffer(bytes: &[u8], targets: &[MatchTarget]) -> Result<UsnMatches, ParseError> {
+    let next_usn = header_usn(bytes)?;
+    let mut matches = Vec::new();
+    let damage = walk(bytes, |record, step| {
+        let Step::Record(usn) = step else {
+            return Ok(());
+        };
+        let kinds = change_kinds(usn.reason);
+        if kinds.is_empty() {
+            return Ok(());
+        }
+        // A damaged name range stops the walk, but only for a record that could match.
+        let name = name_bytes(record, usn.major_version)?;
+        for target in targets {
+            let by_parent = match usn.parent {
+                ParentReference::Index64(parent) => parent == target.parent_index_64,
+                ParentReference::Id128(parent) => parent == target.parent_id_128,
+            };
+            let by_name = by_parent && same_name(name, &target.name);
+            let by_file = target
+                .file
+                .is_some_and(|file| file_matches(record, usn.major_version, file));
+            if by_name || by_file {
+                for &kind in &kinds {
+                    matches.push(JournalMatch {
+                        target: target.index,
+                        kind,
+                        written: usn.written,
+                    });
+                }
+            }
+        }
+        Ok(())
+    });
+    Ok(UsnMatches {
+        next_usn,
+        matches,
+        damage,
+    })
+}
+
+/// The USN every buffer begins with.
+fn header_usn(bytes: &[u8]) -> Result<i64, ParseError> {
     let Some(header) = bytes.first_chunk::<HEADER_LEN>() else {
         return Err(ParseError::Truncated {
             expected: HEADER_LEN,
             found: bytes.len(),
         });
     };
-    let mut parsed = UsnBuffer {
-        next_usn: i64::from_le_bytes(*header),
-        records: Vec::new(),
-        skipped_version_4: 0,
-        damage: None,
-    };
+    Ok(i64::from_le_bytes(*header))
+}
+
+/// Walks the records after the USN header in buffer order, handing each record's bytes and parsed
+/// form to `visit`. Returns the damage that stopped the walk, if any: a damaged record, or an error
+/// `visit` returns. Nothing after either is read.
+fn walk<'a>(
+    bytes: &'a [u8],
+    mut visit: impl FnMut(&'a [u8], Step) -> Result<(), ParseError>,
+) -> Option<ParseError> {
     let mut offset = HEADER_LEN;
     while let Some(rest) = bytes.get(offset..).filter(|rest| !rest.is_empty()) {
-        match record_at(rest) {
-            Ok((step, length)) => {
-                match step {
-                    Step::Record(record) => parsed.records.push(record),
-                    Step::SkippedVersion4 => parsed.skipped_version_4 += 1,
-                }
-                // `length` is at least RECORD_HEADER_LEN and at most `rest.len()`, so this always
-                // advances and never passes the end by more than the alignment.
-                offset = offset.saturating_add(length.next_multiple_of(ALIGNMENT));
-            }
-            Err(damage) => {
-                parsed.damage = Some(damage);
-                break;
-            }
+        let (step, record) = match record_at(rest) {
+            Ok(found) => found,
+            Err(damage) => return Some(damage),
+        };
+        if let Err(damage) = visit(record, step) {
+            return Some(damage);
         }
+        // `record` is at least RECORD_HEADER_LEN and at most `rest.len()`, so this always
+        // advances and never passes the end by more than the alignment.
+        offset = offset.saturating_add(record.len().next_multiple_of(ALIGNMENT));
     }
-    Ok(parsed)
+    None
 }
 
 enum Step {
@@ -140,8 +272,77 @@ enum Step {
     SkippedVersion4,
 }
 
-/// The record at the start of `rest`, and its `RecordLength`.
-fn record_at(rest: &[u8]) -> Result<(Step, usize), ParseError> {
+/// The change kinds a record's `Reason` holds, in `ChangeKind` order. Empty for a record that is not
+/// compared.
+fn change_kinds(reason: u32) -> Vec<ChangeKind> {
+    [
+        (REASON_FILE_DELETE, ChangeKind::Deleted),
+        (REASON_RENAME_OLD_NAME, ChangeKind::RenamedFrom),
+        (REASON_RENAME_NEW_NAME, ChangeKind::RenamedTo),
+    ]
+    .into_iter()
+    .filter(|(flag, _)| reason & *flag != 0)
+    .map(|(_, kind)| kind)
+    .collect()
+}
+
+/// The name's UTF-16 bytes, as `FileNameLength` and `FileNameOffset` place them in the record. A name
+/// of odd length, or one that runs past the record, is damage.
+fn name_bytes(record: &[u8], major_version: u16) -> Result<&[u8], ParseError> {
+    let (length_at, offset_at) = if major_version == 3 {
+        (V3_NAME_LENGTH_AT, V3_NAME_OFFSET_AT)
+    } else {
+        (V2_NAME_LENGTH_AT, V2_NAME_OFFSET_AT)
+    };
+    let length = usize::from(u16_at(record, length_at)?);
+    let offset = usize::from(u16_at(record, offset_at)?);
+    let damaged = |detail: &str| ParseError::Malformed {
+        field: "file_name",
+        detail: detail.to_owned(),
+    };
+    if length % 2 == 1 {
+        return Err(damaged("a file name of odd length"));
+    }
+    offset
+        .checked_add(length)
+        .and_then(|end| record.get(offset..end))
+        .ok_or_else(|| damaged("a file name outside its record"))
+}
+
+/// Whether a record's name is `target`, ignoring ASCII case only.
+fn same_name(record_name: &[u8], target: &[u16]) -> bool {
+    record_name
+        .chunks_exact(2)
+        .filter_map(|pair| pair.first_chunk::<2>())
+        .map(|unit| fold_ascii_case(u16::from_le_bytes(*unit)))
+        .eq(target.iter().map(|&unit| fold_ascii_case(unit)))
+}
+
+/// Folds `A` to `Z` to `a` to `z` in one UTF-16 unit and leaves every other unit alone. A wider fold
+/// would make names that differ only by an accent compare equal (ADR 0086, section 2).
+fn fold_ascii_case(unit: u16) -> u16 {
+    if (0x41..=0x5A).contains(&unit) {
+        unit + 0x20
+    } else {
+        unit
+    }
+}
+
+/// Whether a record's own file reference is `file`: a version 2 record's 64-bit number at offset 8,
+/// or a version 3 record's 128-bit identifier at offsets 8 to 24.
+fn file_matches(record: &[u8], major_version: u16, file: (u64, [u8; 16])) -> bool {
+    if major_version == 3 {
+        record
+            .get(8..24)
+            .and_then(|bytes| <[u8; 16]>::try_from(bytes).ok())
+            == Some(file.1)
+    } else {
+        u64_at(record, 8).ok() == Some(file.0)
+    }
+}
+
+/// The record at the start of `rest`, and its bytes. The record's length is `RecordLength`.
+fn record_at(rest: &[u8]) -> Result<(Step, &[u8]), ParseError> {
     let Some(head) = rest.first_chunk::<RECORD_HEADER_LEN>() else {
         return Err(ParseError::Truncated {
             expected: RECORD_HEADER_LEN,
@@ -174,7 +375,7 @@ fn record_at(rest: &[u8]) -> Result<(Step, usize), ParseError> {
             });
         }
     };
-    Ok((step, length))
+    Ok((step, record))
 }
 
 fn version_2(record: &[u8]) -> Result<UsnRecord, ParseError> {
@@ -214,6 +415,17 @@ fn fixed(record: &[u8], needed: usize) -> Result<(), ParseError> {
         });
     }
     Ok(())
+}
+
+fn u16_at(bytes: &[u8], at: usize) -> Result<u16, ParseError> {
+    bytes
+        .get(at..)
+        .and_then(|rest| rest.first_chunk::<2>())
+        .map(|value| u16::from_le_bytes(*value))
+        .ok_or(ParseError::Truncated {
+            expected: at + 2,
+            found: bytes.len(),
+        })
 }
 
 fn u64_at(bytes: &[u8], at: usize) -> Result<u64, ParseError> {
