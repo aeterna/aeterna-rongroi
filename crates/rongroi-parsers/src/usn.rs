@@ -523,7 +523,12 @@ mod tests {
         record[40..44].copy_from_slice(&reason.to_le_bytes());
         record[56..58].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
         record[58..60].copy_from_slice(&u16::try_from(V2_FIXED_LEN).unwrap().to_le_bytes());
-        for (slot, unit) in record[V2_FIXED_LEN..].as_chunks_mut::<2>().0.iter_mut().zip(name) {
+        for (slot, unit) in record[V2_FIXED_LEN..]
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(name)
+        {
             slot.copy_from_slice(&unit.to_le_bytes());
         }
         record
@@ -542,7 +547,12 @@ mod tests {
         record[56..60].copy_from_slice(&reason.to_le_bytes());
         record[72..74].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
         record[74..76].copy_from_slice(&u16::try_from(V3_FIXED_LEN).unwrap().to_le_bytes());
-        for (slot, unit) in record[V3_FIXED_LEN..].as_chunks_mut::<2>().0.iter_mut().zip(name) {
+        for (slot, unit) in record[V3_FIXED_LEN..]
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(name)
+        {
             slot.copy_from_slice(&unit.to_le_bytes());
         }
         record
@@ -794,7 +804,15 @@ mod tests {
 
     #[test]
     fn a_name_differing_only_in_ascii_case_matches_but_a_non_ascii_letter_does_not() {
-        let upper = buffer(1, &[v3_named([1; 16], [9; 16], &wide("A.EXE"), REASON_FILE_DELETE)]);
+        let upper = buffer(
+            1,
+            &[v3_named(
+                [1; 16],
+                [9; 16],
+                &wide("A.EXE"),
+                REASON_FILE_DELETE,
+            )],
+        );
         let matched = match_buffer(&upper, &[target(0, "a.exe")]).unwrap();
         assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
 
@@ -823,7 +841,12 @@ mod tests {
     fn a_version_3_record_matches_a_target_by_its_own_file_reference_under_another_name() {
         let bytes = buffer(
             1,
-            &[v3_named([1; 16], [0x55; 16], &wide("new.exe"), REASON_FILE_DELETE)],
+            &[v3_named(
+                [1; 16],
+                [0x55; 16],
+                &wide("new.exe"),
+                REASON_FILE_DELETE,
+            )],
         );
         let tracked = MatchTarget {
             parent_id_128: [2; 16],
@@ -842,7 +865,12 @@ mod tests {
 
         let v3_bytes = buffer(
             1,
-            &[v3_named([1; 16], [9; 16], &wide("other.exe"), REASON_FILE_DELETE)],
+            &[v3_named(
+                [1; 16],
+                [9; 16],
+                &wide("other.exe"),
+                REASON_FILE_DELETE,
+            )],
         );
         let matched = match_buffer(&v3_bytes, &[target(0, "a.exe")]).unwrap();
         assert!(matched.matches.is_empty());
@@ -856,7 +884,12 @@ mod tests {
 
         let v3_bytes = buffer(
             1,
-            &[v3_named([3; 16], [9; 16], &wide("a.exe"), REASON_FILE_DELETE)],
+            &[v3_named(
+                [3; 16],
+                [9; 16],
+                &wide("a.exe"),
+                REASON_FILE_DELETE,
+            )],
         );
         let matched = match_buffer(&v3_bytes, &[target(0, "a.exe")]).unwrap();
         assert!(matched.matches.is_empty());
@@ -874,10 +907,7 @@ mod tests {
         let matched = match_buffer(&v2_bytes, &[tracked]).unwrap();
         assert!(matched.matches.is_empty());
 
-        let v3_bytes = buffer(
-            1,
-            &[v3_named([1; 16], [0x55; 16], &wide("a.exe"), reason)],
-        );
+        let v3_bytes = buffer(1, &[v3_named([1; 16], [0x55; 16], &wide("a.exe"), reason)]);
         let tracked = MatchTarget {
             file: Some((0, [0x55; 16])),
             ..target(0, "a.exe")
@@ -898,7 +928,12 @@ mod tests {
 
         let v3_bytes = buffer(
             1,
-            &[v3_named([1; 16], [0x55; 16], &wide("a.exe"), REASON_FILE_DELETE)],
+            &[v3_named(
+                [1; 16],
+                [0x55; 16],
+                &wide("a.exe"),
+                REASON_FILE_DELETE,
+            )],
         );
         let tracked = MatchTarget {
             file: Some((0, [0x55; 16])),
@@ -923,7 +958,10 @@ mod tests {
         assert_eq!(matched.damage, None);
         assert_eq!(
             matched.matches,
-            vec![found(0, ChangeKind::Deleted), found(0, ChangeKind::RenamedTo)]
+            vec![
+                found(0, ChangeKind::Deleted),
+                found(0, ChangeKind::RenamedTo)
+            ]
         );
     }
 
@@ -940,7 +978,10 @@ mod tests {
         let matched = match_buffer(&bytes, &targets).unwrap();
         assert_eq!(
             matched.matches,
-            vec![found(3, ChangeKind::Deleted), found(1, ChangeKind::RenamedFrom)]
+            vec![
+                found(3, ChangeKind::Deleted),
+                found(1, ChangeKind::RenamedFrom)
+            ]
         );
     }
 
@@ -958,10 +999,7 @@ mod tests {
         );
         let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
         assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
-        assert!(matches!(
-            matched.damage,
-            Some(ParseError::Truncated { .. })
-        ));
+        assert!(matches!(matched.damage, Some(ParseError::Truncated { .. })));
     }
 
     #[test]
@@ -978,7 +1016,10 @@ mod tests {
         assert_eq!(matched.damage, None);
         assert_eq!(
             matched.matches,
-            vec![found(0, ChangeKind::Deleted), found(0, ChangeKind::RenamedTo)]
+            vec![
+                found(0, ChangeKind::Deleted),
+                found(0, ChangeKind::RenamedTo)
+            ]
         );
     }
 
