@@ -292,6 +292,70 @@ mod tests {
         bytes
     }
 
+    /// A name as the UTF-16 code units a record and a target both carry.
+    fn wide(name: &str) -> Vec<u16> {
+        name.encode_utf16().collect()
+    }
+
+    /// A version 2 record carrying `name`, its `RecordLength` padded to the alignment.
+    fn v2_named(parent: u64, file_ref: u64, name: &[u16], reason: u32) -> Vec<u8> {
+        let name_bytes = name.len() * 2;
+        let length = (V2_FIXED_LEN + name_bytes).next_multiple_of(ALIGNMENT);
+        let mut record = vec![0u8; length];
+        record[0..4].copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
+        record[4..6].copy_from_slice(&2u16.to_le_bytes());
+        record[8..16].copy_from_slice(&file_ref.to_le_bytes());
+        record[16..24].copy_from_slice(&parent.to_le_bytes());
+        record[32..40].copy_from_slice(&WRITTEN.to_le_bytes());
+        record[40..44].copy_from_slice(&reason.to_le_bytes());
+        record[56..58].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
+        record[58..60].copy_from_slice(&u16::try_from(V2_FIXED_LEN).unwrap().to_le_bytes());
+        for (slot, unit) in record[V2_FIXED_LEN..].chunks_exact_mut(2).zip(name) {
+            slot.copy_from_slice(&unit.to_le_bytes());
+        }
+        record
+    }
+
+    /// A version 3 record carrying `name`, its `RecordLength` padded to the alignment.
+    fn v3_named(parent: [u8; 16], file_ref: [u8; 16], name: &[u16], reason: u32) -> Vec<u8> {
+        let name_bytes = name.len() * 2;
+        let length = (V3_FIXED_LEN + name_bytes).next_multiple_of(ALIGNMENT);
+        let mut record = vec![0u8; length];
+        record[0..4].copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
+        record[4..6].copy_from_slice(&3u16.to_le_bytes());
+        record[8..24].copy_from_slice(&file_ref);
+        record[24..40].copy_from_slice(&parent);
+        record[48..56].copy_from_slice(&WRITTEN.to_le_bytes());
+        record[56..60].copy_from_slice(&reason.to_le_bytes());
+        record[72..74].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
+        record[74..76].copy_from_slice(&u16::try_from(V3_FIXED_LEN).unwrap().to_le_bytes());
+        for (slot, unit) in record[V3_FIXED_LEN..].chunks_exact_mut(2).zip(name) {
+            slot.copy_from_slice(&unit.to_le_bytes());
+        }
+        record
+    }
+
+    /// A target in the folder `v2_named(7, ..)` and `v3_named([1; 16], ..)` records are in, with no
+    /// file identifiers. Tests that need the identifiers set them with struct update syntax.
+    fn target(index: usize, name: &str) -> MatchTarget {
+        MatchTarget {
+            index,
+            parent_index_64: 7,
+            parent_id_128: [1; 16],
+            file: None,
+            name: wide(name),
+        }
+    }
+
+    /// The match a record with `kind` in a buffer written at `WRITTEN` gives for `target`.
+    fn found(target: usize, kind: ChangeKind) -> JournalMatch {
+        JournalMatch {
+            target,
+            kind,
+            written: filetime::to_timestamp(WRITTEN),
+        }
+    }
+
     #[test]
     fn version_3_records_are_read_in_order() {
         let bytes = buffer(
@@ -489,5 +553,327 @@ mod tests {
         for length in 0..bytes.len() {
             let _ = parse_buffer(&bytes[..length]);
         }
+    }
+
+    #[test]
+    fn a_version_3_record_matches_by_parent_and_name_for_each_kind() {
+        let kinds = [
+            (REASON_FILE_DELETE, ChangeKind::Deleted),
+            (REASON_RENAME_OLD_NAME, ChangeKind::RenamedFrom),
+            (REASON_RENAME_NEW_NAME, ChangeKind::RenamedTo),
+        ];
+        for (reason, kind) in kinds {
+            let bytes = buffer(1, &[v3_named([1; 16], [9; 16], &wide("a.exe"), reason)]);
+            let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+            assert_eq!(matched.next_usn, 1);
+            assert_eq!(matched.damage, None);
+            assert_eq!(matched.matches, vec![found(0, kind)]);
+        }
+    }
+
+    #[test]
+    fn a_version_2_record_matches_by_parent_index_and_name() {
+        let bytes = buffer(1, &[v2_named(7, 9, &wide("a.exe"), REASON_FILE_DELETE)]);
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+    }
+
+    #[test]
+    fn a_name_differing_only_in_ascii_case_matches_but_a_non_ascii_letter_does_not() {
+        let upper = buffer(1, &[v3_named([1; 16], [9; 16], &wide("A.EXE"), REASON_FILE_DELETE)]);
+        let matched = match_buffer(&upper, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+
+        // U+00C9 is 'É' and U+00E9 is 'é': a fold beyond ASCII would make these equal.
+        let accented = buffer(
+            1,
+            &[v2_named(7, 9, &wide("\u{00C9}.exe"), REASON_FILE_DELETE)],
+        );
+        let matched = match_buffer(&accented, &[target(0, "\u{00E9}.exe")]).unwrap();
+        assert!(matched.matches.is_empty());
+    }
+
+    #[test]
+    fn a_version_2_record_matches_a_target_by_its_own_file_reference_under_another_name() {
+        let bytes = buffer(1, &[v2_named(7, 9, &wide("new.exe"), REASON_FILE_DELETE)]);
+        let tracked = MatchTarget {
+            parent_index_64: 1,
+            file: Some((9, [0; 16])),
+            ..target(0, "old.exe")
+        };
+        let matched = match_buffer(&bytes, &[tracked]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+    }
+
+    #[test]
+    fn a_version_3_record_matches_a_target_by_its_own_file_reference_under_another_name() {
+        let bytes = buffer(
+            1,
+            &[v3_named([1; 16], [0x55; 16], &wide("new.exe"), REASON_FILE_DELETE)],
+        );
+        let tracked = MatchTarget {
+            parent_id_128: [2; 16],
+            file: Some((0, [0x55; 16])),
+            ..target(0, "old.exe")
+        };
+        let matched = match_buffer(&bytes, &[tracked]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+    }
+
+    #[test]
+    fn a_record_in_the_right_folder_under_another_name_does_not_match() {
+        let v2_bytes = buffer(1, &[v2_named(7, 9, &wide("other.exe"), REASON_FILE_DELETE)]);
+        let matched = match_buffer(&v2_bytes, &[target(0, "a.exe")]).unwrap();
+        assert!(matched.matches.is_empty());
+
+        let v3_bytes = buffer(
+            1,
+            &[v3_named([1; 16], [9; 16], &wide("other.exe"), REASON_FILE_DELETE)],
+        );
+        let matched = match_buffer(&v3_bytes, &[target(0, "a.exe")]).unwrap();
+        assert!(matched.matches.is_empty());
+    }
+
+    #[test]
+    fn a_record_with_the_right_name_in_another_folder_does_not_match() {
+        let v2_bytes = buffer(1, &[v2_named(8, 9, &wide("a.exe"), REASON_FILE_DELETE)]);
+        let matched = match_buffer(&v2_bytes, &[target(0, "a.exe")]).unwrap();
+        assert!(matched.matches.is_empty());
+
+        let v3_bytes = buffer(
+            1,
+            &[v3_named([3; 16], [9; 16], &wide("a.exe"), REASON_FILE_DELETE)],
+        );
+        let matched = match_buffer(&v3_bytes, &[target(0, "a.exe")]).unwrap();
+        assert!(matched.matches.is_empty());
+    }
+
+    #[test]
+    fn a_record_with_neither_delete_nor_rename_does_not_match_even_by_file_reference() {
+        let reason = REASON_DATA_EXTEND | REASON_CLOSE;
+
+        let v2_bytes = buffer(1, &[v2_named(7, 9, &wide("a.exe"), reason)]);
+        let tracked = MatchTarget {
+            file: Some((9, [0; 16])),
+            ..target(0, "a.exe")
+        };
+        let matched = match_buffer(&v2_bytes, &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+
+        let v3_bytes = buffer(
+            1,
+            &[v3_named([1; 16], [0x55; 16], &wide("a.exe"), reason)],
+        );
+        let tracked = MatchTarget {
+            file: Some((0, [0x55; 16])),
+            ..target(0, "a.exe")
+        };
+        let matched = match_buffer(&v3_bytes, &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+    }
+
+    #[test]
+    fn a_record_matching_a_target_by_both_rules_is_reported_once() {
+        let v2_bytes = buffer(1, &[v2_named(7, 9, &wide("a.exe"), REASON_FILE_DELETE)]);
+        let tracked = MatchTarget {
+            file: Some((9, [0; 16])),
+            ..target(0, "a.exe")
+        };
+        let matched = match_buffer(&v2_bytes, &[tracked]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+
+        let v3_bytes = buffer(
+            1,
+            &[v3_named([1; 16], [0x55; 16], &wide("a.exe"), REASON_FILE_DELETE)],
+        );
+        let tracked = MatchTarget {
+            file: Some((0, [0x55; 16])),
+            ..target(0, "a.exe")
+        };
+        let matched = match_buffer(&v3_bytes, &[tracked]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+    }
+
+    #[test]
+    fn a_delete_and_rename_new_name_record_gives_two_matches_deleted_then_renamed_to() {
+        let bytes = buffer(
+            1,
+            &[v3_named(
+                [1; 16],
+                [9; 16],
+                &wide("a.exe"),
+                REASON_FILE_DELETE | REASON_RENAME_NEW_NAME,
+            )],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(
+            matched.matches,
+            vec![found(0, ChangeKind::Deleted), found(0, ChangeKind::RenamedTo)]
+        );
+    }
+
+    #[test]
+    fn two_targets_each_matched_by_one_record_are_returned_in_buffer_order() {
+        let bytes = buffer(
+            1,
+            &[
+                v2_named(7, 9, &wide("a.exe"), REASON_FILE_DELETE),
+                v2_named(7, 10, &wide("b.exe"), REASON_RENAME_OLD_NAME),
+            ],
+        );
+        let targets = [target(1, "b.exe"), target(3, "a.exe")];
+        let matched = match_buffer(&bytes, &targets).unwrap();
+        assert_eq!(
+            matched.matches,
+            vec![found(3, ChangeKind::Deleted), found(1, ChangeKind::RenamedFrom)]
+        );
+    }
+
+    #[test]
+    fn a_damaged_record_keeps_the_matches_before_it() {
+        let mut long = v2_named(7, 10, &wide("a.exe"), REASON_FILE_DELETE);
+        long[0..4].copy_from_slice(&4000u32.to_le_bytes());
+        let bytes = buffer(
+            1,
+            &[
+                v2_named(7, 9, &wide("a.exe"), REASON_FILE_DELETE),
+                long,
+                v2_named(7, 11, &wide("a.exe"), REASON_FILE_DELETE),
+            ],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+        assert!(matches!(
+            matched.damage,
+            Some(ParseError::Truncated { .. })
+        ));
+    }
+
+    #[test]
+    fn a_version_4_record_between_matches_is_skipped() {
+        let bytes = buffer(
+            1,
+            &[
+                v2_named(7, 9, &wide("a.exe"), REASON_FILE_DELETE),
+                v4(),
+                v3_named([1; 16], [9; 16], &wide("a.exe"), REASON_RENAME_NEW_NAME),
+            ],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(
+            matched.matches,
+            vec![found(0, ChangeKind::Deleted), found(0, ChangeKind::RenamedTo)]
+        );
+    }
+
+    #[test]
+    fn an_unknown_major_version_stops_the_match_walk() {
+        let mut unknown = v3_named([1; 16], [9; 16], &wide("a.exe"), REASON_FILE_DELETE);
+        unknown[4..6].copy_from_slice(&5u16.to_le_bytes());
+        let bytes = buffer(
+            1,
+            &[
+                v2_named(7, 9, &wide("a.exe"), REASON_FILE_DELETE),
+                unknown,
+                v2_named(7, 11, &wide("a.exe"), REASON_FILE_DELETE),
+            ],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+        assert!(matches!(
+            matched.damage,
+            Some(ParseError::Malformed {
+                field: "major_version",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn a_buffer_shorter_than_the_usn_header_is_truncated() {
+        assert_eq!(
+            match_buffer(&[0; 7], &[target(0, "a.exe")]),
+            Err(ParseError::Truncated {
+                expected: 8,
+                found: 7
+            })
+        );
+    }
+
+    /// The matches are the only output that leaves the parser, so no name may appear in their debug
+    /// form: twenty records with names, and only the target's one matches.
+    #[test]
+    fn the_matches_show_no_file_name_even_in_debug_form() {
+        let mut records = Vec::new();
+        for index in 0..20u8 {
+            let name = wide(&format!("secret-name-{index:02}.exe"));
+            records.push(v3_named([1; 16], [index; 16], &name, REASON_FILE_DELETE));
+        }
+        let bytes = buffer(1, &records);
+        let matched = match_buffer(&bytes, &[target(0, "secret-name-07.exe")]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+        let shown = format!("{matched:?}");
+        assert!(!shown.contains("secret"), "{shown}");
+        assert!(!shown.contains("exe"), "{shown}");
+    }
+
+    #[test]
+    fn a_name_range_outside_the_record_is_damage_on_a_delete_record() {
+        let mut bad = v3_named([1; 16], [9; 16], &wide("a.exe"), REASON_FILE_DELETE);
+        bad[74..76].copy_from_slice(&0xFFF0u16.to_le_bytes());
+        let matched = match_buffer(&buffer(1, &[bad]), &[target(0, "a.exe")]).unwrap();
+        assert!(matched.matches.is_empty());
+        assert!(matches!(
+            matched.damage,
+            Some(ParseError::Malformed {
+                field: "file_name",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn the_same_bad_name_range_on_a_data_extend_record_is_not_damage() {
+        let mut bad = v3_named([1; 16], [9; 16], &wide("a.exe"), REASON_DATA_EXTEND);
+        bad[74..76].copy_from_slice(&0xFFF0u16.to_le_bytes());
+        let matched = match_buffer(&buffer(1, &[bad]), &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert!(matched.matches.is_empty());
+    }
+
+    #[test]
+    fn parse_buffer_output_is_unchanged_for_buffers_with_names() {
+        let bytes = buffer(
+            9000,
+            &[
+                v3_named([1; 16], [9; 16], &wide("a.exe"), REASON_FILE_DELETE),
+                v2_named(7, 10, &wide("b.exe"), REASON_CLOSE),
+            ],
+        );
+        assert_eq!(
+            parse_buffer(&bytes).unwrap(),
+            UsnBuffer {
+                next_usn: 9000,
+                records: vec![
+                    UsnRecord {
+                        major_version: 3,
+                        parent: ParentReference::Id128([1; 16]),
+                        written: filetime::to_timestamp(WRITTEN),
+                        reason: REASON_FILE_DELETE,
+                    },
+                    UsnRecord {
+                        major_version: 2,
+                        parent: ParentReference::Index64(7),
+                        written: filetime::to_timestamp(WRITTEN),
+                        reason: REASON_CLOSE,
+                    },
+                ],
+                skipped_version_4: 0,
+                damage: None,
+            }
+        );
     }
 }
