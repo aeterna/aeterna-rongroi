@@ -5758,6 +5758,10 @@ mod tests {
             trailing_data: None,
             embedded_pe: None,
             zone_id: None,
+            journal_deleted: None,
+            journal_renamed_from: None,
+            journal_renamed_to: None,
+            journal_more: None,
         }
     }
 
@@ -5816,6 +5820,10 @@ mod tests {
                 trailing_data: Some(false),
                 embedded_pe: Some(false),
                 zone_id: Some(3),
+                journal_deleted: None,
+                journal_renamed_from: None,
+                journal_renamed_to: None,
+                journal_more: None,
             })
         );
     }
