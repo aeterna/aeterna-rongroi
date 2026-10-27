@@ -85,8 +85,8 @@ const REASONS: [UnmeasuredReason; 8] = [
 /// is on every path that read gives it for. All four time fields are kept off the timeline, as
 /// `run_times` is: the three lists hold up to eight times each, and `journal_from` repeats the oldest
 /// record time `usn` already puts on the timeline, so a journal gap on any of them would leave
-/// `recorded_files` in the timeline's unmeasured sources on every scan without a journal (ADR 0086
-/// section 6). `journal_more` says that one of the lists was cut.
+/// `recorded_files` in the timeline's unmeasured sources on every scan without a journal (ADR 0086,
+/// As built: J2). `journal_more` says that one of the lists was cut.
 const FIELDS: [Field; 25] = [
     Field::boolean("by_bam"),
     Field::boolean("by_pca"),
@@ -358,9 +358,13 @@ impl Collector for RecordedFiles {
     }
 }
 
+/// The gaps a source that could not be read gives: every field but the journal's. A source gap is about
+/// which paths were recorded, not about the journal, so the journal fields get a gap only from the
+/// journal itself (ADR 0086 section 3).
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
+        .filter(|field| !JOURNAL_FIELDS.contains(&field.name))
         .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
@@ -705,6 +709,10 @@ fn reach_of(
     volume: char,
     root_serial: u64,
 ) -> (Reach, Option<MatchTarget>) {
+    // Windows reads `/` as `\`, and the journal's folders are named with `\`, so the path is looked up
+    // in that spelling: `C:/Tools/x.exe` is the file in `C:\Tools`.
+    let spelled = path.replace('/', r"\");
+    let path = spelled.as_str();
     if drive_of(path) != Some(volume) {
         return (Reach::OtherVolume, None);
     }
@@ -761,10 +769,8 @@ struct JournalScan<'a> {
     targets: &'a [MatchTarget],
     /// The matches of each target, by the target's index, in buffer order.
     hits: BTreeMap<usize, Vec<JournalMatch>>,
-    /// The oldest record time of the first buffer, when that buffer has a timed record.
+    /// The oldest record time of the first buffer that has a timed record, when one has.
     from: Option<Timestamp>,
-    /// Whether a buffer has been handed over, so that `from` comes from the first one only.
-    seen_first: bool,
     /// Whether a buffer was damaged or could not be read at all.
     damaged: bool,
 }
@@ -775,7 +781,6 @@ impl<'a> JournalScan<'a> {
             targets,
             hits: BTreeMap::new(),
             from: None,
-            seen_first: false,
             damaged: false,
         }
     }
@@ -783,10 +788,10 @@ impl<'a> JournalScan<'a> {
     /// Takes one buffer. Its matches are kept even when it is damaged, as the records before the damage
     /// are (ADR 0086 section 3).
     fn add(&mut self, bytes: &[u8]) {
-        if !self.seen_first {
-            self.seen_first = true;
-            // A real journal is written in time order, so the first buffer's oldest record is the
-            // oldest of the read (ADR 0086 section 3).
+        // A real journal is written in time order, so the oldest record of the first buffer that has a
+        // timed one is the oldest of the read. Until a buffer gives a time, `from` is still unset and
+        // the next buffer is looked at (ADR 0086 section 3).
+        if self.from.is_none() {
             self.from = parse_buffer(bytes).ok().and_then(|buffer| {
                 buffer
                     .records
@@ -806,11 +811,12 @@ impl<'a> JournalScan<'a> {
     }
 }
 
-/// Why the journal's matches are not whole, when they are not. Damage outranks how the read ended, as
-/// it does in `usn`: the records after the damage were never compared (ADR 0086 section 4).
+/// Why the journal's matches are not whole, when they are not. A damaged record is `partial`, as a
+/// changed journal is: the records before the damage were compared and the ones after were not. Damage
+/// outranks how the read ended, as it does in `usn` (ADR 0086 sections 3 and 4).
 fn journal_gap(damaged: bool, end: UsnReadEnd) -> Option<UnmeasuredReason> {
     if damaged {
-        return Some(UnmeasuredReason::ReadFailed);
+        return Some(UnmeasuredReason::Partial);
     }
     match end {
         UsnReadEnd::Complete => None,
@@ -820,9 +826,9 @@ fn journal_gap(damaged: bool, end: UsnReadEnd) -> Option<UnmeasuredReason> {
 }
 
 /// The journal fields of one path. `journal_match` is on every path the journal was read for, and
-/// `journal_from` whenever the first buffer had a timed record. The three lists and `journal_more` are
-/// only for a matched path whose read was whole, so a list is never read from a changing or cut journal
-/// (ADR 0086 section 3).
+/// `journal_from` whenever some buffer of the read had a timed record. The three lists and
+/// `journal_more` are only for a matched path whose read was whole, so a list is never read from a
+/// changing or cut journal (ADR 0086 section 3).
 fn journal_fields(
     reach: Reach,
     matches: &[JournalMatch],
@@ -870,11 +876,12 @@ fn newest_times(matches: &[JournalMatch], kind: ChangeKind) -> (Vec<String>, boo
     (times.iter().map(ToString::to_string).collect(), cut)
 }
 
-/// Gaps the journal fields with `reason`, except the ones an earlier gap already names: a source's gap
-/// was given first, and a field keeps the first reason it was given (ADR 0086 section 4).
+/// Gaps the six journal fields with the journal's own `reason`. `gaps` never holds a journal field
+/// from a source (see [`gaps`]), so this is the only reason those fields can carry (ADR 0086
+/// section 4).
 fn gap_journal_fields(gaps: &mut BTreeMap<String, UnmeasuredReason>, reason: UnmeasuredReason) {
     for field in JOURNAL_FIELDS {
-        gaps.entry(field.to_owned()).or_insert(reason);
+        gaps.insert(field.to_owned(), reason);
     }
 }
 
@@ -912,4 +919,23 @@ fn is_under_root(path: &str, root: &str) -> bool {
     path.len() > root.len()
         && path.starts_with(&root)
         && matches!(path.as_bytes()[root.len()], b'\\' | b'/')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A buffer too short to hold the USN every buffer begins with is damage that `match_buffer` cannot
+    /// read past, and it makes the journal partial, not a failed read (ADR 0086 section 3). The fixture
+    /// always encodes well-formed buffers, so the damage is given to the scan directly.
+    #[test]
+    fn j2_a_buffer_too_short_for_its_header_is_partial() {
+        let mut scan = JournalScan::new(&[]);
+        scan.add(&[0_u8; 4]);
+        assert!(scan.damaged);
+        assert_eq!(
+            journal_gap(scan.damaged, UsnReadEnd::Complete),
+            Some(UnmeasuredReason::Partial)
+        );
+    }
 }

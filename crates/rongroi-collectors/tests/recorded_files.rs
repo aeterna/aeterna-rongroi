@@ -672,11 +672,19 @@ processes:
         )),
         "a rejected line's text must never become a path: {observations:?}"
     );
+    // This fixture has no change journal, so the six journal fields carry the journal's own gap, which
+    // is not PCA's partial reason (ADR 0086 section 4). The PCA gap is on the other fields.
+    let source_gaps = non_journal_gaps(gaps);
     assert!(
-        gaps.values()
-            .all(|reason| *reason == UnmeasuredReason::Partial)
+        source_gaps
+            .iter()
+            .all(|(_, reason)| **reason == UnmeasuredReason::Partial),
+        "{gaps:?}"
     );
-    assert!(!gaps.is_empty(), "a partly read PCA file is a gap");
+    assert!(
+        !source_gaps.is_empty(),
+        "a partly read PCA file is a gap: {gaps:?}"
+    );
 }
 
 /// (k10) `not_on_this_os` is PCA's answer for a Windows that never kept these files, not a reason
@@ -1685,5 +1693,206 @@ fn j2_journal_from_is_declared_off_the_timeline() {
     assert!(
         !field.on_timeline,
         "journal_from must not put the oldest record time on the timeline a second time"
+    );
+}
+
+/// (j2-17) A PCA source that cannot be read gaps the fields PCA feeds and none of the journal's: the
+/// journal is complete here, so its six fields carry no gap, and their lists are emitted (ADR 0086
+/// section 4, and "These gaps cover the journal fields only" in section 3).
+#[test]
+fn j2_a_pca_source_gap_leaves_the_journal_fields_ungapped() {
+    let fixture = helper_deletion_host(
+        "elevated: true\naccess_denied:\n  - 'C:\\Windows\\appcompat\\pca\\PcaAppLaunchDic.txt'\n",
+        "",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    for field in JOURNAL_FIELDS {
+        assert!(
+            !gaps.contains_key(field),
+            "{field} must not be gapped by PCA: {gaps:?}"
+        );
+    }
+    let source_gaps = non_journal_gaps(gaps);
+    assert!(
+        !source_gaps.is_empty(),
+        "PCA's gap must reach the fields it feeds: {gaps:?}"
+    );
+    assert!(
+        source_gaps
+            .iter()
+            .all(|(_, reason)| **reason == UnmeasuredReason::AccessDenied),
+        "PCA's fields carry PCA's reason: {gaps:?}"
+    );
+    assert_matched(
+        observation_named(observations, "helper.exe"),
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T09:30:00Z",
+    );
+}
+
+/// (j2-18) A PCA source whose read fails, with a journal that is refused on a host that is not
+/// elevated: the six journal fields carry `not_admin`, the journal's own reason, and the other fields
+/// carry PCA's `read_failed`. PCA's file has no bytes recorded, so its read fails as `read_failed`; a
+/// refused PCA read on this host would say `not_admin` as well, and could not show the two were kept
+/// apart (ADR 0086 section 4).
+#[test]
+fn j2_a_pca_source_gap_does_not_give_the_journal_fields_its_reason() {
+    let yaml = format!(
+        r#"platform: windows
+os_build: "26100"
+elevated: false
+{SYSTEM_ENV}registry:
+  '{BAM_KEY}':
+    Version: 1
+    SequenceNumber: 1
+    'C:\Tools\helper.exe':
+      content: '012345678901234567890123'
+filesystem:
+  '{PCA_DIR}':
+    - name: PcaAppLaunchDic.txt
+  'C:\Tools':
+    - name: helper.exe
+      content: 'fixture bytes'
+processes:
+{SYSTEM_PROCESS}"#
+    );
+    let fixture = with_usn_journal(
+        yaml,
+        &[(r"C:\Tools", 1)],
+        &[],
+        &[DELETE_HELPER],
+        "  state: access_denied\n",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert_journal_gapped(gaps, UnmeasuredReason::NotAdmin);
+    let source_gaps = non_journal_gaps(gaps);
+    assert!(
+        !source_gaps.is_empty()
+            && source_gaps
+                .iter()
+                .all(|(_, reason)| **reason == UnmeasuredReason::ReadFailed),
+        "PCA's fields carry PCA's reason: {gaps:?}"
+    );
+    assert_no_journal_field(observations);
+    observation_named(observations, "helper.exe");
+}
+
+/// (j2-19) A journal that runs to a second buffer, 501 records, still gives `journal_from` the time of
+/// its first record: the first buffer's oldest record is that time, and the second buffer does not
+/// change it (ADR 0086 section 3).
+#[test]
+fn j2_journal_from_is_the_first_record_time_when_the_journal_runs_to_two_buffers() {
+    let fixture = with_usn_journal(
+        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        &[(r"C:\Tools", 1)],
+        &[],
+        &[
+            r"{ reasons: [close], count: 501, first: '2026-09-13T08:00:00Z', last: '2026-09-13T10:00:00Z' }",
+            DELETE_HELPER,
+        ],
+        "",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_matched(
+        observation_named(observations, "helper.exe"),
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T08:00:00Z",
+    );
+}
+
+/// (j2-20) When the first buffer holds no timed record, `journal_from` is the oldest time of the first
+/// buffer that has one, not nothing (ADR 0086 section 3). The first 500 records carry a time the
+/// parser cannot give, so the first buffer is untimed and the deletion in the second buffer sets it.
+#[test]
+fn j2_journal_from_is_taken_from_the_first_buffer_with_a_timed_record() {
+    let fixture = with_usn_journal(
+        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        &[(r"C:\Tools", 1)],
+        &[],
+        &[
+            r"{ reasons: [close], count: 500, first: '9999-12-31T23:59:59Z' }",
+            DELETE_HELPER,
+        ],
+        "",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_matched(
+        observation_named(observations, "helper.exe"),
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T09:30:00Z",
+    );
+}
+
+/// (j2-21) A path at a drive root, `C:\root.exe`, is matched by the root folder. The root is answered
+/// with NTFS's root directory record, number 5, so the `folders:` entry for `C:\` carries 5 too; the
+/// deletion's parent is that entry (ADR 0086 section 2).
+#[test]
+fn j2_a_path_at_a_drive_root_is_matched_by_the_root_folder() {
+    let fixture = with_usn_journal(
+        host_yaml(SYSTEM_ENV, &[r"C:\root.exe"], None, SYSTEM_PROCESS, &[]),
+        &[(r"C:\", 5)],
+        &[],
+        &[
+            r"{ parent: 'C:\', reasons: [file_delete, close], name: root.exe, first: '2026-09-13T09:30:00Z' }",
+        ],
+        "",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_matched(
+        observation_named(observations, "root.exe"),
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T09:30:00Z",
+    );
+}
+
+/// (j2-22) A path recorded with `/` separators is matched like the `\` form: its folder is the one the
+/// journal names with `\`, so `C:/Tools/helper.exe` is `C:\Tools\helper.exe` to the journal (ADR 0086
+/// section 2).
+#[test]
+fn j2_a_path_recorded_with_slashes_is_matched_like_backslashes() {
+    let fixture = with_usn_journal(
+        host_yaml(SYSTEM_ENV, &["C:/Tools/helper.exe"], None, SYSTEM_PROCESS, &[]),
+        &[(r"C:\Tools", 1)],
+        &[],
+        &[DELETE_HELPER],
+        "",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_matched(
+        observation_named(observations, "helper.exe"),
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T09:30:00Z",
     );
 }
