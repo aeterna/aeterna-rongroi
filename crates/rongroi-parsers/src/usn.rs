@@ -185,8 +185,9 @@ pub struct UsnMatches {
 ///
 /// Only a record whose `Reason` holds `REASON_FILE_DELETE`, `REASON_RENAME_OLD_NAME` or
 /// `REASON_RENAME_NEW_NAME` is compared. It matches a target when its parent is the target's parent
-/// and its name is the target's name, ignoring ASCII case only; or when the target has a file
-/// reference and the record's own file reference is that one. The walk is the one `parse_buffer`
+/// and its name is the target's name, ignoring ASCII case only, and both names are non-empty; or
+/// when the target has a file reference and the record's own file reference is that one. An
+/// all-zero reference is no reference for the record's version. The walk is the one `parse_buffer`
 /// makes, with the same damage handling.
 ///
 /// # Errors
@@ -210,7 +211,12 @@ pub fn match_buffer(bytes: &[u8], targets: &[MatchTarget]) -> Result<UsnMatches,
                 ParentReference::Index64(parent) => parent == target.parent_index_64,
                 ParentReference::Id128(parent) => parent == target.parent_id_128,
             };
-            let by_name = by_parent && same_name(name, &target.name);
+            // An empty name is no name: two empty names would match every unnamed record in a
+            // folder.
+            let by_name = by_parent
+                && !name.is_empty()
+                && !target.name.is_empty()
+                && same_name(name, &target.name);
             let by_file = target
                 .file
                 .is_some_and(|file| file_matches(record, usn.major_version, file));
@@ -287,12 +293,13 @@ fn change_kinds(reason: u32) -> Vec<ChangeKind> {
 }
 
 /// The name's UTF-16 bytes, as `FileNameLength` and `FileNameOffset` place them in the record. A name
-/// of odd length, or one that runs past the record, is damage.
+/// of odd length, one that starts inside the fixed header, or one that runs past the record, is
+/// damage. The header check keeps header bytes from ever being compared as a name.
 fn name_bytes(record: &[u8], major_version: u16) -> Result<&[u8], ParseError> {
-    let (length_at, offset_at) = if major_version == 3 {
-        (V3_NAME_LENGTH_AT, V3_NAME_OFFSET_AT)
+    let (length_at, offset_at, fixed_len) = if major_version == 3 {
+        (V3_NAME_LENGTH_AT, V3_NAME_OFFSET_AT, V3_FIXED_LEN)
     } else {
-        (V2_NAME_LENGTH_AT, V2_NAME_OFFSET_AT)
+        (V2_NAME_LENGTH_AT, V2_NAME_OFFSET_AT, V2_FIXED_LEN)
     };
     let length = usize::from(u16_at(record, length_at)?);
     let offset = usize::from(u16_at(record, offset_at)?);
@@ -302,6 +309,9 @@ fn name_bytes(record: &[u8], major_version: u16) -> Result<&[u8], ParseError> {
     };
     if length % 2 == 1 {
         return Err(damaged("a file name of odd length"));
+    }
+    if offset < fixed_len {
+        return Err(damaged("a file name inside the record header"));
     }
     offset
         .checked_add(length)
@@ -330,15 +340,18 @@ fn fold_ascii_case(unit: u16) -> u16 {
 }
 
 /// Whether a record's own file reference is `file`: a version 2 record's 64-bit number at offset 8,
-/// or a version 3 record's 128-bit identifier at offsets 8 to 24.
+/// or a version 3 record's 128-bit identifier at offsets 8 to 24. Only the part for the record's
+/// version is compared. An all-zero part is no reference, or every unset target would match every
+/// zeroed record.
 fn file_matches(record: &[u8], major_version: u16, file: (u64, [u8; 16])) -> bool {
     if major_version == 3 {
-        record
-            .get(8..24)
-            .and_then(|bytes| <[u8; 16]>::try_from(bytes).ok())
-            == Some(file.1)
+        file.1 != [0; 16]
+            && record
+                .get(8..24)
+                .and_then(|bytes| <[u8; 16]>::try_from(bytes).ok())
+                == Some(file.1)
     } else {
-        u64_at(record, 8).ok() == Some(file.0)
+        file.0 != 0 && u64_at(record, 8).ok() == Some(file.0)
     }
 }
 
@@ -512,18 +525,33 @@ mod tests {
 
     /// A version 2 record carrying `name`, its `RecordLength` padded to the alignment.
     fn v2_named(parent: u64, file_ref: u64, name: &[u16], reason: u32) -> Vec<u8> {
+        v2_at(parent, file_ref, WRITTEN, reason, name, 0)
+    }
+
+    /// A version 2 record written at `written`, whose name sits `padding` zero bytes past the fixed
+    /// fields: `FileNameOffset` is `V2_FIXED_LEN + padding`. `RecordLength` is padded to the
+    /// alignment.
+    fn v2_at(
+        parent: u64,
+        file_ref: u64,
+        written: u64,
+        reason: u32,
+        name: &[u16],
+        padding: usize,
+    ) -> Vec<u8> {
+        let name_at = V2_FIXED_LEN + padding;
         let name_bytes = name.len() * 2;
-        let length = (V2_FIXED_LEN + name_bytes).next_multiple_of(ALIGNMENT);
+        let length = (name_at + name_bytes).next_multiple_of(ALIGNMENT);
         let mut record = vec![0u8; length];
         record[0..4].copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
         record[4..6].copy_from_slice(&2u16.to_le_bytes());
         record[8..16].copy_from_slice(&file_ref.to_le_bytes());
         record[16..24].copy_from_slice(&parent.to_le_bytes());
-        record[32..40].copy_from_slice(&WRITTEN.to_le_bytes());
+        record[32..40].copy_from_slice(&written.to_le_bytes());
         record[40..44].copy_from_slice(&reason.to_le_bytes());
         record[56..58].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
-        record[58..60].copy_from_slice(&u16::try_from(V2_FIXED_LEN).unwrap().to_le_bytes());
-        for (slot, unit) in record[V2_FIXED_LEN..]
+        record[58..60].copy_from_slice(&u16::try_from(name_at).unwrap().to_le_bytes());
+        for (slot, unit) in record[name_at..]
             .as_chunks_mut::<2>()
             .0
             .iter_mut()
@@ -536,18 +564,33 @@ mod tests {
 
     /// A version 3 record carrying `name`, its `RecordLength` padded to the alignment.
     fn v3_named(parent: [u8; 16], file_ref: [u8; 16], name: &[u16], reason: u32) -> Vec<u8> {
+        v3_at(parent, file_ref, WRITTEN, reason, name, 0)
+    }
+
+    /// A version 3 record written at `written`, whose name sits `padding` zero bytes past the fixed
+    /// fields: `FileNameOffset` is `V3_FIXED_LEN + padding`. `RecordLength` is padded to the
+    /// alignment.
+    fn v3_at(
+        parent: [u8; 16],
+        file_ref: [u8; 16],
+        written: u64,
+        reason: u32,
+        name: &[u16],
+        padding: usize,
+    ) -> Vec<u8> {
+        let name_at = V3_FIXED_LEN + padding;
         let name_bytes = name.len() * 2;
-        let length = (V3_FIXED_LEN + name_bytes).next_multiple_of(ALIGNMENT);
+        let length = (name_at + name_bytes).next_multiple_of(ALIGNMENT);
         let mut record = vec![0u8; length];
         record[0..4].copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
         record[4..6].copy_from_slice(&3u16.to_le_bytes());
         record[8..24].copy_from_slice(&file_ref);
         record[24..40].copy_from_slice(&parent);
-        record[48..56].copy_from_slice(&WRITTEN.to_le_bytes());
+        record[48..56].copy_from_slice(&written.to_le_bytes());
         record[56..60].copy_from_slice(&reason.to_le_bytes());
         record[72..74].copy_from_slice(&u16::try_from(name_bytes).unwrap().to_le_bytes());
-        record[74..76].copy_from_slice(&u16::try_from(V3_FIXED_LEN).unwrap().to_le_bytes());
-        for (slot, unit) in record[V3_FIXED_LEN..]
+        record[74..76].copy_from_slice(&u16::try_from(name_at).unwrap().to_le_bytes());
+        for (slot, unit) in record[name_at..]
             .as_chunks_mut::<2>()
             .0
             .iter_mut()
@@ -572,10 +615,15 @@ mod tests {
 
     /// The match a record with `kind` in a buffer written at `WRITTEN` gives for `target`.
     fn found(target: usize, kind: ChangeKind) -> JournalMatch {
+        found_at(target, kind, WRITTEN)
+    }
+
+    /// The match a record with `kind` written at `written` gives for `target`.
+    fn found_at(target: usize, kind: ChangeKind, written: u64) -> JournalMatch {
         JournalMatch {
             target,
             kind,
-            written: filetime::to_timestamp(WRITTEN),
+            written: filetime::to_timestamp(written),
         }
     }
 
@@ -769,12 +817,15 @@ mod tests {
             &[
                 v3([1; 16], WRITTEN, REASON_CLOSE),
                 v2(7, WRITTEN, REASON_CLOSE),
+                v2_named(7, 9, &wide("ab"), REASON_FILE_DELETE),
                 v4(),
             ],
         );
         bytes.extend((0..=255u8).cycle().take(300));
+        let wanted = target(0, "ab");
         for length in 0..bytes.len() {
             let _ = parse_buffer(&bytes[..length]);
+            let _ = match_buffer(&bytes[..length], std::slice::from_ref(&wanted));
         }
     }
 
@@ -1041,6 +1092,250 @@ mod tests {
             matched.damage,
             Some(ParseError::Malformed {
                 field: "major_version",
+                ..
+            })
+        ));
+    }
+
+    /// A name after eight bytes of padding past the fixed fields is still read: the offset is what
+    /// places it, not the fixed length alone.
+    #[test]
+    fn a_name_after_padding_past_the_fixed_fields_still_matches() {
+        let v2_bytes = buffer(
+            1,
+            &[v2_at(7, 9, WRITTEN, REASON_FILE_DELETE, &wide("a.exe"), 8)],
+        );
+        let matched = match_buffer(&v2_bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+
+        let v3_bytes = buffer(
+            1,
+            &[v3_at(
+                [1; 16],
+                [9; 16],
+                WRITTEN,
+                REASON_FILE_DELETE,
+                &wide("a.exe"),
+                8,
+            )],
+        );
+        let matched = match_buffer(&v3_bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+    }
+
+    /// The units at bytes 24..40 spell the target's name, and the record's own offset points there
+    /// with a length of 16. Those bytes are inside the header, so this is damage and no match.
+    #[test]
+    fn a_name_offset_inside_the_record_header_is_damage_even_when_it_spells_the_name() {
+        let name = wide("abcdefgh");
+        let units: Vec<u8> = name.iter().flat_map(|unit| unit.to_le_bytes()).collect();
+
+        let mut v2_bad = v2_named(7, 9, &name, REASON_FILE_DELETE);
+        v2_bad[24..40].copy_from_slice(&units);
+        v2_bad[56..58].copy_from_slice(&16u16.to_le_bytes());
+        v2_bad[58..60].copy_from_slice(&24u16.to_le_bytes());
+        let matched = match_buffer(&buffer(1, &[v2_bad]), &[target(0, "abcdefgh")]).unwrap();
+        assert!(matched.matches.is_empty());
+        assert!(matches!(
+            matched.damage,
+            Some(ParseError::Malformed {
+                field: "file_name",
+                ..
+            })
+        ));
+
+        // The record's parent is the same sixteen bytes, so the parent is not what stops the match.
+        let parent: [u8; 16] = units.as_slice().try_into().unwrap();
+        let mut v3_bad = v3_named(parent, [9; 16], &name, REASON_FILE_DELETE);
+        v3_bad[24..40].copy_from_slice(&units);
+        v3_bad[72..74].copy_from_slice(&16u16.to_le_bytes());
+        v3_bad[74..76].copy_from_slice(&24u16.to_le_bytes());
+        let tracked = MatchTarget {
+            parent_id_128: parent,
+            ..target(0, "abcdefgh")
+        };
+        let matched = match_buffer(&buffer(1, &[v3_bad]), &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+        assert!(matches!(
+            matched.damage,
+            Some(ParseError::Malformed {
+                field: "file_name",
+                ..
+            })
+        ));
+    }
+
+    /// An empty target name is no name: it must not match a record whose name is also empty, even
+    /// in the same folder.
+    #[test]
+    fn an_empty_target_name_does_not_match_an_empty_record_name_in_the_same_folder() {
+        let v2_bytes = buffer(1, &[v2_named(7, 9, &[], REASON_FILE_DELETE)]);
+        let matched = match_buffer(&v2_bytes, &[target(0, "")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert!(matched.matches.is_empty());
+
+        let v3_bytes = buffer(1, &[v3_named([1; 16], [9; 16], &[], REASON_FILE_DELETE)]);
+        let matched = match_buffer(&v3_bytes, &[target(0, "")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert!(matched.matches.is_empty());
+    }
+
+    /// A target's unset (all-zero) reference is no reference, so it cannot match a record whose own
+    /// reference is zero, in another folder.
+    #[test]
+    fn an_all_zero_target_reference_does_not_match_a_record_whose_reference_is_zero() {
+        let v2_bytes = buffer(1, &[v2_named(7, 0, &wide("new.exe"), REASON_FILE_DELETE)]);
+        let tracked = MatchTarget {
+            parent_index_64: 1,
+            file: Some((0, [0; 16])),
+            ..target(0, "old.exe")
+        };
+        let matched = match_buffer(&v2_bytes, &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+
+        // The v2 number is what a version 2 record is compared by, so a zero number is unset even
+        // when the 128-bit part is not.
+        let tracked = MatchTarget {
+            parent_index_64: 1,
+            file: Some((0, [0x55; 16])),
+            ..target(0, "old.exe")
+        };
+        let matched = match_buffer(&v2_bytes, &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+
+        let v3_bytes = buffer(
+            1,
+            &[v3_named(
+                [3; 16],
+                [0; 16],
+                &wide("new.exe"),
+                REASON_FILE_DELETE,
+            )],
+        );
+        let tracked = MatchTarget {
+            parent_id_128: [2; 16],
+            file: Some((0, [0; 16])),
+            ..target(0, "old.exe")
+        };
+        let matched = match_buffer(&v3_bytes, &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+    }
+
+    /// A version 2 target is compared with a version 2 record by its 64-bit number only. Here the
+    /// target's 128-bit identifier starts with the record's number, and that must not match.
+    #[test]
+    fn a_v2_target_is_not_matched_through_the_v3_identifier() {
+        let bytes = buffer(1, &[v2_named(7, 9, &wide("new.exe"), REASON_FILE_DELETE)]);
+        let mut identifier = [0u8; 16];
+        identifier[0] = 9;
+        let tracked = MatchTarget {
+            parent_index_64: 1,
+            file: Some((42, identifier)),
+            ..target(0, "old.exe")
+        };
+        let matched = match_buffer(&bytes, &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+    }
+
+    /// A version 3 target is compared with a version 3 record by its 128-bit identifier only. Here
+    /// the target's 64-bit number equals the record's leading number, and that must not match.
+    #[test]
+    fn a_v3_target_is_not_matched_through_the_v2_number() {
+        let mut file_ref = [0u8; 16];
+        file_ref[0] = 9;
+        let bytes = buffer(
+            1,
+            &[v3_named([1; 16], file_ref, &wide("new.exe"), REASON_FILE_DELETE)],
+        );
+        let tracked = MatchTarget {
+            parent_id_128: [2; 16],
+            file: Some((9, [0x66; 16])),
+            ..target(0, "old.exe")
+        };
+        let matched = match_buffer(&bytes, &[tracked]).unwrap();
+        assert!(matched.matches.is_empty());
+    }
+
+    /// A delete record that also closes the file gives one match, not one per flag.
+    #[test]
+    fn a_close_and_delete_record_gives_exactly_one_deleted_match() {
+        let bytes = buffer(
+            1,
+            &[v2_named(7, 9, &wide("a.exe"), REASON_CLOSE | REASON_FILE_DELETE)],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+    }
+
+    /// Each matching record keeps its own time stamp.
+    #[test]
+    fn two_matching_records_keep_their_own_timestamps() {
+        const ONE_SECOND: u64 = 10_000_000;
+        let bytes = buffer(
+            1,
+            &[
+                v2_at(7, 9, WRITTEN, REASON_FILE_DELETE, &wide("a.exe"), 0),
+                v2_at(7, 10, WRITTEN + ONE_SECOND, REASON_FILE_DELETE, &wide("a.exe"), 0),
+            ],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(
+            matched.matches,
+            vec![
+                found_at(0, ChangeKind::Deleted, WRITTEN),
+                found_at(0, ChangeKind::Deleted, WRITTEN + ONE_SECOND),
+            ]
+        );
+
+        let bytes = buffer(
+            1,
+            &[
+                v3_at([1; 16], [9; 16], WRITTEN, REASON_FILE_DELETE, &wide("a.exe"), 0),
+                v3_at(
+                    [1; 16],
+                    [10; 16],
+                    WRITTEN + ONE_SECOND,
+                    REASON_FILE_DELETE,
+                    &wide("a.exe"),
+                    0,
+                ),
+            ],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.damage, None);
+        assert_eq!(
+            matched.matches,
+            vec![
+                found_at(0, ChangeKind::Deleted, WRITTEN),
+                found_at(0, ChangeKind::Deleted, WRITTEN + ONE_SECOND),
+            ]
+        );
+    }
+
+    /// A delete record with an odd `FileNameLength` is damage; the match before it is kept and the
+    /// record after it is not read.
+    #[test]
+    fn an_odd_file_name_length_on_a_delete_record_is_damage_and_keeps_the_matches_before_it() {
+        let mut odd = v2_named(7, 10, &wide("a.exe"), REASON_FILE_DELETE);
+        odd[56..58].copy_from_slice(&5u16.to_le_bytes());
+        let bytes = buffer(
+            1,
+            &[
+                v2_named(7, 9, &wide("a.exe"), REASON_FILE_DELETE),
+                odd,
+                v2_named(7, 11, &wide("a.exe"), REASON_FILE_DELETE),
+            ],
+        );
+        let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
+        assert_eq!(matched.matches, vec![found(0, ChangeKind::Deleted)]);
+        assert!(matches!(
+            matched.damage,
+            Some(ParseError::Malformed {
+                field: "file_name",
                 ..
             })
         ));
