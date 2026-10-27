@@ -1238,3 +1238,304 @@ fn j2_a_file_in_a_folder_the_journal_does_not_name_is_folder_unknown() {
     let observation = observation_named(observations, "helper.exe");
     assert_unmatched(observation, "folder_unknown", "2026-09-13T09:30:00Z");
 }
+
+/// One deletion of `helper.exe` in `C:\Tools`, written at 09:30 on 2026-09-13.
+const DELETE_HELPER: &str = r"{ parent: 'C:\Tools', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T09:30:00Z' }";
+
+/// A host with `helper.exe` on disk and BAM's record of it, whose journal is `DELETE_HELPER` alone.
+/// `top` is YAML written before the rest of the host (`elevated:`), and `extra` the journal's own
+/// keys (`state:`, `ends:`), as [`with_usn_journal`] takes them.
+fn helper_deletion_host(top: &str, extra: &str) -> FixtureHost {
+    with_usn_journal(
+        format!(
+            "{top}{}",
+            host_yaml(
+                SYSTEM_ENV,
+                &[r"C:\Tools\helper.exe"],
+                None,
+                SYSTEM_PROCESS,
+                &[(r"C:\Tools", "helper.exe")],
+            )
+        ),
+        &[(r"C:\Tools", 1)],
+        &[],
+        &[DELETE_HELPER],
+        extra,
+    )
+}
+
+/// Asserts each of the six journal fields is gapped with `reason` (ADR 0086 section 4).
+fn assert_journal_gapped(gaps: &BTreeMap<String, UnmeasuredReason>, reason: &UnmeasuredReason) {
+    for field in JOURNAL_FIELDS {
+        assert_eq!(gaps.get(field), Some(reason), "{field}: {gaps:?}");
+    }
+}
+
+/// Asserts no observation carries any of the six journal fields.
+fn assert_no_journal_field(observations: &[Observation]) {
+    for observation in observations {
+        for field in JOURNAL_FIELDS {
+            assert_eq!(
+                observation.fields.get(field),
+                None,
+                "{field} must not be emitted: {observation:?}"
+            );
+        }
+    }
+}
+
+/// (j2-8) A list keeps at most eight times, the newest first, and `journal_more` says some were cut.
+/// Ten deletions of one file, written an hour apart, list 09:00 down to 02:00, and the journal's first
+/// record time is 00:00 (ADR 0086 section 3).
+#[test]
+fn j2_a_list_keeps_the_eight_newest_times_newest_first_and_says_more_were_cut() {
+    let records: Vec<String> = (0..10)
+        .map(|hour| {
+            format!(
+                r"{{ parent: 'C:\Tools', reasons: [file_delete, close], name: helper.exe, first: '2026-09-13T{hour:02}:00:00Z' }}"
+            )
+        })
+        .collect();
+    let record_refs: Vec<&str> = records.iter().map(String::as_str).collect();
+    let fixture = with_usn_journal(
+        host_yaml(SYSTEM_ENV, &[r"C:\Tools\helper.exe"], None, SYSTEM_PROCESS, &[]),
+        &[(r"C:\Tools", 1)],
+        &[],
+        &record_refs,
+        "",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    let observation = observation_named(observations, "helper.exe");
+    let newest_first: Vec<String> = (2..10)
+        .rev()
+        .map(|hour| format!("2026-09-13T{hour:02}:00:00Z"))
+        .collect();
+    let deleted: Vec<&str> = newest_first.iter().map(String::as_str).collect();
+    assert_eq!(
+        text(observation, "journal_match"),
+        Some("matched"),
+        "{observation:?}"
+    );
+    assert_eq!(
+        times(observation, "journal_deleted"),
+        Some(deleted),
+        "{observation:?}"
+    );
+    assert_eq!(
+        times(observation, "journal_renamed_from"),
+        Some(Vec::new()),
+        "{observation:?}"
+    );
+    assert_eq!(
+        times(observation, "journal_renamed_to"),
+        Some(Vec::new()),
+        "{observation:?}"
+    );
+    assert_eq!(flag(observation, "journal_more"), Some(true), "{observation:?}");
+    assert_eq!(
+        text(observation, "journal_from"),
+        Some("2026-09-13T00:00:00Z"),
+        "{observation:?}"
+    );
+}
+
+/// (j2-9) A journal that is not active gaps the six journal fields as `source_absent` and emits none
+/// of them; the file's own identity is read as before (ADR 0086 section 4).
+#[test]
+fn j2_a_journal_that_is_not_active_gaps_the_six_fields_as_source_absent() {
+    let fixture = helper_deletion_host("", "  state: not_active\n");
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_journal_gapped(gaps, &UnmeasuredReason::SourceAbsent);
+    assert_no_journal_field(observations);
+    let observation = observation_named(observations, "helper.exe");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("read"),
+        "{observation:?}"
+    );
+}
+
+/// (j2-10) A journal whose handle Windows refuses, on an elevated host, gaps the six journal fields as
+/// `access_denied`, and the file's identity is unchanged (ADR 0086 section 4).
+#[test]
+fn j2_a_refused_journal_on_an_elevated_host_gaps_the_six_fields_as_access_denied() {
+    let fixture = helper_deletion_host("elevated: true\n", "  state: access_denied\n");
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_journal_gapped(gaps, &UnmeasuredReason::AccessDenied);
+    assert_no_journal_field(observations);
+    let observation = observation_named(observations, "helper.exe");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("read"),
+        "{observation:?}"
+    );
+}
+
+/// (j2-11) A journal that changed while it was read is `partial`: the path is still matched, but no
+/// list is emitted, because a list read from a changing journal is not the whole of it (ADR 0086
+/// sections 3 and 4).
+#[test]
+fn j2_a_journal_that_changed_while_read_is_partial_and_lists_nothing() {
+    let fixture = helper_deletion_host("", "  ends: journal_changed\n");
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_journal_gapped(gaps, &UnmeasuredReason::Partial);
+    let observation = observation_named(observations, "helper.exe");
+    assert_eq!(
+        text(observation, "journal_match"),
+        Some("matched"),
+        "{observation:?}"
+    );
+    for field in ["journal_deleted", "journal_renamed_from", "journal_renamed_to"] {
+        assert_eq!(observation.fields.get(field), None, "{observation:?}");
+    }
+    assert_eq!(flag(observation, "journal_more"), None, "{observation:?}");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("read"),
+        "{observation:?}"
+    );
+}
+
+/// (j2-12) A journal read that the journal budget stops is `budget_spent` for the six fields, with no
+/// list (ADR 0086 sections 3 and 4).
+#[test]
+fn j2_a_journal_read_the_journal_budget_stops_is_budget_spent() {
+    let fixture = helper_deletion_host("", "");
+
+    let run = RecordedFiles {
+        journal_budget: Duration::ZERO,
+        ..RecordedFiles::default()
+    }
+    .collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    assert_journal_gapped(gaps, &UnmeasuredReason::BudgetSpent);
+    let observation = observation_named(observations, "helper.exe");
+    assert_eq!(
+        observation.fields.get("journal_deleted"),
+        None,
+        "{observation:?}"
+    );
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("read"),
+        "{observation:?}"
+    );
+}
+
+/// (j2-13) The file budget and the journal budget are separate clocks. With no file budget every
+/// identity read says `budget_spent`, yet the journal, which has its own budget, is still read in full
+/// and ungapped (ADR 0086 section 3, budget).
+#[test]
+fn j2_the_file_budget_and_the_journal_budget_never_share_time() {
+    let fixture = helper_deletion_host("", "");
+
+    let run = RecordedFiles {
+        budget: Duration::ZERO,
+        ..RecordedFiles::default()
+    }
+    .collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    for field in JOURNAL_FIELDS {
+        assert!(
+            !gaps.contains_key(field),
+            "{field} must not be gapped by the file budget: {gaps:?}"
+        );
+    }
+    let observation = observation_named(observations, "helper.exe");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("budget_spent"),
+        "{observation:?}"
+    );
+    assert_matched(
+        observation,
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T09:30:00Z",
+    );
+}
+
+/// (j2-14) No journal name, USN or file reference reaches the run: twenty deletions of `secret-NN.exe`
+/// sit in the same folder as the one that matches, and none of their names is in any output, though
+/// the journal was read (ADR 0086 section 8).
+#[test]
+fn j2_no_journal_name_reaches_the_run() {
+    let mut records: Vec<String> = (0..20)
+        .map(|number| {
+            format!(
+                r"{{ parent: 'C:\Tools', reasons: [file_delete, close], name: secret-{number:02}.exe, first: '2026-09-13T09:31:00Z' }}"
+            )
+        })
+        .collect();
+    records.push(DELETE_HELPER.to_owned());
+    let record_refs: Vec<&str> = records.iter().map(String::as_str).collect();
+    let fixture = with_usn_journal(
+        host_yaml(
+            SYSTEM_ENV,
+            &[r"C:\Tools\helper.exe"],
+            None,
+            SYSTEM_PROCESS,
+            &[(r"C:\Tools", "helper.exe")],
+        ),
+        &[(r"C:\Tools", 1)],
+        &[],
+        &record_refs,
+        "",
+    );
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, _) = measured(&run);
+    assert_matched(
+        observation_named(observations, "helper.exe"),
+        &["2026-09-13T09:30:00Z"],
+        &[],
+        &[],
+        "2026-09-13T09:30:00Z",
+    );
+    let json = serde_json::to_string(&run).unwrap();
+    assert!(!json.contains("secret"), "a journal name reached the run: {json}");
+}
+
+/// (j2-15) The three lists are timestamp lists kept off the timeline, as `run_times` is (ADR 0086
+/// section 6). `journal_from` is a timestamp, `journal_match` text and `journal_more` a boolean.
+#[test]
+fn j2_the_journal_fields_are_declared_with_their_kinds() {
+    let fields = recorded_files().fields();
+    let declared = |name: &str| {
+        fields
+            .iter()
+            .find(|field| field.name == name)
+            .unwrap_or_else(|| panic!("recorded_files does not declare `{name}`"))
+    };
+    for name in ["journal_deleted", "journal_renamed_from", "journal_renamed_to"] {
+        let field = declared(name);
+        assert_eq!(format!("{:?}", field.kind), "TimestampList", "{name}");
+        assert!(
+            !field.on_timeline,
+            "{name} must not put its up to eight times on the timeline"
+        );
+    }
+    assert_eq!(format!("{:?}", declared("journal_from").kind), "Timestamp");
+    assert_eq!(format!("{:?}", declared("journal_match").kind), "Text");
+    assert_eq!(format!("{:?}", declared("journal_more").kind), "Bool");
+}
