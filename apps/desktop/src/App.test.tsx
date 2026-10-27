@@ -1457,6 +1457,69 @@ describe("App", () => {
     ).toBeTruthy();
   });
 
+  // ADR 0086 (J3): the change journal's fact, I5, with its cause when it holds and its reason when not.
+  it("shows the change-journal fact with its causes when the journal recorded the file", async () => {
+    viewOverride = { ...selfView, game_windows: withFile({ i5: { fact: "true" } }) };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "the change journal recorded it being deleted or renamed near the latest session (updates, the Recycle Bin, antivirus quarantine)",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says the change journal is not known, with its reason, when it is on another drive", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        i5: { fact: "not_known", reason: { reason: "journal_other_drive" } },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "the change journal recorded it being deleted or renamed near the latest session: not known: the file is on another drive, whose change journal this program does not read",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("names the change journal by its words when the journal does not reach back that far", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        i5: { fact: "not_known", reason: { reason: "before_trace_age", source: "usn" } },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "the change journal recorded it being deleted or renamed near the latest session: not known: NTFS change journal does not reach back that far",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows the journal's deletion times in the file details, with the more marker", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        file: {
+          read: "read",
+          journal_deleted: ["2026-10-27T20:40:00Z"],
+          journal_more: true,
+        },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await openFileDetails();
+    expect(screen.getByText("Deleted at: 2026-10-27T20:40:00Z + more")).toBeTruthy();
+    expect(screen.queryByText(/Renamed away from this name/)).toBeNull();
+    expect(screen.queryByText(/Renamed to this name/)).toBeNull();
+  });
+
   it("gives an earlier session's start once, in its began line", async () => {
     const [latest] = gameWindows().sessions;
     if (!latest) throw new Error("the test view has no session");
