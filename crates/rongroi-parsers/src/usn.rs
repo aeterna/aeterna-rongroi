@@ -1247,7 +1247,12 @@ mod tests {
         file_ref[0] = 9;
         let bytes = buffer(
             1,
-            &[v3_named([1; 16], file_ref, &wide("new.exe"), REASON_FILE_DELETE)],
+            &[v3_named(
+                [1; 16],
+                file_ref,
+                &wide("new.exe"),
+                REASON_FILE_DELETE,
+            )],
         );
         let tracked = MatchTarget {
             parent_id_128: [2; 16],
@@ -1263,7 +1268,12 @@ mod tests {
     fn a_close_and_delete_record_gives_exactly_one_deleted_match() {
         let bytes = buffer(
             1,
-            &[v2_named(7, 9, &wide("a.exe"), REASON_CLOSE | REASON_FILE_DELETE)],
+            &[v2_named(
+                7,
+                9,
+                &wide("a.exe"),
+                REASON_CLOSE | REASON_FILE_DELETE,
+            )],
         );
         let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
         assert_eq!(matched.damage, None);
@@ -1278,7 +1288,14 @@ mod tests {
             1,
             &[
                 v2_at(7, 9, WRITTEN, REASON_FILE_DELETE, &wide("a.exe"), 0),
-                v2_at(7, 10, WRITTEN + ONE_SECOND, REASON_FILE_DELETE, &wide("a.exe"), 0),
+                v2_at(
+                    7,
+                    10,
+                    WRITTEN + ONE_SECOND,
+                    REASON_FILE_DELETE,
+                    &wide("a.exe"),
+                    0,
+                ),
             ],
         );
         let matched = match_buffer(&bytes, &[target(0, "a.exe")]).unwrap();
@@ -1294,7 +1311,14 @@ mod tests {
         let bytes = buffer(
             1,
             &[
-                v3_at([1; 16], [9; 16], WRITTEN, REASON_FILE_DELETE, &wide("a.exe"), 0),
+                v3_at(
+                    [1; 16],
+                    [9; 16],
+                    WRITTEN,
+                    REASON_FILE_DELETE,
+                    &wide("a.exe"),
+                    0,
+                ),
                 v3_at(
                     [1; 16],
                     [10; 16],
