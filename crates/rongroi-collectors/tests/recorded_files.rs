@@ -778,8 +778,17 @@ fn k14_an_unmatched_recorded_file_is_listed_in_self_mode_and_only_counted_in_ss_
 
     let ss_view = view::for_mode(&report, Mode::Ss);
     let ss_json = serde_json::to_string(&ss_view).unwrap();
-    for leaked in ["downloaded.exe", "fixtureuser", "dl.example.com", "loader.exe", PE_SHA256] {
-        assert!(!ss_json.contains(leaked), "{leaked} reached the SS view: {ss_json}");
+    for leaked in [
+        "downloaded.exe",
+        "fixtureuser",
+        "dl.example.com",
+        "loader.exe",
+        PE_SHA256,
+    ] {
+        assert!(
+            !ss_json.contains(leaked),
+            "{leaked} reached the SS view: {ss_json}"
+        );
     }
     assert!(ss_view.hidden.unmatched > 0);
 }
