@@ -3246,9 +3246,18 @@ usn_journal:
         let (read, buffers) = read_all(&version_2, 'C');
         assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
         let record = &buffers[0][8..];
-        assert_eq!(u64::from_le_bytes(record[8..16].try_into().unwrap()), own.index_64);
-        assert_eq!(u64::from_le_bytes(record[16..24].try_into().unwrap()), parent.index_64);
-        assert_ne!(u64::from_le_bytes(record[16..24].try_into().unwrap()), own.index_64);
+        assert_eq!(
+            u64::from_le_bytes(record[8..16].try_into().unwrap()),
+            own.index_64
+        );
+        assert_eq!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            parent.index_64
+        );
+        assert_ne!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            own.index_64
+        );
 
         // No `file:`: version 3 leaves 8..24 zero and version 2 leaves 8..16 zero, while the parent
         // is still the folder.
