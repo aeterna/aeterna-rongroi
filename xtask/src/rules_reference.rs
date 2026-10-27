@@ -262,7 +262,7 @@ const EN: Words = Words {
     matches: "Matches when all of these hold for one observation",
     unmeasured: "Not measured, and named by the rule as ordinary on some machines",
     unmeasured_none: "The rule names none.",
-    allow: "Legitimate software excluded (`allow`)",
+    allow: "What the rule expects (`allow`)",
     allow_sha256: "the file whose SHA-256 is",
     allow_cert: "files signed with the certificate whose SHA-256 is",
     related: "Related rules",
@@ -307,7 +307,7 @@ const EN: Words = Words {
     statuses: [
         "being developed",
         "believed correct; has a positive and a negative fixture",
-        "proven on real traffic; has a positive and a negative fixture",
+        "seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)",
         "kept for history; never evaluated",
     ],
     related_kinds: [
@@ -345,7 +345,7 @@ const TH: Words = Words {
     matches: "ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน",
     unmeasured: "ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง",
     unmeasured_none: "rule นี้ไม่ได้ระบุไว้",
-    allow: "ซอฟต์แวร์ที่ถูกต้องซึ่งยกเว้นไว้ (`allow`)",
+    allow: "สิ่งที่ rule คาดไว้ (`allow`)",
     allow_sha256: "ไฟล์ที่มี SHA-256 เป็น",
     allow_cert: "ไฟล์ที่เซ็นด้วยใบรับรองที่มี SHA-256 เป็น",
     related: "rule ที่เกี่ยวข้อง",
@@ -398,7 +398,7 @@ const TH: Words = Words {
     statuses: [
         "อยู่ระหว่างพัฒนา",
         "เชื่อว่าถูกต้อง มี fixture ทั้งแบบเจอและแบบไม่เจอ",
-        "พิสูจน์แล้วกับการใช้งานจริง มี fixture ทั้งแบบเจอและแบบไม่เจอ",
+        "เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)",
         "เก็บไว้เป็นประวัติ ไม่ถูกประเมิน",
     ],
     related_kinds: ["เปลี่ยนชื่อมาจาก", "ใช้แทน", "ดัดแปลงมาจาก", "รวมมาจาก", "คล้ายกับ"],

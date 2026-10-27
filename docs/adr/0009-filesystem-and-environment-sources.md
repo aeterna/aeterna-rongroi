@@ -97,3 +97,9 @@ and counted — never listed — in SS mode.
   not depend on each other, and this one streams rather than taking a slice.
 - A path is now part of an observation, so SS-mode redaction (`rongroi_core::view`) matters for this
   collector's output the moment a rule starts reading it.
+
+## Amendment (2026-10-24) — no starter allow-list
+
+"The rule follows once signer checking or a starter allow-list exists" is withdrawn as far as the allow-list
+goes. Hard rule 9 forbids any list of known-good software, and hard rule 6 now lets `allow` name only what a
+rule expects, so that the rule reports what differs from it (ADR 0084 decision 5).

@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 77 |
-| SHA-256 | `8c36ae097c75224e212fd5c50b13dccaa16c98a7e7c82e08d6467c24d0d1c5d2` |
+| SHA-256 | `f8194b3e7299807c919d53c1a528f4883b5b52fa046479ad7f70dc95e1a1ef78` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -53,7 +53,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Microsoft Defender recorded that its real-time protection was switched off](#rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185) — `context` · `experimental`
   - [An event log file was cleared](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [The Security log records that it was cleared](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
-  - [An event log file is marked read-only](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
+  - [An event log file is marked read-only](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `stable`
   - [An event log file is not the file Windows writes its channel to](#rule-87a53c8f-b0e4-477d-91e7-93b904ba965f) — `tamper` · `experimental`
 - `fivem_dir`
   - [FiveM.exe is validly signed, but not with the certificate this rule knows](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e) — `presence` · `experimental`
@@ -67,7 +67,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `fivem_servers`
   - [FiveM for GTA V Enhanced keeps a cache folder for a server](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
 - `hid_device`
-  - [A mouse, keyboard or other input device Windows set up earlier is not present now](#rule-e1dc0747-5038-4389-be3d-80de451d7fe6) — `context` · `experimental`
+  - [A mouse, keyboard or other input device Windows set up earlier is not present now](#rule-e1dc0747-5038-4389-be3d-80de451d7fe6) — `context` · `stable`
 - `install_marker`
   - [A folder or key the Atlas playbook installs is on this PC](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
   - [A folder the ReviOS playbook installs is on this PC](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
@@ -83,16 +83,16 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [The Windows Event Log service does not start with Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
   - [Windows Update's service cannot start on this PC](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
 - `pci_device`
-  - [A PCI device Windows set up earlier is not present now](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `experimental`
-  - [A PCI device has no driver installed](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `experimental`
+  - [A PCI device Windows set up earlier is not present now](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `stable`
+  - [A PCI device has no driver installed](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `stable`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [Windows test signing is turned on](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
   - [The firmware describes no IOMMU to Windows](#rule-c5c19a2d-8008-4bc8-b36f-6607ed091313) — `posture` · `experimental`
-  - [A machine policy turns PowerShell 7 script block logging off](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
+  - [A machine policy turns PowerShell 7 script block logging off](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `stable`
   - [A per-user policy turns PowerShell 7 script block logging off](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
-  - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
+  - [A machine policy turns Windows PowerShell script block logging off](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `stable`
   - [A per-user policy turns Windows PowerShell script block logging off](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [Memory integrity (HVCI) is configured off](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [Structured exception handling overwrite protection (SEHOP) is switched off](#rule-dc858978-954d-418f-a42e-29f06975f4ed) — `posture` · `experimental`
@@ -164,7 +164,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 **About this check**
 
-Windows is set to start this program by itself — as a service that starts with the PC or on a trigger, a Run or RunOnce value at sign-in, or an enabled scheduled task with a trigger — and its file is outside the Windows folder and Program Files, and carries no embedded signature Windows trusts: either none at all, or one that does not verify. The row shows where the entry is registered, the file's path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads here as having no embedded signature, because this program does not read catalogs. Files under the Windows folder are not checked at all, and a program that starts from inside Program Files is not shown by this rule. Arguments are never read, so this does not say what the program is given to run. This says a program is set to start without being asked; it does not say what the program does, who installed it, or that it ever ran.
+Windows is set to start this program by itself — as a service that starts with the PC or on a trigger, a Run or RunOnce value at sign-in, or an enabled scheduled task with a trigger — and its file is outside the Windows folder and Program Files, and carries no embedded signature Windows trusts: either none at all, or one that does not verify. The row shows where the entry is registered, the file's path, its SHA-256 and what the signature check said. A file signed through a Windows catalog reads here as having no embedded signature, because this program does not read catalogs. Files under the Windows folder are checked after the others and are shown among the unmatched rows, but this rule does not ask about them. A program that starts from inside Program Files is not shown by this rule. Arguments are never read, so this does not say what the program is given to run. This says a program is set to start without being asked; it does not say what the program does, who installed it, or that it ever ran.
 
 **Matches when all of these hold for one observation**
 
@@ -472,7 +472,7 @@ Only clearings still recorded in the Security log as it stands today. The log ho
 - File: [`rules/evtx/log-file/event-log-file-read-only/rule.yaml`](../rules/evtx/log-file/event-log-file-read-only/rule.yaml)
 - Collector: `evtx`
 - Strength: `tamper`
-- Status: `experimental` — being developed
+- Status: `stable` — seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)
 - Tags: `evtx`, `log-file`
 - Written: 2026-09-13
 
@@ -593,7 +593,7 @@ The file as it was when the scan ran. It says nothing about the file at any earl
 - A FiveM.exe that has not updated since before 2026-07-21, when the certificate this rule knows became valid. A signature made before then was made with an earlier certificate. FiveM updates itself, so this is most likely a player who has not launched FiveM since
 - A beta or test build of the client signed with a different certificate. Nothing was measured about those
 
-**Legitimate software excluded (`allow`)**
+**What the rule expects (`allow`)**
 
 - files signed with the certificate whose SHA-256 is `65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f`
 
@@ -975,7 +975,7 @@ The server cache folders there when the scan ran. A folder the player, a cleaner
 - File: [`rules/hid_device/absent/not-present/rule.yaml`](../rules/hid_device/absent/not-present/rule.yaml)
 - Collector: `hid_device`
 - Strength: `context`
-- Status: `experimental` — being developed
+- Status: `stable` — seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)
 - Tags: `hid_device`, `hardware`
 - Written: 2026-10-16
 
@@ -1464,7 +1464,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 - File: [`rules/pci_device/absent/not-present/rule.yaml`](../rules/pci_device/absent/not-present/rule.yaml)
 - Collector: `pci_device`
 - Strength: `context`
-- Status: `experimental` — being developed
+- Status: `stable` — seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)
 - Tags: `pci_device`, `hardware`
 - Written: 2026-10-15
 
@@ -1501,7 +1501,7 @@ Devices Windows still remembers. Windows keeps a device it has set up after the 
 - File: [`rules/pci_device/no-driver/problem-28/rule.yaml`](../rules/pci_device/no-driver/problem-28/rule.yaml)
 - Collector: `pci_device`
 - Strength: `presence`
-- Status: `experimental` — being developed
+- Status: `stable` — seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)
 - Tags: `pci_device`, `hardware`
 - Written: 2026-10-15
 
@@ -1707,7 +1707,7 @@ Current firmware state only. It says nothing about earlier firmware settings.
 - File: [`rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml)
 - Collector: `posture`
 - Strength: `posture`
-- Status: `experimental` — being developed
+- Status: `stable` — seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)
 - Tags: `posture`, `logging`
 - Written: 2026-09-14
 
@@ -1787,7 +1787,7 @@ Current setting only. It says nothing about how the account was configured in th
 - File: [`rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml)
 - Collector: `posture`
 - Strength: `posture`
-- Status: `experimental` — being developed
+- Status: `stable` — seen found on a lab machine, measured on a client Windows build, and confronted by a baseline; has a positive and a negative fixture (ADR 0074 section 5)
 - Tags: `posture`, `logging`
 - Written: 2026-09-13 · changed: 2026-09-14
 

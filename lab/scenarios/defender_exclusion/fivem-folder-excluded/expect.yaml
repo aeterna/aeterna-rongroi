@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+found:
+  - d7191cf3-ce56-480b-8501-66a198f83e08   # defender_exclusion/fivem/fivem-folder-excluded: Defender's settings hold a path exclusion for FiveM's folder, FiveM's own folder
+restart: false

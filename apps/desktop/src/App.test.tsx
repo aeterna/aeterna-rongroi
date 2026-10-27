@@ -11,7 +11,14 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import i18n, { initI18n } from "./i18n";
-import type { ReportHeader, ReportView, RuleText, UnmeasuredReason } from "./types";
+import type {
+  GameCandidate,
+  GameWindows,
+  ReportHeader,
+  ReportView,
+  RuleText,
+  UnmeasuredReason,
+} from "./types";
 import { COPIED_FOR_MS } from "./views/CodeLink";
 
 // Vitest runs with apps/desktop as the working directory.
@@ -1289,8 +1296,409 @@ describe("App", () => {
     });
     expect(clipboardWrites.length).toBeGreaterThan(0);
     expect(clipboardWrites[0]).toContain(
-      "Please analyze this PC Forensics / FiveM inspection report",
+      "Please explain this PC check report from aeterna-rongroi v",
     );
     expect(aiButton.textContent).toContain("Copied!");
+  });
+
+  // ADR 0078 (P6, decisions 3–7): the game-window section sits directly after the latest-session
+  // statement, in both modes. Its facts and ordinary causes come from the core; the test host is
+  // synthetic — no person's name, host name or SID appears in it.
+  function gameWindows(overrides: Partial<GameWindows> = {}): GameWindows {
+    return {
+      sessions: [
+        {
+          edition: "legacy",
+          start: "2025-12-31T20:00:00Z",
+          end: "2025-12-31T21:30:00Z",
+          latest: true,
+          l1: { fact: "true" },
+          loaded_outside: 2,
+        },
+      ],
+      candidates: [
+        {
+          name: "overlay-helper.exe",
+          path: "C:\\Tools\\overlay-helper.exe",
+          t1: { fact: "false" },
+          t2: { fact: "true" },
+          t3: { fact: "false" },
+          t4: { fact: "false" },
+          i1: { fact: "true" },
+          i2: { fact: "false" },
+          i3: { fact: "false" },
+          i4: { fact: "true" },
+          i5: { fact: "false" },
+          near_sessions: { near: 1, found: 1 },
+        },
+      ],
+      counts: { before: 1, during: 2, after: 0, before_scan: 4 },
+      unnamed: { before: 0, during: 1, after: 0, before_scan: 3 },
+      clock: { changes: [], history: "known" },
+      ...overrides,
+    };
+  }
+
+  it("shows the game-window section with its facts, causes and window counts in Self mode", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Programs recorded near a game session")).toBeTruthy();
+    expect(screen.getByText("experimental")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "its file is no longer at the recorded path (a self-deleting installer, Storage Sense, a removed USB drive)",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("it ran from Temp or Downloads (anything downloaded and run)"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("recorded during a session (overlays, recording tools, a browser)"),
+    ).toBeTruthy();
+    expect(screen.getByText("30 min before · 1")).toBeTruthy();
+    expect(screen.getByText("during · 2")).toBeTruthy();
+    expect(screen.getByText("30 min after · 0")).toBeTruthy();
+    expect(screen.getByText("before this scan · 4")).toBeTruthy();
+  });
+
+  it("shows a clock change with its old and new times, and says when the clock history is not known", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        clock: {
+          changes: [
+            {
+              changed_at: "2026-01-02T03:04:05Z",
+              old_time: "2026-01-02T03:00:00Z",
+              new_time: "2026-01-02T03:04:00Z",
+            },
+          ],
+          history: "known",
+        },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "The clock was changed at 2026-01-02T03:04:05Z (from 2026-01-02T03:00:00Z to 2026-01-02T03:04:00Z); times before and after may not be on the same clock.",
+      ),
+    ).toBeTruthy();
+    cleanup();
+
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({ clock: { changes: [], history: "not_known" } }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "Whether the clock was changed is not known: the System event log does not reach back to the compared span, or could not be read.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows whether the latest session loaded files from outside the usual folders", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("loaded from outside the usual folders: 2 files")).toBeTruthy();
+    cleanup();
+
+    const [latest] = gameWindows().sessions;
+    if (!latest) throw new Error("the test view has no session");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        sessions: [{ ...latest, l1: { fact: "false" }, loaded_outside: null }],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "of the files Prefetch recorded for it, none with a program's extension is outside Windows, Program Files and FiveM's folders",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("loaded from outside the usual folders: 2 files")).toBeNull();
+  });
+
+  it("says a time fact that is not known, with its reason, in Self mode", async () => {
+    const [candidate] = gameWindows().candidates;
+    if (!candidate) throw new Error("the test view has no candidate");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        candidates: [
+          {
+            ...candidate,
+            t1: {
+              fact: "not_known",
+              reason: { reason: "before_trace_age", source: "prefetch" },
+            },
+            t4: { fact: "not_known", reason: { reason: "scan_time_not_recorded" } },
+          },
+        ],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "recorded in the 30 minutes before a session: not known: prefetch does not reach back that far",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "recorded between the session and this scan: not known: the scan's time is not recorded",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("gives an earlier session's start once, in its began line", async () => {
+    const [latest] = gameWindows().sessions;
+    if (!latest) throw new Error("the test view has no session");
+    viewOverride = {
+      ...selfView,
+      game_windows: gameWindows({
+        sessions: [
+          latest,
+          { edition: "legacy", start: "2026-10-18T19:00:00Z", end: null, latest: false },
+        ],
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("earlier session, began 2026-10-18T19:00:00Z")).toBeTruthy();
+    const section = screen.getByText("Programs recorded near a game session").closest("section");
+    if (!section) throw new Error("the game-window section is not rendered");
+    const occurrences = (section.textContent ?? "").split("2026-10-18T19:00:00Z").length - 1;
+    expect(occurrences).toBe(1);
+  });
+
+  it("shows the SS rule and the unnamed counts, and no window chips, in SS mode", async () => {
+    viewOverride = { ...ssView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    expect(
+      await screen.findByText(
+        "SS mode names a program only when a fact about its file holds; other programs are counted per window.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Other programs, not named: 30 min before 0 · during 1 · 30 min after 0 · before this scan 3",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("30 min before · 1")).toBeNull();
+    expect(screen.queryByText("during · 2")).toBeNull();
+    expect(screen.queryByText("30 min after · 0")).toBeNull();
+    expect(screen.queryByText("before this scan · 4")).toBeNull();
+  });
+
+  it("shows no game-window section when the report carries none", async () => {
+    expect(selfView).not.toHaveProperty("game_windows");
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Overview Summary")).toBeTruthy();
+    expect(screen.queryByText("Programs recorded near a game session")).toBeNull();
+    expect(screen.queryByText("experimental")).toBeNull();
+  });
+
+  it("shows the game-window title in Thai", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    expect(await screen.findByText("โปรแกรมที่ถูกบันทึกไว้ใกล้ช่วงเล่นเกม")).toBeTruthy();
+  });
+
+  it("shows the first words of the SS paragraph on the consent screen in English", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    expect(
+      await screen.findByText(
+        /In SS mode, programs recorded near your last game session are named only when/,
+      ),
+    ).toBeTruthy();
+  });
+
+  // ADR 0078 (P6b): each candidate's file details sit in a closed <details> under its card, opened by
+  // a click on "File details". The hashes are synthetic (a repeated pattern, 64 hex characters), and
+  // the signer and host are invented: no real person's or machine's name appears here.
+  const FILE_SHA256 = "0123456789abcdef".repeat(4);
+  const CERT_SHA256 = "fedcba9876543210".repeat(4);
+
+  /** The game-window view with the file-detail fields set on its one candidate. */
+  function withFile(fields: Partial<GameCandidate>): GameWindows {
+    const [candidate] = gameWindows().candidates;
+    if (!candidate) throw new Error("the test view has no candidate");
+    return gameWindows({ candidates: [{ ...candidate, ...fields }] });
+  }
+
+  /** Opens the file details by their summary text and returns the <details> element. */
+  async function openFileDetails(summaryText = "File details"): Promise<HTMLDetailsElement> {
+    fireEvent.click(await screen.findByText(summaryText));
+    const details = screen.getByText(summaryText).closest("details");
+    if (!details) throw new Error("the file details are not a <details> element");
+    return details;
+  }
+
+  it("folds a candidate's file details under its card and shows each line in Self mode", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        recorded_by: ["prefetch", "bam"],
+        file: {
+          read: "read",
+          sha256: FILE_SHA256,
+          signature: "no_embedded_signature",
+          content_kind: "pe_executable",
+          trailing_data: true,
+          embedded_pe: false,
+          original_filename: "helper.exe",
+          zone_id: 3,
+          download_host: "files.example.net",
+        },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const summary = await screen.findByText("File details");
+    expect(summary.closest<HTMLDetailsElement>("details")?.open).toBe(false);
+    const details = await openFileDetails();
+    expect(details.open).toBe(true);
+    expect(FILE_SHA256).toHaveLength(64);
+    expect(
+      screen.getByText("Recorded by: Windows Prefetch, Background Activity Moderator (BAM)"),
+    ).toBeTruthy();
+    expect(screen.getByText(FILE_SHA256)).toBeTruthy();
+    expect(screen.getByText("No embedded signature")).toBeTruthy();
+    expect(screen.getByText("What the bytes are: a program (PE)")).toBeTruthy();
+    expect(screen.getByText("It has data after the end of its format.")).toBeTruthy();
+    expect(screen.getByText("Name in its version information: helper.exe")).toBeTruthy();
+    expect(screen.getByText("Download zone Windows recorded: the Internet (3)")).toBeTruthy();
+    expect(screen.getByText("Downloaded from: files.example.net")).toBeTruthy();
+    expect(screen.queryByText("It holds a program (PE) inside.")).toBeNull();
+  });
+
+  it("says a file is no longer at its path, and that a standard scan does not read it", async () => {
+    viewOverride = { ...selfView, game_windows: withFile({ file: { read: "missing" } }) };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const missing = await openFileDetails();
+    expect(
+      screen.getByText("The file is no longer at this path, so it was not read."),
+    ).toBeTruthy();
+    expect(missing.textContent).not.toContain("SHA-256");
+    cleanup();
+
+    viewOverride = { ...selfView, game_windows: withFile({ file: { read: "not_run" } }) };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    const notRun = await openFileDetails();
+    expect(screen.getByText("A standard scan does not read the file.")).toBeTruthy();
+    expect(notRun.textContent).not.toContain("SHA-256");
+  });
+
+  it("shows a zone it does not name by its number, and a signer with its certificate hash", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({ file: { read: "read", zone_id: 7 } }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await openFileDetails();
+    expect(screen.getByText("Download zone Windows recorded: zone 7")).toBeTruthy();
+    cleanup();
+
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        file: { read: "read", signer: "Example Signer Ltd", signer_cert_sha256: CERT_SHA256 },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await openFileDetails();
+    expect(screen.getByText("Signer: Example Signer Ltd")).toBeTruthy();
+    expect(screen.getByText(CERT_SHA256)).toBeTruthy();
+  });
+
+  it("shows the download host as the core gives it, the placeholder included, in SS mode", async () => {
+    viewOverride = {
+      ...ssView,
+      game_windows: withFile({
+        recorded_by: ["bam"],
+        file: { read: "read", download_host: "%DOWNLOAD_HOST%" },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    await openFileDetails();
+    expect(screen.getByText("Downloaded from: %DOWNLOAD_HOST%")).toBeTruthy();
+  });
+
+  it("shows no file details for a candidate that carries neither file nor recorded_by", async () => {
+    viewOverride = { ...selfView, game_windows: gameWindows() };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(await screen.findByText("Programs recorded near a game session")).toBeTruthy();
+    expect(screen.queryByText("File details")).toBeNull();
+  });
+
+  it("shows a file's kind in Thai, inside the file details", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({ file: { read: "read", content_kind: "pe_executable" } }),
+    };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจเครื่องตัวเอง"));
+    await openFileDetails("รายละเอียดไฟล์");
+    expect(screen.getByText("ตัวไฟล์เป็น: โปรแกรม (PE)")).toBeTruthy();
+  });
+
+  it("adds the file-details sentence to the SS consent in English", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    expect(
+      await screen.findByText(/For a program it names, it also shows the file's details/),
+    ).toBeTruthy();
+  });
+
+  it("adds the file-details sentence to the SS consent in Thai", async () => {
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจระหว่างแชร์หน้าจอ (โหมด SS)"));
+    expect(await screen.findByText(/สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย/)).toBeTruthy();
+  });
+
+  // ADR 0078 (P6b), owner's wording of 2026-10-23: the download-host option names both sources. The
+  // option is offered only after a full scan, so the header is set to one.
+  it("words the download-host option in full, in English and in Thai", async () => {
+    headerOverride = { ...selfView.header, scan_tier: "full" };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    expect(
+      screen.getByText(
+        "Also show the name of each website a PowerShell command, or a recorded program's file, was downloaded from. Off: each name is shown as %DOWNLOAD_HOST%.",
+      ),
+    ).toBeTruthy();
+    cleanup();
+
+    headerOverride = { ...selfView.header, scan_tier: "full" };
+    await i18n.changeLanguage("th");
+    render(<App />);
+    fireEvent.click(await screen.findByText("ตรวจระหว่างแชร์หน้าจอ (โหมด SS)"));
+    expect(
+      screen.getByText(
+        "แสดงชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาด้วย ถ้าปิดไว้ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST%",
+      ),
+    ).toBeTruthy();
   });
 });

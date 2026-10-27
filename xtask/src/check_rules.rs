@@ -81,6 +81,7 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
     let mut fixture_count = 0;
     for sourced in bundle.rules() {
         vocabulary.check(&sourced.path, &sourced.rule, &mut problems);
+        check_file_absence(&sourced.path, &sourced.rule, &mut problems);
         let rule_folder = rules_dir.join(sourced.path.trim_end_matches("rule.yaml"));
         let tests_dir = rule_folder.join("tests");
         let positive = json_files(&tests_dir.join("positive"))?;
@@ -141,6 +142,73 @@ fn check(root: &Path) -> anyhow::Result<CheckRulesOutcome> {
         rule_count: bundle.rules().len(),
         fixture_count,
         language_count: bundle.languages().len(),
+    })
+}
+
+/// The `autostart` fields a file under `%SystemRoot%` that was not read has no value for: it says
+/// `file_unread` instead, and is no gap of its place (ADR 0084).
+const UNREAD_FILE_FIELDS: [&str; 4] = ["sha256", "signature", "signer", "signer_cert_sha256"];
+
+/// Rejects an `autostart` rule that asks for one of [`UNREAD_FILE_FIELDS`] to be absent (`exists:
+/// false`) unless it also has a `path_kind` condition that names only kinds other than `windows`. A
+/// file under `%SystemRoot%` that was not read is `not_found` on that field and not a gap, so such a
+/// rule would say "looked for, not there" about a file nobody read (ADR 0084, ADR 0029).
+fn check_file_absence(path: &str, rule: &Rule, problems: &mut Vec<String>) {
+    if rule.collector != "autostart" {
+        return;
+    }
+    let absent: Vec<&str> = rule
+        .conditions()
+        .filter_map(|(key, value)| match key {
+            MatchKey::Known {
+                field,
+                operator: Operator::Exists,
+            } if value == &serde_json::Value::Bool(false)
+                && UNREAD_FILE_FIELDS.contains(&field) =>
+            {
+                Some(field)
+            }
+            _ => None,
+        })
+        .collect();
+    if absent.is_empty() || leaves_out_windows(rule) {
+        return;
+    }
+    let names = absent
+        .iter()
+        .map(|field| format!("`{field}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    problems.push(format!(
+        "rules/{path}: `match` asks for {names} to be absent, but a file under `%SystemRoot%` that was not read carries `file_unread`, not a gap, so this would say `not_found` about a file nobody read; add a `path_kind` condition that leaves out `windows` (ADR 0084)"
+    ));
+}
+
+/// Whether the rule has a `path_kind` condition, written as a plain value or a list, that names only
+/// kinds other than `windows`.
+fn leaves_out_windows(rule: &Rule) -> bool {
+    rule.conditions().any(|(key, value)| {
+        let plain = matches!(
+            key,
+            MatchKey::Known {
+                field: "path_kind",
+                operator: Operator::Equals,
+            }
+        );
+        let named: Option<Vec<&str>> = match value {
+            serde_json::Value::String(kind) => Some(vec![kind.as_str()]),
+            serde_json::Value::Array(items) => {
+                items.iter().map(serde_json::Value::as_str).collect()
+            }
+            _ => None,
+        };
+        plain
+            && named.is_some_and(|kinds| {
+                !kinds.is_empty()
+                    && kinds
+                        .iter()
+                        .all(|kind| !kind.eq_ignore_ascii_case("windows"))
+            })
     })
 }
 
@@ -353,6 +421,14 @@ fn check_operator(
     let key = operator
         .as_str()
         .map_or_else(|| field.to_owned(), |name| format!("{field}|{name}"));
+    // A list is not a value any operator can compare against, so the operator does not matter:
+    // every `match` that names one is refused, naming the rule and the field (ADR 0078 section 6).
+    if kind == FieldKind::TimestampList {
+        problems.push(format!(
+            "rules/{path}: `match` key `{key}` names `{field}`, which the `{collector}` collector emits as a list of timestamps; no comparison can match a list of timestamps (ADR 0078 section 6)"
+        ));
+        return;
+    }
     if operator.is_ordinal() {
         match kind {
             FieldKind::Number if !holds(value, serde_json::Value::is_number) => problems.push(format!(
@@ -362,7 +438,7 @@ fn check_operator(
                 "rules/{path}: `match` key `{key}` puts values in order, and the `{collector}` collector emits `{field}` as a timestamp, so the value must be an RFC 3339 timestamp such as `2026-09-13T00:00:00Z`"
             )),
             FieldKind::Number | FieldKind::Timestamp => {}
-            FieldKind::Text | FieldKind::Bool => problems.push(format!(
+            FieldKind::Text | FieldKind::Bool | FieldKind::TimestampList => problems.push(format!(
                 "rules/{path}: `match` key `{key}` puts values in order, which the `{collector}` collector's `{field}` cannot be: it emits {}. `gt`, `gte`, `lt` and `lte` need a number or a timestamp",
                 kind.as_str()
             )),
@@ -573,7 +649,7 @@ date: 2026-09-11
         assert_eq!(check_ages(&root).unwrap(), Vec::<String>::new());
     }
 
-    /// A tree with one age text for a collector that declares none, and none for the six that do.
+    /// A tree with one age text for a collector that declares none, and none for the seven that do.
     #[test]
     fn a_missing_or_unused_age_text_is_refused() {
         let tmp = TempRoot::new("ages");
@@ -582,11 +658,16 @@ date: 2026-09-11
             "id: 5b0b1f55-4d2c-4c3e-9d8a-7a6b5c4d3e2f\ncollector: posture\nretention: Now.\ndocumented: false\nreferences: [docs/adr/0011.md]\n",
         );
         let problems = check_ages(tmp.path()).unwrap();
-        assert_eq!(problems.len(), 7, "{problems:?}");
+        assert_eq!(problems.len(), 8, "{problems:?}");
         assert!(
             problems
                 .iter()
                 .any(|p| p.contains("`evtx` declares a trace age and has no"))
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("`userassist` declares a trace age and has no"))
         );
         assert!(
             problems
@@ -1061,7 +1142,7 @@ date: 2026-09-11
             ("service_disabled", &["prefetch"]),
             (
                 "budget_spent",
-                &["autostart", "driver_service", "evtx", "usn"],
+                &["autostart", "driver_service", "event_fields", "evtx", "usn"],
             ),
             ("not_attempted", &["evtx"]),
             ("other_volume", &["usn"]),
@@ -1174,6 +1255,24 @@ date: 2026-09-11
             .problems
     }
 
+    /// The field-kind gate on a rule and its `match_lists` data, without a fixture tree on disk:
+    /// the bundle loader expands the lists, then the vocabulary checks the fields the engine will
+    /// see. This is the same pair `check` runs for every rule.
+    fn checked_rule(rule_yaml: &str, data: &[(&str, &str)]) -> Vec<String> {
+        let mut rule: Rule = serde_saphyr::from_str(rule_yaml).expect("the rule parses");
+        let data: BTreeMap<String, String> = data
+            .iter()
+            .map(|(name, contents)| ((*name).to_owned(), (*contents).to_owned()))
+            .collect();
+        let mut problems = rongroi_core::rules::expand_match_lists(&mut rule, &data);
+        Vocabulary::of_this_build().check(
+            "prefetch/execution/example/rule.yaml",
+            &rule,
+            &mut problems,
+        );
+        problems
+    }
+
     /// Gate (6): an operator that is not one of ours. Accepting it would evaluate the rule as
     /// something other than what it says (ADR 0029).
     #[test]
@@ -1274,6 +1373,55 @@ date: 2026-09-11
         );
     }
 
+    /// A list of timestamps is not a value a comparison can match: `check-rules` refuses every
+    /// `match` that names one, naming the rule and the field (ADR 0078 section 6).
+    #[test]
+    fn a_match_on_a_timestamp_list_field_is_rejected() {
+        let problems = checked_rule(
+            &prefetch_rule("  run_times: \"2025-12-30T00:00:00Z\"\n"),
+            &[],
+        );
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The same field reached through `match_lists`: it expands into `match`, so the refusal must
+    /// not depend on which of the two wrote it.
+    #[test]
+    fn a_match_lists_entry_for_a_timestamp_list_field_is_rejected() {
+        let rule = prefetch_rule("  run_count|gte: 1\n").replace(
+            "retention:",
+            "match_lists:\n  run_times: run_times.csv\nretention:",
+        );
+        let problems = checked_rule(
+            &rule,
+            &[("run_times.csv", "run_times\n2025-12-30T00:00:00Z\n")],
+        );
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The control: matching Prefetch's `last_run` is allowed, before and after the list joins it.
+    #[test]
+    fn a_match_on_prefetch_last_run_is_accepted() {
+        let problems = checked_rule(
+            &prefetch_rule("  last_run|lt: \"2026-09-13T00:00:00Z\"\n"),
+            &[],
+        );
+
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+
     /// Every field a collector declares carries a kind, so the first rule written for any of them
     /// can use an operator.
     #[test]
@@ -1292,5 +1440,67 @@ date: 2026-09-11
                 collector.id()
             );
         }
+    }
+
+    /// An `autostart` rule with the `match` block under test, under `outside-windows`. `experimental`
+    /// needs no fixtures, so the `match` is the only thing the test asks about.
+    fn autostart_rule(match_block: &str) -> String {
+        format!(
+            "id: 5d3e8a21-7c4b-4f96-b1a0-2e8c6d9f0a13\ntitle: t\ndescription: d\nstatus: experimental\ncollector: autostart\nstrength: posture\nmatch:\n{match_block}retention: What autostart still holds.\nfalsepositives: [x]\nauthor: a\ndate: 2026-10-24\n"
+        )
+    }
+
+    /// The problems `check` reports for one such rule.
+    fn autostart_problems(label: &str, match_block: &str) -> Vec<String> {
+        let tmp = TempRoot::new(label);
+        let dir = tmp.path().join("rules/autostart/outside-windows/example");
+        write(&dir.join("rule.yaml"), &autostart_rule(match_block));
+        write_empty_tests_dir(&dir);
+        check(tmp.path())
+            .expect("check-rules should run to completion")
+            .problems
+    }
+
+    /// ADR 0084 decision 4: a file under `%SystemRoot%` that was not read has no value for the file
+    /// fields and no gap either, so asking for one of them to be absent would say `not_found` about a
+    /// file nobody read. Refused unless the rule also leaves `windows` out of `path_kind`.
+    #[test]
+    fn an_autostart_absence_of_a_file_field_is_refused_when_windows_is_not_left_out() {
+        for (label, match_block) in [
+            (
+                "absent-sha256-no-kind",
+                "  starts_by_itself: true\n  sha256|exists: false\n",
+            ),
+            (
+                "absent-signature-windows",
+                "  starts_by_itself: true\n  signature|exists: false\n  path_kind: windows\n",
+            ),
+            (
+                "absent-signer-any-kind",
+                "  signer|exists: false\n  path_kind|exists: true\n",
+            ),
+        ] {
+            let problems = autostart_problems(label, match_block);
+            assert_eq!(problems.len(), 1, "{match_block}: {problems:?}");
+            assert!(
+                problems[0].contains("autostart/outside-windows/example/rule.yaml"),
+                "{problems:?}"
+            );
+            assert!(problems[0].contains("file_unread"), "{problems:?}");
+        }
+    }
+
+    /// The control: an absence of a file field is accepted once `path_kind` leaves `windows` out, and
+    /// an absence of a field that is not a file's is never the guard's business.
+    #[test]
+    fn an_autostart_absence_is_accepted_when_the_rule_leaves_windows_out() {
+        let problems = autostart_problems(
+            "absent-outside-windows",
+            "  starts_by_itself: true\n  signer|exists: false\n  path_kind: [program_data, user_profile, other]\n",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+
+        let problems = autostart_problems("absent-service", "  service|exists: false\n");
+        assert!(problems.is_empty(), "{problems:?}");
     }
 }

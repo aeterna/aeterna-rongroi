@@ -21,6 +21,8 @@
 //! The word says where a file of that name ran from, not which program it was (ADR 0034). A path below
 //! neither folder has no edition, and the field is then omitted.
 
+use rongroi_host::is_unusable_segment;
+
 use crate::fivem_dir::{ENHANCED_PROGRAM_RELATIVE_PATH, LEGACY_PROGRAM_RELATIVE_PATH};
 
 /// The observation field that carries the edition.
@@ -64,14 +66,11 @@ impl FivemEdition {
 /// Only the first `AppData` segment is considered, and it must have a profile folder before it and the
 /// path's root before that. A path holding a `.` or `..` segment, or an empty segment after `AppData`,
 /// is refused: such a spelling may name a file outside the folder it appears to be below, and this
-/// program does not attribute a path to a folder it only appears to be below (as `paths::is_refused_form`
-/// refuses those forms for reading).
+/// program does not attribute a path to a folder it only appears to be below (as
+/// `rongroi_host::is_refused_form` refuses those forms for reading).
 pub fn of_path(path: &str) -> Option<FivemEdition> {
     let segments: Vec<&str> = path.split(['\\', '/']).collect();
-    if segments
-        .iter()
-        .any(|segment| crate::paths::is_unusable_segment(segment))
-    {
+    if segments.iter().any(|segment| is_unusable_segment(segment)) {
         return None;
     }
     let app_data = segments

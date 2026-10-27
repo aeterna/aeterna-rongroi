@@ -55,33 +55,35 @@ const KNOWN_FPS_COLUMNS: [&str; 4] = ["rule_id", "baseline", "reason", "added"];
 const UNCONFRONTED_COLUMNS: [&str; 4] = ["rule_id", "reason", "resolved_when", "added"];
 
 /// One accepted match, as written in `known-fps.csv`.
-struct KnownFp {
+pub(crate) struct KnownFp {
     /// Line in the file, for messages.
-    line: usize,
+    pub(crate) line: usize,
     /// Rule the row accepts a match from.
-    rule_id: String,
+    pub(crate) rule_id: String,
     /// Baseline the row accepts it on.
-    baseline: String,
+    pub(crate) baseline: String,
     /// Why it is accepted. Never empty.
-    reason: String,
+    pub(crate) reason: String,
     /// Whether both the rule and the baseline exist, so the row could be hit at all.
-    resolvable: bool,
+    pub(crate) resolvable: bool,
     /// Whether the match this row describes actually happened.
-    hit: bool,
+    pub(crate) hit: bool,
 }
 
 /// One rule whose hole is accepted for now, as written in `unconfronted.csv`.
-struct Unconfronted {
+pub(crate) struct Unconfronted {
     /// Line in the file, for messages.
-    line: usize,
+    pub(crate) line: usize,
     /// Rule the row excuses.
-    rule_id: String,
+    pub(crate) rule_id: String,
     /// Why no baseline confronts it. Never empty.
-    reason: String,
+    pub(crate) reason: String,
     /// What would make the row unnecessary. Never empty.
-    resolved_when: String,
+    pub(crate) resolved_when: String,
+    /// The `added` column as written (not validated here), for ordering the open holes by age.
+    pub(crate) added: String,
     /// Whether the rule exists, so the row could be needed at all.
-    resolvable: bool,
+    pub(crate) resolvable: bool,
 }
 
 /// Everything `run` needs to print or bail on, computed without touching stdout/stderr so tests can
@@ -362,7 +364,10 @@ fn render(value: &serde_json::Value) -> String {
 
 /// Reads `unconfronted.csv`. An absent file is no rows, which is the state a rule set every baseline
 /// confronts should be in.
-fn read_unconfronted(root: &Path, problems: &mut Vec<String>) -> anyhow::Result<Vec<Unconfronted>> {
+pub(crate) fn read_unconfronted(
+    root: &Path,
+    problems: &mut Vec<String>,
+) -> anyhow::Result<Vec<Unconfronted>> {
     let path = root.join(UNCONFRONTED);
     if !path.is_file() {
         return Ok(Vec::new());
@@ -387,7 +392,7 @@ fn read_unconfronted(root: &Path, problems: &mut Vec<String>) -> anyhow::Result<
             }
             continue;
         }
-        let [rule_id, reason, resolved_when, _added] = fields.as_slice() else {
+        let [rule_id, reason, resolved_when, added] = fields.as_slice() else {
             problems.push(format!(
                 "{UNCONFRONTED}:{line_number}: expected the {} fields of `{header}`, found {}",
                 UNCONFRONTED_COLUMNS.len(),
@@ -400,6 +405,7 @@ fn read_unconfronted(root: &Path, problems: &mut Vec<String>) -> anyhow::Result<
             rule_id: rule_id.clone(),
             reason: reason.clone(),
             resolved_when: resolved_when.clone(),
+            added: added.clone(),
             resolvable: false,
         });
     }
@@ -457,7 +463,10 @@ fn baseline_hosts(root: &Path) -> anyhow::Result<Vec<(String, PathBuf)>> {
 
 /// Reads `known-fps.csv`. An absent file is no rows, not a problem: a rule set with nothing to accept
 /// need not carry the file.
-fn read_known_fps(root: &Path, problems: &mut Vec<String>) -> anyhow::Result<Vec<KnownFp>> {
+pub(crate) fn read_known_fps(
+    root: &Path,
+    problems: &mut Vec<String>,
+) -> anyhow::Result<Vec<KnownFp>> {
     let path = root.join(KNOWN_FPS);
     if !path.is_file() {
         return Ok(Vec::new());

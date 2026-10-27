@@ -31,12 +31,16 @@
 //! [`rongroi_host::Host`]: https://github.com/aeterna/aeterna-rongroi
 
 pub mod bam;
+pub mod content_kind;
 mod cp1252;
 pub mod error;
 pub mod evtx;
 pub mod filetime;
 pub mod pca;
+pub mod pe_version;
 pub mod powershell_text;
 pub mod prefetch;
 pub mod task;
+pub mod userassist;
 pub mod usn;
+pub mod zone_identifier;

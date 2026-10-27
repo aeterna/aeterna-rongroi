@@ -8,7 +8,7 @@ description: >-
   these files itself, and on the one Windows 11 machine this project measured, none of several hundred
   carried the attribute. This row names the log. It does not say who set the attribute, when, or why,
   and it is not evidence that anything was hidden.
-status: experimental
+status: stable
 collector: evtx
 strength: tamper
 match:

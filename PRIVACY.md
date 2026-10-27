@@ -97,9 +97,9 @@ read only to find where the program's file ends, because arguments are where a t
 address is passed to a program. (The one place this program reads any command, PowerShell's, is a full
 scan's, and it keeps only what kinds of words it held — [below](#a-full-scan-reads-more-and-only-if-you-agree-before-it-starts).) Of a task it also never reads who made it, its description, its working
 folder or the account it runs as into the report; the account is compared with the one running this
-scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file **outside the Windows
-folder** it reads a SHA-256 and what Windows says about its embedded signature, as for FiveM's files;
-files inside the Windows folder are reported by their path alone. The list names software you
+scan, only to know whose folders a `%LOCALAPPDATA%`-style path means. Of each file it reads a SHA-256 and what Windows
+says about its embedded signature, as for FiveM's files — files inside the Windows folder too, after the
+others (ADR 0084); one the time does not reach says so on its row. The list names software you
 installed — launchers, chat apps, peripheral and RGB utilities — because they set themselves to start.
 
 **In SS mode, the name of a `Run` value and of a scheduled task is never shown**: a task's name can
@@ -155,7 +155,11 @@ identifies your PC. None of that is reported, in either mode.** Replacing your u
 paths would not help: the list itself is a description of what is on your PC, and this check has no use
 for it. The report says so, rather than leaving you to notice it is missing. The program's own entry in
 that list is read for one word only: when it is below one of FiveM's two program folders, which one —
-`legacy` or `enhanced` — and the entry itself is not reported (ADR 0062).
+`legacy` or `enhanced` — and the entry itself is not reported (ADR 0062). For FiveM, the game and its
+launcher, `rundll32.exe` and `regsvr32.exe` only, the list is also read for **one number**: how many of the
+files it names have a program's extension (`.dll`, `.exe` and the like) and are outside Windows, Program
+Files and FiveM's two program folders. Only that number is reported, in both modes; no path, file name or
+disk from the list is (ADR 0082).
 
 Of Windows' Background Activity Moderator it reads which programs ran and when. That record is kept
 **per user account**, and the account is named by a SID — an identifier of the account *and* of the
@@ -166,6 +170,13 @@ written any other way can carry your account name with nothing to replace it, so
 than shown — and the report says it was withheld, rather than leaving you to notice it is missing. When
 the path is below one of FiveM's two program folders, the record also carries which one — `legacy` or
 `enhanced` — whether the path is shown or withheld (ADR 0062).
+Of Windows' **UserAssist** record it reads, for the account the scan runs as, which programs that
+account opened through Windows' shell — by double-clicking, from the Start menu or the taskbar — and when
+it last opened each (ADR 0080). A program another program started is not in that record. The path is
+reported only when it starts with a drive letter, as for the Background Activity Moderator; a program
+known by an app name rather than a path (for example a Store app) is reported by that name. Shortcuts are
+counted, never listed. Whether the account the scan ran as is the one signed in at the keyboard is said as
+`same` or `other`, by comparing two account IDs that are never put in the report.
 Of the Windows event logs it reads **how many events of each kind each log holds** — the channel, who
 wrote them, the event number, the severity and the first and last time one was written — and, of each log
 itself, how far back it still reaches: the time and the record number of the oldest and the newest event
@@ -179,7 +190,19 @@ all**: an event's own text is where user names, PC names, addresses, account ide
 lines live, and none of it survives the step that reads the file. **One number is the exception** (ADR 0071):
 of the event Windows writes to its System log each time it starts, the tool reads `BootType`, which says
 whether that start followed a full shutdown or a Fast Startup one, and the time of the event. Nothing else of
-that event is read, and nothing of any other event.
+that event is read. **Four more kinds of event are read for a few named fields** (ADR 0081), and their text
+never reaches the report:
+- when a service or driver was installed (System log, 7045), whether it is a driver or a program, and a
+  **fingerprint** of its file's path — a SHA-256 of the path, which matches only the same path. The path,
+  the service's name and the account it runs as are not read;
+- when the clock was changed (System log, Kernel-General 1; Security log, 4616): the time before and after,
+  Windows' reason number, and whether a program in Windows' own folder made the change — never which
+  program. Changes under a minute are only counted;
+- for each file Code Integrity refused to load (3033), a fingerprint of its path after the drive, how many
+  times and when — never the file's name or the program that tried to load it.
+A fingerprint is not a secret: anyone who already has a path can compute it, and the same file gives the
+same fingerprint in every report, so two reports of the same file can be matched by it. SS mode shows it.
+Nothing of any other event is read.
 A log the tool could not read — because Windows refused it, because it is larger than the tool will open,
 or because the tool's own time limit ran out — is **named in the report as one it could not read**, rather
 than passed over in silence. A log the tool never opened at all, because that time limit was already gone
@@ -287,6 +310,14 @@ What a full scan reads today:
   unspecified. PowerShell itself leaves out of its history every line holding the words password, token,
   key or secret. Whether that history is the one of the account signed in at the keyboard is said as `same`
   or `other`, by comparing two account IDs that are never put in the report.
+- **The files of programs Windows recorded running** (ADR 0079, ADR 0080): for each path BAM, the Program
+  Compatibility Assistant, UserAssist or the list of running programs names, the file at that path is read for what
+  kind of content it holds (whether its bytes match its name, whether data trails its end, whether a
+  program is hidden inside), its hash, its digital signature, the original file name in its version
+  information, and its `Zone.Identifier` stream: the download zone Windows wrote on it and the name of the
+  website it came from. The rest of the download address and the page that linked to it are never kept.
+  The website's name is shown in SS mode only if you agree to that separately, as for PowerShell. Files
+  are read nearest your last FiveM or GTA V session first, for up to 90 seconds in total.
 
 A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
 reads a browser's history, a messenger's storage, or anything that holds a password or a token.
@@ -311,6 +342,14 @@ reasons are the ordinary state of an ordinary PC and none of them is a finding a
 
 The tool does **not** take screenshots, read browser history, access files unrelated to its collectors,
 or allow remote access.
+
+**Reading a file can update its last-access time.** The tool opens every file it reads for reading only,
+and it never changes a file's contents, its creation time or its last-write time. On a PC where Windows
+keeps last-access times up to date, which many Windows 11 PCs do, Windows records the read itself: a file
+this tool hashed or read shows the time of the scan as its last access. That was measured on a Windows 11
+PC for an ordinary read and for a downloaded file's `Zone.Identifier` stream (ADR 0079). A last-access time
+after a scan therefore says nothing about what the player did, and this tool never reads last-access times
+itself (ADR 0050).
 
 ## What leaves the machine
 
@@ -339,6 +378,7 @@ or allow remote access.
 | When parts of this PC were set up (dates) | shown | shown — [below](#how-far-back-the-traces-reach) |
 | How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |
 | Each FiveM edition's last session beside its folders | shown | shown — [below](#how-far-back-the-traces-reach) |
+| Programs recorded near a game session (ADR 0078) | every program with a recorded time in the 30 minutes before a FiveM session, during it, the 30 minutes after it, or between it and the scan, with its facts and their ordinary causes, which of Windows' records recorded it, and, after a full scan, its file's details (hash, signature and signer, what kind of file it is, the name in its version information, its download zone and the website it came from); your user name is hidden in paths | **named only when a fact about its file holds** (it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders), with the same facts and file details, the website shown as `%DOWNLOAD_HOST%` unless you agree to show websites (ADR 0064); every other program is **a count per window**. Before ADR 0078, SS mode showed no Prefetch, BAM or Program Compatibility Assistant record by name (ADR 0034) |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
 
 ### The timeline

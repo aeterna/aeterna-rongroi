@@ -447,7 +447,7 @@ fn decode_utf16_base64(s: &str) -> Option<String> {
 }
 
 /// The host of the first `http://` or `https://` URL, reduced as [`DownloadHost`] says.
-fn first_url_host(text: &str) -> Option<DownloadHost> {
+pub(crate) fn first_url_host(text: &str) -> Option<DownloadHost> {
     let lower = text.to_ascii_lowercase();
     let start = ["http://", "https://"]
         .iter()
@@ -488,7 +488,7 @@ fn first_url_host(text: &str) -> Option<DownloadHost> {
     plain.then(|| DownloadHost::Name(host.to_owned()))
 }
 
-fn address_kind(ip: IpAddr) -> AddressKind {
+pub(crate) fn address_kind(ip: IpAddr) -> AddressKind {
     match ip {
         IpAddr::V4(v4) => {
             if v4.is_unspecified() {

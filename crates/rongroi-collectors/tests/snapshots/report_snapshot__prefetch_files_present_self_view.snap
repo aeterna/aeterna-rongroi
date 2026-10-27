@@ -625,6 +625,16 @@ expression: view
             "read_only": false,
             "recorded_runs": 8,
             "run_count": 55,
+            "run_times": [
+              "2016-01-12T20:07:03.9810694Z",
+              "2016-01-10T02:29:02.7887265Z",
+              "2016-01-04T23:27:28.7268912Z",
+              "2016-01-04T23:27:28.4058698Z",
+              "2016-01-04T18:38:11.3441634Z",
+              "2016-01-04T18:38:10.9356554Z",
+              "2015-12-31T21:42:29.6670183Z",
+              "2015-12-17T22:34:21.5798615Z"
+            ],
             "scca_version": 30
           }
         },
@@ -706,6 +716,10 @@ expression: view
         "reason": "read_failed"
       },
       {
+        "collector": "userassist",
+        "reason": "source_absent"
+      },
+      {
         "collector": "pci_device",
         "reason": "read_failed"
       },
@@ -720,6 +734,10 @@ expression: view
       {
         "collector": "windows_start",
         "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "reason": "source_absent"
       }
     ]
   },
@@ -727,6 +745,7 @@ expression: view
     "posture",
     "driver_service",
     "windows_start",
+    "event_fields",
     "pci_device",
     "hid_device",
     "autostart",
@@ -740,6 +759,8 @@ expression: view
     "prefetch",
     "bam",
     "pca",
+    "userassist",
+    "recorded_files",
     "usn"
   ],
   "trace_ages": {
@@ -860,6 +881,11 @@ expression: view
         "collector": "pca",
         "state": "unmeasured",
         "reason": "read_failed"
+      },
+      {
+        "collector": "userassist",
+        "state": "unmeasured",
+        "reason": "source_absent"
       },
       {
         "collector": "usn",

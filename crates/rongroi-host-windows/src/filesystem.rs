@@ -4,8 +4,10 @@
 
 //! Reads directories, file hashes and environment variables from the real machine.
 //!
-//! Everything here opens for reading only: nothing is written, renamed, deleted or locked, and no
-//! timestamp is changed (AGENTS.md hard rule 2). No `unsafe` is needed — `std::fs` is enough.
+//! Everything here opens for reading only: nothing is written, renamed, deleted or locked, and
+//! creation and last-write times are unchanged (AGENTS.md hard rule 2). Reading a file or its stream
+//! can move the file's last-access time on a PC with last-access updates enabled (ADR 0079,
+//! Measured). No `unsafe` is needed — `std::fs` is enough.
 
 use rongroi_host::{DirEntryInfo, EntryTimes, EnvironmentSource, FilesystemSource, SourceError};
 
@@ -65,8 +67,9 @@ impl FilesystemSource for LiveHost {
     }
 
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
-        // Opened for reading only, like every other read here: no truncation flag, no write share
-        // request, no timestamp changed (AGENTS.md hard rule 2).
+        // Opened for reading only, like every other read here: no truncation flag and no write share
+        // request (AGENTS.md hard rule 2). Creation and last-write times are unchanged; the read can
+        // move the last-access time on a PC with last-access updates enabled (ADR 0079, Measured).
         let file = match std::fs::File::open(path) {
             Ok(file) => file,
             // The file is not there — the same fact `list_dir` reports for a folder. A Prefetch entry
@@ -77,6 +80,25 @@ impl FilesystemSource for LiveHost {
         // The limit lives in `rongroi-host`, so this host refuses exactly what the fixture host does.
         rongroi_host::read_bounded(std::io::BufReader::new(file), rongroi_host::MAX_FILE_BYTES)
             .map(Some)
+    }
+
+    /// The stream is opened for reading only, after the path is checked: a refused form never reaches
+    /// the join, so no spelling of a path can name a stream this program does not read (ADR 0079
+    /// section 1). Reading the stream can move the file's last-access time, as reading the file can
+    /// (ADR 0079, Measured).
+    fn zone_identifier(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        let stream = rongroi_host::zone_identifier_path(path)?;
+        let file = match std::fs::File::open(&stream) {
+            Ok(file) => file,
+            // Neither the file nor its stream is there. Both are the same answer: nothing to read.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(SourceError::from_io(&error)),
+        };
+        rongroi_host::read_bounded(
+            std::io::BufReader::new(file),
+            rongroi_host::MAX_STREAM_BYTES,
+        )
+        .map(Some)
     }
 
     /// `symlink_metadata`, not `metadata`: the attribute of the directory entry the collector listed,
@@ -205,6 +227,30 @@ mod tests {
         #[allow(clippy::permissions_set_readonly_false)]
         permissions.set_readonly(false);
         std::fs::set_permissions(&set, permissions).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The stream is read from a real file system, and a file without one has none (ADR 0079 section
+    /// 1). The stream is written to a file this test created in its own temporary folder, never to
+    /// anything a scan reads.
+    #[cfg(windows)]
+    #[test]
+    fn the_zone_identifier_stream_is_read_from_a_real_file() {
+        let dir = std::env::temp_dir().join(format!("rongroi-zone-id-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let with_stream = dir.join("with-stream.bin");
+        let plain = dir.join("plain.bin");
+        std::fs::write(&with_stream, b"x").unwrap();
+        std::fs::write(&plain, b"x").unwrap();
+        let stream = b"[ZoneTransfer]\r\nZoneId=3\r\n";
+        let mut stream_path = with_stream.as_os_str().to_os_string();
+        stream_path.push(":Zone.Identifier");
+        std::fs::write(&stream_path, stream).unwrap();
+
+        let answer = |path: &std::path::Path| LiveHost.zone_identifier(path.to_str().unwrap());
+        assert_eq!(answer(&with_stream), Ok(Some(stream.to_vec())));
+        assert_eq!(answer(&plain), Ok(None));
+
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

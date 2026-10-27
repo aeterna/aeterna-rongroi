@@ -258,12 +258,13 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
              %ACCOUNT_IDENTIFIER% [y/N] "
         }
         (Lang::En, "download_host_question") => {
-            "Show the person watching the name of each website a PowerShell command downloaded from? \
-             Only the name is read, never the rest of the address or the command. If not, each name is \
-             shown as %DOWNLOAD_HOST%. [y/N] "
+            "Show the person watching the name of each website a PowerShell command, or a recorded \
+             program's file, was downloaded from? Only the name is read, never the rest of the address \
+             or the command. If not, each name is shown as %DOWNLOAD_HOST%. [y/N] "
         }
         (Lang::Th, "download_host_question") => {
-            "ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell ดาวน์โหลดจากมาหรือไม่ อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง \
+            "ให้คนที่ดูอยู่เห็นชื่อเว็บไซต์ที่คำสั่ง PowerShell หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้ ดาวน์โหลดมาหรือไม่ \
+             อ่านเฉพาะชื่อ ไม่อ่านส่วนอื่นของที่อยู่หรือตัวคำสั่ง \
              ถ้าไม่ แต่ละชื่อจะแสดงเป็น %DOWNLOAD_HOST% [y/N] "
         }
         _ => "",
@@ -346,21 +347,23 @@ pub fn consent(lang: Lang) -> String {
             \x20 - the programs running now and when each started, and the files in FiveM's plugin folders for GTA V Legacy and Enhanced and FiveM.exe itself, with their signatures (Authenticode)\n\
             \x20 - for FiveM's log, crash and cache folders for GTA V Legacy and Enhanced: how many files and subfolders each holds, their total size and the earliest and latest file times, and for each Enhanced server cache folder when it was created and last changed and how many entries it holds, and for Legacy's resource cache, its index folder's own times, how many files it holds and the latest of their times, never a file or folder name; these times can match two reports of this PC\n\
             \x20 - what Windows recorded about programs that ran (Prefetch, BAM, Program Compatibility Assistant), and whether Prefetch is switched on, and for a running program or one of these records whose file is below FiveM's program folder, which edition's it was (Legacy or Enhanced), never the path\n\
-            \x20 - how many events of each kind the Windows event logs hold, not what the events say, and which file and size Windows sets for each log\n\
+            \x20 - the programs this account opened through Windows' shell (UserAssist), and when it last opened each; whether the account that ran the scan is the one signed in at the keyboard\n\
+            \x20 - how many events of each kind the Windows event logs hold, not what the events say, except BootType and the fields in the item below, and which file and size Windows sets for each log\n\
+            \x20 - from four kinds of event in the System, Code Integrity and Security logs: when a service or driver was installed, when the clock was changed, from what time to what time, with Windows' reason number and whether a Windows program made the change, and, for a service's file and each file Code Integrity refused, a fingerprint of its path that matches only the same path — never a path or a name\n\
             \x20 - whether a Prefetch or event log file is marked read-only\n\
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders, FiveM's plugin folders and the folder PowerShell keeps its command history in, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
             \x20 - the PCI devices Windows remembers, present or not: the maker, device and subsystem numbers and the class Windows records, the driver bound to each, its problem code, and when Windows set it up, last saw it at a start of Windows and recorded it removed, never a serial number; these times can match two reports of this PC\n\
             \x20 - the mice, keyboards and other input devices (HID) Windows remembers, present or not: the maker and model numbers and the driver, and when Windows set each up, last saw it at a start of Windows and recorded it removed, never a serial number or a name\n\
             \x20 - how Windows started each time its System log remembers: one number per start that says whether it followed a full shutdown or a Fast Startup one, and nothing else of that event\n\
-            \x20 - what Windows starts by itself: each program service's name and start setting, each Run and RunOnce value's name, and each scheduled task's name, whether it is on and what starts it, with the file each one starts — where it is and, outside the Windows folder, its SHA-256 and signature (Authenticode); never the arguments a program is given\n\
+            \x20 - what Windows starts by itself: each program service's name and start setting, each Run and RunOnce value's name, and each scheduled task's name, whether it is on and what starts it, with the file each one starts — where it is, its SHA-256 and signature (Authenticode); never the arguments a program is given\n\
             \x20 - Microsoft Defender's exclusions: each folder, program and file type Defender is told not to scan, and how many network addresses it is told to skip, never the addresses\n\
             \x20 - the settings that decide where network traffic goes, never a record of where it went: the lines of the hosts file that give a name under cfx.re, fivem.net or rockstargames.com an address, with that address (other lines are only counted), whether a proxy is on and whether a proxy server or a setup script is set, never their addresses, and the Windows Firewall rules for programs in FiveM's folders, with how many rules there are\n\
             \x20 - what Windows says this installation is — the edition, the build, the registered organisation and the manufacturer, model and support link Settings shows, never the registered owner's name — and how each of the services Windows ships with (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) is set to start, or that its key is not there\n\
             \x20 - whether six named places are on this PC: five that the Atlas and ReviOS Windows modifications install, and the folder Windows keeps Defender's engine in — whether each is there and nothing about what is inside it\n\
             \x20 - when parts of this PC were set up, as dates and never times: when this Windows installation was installed or last feature-upgraded, the earliest installation date Windows Setup kept and how many it kept, when the Windows drive's change journal, its root folder and its $Recycle.Bin were created, and when FiveM's program folders were created; these dates can match two reports of this PC\n\
             \x20 - when Windows last started, which is shown to staff as one time at the top of the report\n\
-            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; the first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as suspicious, never what the script said; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. With --case-code, the output also holds every PCI and input device above (model numbers and times, no names) and the case code. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown.\n\
+            It shows what matches a rule, and a timeline of: the times Windows recorded (Prefetch, BAM, Program Compatibility Assistant) for programs named FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b<number>_GTAProcess.exe, a name that does not show which program it was; the times of FiveM's log, crash and cache folders above; the oldest and newest record of each event log; the first and last time the Code Integrity log recorded Windows refusing to load a file and Microsoft Defender's log recorded a detection, never which file or what was detected; the first and last time Windows PowerShell's log recorded a script block PowerShell itself flagged as suspicious, never what the script said; and the oldest and newest change the journal holds for each folder above. It also shows how far back each of these records reaches — for each event log, Prefetch, BAM, Program Compatibility Assistant, the change journal and FiveM's folders, how many entries it holds and the oldest time still there, never a name — beside the dates above, and, when Prefetch or BAM reaches back further than FiveM's folders were last written and holds none of the names above, one statement that puts the two side by side with the ordinary reasons for it; and, for each FiveM edition, one statement that puts its last session — when it began and ended, from a FiveM process running now, Prefetch or BAM, never compared with the scan's time — beside how long before or after its start its own folders were written, with the ordinary reasons for that. Its own code sends nothing anywhere. With --case-code, the output also holds every PCI and input device above (model numbers and times, no names) and the case code. Your user name is hidden in paths. A hosts line's address is shown only as its kind: loopback, unspecified, private or public. The name of a Run value or a scheduled task is not shown. In SS mode, programs recorded near your last game session are named only when a fact about the file holds: it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders. Other programs are counted, not named. For a program it names, it also shows the file's details: its hash, signature and signer, what kind of file it is, the name in its version information, and its download zone. The website it came from is shown only if you agree to show websites.\n\
             You may refuse.\n\
             Continue? [y/N] "
             .to_owned(),
@@ -370,29 +373,32 @@ pub fn consent(lang: Lang) -> String {
             \x20 - โปรแกรมที่กำลังรันอยู่และเวลาที่แต่ละตัวเริ่ม ไฟล์ในโฟลเดอร์ plugin ของ FiveM ทั้ง GTA V Legacy และ Enhanced และตัว FiveM.exe พร้อมลายเซ็นของไฟล์ (Authenticode)\n\
             \x20 - โฟลเดอร์ log, crash และ cache ของ FiveM ทั้ง GTA V Legacy และ Enhanced: จำนวนไฟล์และโฟลเดอร์ย่อย ขนาดรวม และเวลาของไฟล์ที่เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ใน Enhanced เวลาที่สร้างกับเวลาที่แก้ไขล่าสุด และจำนวนรายการข้างใน และสำหรับ resource cache ของ Legacy เวลาของโฟลเดอร์ดัชนีเอง จำนวนไฟล์ในนั้น และเวลาล่าสุดของไฟล์เหล่านั้น โดยไม่เก็บชื่อไฟล์หรือชื่อโฟลเดอร์ เวลาเหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - สิ่งที่ Windows บันทึกไว้เกี่ยวกับโปรแกรมที่เคยรัน (Prefetch, BAM, Program Compatibility Assistant) และ Prefetch เปิดอยู่หรือไม่ และสำหรับโปรแกรมที่กำลังรันหรือบันทึกเหล่านี้ที่ไฟล์อยู่ใต้โฟลเดอร์โปรแกรมของ FiveM ว่าเป็นของ edition ไหน (Legacy หรือ Enhanced) โดยไม่แสดง path\n\
-            \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
+            \x20 - โปรแกรมที่บัญชีนี้เปิดผ่าน shell ของ Windows (UserAssist) และเวลาที่เปิดครั้งล่าสุดของแต่ละโปรแกรม รวมถึงว่าบัญชีที่รันการสแกนเป็นบัญชีเดียวกับที่ลงชื่อเข้าใช้ที่หน้าเครื่องหรือไม่\n\
+            \x20 - จำนวน event แต่ละแบบใน event log ของ Windows โดยไม่อ่านว่า event นั้นเขียนว่าอะไร ยกเว้น BootType และ field ในข้อถัดไป และไฟล์กับขนาดที่ Windows ตั้งไว้ให้ log แต่ละตัว\n\
+            \x20 - จาก event 4 ชนิดใน log ของ System, Code Integrity และ Security: เวลาที่มีการติดตั้ง service หรือ driver เวลาที่นาฬิกาถูกเปลี่ยน จากเวลาไหนเป็นเวลาไหน พร้อมหมายเลขเหตุผลของ Windows และว่าโปรแกรมของ Windows เป็นผู้เปลี่ยนหรือไม่ และสำหรับไฟล์ของ service และไฟล์ที่ Code Integrity ปฏิเสธ จะเก็บลายนิ้วมือ (fingerprint) ของ path ที่ตรงกับ path เดียวกันเท่านั้น — ไม่เก็บ path หรือชื่อ\n\
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
             \x20 - อุปกรณ์ PCI ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิต อุปกรณ์ และ subsystem กับ class ที่ Windows บันทึก ไดรเวอร์ที่ผูกกับแต่ละตัว problem code และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียล เวลาเหล่านี้ใช้จับคู่รายงานสองฉบับของเครื่องนี้ได้\n\
             \x20 - เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น (HID) ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิตและรุ่น ไดรเวอร์ และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียลหรือชื่อ\n\
             \x20 - Windows เริ่มทำงานแบบไหนในแต่ละครั้งที่ log System ยังจำไว้: ตัวเลขหนึ่งตัวต่อการเริ่มทำงาน ที่บอกว่าต่อจากการปิดเครื่องแบบเต็มหรือแบบ Fast Startup และไม่อ่านอย่างอื่นของ event นั้น\n\
-            \x20 - สิ่งที่ Windows เริ่มเอง: ชื่อและการตั้งค่าการเริ่มทำงานของ service แต่ละตัว ชื่อค่าใน Run และ RunOnce แต่ละค่า และชื่อ scheduled task แต่ละตัว ว่าเปิดอยู่หรือไม่และอะไรทำให้มันเริ่ม พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง และถ้าอยู่นอกโฟลเดอร์ Windows ก็ SHA-256 กับลายเซ็น (Authenticode) โดยไม่อ่าน argument ที่โปรแกรมได้รับเลย\n\
+            \x20 - สิ่งที่ Windows เริ่มเอง: ชื่อและการตั้งค่าการเริ่มทำงานของ service แต่ละตัว ชื่อค่าใน Run และ RunOnce แต่ละค่า และชื่อ scheduled task แต่ละตัว ว่าเปิดอยู่หรือไม่และอะไรทำให้มันเริ่ม พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง SHA-256 และลายเซ็น (Authenticode) โดยไม่อ่าน argument ที่โปรแกรมได้รับเลย\n\
             \x20 - exclusion ของ Microsoft Defender: โฟลเดอร์ โปรแกรม และชนิดไฟล์แต่ละรายการที่ Defender ถูกสั่งไม่ให้สแกน และจำนวน address ของเครือข่ายที่ถูกยกเว้น โดยไม่อ่านตัว address\n\
             \x20 - การตั้งค่าที่กำหนดว่า traffic ของเครือข่ายไปที่ไหน โดยไม่อ่านบันทึกว่าเคยไปที่ไหน: บรรทัดในไฟล์ hosts ที่กำหนด address ให้ชื่อใต้ cfx.re, fivem.net หรือ rockstargames.com พร้อม address นั้น (บรรทัดอื่นแค่นับจำนวน) proxy เปิดอยู่หรือไม่ และตั้ง proxy server หรือสคริปต์ตั้งค่า proxy ไว้หรือไม่ โดยไม่อ่าน address ของมัน และ rule ของ Windows Firewall สำหรับโปรแกรมในโฟลเดอร์ของ FiveM พร้อมจำนวน rule ทั้งหมด\n\
             \x20 - สิ่งที่ Windows บอกว่าตัวเองเป็นอะไร — edition, build, ชื่อองค์กรที่จดทะเบียนไว้ และชื่อผู้ผลิต รุ่นเครื่อง กับลิงก์ฝ่ายสนับสนุนที่ Settings แสดง โดยไม่อ่านชื่อเจ้าของที่จดทะเบียนไว้ — และเซอร์วิสที่ Windows มีมาให้แต่ละตัว (Defender, Windows Update, Error Reporting, Event Log, SysMain, Diagnostic Policy, Search, telemetry) ถูกตั้งให้เริ่มทำงานแบบไหน หรือไม่มีคีย์ของมันอยู่\n\
             \x20 - มีที่ที่ระบุชื่อไว้ 6 แห่งอยู่บนเครื่องนี้หรือไม่: ห้าแห่งที่โปรแกรมดัดแปลง Windows อย่าง Atlas และ ReviOS ติดตั้ง กับโฟลเดอร์ที่ Windows เก็บเอนจิ้นของ Defender ไว้ — อ่านแค่ว่ามีอยู่หรือไม่ ไม่อ่านว่าข้างในมีอะไร\n\
             \x20 - ส่วนต่าง ๆ ของเครื่องนี้ถูกติดตั้งเมื่อไร เป็นวันที่ ไม่ใช่เวลา: Windows ชุดนี้ติดตั้งหรืออัปเกรด feature ครั้งล่าสุดเมื่อไร วันติดตั้งเก่าสุดที่ Windows Setup เก็บไว้และเก็บไว้กี่รายการ change journal ของไดรฟ์ Windows, root ของไดรฟ์ และ $Recycle.Bin ถูกสร้างเมื่อไร และโฟลเดอร์โปรแกรมของ FiveM ถูกสร้างเมื่อไร วันที่เหล่านี้ทำให้จับคู่รายงานสองฉบับจากเครื่องเดียวกันได้\n\
             \x20 - เวลาที่ Windows เริ่มทำงานครั้งล่าสุด ซึ่งแอดมินจะเห็นเป็นเวลาเดียวที่ด้านบนของรายงาน\n\
-            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Windows PowerShell บันทึก script block ที่ PowerShell เองตั้งธงว่าน่าสงสัย โดยไม่บอกว่า script เขียนว่าอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ถ้าใช้ --case-code ผลที่ออกมาจะมีอุปกรณ์ PCI และอุปกรณ์อินพุตทุกตัวข้างต้น (หมายเลขรุ่นและเวลา ไม่มีชื่อ) และรหัสคดีด้วย ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง\n\
+            แสดงสิ่งที่ตรง rule และ timeline ของ: เวลาที่ Windows บันทึกไว้ (Prefetch, BAM, Program Compatibility Assistant) สำหรับโปรแกรมที่ชื่อ FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe หรือ FiveM_b<ตัวเลข>_GTAProcess.exe ซึ่งชื่อไม่ได้บอกว่าเป็นโปรแกรมไหน เวลาของโฟลเดอร์ log, crash และ cache ของ FiveM ข้างต้น เวลาของ record เก่าสุดกับใหม่สุดของ event log แต่ละตัว เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Code Integrity บันทึกว่า Windows ปฏิเสธไม่โหลดไฟล์ และที่ log ของ Microsoft Defender บันทึกว่าตรวจพบบางอย่าง โดยไม่บอกว่าเป็นไฟล์ไหนหรือตรวจพบอะไร เวลาครั้งแรกและครั้งล่าสุดที่ log ของ Windows PowerShell บันทึก script block ที่ PowerShell เองตั้งธงว่าน่าสงสัย โดยไม่บอกว่า script เขียนว่าอะไร และเวลาของการเปลี่ยนแปลงเก่าสุดกับใหม่สุดที่ journal เก็บไว้ของแต่ละโฟลเดอร์ข้างต้น และยังแสดงว่าบันทึกเหล่านี้แต่ละแหล่งย้อนกลับไปได้ไกลแค่ไหน — สำหรับ event log แต่ละตัว, Prefetch, BAM, Program Compatibility Assistant, change journal และโฟลเดอร์ของ FiveM ว่ามีกี่รายการและเวลาเก่าสุดที่ยังอยู่ โดยไม่แสดงชื่อ — เทียบกับวันที่ข้างต้น และเมื่อ Prefetch หรือ BAM ย้อนกลับไปได้ไกลกว่าครั้งล่าสุดที่โฟลเดอร์ของ FiveM ถูกเขียนแต่ไม่มีชื่อข้างต้นเลย จะมีข้อความหนึ่งข้อที่วางสองอย่างนี้ไว้ข้างกันพร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น และสำหรับ FiveM แต่ละ edition จะมีข้อความหนึ่งข้อที่วางเซสชันล่าสุด — เริ่มและจบเมื่อไร จาก process ของ FiveM ที่กำลังรัน, Prefetch หรือ BAM โดยไม่เทียบกับเวลาที่สแกน — ไว้ข้างว่าโฟลเดอร์ของ FiveM เองถูกเขียนก่อนหรือหลังเซสชันเริ่มนานเท่าไร พร้อมเหตุผลปกติที่ทำให้เกิดผลแบบนั้น โค้ดของโปรแกรมไม่ส่งอะไรออกไปไหน ถ้าใช้ --case-code ผลที่ออกมาจะมีอุปกรณ์ PCI และอุปกรณ์อินพุตทุกตัวข้างต้น (หมายเลขรุ่นและเวลา ไม่มีชื่อ) และรหัสคดีด้วย ชื่อผู้ใช้ใน path จะถูกซ่อน address ในบรรทัดของไฟล์ hosts จะแสดงแค่ชนิด: loopback, unspecified, private หรือ public ชื่อค่าใน Run และชื่อ scheduled task จะไม่แสดง ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุดจะแสดงชื่อเฉพาะเมื่อมีข้อเท็จจริงด้านตัวไฟล์เป็นจริง ได้แก่ ไฟล์ไม่อยู่ที่เดิมแล้ว ไม่มีลายเซ็นที่ตรวจผ่าน ชื่อไม่ตรงกับสิ่งที่ไฟล์เป็น รันจาก Temp หรือ Downloads หรือโหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย ได้แก่ hash ลายเซ็นและผู้เซ็น ชนิดของไฟล์ ชื่อในข้อมูลเวอร์ชัน และโซนดาวน์โหลด ส่วนชื่อเว็บที่ดาวน์โหลดแสดงเฉพาะเมื่อคุณยินยอมให้แสดงชื่อเว็บ\n\
             คุณปฏิเสธได้\n\
             ดำเนินการต่อ? [y/N] "
             .to_owned(),
     }
 }
 
-/// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055).
-fn full_reads(lang: Lang) -> [&'static str; 2] {
+/// What a full scan reads beyond the standard one, in the words `PRIVACY.md` uses (ADR 0052, ADR 0055,
+/// ADR 0079).
+fn full_reads(lang: Lang) -> [&'static str; 3] {
     match lang {
         Lang::En => [
             "the name of each server cache folder FiveM for GTA V Enhanced keeps — one per server \
@@ -405,6 +411,12 @@ fn full_reads(lang: Lang) -> [&'static str; 2] {
              Windows PowerShell flagged as suspicious, and the command lines it was started with, with \
              how many and when. No command is kept or shown; the one thing kept is the name of a website \
              a command downloaded from, which SS mode shows only if you agree to that separately",
+            "the files of programs Windows recorded running (BAM, Program Compatibility \
+             Assistant, the programs running now): what kind of content each holds, its hash, \
+             digital signature and version name, the download zone Windows wrote on it, and the \
+             name of the website it came from — never the rest of the address — starting nearest \
+             your last FiveM or GTA V session, for up to 90 seconds. Reading a file can update its \
+             last-access time",
         ],
         Lang::Th => [
             "ชื่อโฟลเดอร์ cache ของแต่ละเซิร์ฟเวอร์ที่ FiveM for GTA V Enhanced เก็บไว้ \
@@ -415,6 +427,11 @@ fn full_reads(lang: Lang) -> [&'static str; 2] {
              มองข้ามบางอย่างหรือไม่ ล้าง log หรือประวัติหรือไม่ หรือพูดถึง FiveM หรือไม่ — จากประวัติคำสั่งที่พิมพ์ในหน้าต่าง \
              PowerShell, script ที่ Windows PowerShell ตั้งธงว่าน่าสงสัย และ command line ที่ใช้เปิดมัน พร้อมจำนวนและเวลา \
              ไม่เก็บและไม่แสดงคำสั่งใด ๆ สิ่งเดียวที่เก็บคือชื่อเว็บไซต์ที่คำสั่งดาวน์โหลดมา ซึ่งโหมด SS จะแสดงก็ต่อเมื่อคุณยินยอมแยกอีกข้อหนึ่ง",
+            "ไฟล์ของโปรแกรมที่ Windows บันทึกว่าเคยรัน (BAM, Program Compatibility Assistant, \
+             โปรแกรมที่กำลังรัน): เนื้อไฟล์เป็นชนิดไหน hash ลายเซ็นดิจิทัล และชื่อในข้อมูลเวอร์ชัน \
+             โซนดาวน์โหลดที่ Windows เขียนไว้บนไฟล์ และชื่อเว็บไซต์ที่ไฟล์มาจาก โดยไม่เก็บส่วนอื่นของที่อยู่ \
+             เริ่มจากไฟล์ที่ใกล้เซสชัน FiveM หรือ GTA V ล่าสุดก่อน ใช้เวลาไม่เกิน 90 วินาที \
+             การอ่านไฟล์อาจทำให้เวลาเข้าถึงล่าสุดของไฟล์เปลี่ยน",
         ],
     }
 }
@@ -606,6 +623,12 @@ pub fn render(view: &ReportView, bundle: &Bundle, lang: Lang) -> String {
 
     // Above the timeline, in both modes, only when its conditions hold (ADR 0061 section 3).
     out.push_str(&crate::trace_ages::statement(&view.cross_source, lang));
+    // The game-window section follows the statements, in both modes (ADR 0078).
+    out.push_str(&crate::game_windows::section(
+        view.game_windows.as_ref(),
+        view.mode,
+        lang,
+    ));
 
     out.push_str(&timeline_section(&view.timeline, bundle, lang));
 
@@ -1178,6 +1201,7 @@ mod tests {
         ("bam", &["BAM"]),
         ("defender_exclusion", &["Microsoft Defender", "exclusion"]),
         ("driver_service", &["driver"]),
+        ("event_fields", &["fingerprint"]),
         ("evtx", &["event log"]),
         (
             "fivem_dir",
@@ -1217,6 +1241,8 @@ mod tests {
         ),
         ("prefetch", &["Prefetch"]),
         ("process", &[]),
+        ("recorded_files", &["BAM", "hash", "90"]),
+        ("userassist", &["UserAssist"]),
         ("usn", &["change journal"]),
         ("windows_start", &["System", "Fast Startup"]),
     ];
@@ -1284,6 +1310,139 @@ mod tests {
         }
     }
 
+    /// ADR 0078, P6 decision 6 (2026-10-23): the consent says, after the paragraph that names what the
+    /// report shows, how SS mode treats the programs recorded near a game session, in both languages.
+    #[test]
+    fn consent_says_how_ss_mode_treats_programs_near_a_game_session() {
+        let en = consent(Lang::En);
+        assert!(
+            en.contains(
+                "In SS mode, programs recorded near your last game session are named only when"
+            ),
+            "{en}"
+        );
+        assert!(
+            en.contains(
+                "The name of a Run value or a scheduled task is not shown. In SS mode, programs recorded near your last game session are named only when a fact about the file holds: it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, or it loaded a program file from outside the usual folders. Other programs are counted, not named."
+            ),
+            "{en}"
+        );
+        let th = consent(Lang::Th);
+        assert!(
+            th.contains("ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุด"),
+            "{th}"
+        );
+        assert!(
+            th.contains(
+                "จะไม่แสดง ในโหมด SS โปรแกรมที่ถูกบันทึกใกล้ช่วงที่คุณเล่นเกมครั้งล่าสุดจะแสดงชื่อเฉพาะเมื่อมีข้อเท็จจริงด้านตัวไฟล์เป็นจริง ได้แก่ ไฟล์ไม่อยู่ที่เดิมแล้ว ไม่มีลายเซ็นที่ตรวจผ่าน ชื่อไม่ตรงกับสิ่งที่ไฟล์เป็น รันจาก Temp หรือ Downloads หรือโหลดไฟล์โปรแกรมจากนอกโฟลเดอร์ปกติ โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น"
+            ),
+            "{th}"
+        );
+    }
+
+    /// ADR 0078, P6b decision 4 (2026-10-23): one sentence follows the SS paragraph in both languages,
+    /// so the player agrees to the file details a named program gets, and to the website only apart.
+    #[test]
+    fn consent_says_what_file_details_ss_mode_shows_for_a_named_program() {
+        let en = consent(Lang::En);
+        assert!(
+            en.contains(
+                "Other programs are counted, not named. For a program it names, it also shows the file's details: its hash, signature and signer, what kind of file it is, the name in its version information, and its download zone. The website it came from is shown only if you agree to show websites."
+            ),
+            "{en}"
+        );
+        let th = consent(Lang::Th);
+        assert!(
+            th.contains(
+                "โปรแกรมอื่นแสดงเป็นจำนวนเท่านั้น สำหรับโปรแกรมที่แสดงชื่อ จะแสดงรายละเอียดของไฟล์ด้วย ได้แก่ hash ลายเซ็นและผู้เซ็น ชนิดของไฟล์ ชื่อในข้อมูลเวอร์ชัน และโซนดาวน์โหลด ส่วนชื่อเว็บที่ดาวน์โหลดแสดงเฉพาะเมื่อคุณยินยอมให้แสดงชื่อเว็บ"
+            ),
+            "{th}"
+        );
+    }
+
+    /// ADR 0079 owner decision 4 (2026-10-23): the download-host question names a recorded program's
+    /// file as well as a PowerShell command, worded as the ADR gives it, in both languages.
+    #[test]
+    fn the_download_host_question_names_a_recorded_programs_file() {
+        assert_eq!(
+            sensitive_question(Lang::En, SensitiveKind::DownloadHost),
+            "Show the person watching the name of each website a PowerShell command, or a recorded program's file, was downloaded from? Only the name is read, never the rest of the address or the command. If not, each name is shown as %DOWNLOAD_HOST%. [y/N] "
+        );
+        let th = sensitive_question(Lang::Th, SensitiveKind::DownloadHost);
+        assert!(
+            th.contains("หรือไฟล์ของโปรแกรมที่ถูกบันทึกไว้"),
+            "the Thai question does not name a recorded program's file: {th}"
+        );
+    }
+
+    /// ADR 0080 section 5: a scan that reads `UserAssist` says so before it starts, in both languages,
+    /// so a player agrees to the programs their account opened through the shell and to the times
+    /// Windows keeps for them.
+    #[test]
+    fn consent_names_userassist_in_both_languages() {
+        for lang in [Lang::En, Lang::Th] {
+            let question = consent(lang);
+            assert!(
+                question.contains("UserAssist"),
+                "UserAssist missing from {question}"
+            );
+        }
+    }
+
+    /// ADR 0081 section 5: the consent names the event fields that are read beyond what the event
+    /// logs' item says, in both languages, worded as the ADR gives them. A player agrees to the
+    /// fingerprint of a path and to nothing that shows the path itself.
+    #[test]
+    fn the_event_fields_are_named_in_both_languages() {
+        let en_item = "from four kinds of event in the System, Code Integrity and Security logs: when a service or driver was installed, when the clock was changed, from what time to what time, with Windows' reason number and whether a Windows program made the change, and, for a service's file and each file Code Integrity refused, a fingerprint of its path that matches only the same path — never a path or a name";
+        let th_item = "จาก event 4 ชนิดใน log ของ System, Code Integrity และ Security: เวลาที่มีการติดตั้ง service หรือ driver เวลาที่นาฬิกาถูกเปลี่ยน จากเวลาไหนเป็นเวลาไหน พร้อมหมายเลขเหตุผลของ Windows และว่าโปรแกรมของ Windows เป็นผู้เปลี่ยนหรือไม่ และสำหรับไฟล์ของ service และไฟล์ที่ Code Integrity ปฏิเสธ จะเก็บลายนิ้วมือ (fingerprint) ของ path ที่ตรงกับ path เดียวกันเท่านั้น — ไม่เก็บ path หรือชื่อ";
+        let en = consent(Lang::En);
+        assert!(en.contains("fingerprint"), "fingerprint missing from {en}");
+        assert!(
+            en.contains("Code Integrity"),
+            "Code Integrity missing from {en}"
+        );
+        assert!(
+            en.contains(en_item),
+            "the English event-field item is not worded as given: {en}"
+        );
+        assert!(
+            !en.contains("BootType is the one"),
+            "the old single-exception claim is still in {en}"
+        );
+        let th = consent(Lang::Th);
+        assert!(th.contains("fingerprint"), "fingerprint missing from {th}");
+        assert!(
+            th.contains("Code Integrity"),
+            "Code Integrity missing from {th}"
+        );
+        assert!(
+            th.contains(th_item),
+            "the Thai event-field item is not worded as given: {th}"
+        );
+    }
+
+    /// ADR 0081 section 5: the event-log item stops claiming that nothing but the event count is read.
+    /// The sentence that says the events are not read names its exceptions, `BootType` and the
+    /// fields in the item below, in both languages.
+    #[test]
+    fn the_event_log_item_names_its_exceptions_in_both_languages() {
+        for (lang, anchor) in [
+            (Lang::En, "not what the events say"),
+            (Lang::Th, "โดยไม่อ่านว่า event นั้นเขียนว่าอะไร"),
+        ] {
+            let question = consent(lang);
+            let line = question
+                .lines()
+                .find(|line| line.contains(anchor))
+                .unwrap_or("");
+            assert!(
+                line.contains("BootType"),
+                "the event-log item does not name `BootType` as an exception: {question}"
+            );
+        }
+    }
+
     /// A full scan's two questions name what ADR 0064's collector reads, that no command is kept, and the
     /// separate answer for a website's name; the standard scan's question names none of it.
     #[test]
@@ -1314,6 +1473,34 @@ mod tests {
             assert!(
                 sensitive_question(lang, SensitiveKind::DownloadHost).contains("%DOWNLOAD_HOST%")
             );
+        }
+    }
+
+    /// ADR 0079 section 6: the full scan's two questions name the files that the recorded programs
+    /// point at, together with the last-access time a read can move; the standard scan's names none
+    /// of it.
+    #[test]
+    fn a_full_scan_names_the_files_of_recorded_programs_and_the_last_access_time() {
+        for (lang, words) in [
+            (
+                Lang::En,
+                ["programs Windows recorded running", "last-access time"],
+            ),
+            (Lang::Th, ["โปรแกรมที่ Windows บันทึกว่าเคยรัน", "เวลาเข้าถึงล่าสุด"]),
+        ] {
+            let full = format!(
+                "{}{}",
+                consent_for(lang, ScanTier::Full),
+                full_question(lang)
+            );
+            for word in words {
+                assert!(full.contains(word), "{word} missing from {full}");
+                assert!(
+                    !consent(lang).contains(word),
+                    "{word} is in the standard consent: {}",
+                    consent(lang)
+                );
+            }
         }
     }
 

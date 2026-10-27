@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+found:
+  - 9b318bfa-805d-4edd-81f1-602b57639a69   # evtx/log-file/event-log-file-read-only: Application.evtx carries the read-only attribute
+not_found:
+  - 87a53c8f-b0e4-477d-91e7-93b904ba965f   # evtx/log-file/event-log-not-at-configured-path: the Application channel is still written to this file, so the log is where the service is configured to keep it
+restart: false

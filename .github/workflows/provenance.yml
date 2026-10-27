@@ -1,0 +1,114 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+# Commit provenance of a pull request (AETERNA delivery model, T2): every commit carries `Agent:`, a commit
+# that touches product code carries `Delegated-Run:`, the rest carry `Exempt:`. It reads the PR's own
+# commits, since a squash merge keeps only what its message repeats.
+# The checker is tools/provenance in the private aeterna/org-standards repository, read through a GitHub App
+# token limited to that repository's contents. No copy of it lives here, and a PR cannot change it.
+# ADVISORY: a failure is a warning and a step summary and the job stays green. With no App configured (a fork's
+# PR, or before the variable and secret exist) or a token that cannot be minted, it skips with a notice.
+# It is never a required check (owner's decision, 2026-10-19).
+
+name: provenance
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provenance:
+    name: provenance
+    runs-on: ubuntu-latest
+    # Generous on purpose: every network step below has its own shorter timeout and continue-on-error, so a
+    # slow API reads as a skip rather than a red job.
+    timeout-minutes: 15
+    steps:
+      - name: Which checks this pull request needs
+        id: scope
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          CLIENT_ID: ${{ vars.ORG_STANDARDS_APP_CLIENT_ID }}
+          HAS_KEY: ${{ secrets.ORG_STANDARDS_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$BASE_REF" = "main" ] && [ "$HEAD_REF" = "dev" ] && [ "$SAME_REPO" = "true" ]; then
+            echo "PR is a promotion from 'dev' to 'main': its commits were checked on their own PRs. Fast-pass."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CLIENT_ID" ] || [ "$HAS_KEY" != "true" ]; then
+            echo "::notice title=provenance skipped::the org-standards App is not configured for this run (fork PR, or the variable or secret is missing)"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Token for org-standards (contents read)
+        id: app
+        if: steps.scope.outputs.run == 'true'
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.ORG_STANDARDS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_STANDARDS_APP_PRIVATE_KEY }}
+          owner: aeterna
+          repositories: org-standards
+          permission-contents: read
+      - name: Check out org-standards (the checker)
+        id: org
+        if: steps.app.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: aeterna/org-standards
+          token: ${{ steps.app.outputs.token }}
+          path: .org-standards
+          persist-credentials: false
+          sparse-checkout: /tools/provenance
+          sparse-checkout-cone-mode: false
+      - name: Check out the pull request's commits
+        id: head
+        if: steps.org.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: repo
+      - name: Skip notice
+        if: steps.scope.outputs.run == 'true' && steps.head.outcome != 'success'
+        run: echo "::notice title=provenance skipped::could not mint the org-standards token or check out the commits"
+      - name: Provenance of the PR's commits (advisory)
+        if: steps.head.outcome == 'success'
+        working-directory: repo
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/provenance.txt"
+          rc=0
+          python3 "$GITHUB_WORKSPACE/.org-standards/tools/provenance" "$BASE..$HEAD" > "$out" 2>&1 || rc=$?
+          # The output quotes commit subjects, which a PR author controls: never let it act as a workflow command.
+          stop="stop-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+          echo "::stop-commands::$stop"
+          cat "$out"
+          echo "::$stop::"
+          if [ "$rc" -eq 1 ]; then
+            echo "::warning title=provenance (advisory)::commits without the trailers T2 asks for; see the step summary"
+          elif [ "$rc" -ne 0 ]; then
+            echo "::warning title=provenance (advisory)::the checker could not run (exit $rc); see the step summary"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            { echo '### provenance (advisory)'; echo '~~~~~~~~~~'; cat "$out"; echo '~~~~~~~~~~'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0

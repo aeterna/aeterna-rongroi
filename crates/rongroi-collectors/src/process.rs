@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform, ProcessRecord, SourceError};
 
+use crate::paths::RecordedPath;
 use crate::{Collector, Field, fivem_edition};
 
 const ID: &str = "process";
@@ -118,6 +119,35 @@ fn observation(process: &ProcessRecord) -> Observation {
     Observation {
         collector: ID.to_owned(),
         fields,
+    }
+}
+
+/// The image paths of the processes running now, and when each started, for `recorded_files`
+/// (ADR 0079 amendment 7).
+///
+/// This runs the same collection [`Process::collect`] does and keeps the `path` and `started_at` each
+/// observation carries, through the same filter that drops an empty path. A process whose image path
+/// could not be resolved contributes nothing, and the list being unreadable is the source's gap.
+pub(crate) fn recorded_paths(
+    host: &dyn Host,
+) -> Result<(Vec<RecordedPath>, Option<UnmeasuredReason>), UnmeasuredReason> {
+    match Process.collect(host) {
+        CollectorRun::Unmeasured { reason, .. } => Err(reason),
+        CollectorRun::Measured { observations, .. } => Ok((
+            observations
+                .iter()
+                .filter_map(|observation| {
+                    let path = observation.fields.get("path")?.as_str()?.to_owned();
+                    let at = observation
+                        .fields
+                        .get("started_at")
+                        .and_then(serde_json::Value::as_str)
+                        .and_then(|text| text.parse().ok());
+                    Some(RecordedPath { path, at })
+                })
+                .collect(),
+            None,
+        )),
     }
 }
 

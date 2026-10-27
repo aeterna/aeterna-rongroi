@@ -534,3 +534,10 @@ readings taken, recorded here so the ADR matches the code:
 - `view::SS_WITHHELD_FIELDS` gains `autostart`'s `entry`.
 - `PRIVACY.md`, both consent texts, `docs/architecture.md`, README (both languages) and CHANGELOG change
   in the pull requests that ship it. No network code, and no new crate outside what the XML parser needs.
+
+## Amendment (2026-10-24) — files under `%SystemRoot%` are checked too
+
+Decision 5 no longer leaves files under `%SystemRoot%` unhashed and unchecked. They are hashed and checked
+after the other files, under a second 30 s budget. One that is not read says why on its own row
+(`file_unread`) and is not a gap of its place, so the rule that rules out `%SystemRoot%` keeps its measured
+answer. The consent text drops "outside the Windows folder" (ADR 0084 decision 4).

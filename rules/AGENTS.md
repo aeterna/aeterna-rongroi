@@ -33,8 +33,9 @@ Adds to the root [`AGENTS.md`](../AGENTS.md); read that first. Authoring guide:
   must not declare the other. `source_empty` in particular is **never** evidence that anything was
   removed: Windows' own scavenger empties BAM of entries older than seven days at every boot, and a
   Prefetch folder is routinely emptied by an optimiser the player ran.
-- `allow` identifies legitimate software by `sha256` or `signer_cert_sha256` only — never by a file's or a
-  signer's name, which a stolen certificate carries too (ADR 0035).
+- `allow` names only what a rule expects, so that the rule reports what differs from it, by `sha256` or
+  `signer_cert_sha256` only — never by a file's or a signer's name, which a stolen certificate carries too
+  (ADR 0035). It never lists software as known good (`AGENTS.md` rule 9, ADR 0084).
 - **No rule on `prefetch`, `bam` or `pca` names a program** by `name` or `path` (ADR 0034). Nothing those
   collectors emit identifies software, so such a rule cannot `allow` the legitimate program with that name
   and a rename defeats it. Since ADR 0051 the bundle loader, and so `check-rules`, refuses such a rule.

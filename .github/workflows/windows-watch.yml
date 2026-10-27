@@ -1,0 +1,168 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+#
+# A watch on GitHub's Windows images (ADR 0075 §1). Every week, on every Windows image GitHub offers by
+# label, this builds the CLI, runs `scan --json` on the elevated runner, and reduces the report to its
+# shape: `os_build`, every rule's state and reason, and every collector's state and the set of field
+# names its observations carried. No field value, no path and no count of observations is kept — a count
+# changes from run to run on one image and would make every week a difference. The shape is compared with
+# `fixtures/watch/<label>.json`, so the first sign that GitHub moved an image or Windows changed a source
+# is this run, not a red pull request about something else.
+#
+# Deliberately NOT on pull_request or push, and never a required check — the reason
+# `certificate-pins.yml` gives: a calendar must not turn someone's pull request red, and §11.2 of the
+# organisation standard removed exactly the repeat runs a push trigger would add. The job only reads: it
+# has `contents: read`, uploads the shape as an artifact and opens nothing. A changed shape is committed
+# by a maintainer in a pull request that says what changed and why (a new build, a collector change, a
+# real regression).
+#
+# GitHub runs a schedule on the default branch's latest commit, may delay or drop a scheduled run under
+# load, and disables schedules in a public repository after 60 days without activity (GitHub Docs,
+# "Events that trigger workflows", `schedule`).
+
+name: windows watch
+
+on:
+  schedule:
+    # 05:41 UTC every Monday.
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # Report-only phase (ADR 0075, "What is unverified"): for the first two or three runs a difference
+  # from `fixtures/watch/<label>.json`, or a missing file, is printed and does not fail the job, so that
+  # a field set which comes and goes between runs on one image can be seen and left out first.
+  # Set to "true" to make a difference (or a missing shape file) fail the job.
+  WATCH_FAIL_ON_DIFFERENCE: "false"
+
+jobs:
+  shape:
+    name: shape (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # The Windows labels in GitHub's runner-images README, "Available Images", read 2026-10-18.
+        # `windows-latest` is today image windows-2025-vs2026 (ADR 0060), which `windows-2025` and
+        # `windows-2025-vs2026` also name, so it is listed once, by the label pull requests use: when
+        # GitHub moves `windows-latest`, its shape is the one that changes. Edit this list when GitHub
+        # adds or retires an image. On 2026-10-18 `windows-11-arm` and `windows-11-vs2026-arm` both ran
+        # image win11-vs2026-arm64 (run 39107233878); both are kept because the README lists them as two
+        # images, and the day they part is a thing this watch should show.
+        label:
+          - windows-latest
+          - windows-2022
+          - windows-11-arm
+          - windows-11-vs2026-arm
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the toolchain pinned in rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: false
+      - name: Build the CLI
+        run: cargo build --locked -p rongroi-cli
+      - name: Scan this runner and reduce the report to its shape
+        shell: pwsh
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The image GitHub says it is, for the log only: ImageVersion changes every week and is not
+          # part of the shape.
+          Write-Output "label $env:LABEL · image $env:ImageOS $env:ImageVersion"
+          $json = & (Join-Path $PWD 'target\debug\aeterna-rongroi-cli.exe') scan --json | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "scan --json exited with $LASTEXITCODE" }
+          $report = $json | ConvertFrom-Json
+          if ($report.header.platform -ne 'windows') { throw "expected platform windows, got '$($report.header.platform)'" }
+          if ($report.header.elevated -ne $true) { throw "the scan was not elevated on the runner: '$($report.header.elevated)'" }
+
+          # Every observation the report holds, with the collector that made it: the ones a rule
+          # matched and the ones none did. Only the names of their fields are read below.
+          $observations = @(
+            @($report.evidence | Where-Object { $_.state -eq 'found' } | ForEach-Object { $_.observations })
+            @($report.unmatched | ForEach-Object { $_.observations })
+          ) | Where-Object { $_ }
+
+          $rules = [ordered]@{}
+          foreach ($e in @($report.evidence | Sort-Object -Property rule_id)) {
+            $entry = [ordered]@{ state = $e.state }
+            if ($e.state -eq 'unmeasured') { $entry.reason = $e.reason }
+            $rules[$e.rule_id] = $entry
+          }
+
+          $names = @(
+            @($report.evidence | ForEach-Object { $_.collector })
+            @($report.unmatched | ForEach-Object { $_.collector })
+            @($observations | ForEach-Object { $_.collector })
+          ) | Where-Object { $_ } | Sort-Object -Unique
+          $collectors = [ordered]@{}
+          foreach ($name in $names) {
+            $own = @($observations | Where-Object { $_.collector -eq $name })
+            $fields = @($own | ForEach-Object { $_.fields.PSObject.Properties.Name } | Sort-Object -Unique)
+            # A collector's state in the words of ADR 0074's ledger: `observations` when it saw
+            # anything, `unmeasured:<reason>` when every rule on it was unmeasured (several reasons are
+            # joined with `+`), and `none` otherwise.
+            if ($own.Count -gt 0) {
+              $state = 'observations'
+            } else {
+              $ruleRows = @($report.evidence | Where-Object { $_.collector -eq $name })
+              $unmeasured = @($ruleRows | Where-Object { $_.state -eq 'unmeasured' })
+              if ($ruleRows.Count -gt 0 -and $unmeasured.Count -eq $ruleRows.Count) {
+                $state = 'unmeasured:' + ((@($unmeasured | ForEach-Object { $_.reason }) | Sort-Object -Unique) -join '+')
+              } else {
+                $state = 'none'
+              }
+            }
+            $collectors[$name] = [ordered]@{ state = $state; fields = $fields }
+          }
+
+          $shape = [ordered]@{
+            os_build = $report.header.os_build
+            rules = $rules
+            collectors = $collectors
+          }
+          New-Item -ItemType Directory -Force -Path watch | Out-Null
+          # LF line endings, no BOM, a final newline: the file is committed as it is written here.
+          $text = ($shape | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
+          [System.IO.File]::WriteAllText("$PWD/watch/$env:LABEL.json", "$text`n", [System.Text.UTF8Encoding]::new($false))
+          Write-Output "shape of $env:LABEL ($($rules.Count) rules, $($collectors.Count) collectors):"
+          Get-Content "watch/$env:LABEL.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-watch-${{ matrix.label }}
+          path: watch/${{ matrix.label }}.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Compare with the committed shape
+        shell: bash
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          set -euo pipefail
+          committed="fixtures/watch/$LABEL.json"
+          if [ ! -f "$committed" ]; then
+            echo "::warning::no committed shape for $LABEL ($committed); this run's shape is the artifact windows-watch-$LABEL"
+            if [ "$WATCH_FAIL_ON_DIFFERENCE" = true ]; then exit 1; fi
+            exit 0
+          fi
+          if git diff --no-index --exit-code -- "$committed" "watch/$LABEL.json"; then
+            echo "The shape of $LABEL matches $committed."
+            exit 0
+          fi
+          echo "::warning::the shape of $LABEL differs from $committed (diff above)"
+          if [ "$WATCH_FAIL_ON_DIFFERENCE" = true ]; then exit 1; fi
+          echo "Report-only phase (WATCH_FAIL_ON_DIFFERENCE=false): not failing."

@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Golden task: redact_user_path() in Rust, checked by a rustc test harness that runs in a child without the nonce.
+check = "python3 check/run.py"
+timeout = 300

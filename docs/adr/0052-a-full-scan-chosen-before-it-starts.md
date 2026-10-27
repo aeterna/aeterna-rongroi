@@ -247,3 +247,17 @@ unverified points above about the relaunch and the dialog are measured on a real
   tiers in the change that adds the first `full` collector. Until then the tier exists and changes nothing
   a player sees.
 - `CONVENTIONS.md`'s glossary gains **scan tier**, **full scan** and **sensitive field**.
+
+## Amendment (2026-10-27): the lab machine's replay answers the question
+
+The owner made one exception to decision 2 ("no bypass for scripts") on 2026-10-27. `lab/replay.sh` may
+answer the full-scan question with `yes` on standard input, for a scenario whose `expect.yaml` says
+`full: true` (ADR 0076, "Amendment (2026-10-27)"), and only there:
+
+- the machine it runs on is the maintainer's lab virtual machine, which belongs to no person, has no
+  network, and is booted from a throwaway overlay that is deleted after the scan (ADR 0076 §1);
+- the question is still asked, by the process that reads, before any collector runs; only the answer comes
+  from the script, and the CLI and the desktop app are unchanged;
+- nothing a player runs gains a way to skip the question: no flag, no environment variable, no default.
+
+Every other script still gets the standard scan, as section 3 says.

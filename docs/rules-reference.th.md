@@ -17,7 +17,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 |---|---|
 | รูปแบบ rule | 4 |
 | จำนวน rule | 77 |
-| SHA-256 | `8c36ae097c75224e212fd5c50b13dccaa16c98a7e7c82e08d6467c24d0d1c5d2` |
+| SHA-256 | `f8194b3e7299807c919d53c1a528f4883b5b52fa046479ad7f70dc95e1a1ef78` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -49,7 +49,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [Microsoft Defender บันทึกว่าการป้องกันแบบ real-time ถูกปิด](#rule-429f8bc3-3c7d-4924-87f7-7cccefa1a185) — `context` · `experimental`
   - [มี event log ไฟล์หนึ่งถูกล้าง](#rule-f4c99b57-02c8-4e53-82d0-dba8bdc13dda) — `tamper` · `experimental`
   - [Security log มีบันทึกว่าตัวเองถูกล้าง](#rule-ff967b28-984b-4de0-b361-58367ae0c2d5) — `tamper` · `experimental`
-  - [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `experimental`
+  - [มีไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียว](#rule-9b318bfa-805d-4edd-81f1-602b57639a69) — `tamper` · `stable`
   - [มีไฟล์ event log ที่ไม่ใช่ไฟล์ที่ Windows เขียน channel ของมันลงไป](#rule-87a53c8f-b0e4-477d-91e7-93b904ba965f) — `tamper` · `experimental`
 - `fivem_dir`
   - [FiveM.exe มีลายเซ็นที่ถูกต้อง แต่ไม่ได้เซ็นด้วยใบรับรองที่ rule นี้รู้จัก](#rule-2dc11b64-72a2-48f5-a273-985e906d5a9e) — `presence` · `experimental`
@@ -63,7 +63,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 - `fivem_servers`
   - [FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache ของเซิร์ฟเวอร์ไว้](#rule-c402aedc-1ed7-49a6-998c-0762e17e9bd0) — `context` · `experimental`
 - `hid_device`
-  - [เมาส์ คีย์บอร์ด หรืออุปกรณ์อินพุตอื่นที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้ต่ออยู่](#rule-e1dc0747-5038-4389-be3d-80de451d7fe6) — `context` · `experimental`
+  - [เมาส์ คีย์บอร์ด หรืออุปกรณ์อินพุตอื่นที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้ต่ออยู่](#rule-e1dc0747-5038-4389-be3d-80de451d7fe6) — `context` · `stable`
 - `install_marker`
   - [มีโฟลเดอร์หรือคีย์ที่ Atlas playbook ติดตั้งอยู่บนเครื่องนี้](#rule-fd58dec6-84c1-49cb-806c-10b4614a046f) — `posture` · `experimental`
   - [มีโฟลเดอร์ที่ ReviOS playbook ติดตั้งอยู่บนเครื่องนี้](#rule-3ec29285-f365-4e60-81fe-818d27c6b47a) — `posture` · `experimental`
@@ -79,16 +79,16 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [เซอร์วิส Windows Event Log ไม่ได้เริ่มพร้อม Windows](#rule-cf83f06e-23b5-47fc-b7a0-b6d1b8192379) — `posture` · `experimental`
   - [เซอร์วิส Windows Update เริ่มทำงานไม่ได้บนเครื่องนี้](#rule-c9012982-5fc1-4d61-ab0c-0bc1abe93830) — `posture` · `experimental`
 - `pci_device`
-  - [อุปกรณ์ PCI ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่อยู่ในเครื่อง](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `experimental`
-  - [อุปกรณ์ PCI ที่ไม่มีไดรเวอร์ติดตั้ง](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `experimental`
+  - [อุปกรณ์ PCI ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่อยู่ในเครื่อง](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `stable`
+  - [อุปกรณ์ PCI ที่ไม่มีไดรเวอร์ติดตั้ง](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `stable`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
   - [เปิดโหมด test signing ของ Windows อยู่](#rule-75162c70-a6d1-47ec-94af-be25184d5ece) — `posture` · `experimental`
   - [firmware ไม่ได้ประกาศ IOMMU ให้ Windows](#rule-c5c19a2d-8008-4bc8-b36f-6607ed091313) — `posture` · `experimental`
-  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `experimental`
+  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ PowerShell 7](#rule-98ee9213-39f3-4219-b2ac-f2bb3d21d6cc) — `posture` · `stable`
   - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ PowerShell 7](#rule-e9f05cfb-6618-42ca-b4bf-f57f2e9ba8c7) — `posture` · `experimental`
-  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `experimental`
+  - [นโยบายระดับเครื่องปิดการบันทึก script block ของ Windows PowerShell](#rule-88eb2aca-a33e-414d-bd0f-cfb87af95a2d) — `posture` · `stable`
   - [นโยบายระดับผู้ใช้ปิดการบันทึก script block ของ Windows PowerShell](#rule-869c34b6-7b32-4f56-a281-9f5ac00e43c4) — `posture` · `experimental`
   - [ตั้งค่า Memory integrity (HVCI) ไว้เป็นปิด](#rule-8458638a-04fd-4bbf-910a-c4dd9bbe36bb) — `posture` · `experimental`
   - [ปิด SEHOP (การตรวจสอบสายตัวจัดการข้อยกเว้น) ไว้](#rule-dc858978-954d-418f-a42e-29f06975f4ed) — `posture` · `experimental`
@@ -161,7 +161,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 **เกี่ยวกับการตรวจนี้**
 
-Windows ถูกตั้งให้เริ่มโปรแกรมนี้เอง ไม่ว่าจะเป็น service ที่เริ่มพร้อมเครื่องหรือเมื่อมี trigger ค่าใน Run หรือ RunOnce ตอน sign-in หรือ scheduled task ที่เปิดอยู่และมี trigger และไฟล์ของมันอยู่นอกโฟลเดอร์ Windows กับ Program Files และไม่มีลายเซ็นฝังในไฟล์ที่ Windows เชื่อถือ คือไม่มีเลย หรือมีแต่ตรวจแล้วไม่ผ่าน แถวนี้แสดงว่าลงทะเบียนไว้ที่ไหน path ของไฟล์ SHA-256 และผลการตรวจลายเซ็น ไฟล์ที่เซ็นผ่าน catalog ของ Windows จะอ่านได้ว่าไม่มีลายเซ็นฝังในไฟล์ เพราะโปรแกรมนี้ไม่อ่าน catalog ไฟล์ในโฟลเดอร์ Windows ไม่ถูกตรวจเลย และโปรแกรมที่เริ่มจากใน Program Files จะไม่แสดงใน rule นี้ โปรแกรมนี้ไม่อ่าน argument เลย จึงไม่ได้บอกว่าโปรแกรมถูกสั่งให้รันอะไร ข้อนี้บอกว่ามีโปรแกรมถูกตั้งให้เริ่มเองโดยไม่ต้องมีใครสั่ง ไม่ได้บอกว่าโปรแกรมทำอะไร ใครติดตั้ง หรือเคยรันจริงหรือไม่
+Windows ถูกตั้งให้เริ่มโปรแกรมนี้เอง ไม่ว่าจะเป็น service ที่เริ่มพร้อมเครื่องหรือเมื่อมี trigger ค่าใน Run หรือ RunOnce ตอน sign-in หรือ scheduled task ที่เปิดอยู่และมี trigger และไฟล์ของมันอยู่นอกโฟลเดอร์ Windows กับ Program Files และไม่มีลายเซ็นฝังในไฟล์ที่ Windows เชื่อถือ คือไม่มีเลย หรือมีแต่ตรวจแล้วไม่ผ่าน แถวนี้แสดงว่าลงทะเบียนไว้ที่ไหน path ของไฟล์ SHA-256 และผลการตรวจลายเซ็น ไฟล์ที่เซ็นผ่าน catalog ของ Windows จะอ่านได้ว่าไม่มีลายเซ็นฝังในไฟล์ เพราะโปรแกรมนี้ไม่อ่าน catalog ไฟล์ในโฟลเดอร์ Windows ถูกตรวจหลังไฟล์อื่น และแสดงในรายการที่ไม่เข้า rule แต่ rule นี้ไม่ถามถึงมัน และโปรแกรมที่เริ่มจากใน Program Files จะไม่แสดงใน rule นี้ โปรแกรมนี้ไม่อ่าน argument เลย จึงไม่ได้บอกว่าโปรแกรมถูกสั่งให้รันอะไร ข้อนี้บอกว่ามีโปรแกรมถูกตั้งให้เริ่มเองโดยไม่ต้องมีใครสั่ง ไม่ได้บอกว่าโปรแกรมทำอะไร ใครติดตั้ง หรือเคยรันจริงหรือไม่
 
 **ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
 
@@ -476,7 +476,7 @@ Security log มีบันทึกว่าบันทึกการตร�
 - ไฟล์: [`rules/evtx/log-file/event-log-file-read-only/rule.yaml`](../rules/evtx/log-file/event-log-file-read-only/rule.yaml)
 - collector: `evtx`
 - strength: `tamper` — ร่องรอยถูกล้าง
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `evtx`, `log-file`
 - เขียนเมื่อ: 2026-09-13
 
@@ -599,7 +599,7 @@ FiveM.exe ในโฟลเดอร์โปรแกรมของ FiveM for
 - FiveM.exe ที่ไม่ได้อัปเดตเลยตั้งแต่ก่อน 2026-07-21 ซึ่งเป็นวันที่ใบรับรองที่ rule นี้รู้จักเริ่มใช้ได้ ลายเซ็นที่ทำก่อนวันนั้นทำด้วยใบรับรองใบก่อน FiveM อัปเดตตัวเอง กรณีนี้จึงน่าจะเป็นผู้เล่นที่ไม่ได้เปิด FiveM เลยตั้งแต่นั้น
 - ตัว client รุ่นเบต้าหรือรุ่นทดสอบที่เซ็นด้วยใบรับรองอื่น ซึ่งยังไม่ได้วัดอะไรเกี่ยวกับรุ่นเหล่านั้นเลย
 
-**ซอฟต์แวร์ที่ถูกต้องซึ่งยกเว้นไว้ (`allow`)**
+**สิ่งที่ rule คาดไว้ (`allow`)**
 
 - ไฟล์ที่เซ็นด้วยใบรับรองที่มี SHA-256 เป็น `65866007102ff66498c1ef739cf23dff71ae3d08da0d9d759b89d1a409c4208f`
 
@@ -990,7 +990,7 @@ FiveM for GTA V Enhanced เก็บโฟลเดอร์ cache หนึ่
 - ไฟล์: [`rules/hid_device/absent/not-present/rule.yaml`](../rules/hid_device/absent/not-present/rule.yaml)
 - collector: `hid_device`
 - strength: `context` — ข้อมูลประกอบ
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `hid_device`, `hardware`
 - เขียนเมื่อ: 2026-10-16
 
@@ -1491,7 +1491,7 @@ Windows ไม่มีคีย์เซอร์วิส \`WinDefend\` อย
 - ไฟล์: [`rules/pci_device/absent/not-present/rule.yaml`](../rules/pci_device/absent/not-present/rule.yaml)
 - collector: `pci_device`
 - strength: `context` — ข้อมูลประกอบ
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `pci_device`, `hardware`
 - เขียนเมื่อ: 2026-10-15
 
@@ -1529,7 +1529,7 @@ Windows เคยตั้งค่าอุปกรณ์ PCI นี้ไว�
 - ไฟล์: [`rules/pci_device/no-driver/problem-28/rule.yaml`](../rules/pci_device/no-driver/problem-28/rule.yaml)
 - collector: `pci_device`
 - strength: `presence` — มีไฟล์อยู่
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `pci_device`, `hardware`
 - เขียนเมื่อ: 2026-10-15
 
@@ -1740,7 +1740,7 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 - ไฟล์: [`rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/pwsh-script-block-logging-disabled-by-policy/rule.yaml)
 - collector: `posture`
 - strength: `posture` — สถานะเครื่อง
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `posture`, `logging`
 - เขียนเมื่อ: 2026-09-14
 
@@ -1822,7 +1822,7 @@ Windows รายงานว่าเปิด test signing อยู่ เค
 - ไฟล์: [`rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml`](../rules/posture/logging/script-block-logging-disabled-by-policy/rule.yaml)
 - collector: `posture`
 - strength: `posture` — สถานะเครื่อง
-- status: `experimental` — อยู่ระหว่างพัฒนา
+- status: `stable` — เคยอ่านเจอบนเครื่อง lab วัดบน Windows รุ่น client แล้ว และมี baseline ยืนยัน มี fixture ทั้งแบบเจอและแบบไม่เจอ (ADR 0074 ข้อ 5)
 - tag: `posture`, `logging`
 - เขียนเมื่อ: 2026-09-13 · แก้ไขล่าสุด: 2026-09-14
 

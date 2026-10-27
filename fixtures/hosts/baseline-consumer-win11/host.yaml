@@ -66,6 +66,19 @@ registry:
   # file is not read on this host.
   'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings':
     ProxyEnable: 0
+  # What Explorer recorded about programs this account opened through the shell (ADR 0080): three
+  # ordinary entries and the session counter, whose value names are ROT13 as Explorer writes them.
+  # The entries' last-run FILETIMEs are the bytes at offset 60; offset 4 is zero, as it was on almost
+  # every entry measured on the development PC.
+  'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count':
+    'P:\Cebtenz Svyrf\Zbmvyyn Sversbk\sversbk.rkr':
+      content_hex: "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000449f87f754dd0100000000"
+    '{1NP14R77-02R7-4R5Q-O744-2RO1NR5198O7}\abgrcnq.rkr':
+      content_hex: "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030d0e83b56dd0100000000"
+    'Zvpebfbsg.Jvaqbjf.Rkcybere':
+      content_hex: "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008065bfa4ca57dd0100000000"
+    'HRZR_PGYFRFFVBA':
+      content_hex: "0000000000000000"
   'HKLM\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules':
     fixture-rule-1: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=6|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'
     fixture-rule-2: 'v2.10|Action=Allow|Active=TRUE|Dir=In|Protocol=17|Profile=Private|App=C:\users\fixtureuser\appdata\local\fivem\fivem.exe|Name=fivem|Desc=fivem|Defer=User|'

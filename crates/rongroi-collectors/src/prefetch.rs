@@ -19,11 +19,14 @@
 //!
 //! A `.pf` file's string table is the sharpest privacy boundary in this program:
 //!
-//! - **`loaded_files` is withheld whole.** It is normally hundreds of paths, some of them under a
-//!   user's profile, and Prefetch writes them as `\VOLUME{…}\USERS\<account>\…` — a shape
-//!   `rongroi_core::view::redact_profile_paths` does not touch, because it has no drive letter. It is
-//!   also, on its own, a list of what a person has on their computer, which ADR 0014 already refused
-//!   to let redaction stand in for withholding.
+//! - **`loaded_files` is withheld whole, but one count is derived from it.** It is normally hundreds
+//!   of paths, some of them under a user's profile, and Prefetch writes them as
+//!   `\VOLUME{…}\USERS\<account>\…` — a shape `rongroi_core::view::redact_profile_paths` does not
+//!   touch, because it has no drive letter. It is also, on its own, a list of what a person has on
+//!   their computer, which ADR 0014 already refused to let redaction stand in for withholding. The
+//!   list is still never emitted. For the programs ADR 0082 names, `loaded_outside` is how many of
+//!   its executable files were loaded from outside Windows' and the installers' folders: a number,
+//!   with no path or name in it.
 //! - **`volumes` is withheld whole**, device path, serial number and creation time alike. A volume
 //!   serial is not a person's name, but it identifies one machine across two reports, no rule can
 //!   express a question about it, and the device path is the prefix of the list above.
@@ -48,6 +51,7 @@
 
 use std::collections::BTreeMap;
 
+use rongroi_core::loaded_files::{counts_loaded_files, has_pe_extension};
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform};
 use rongroi_parsers::error::ParseError;
@@ -66,6 +70,14 @@ pub const SYSTEM_ROOT: &str = "SystemRoot";
 pub const PREFETCH_RELATIVE_PATH: &str = "Prefetch";
 /// Extension of the files Windows writes there, lower-cased for comparison.
 const PREFETCH_EXTENSION: &str = ".pf";
+/// The prefix of a device path in a string table, before the volume's identifier.
+const VOLUME_PREFIX: &str = r"\VOLUME{";
+/// The system library whose entry names the system volume: every Windows install has one.
+const SYSTEM_LIBRARY: &str = r"\Windows\System32\ntdll.dll";
+/// Folders on the system volume whose files Windows or an installer put there, as `rest` begins.
+const SYSTEM_FOLDERS: [&str; 3] = [r"\Windows\", r"\Program Files\", r"\Program Files (x86)\"];
+/// Why `loaded_outside` gives no count: there is no single system volume to compare entries with.
+const NO_SYSTEM_VOLUME: &str = "no_system_volume";
 
 /// The key holding the switch that decides whether Windows writes these files at all.
 pub const PREFETCH_PARAMETERS_KEY: &str =
@@ -100,7 +112,7 @@ const REASONS: [UnmeasuredReason; 8] = [
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
 /// the comment on [`Prefetch::collect`].
-const FIELDS: [Field; 17] = [
+const FIELDS: [Field; 20] = [
     Field::number("enable_prefetcher"),
     Field::number("entries"),
     Field::number("files"),
@@ -109,6 +121,8 @@ const FIELDS: [Field; 17] = [
     Field::boolean("intact"),
     Field::timestamp("last_run"),
     Field::text("loaded_files_withheld"),
+    Field::number("loaded_outside"),
+    Field::text("loaded_outside_unknown"),
     Field::text("name"),
     Field::text("path"),
     Field::text("read"),
@@ -116,6 +130,7 @@ const FIELDS: [Field; 17] = [
     Field::number("recorded_runs"),
     Field::number("rejected"),
     Field::number("run_count"),
+    Field::timestamp_list("run_times"),
     Field::number("scca_version"),
     Field::text("volumes_withheld"),
 ];
@@ -126,13 +141,16 @@ const FIELDS: [Field; 17] = [
 /// all describe a folder this collector **did** read, so gapping `files`, `entries`, `rejected` or
 /// `intact` — which were measured — would claim it had not. The reasons that describe a folder
 /// nothing was read from keep gapping every field (ADR 0030).
-const RECORD_FIELDS: [&str; 7] = [
+const RECORD_FIELDS: [&str; 10] = [
     fivem_edition::FIELD,
     "last_run",
+    "loaded_outside",
+    "loaded_outside_unknown",
     "name",
     "path",
     "recorded_runs",
     "run_count",
+    "run_times",
     "scca_version",
 ];
 
@@ -439,6 +457,21 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
             serde_json::Value::from(edition.as_str()),
         );
     }
+    // Only for the programs ADR 0082 names. The count is derived from `loaded_files`, and nothing
+    // else of that list reaches the observation.
+    if counts_loaded_files(&record.executable) {
+        match loaded_outside(&record.loaded_files) {
+            Ok(count) => {
+                fields.insert("loaded_outside".to_owned(), serde_json::Value::from(count));
+            }
+            Err(word) => {
+                fields.insert(
+                    "loaded_outside_unknown".to_owned(),
+                    serde_json::Value::from(word),
+                );
+            }
+        }
+    }
     fields.insert(
         "run_count".to_owned(),
         serde_json::Value::from(record.run_count),
@@ -455,6 +488,19 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
             serde_json::Value::from(at.to_string()),
         );
     }
+    // Every run time the file still holds, newest first and at most eight. The unrepresentable ones
+    // are left out rather than invented; the representable ones stay, in time order. Read only by
+    // the game-windows view, never put on the timeline (ADR 0078 section 6).
+    let mut run_times: Vec<jiff::Timestamp> =
+        record.last_runs.iter().filter_map(|run| run.at).collect();
+    // The file's order is not always the clock's: one fixture holds two runs a fraction of a second
+    // out of place, so the list is ordered here rather than trusted as read.
+    run_times.sort_unstable_by(|left, right| right.cmp(left));
+    let run_times: Vec<serde_json::Value> = run_times
+        .into_iter()
+        .map(|at| serde_json::Value::from(at.to_string()))
+        .collect();
+    fields.insert("run_times".to_owned(), serde_json::Value::Array(run_times));
     fields.insert(
         "scca_version".to_owned(),
         serde_json::Value::from(record.scca_version),
@@ -463,6 +509,69 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
         collector: ID.to_owned(),
         fields,
     }
+}
+
+/// How many of a program's loaded files are executable and sit outside the folders Windows and the
+/// installers use, or why there is no count.
+///
+/// Every entry's device prefix is compared with the system volume's, which is the one the system's
+/// own `ntdll.dll` is on. Without exactly one such volume the entries cannot be told apart by
+/// volume, so no count is given rather than a guess (ADR 0082 section 2). An entry with no device
+/// prefix is skipped. NTFS metadata such as `\$MFT` is not counted because it has no executable
+/// extension, so it needs no special case.
+fn loaded_outside(loaded_files: &[String]) -> Result<usize, &'static str> {
+    let mut system: Option<&str> = None;
+    for entry in loaded_files {
+        let Some((volume, rest)) = split_volume(entry) else {
+            continue;
+        };
+        if !rest.eq_ignore_ascii_case(SYSTEM_LIBRARY) {
+            continue;
+        }
+        match system {
+            None => system = Some(volume),
+            Some(known) if !known.eq_ignore_ascii_case(volume) => {
+                return Err(NO_SYSTEM_VOLUME);
+            }
+            Some(_) => {}
+        }
+    }
+    let system = system.ok_or(NO_SYSTEM_VOLUME)?;
+
+    let mut outside = 0;
+    for entry in loaded_files {
+        let Some((volume, rest)) = split_volume(entry) else {
+            continue;
+        };
+        // A `FiveM` program folder is expected on any volume, because it is the program's own.
+        let expected = (volume.eq_ignore_ascii_case(system) && in_system_folder(rest))
+            || fivem_edition::of_path(entry).is_some();
+        if !expected && has_pe_extension(entry) {
+            outside += 1;
+        }
+    }
+    Ok(outside)
+}
+
+/// Splits an entry `\VOLUME{…}\rest` into its device prefix and its rest, which keeps the backslash
+/// that follows the closing brace. `None` for an entry of any other shape.
+fn split_volume(entry: &str) -> Option<(&str, &str)> {
+    let head = entry.get(..VOLUME_PREFIX.len())?;
+    if !head.eq_ignore_ascii_case(VOLUME_PREFIX) {
+        return None;
+    }
+    let close = entry.find('}')?;
+    let volume = entry.get(..=close)?;
+    let rest = entry.get(close + 1..)?;
+    rest.starts_with('\\').then_some((volume, rest))
+}
+
+/// Whether `rest` lies below one of `SYSTEM_FOLDERS`, ignoring ASCII case.
+fn in_system_folder(rest: &str) -> bool {
+    SYSTEM_FOLDERS.iter().any(|folder| {
+        rest.get(..folder.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(folder))
+    })
 }
 
 /// What the folder held, how much of it decoded, and what this collector did not report.
@@ -575,6 +684,7 @@ mod tests {
     use std::path::PathBuf;
 
     use rongroi_host::{FixtureHost, NonWindowsHost};
+    use rongroi_parsers::prefetch::PrefetchRun;
 
     use super::*;
 
@@ -602,6 +712,21 @@ mod tests {
 
     fn text<'a>(observation: &'a Observation, name: &str) -> Option<&'a str> {
         field(observation, name).and_then(serde_json::Value::as_str)
+    }
+
+    /// Every run time the observation carries, in the order it emitted them.
+    fn run_times_of(observation: &Observation) -> Vec<String> {
+        field(observation, "run_times")
+            .and_then(serde_json::Value::as_array)
+            .expect("an execution observation carries run_times")
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .expect("every run time is an RFC 3339 string")
+                    .to_owned()
+            })
+            .collect()
     }
 
     /// The one observation that says what the folder held.
@@ -649,6 +774,79 @@ mod tests {
             text(records[0], "last_run"),
             Some("2016-01-12T20:07:03.9810694Z")
         );
+    }
+
+    /// Every run time the Windows 10 fixture holds is representable, so `run_times` carries all
+    /// eight, newest first, and its first entry is the `last_run` the collector already emitted
+    /// (ADR 0078 section 6).
+    #[test]
+    fn the_windows_10_fixture_emits_every_run_time_newest_first() {
+        let run = Prefetch.collect(&fixture("prefetch-files-present"));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        let record = executions(observations)[0];
+
+        let times = run_times_of(record);
+        assert!(!times.is_empty(), "{times:?}");
+        assert_eq!(
+            field(record, "recorded_runs").and_then(serde_json::Value::as_u64),
+            Some(times.len() as u64),
+            "every recorded run in this fixture is representable: {times:?}"
+        );
+        assert_eq!(Some(times[0].as_str()), text(record, "last_run"));
+        let instants: Vec<jiff::Timestamp> = times
+            .iter()
+            .map(|time| time.parse().expect("an RFC 3339 timestamp"))
+            .collect();
+        assert!(
+            instants.windows(2).all(|pair| pair[0] >= pair[1]),
+            "run_times is not newest first: {times:?}"
+        );
+
+        let declared = FIELDS
+            .iter()
+            .find(|field| field.name == "run_times")
+            .expect("the collector declares run_times");
+        // The ADR names the new variant; `Debug` keeps this test independent of `as_str`'s wording.
+        assert_eq!(format!("{:?}", declared.kind), "TimestampList");
+        assert!(
+            !declared.on_timeline,
+            "run_times must not put its up to eight times on the timeline"
+        );
+    }
+
+    /// A raw `FILETIME` that names no representable instant is left out, and the older runs that
+    /// are representable stay in order. `last_run` stays absent, as it was before the list existed.
+    #[test]
+    fn an_unrepresentable_newest_run_is_left_out_and_the_older_runs_are_kept() {
+        let newest = "2016-01-12T20:07:03.9810694Z".to_owned();
+        let older = "2016-01-11T20:07:03.9810694Z".to_owned();
+        let instant = |value: &str| Some(value.parse::<jiff::Timestamp>().expect("test instant"));
+        let record = PrefetchRecord {
+            scca_version: 30,
+            executable: "CMD.EXE".to_owned(),
+            run_count: 3,
+            last_runs: vec![
+                PrefetchRun {
+                    filetime: u64::MAX,
+                    at: None,
+                },
+                PrefetchRun {
+                    filetime: 2,
+                    at: instant(&newest),
+                },
+                PrefetchRun {
+                    filetime: 1,
+                    at: instant(&older),
+                },
+            ],
+            volumes: Vec::new(),
+            loaded_files: Vec::new(),
+        };
+
+        let observation = execution(r"C:\Windows\Prefetch\CMD.EXE-D269B812.pf", &record, None);
+        assert_eq!(text(&observation, "last_run"), None);
+        assert_eq!(run_times_of(&observation), vec![newest, older]);
     }
 
     /// The account is what a rule can ask a question of: an emptied folder is `files: 0`, and a
@@ -1182,5 +1380,217 @@ mod tests {
                 "{field}"
             );
         }
+    }
+
+    /// The device prefix of the system volume, as Prefetch writes it in a string table (ADR 0082).
+    const SYSTEM: &str = r"\VOLUME{01d0000000000000-aaaaaaaa}";
+    /// The device prefix of a second volume on the same machine.
+    const OTHER: &str = r"\VOLUME{01d0000000000000-bbbbbbbb}";
+
+    /// `ntdll.dll` in `\Windows\System32` on the given volume: the entry that names the system volume.
+    fn ntdll_on(volume: &str) -> String {
+        format!(r"{volume}\WINDOWS\SYSTEM32\NTDLL.DLL")
+    }
+
+    /// A record for `executable` that loaded `loaded_files` and nothing else.
+    fn record_loading(executable: &str, loaded_files: Vec<String>) -> PrefetchRecord {
+        PrefetchRecord {
+            scca_version: 30,
+            executable: executable.to_owned(),
+            run_count: 1,
+            last_runs: Vec::new(),
+            volumes: Vec::new(),
+            loaded_files,
+        }
+    }
+
+    /// A library in a user's profile on the system volume is outside what Windows put there; the
+    /// system volume's own `ntdll.dll` is not.
+    #[test]
+    fn a_profile_library_on_the_system_volume_is_outside() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\TEMP\X.DLL"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(1));
+    }
+
+    /// Rest below `\Windows\`, `\Program Files\` and `\Program Files (x86)\` on the system volume is
+    /// expected, whatever the case of the folder names.
+    #[test]
+    fn the_windows_and_program_folders_of_the_system_volume_are_expected() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\Windows\System32\x.dll"),
+            format!(r"{SYSTEM}\Program Files\A\b.dll"),
+            format!(r"{SYSTEM}\Program Files (x86)\A\c.ocx"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(0));
+    }
+
+    /// The same folder on another volume is not the system's: a `\Windows\` elsewhere is outside.
+    #[test]
+    fn a_windows_folder_on_another_volume_is_outside() {
+        let loaded = vec![ntdll_on(SYSTEM), format!(r"{OTHER}\Windows\x.dll")];
+        assert_eq!(loaded_outside(&loaded), Ok(1));
+    }
+
+    /// Both `FiveM` program folders are expected on any volume, because the whole entry is below one.
+    #[test]
+    fn the_fivem_program_folders_are_expected_on_any_volume() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\FIVEM\FIVEM.APP\x.dll"),
+            format!(r"{OTHER}\Users\V\AppData\Local\FiveM for GTAV Enhanced\y.dll"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(0));
+    }
+
+    /// Only entries with an executable extension are counted: a picture and an ini file outside the
+    /// expected folders are not.
+    #[test]
+    fn outside_entries_without_an_executable_extension_are_not_counted() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\DOWNLOADS\a.png"),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\x.ini"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(0));
+    }
+
+    /// Without exactly one system volume there is no answer: none, two different ones, and an empty
+    /// list are all `no_system_volume`, while two entries naming the same volume in another case agree.
+    #[test]
+    fn no_single_system_volume_gives_the_unknown_word() {
+        assert_eq!(
+            loaded_outside(&[format!(r"{SYSTEM}\Windows\x.dll")]),
+            Err("no_system_volume")
+        );
+        assert_eq!(
+            loaded_outside(&[ntdll_on(SYSTEM), ntdll_on(OTHER)]),
+            Err("no_system_volume")
+        );
+        assert_eq!(loaded_outside(&[]), Err("no_system_volume"));
+        assert_eq!(
+            loaded_outside(&[
+                ntdll_on(SYSTEM),
+                format!(r"{SYSTEM}\Windows\System32\ntdll.dll"),
+            ]),
+            Ok(0)
+        );
+    }
+
+    /// NTFS metadata such as `\$MFT` has no executable extension and entries with no volume prefix
+    /// are skipped, while `$`-named folders such as the recycle bin are counted like any other folder.
+    #[test]
+    fn ntfs_metadata_and_unprefixed_entries_are_skipped() {
+        let metadata = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\$MFT"),
+            r"C:\x.dll".to_owned(),
+        ];
+        assert_eq!(loaded_outside(&metadata), Ok(0));
+
+        let recycle_bin = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\$Recycle.Bin\S-1-5-21-1\$R1.dll"),
+        ];
+        assert_eq!(loaded_outside(&recycle_bin), Ok(1));
+
+        let dollar_folder = vec![ntdll_on(SYSTEM), format!(r"{SYSTEM}\$x\evil.dll")];
+        assert_eq!(loaded_outside(&dollar_folder), Ok(1));
+    }
+
+    /// Volume and folder comparisons ignore ASCII case: the system volume written in lower case is
+    /// the same volume, and the system folders match in any case.
+    #[test]
+    fn volume_and_folder_comparisons_ignore_ascii_case() {
+        let lower = r"\volume{01d0000000000000-aaaaaaaa}";
+        assert_eq!(
+            loaded_outside(&[ntdll_on(SYSTEM), format!(r"{lower}\windows\system32\x.dll"),]),
+            Ok(0)
+        );
+        assert_eq!(
+            loaded_outside(&[
+                ntdll_on(SYSTEM),
+                format!(r"{lower}\WINDOWS\SYSTEM32\NTDLL.DLL"),
+            ]),
+            Ok(0)
+        );
+        let program_files = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\PROGRAM FILES (X86)\A\b.dll"),
+        ];
+        assert_eq!(loaded_outside(&program_files), Ok(0));
+    }
+
+    /// The program's own executable is not special: outside the expected folders it is counted.
+    #[test]
+    fn the_programs_own_executable_is_counted_when_it_is_outside() {
+        let loaded = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\STEAMLIBRARY\GAME\PLAYGTAV.EXE"),
+        ];
+        assert_eq!(loaded_outside(&loaded), Ok(1));
+    }
+
+    /// The count appears only for an executable that passes `counts_loaded_files`, and the unknown word
+    /// only in place of it. Neither appears for another executable, and never both.
+    #[test]
+    fn the_observation_carries_the_count_or_the_unknown_word() {
+        let outside = vec![
+            ntdll_on(SYSTEM),
+            format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\TEMP\X.DLL"),
+        ];
+
+        let counted = execution(
+            r"C:\Windows\Prefetch\RUNDLL32.EXE-12345678.pf",
+            &record_loading("RUNDLL32.EXE", outside.clone()),
+            None,
+        );
+        assert_eq!(field(&counted, "loaded_outside"), Some(&1_u64.into()));
+        assert_eq!(field(&counted, "loaded_outside_unknown"), None);
+
+        let not_counted = execution(
+            r"C:\Windows\Prefetch\CMD.EXE-D269B812.pf",
+            &record_loading("CMD.EXE", outside),
+            None,
+        );
+        assert_eq!(field(&not_counted, "loaded_outside"), None);
+        assert_eq!(field(&not_counted, "loaded_outside_unknown"), None);
+
+        let unknown = execution(
+            r"C:\Windows\Prefetch\FIVEM.EXE-11111111.pf",
+            &record_loading("FIVEM.EXE", vec![format!(r"{SYSTEM}\Windows\x.dll")]),
+            None,
+        );
+        assert_eq!(
+            text(&unknown, "loaded_outside_unknown"),
+            Some("no_system_volume")
+        );
+        assert_eq!(field(&unknown, "loaded_outside"), None);
+    }
+
+    /// **Nothing `loaded_files` holds is emitted.** The count is a number, and the observation's `Debug`
+    /// text — the form a report's diagnostics take — carries no entry's path, name or volume identifier.
+    #[test]
+    fn no_loaded_path_or_volume_identifier_reaches_the_observation() {
+        let observation = execution(
+            r"C:\Windows\Prefetch\RUNDLL32.EXE-12345678.pf",
+            &record_loading(
+                "RUNDLL32.EXE",
+                vec![
+                    ntdll_on(SYSTEM),
+                    format!(r"{SYSTEM}\USERS\U\APPDATA\LOCAL\TEMP\X.DLL"),
+                ],
+            ),
+            None,
+        );
+        let debug = format!("{observation:?}");
+        for withheld in ["TEMP", "X.DLL", "aaaaaaaa", "VOLUME"] {
+            assert!(!debug.contains(withheld), "{withheld} in {debug}");
+        }
+        // The count is there, so this is not passing only because nothing was emitted.
+        assert_eq!(field(&observation, "loaded_outside"), Some(&1_u64.into()));
     }
 }

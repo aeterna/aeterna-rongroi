@@ -594,6 +594,48 @@ mod tests {
         assert!(!report.timestamp_fields.contains_key("process"));
     }
 
+    /// A Prefetch observation carries `run_times`, and neither mode puts those times on the
+    /// timeline: the field is declared off it, so the timeline still holds one entry per record
+    /// from `last_run` and nothing from the up-to-eight list (ADR 0078 section 6).
+    #[test]
+    fn run_times_is_not_a_timeline_source_in_either_mode() {
+        let bundle = Bundle::embedded().unwrap();
+        let report = run(
+            &fixture_host("prefetch-files-present"),
+            &bundle,
+            context(ScanTier::Standard),
+        );
+        let execution = report
+            .unmatched
+            .iter()
+            .filter(|group| group.collector == "prefetch")
+            .flat_map(|group| &group.observations)
+            .find(|observation| observation.fields.contains_key("name"))
+            .expect("the fixture's CMD.EXE record is unmatched and named");
+        assert!(
+            execution
+                .fields
+                .get("run_times")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|times| !times.is_empty()),
+            "the observation must carry run_times before the timeline can be asked about it: {execution:?}"
+        );
+
+        for mode in [
+            rongroi_core::model::Mode::SelfCheck,
+            rongroi_core::model::Mode::Ss,
+        ] {
+            let timeline = rongroi_core::view::timeline(&report, mode);
+            assert!(
+                timeline
+                    .entries
+                    .iter()
+                    .all(|entry| entry.field != "run_times"),
+                "{mode:?} put run_times on the timeline: {timeline:?}"
+            );
+        }
+    }
+
     fn context(tier: ScanTier) -> ScanContext {
         ScanContext {
             provenance: Provenance::from_parts(None, "0.0.0-test", None, None),

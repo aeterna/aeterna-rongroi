@@ -227,6 +227,11 @@ expression: own
         "count": 2
       },
       {
+        "collector": "userassist",
+        "state": "unmeasured",
+        "reason": "source_absent"
+      },
+      {
         "collector": "usn",
         "place": "journal",
         "state": "measured",

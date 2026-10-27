@@ -8,9 +8,15 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
+mod game;
 mod saved;
 mod session;
 
+pub use game::{
+    ClockHistory, ClockLine, ClockTrust, FileDetails, FileRead, GameCandidate, GameSession,
+    GameWindows, IdentityFact, IdentityNotKnownReason, InstallCounts, NearSessions, NotKnownReason,
+    TimeFact, WINDOW_SECONDS, WindowCounts, game_windows,
+};
 pub use saved::{
     CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,
     SHOWN_DIGEST_LEN, SavedRecord, SavedTimes, canonical_case_code, digest, saved_record,
@@ -30,10 +36,11 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 17] = [
+pub const COLLECTOR_ORDER: [&str; 20] = [
     "posture",
     "driver_service",
     "windows_start",
+    "event_fields",
     "pci_device",
     "hid_device",
     "autostart",
@@ -47,18 +54,26 @@ pub const COLLECTOR_ORDER: [&str; 17] = [
     "prefetch",
     "bam",
     "pca",
+    "userassist",
+    "recorded_files",
     "usn",
 ];
 
-/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054, ADR 0060).
+/// Observation fields SS mode never shows, by collector, even on a match (ADR 0054, ADR 0060,
+/// ADR 0078).
 ///
 /// A hosts line's address can name the player's own server; its kind, which `net_config` emits
 /// beside it as `address_kind`, is what separates a blocklist from a redirect and is what SS mode
 /// shows in its place (ADR 0054, owner decision 2). A scheduled task's path can carry an account SID,
 /// and a `Run` value's name is whatever the program chose, so `autostart`'s `entry` is withheld; the
 /// file it starts, its `path`, is shown and redacted like every path (ADR 0060, owner decision 3).
-pub const SS_WITHHELD_FIELDS: [(&str, &str); 2] =
-    [("net_config", "address"), ("autostart", "entry")];
+/// A Prefetch record's `run_times` is every run time the file still holds, which SS mode never lists
+/// (ADR 0078 section 9, amending ADR 0034 decision 2).
+pub const SS_WITHHELD_FIELDS: [(&str, &str); 3] = [
+    ("net_config", "address"),
+    ("autostart", "entry"),
+    ("prefetch", "run_times"),
+];
 
 /// What SS mode shows in place of a server identity the player did not agree to show (ADR 0052).
 pub const SERVER_IDENTITY_PLACEHOLDER: &str = "%SERVER_IDENTITY%";
@@ -222,6 +237,12 @@ pub struct ReportView {
     /// own folders (ADR 0062), at most one per edition. Not evidence and never counted. Additive.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cross_source: Vec<CrossSourceStatement>,
+    /// The programs Windows recorded near the latest `FiveM` session, beside the ADR 0061 statement
+    /// above (ADR 0078 P6 decision 4). In SS mode the same filter as the rest of the view applies:
+    /// only listed candidates are named, the others are counted (ADR 0078 section 9). Absent when
+    /// no session was found. Additive; the report schema stays at 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game_windows: Option<GameWindows>,
 }
 
 /// The span one row's count is for (ADR 0047, amendment of 2026-09-30, decision 3).
@@ -435,6 +456,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             row_bands: row_bands(report, &report.evidence),
             trace_ages: trace_ages_of(report, mode),
             cross_source: cross_source_of(report),
+            game_windows: game_windows_of(report, mode),
         },
         Mode::Ss => {
             let machine_root = report
@@ -488,9 +510,17 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 row_bands,
                 trace_ages: trace_ages_of(report, mode),
                 cross_source: cross_source_of(report),
+                game_windows: game_windows_of(report, mode),
             }
         }
     }
+}
+
+/// The game-windows view of `mode`, or nothing when no `FiveM` session was found: the ADR 0061
+/// statement is then all there is to show (ADR 0078 section 2).
+fn game_windows_of(report: &Report, mode: Mode) -> Option<GameWindows> {
+    let view = game_windows(report, mode);
+    (!view.sessions.is_empty()).then_some(view)
 }
 
 /// How far back each source reaches on this PC, beside when parts of this PC were set up (ADR 0061).
@@ -2423,6 +2453,41 @@ mod tests {
         assert_eq!(own["entry"], r"\Updater-S-1-5-21-1-2-3-1001");
     }
 
+    /// A Prefetch observation's `run_times` never reaches an SS view, even on a match; Self mode
+    /// keeps the list (ADR 0078 section 9, amending ADR 0034 decision 2).
+    #[test]
+    fn ss_view_withholds_prefetch_run_times_and_self_keeps_them() {
+        let mut report = report();
+        report.evidence = vec![Evidence {
+            rule_id: "prefetch-file-read-only".to_owned(),
+            collector: "prefetch".to_owned(),
+            strength: Strength::Presence,
+            state: EvidenceState::Found {
+                observations: vec![Observation {
+                    collector: "prefetch".to_owned(),
+                    fields: BTreeMap::from([
+                        ("name".to_owned(), serde_json::Value::from("x.exe")),
+                        (
+                            "run_times".to_owned(),
+                            serde_json::json!(["2026-01-10T09:50:00Z", "2026-01-10T08:50:00Z"]),
+                        ),
+                    ]),
+                }],
+            },
+        }];
+        let fields = |view: &ReportView| match &view.evidence[0].state {
+            EvidenceState::Found { observations } => observations[0].fields.clone(),
+            state => panic!("expected a match, got {state:?}"),
+        };
+        let ss = fields(&for_mode(&report, Mode::Ss));
+        assert!(!ss.contains_key("run_times"), "{ss:?}");
+        let own = fields(&for_mode(&report, Mode::SelfCheck));
+        assert_eq!(
+            own["run_times"],
+            serde_json::json!(["2026-01-10T09:50:00Z", "2026-01-10T08:50:00Z"])
+        );
+    }
+
     #[test]
     fn ss_view_shows_found_and_posture_and_counts_the_rest() {
         let view = for_mode(&report(), Mode::Ss);
@@ -4271,5 +4336,1784 @@ mod tests {
             &[],
         );
         assert_eq!(sessions_of(&nothing), vec![]);
+    }
+
+    // ---- ADR 0078 P1: the game-windows view, data only ----
+    //
+    // The shape these tests hold `view::game_windows` to:
+    //
+    // - `GameWindows { sessions: Vec<GameSession>, candidates: Vec<GameCandidate>,
+    //   counts: WindowCounts }`;
+    // - `GameSession { edition, start, end: Option<String>, latest: bool }`, where `latest` is ADR
+    //   0062's session and an earlier one has no end;
+    // - `GameCandidate { name, path: Option<String>, t1, t2, t3, t4: TimeFact,
+    //   near_sessions: NearSessions }`;
+    // - `TimeFact::{True, False, NotKnown { reason: NotKnownReason }}`, with
+    //   `NotKnownReason::{SessionEndNotRecorded, ScanTimeNotRecorded, BeforeTraceAge { source }}`
+    //   (ADR 0078 sections 4 and 5, ADR 0061's trace ages);
+    // - `NearSessions { near, found }` for R, a fact value rather than a score;
+    // - `WindowCounts { before, during, after, before_scan }`, in both modes.
+
+    const GAME_START_1: &str = "2026-01-10T08:00:00Z";
+    const GAME_START_2: &str = "2026-01-10T09:00:00Z";
+    const GAME_START_3: &str = "2026-01-10T10:00:00Z";
+    const GAME_END: &str = "2026-01-10T10:30:00Z";
+
+    /// One Prefetch record, with every run time it holds, newest first (ADR 0078 section 6). The
+    /// report holds `run_times` as an array of RFC 3339 strings, built here by hand. Its `path` is
+    /// the `.pf` file the collector reads, never the program path, as the collector emits it.
+    fn prefetch_runs(name: &str, edition: Option<&str>, times: &[&str]) -> Observation {
+        let mut fields = BTreeMap::from([
+            ("name".to_owned(), serde_json::Value::from(name)),
+            ("run_times".to_owned(), serde_json::json!(times)),
+            ("last_run".to_owned(), serde_json::Value::from(times[0])),
+            (
+                "path".to_owned(),
+                serde_json::Value::from(format!(
+                    r"C:\Windows\Prefetch\{}-1A2B3C4D.pf",
+                    name.to_ascii_uppercase()
+                )),
+            ),
+            (
+                "recorded_runs".to_owned(),
+                serde_json::Value::from(times.len()),
+            ),
+        ]);
+        if let Some(edition) = edition {
+            fields.insert("fivem_edition".to_owned(), serde_json::Value::from(edition));
+        }
+        Observation {
+            collector: "prefetch".to_owned(),
+            fields,
+        }
+    }
+
+    /// One BAM, PCA or process record: a name, a time in `field`, and a path when it has one.
+    fn recorded(
+        collector: &str,
+        name: &str,
+        path: Option<&str>,
+        field: &str,
+        at: &str,
+    ) -> Observation {
+        let mut fields = BTreeMap::from([
+            ("name".to_owned(), serde_json::Value::from(name)),
+            (field.to_owned(), serde_json::Value::from(at)),
+        ]);
+        if let Some(path) = path {
+            fields.insert("path".to_owned(), serde_json::Value::from(path));
+        }
+        Observation {
+            collector: collector.to_owned(),
+            fields,
+        }
+    }
+
+    /// BAM's end for one of an edition's anchor names.
+    fn bam_end(name: &str, edition: &str, at: &str) -> Observation {
+        let mut observation = recorded("bam", name, None, "last_run", at);
+        observation
+            .fields
+            .insert("fivem_edition".to_owned(), serde_json::Value::from(edition));
+        observation
+    }
+
+    /// One Legacy session per run time Prefetch holds for `FiveM.exe`, and BAM's end when given.
+    fn legacy_sessions(times: &[&str], end: Option<&str>) -> Vec<Observation> {
+        let mut observations = vec![prefetch_runs("FiveM.exe", Some("legacy"), times)];
+        if let Some(end) = end {
+            observations.push(bam_end("FiveM.exe", "legacy", end));
+        }
+        observations
+    }
+
+    /// A report holding the observations, the bundle's `FiveM` selectors and the age declarations the
+    /// view reads. The scan ran on 2026-01-10T12:00:00Z (`session_report`).
+    fn game_report(observations: Vec<Observation>) -> Report {
+        let mut report = session_report(observations, &[]);
+        report.timeline_selectors =
+            FIVEM_SELECTORS
+                .iter()
+                .fold(BTreeMap::new(), |mut held, (collector, id)| {
+                    held.entry((*collector).to_owned())
+                        .or_insert_with(Vec::new)
+                        .push((*id).to_owned());
+                    held
+                });
+        report.age_fields = BTreeMap::from([
+            (
+                "prefetch".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Field {
+                        field: "entries".to_owned(),
+                    },
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+            (
+                "bam".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Field {
+                        field: "entries".to_owned(),
+                    },
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+            (
+                "pca".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Observations,
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+            (
+                "userassist".to_owned(),
+                age(
+                    &["last_run"],
+                    AgeCount::Observations,
+                    AgeRows::One,
+                    &[],
+                    &[],
+                ),
+            ),
+        ]);
+        report
+    }
+
+    fn latest_session<'a>(view: &'a GameWindows, edition: &str) -> &'a GameSession {
+        view.sessions
+            .iter()
+            .find(|session| session.edition == edition && session.latest)
+            .unwrap_or_else(|| panic!("no latest {edition} session"))
+    }
+
+    fn earlier_sessions<'a>(view: &'a GameWindows, edition: &str) -> Vec<&'a GameSession> {
+        view.sessions
+            .iter()
+            .filter(|session| session.edition == edition && !session.latest)
+            .collect()
+    }
+
+    fn game_candidate<'a>(view: &'a GameWindows, name: &str) -> &'a GameCandidate {
+        view.candidates
+            .iter()
+            .find(|candidate| candidate.name.eq_ignore_ascii_case(name))
+            .unwrap_or_else(|| panic!("no candidate {name}"))
+    }
+
+    /// b1: no record of a `FiveM` run: the view says there is no session and holds no candidate.
+    #[test]
+    fn b1_no_fivem_record_is_no_session_and_no_candidates() {
+        let report = game_report(vec![prefetch_runs(
+            "other.exe",
+            None,
+            &["2026-01-10T09:00:00Z"],
+        )]);
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert!(view.sessions.is_empty());
+        assert!(view.candidates.is_empty());
+        assert_eq!(view.counts.before, 0);
+        assert_eq!(view.counts.during, 0);
+        assert_eq!(view.counts.after, 0);
+        assert_eq!(view.counts.before_scan, 0);
+    }
+
+    /// b2: three runs Prefetch kept for `FiveM.exe` and BAM's end: the latest session has an end,
+    /// and the two earlier ones are start-only.
+    #[test]
+    fn b2_earlier_runs_are_start_only_sessions() {
+        let report = game_report(legacy_sessions(
+            &[GAME_START_3, GAME_START_2, GAME_START_1],
+            Some(GAME_END),
+        ));
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(view.sessions.len(), 3);
+        let latest = latest_session(&view, "legacy");
+        assert_eq!(latest.start, GAME_START_3);
+        assert_eq!(latest.end.as_deref(), Some(GAME_END));
+        let earlier = earlier_sessions(&view, "legacy");
+        assert_eq!(earlier.len(), 2);
+        assert!(earlier.iter().all(|session| session.end.is_none()));
+        let mut starts: Vec<&str> = earlier
+            .iter()
+            .map(|session| session.start.as_str())
+            .collect();
+        starts.sort_unstable();
+        assert_eq!(starts, vec![GAME_START_1, GAME_START_2]);
+    }
+
+    /// b2b: `FiveM.exe` and `FiveM_b…_GTAProcess.exe` run times five seconds apart are one session
+    /// for each of two starts, not four.
+    #[test]
+    fn b2b_starts_within_the_margin_are_one_session() {
+        let report = game_report(vec![
+            prefetch_runs("FiveM.exe", Some("legacy"), &[GAME_START_3, GAME_START_2]),
+            prefetch_runs(
+                "FiveM_b1234_GTAProcess.exe",
+                Some("legacy"),
+                &["2026-01-10T10:00:05Z", "2026-01-10T09:00:05Z"],
+            ),
+        ]);
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(view.sessions.len(), 2, "{:?}", view.sessions);
+        assert_eq!(earlier_sessions(&view, "legacy").len(), 1);
+    }
+
+    /// b3: a run ten minutes before each of three sessions is in each before window: T1 is true, and
+    /// R is 3 of 3 sessions found.
+    #[test]
+    fn b3_a_run_before_every_session_is_t1_and_r_of_three() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        observations.push(prefetch_runs(
+            "x.exe",
+            None,
+            &[
+                "2026-01-10T09:50:00Z",
+                "2026-01-10T08:50:00Z",
+                "2026-01-10T07:50:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.t1, TimeFact::True);
+        assert_eq!(candidate.near_sessions, NearSessions { near: 3, found: 3 });
+    }
+
+    /// b4: 45 minutes before every start is outside the 30-minute before window, so it is not a
+    /// candidate at all.
+    #[test]
+    fn b4_a_run_outside_every_window_is_not_a_candidate() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        observations.push(prefetch_runs(
+            "far.exe",
+            None,
+            &[
+                "2026-01-10T09:15:00Z",
+                "2026-01-10T08:15:00Z",
+                "2026-01-10T07:15:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert!(
+            view.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("far.exe"))
+        );
+    }
+
+    /// b5: a run only in the latest session's before window: T1 is true, but an earlier session has
+    /// no recorded end, so T2 is not known rather than false.
+    #[test]
+    fn b5_an_earlier_session_makes_t2_not_known() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        observations.push(prefetch_runs("x.exe", None, &["2026-01-10T09:50:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.t1, TimeFact::True);
+        assert_eq!(
+            candidate.t2,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::SessionEndNotRecorded,
+            }
+        );
+    }
+
+    /// b6: one session, the sources reach it, and the run is not during it: T2 is false.
+    #[test]
+    fn b6_t2_is_false_when_the_one_session_and_its_sources_cover_it() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("old.exe", None, &["2026-01-09T00:00:00Z"]));
+        observations.push(recorded(
+            "bam",
+            "old.exe",
+            None,
+            "last_run",
+            "2026-01-09T00:00:00Z",
+        ));
+        observations.push(prefetch_runs("x.exe", None, &["2026-01-10T09:50:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(game_candidate(&view, "x.exe").t2, TimeFact::False);
+    }
+
+    /// b7: GTA V's own executables never start a session, even with an edition and BAM's end.
+    #[test]
+    fn b7_gta_v_executables_never_start_a_session() {
+        let report = game_report(vec![
+            prefetch_runs("PlayGTAV.exe", Some("enhanced"), &["2026-01-10T09:00:00Z"]),
+            prefetch_runs("GTA5.exe", Some("legacy"), &["2026-01-10T08:00:00Z"]),
+            bam_end("PlayGTAV.exe", "enhanced", GAME_END),
+            bam_end("GTA5.exe", "legacy", GAME_END),
+        ]);
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert!(view.sessions.is_empty());
+        assert!(view.candidates.is_empty());
+    }
+
+    /// b8: SS mode shows no candidate name or path, and its per-window counts are Self mode's.
+    #[test]
+    fn b8_ss_mode_shows_per_window_counts_and_no_candidate_identity() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs(
+            "before-tool.exe",
+            None,
+            &["2026-01-10T09:50:00Z"],
+        ));
+        observations.push(recorded(
+            "bam",
+            "during-tool.exe",
+            Some(r"C:\Tools\During-Tool.exe"),
+            "last_run",
+            "2026-01-10T10:15:00Z",
+        ));
+        observations.push(prefetch_runs(
+            "after-tool.exe",
+            None,
+            &["2026-01-10T10:45:00Z"],
+        ));
+        observations.push(prefetch_runs(
+            "later-tool.exe",
+            None,
+            &["2026-01-10T11:30:00Z"],
+        ));
+        let report = game_report(observations);
+        let own = game_windows(&report, Mode::SelfCheck);
+        let ss = game_windows(&report, Mode::Ss);
+        // The two FiveM.exe anchors are candidates since ADR 0084: Prefetch's run is at the
+        // session's start and BAM's end at its end, so both are in the during window. Neither has
+        // a path, so SS mode counts them unnamed.
+        assert_eq!(own.candidates.len(), 6);
+        assert_eq!(
+            own.counts,
+            WindowCounts {
+                before: 1,
+                during: 3,
+                after: 1,
+                // The before-the-scan window is the latest end up to the scan, so it overlaps the
+                // after window: `after-tool.exe` counts in both, once per window kind.
+                before_scan: 2,
+            }
+        );
+        assert!(ss.candidates.is_empty());
+        assert_eq!(ss.sessions, own.sessions);
+        assert_eq!(ss.counts, own.counts);
+        let json = serde_json::to_string(&ss).unwrap();
+        for identity in [
+            "before-tool.exe",
+            "during-tool.exe",
+            "after-tool.exe",
+            "later-tool.exe",
+            r"C:\Tools\During-Tool.exe",
+        ] {
+            assert!(!json.contains(identity), "{json}");
+        }
+    }
+
+    /// b9: R descending, then the number of true T facts, then the earliest time. The second report
+    /// ties R and the number of true facts to show the earliest time deciding the order.
+    #[test]
+    fn b9_candidates_are_ordered_by_r_true_facts_then_earliest_time() {
+        let mut observations =
+            legacy_sessions(&[GAME_START_3, GAME_START_2, GAME_START_1], Some(GAME_END));
+        // R = 3, T1 and T2 true.
+        observations.push(prefetch_runs(
+            "r-three-facts-two.exe",
+            None,
+            &[
+                "2026-01-10T10:15:00Z",
+                "2026-01-10T09:50:00Z",
+                "2026-01-10T08:50:00Z",
+                "2026-01-10T07:50:00Z",
+            ],
+        ));
+        // R = 3, T1 true only.
+        observations.push(prefetch_runs(
+            "r-three-facts-one.exe",
+            None,
+            &[
+                "2026-01-10T09:50:00Z",
+                "2026-01-10T08:50:00Z",
+                "2026-01-10T07:50:00Z",
+            ],
+        ));
+        // R = 1, T2, T3 and T4 true: R keeps it last.
+        observations.push(prefetch_runs(
+            "r-one-facts-three.exe",
+            None,
+            &[
+                "2026-01-10T11:30:00Z",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T10:15:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let order: Vec<&str> = view
+            .candidates
+            .iter()
+            .map(|candidate| candidate.name.as_str())
+            .collect();
+        // The two FiveM.exe anchors are candidates since ADR 0084. Neither is near two sessions and
+        // each has one true T fact, so both sort after r-one-facts-three, which has three.
+        assert_eq!(
+            order,
+            [
+                "r-three-facts-two.exe",
+                "r-three-facts-one.exe",
+                "r-one-facts-three.exe",
+                "FiveM.exe",
+                "FiveM.exe",
+            ]
+        );
+
+        // All three tie on R and on the number of true facts; the earliest time orders them. The
+        // two FiveM.exe anchors are candidates since ADR 0084, at 10:00 and 10:30, so they sort in
+        // among the others by time, not at the end.
+        let mut tied = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        tied.push(prefetch_runs("early.exe", None, &["2026-01-10T09:35:00Z"]));
+        tied.push(prefetch_runs("late.exe", None, &["2026-01-10T09:50:00Z"]));
+        tied.push(prefetch_runs("during.exe", None, &["2026-01-10T10:15:00Z"]));
+        let view = game_windows(&game_report(tied), Mode::SelfCheck);
+        let order: Vec<&str> = view
+            .candidates
+            .iter()
+            .map(|candidate| candidate.name.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            [
+                "early.exe",
+                "late.exe",
+                "FiveM.exe",
+                "during.exe",
+                "FiveM.exe"
+            ]
+        );
+    }
+
+    /// b10: a run between the latest end and the scan's own time is in the before-the-scan window.
+    #[test]
+    fn b10_a_run_after_the_session_and_before_the_scan_is_t4() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("later.exe", None, &["2026-01-10T11:30:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(game_candidate(&view, "later.exe").t4, TimeFact::True);
+    }
+
+    /// b11: a Prefetch name joins the one path candidate whose file name is its own; with two such
+    /// paths it joins neither and stays a candidate by its name, with no path (its `.pf` path is not
+    /// the program's).
+    #[test]
+    fn b11_a_prefetch_name_joins_one_path_candidate_or_stays_its_own() {
+        let mut joined = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        joined.push(prefetch_runs("X.EXE", None, &["2026-01-10T09:50:00Z"]));
+        joined.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:55:00Z",
+        ));
+        // The two FiveM.exe anchors are candidates since ADR 0084, so the joined name is one of
+        // three. It sorts first: its run is earliest, and the anchors' runs are later.
+        let view = game_windows(&game_report(joined), Mode::SelfCheck);
+        assert_eq!(view.candidates.len(), 3);
+        assert_eq!(view.candidates[0].path.as_deref(), Some(r"C:\Tools\x.exe"));
+
+        let mut ambiguous = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        ambiguous.push(prefetch_runs("X.EXE", None, &["2026-01-10T09:50:00Z"]));
+        ambiguous.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:55:00Z",
+        ));
+        ambiguous.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"D:\Other\x.exe"),
+            "last_run",
+            "2026-01-10T09:56:00Z",
+        ));
+        // The two FiveM.exe anchors are candidates since ADR 0084, with no path. The two x.exe
+        // paths and the X.EXE record make three more candidates, and the no-path count holds
+        // X.EXE and the anchors.
+        let view = game_windows(&game_report(ambiguous), Mode::SelfCheck);
+        assert_eq!(view.candidates.len(), 5);
+        assert_eq!(
+            view.candidates
+                .iter()
+                .filter(|candidate| candidate.path.is_none())
+                .count(),
+            3
+        );
+        assert!(
+            view.candidates
+                .iter()
+                .any(|candidate| candidate.path.is_none()
+                    && candidate.name.eq_ignore_ascii_case("x.exe"))
+        );
+    }
+
+    /// b12: a record with no program path is a candidate of its own, never merged by name with
+    /// another, and a Prefetch record with no path candidate to join stays its own too.
+    #[test]
+    fn b12_a_record_without_a_path_is_its_own_candidate() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "ghost.exe",
+            None,
+            "last_run",
+            "2026-01-10T09:40:00Z",
+        ));
+        observations.push(recorded(
+            "bam",
+            "ghost.exe",
+            None,
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(prefetch_runs("ghost.exe", None, &["2026-01-10T09:45:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let ghosts: Vec<&GameCandidate> = view
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("ghost.exe"))
+            .collect();
+        assert_eq!(ghosts.len(), 3, "{ghosts:?}");
+        assert!(
+            ghosts.iter().all(|candidate| candidate.path.is_none()),
+            "{ghosts:?}"
+        );
+    }
+
+    /// b13: two Prefetch records with the same name are two files, each with its own `.pf` hash, so
+    /// with no path candidate to join they stay two candidates rather than merging by name.
+    #[test]
+    fn b13_two_prefetch_records_with_one_name_stay_two_candidates() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("setup.exe", None, &["2026-01-10T09:40:00Z"]));
+        observations.push(prefetch_runs("setup.exe", None, &["2026-01-10T09:50:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let setups: Vec<&GameCandidate> = view
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("setup.exe"))
+            .collect();
+        assert_eq!(setups.len(), 2, "{setups:?}");
+        assert!(
+            setups.iter().all(|candidate| candidate.path.is_none()),
+            "{setups:?}"
+        );
+        assert!(
+            setups
+                .iter()
+                .all(|candidate| candidate.t1 == TimeFact::True),
+            "{setups:?}"
+        );
+    }
+
+    /// c1 (control): Prefetch's trace age is later than the before window, so the missing before time
+    /// is not known, not false.
+    #[test]
+    fn c1_a_window_before_prefetch_trace_age_is_not_known() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("during.exe", None, &["2026-01-10T10:15:00Z"]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "during.exe");
+        assert_eq!(
+            candidate.t1,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::BeforeTraceAge {
+                    source: "prefetch".to_owned(),
+                },
+            }
+        );
+        assert_eq!(candidate.t2, TimeFact::True);
+    }
+
+    /// v2: a `UserAssist`-only candidate is bounded by `UserAssist`'s trace age as a BAM candidate is
+    /// by BAM's: a before window older than its oldest entry is not known, while a time inside the
+    /// before window is true and a during window it does not hold is false (ADR 0080 section 3).
+    #[test]
+    fn u4_v2_a_userassist_only_candidate_is_bounded_by_its_trace_age() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "userassist",
+            "During-Tool.exe",
+            Some(r"C:\Tools\During-Tool.exe"),
+            "last_run",
+            "2026-01-10T10:15:00Z",
+        ));
+        observations.push(recorded(
+            "userassist",
+            "Before-Tool.exe",
+            Some(r"C:\Tools\Before-Tool.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+
+        // UserAssist's oldest entry is 09:50, later than the before window's 09:30 start, so the
+        // window is outside what UserAssist still covers.
+        let during = game_candidate(&view, "During-Tool.exe");
+        assert_eq!(
+            during.t1,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::BeforeTraceAge {
+                    source: "userassist".to_owned(),
+                },
+            }
+        );
+        assert_eq!(during.t2, TimeFact::True);
+
+        let before = game_candidate(&view, "Before-Tool.exe");
+        assert_eq!(before.t1, TimeFact::True);
+        assert_eq!(before.t2, TimeFact::False);
+    }
+
+    /// c2 (control): a report with no scan time makes the before-the-scan window not known for its
+    /// own reason, not because a session's end is missing.
+    #[test]
+    fn c2_a_missing_scan_time_has_its_own_not_known_reason() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("during.exe", None, &["2026-01-10T10:15:00Z"]));
+        let mut report = game_report(observations);
+        report.header.generated_at = "not-a-time".to_owned();
+        let view = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "during.exe").t4,
+            TimeFact::NotKnown {
+                reason: NotKnownReason::ScanTimeNotRecorded,
+            }
+        );
+    }
+
+    // ---- ADR 0078 section 5 and ADR 0079: a candidate's file identity ----
+    //
+    // A candidate with a program path joins the `recorded_files` observation of that path, ignoring
+    // ASCII case. The observation's `identity_read` and `signature` become I1 and I2. Each identity
+    // fact is `IdentityFact::{True, False, NotKnown { reason }}`, and I3 and I4 wait for F2 while I5
+    // waits for its own ADR (ADR 0079 section 5), so all three are deferred for now.
+
+    /// One `recorded_files` observation as that collector emits it (ADR 0079 amendment 7): the path,
+    /// its file name, what happened to the read, and any identity fields the read produced.
+    fn recorded_file(
+        path: &str,
+        identity_read: Option<&str>,
+        extra: &[(&str, serde_json::Value)],
+    ) -> Observation {
+        let name = path.rsplit(['\\', '/']).next().unwrap_or(path);
+        let mut fields = BTreeMap::from([
+            ("path".to_owned(), serde_json::Value::from(path)),
+            ("name".to_owned(), serde_json::Value::from(name)),
+        ]);
+        if let Some(identity_read) = identity_read {
+            fields.insert(
+                "identity_read".to_owned(),
+                serde_json::Value::from(identity_read),
+            );
+        }
+        for (field, value) in extra {
+            fields.insert((*field).to_owned(), value.clone());
+        }
+        Observation {
+            collector: "recorded_files".to_owned(),
+            fields,
+        }
+    }
+
+    /// f1: a candidate joins the `recorded_files` observation of its path ignoring ASCII case.
+    /// `missing` makes I1 true and leaves I2 not known because the file was not read; a `read` one
+    /// makes I1 false. With the collector run but no observation for the path, I1 is not known for
+    /// that reason.
+    #[test]
+    fn f1_a_candidate_joins_its_recorded_file_and_i1_follows_identity_read() {
+        const PATH: &str = r"C:\Tools\X.EXE";
+
+        let mut missing = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        missing.push(recorded(
+            "bam",
+            "x.exe",
+            Some(PATH),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        missing.push(recorded_file(r"c:\tools\x.exe", Some("missing"), &[]));
+        let view = game_windows(&game_report(missing), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.i1, IdentityFact::True);
+        assert_eq!(
+            candidate.i2,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+
+        let mut read = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        read.push(recorded(
+            "bam",
+            "x.exe",
+            Some(PATH),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        read.push(recorded_file(
+            r"c:\tools\x.exe",
+            Some("read"),
+            &[("signature", serde_json::json!("valid"))],
+        ));
+        let view = game_windows(&game_report(read), Mode::SelfCheck);
+        assert_eq!(game_candidate(&view, "x.exe").i1, IdentityFact::False);
+
+        let mut absent = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        absent.push(recorded(
+            "bam",
+            "x.exe",
+            Some(PATH),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        absent.push(recorded_file(
+            r"C:\Other\y.exe",
+            Some("read"),
+            &[("signature", serde_json::json!("valid"))],
+        ));
+        let view = game_windows(&game_report(absent), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "x.exe").i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoObservationForPath,
+            }
+        );
+    }
+
+    /// f2: I2 is true for an invalid or absent signature and false for a valid one; a signature that
+    /// could not be checked offline is not known, for its own reason.
+    #[test]
+    fn f2_i2_follows_the_signature_that_was_read() {
+        for (signature, expected) in [
+            ("invalid", IdentityFact::True),
+            ("no_embedded_signature", IdentityFact::True),
+            ("valid", IdentityFact::False),
+            (
+                "unverifiable_offline",
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Unverifiable,
+                },
+            ),
+        ] {
+            let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+            observations.push(recorded(
+                "bam",
+                "signed.exe",
+                Some(r"C:\Tools\signed.exe"),
+                "last_run",
+                "2026-01-10T09:50:00Z",
+            ));
+            observations.push(recorded_file(
+                r"C:\Tools\signed.exe",
+                Some("read"),
+                &[("signature", serde_json::json!(signature))],
+            ));
+            let view = game_windows(&game_report(observations), Mode::SelfCheck);
+            let candidate = game_candidate(&view, "signed.exe");
+            assert_eq!(candidate.i1, IdentityFact::False, "{signature}");
+            assert_eq!(candidate.i2, expected, "{signature}");
+        }
+    }
+
+    /// f3: a standard scan does not run `recorded_files`, so I1 and I2 are not known for that
+    /// reason; I3 and I4 wait for F2 and I5 for its own ADR, so those three are deferred.
+    #[test]
+    fn f3_a_standard_scan_leaves_every_identity_fact_not_known_with_its_reason() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        for fact in [&candidate.i1, &candidate.i2] {
+            assert_eq!(
+                *fact,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::RecordedFilesNotRun,
+                }
+            );
+        }
+        for fact in [&candidate.i3, &candidate.i4, &candidate.i5] {
+            assert_eq!(
+                *fact,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                }
+            );
+        }
+    }
+
+    /// f4: an `identity_read` other than `read` or `missing` says the file was not read, so I1 is
+    /// not known rather than false. The path here is one the collector's budget reached too late.
+    #[test]
+    fn f4_a_budget_spent_path_leaves_i1_not_known() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "late.exe",
+            Some(r"C:\Tools\late.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(
+            r"C:\Tools\late.exe",
+            Some("budget_spent"),
+            &[],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "late.exe").i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+    }
+
+    /// f5: the order counts R (near at least two sessions) and I1 to I4 true before the true T
+    /// facts. A candidate whose file is gone has one identity fact and comes before a Prefetch-only
+    /// candidate with three true T facts; the Prefetch record has no program path, so its identity
+    /// facts are not known for that reason.
+    #[test]
+    fn f5_identity_facts_outrank_time_facts_in_the_order() {
+        let mut observations = legacy_sessions(&[GAME_START_3, GAME_START_2], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "gone.exe",
+            Some(r"C:\Tools\gone.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(r"C:\Tools\gone.exe", Some("missing"), &[]));
+        observations.push(prefetch_runs(
+            "time-only.exe",
+            None,
+            &[
+                "2026-01-10T11:30:00Z",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T10:15:00Z",
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+
+        let gone = game_candidate(&view, "gone.exe");
+        assert_eq!(gone.i1, IdentityFact::True);
+        assert_eq!(
+            gone.i2,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+        assert_eq!(gone.near_sessions, NearSessions { near: 1, found: 2 });
+        for fact in [&gone.i3, &gone.i4, &gone.i5] {
+            assert_eq!(
+                *fact,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                }
+            );
+        }
+
+        let time_only = game_candidate(&view, "time-only.exe");
+        assert_eq!(
+            time_only.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoPath,
+            }
+        );
+
+        // The two FiveM.exe anchors are candidates since ADR 0084. They have no identity fact and
+        // their runs are not near two sessions, so they come after the two above, in time order.
+        let order: Vec<&str> = view
+            .candidates
+            .iter()
+            .map(|candidate| candidate.name.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            ["gone.exe", "time-only.exe", "FiveM.exe", "FiveM.exe"]
+        );
+    }
+
+    // ---- ADR 0078 section 5 and ADR 0079: I3, I4 and the SS list ----
+
+    /// One BAM record and the `recorded_files` observation of the same path, read, carrying
+    /// `extra`'s identity fields (ADR 0079 amendment 7).
+    fn identified_candidate(
+        name: &str,
+        path: &str,
+        extra: &[(&'static str, serde_json::Value)],
+    ) -> Vec<Observation> {
+        vec![
+            recorded("bam", name, Some(path), "last_run", "2026-01-10T09:50:00Z"),
+            recorded_file(path, Some("read"), extra),
+        ]
+    }
+
+    /// The identity fields a `read` leaves for I3 and I4: the content kind, the version resource's
+    /// name, a valid signature, and where the file lives.
+    fn identity_fields(
+        content_kind: &str,
+        original_filename: Option<&str>,
+        on_system_drive: bool,
+        under_system_root: bool,
+    ) -> Vec<(&'static str, serde_json::Value)> {
+        let mut fields = vec![
+            ("content_kind", serde_json::json!(content_kind)),
+            ("signature", serde_json::json!("valid")),
+            ("on_system_drive", serde_json::json!(on_system_drive)),
+            ("under_system_root", serde_json::json!(under_system_root)),
+        ];
+        if let Some(original_filename) = original_filename {
+            fields.push(("original_filename", serde_json::json!(original_filename)));
+        }
+        fields
+    }
+
+    /// f6: I3 is true when a recorded name contradicts what ran or what the file is. A Prefetch-only
+    /// `banner.png` was recorded running with an extension that is not an executable's; `x.png.exe`
+    /// has a double extension; a bidi control in the name hides its extension; `svchost.exe` outside
+    /// `%SystemRoot%` is a Windows file name where Windows does not keep it. `tool.exe` whose
+    /// `OriginalFilename` is `TOOL.EXE` only differs in ASCII case, so it is false.
+    #[test]
+    fn f6_i3_is_true_when_the_name_contradicts_what_ran_or_what_the_file_is() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(prefetch_runs("banner.png", None, &["2026-01-10T09:50:00Z"]));
+        observations.extend(identified_candidate(
+            "tool.exe",
+            r"C:\Tools\tool.exe",
+            &identity_fields("pe_executable", Some("TOOL.EXE"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "x.png.exe",
+            r"C:\Tools\x.png.exe",
+            &identity_fields("pe_executable", Some("x.png.exe"), true, false),
+        ));
+        let bidi_name = "a\u{202E}gnp.exe";
+        let bidi_path = "C:\\Tools\\a\u{202E}gnp.exe";
+        observations.extend(identified_candidate(
+            bidi_name,
+            bidi_path,
+            &identity_fields("pe_executable", Some(bidi_name), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "svchost.exe",
+            r"C:\Tools\svchost.exe",
+            &identity_fields("pe_executable", Some("svchost.exe"), true, false),
+        ));
+
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let banner = game_candidate(&view, "banner.png");
+        assert!(banner.path.is_none(), "Prefetch emits no program path");
+        assert_eq!(
+            banner.i3,
+            IdentityFact::True,
+            "a non-executable name recorded running"
+        );
+        assert_eq!(
+            game_candidate(&view, "tool.exe").i3,
+            IdentityFact::False,
+            "OriginalFilename differing only in ASCII case"
+        );
+        assert_eq!(
+            game_candidate(&view, "x.png.exe").i3,
+            IdentityFact::True,
+            "a double extension ending in an executable one"
+        );
+        assert_eq!(
+            game_candidate(&view, bidi_name).i3,
+            IdentityFact::True,
+            "a bidi control in the name"
+        );
+        assert_eq!(
+            game_candidate(&view, "svchost.exe").i3,
+            IdentityFact::True,
+            "a Windows file name outside %SystemRoot%"
+        );
+    }
+
+    /// f7: I4 is true under Temp or Downloads; anywhere else is not known yet, because another drive
+    /// and other writable folders arrive with later work (ADR 0078 section 5).
+    #[test]
+    fn f7_i4_is_true_under_temp_or_downloads_and_not_known_otherwise() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "temp.exe",
+            r"C:\Users\fixtureuser\AppData\Local\Temp\temp.exe",
+            &identity_fields("pe_executable", Some("temp.exe"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "portable.exe",
+            r"D:\Tools\portable.exe",
+            &identity_fields("pe_executable", Some("portable.exe"), false, false),
+        ));
+        observations.extend(identified_candidate(
+            "installed.exe",
+            r"C:\Program Files\Tool\installed.exe",
+            &identity_fields("pe_executable", Some("installed.exe"), true, false),
+        ));
+
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "temp.exe").i4,
+            IdentityFact::True,
+            "a path under \\AppData\\Local\\Temp\\"
+        );
+        for name in ["portable.exe", "installed.exe"] {
+            assert_eq!(
+                game_candidate(&view, name).i4,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                },
+                "{name}"
+            );
+        }
+    }
+
+    /// f8: SS mode lists a candidate with a true identity fact, its path redacted as rows are, and
+    /// counts a candidate with none; Self mode lists both. The listed candidate is on the Desktop, so
+    /// I4 is not known yet and its I3 alone puts it in the SS list.
+    #[test]
+    fn f8_ss_lists_only_candidates_with_an_identity_fact_and_redacts_their_paths() {
+        const RAW: &str = r"C:\Users\fixtureuser\Desktop\x.png.exe";
+        const REDACTED: &str = r"%USERPROFILE%\Desktop\x.png.exe";
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "x.png.exe",
+            RAW,
+            &identity_fields("pe_executable", Some("x.png.exe"), true, false),
+        ));
+        observations.extend(identified_candidate(
+            "plain.exe",
+            r"C:\Tools\plain.exe",
+            &identity_fields("pe_executable", Some("plain.exe"), true, false),
+        ));
+        let report = game_report(observations);
+
+        let own = game_windows(&report, Mode::SelfCheck);
+        // The two FiveM.exe anchors are candidates since ADR 0084. They have no identity fact, so
+        // SS mode does not list them and counts them unnamed.
+        assert_eq!(own.candidates.len(), 4);
+        assert!(
+            own.candidates
+                .iter()
+                .any(|candidate| candidate.path.as_deref() == Some(RAW)),
+            "Self mode shows the unredacted path: {:?}",
+            own.candidates
+        );
+
+        let ss = game_windows(&report, Mode::Ss);
+        assert_eq!(ss.candidates.len(), 1, "{:?}", ss.candidates);
+        let listed = &ss.candidates[0];
+        assert_eq!(listed.name, "x.png.exe");
+        assert_eq!(listed.path.as_deref(), Some(REDACTED));
+        assert_eq!(listed.i3, IdentityFact::True);
+        assert_eq!(
+            listed.i4,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::Deferred,
+            },
+            "the Desktop is not I4"
+        );
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("plain.exe")),
+            "{:?}",
+            ss.candidates
+        );
+        assert_eq!(ss.counts, own.counts);
+        assert_eq!(ss.counts.before, 2, "the plain candidate is counted");
+    }
+
+    /// f9: a missing file leaves I2 not known because it was not read; a file too large to read still
+    /// makes I1 false and reads I2 from its signature field, and an absent field is not known.
+    #[test]
+    fn f9_i2_follows_what_the_read_established_and_missing_is_not_read() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "gone.exe",
+            Some(r"C:\Tools\gone.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(r"C:\Tools\gone.exe", Some("missing"), &[]));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let gone = game_candidate(&view, "gone.exe");
+        assert_eq!(gone.i1, IdentityFact::True);
+        assert_eq!(
+            gone.i2,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NotRead,
+            }
+        );
+
+        for (signature, expected) in [
+            (Some("invalid"), IdentityFact::True),
+            (Some("valid"), IdentityFact::False),
+            (
+                None,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::NotRead,
+                },
+            ),
+        ] {
+            let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+            observations.push(recorded(
+                "bam",
+                "large.exe",
+                Some(r"C:\Tools\large.exe"),
+                "last_run",
+                "2026-01-10T09:50:00Z",
+            ));
+            let extra: Vec<(&str, serde_json::Value)> = signature
+                .map(|signature| ("signature", serde_json::json!(signature)))
+                .into_iter()
+                .collect();
+            observations.push(recorded_file(
+                r"C:\Tools\large.exe",
+                Some("too_large"),
+                &extra,
+            ));
+            let view = game_windows(&game_report(observations), Mode::SelfCheck);
+            let large = game_candidate(&view, "large.exe");
+            assert_eq!(large.i1, IdentityFact::False, "{signature:?}");
+            assert_eq!(large.i2, expected, "{signature:?}");
+        }
+    }
+
+    /// f10: I3's double extension needs a document, media or archive extension before the program's;
+    /// a dotted stem such as `Battle.net.exe` or `vc_redist.x64.exe` is not one.
+    #[test]
+    fn f10_i3_double_extension_is_only_a_mask_extension_before_a_program_one() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for (name, path) in [
+            ("Battle.net.exe", r"C:\Tools\Battle.net.exe"),
+            (
+                "vc_redist.x64.exe",
+                r"C:\Program Files\Tool\vc_redist.x64.exe",
+            ),
+            ("photo.png.exe", r"C:\Tools\photo.png.exe"),
+            ("invoice.pdf.scr", r"C:\Tools\invoice.pdf.scr"),
+        ] {
+            observations.extend(identified_candidate(
+                name,
+                path,
+                &identity_fields("pe_executable", Some(name), true, false),
+            ));
+        }
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        for name in ["Battle.net.exe", "vc_redist.x64.exe"] {
+            assert_eq!(
+                game_candidate(&view, name).i3,
+                IdentityFact::False,
+                "{name}"
+            );
+        }
+        for name in ["photo.png.exe", "invoice.pdf.scr"] {
+            assert_eq!(game_candidate(&view, name).i3, IdentityFact::True, "{name}");
+        }
+    }
+
+    /// f11: a recorded name with no extension is not by itself an I3 contradiction — a packaged-app
+    /// name has none — while a name whose extension is not a program's still is.
+    #[test]
+    fn f11_i3_does_not_treat_a_name_without_an_extension_as_a_contradiction() {
+        const PACKAGED: &str = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
+        const PACKAGED_NO_BANG: &str = "Microsoft.WindowsCalculator_8wekyb3d8bbwe";
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for name in [PACKAGED, PACKAGED_NO_BANG, "cheat.png"] {
+            observations.push(prefetch_runs(name, None, &["2026-01-10T09:50:00Z"]));
+        }
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        for name in [PACKAGED, PACKAGED_NO_BANG] {
+            assert_eq!(
+                game_candidate(&view, name).i3,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                },
+                "{name}"
+            );
+        }
+        assert_eq!(
+            game_candidate(&view, "cheat.png").i3,
+            IdentityFact::True,
+            "a non-program extension recorded running"
+        );
+    }
+
+    /// f12: I4 is known true only under Temp or Downloads; another drive and Program Files are not
+    /// known yet, and a candidate with no path has nothing to judge.
+    #[test]
+    fn f12_i4_is_known_only_under_temp_or_downloads() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for (name, path, on_system_drive) in [
+            (
+                "temp.exe",
+                r"C:\Users\fixtureuser\AppData\Local\Temp\temp.exe",
+                true,
+            ),
+            (
+                "downloaded.exe",
+                r"C:\Users\fixtureuser\Downloads\downloaded.exe",
+                true,
+            ),
+            ("portable.exe", r"D:\Tools\portable.exe", false),
+            (
+                "installed.exe",
+                r"C:\Program Files\Tool\installed.exe",
+                true,
+            ),
+        ] {
+            observations.extend(identified_candidate(
+                name,
+                path,
+                &identity_fields("pe_executable", Some(name), on_system_drive, false),
+            ));
+        }
+        observations.push(recorded(
+            "bam",
+            "no-path.exe",
+            None,
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        for name in ["temp.exe", "downloaded.exe"] {
+            assert_eq!(game_candidate(&view, name).i4, IdentityFact::True, "{name}");
+        }
+        for name in ["portable.exe", "installed.exe"] {
+            assert_eq!(
+                game_candidate(&view, name).i4,
+                IdentityFact::NotKnown {
+                    reason: IdentityNotKnownReason::Deferred,
+                },
+                "{name}"
+            );
+        }
+        assert_eq!(
+            game_candidate(&view, "no-path.exe").i4,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoPath,
+            }
+        );
+    }
+
+    // ---- ADR 0078 step P6b and ADR 0079 section 3: a candidate's sources and file details ----
+    //
+    // A candidate lists the collectors that recorded one of its times, in the order `gather` reads
+    // them. Its `file` holds what `recorded_files` read of its path, from the same join as I1 and I2,
+    // so `file.read` and I1's not-known reason always agree. Evidence only, never a verdict.
+
+    const SHA256: &str = "5e0c9b7d3a1f8e42c6b0d9a7f3e1c5b8d2a4f6e0c9b7d3a1f8e42c6b0d9a7f3e";
+
+    /// The details of a file that was not read: no field copied, only what the read was.
+    fn bare(read: FileRead) -> FileDetails {
+        FileDetails {
+            read,
+            sha256: None,
+            signature: None,
+            signer: None,
+            signer_cert_sha256: None,
+            content_kind: None,
+            original_filename: None,
+            download_host: None,
+            trailing_data: None,
+            embedded_pe: None,
+            zone_id: None,
+        }
+    }
+
+    /// The file details of the candidate named `name` in `view`'s game windows.
+    fn view_file<'a>(view: &'a ReportView, name: &str) -> &'a FileDetails {
+        let windows = view
+            .game_windows
+            .as_ref()
+            .unwrap_or_else(|| panic!("no game windows"));
+        game_candidate(windows, name)
+            .file
+            .as_ref()
+            .unwrap_or_else(|| panic!("no file details for {name}"))
+    }
+
+    /// d1: a BAM candidate joins the `read` file of its path ignoring ASCII case, and its details
+    /// are the fields that file carried; a signer the file does not carry is absent.
+    #[test]
+    fn d1_a_candidate_carries_the_details_of_the_file_it_joins() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\X.EXE"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        observations.push(recorded_file(
+            r"c:\tools\x.exe",
+            Some("read"),
+            &[
+                ("sha256", serde_json::json!(SHA256)),
+                ("signature", serde_json::json!("no_embedded_signature")),
+                ("content_kind", serde_json::json!("pe_executable")),
+                ("trailing_data", serde_json::json!(false)),
+                ("embedded_pe", serde_json::json!(false)),
+                ("original_filename", serde_json::json!("helper.exe")),
+                ("zone_id", serde_json::json!(3)),
+                ("download_host", serde_json::json!("files.example.net")),
+            ],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.recorded_by, vec!["bam"]);
+        assert_eq!(
+            candidate.file,
+            Some(FileDetails {
+                read: FileRead::Read,
+                sha256: Some(SHA256.to_owned()),
+                signature: Some("no_embedded_signature".to_owned()),
+                signer: None,
+                signer_cert_sha256: None,
+                content_kind: Some("pe_executable".to_owned()),
+                original_filename: Some("helper.exe".to_owned()),
+                download_host: Some("files.example.net".to_owned()),
+                trailing_data: Some(false),
+                embedded_pe: Some(false),
+                zone_id: Some(3),
+            })
+        );
+    }
+
+    /// d2: `identity_read` gives `file.read`, and a missing file carries no details. A field is
+    /// copied only when it is present with its JSON type, and a zone id that does not fit is absent.
+    #[test]
+    fn d2_identity_read_gives_the_file_read_and_copies_only_fields_of_their_type() {
+        let cases: [(&str, Option<&str>, FileRead); 8] = [
+            ("missing.exe", Some("missing"), FileRead::Missing),
+            ("large.exe", Some("too_large"), FileRead::TooLarge),
+            ("denied.exe", Some("access_denied"), FileRead::AccessDenied),
+            ("failed.exe", Some("failed"), FileRead::Failed),
+            ("refused.exe", Some("refused_form"), FileRead::RefusedForm),
+            ("late.exe", Some("budget_spent"), FileRead::BudgetSpent),
+            ("unlabelled.exe", None, FileRead::Failed),
+            ("odd.exe", Some("read"), FileRead::Read),
+        ];
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        for (name, identity_read, _) in cases {
+            let path = format!(r"C:\Tools\{name}");
+            observations.push(recorded(
+                "bam",
+                name,
+                Some(path.as_str()),
+                "last_run",
+                "2026-01-10T09:50:00Z",
+            ));
+            let extra = match name {
+                "large.exe" => vec![
+                    ("sha256", serde_json::json!(SHA256)),
+                    ("signature", serde_json::json!("valid")),
+                ],
+                // Wrong JSON types and a zone id past `u32::MAX` are absent, not an error.
+                "odd.exe" => vec![
+                    ("sha256", serde_json::json!(7)),
+                    ("signature", serde_json::json!(["valid"])),
+                    ("trailing_data", serde_json::json!("false")),
+                    ("signer", serde_json::json!(["fixture"])),
+                    ("zone_id", serde_json::json!(4_294_967_296_u64)),
+                ],
+                _ => Vec::new(),
+            };
+            observations.push(recorded_file(&path, identity_read, &extra));
+        }
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+
+        for (name, _, read) in cases {
+            assert_eq!(
+                game_candidate(&view, name)
+                    .file
+                    .as_ref()
+                    .map(|file| file.read),
+                Some(read),
+                "{name}"
+            );
+        }
+        assert_eq!(
+            game_candidate(&view, "missing.exe").file,
+            Some(bare(FileRead::Missing)),
+            "a missing file has no details"
+        );
+        assert_eq!(
+            game_candidate(&view, "large.exe").file,
+            Some(FileDetails {
+                sha256: Some(SHA256.to_owned()),
+                signature: Some("valid".to_owned()),
+                ..bare(FileRead::TooLarge)
+            })
+        );
+        assert_eq!(
+            game_candidate(&view, "odd.exe").file,
+            Some(bare(FileRead::Read)),
+            "a field of the wrong JSON type, or a zone id that does not fit, is not copied"
+        );
+    }
+
+    /// d3: a candidate with no read says why, and the reason agrees with I1's not-known reason for
+    /// the same report: no `recorded_files` run, no program path, or no observation for the path.
+    #[test]
+    fn d3_no_read_says_why_and_agrees_with_i1() {
+        let mut not_run = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        not_run.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        let view = game_windows(&game_report(not_run), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.file, Some(bare(FileRead::NotRun)));
+        assert_eq!(
+            candidate.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::RecordedFilesNotRun,
+            }
+        );
+
+        let mut no_path = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        no_path.push(prefetch_runs(
+            "time-only.exe",
+            None,
+            &["2026-01-10T09:50:00Z"],
+        ));
+        let view = game_windows(&game_report(no_path), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "time-only.exe");
+        assert_eq!(candidate.file, Some(bare(FileRead::NoPath)));
+        assert_eq!(
+            candidate.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoPath,
+            }
+        );
+
+        let mut no_observation = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        no_observation.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:50:00Z",
+        ));
+        no_observation.push(recorded_file(
+            r"C:\Other\y.exe",
+            Some("read"),
+            &[("signature", serde_json::json!("valid"))],
+        ));
+        let view = game_windows(&game_report(no_observation), Mode::SelfCheck);
+        let candidate = game_candidate(&view, "x.exe");
+        assert_eq!(candidate.file, Some(bare(FileRead::NoObservation)));
+        assert_eq!(
+            candidate.i1,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::NoObservationForPath,
+            }
+        );
+    }
+
+    /// d4: a candidate lists each collector that recorded one of its times once, in the order
+    /// `gather` reads them (prefetch, bam, pca, process, userassist), not alphabetically. A
+    /// Prefetch-only candidate lists Prefetch.
+    #[test]
+    fn d4_recorded_by_lists_each_collector_once_in_gather_order() {
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.push(recorded(
+            "userassist",
+            "pair.exe",
+            Some(r"C:\Tools\pair.exe"),
+            "last_run",
+            "2026-01-10T09:40:00Z",
+        ));
+        for at in ["2026-01-10T09:35:00Z", "2026-01-10T09:55:00Z"] {
+            observations.push(recorded(
+                "bam",
+                "pair.exe",
+                Some(r"C:\Tools\pair.exe"),
+                "last_run",
+                at,
+            ));
+        }
+        observations.push(recorded(
+            "userassist",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:40:00Z",
+        ));
+        observations.push(recorded(
+            "bam",
+            "x.exe",
+            Some(r"C:\Tools\x.exe"),
+            "last_run",
+            "2026-01-10T09:35:00Z",
+        ));
+        observations.push(prefetch_runs("x.exe", None, &["2026-01-10T09:45:00Z"]));
+        observations.push(prefetch_runs(
+            "time-only.exe",
+            None,
+            &["2026-01-10T09:50:00Z"],
+        ));
+        let view = game_windows(&game_report(observations), Mode::SelfCheck);
+        assert_eq!(
+            game_candidate(&view, "pair.exe").recorded_by,
+            vec!["bam", "userassist"]
+        );
+        assert_eq!(
+            game_candidate(&view, "x.exe").recorded_by,
+            vec!["prefetch", "bam", "userassist"]
+        );
+        assert_eq!(
+            game_candidate(&view, "time-only.exe").recorded_by,
+            vec!["prefetch"]
+        );
+    }
+
+    /// d5: in SS mode a candidate's download host is the placeholder unless the player agreed to
+    /// show it, and it is the real host in Self mode; its file's hash is shown in both modes
+    /// (ADR 0079 section 6). The candidate is under Downloads, so SS mode names it.
+    #[test]
+    fn d5_ss_mode_masks_the_download_host_unless_the_player_agreed() {
+        const HOST: &str = "files.example.net";
+        const PATH: &str = r"C:\Users\fixtureuser\Downloads\saved.exe";
+        let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
+        observations.extend(identified_candidate(
+            "saved.exe",
+            PATH,
+            &[
+                ("sha256", serde_json::json!(SHA256)),
+                ("download_host", serde_json::json!(HOST)),
+            ],
+        ));
+        let mut report = game_report(observations);
+        report.sensitive_fields = BTreeMap::from([(
+            "recorded_files".to_owned(),
+            BTreeMap::from([("download_host".to_owned(), SensitiveKind::DownloadHost)]),
+        )]);
+
+        let hidden = for_mode_with(&report, Mode::Ss, SsOptions::default());
+        let file = view_file(&hidden, "saved.exe");
+        assert_eq!(file.download_host.as_deref(), Some("%DOWNLOAD_HOST%"));
+        assert_eq!(file.sha256.as_deref(), Some(SHA256));
+
+        let agreed = for_mode_with(
+            &report,
+            Mode::Ss,
+            SsOptions {
+                download_host: true,
+                ..SsOptions::default()
+            },
+        );
+        let file = view_file(&agreed, "saved.exe");
+        assert_eq!(file.download_host.as_deref(), Some(HOST));
+        assert_eq!(file.sha256.as_deref(), Some(SHA256));
+
+        let own = for_mode(&report, Mode::SelfCheck);
+        let file = view_file(&own, "saved.exe");
+        assert_eq!(file.download_host.as_deref(), Some(HOST));
+        assert_eq!(file.sha256.as_deref(), Some(SHA256));
+    }
+
+    /// d6: a candidate saved before this change, with neither `recorded_by` nor `file`, reads with
+    /// no sources and no details; one with no details serializes with no `file` key.
+    #[test]
+    fn d6_a_candidate_saved_before_the_details_reads_empty_and_writes_no_file_key() {
+        let saved = serde_json::json!({
+            "name": "x.exe",
+            "path": r"C:\Tools\x.exe",
+            "t1": {"fact": "true"},
+            "t2": {"fact": "false"},
+            "t3": {"fact": "false"},
+            "t4": {"fact": "false"},
+            "i1": {"fact": "true"},
+            "i2": {"fact": "false"},
+            "i3": {"fact": "false"},
+            "i4": {"fact": "false"},
+            "i5": {"fact": "not_known", "reason": {"reason": "deferred"}},
+            "near_sessions": {"near": 1, "found": 1},
+        });
+        let read: GameCandidate =
+            serde_json::from_value(saved).expect("a candidate saved before the details reads");
+        assert!(read.recorded_by.is_empty(), "{:?}", read.recorded_by);
+        assert_eq!(read.file, None);
+        let json = serde_json::to_value(&read).expect("a candidate serializes");
+        assert!(json.get("file").is_none(), "{json}");
+    }
+
+    /// A Prefetch record that loaded `count` files from outside, as L1 reads it (ADR 0082 section 5).
+    fn with_loaded_outside_count(mut observation: Observation, count: u64) -> Observation {
+        observation
+            .fields
+            .insert("loaded_outside".to_owned(), serde_json::Value::from(count));
+        observation
+    }
+
+    /// The report the ADR 0078 section 9 tests read: the Legacy session, a Prefetch `rundll32.exe`
+    /// that loaded a file from outside (true L1, so SS mode lists it), a Prefetch `plain.exe` and a
+    /// BAM `bam-only.exe` with no true identity fact (SS mode counts them without naming them). Each
+    /// candidate has times in more than one window.
+    fn unnamed_report() -> Report {
+        let mut observations = legacy_sessions(&[GAME_START_1], Some(GAME_END));
+        observations.push(with_loaded_outside_count(
+            prefetch_runs(
+                "rundll32.exe",
+                None,
+                &["2026-01-10T09:00:00Z", "2026-01-10T07:50:00Z"],
+            ),
+            1,
+        ));
+        observations.push(prefetch_runs(
+            "plain.exe",
+            None,
+            &[
+                "2026-01-10T11:30:00Z",
+                "2026-01-10T10:45:00Z",
+                "2026-01-10T07:40:00Z",
+            ],
+        ));
+        observations.push(recorded(
+            "bam",
+            "bam-only.exe",
+            Some(r"C:\Tools\bam-only.exe"),
+            "last_run",
+            "2026-01-10T09:30:00Z",
+        ));
+        game_report(observations)
+    }
+
+    /// a1: the view carries the game-windows view of its own mode, in both modes (ADR 0078 section 9).
+    #[test]
+    fn a1_the_view_carries_the_game_windows_of_its_mode() {
+        let report = unnamed_report();
+        let own = for_mode(&report, Mode::SelfCheck);
+        assert_eq!(
+            own.game_windows,
+            Some(game_windows(&report, Mode::SelfCheck))
+        );
+        let ss = for_mode(&report, Mode::Ss);
+        assert_eq!(ss.game_windows, Some(game_windows(&report, Mode::Ss)));
+    }
+
+    /// a2: with no `FiveM` record the view has no game windows, and its JSON has no such key
+    /// (ADR 0078 section 2).
+    #[test]
+    fn a2_no_fivem_record_means_no_game_windows_in_the_view() {
+        let report = game_report(vec![prefetch_runs(
+            "other.exe",
+            None,
+            &["2026-01-10T09:00:00Z"],
+        )]);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let view = for_mode(&report, mode);
+            assert_eq!(view.game_windows, None, "{mode:?}");
+            let json = serde_json::to_value(&view).unwrap();
+            assert!(json.get("game_windows").is_none(), "{mode:?}: {json}");
+        }
+    }
+
+    /// a3: in SS mode, for each window, the candidates SS mode counts without naming plus the listed
+    /// candidates whose fact for that window is true equal the window's count (ADR 0078 section 9).
+    #[test]
+    fn a3_ss_unnamed_and_listed_true_facts_add_up_to_the_counts() {
+        let report = unnamed_report();
+        let own = game_windows(&report, Mode::SelfCheck);
+        let ss = game_windows(&report, Mode::Ss);
+        assert!(!ss.candidates.is_empty(), "SS mode lists no candidate");
+        assert!(
+            ss.candidates.len() < own.candidates.len(),
+            "SS mode lists every candidate"
+        );
+        // `plain.exe` has a time in the before window and no true identity fact, so it is unnamed.
+        assert_eq!(ss.unnamed.before, 1);
+        let listed = |fact: fn(&GameCandidate) -> &TimeFact| {
+            ss.candidates
+                .iter()
+                .filter(|candidate| *fact(candidate) == TimeFact::True)
+                .count()
+        };
+        let windows = [
+            (
+                "before",
+                ss.unnamed.before,
+                listed(|c| &c.t1),
+                ss.counts.before,
+            ),
+            (
+                "during",
+                ss.unnamed.during,
+                listed(|c| &c.t2),
+                ss.counts.during,
+            ),
+            (
+                "after",
+                ss.unnamed.after,
+                listed(|c| &c.t3),
+                ss.counts.after,
+            ),
+            (
+                "before_scan",
+                ss.unnamed.before_scan,
+                listed(|c| &c.t4),
+                ss.counts.before_scan,
+            ),
+        ];
+        for (window, unnamed, named, counted) in windows {
+            assert_eq!(unnamed + named, counted, "{window}");
+        }
+    }
+
+    /// a4: Self mode names every candidate, so its `unnamed` is zero in every window; a saved view
+    /// without `unnamed` reads as zero in every window (ADR 0078 section 9).
+    #[test]
+    fn a4_self_mode_has_no_unnamed_and_a_saved_view_without_it_reads_as_zero() {
+        let report = unnamed_report();
+        let own = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(own.unnamed.before, 0, "before");
+        assert_eq!(own.unnamed.during, 0, "during");
+        assert_eq!(own.unnamed.after, 0, "after");
+        assert_eq!(own.unnamed.before_scan, 0, "before_scan");
+
+        let ss = game_windows(&report, Mode::Ss);
+        let mut saved = serde_json::to_value(&ss).unwrap();
+        let removed = saved
+            .as_object_mut()
+            .and_then(|object| object.remove("unnamed"));
+        assert!(removed.is_some(), "no unnamed key to remove: {saved}");
+        let read: GameWindows = serde_json::from_value(saved).unwrap();
+        assert_eq!(read.unnamed.before, 0, "before");
+        assert_eq!(read.unnamed.during, 0, "during");
+        assert_eq!(read.unnamed.after, 0, "after");
+        assert_eq!(read.unnamed.before_scan, 0, "before_scan");
+        assert_eq!(read.counts, ss.counts);
     }
 }

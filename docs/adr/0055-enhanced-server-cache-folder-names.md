@@ -79,8 +79,8 @@ no folder name was written down.
 
 - What the name is computed from, and whether it is the same on another PC.
 - Whether FiveM removes a server's folder itself, and when.
-- Whether Legacy keeps anything that names a server: its `server-cache-priv` held content-addressed files, and its
-  `db` folder did not read as the leveldb index the public FiveM source describes.
+- Legacy server identity cannot be recovered: its `server-cache-priv\db` is encrypted and opaque (measured in
+  probe m, 2026-09-16), and it will not be decrypted under purpose boundary principles (as recorded in HANDOFF.md).
 
 ## Consequences
 

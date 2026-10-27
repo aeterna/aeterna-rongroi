@@ -1,5 +1,5 @@
 {
-  "description": "The near misses: a valid signature, a service set to start on demand with no trigger, a file under Program Files, and one under the Windows folder that is never checked",
+  "description": "The near misses: a valid signature, a service set to start on demand with no trigger, a file under Program Files, and one under the Windows folder, which this rule does not ask about",
   "observations": [
     {
       "collector": "autostart",

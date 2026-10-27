@@ -1001,6 +1001,111 @@ details summary {
   gap: 8px;
 }
 
+/* The game-window section (ADR 0078): a card like the cross-source one, its facts in a two-column table. */
+.game-windows {
+  background: var(--surface);
+  border: 1px solid #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.game-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.game-head h3 {
+  margin: 0;
+}
+
+.game-experimental {
+  color: var(--muted);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 0.85em;
+}
+
+.game-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.game-facts dt {
+  color: var(--muted);
+}
+
+.game-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.game-chips,
+.game-labels,
+.game-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.game-chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.game-chip {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.9em;
+}
+
+.game-candidate {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.game-candidate p {
+  margin: 0;
+}
+
+/* A candidate's file details, folded under its card. Hashes wrap and stay selectable, so a long one
+   does not widen the card and can be copied. */
+.game-file summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.game-file code {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* A found label carries the found mark (a square), so its state is not colour alone. */
+.game-label-found {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--found);
+}
+
+.game-label-found .mark {
+  margin-top: 0.3em;
+}
+
 .about {
   display: grid;
   gap: 18px;

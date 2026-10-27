@@ -19,25 +19,47 @@
 <meta property="og:url" content="https://aeterna.github.io/aeterna-rongroi/en/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="th_TH">
+<meta property="og:image" content="https://aeterna.github.io/aeterna-rongroi/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="aeterna-rongroi, a free offline FiveM PC check that shows evidence and leaves the decision to a person">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#a9d8ff">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../styles.css">
 <script type="application/ld+json">
 {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "aeterna-rongroi",
-  "alternateName": "FiveM PC check",
-  "description": "An offline, open-source PC check for FiveM communities. It shows the traces cheats leave on a Windows PC as evidence and never gives a clean verdict.",
-  "applicationCategory": "SecurityApplication",
-  "operatingSystem": "Windows (x64)",
-  "softwareVersion": "{{rongroi.version}}",
-  "inLanguage": ["en", "th"],
-  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
-  "url": "https://aeterna.github.io/aeterna-rongroi/en/",
-  "downloadUrl": "{{rongroi.release_url}}",
-  "codeRepository": "https://github.com/aeterna/aeterna-rongroi",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+"@context": "https://schema.org",
+"@graph": [
+  {
+    "@type": "SoftwareApplication",
+    "name": "aeterna-rongroi",
+    "alternateName": "FiveM PC check",
+    "description": "An offline, open-source PC check for FiveM communities. It shows the traces cheats leave on a Windows PC as evidence and never gives a clean verdict.",
+    "applicationCategory": "SecurityApplication",
+    "operatingSystem": "Windows (x64)",
+    "softwareVersion": "{{rongroi.version}}",
+    "inLanguage": ["en", "th"],
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "url": "https://aeterna.github.io/aeterna-rongroi/en/",
+    "downloadUrl": "{{rongroi.release_url}}",
+    "codeRepository": "https://github.com/aeterna/aeterna-rongroi",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  },
+  {
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "Is it free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. It is open source under GPL-3.0-or-later; the rules are CC-BY-SA-4.0." } },
+      { "@type": "Question", "name": "Does it send anything from my PC?", "acceptedAnswer": { "@type": "Answer", "text": "The program's own code sends nothing. The window version uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The command-line (CLI) version does not use WebView2. Details: <a href=\"https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md\">PRIVACY.md</a>" } },
+      { "@type": "Question", "name": "Why does Windows warn when I open it?", "acceptedAnswer": { "@type": "Answer", "text": "Releases are not code-signed yet. Always check the hash first (step 2), and do not turn SmartScreen off for the whole PC." } },
+      { "@type": "Question", "name": "Does it need administrator rights?", "acceptedAnswer": { "@type": "Answer", "text": "No. It scans without them, but some checks then read \"not measured\", and the report says how many." } },
+      { "@type": "Question", "name": "Does it catch every cheat?", "acceptedAnswer": { "@type": "Answer", "text": "No. It shows the traces left on the PC. Cheats on a second PC (DMA) and menus hidden from screen capture are out of its sight." } },
+      { "@type": "Question", "name": "Can it tell me a PC is clean?", "acceptedAnswer": { "@type": "Answer", "text": "No, and it never will. Finding nothing does not mean there is nothing." } },
+      { "@type": "Question", "name": "Which Windows does it run on?", "acceptedAnswer": { "@type": "Answer", "text": "64-bit Windows (x64). The measurements recorded in the project were made on Windows 11." } },
+      { "@type": "Question", "name": "I found a way around a check. Where do I report it?", "acceptedAnswer": { "@type": "Answer", "text": "Privately, as <a href=\"https://github.com/aeterna/aeterna-rongroi/blob/dev/SECURITY.md\">SECURITY.md</a> describes. Please do not post it publicly." } }
+    ]
+  }
+]
 }
 </script>
 </head>
@@ -200,7 +222,7 @@
   <div class="wrap">
     <p><em>rongroi</em> (ร่องรอย) is Thai for "traces" · Code GPL-3.0-or-later · Rules CC-BY-SA-4.0 · Anuphan and Mali typefaces (OFL-1.1)</p>
     <p>This page has no tracker, no cookie, and loads nothing from another site.</p>
-    <p><a href="https://github.com/aeterna/aeterna-rongroi">GitHub</a> · <a href="https://github.com/aeterna/aeterna-rongroi/releases">Releases</a> · <a href="https://github.com/aeterna/aeterna-rongroi/discussions">Discussions</a> · <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md">Privacy</a></p>
+    <p><a href="https://github.com/aeterna/aeterna-rongroi">GitHub</a> · <a href="https://github.com/aeterna/aeterna-rongroi/releases">Releases</a> · <a href="https://github.com/aeterna/aeterna-rongroi/discussions">Discussions</a> · <a href="https://discord.gg/eZ8CNrGe2b">Discord</a> · <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md">Privacy</a></p>
   </div>
 </footer>
 </body>

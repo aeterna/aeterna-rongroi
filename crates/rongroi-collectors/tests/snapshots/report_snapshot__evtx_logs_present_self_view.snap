@@ -751,6 +751,35 @@ expression: view
           }
         }
       ]
+    },
+    {
+      "collector": "event_fields",
+      "observations": [
+        {
+          "collector": "event_fields",
+          "fields": {
+            "log": "system",
+            "read": "absent"
+          }
+        },
+        {
+          "collector": "event_fields",
+          "fields": {
+            "log": "code_integrity",
+            "read": "absent"
+          }
+        },
+        {
+          "collector": "event_fields",
+          "fields": {
+            "log": "security",
+            "read": "read",
+            "rejected": 0,
+            "small_clock_changes": 0,
+            "unreadable_clock_changes": 0
+          }
+        }
+      ]
     }
   ],
   "scope": {
@@ -976,6 +1005,10 @@ expression: view
         "reason": "read_failed"
       },
       {
+        "collector": "userassist",
+        "reason": "source_absent"
+      },
+      {
         "collector": "pci_device",
         "reason": "read_failed"
       },
@@ -994,6 +1027,16 @@ expression: view
       {
         "collector": "windows_start",
         "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "place": "system",
+        "reason": "source_absent"
+      },
+      {
+        "collector": "event_fields",
+        "place": "code_integrity",
+        "reason": "source_absent"
       }
     ]
   },
@@ -1001,6 +1044,7 @@ expression: view
     "posture",
     "driver_service",
     "windows_start",
+    "event_fields",
     "pci_device",
     "hid_device",
     "autostart",
@@ -1014,6 +1058,8 @@ expression: view
     "prefetch",
     "bam",
     "pca",
+    "userassist",
+    "recorded_files",
     "usn"
   ],
   "trace_ages": {
@@ -1163,6 +1209,11 @@ expression: view
         "collector": "pca",
         "state": "unmeasured",
         "reason": "read_failed"
+      },
+      {
+        "collector": "userassist",
+        "state": "unmeasured",
+        "reason": "source_absent"
       },
       {
         "collector": "usn",

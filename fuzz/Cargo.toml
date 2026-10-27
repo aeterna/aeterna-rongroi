@@ -100,8 +100,43 @@ doc = false
 bench = false
 
 [[bin]]
+name = "fuzz_content_kind"
+path = "fuzz_targets/fuzz_content_kind.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "fuzz_usn"
 path = "fuzz_targets/fuzz_usn.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_pe_version"
+path = "fuzz_targets/fuzz_pe_version.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_zone_identifier"
+path = "fuzz_targets/fuzz_zone_identifier.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_userassist_entry"
+path = "fuzz_targets/fuzz_userassist_entry.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_userassist_name"
+path = "fuzz_targets/fuzz_userassist_name.rs"
 test = false
 doc = false
 bench = false

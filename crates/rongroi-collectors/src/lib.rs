@@ -9,6 +9,7 @@ pub mod autostart;
 pub mod bam;
 pub mod defender_exclusion;
 pub mod driver_service;
+pub mod event_fields;
 pub mod evtx;
 pub mod failure;
 pub mod fivem_dir;
@@ -25,7 +26,9 @@ pub mod posture;
 pub mod powershell_text;
 pub mod prefetch;
 pub mod process;
+pub mod recorded_files;
 pub mod scan;
+pub mod userassist;
 pub mod usn;
 pub mod windows_start;
 
@@ -49,6 +52,10 @@ pub enum FieldKind {
     Bool,
     /// A string holding one instant, written by `jiff::Timestamp::to_string` (RFC 3339, UTC).
     Timestamp,
+    /// A JSON array of such strings, newest first: every run time one record holds (ADR 0078
+    /// section 6). A list is not one value a comparison can ask about, so `check-rules` refuses a
+    /// rule that names a field of this kind.
+    TimestampList,
 }
 
 impl FieldKind {
@@ -59,6 +66,7 @@ impl FieldKind {
             Self::Number => "a number",
             Self::Bool => "a boolean",
             Self::Timestamp => "a timestamp",
+            Self::TimestampList => "a list of timestamps",
         }
     }
 }
@@ -126,6 +134,19 @@ impl Field {
             kind: FieldKind::Timestamp,
             sensitive: None,
             on_timeline: true,
+        }
+    }
+
+    /// A field carrying a list of instants as RFC 3339 text, newest first.
+    ///
+    /// It is declared off the timeline: the timeline does not grow by one entry per listed time.
+    /// The field is read for a named purpose only (ADR 0078 section 6).
+    pub const fn timestamp_list(name: &'static str) -> Self {
+        Self {
+            name,
+            kind: FieldKind::TimestampList,
+            sensitive: None,
+            on_timeline: false,
         }
     }
 
@@ -306,14 +327,17 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(net_config::NetConfig),
         Box::new(os_image::OsImage),
         Box::new(pca::Pca),
+        Box::new(userassist::UserAssist),
         Box::new(pci_device::PciDevice),
         Box::new(hid_device::HidDevice),
         Box::new(posture::Posture),
         Box::new(powershell_text::PowershellText),
         Box::new(prefetch::Prefetch),
         Box::new(process::Process),
+        Box::new(recorded_files::RecordedFiles::default()),
         Box::new(usn::Usn::default()),
         Box::new(windows_start::WindowsStart),
+        Box::new(event_fields::EventFields),
     ]
 }
 
@@ -413,6 +437,11 @@ mod tests {
                             FieldKind::Timestamp => {
                                 value.as_str().is_some_and(rongroi_core::rules::is_rfc3339)
                             }
+                            FieldKind::TimestampList => value.as_array().is_some_and(|times| {
+                                times.iter().all(|time| {
+                                    time.as_str().is_some_and(rongroi_core::rules::is_rfc3339)
+                                })
+                            }),
                         };
                         assert!(
                             ok,
@@ -504,7 +533,15 @@ mod tests {
         }
         assert_eq!(
             declared,
-            BTreeSet::from(["bam", "evtx", "fivem_dir", "pca", "prefetch", "usn"])
+            BTreeSet::from([
+                "bam",
+                "evtx",
+                "fivem_dir",
+                "pca",
+                "prefetch",
+                "usn",
+                "userassist"
+            ])
         );
     }
 

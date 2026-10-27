@@ -93,6 +93,12 @@ jobs:
       - name: Rule reference pages match the rules
         if: steps.scope.outputs.skip != 'true'
         run: cargo xtask rules-reference --check
+      # docs/coverage.md is written from the rules, the baseline lists, rules/ages and the measurement
+      # ledger rules/measured.csv (ADR 0074). It fails when the page is stale or the ledger does not
+      # parse; a coverage gap never fails it (ADR 0074 §4).
+      - name: Coverage table matches the rules and the ledger
+        if: steps.scope.outputs.skip != 'true'
+        run: cargo xtask coverage --check
       # The vulnerable-driver data file is rebuilt from LOLDrivers at the commit its PROVENANCE.md names and
       # compared with the committed file (ADR 0048). Only `yaml/` is fetched, one commit deep, and the step
       # fails if any other file lands on disk. A pull request fetches only when it changes the data file's
@@ -216,7 +222,10 @@ jobs:
           mkdir -p fuzz/corpus/fuzz_bam fuzz/corpus/fuzz_pca_app_launch \
                    fuzz/corpus/fuzz_pca_general fuzz/corpus/fuzz_filetime \
                    fuzz/corpus/fuzz_prefetch fuzz/corpus/fuzz_evtx fuzz/corpus/fuzz_usn \
-                   fuzz/corpus/fuzz_task fuzz/corpus/fuzz_powershell_text
+                   fuzz/corpus/fuzz_task fuzz/corpus/fuzz_powershell_text \
+                   fuzz/corpus/fuzz_content_kind fuzz/corpus/fuzz_pe_version \
+                   fuzz/corpus/fuzz_zone_identifier fuzz/corpus/fuzz_userassist_entry \
+                   fuzz/corpus/fuzz_userassist_name
           run_target() {
             local target=$1; local corpus=$2; shift 2
             cargo +nightly fuzz run "$target" "$corpus" "$@" -- -max_total_time=30 -timeout=10
@@ -227,6 +236,12 @@ jobs:
             run_target fuzz_prefetch fuzz/corpus/fuzz_prefetch fixtures/prefetch fixtures/parsers/prefetch
             run_target fuzz_usn fuzz/corpus/fuzz_usn fixtures/parsers/usn
             run_target fuzz_powershell_text fuzz/corpus/fuzz_powershell_text fixtures/parsers/powershell-text
+            # content_kind and pe_version have no fixture directory of their own (their tests build bytes
+            # in code), so they start from the repository's other binary and text fixtures.
+            run_target fuzz_content_kind fuzz/corpus/fuzz_content_kind fixtures/prefetch fixtures/parsers/task
+            # userassist has no fixture directory of its own yet (the delegation wrapper cannot carry binary
+            # seeds); its entry parser starts from BAM's binary values, its name decoder from text.
+            run_target fuzz_userassist_entry fuzz/corpus/fuzz_userassist_entry fixtures/parsers/bam
           ) &
           pid1=$!
 
@@ -235,6 +250,11 @@ jobs:
             run_target fuzz_filetime fuzz/corpus/fuzz_filetime fixtures/parsers/bam
             run_target fuzz_evtx fuzz/corpus/fuzz_evtx fixtures/evtx
             run_target fuzz_task fuzz/corpus/fuzz_task fixtures/parsers/task
+            run_target fuzz_pe_version fuzz/corpus/fuzz_pe_version fixtures/parsers/bam fixtures/prefetch
+            # zone_identifier has no fixture directory either; a Zone.Identifier stream is short INI text,
+            # so it starts from the repository's text fixtures.
+            run_target fuzz_zone_identifier fuzz/corpus/fuzz_zone_identifier fixtures/parsers/powershell-text fixtures/parsers/task
+            run_target fuzz_userassist_name fuzz/corpus/fuzz_userassist_name fixtures/parsers/powershell-text
           ) &
           pid2=$!
 

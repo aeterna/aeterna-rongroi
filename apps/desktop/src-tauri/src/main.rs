@@ -43,6 +43,11 @@ ran it, told Microsoft Defender to look away, cleared a log or history, or named
 history of commands typed into a PowerShell window, the scripts Windows PowerShell flagged as \
 suspicious, and the command lines it was started with. No command is kept or shown; the one thing \
 kept is the name of a website a command downloaded from.\n\n\
+- the files of programs Windows recorded running (BAM, Program Compatibility Assistant, the programs \
+running now): what kind of content each holds, its hash, digital signature and version name, the \
+download zone Windows wrote on it, and the name of the website it came from — never the rest of the \
+address — starting nearest your last FiveM or GTA V session, for up to 90 seconds. Reading a file can \
+update its last-access time.\n\n\
 Nothing is sent anywhere. In SS mode a server's name and a website's name are each shown only if \
 you agree to that separately.\n\nYes: full scan. No: standard scan.\n\n\
 การสแกนแบบ Full อ่านมากกว่าการสแกนแบบมาตรฐาน:\n\n\
@@ -52,6 +57,7 @@ you agree to that separately.\n\nYes: full scan. No: standard scan.\n\n\
 - คำในคำสั่ง PowerShell โดยเก็บไว้แค่เป็นชนิด — คำสั่งนั้นดาวน์โหลดแล้วรันอะไรหรือไม่ สั่งให้ Microsoft Defender มองข้ามบางอย่างหรือไม่ \
 ล้าง log หรือประวัติหรือไม่ หรือพูดถึง FiveM หรือไม่ — จากประวัติคำสั่งที่พิมพ์ในหน้าต่าง PowerShell, script ที่ Windows PowerShell \
 ตั้งธงว่าน่าสงสัย และ command line ที่ใช้เปิดมัน ไม่เก็บและไม่แสดงคำสั่งใด ๆ สิ่งเดียวที่เก็บคือชื่อเว็บไซต์ที่คำสั่งดาวน์โหลดมา\n\n\
+- ไฟล์ของโปรแกรมที่ Windows บันทึกว่าเคยรัน (BAM, Program Compatibility Assistant, โปรแกรมที่กำลังรัน): เนื้อไฟล์เป็นชนิดไหน hash ลายเซ็นดิจิทัล และชื่อในข้อมูลเวอร์ชัน โซนดาวน์โหลดที่ Windows เขียนไว้บนไฟล์ และชื่อเว็บไซต์ที่ไฟล์มาจาก โดยไม่เก็บส่วนอื่นของที่อยู่ เริ่มจากไฟล์ที่ใกล้เซสชัน FiveM หรือ GTA V ล่าสุดก่อน ใช้เวลาไม่เกิน 90 วินาที การอ่านไฟล์อาจทำให้เวลาเข้าถึงล่าสุดของไฟล์เปลี่ยน\n\n\
 ไม่ส่งอะไรออกไปไหน ในโหมด SS ชื่อเซิร์ฟเวอร์และชื่อเว็บไซต์จะแสดงก็ต่อเมื่อคุณยินยอมแยกทีละข้อ\n\n\
 Yes: สแกนแบบ Full  No: สแกนแบบมาตรฐาน";
 
@@ -172,5 +178,17 @@ mod tests {
             chosen_tier(&args(&[]), || panic!("asked without --full")),
             ScanTier::Standard
         );
+    }
+
+    /// ADR 0079 section 6: the full-scan text names the files the recorded programs point at, in
+    /// both languages.
+    #[test]
+    fn the_full_scan_text_names_the_files_of_recorded_programs() {
+        for words in [
+            "programs Windows recorded running",
+            "โปรแกรมที่ Windows บันทึกว่าเคยรัน",
+        ] {
+            assert!(FULL_TEXT.contains(words), "{words} missing from FULL_TEXT");
+        }
     }
 }

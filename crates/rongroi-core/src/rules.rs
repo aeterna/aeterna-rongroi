@@ -49,10 +49,17 @@ impl Role {
 /// The collectors whose records carry a program's name and nothing that identifies the program
 /// (ADR 0034). A `role: evidence` file on one of them may not match `name` or `path`; a timeline
 /// selector may (ADR 0051).
-pub const NAME_ONLY_COLLECTORS: [&str; 3] = ["bam", "pca", "prefetch"];
+pub const NAME_ONLY_COLLECTORS: [&str; 4] = ["bam", "pca", "prefetch", "userassist"];
 
 /// The fields [`NAME_ONLY_COLLECTORS`] carry that name a program.
 pub const NAMING_FIELDS: [&str; 2] = ["name", "path"];
+
+/// Observation fields that hold a list of instants rather than one value (ADR 0078 section 6).
+///
+/// A comparison asks about one value, so no rule may name one of these. `cargo xtask check-rules`
+/// enforces the same rule for every field a collector declares as a list of timestamps, using the
+/// collectors' own declaration; this list is what the bundle loader can know without them.
+const TIMESTAMP_LIST_FIELDS: [&str; 1] = ["run_times"];
 
 /// Lifecycle of a rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -62,7 +69,7 @@ pub enum Status {
     Experimental,
     /// Believed correct; positive and negative fixtures required.
     Test,
-    /// Proven on real traffic; fixtures required.
+    /// Seen found on a lab machine, measured on a client build, baseline-confronted (ADR 0074 section 5); fixtures required.
     Stable,
     /// Kept for history; never evaluated.
     Deprecated,
@@ -75,8 +82,9 @@ impl Status {
     }
 }
 
-/// Legitimate software excluded from a rule. Identified by the file's hash or by the certificate that
-/// signed it, never by a name — of the file or of the signer (ADR 0035).
+/// What a rule expects, so that it reports what differs from it. Identified by the file's hash or by the
+/// certificate that signed it, never by a name — of the file or of the signer (ADR 0035). It never
+/// lists software as known good (ADR 0084).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Allow {
@@ -303,7 +311,7 @@ pub struct Rule {
     /// `startswith` included (ADR 0029).
     #[serde(default)]
     pub cased: BTreeSet<String>,
-    /// Legitimate software excluded from matching.
+    /// What the rule expects, by hash or certificate: a file that carries one is not a match (ADR 0084).
     #[serde(default)]
     pub allow: Vec<Allow>,
     /// How far back the source can see, in words for the user.
@@ -633,6 +641,7 @@ fn validate_rule(rule: &Rule, report: &mut impl FnMut(String)) {
     }
     validate_cased(rule, report);
     validate_role(rule, report);
+    validate_timestamp_lists(rule, report);
     if rule.falsepositives.is_empty() || rule.falsepositives.iter().any(|f| f.trim().is_empty()) {
         report("`falsepositives` must list what legitimately produces this evidence".to_owned());
     }
@@ -704,6 +713,35 @@ fn validate_role(rule: &Rule, report: &mut impl FnMut(String)) {
                     }
                 }
             }
+        }
+    }
+}
+
+/// Refuses a `match` or `match_lists` entry that names a list of instants.
+///
+/// A list is not one value a comparison can ask about: the engine would compare the array and the
+/// rule would be `not_found` on every machine. The bundle loader expands `match_lists` into `match`
+/// before this runs, so the first loop covers the expanded form; the second covers the file as the
+/// author wrote it, which is what the message should say (ADR 0078 section 6).
+fn validate_timestamp_lists(rule: &Rule, report: &mut impl FnMut(String)) {
+    let mut named = BTreeSet::new();
+    for key in rule.matcher.keys() {
+        let field = parse_match_key(key).field();
+        if TIMESTAMP_LIST_FIELDS.contains(&field) {
+            named.insert(field);
+            report(format!(
+                "a rule on `{}` may not match `{field}`: it is a list of timestamps, not one value a comparison can ask about (ADR 0078)",
+                rule.collector
+            ));
+        }
+    }
+    for key in rule.match_lists.keys() {
+        let field = parse_match_key(key).field();
+        if TIMESTAMP_LIST_FIELDS.contains(&field) && !named.contains(field) {
+            report(format!(
+                "a rule on `{}` may not name `{field}` in `match_lists`: it is a list of timestamps, not one value a comparison can ask about (ADR 0078)",
+                rule.collector
+            ));
         }
     }
 }
@@ -1548,6 +1586,79 @@ date: 2026-09-15
         }
         let elsewhere = name_only("process", "evidence", "presence", "  name: fivem.exe\n");
         assert_eq!(problems_at("process", &elsewhere), Vec::<String>::new());
+    }
+
+    /// ADR 0034 as amended by ADR 0080: `userassist` is the fourth collector whose records carry a
+    /// program's name and nothing that identifies it, so an evidence rule on it may not match the
+    /// name or the path, and a timeline selector may. Written out rather than looped over
+    /// `NAME_ONLY_COLLECTORS`, so that this fails until the collector joins that list instead of
+    /// passing without ever having asked about it.
+    #[test]
+    fn only_a_timeline_selector_may_select_a_userassist_record_by_name() {
+        for block in ["  name: firefox.exe\n", "  path|endswith: \\firefox.exe\n"] {
+            let rule = name_only("userassist", "evidence", "execution", block);
+            let problems = problems_at("userassist", &rule);
+            assert_eq!(problems.len(), 1, "{block}: {problems:?}");
+            assert!(problems[0].contains("ADR 0034"), "{block}: {problems:?}");
+
+            let selector = name_only("userassist", "timeline", "context", block);
+            assert_eq!(
+                problems_at("userassist", &selector),
+                Vec::<String>::new(),
+                "{block}"
+            );
+        }
+    }
+
+    /// `run_times` is a list of times, not one value a comparison can ask about: the bundle loader
+    /// refuses a `match` that names it, as it refuses name and path on a name-only record
+    /// (ADR 0078 section 6).
+    #[test]
+    fn a_rule_that_matches_a_timestamp_list_field_is_refused() {
+        let rule = name_only(
+            "prefetch",
+            "evidence",
+            "execution",
+            "  run_times: \"2025-12-30T00:00:00Z\"\n",
+        );
+        let problems = problems_at("prefetch", &rule);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The same through `match_lists`: a listed field expands into `match`, and a list of times
+    /// cannot be matched by equality either.
+    #[test]
+    fn a_match_lists_entry_for_a_timestamp_list_field_is_refused() {
+        let rule = name_only("prefetch", "evidence", "execution", "  run_count|gte: 1\n").replace(
+            "retention:",
+            "match_lists:\n  run_times: run_times.csv\nretention:",
+        );
+        let problems = problems_at("prefetch", &rule);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("run_times"), "{problems:?}");
+        assert!(problems[0].contains("match_lists"), "{problems:?}");
+        assert!(
+            problems[0].to_lowercase().contains("timestamp"),
+            "{problems:?}"
+        );
+    }
+
+    /// The control: `last_run` is the one time a rule on Prefetch may match, and this change leaves
+    /// it alone.
+    #[test]
+    fn a_rule_that_matches_prefetch_last_run_is_allowed() {
+        let rule = name_only(
+            "prefetch",
+            "evidence",
+            "execution",
+            "  last_run|lt: \"2026-09-13T00:00:00Z\"\n",
+        );
+        assert_eq!(problems_at("prefetch", &rule), Vec::<String>::new());
     }
 
     #[test]

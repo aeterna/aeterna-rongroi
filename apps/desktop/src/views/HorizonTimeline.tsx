@@ -57,15 +57,21 @@ export function HorizonTimeline({ view, header, onStepClick }: Props) {
     fivemSub = `FiveM (${fivemCrossSource.fivem.editions.join(", ") || "Active"})`;
   }
 
-  // Earliest horizon tag
-  const oldestAnchor = view.trace_ages?.anchors.find(
-    (a) => a.anchor === "install_date" || a.anchor === "boot_time",
-  );
-  const historyTag =
-    oldestAnchor && oldestAnchor.state === "measured" ? `${oldestAnchor.days_before}d` : "-";
+  // Earliest horizon tag: the install date names the anchor when it is known, otherwise the boot
+  // time does (ADR 0084 decision 1).
+  const anchors = view.trace_ages?.anchors ?? [];
+  const installAnchor = anchors.find((a) => a.anchor === "install_date");
+  const bootAnchor = anchors.find((a) => a.anchor === "boot_time");
+  const oldestAnchor =
+    installAnchor?.state === "measured"
+      ? installAnchor
+      : bootAnchor?.state === "measured"
+        ? bootAnchor
+        : undefined;
+  const historyTag = oldestAnchor ? `${oldestAnchor.days_before}d` : "-";
 
   // Badge status
-  let badgeText = t("horizon_timeline.badge_continuous");
+  let badgeText = t("horizon_timeline.badge_not_found");
   let badgeClass = "";
   if (hasTamper) {
     badgeText = t("horizon_timeline.badge_broken");
@@ -113,7 +119,16 @@ export function HorizonTimeline({ view, header, onStepClick }: Props) {
           <div>
             <div className="timeline-tag">{historyTag}</div>
             <div className="timeline-label">{t("horizon_timeline.step_history_start")}</div>
-            <div className="timeline-sub">{t("horizon_timeline.step_history_start_sub")}</div>
+            {oldestAnchor?.anchor === "install_date" && (
+              <div className="timeline-sub">
+                {t("horizon_timeline.step_history_start_sub_install")}
+              </div>
+            )}
+            {oldestAnchor?.anchor === "boot_time" && (
+              <div className="timeline-sub">
+                {t("horizon_timeline.step_history_start_sub_boot")}
+              </div>
+            )}
           </div>
         </button>
 

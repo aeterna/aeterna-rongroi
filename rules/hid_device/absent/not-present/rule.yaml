@@ -11,7 +11,7 @@ description: >-
   Windows was running, or at the resume after a Fast Startup shutdown, and none after a full shutdown. The row never
   says what the device was beyond its numbers and its driver, or why it left. A box between a mouse and the PC that
   copies the mouse's numbers looks like that mouse.
-status: experimental
+status: stable
 collector: hid_device
 strength: context
 match:
