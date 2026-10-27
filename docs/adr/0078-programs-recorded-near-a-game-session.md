@@ -1,6 +1,7 @@
 # ADR 0078 — Programs recorded near a game session
 
-- Status: accepted — the owner accepted the six choices in "Owner decisions" on 2026-10-21; nothing is built yet
+- Status: accepted — the owner accepted the six choices in "Owner decisions" on 2026-10-21; steps P1 to P6
+  are built (the "As built" sections here and in ADR 0079 to ADR 0082); P7 and P8 are open
 - Date: 2026-10-21
 - Related: ADR 0002 (evidence, not verdict), ADR 0021 (Prefetch), ADR 0028 (facts about more than one
   observation are computed in Rust), ADR 0034 (Prefetch, BAM and PCA carry no identity), ADR 0035
@@ -72,8 +73,8 @@ compare with.
 | before the scan | the latest session's end, up to the scan's `generated_at` | latest session only |
 
 The 30 minutes are constants in `rongroi-core`, printed in the view's text. Rules and core constants are
-compiled into the binary (ADR 0004), so changing them is a release. Lab replay (section 10) measures them
-before the view leaves `experimental` wording.
+compiled into the binary (ADR 0004), so changing them is a release. Lab replay (step P7 in "Order of work")
+measures them before the view leaves `experimental` wording.
 
 ### 4. Candidates
 
@@ -290,6 +291,14 @@ yet; that is P3. The build differs from section 8 in three places:
 3. **No seed fixtures of their own.** The delegation wrapper cannot carry binary files in a patch. The two
    fuzz targets therefore start from the repository's other fixtures, and their tests build their bytes in
    code.
+
+## As built: P3 to P5
+
+These steps are recorded in the ADRs that decided their details:
+
+- P3, `recorded_files` and the `Zone.Identifier` stream: ADR 0079, "As built: P3".
+- P4, UserAssist: ADR 0080, "As built: P4". The three event fields: ADR 0081, "As built: P4".
+- P5, files a program loaded from outside the expected folders: ADR 0082, "As built: P5".
 
 ## P6 decisions (2026-10-23, each as recommended)
 
