@@ -367,3 +367,30 @@ any file's bytes, and emits section 3's six fields. As built, where it differs f
 A name is compared with ASCII case folding only (section 2), so a recorded 8.3 short name or a name that differs
 only in a non-ASCII letter's case is not matched by name; it is matched by the file's own reference when the
 file still exists. `matched` then shows empty lists. Not measured how often this happens.
+
+## Measured: J4 (2026-10-28)
+
+One elevated full scan of `dev` at `582c93d` (x64 build), on a Windows 11 PC (build 26220) that is not a gaming PC,
+over SSH. Counts only; no path or name is recorded here.
+
+| What | Measured |
+|---|---|
+| The journal's span at the scan (`journal_from` to the scan time) | 42 minutes 56 seconds |
+| `recorded_files` paths | 232 |
+| `journal_match: matched` | 172 (155 read, 11 too large, 6 missing); every list empty, `journal_more` false on all |
+| `journal_match: folder_unknown` | 55, each recorded by UserAssist alone, its file missing: its folder no longer exists |
+| `journal_match: other_volume` | 5, on another drive letter |
+| The full scan's time after the consent answer | about 6 seconds, journal read and files together |
+
+What this shows:
+
+1. **The span matches ADR 0047's.** About 40 minutes on both PCs measured. A session that ended more than about
+   40 minutes before the scan gives I5 "not known: the NTFS change journal does not reach back that far" for
+   every candidate, as section 5 designed; I5 answers for a scan made soon after a session.
+2. **`folder_unknown` is common, and it is the folder that is gone, not unreadable**, on this PC: all 55 were old
+   UserAssist entries whose files are missing. I1 already says the file is gone; I5 cannot say when.
+3. **The test half was not done.** A test program copied, run, renamed and deleted over SSH was recorded by none
+   of BAM, PCA, the process list or UserAssist, so it never became a `recorded_files` path and the journal was not
+   asked about it. Reading I5 back for a renamed and deleted program needs an interactive run: the lab replay
+   (step J5) or the owner's PC. On the lab machine the scenario's program is known only from BAM, whose path is
+   withheld until ADR 0087's drive map, so its I5 is "not known: no path" today.
