@@ -12,6 +12,7 @@
 #   lab/replay.sh control              one scan of a fresh overlay with no setup (ADR 0076 §1 control scan)
 #   lab/replay.sh <scenario-dir>       e.g. lab/scenarios/posture/script-block-logging-off
 #                                      (must contain setup.ps1 and expect.yaml)
+#                                      full: true in expect.yaml makes the scan a full scan, and the script answers its consent question.
 #   lab/replay.sh -h                   this text
 #
 # Environment:
@@ -41,6 +42,7 @@ IS_CONTROL=0
 NAME=""
 SCEN_DIR=""
 RESTART=0
+FULL=0
 RUN_ID=""
 WORK=""
 RESULTS=""
@@ -93,6 +95,10 @@ parse_args() {
       # settings only at boot). The control scan never restarts.
       if grep -Eq '^restart:[[:space:]]*true[[:space:]]*$' "$SCEN_DIR/expect.yaml"; then
         RESTART=1
+      fi
+      # A full scan (`scan --full`) stops at a consent question; the script answers it, so the run does not wait.
+      if grep -Eq '^full:[[:space:]]*true[[:space:]]*$' "$SCEN_DIR/expect.yaml"; then
+        FULL=1
       fi
       ;;
   esac
@@ -180,13 +186,13 @@ unmount_share() {
   SHARE_MOUNTED=0
 }
 
-# run.ps1 is written here with the scenario's restart flag filled in. The heredoc is quoted so PowerShell
-# variables are not expanded by bash; the one placeholder is replaced by sed.
+# run.ps1 is written here with the scenario's restart and full-scan flags filled in. The heredoc is quoted so
+# PowerShell variables are not expanded by bash; the placeholders are replaced by sed.
 # Windows PowerShell 5.1 re-encodes > output as UTF-16LE (seen 2026-10-18), so cmd does the redirect and
 # scan.json holds the bytes rongroi.exe writes. The share root is a drive root (D:\), so relative paths
 # with no inner quotes avoid cmd's quote-stripping rules.
 write_run_ps1() {
-  sed "s/__RESTART__/$RESTART/" >"$SHARE_MNT/run.ps1" <<'PS1'
+  sed -e "s/__RESTART__/$RESTART/" -e "s/__FULL__/$FULL/" >"$SHARE_MNT/run.ps1" <<'PS1'
 param([string]$Root)
 $out = Join-Path $Root 'out'; New-Item -ItemType Directory -Force -Path $out | Out-Null
 Start-Transcript -Path (Join-Path $out 'transcript.txt') -Append -Force
@@ -197,7 +203,7 @@ if ((Test-Path $setup) -and -not (Test-Path $done)) {
   if (__RESTART__ -eq 1) { Stop-Transcript; shutdown /r /f /t 10; exit }
 }
 Set-Location $Root
-cmd /c 'rongroi.exe scan --json > out\scan.json 2> out\scan-stderr.txt'
+if (__FULL__ -eq 1) { cmd /c 'echo yes| rongroi.exe scan --full --json > out\scan.json 2> out\scan-stderr.txt' } else { cmd /c 'rongroi.exe scan --json > out\scan.json 2> out\scan-stderr.txt' }
 Remove-Item (Join-Path $Root 'run.ps1')
 Stop-Transcript
 shutdown /s /f /t 10
