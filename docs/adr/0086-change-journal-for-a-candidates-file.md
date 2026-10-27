@@ -1,8 +1,7 @@
 # ADR 0086 — The change journal for a candidate's file
 
 - Status: accepted — the owner decided the seven questions in "Owner decisions" on 2026-10-27, each as
-  recommended; nothing is built. 0.13.0 ships this ADR only, and the code follows after 0.13.0 ("Order of
-  work")
+  recommended. J1 and J2 are built ("As built: J1, J2"); J3 to J5 are not
 - Date: 2026-10-27
 - Related: ADR 0021 (no identifier that names one file across two reports), ADR 0044 (gaps), ADR 0047 (the
   change journal, and "The privacy problem"), ADR 0052 (full scan), ADR 0061 (trace ages), ADR 0062 (the
@@ -330,3 +329,41 @@ D6 (a) and D7 (approve section 6's text at J3's G1). Step J0 is done; J1 starts 
   `has_identity_fact` include I5; the `Deferred` reason is then used by I3 and I4 only.
 - Locale keys, consent text, `PRIVACY.md` and `docs/architecture.md` change in J3.
 - ADR 0047's "It reads no file name" holds for the standard scan only; ADR 0079 section 5 is closed.
+
+## As built: J1, J2 (2026-10-28)
+
+**J1** (#243): `rongroi_parsers::usn::match_buffer` walks a buffer as `parse_buffer` does and returns, for each
+match, a target index, a kind (`Deleted`, `RenamedFrom`, `RenamedTo`) and the record's time, as section 2 says.
+A record with more than one of the three reasons gives one match per kind. Three rules were added at review,
+each so that a damaged or hostile buffer cannot make a match:
+
+1. A name whose offset points inside the record's fixed part is damage (`file_name`), so header bytes are never
+   compared as a name.
+2. An empty name never matches by name.
+3. An all-zero file reference on the target is no reference for that record version.
+
+`parse_buffer` is unchanged in what it returns; both share one walk. The fuzz target calls both.
+
+**J2** (fixture #244, collector: this ADR's J2 pull request): `recorded_files` reads the journal once, before
+any file's bytes, and emits section 3's six fields. As built, where it differs from or adds to section 3:
+
+1. **`journal_from` is off the timeline too.** Section 3 declared only the three lists so. On the timeline,
+   `journal_from` would repeat the oldest record the `usn` collector already puts there, and a full scan with
+   no journal would list `recorded_files` among the timeline's unmeasured sources.
+2. **`journal_from` is the earliest time of the first buffer that has a timed record**, the oldest record of a
+   journal written in time order.
+3. **A source gap does not reach the journal fields.** A source BAM, PCA, the process list or UserAssist could
+   not read gaps every other field, as before; the six journal fields carry only the journal's own reason.
+4. **A damaged record is `partial`**, as section 3 says, not `read_failed` as the `usn` collector gives for
+   the same damage: the records before it were compared.
+5. **The journal volume is `%SystemRoot%`'s drive**, as the `usn` collector reads it; a path on another letter is
+   `other_volume`. A path spelled with `/` is looked up with `\`, and a file at a drive's root is looked for
+   under `X:\`.
+6. **The journal read's time is given back to the file clock**, so the 30 seconds of the journal and the 90 of
+   the files never share time (section 4). The two `file_id` calls per path before the read are counted in
+   neither; they read no file.
+7. **`budget_spent` has a fifth owner**, `recorded_files`, in the owner list `cargo xtask check-rules` asserts.
+
+A name is compared with ASCII case folding only (section 2), so a recorded 8.3 short name or a name that differs
+only in a non-ASCII letter's case is not matched by name; it is matched by the file's own reference when the
+file still exists. `matched` then shows empty lists. Not measured how often this happens.

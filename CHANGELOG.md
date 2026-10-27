@@ -3,6 +3,17 @@
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `recorded_files` (full scan) reads the system drive's NTFS change journal once and, for each recorded file,
+  says whether the journal holds its deletion or a rename (ADR 0086): `journal_match` (`matched`, `other_volume`,
+  `folder_unknown`), the newest eight times of each kind in `journal_deleted`, `journal_renamed_from` and
+  `journal_renamed_to`, `journal_more` when a list was cut, and `journal_from`, the oldest record the read held.
+  Names in the journal are compared inside the parser and never kept; no name, USN or file number is reported.
+  The read has its own 30-second budget, and a journal that could not be read gaps only these six fields. The
+  game-window view does not show this yet (ADR 0086 step J3).
+
 ## [0.13.0] - 2026-10-27
 
 ### Added
