@@ -1133,7 +1133,7 @@ fn resolve_usn_journal(
     described: &FixtureUsnJournal,
     origin: &str,
 ) -> Result<StoredUsnJournal, FixtureError> {
-    let folders = resolve_usn_folders(&described, origin)?;
+    let folders = resolve_usn_folders(described, origin)?;
     let mut records = Vec::new();
     for group in &described.records {
         records.extend(group_records(group, &folders, origin)?);
