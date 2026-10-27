@@ -1039,93 +1039,104 @@ fn resolve_usn_folders(
         .collect())
 }
 
+/// Encodes one record group, in the order its records sit in the journal. The group's parent and file
+/// must be under `folders:`, its version 2 or 3, and its `last` no earlier than its `first`.
+fn group_records(
+    group: &FixtureUsnRecords,
+    folders: &BTreeMap<String, FileId>,
+    origin: &str,
+) -> Result<Vec<Vec<u8>>, FixtureError> {
+    let parent = match &group.parent {
+        None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
+        Some(path) => {
+            *folders
+                .get(&normalise_path(path))
+                .ok_or_else(|| FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!("usn_journal record parent `{path}` is not under `folders:`"),
+                })?
+        }
+    };
+    let own = match &group.file {
+        None => None,
+        Some(path) => Some(*folders.get(&normalise_path(path)).ok_or_else(|| {
+            FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal record file `{path}` is not under `folders:`"),
+            }
+        })?),
+    };
+    if group.major != 2 && group.major != 3 {
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!("usn_journal major version {} is not 2 or 3", group.major),
+        });
+    }
+    let name: Vec<u8> = group
+        .name
+        .as_deref()
+        .unwrap_or("fx")
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let reason = group
+        .reasons
+        .iter()
+        .fold(0u32, |flags, reason| flags | reason.flag());
+    let first = group
+        .first
+        .as_deref()
+        .map(|text| filetime_of(text, origin))
+        .transpose()?
+        .unwrap_or(133_000_000_000_000_000);
+    let last = group
+        .last
+        .as_deref()
+        .map(|text| filetime_of(text, origin))
+        .transpose()?
+        .unwrap_or(first);
+    if last < first {
+        let first_text = group.first.as_deref().unwrap_or("<default>");
+        let last_text = group.last.as_deref().unwrap_or("<default>");
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
+            ),
+        });
+    }
+    let span = last.saturating_sub(first);
+    let steps = u64::from(group.count.saturating_sub(1)).max(1);
+    let mut records = Vec::new();
+    for index in 0..group.count {
+        let written = first + span / steps * u64::from(index);
+        let written = if index + 1 == group.count {
+            last
+        } else {
+            written
+        };
+        let record = encode_record(group.major, parent, own, written, reason, &name).map_err(
+            |_| FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!(
+                    "usn_journal record name `{}` is too long",
+                    group.name.as_deref().unwrap_or("fx")
+                ),
+            },
+        )?;
+        records.push(record);
+    }
+    Ok(records)
+}
+
 fn resolve_usn_journal(
     described: FixtureUsnJournal,
     origin: &str,
 ) -> Result<StoredUsnJournal, FixtureError> {
     let folders = resolve_usn_folders(&described, origin)?;
     let mut records = Vec::new();
-    for group in described.records {
-        let parent = match &group.parent {
-            None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
-            Some(path) => {
-                *folders
-                    .get(&normalise_path(path))
-                    .ok_or_else(|| FixtureError::Parse {
-                        path: origin.to_owned(),
-                        message: format!(
-                            "usn_journal record parent `{path}` is not under `folders:`"
-                        ),
-                    })?
-            }
-        };
-        let own = match &group.file {
-            None => None,
-            Some(path) => Some(*folders.get(&normalise_path(path)).ok_or_else(|| {
-                FixtureError::Parse {
-                    path: origin.to_owned(),
-                    message: format!("usn_journal record file `{path}` is not under `folders:`"),
-                }
-            })?),
-        };
-        if group.major != 2 && group.major != 3 {
-            return Err(FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!("usn_journal major version {} is not 2 or 3", group.major),
-            });
-        }
-        let name: Vec<u8> = group
-            .name
-            .as_deref()
-            .unwrap_or("fx")
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect();
-        let reason = group
-            .reasons
-            .iter()
-            .fold(0u32, |flags, reason| flags | reason.flag());
-        let first = group
-            .first
-            .as_deref()
-            .map(|text| filetime_of(text, origin))
-            .transpose()?
-            .unwrap_or(133_000_000_000_000_000);
-        let last = group
-            .last
-            .as_deref()
-            .map(|text| filetime_of(text, origin))
-            .transpose()?
-            .unwrap_or(first);
-        if last < first {
-            let first_text = group.first.as_deref().unwrap_or("<default>");
-            let last_text = group.last.as_deref().unwrap_or("<default>");
-            return Err(FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!(
-                    "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
-                ),
-            });
-        }
-        let span = last.saturating_sub(first);
-        let steps = u64::from(group.count.saturating_sub(1)).max(1);
-        for index in 0..group.count {
-            let written = first + span / steps * u64::from(index);
-            let written = if index + 1 == group.count {
-                last
-            } else {
-                written
-            };
-            let record = encode_record(group.major, parent, own, written, reason, &name)
-                .map_err(|_| FixtureError::Parse {
-                    path: origin.to_owned(),
-                    message: format!(
-                        "usn_journal record name `{}` is too long",
-                        group.name.as_deref().unwrap_or("fx")
-                    ),
-                })?;
-            records.push(record);
-        }
+    for group in &described.records {
+        records.extend(group_records(group, &folders, origin)?);
     }
     let first_usn: i64 = if described.trimmed { 4096 } else { 0 };
     let mut buffers = Vec::new();
