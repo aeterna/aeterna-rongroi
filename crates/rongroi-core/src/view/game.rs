@@ -3349,7 +3349,7 @@ mod tests {
         assert_eq!(file.journal_more, None);
     }
 
-    /// i5: the journal reasons serialise under their snake_case names, the source beside
+    /// i5: the journal reasons serialise under their `snake_case` names, the source beside
     /// `before_trace_age` (ADR 0086 section 5).
     #[test]
     fn i5_journal_reasons_serialise_under_their_spec_names() {
