@@ -1,7 +1,7 @@
 # ADR 0085 — SRUM: whether it can be read, and what it would add near a game session
 
-- Status: proposed — feasibility only; nothing is measured, built or decided. The owner's questions are
-  in "Owner questions"
+- Status: accepted — feasibility only; the owner decided the seven questions in "Owner questions" on
+  2026-10-27, each as recommended. Nothing is measured or built yet: the read-only probe of D1 comes first
 - Date: 2026-10-27
 - Related: ADR 0019 (`read_file` and its 64 MiB limit), ADR 0021 (Prefetch; paths SS mode cannot reach),
   ADR 0023 and ADR 0049 (which paths SS mode redacts), ADR 0038 (one privilege, for one read), ADR 0041
@@ -299,6 +299,11 @@ needs a reason for a held file. ADR 0041 found that `read_failed` is the nearest
    - Recommended: **A**. T1–T4 compare a recorded instant with a window; a period is a different fact, and
      merging them would let an hour-wide row look as precise as a Prefetch run time.
 
+**Decided (2026-10-27).** The owner chose every recommended option: D1 A (measure first), D2 A (park SRUM
+if the file is held), D3 A (`sootmark-ese` after review, falling back to B), D4 A (a dirty database is
+`partial`), D5 A (Application Resource Usage and the id map only), D6 decided after D1, and D7 A (its own
+label, not T1 to T4). The next step is D1's probe; its results are written here.
+
 ## Alternatives weighed
 
 | Alternative | Why not |
@@ -332,7 +337,7 @@ needs a reason for a held file. ADR 0041 found that `read_failed` is the nearest
 
 - No code, no rule, no fixture, no dependency. `Cargo.lock`, `deny.toml`, `PRIVACY.md` and the report are
   unchanged.
-- ADR 0078 step P8 is answered as "proposed, waiting on owner question 1". Steps P1–P7 do not depend on it.
+- ADR 0078 step P8 is answered as "accepted, waiting on owner question 1's probe". Steps P1–P7 do not depend on it.
 - If the owner chooses D1 A, the probe is not kept in this repository; its results are written into this
   ADR, with no content of the PC's database.
 - If D1 shows the file held and D2 is A, this ADR is accepted as "SRUM parked", and ADR 0054's sentence
