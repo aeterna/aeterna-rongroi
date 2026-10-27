@@ -1130,7 +1130,7 @@ fn group_records(
 }
 
 fn resolve_usn_journal(
-    described: FixtureUsnJournal,
+    described: &FixtureUsnJournal,
     origin: &str,
 ) -> Result<StoredUsnJournal, FixtureError> {
     let folders = resolve_usn_folders(&described, origin)?;
@@ -1300,7 +1300,7 @@ impl FixtureHost {
                 .transpose()?,
             usn_journal: file
                 .usn_journal
-                .map(|journal| resolve_usn_journal(journal, origin))
+                .map(|journal| resolve_usn_journal(&journal, origin))
                 .transpose()?,
         })
     }
