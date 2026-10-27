@@ -480,8 +480,16 @@ fn a_candidate_fact_that_holds_passes() {
     let report = check(&expect, &scan, None);
     assert_eq!(report.ok, 2, "{:?}", report.lines);
     assert_eq!(report.failed, 0, "{:?}", report.lines);
-    assert!(report.lines.contains(&"ok    fact       helper.exe t1".to_owned()));
-    assert!(report.lines.contains(&"ok    fact       helper.exe i1".to_owned()));
+    assert!(
+        report
+            .lines
+            .contains(&"ok    fact       helper.exe t1".to_owned())
+    );
+    assert!(
+        report
+            .lines
+            .contains(&"ok    fact       helper.exe i1".to_owned())
+    );
 }
 
 #[test]
@@ -533,7 +541,11 @@ fn a_missing_candidate_fails() {
     let report = check(&expect, &scan, None);
     assert_eq!(report.failed, 1, "{:?}", report.lines);
     assert_eq!(report.lines.len(), 1, "{:?}", report.lines);
-    assert!(report.lines[0].starts_with("FAIL  candidate"), "{:?}", report.lines);
+    assert!(
+        report.lines[0].starts_with("FAIL  candidate"),
+        "{:?}",
+        report.lines
+    );
     assert!(
         report.lines[0].ends_with(" not a candidate"),
         "{:?}",
@@ -543,17 +555,18 @@ fn a_missing_candidate_fails() {
 
 #[test]
 fn a_scan_with_no_view_fails() {
-    let no_view = [
-        scan(&[], true),
-        scan_with_game_windows(&[], Value::Null),
-    ];
+    let no_view = [scan(&[], true), scan_with_game_windows(&[], Value::Null)];
     let expect = expect_windows(&[("helper.exe", &[("t1", "true"), ("i1", "not_known")])]);
     for text in no_view {
         let scan = parse_scan(&text).expect("the scan parses");
         let report = check(&expect, &scan, None);
         assert_eq!(report.failed, 1, "{:?}", report.lines);
         assert_eq!(report.lines.len(), 1, "{:?}", report.lines);
-        assert!(report.lines[0].starts_with("FAIL  view"), "{:?}", report.lines);
+        assert!(
+            report.lines[0].starts_with("FAIL  view"),
+            "{:?}",
+            report.lines
+        );
         assert!(
             report.lines[0].ends_with(" no game-window view in the scan"),
             "{:?}",
@@ -591,9 +604,9 @@ fn two_candidates_of_one_name_do_not_mix_their_facts() {
     assert_eq!(report.ok, 1, "{:?}", report.lines);
     assert_eq!(report.failed, 1, "{:?}", report.lines);
     assert!(
-        report
-            .lines
-            .contains(&"FAIL  fact       helper.exe i1 read not_known:recorded_files_not_run".to_owned()),
+        report.lines.contains(
+            &"FAIL  fact       helper.exe i1 read not_known:recorded_files_not_run".to_owned()
+        ),
         "{:?}",
         report.lines
     );
@@ -603,10 +616,7 @@ fn two_candidates_of_one_name_do_not_mix_their_facts() {
 fn a_candidate_fact_of_the_wrong_shape_is_an_error_naming_it() {
     let text = scan_with_game_windows(
         &[],
-        game_windows_value(
-            vec![json!({"name": "Helper.EXE", "t1": {"nope": "x"}})],
-            0,
-        ),
+        game_windows_value(vec![json!({"name": "Helper.EXE", "t1": {"nope": "x"}})], 0),
     );
     let err = parse_scan(&text).expect_err("a fact object of the wrong shape is refused");
     let message = format!("{err:#}");

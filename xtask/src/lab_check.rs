@@ -394,13 +394,14 @@ pub(crate) fn check(expect: &Expect, scan: &Scan, control: Option<&Scan>) -> Rep
 /// Checks one `game_windows` entry: one line per listed fact, or one line when the scan has no view or
 /// no candidate of that name. Two candidates may share a name; the one that holds every listed fact
 /// supplies the values, and if none does, the first one does.
-fn check_candidate(
-    report: &mut Report,
-    expect: &CandidateExpect,
-    view: Option<&GameWindowsSeen>,
-) {
+fn check_candidate(report: &mut Report, expect: &CandidateExpect, view: Option<&GameWindowsSeen>) {
     let Some(view) = view else {
-        report.push(false, "view", &expect.name, " no game-window view in the scan");
+        report.push(
+            false,
+            "view",
+            &expect.name,
+            " no game-window view in the scan",
+        );
         return;
     };
     let matching: Vec<&SeenCandidate> = view
