@@ -1048,23 +1048,27 @@ fn group_records(
 ) -> Result<Vec<Vec<u8>>, FixtureError> {
     let parent = match &group.parent {
         None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
-        Some(path) => {
-            *folders
-                .get(&normalise_path(path))
-                .ok_or_else(|| FixtureError::Parse {
-                    path: origin.to_owned(),
-                    message: format!("usn_journal record parent `{path}` is not under `folders:`"),
-                })?
-        }
+        Some(path) => *folders
+            .get(&normalise_path(path))
+            .ok_or_else(|| FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal record parent `{path}` is not under `folders:`"),
+            })?,
     };
     let own = match &group.file {
         None => None,
-        Some(path) => Some(*folders.get(&normalise_path(path)).ok_or_else(|| {
-            FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!("usn_journal record file `{path}` is not under `folders:`"),
-            }
-        })?),
+        Some(path) => {
+            Some(
+                *folders
+                    .get(&normalise_path(path))
+                    .ok_or_else(|| FixtureError::Parse {
+                        path: origin.to_owned(),
+                        message: format!(
+                            "usn_journal record file `{path}` is not under `folders:`"
+                        ),
+                    })?,
+            )
+        }
     };
     if group.major != 2 && group.major != 3 {
         return Err(FixtureError::Parse {
@@ -1115,15 +1119,16 @@ fn group_records(
         } else {
             written
         };
-        let record = encode_record(group.major, parent, own, written, reason, &name).map_err(
-            |_| FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!(
-                    "usn_journal record name `{}` is too long",
-                    group.name.as_deref().unwrap_or("fx")
-                ),
-            },
-        )?;
+        let record =
+            encode_record(group.major, parent, own, written, reason, &name).map_err(|_| {
+                FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!(
+                        "usn_journal record name `{}` is too long",
+                        group.name.as_deref().unwrap_or("fx")
+                    ),
+                }
+            })?;
         records.push(record);
     }
     Ok(records)
@@ -3214,8 +3219,7 @@ usn_journal:
                 "platform: windows\nusn_journal:\n  folders:\n    'C:\\Tools\\Helper.exe': 9\n  records:\n    - major: {major}\n      reasons: [file_create]\n      file: 'c:\\tools\\helper.exe'\n"
             )
         };
-        let expected =
-            |host: &FixtureHost| host.file_id(r"C:\Tools\Helper.exe").unwrap().unwrap();
+        let expected = |host: &FixtureHost| host.file_id(r"C:\Tools\Helper.exe").unwrap().unwrap();
 
         let version_3 = FixtureHost::from_yaml_str(&yaml(3), "inline").unwrap();
         let identifier = expected(&version_3);
@@ -3307,6 +3311,9 @@ usn_journal:
 
         // The first two records are the default `fx` name, as before `name:` existed.
         assert_eq!(&bytes[8 + 76..8 + 80], utf16le("fx").as_slice());
-        assert_eq!(&bytes[8 + 160 + 76..8 + 160 + 96], utf16le("Helper.exe").as_slice());
+        assert_eq!(
+            &bytes[8 + 160 + 76..8 + 160 + 96],
+            utf16le("Helper.exe").as_slice()
+        );
     }
 }
