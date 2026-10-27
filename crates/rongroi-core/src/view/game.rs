@@ -729,32 +729,30 @@ impl<'r> RecordedFiles<'r> {
         {
             return IdentityFact::True;
         }
+        // The journal must reach back to the earliest before window; one that starts later cannot
+        // show it (ADR 0086 section 5). No latest session leaves no window to reach, so it is not
+        // shown as false. This is the first reason after "no time in a window" in the table's order.
+        let earliest = latest
+            .iter()
+            .map(|session| session.start.as_second().saturating_sub(WINDOW_SECONDS))
+            .min();
+        let reaches_back = earliest
+            .zip(journal_reaches_from(observation))
+            .is_some_and(|(earliest, from)| from.as_second() <= earliest);
+        if !reaches_back {
+            return not_known(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            });
+        }
         // Without a recorded end the during, after and before-the-scan windows are not known; the
-        // before window is, and is judged below.
+        // before window is, and is judged above.
         if latest.iter().any(|session| session.end.is_none()) {
             return not_known(IdentityNotKnownReason::SessionEndNotRecorded);
         }
         if scan.is_none() {
             return not_known(IdentityNotKnownReason::ScanTimeNotRecorded);
         }
-        // The journal must reach back to the earliest before window; one that starts later cannot
-        // show it (ADR 0086 section 5). No latest session leaves no window to reach, so it is not
-        // shown as false.
-        let earliest = latest
-            .iter()
-            .map(|session| session.start.as_second().saturating_sub(WINDOW_SECONDS))
-            .min();
-        let journal_from = session::text(observation, "journal_from").and_then(parse_time);
-        let reaches_back = earliest
-            .zip(journal_from)
-            .is_some_and(|(earliest, from)| from.as_second() <= earliest);
-        if reaches_back {
-            IdentityFact::False
-        } else {
-            not_known(IdentityNotKnownReason::BeforeTraceAge {
-                source: "usn".to_owned(),
-            })
-        }
+        IdentityFact::False
     }
 
     /// What `recorded_files` read of `candidate`'s path, from the same join as I1 and I2, or why it
@@ -885,6 +883,26 @@ fn flag_of(observation: &Observation, field: &str) -> Option<bool> {
         .fields
         .get(field)
         .and_then(serde_json::Value::as_bool)
+}
+/// How many times a journal list holds when it was cut: the newest eight per kind, the bound
+/// `recorded_files` applies (`JOURNAL_TIMES_CAP` there; ADR 0086 section 3, D5).
+const JOURNAL_TIMES_CAP: usize = 8;
+
+/// The time the journal's lists reach back to (ADR 0086 section 5): `journal_from`, or, when
+/// `journal_more` says a list was cut, the later of that and the oldest time a cut list kept. A cut
+/// list hides every older time, so the journal cannot show before that kept time.
+fn journal_reaches_from(observation: &Observation) -> Option<jiff::Timestamp> {
+    let from = session::text(observation, "journal_from").and_then(parse_time);
+    if flag_of(observation, "journal_more") != Some(true) {
+        return from;
+    }
+    let oldest_kept = ["journal_deleted", "journal_renamed_from", "journal_renamed_to"]
+        .into_iter()
+        .filter_map(|field| times_list(observation, field))
+        .filter(|times| times.len() == JOURNAL_TIMES_CAP)
+        .filter_map(|times| times.into_iter().min())
+        .max();
+    from.map(|from| oldest_kept.map_or(from, |kept| from.max(kept)))
 }
 /// The zone identifier `observation` holds, when it is a number that fits a `u32`.
 fn zone_id_of(observation: &Observation) -> Option<u32> {
@@ -3277,6 +3295,202 @@ mod tests {
         let ss = game_windows(&report, Mode::Ss);
 
         assert_eq!(shown(&ss, "Helper.exe").i5, IdentityFact::True);
+    }
+
+    /// `journal` with `journal_more` set: its lists were cut at the cap (ADR 0086 section 3, D5).
+    fn cut(
+        mut journal: Vec<(&'static str, serde_json::Value)>,
+    ) -> Vec<(&'static str, serde_json::Value)> {
+        journal.retain(|(field, _)| *field != "journal_more");
+        journal.push(("journal_more", true.into()));
+        journal
+    }
+
+    /// i5: the window edges are inclusive where ADR 0086 section 5 says: the before window starts at
+    /// 09:30 and the during window at 10:00, both in; the scan's window ends at 12:00, in; a time one
+    /// second before 09:30 is not.
+    #[test]
+    fn i5_a_time_at_each_window_edge_is_true() {
+        let from = "2026-01-10T09:00:00Z";
+        for (time, edge) in [
+            ("2026-01-10T09:30:00Z", "the before window's start"),
+            ("2026-01-10T10:00:00Z", "the during window's start"),
+            ("2026-01-10T10:30:00Z", "the during window's end"),
+            ("2026-01-10T11:00:00Z", "the after window's end"),
+            ("2026-01-10T12:00:00Z", "the scan"),
+        ] {
+            assert_eq!(
+                i5_with(whole_journal(&[time], &[], &[], from)),
+                IdentityFact::True,
+                "{edge}"
+            );
+        }
+        assert_eq!(
+            i5_with(whole_journal(&["2026-01-10T09:29:59Z"], &[], &[], from)),
+            IdentityFact::False,
+            "one second before the before window"
+        );
+    }
+
+    /// i5: a journal that starts exactly at the before window's start, 09:30, with empty lists is
+    /// false: it reaches the window (ADR 0086 section 5).
+    #[test]
+    fn i5_a_journal_from_exactly_the_before_window_start_is_false() {
+        assert_eq!(
+            i5_with(whole_journal(&[], &[], &[], "2026-01-10T09:30:00Z")),
+            IdentityFact::False
+        );
+    }
+
+    /// i5: a deletion in the before window of an earlier, non-latest session is not a true I5: only the
+    /// latest session's windows count (ADR 0086 section 5). The earlier session is at 08:00.
+    #[test]
+    fn i5_a_deletion_in_an_earlier_sessions_before_window_is_not_true() {
+        let mut records = base_records();
+        records.push(prefetch("FiveM.exe", Some("legacy"), &["2026-01-10T08:00:00Z"]));
+        records.push(journaled(
+            r"C:\Tools\x.sys",
+            whole_journal(&["2026-01-10T07:45:00Z"], &[], &[], "2026-01-10T07:00:00Z"),
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(windows.sessions.iter().filter(|s| !s.latest).count(), 1);
+        assert_eq!(shown(&windows, "x.sys").i5, IdentityFact::False);
+    }
+
+    /// i5: a latest session with no recorded end still has its before window, so a deletion at 09:45
+    /// in it makes I5 true (ADR 0086 section 5).
+    #[test]
+    fn i5_a_latest_session_without_an_end_has_its_before_window() {
+        let records = vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            bam("x.sys", r"C:\Tools\x.sys", "2026-01-10T09:45:00Z"),
+            journaled(
+                r"C:\Tools\x.sys",
+                whole_journal(&["2026-01-10T09:45:00Z"], &[], &[], "2026-01-10T09:00:00Z"),
+            ),
+        ];
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(windows.sessions[0].end, None);
+        assert_eq!(shown(&windows, "x.sys").i5, IdentityFact::True);
+    }
+
+    /// i5: when the latest session has no end and the journal starts after its before window, the reason
+    /// is `before_trace_age`, which comes before `session_end_not_recorded` (ADR 0086 section 5).
+    #[test]
+    fn i5_a_latest_session_without_an_end_and_a_late_journal_is_before_trace_age() {
+        let records = vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            bam("x.sys", r"C:\Tools\x.sys", "2026-01-10T09:45:00Z"),
+            journaled(
+                r"C:\Tools\x.sys",
+                whole_journal(&[], &[], &[], "2026-01-10T09:40:00Z"),
+            ),
+        ];
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "x.sys").i5,
+            not_known(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            })
+        );
+    }
+
+    /// i5: with no scan time, an empty journal that reaches the before window is
+    /// `scan_time_not_recorded`, the reason for the before-the-scan window (ADR 0086 section 5).
+    #[test]
+    fn i5_without_a_scan_time_an_empty_journal_is_scan_time_not_recorded() {
+        let mut records = base_records();
+        records.push(journaled(
+            r"C:\Tools\x.sys",
+            whole_journal(&[], &[], &[], "2026-01-10T09:00:00Z"),
+        ));
+        let mut report = report_of(records);
+        report.header.generated_at = "not a time".to_owned();
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "x.sys").i5,
+            not_known(IdentityNotKnownReason::ScanTimeNotRecorded)
+        );
+    }
+
+    /// i5: a cut list hides the times older than its oldest kept one. Here the eight kept times are all
+    /// after the scan, so the journal's effective start is 12:05, after the before window's 09:30: it
+    /// cannot show that window, so the reason is `before_trace_age`, not false (ADR 0086 section 5).
+    #[test]
+    fn i5_a_cut_journal_whose_kept_times_are_all_late_is_before_trace_age() {
+        let kept = [
+            "2026-01-10T12:40:00Z",
+            "2026-01-10T12:35:00Z",
+            "2026-01-10T12:30:00Z",
+            "2026-01-10T12:25:00Z",
+            "2026-01-10T12:20:00Z",
+            "2026-01-10T12:15:00Z",
+            "2026-01-10T12:10:00Z",
+            "2026-01-10T12:05:00Z",
+        ];
+        assert_eq!(
+            i5_with(cut(whole_journal(&kept, &[], &[], "2026-01-10T09:00:00Z"))),
+            not_known(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            })
+        );
+    }
+
+    /// i5: a cut list whose oldest kept time, 09:00, is before the before window and that holds no time
+    /// in a window, with a journal from 08:00, is false (ADR 0086 section 5).
+    #[test]
+    fn i5_a_cut_journal_whose_oldest_kept_time_is_before_the_window_is_false() {
+        let kept = [
+            "2026-01-10T09:20:00Z",
+            "2026-01-10T09:15:00Z",
+            "2026-01-10T09:10:00Z",
+            "2026-01-10T09:05:00Z",
+            "2026-01-10T09:04:00Z",
+            "2026-01-10T09:03:00Z",
+            "2026-01-10T09:02:00Z",
+            "2026-01-10T09:00:00Z",
+        ];
+        assert_eq!(
+            i5_with(cut(whole_journal(&kept, &[], &[], "2026-01-10T08:00:00Z"))),
+            IdentityFact::False
+        );
+    }
+
+    /// i5: in SS mode a candidate that names no identity fact is not named, so none of its journal times
+    /// appears in the serialised view. Its one journal time is outside every window, so I5 is false
+    /// (ADR 0086 section 5 and decision 6).
+    #[test]
+    fn i5_in_ss_mode_a_candidate_not_named_shows_no_journal_time() {
+        let time = "2026-01-10T08:17:23Z";
+        let mut records = base_records();
+        records.push(journaled(
+            r"C:\Tools\x.sys",
+            whole_journal(&[time], &[], &[], "2026-01-10T07:00:00Z"),
+        ));
+        let report = report_of(records);
+
+        let self_mode = game_windows(&report, Mode::SelfCheck);
+        let self_text = serde_json::to_string(&self_mode)
+            .unwrap_or_else(|error| panic!("the Self view serialises: {error}"));
+        assert!(self_text.contains(time), "the time shows in Self mode");
+        let ss = game_windows(&report, Mode::Ss);
+
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("x.sys"))
+        );
+        let text = serde_json::to_string(&ss)
+            .unwrap_or_else(|error| panic!("the SS view serialises: {error}"));
+        assert!(!text.contains(time), "{text}");
     }
 
     /// i5: `FileDetails` carries the three lists, newest first as the observation holds them, and
