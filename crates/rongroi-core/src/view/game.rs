@@ -896,12 +896,16 @@ fn journal_reaches_from(observation: &Observation) -> Option<jiff::Timestamp> {
     if flag_of(observation, "journal_more") != Some(true) {
         return from;
     }
-    let oldest_kept = ["journal_deleted", "journal_renamed_from", "journal_renamed_to"]
-        .into_iter()
-        .filter_map(|field| times_list(observation, field))
-        .filter(|times| times.len() == JOURNAL_TIMES_CAP)
-        .filter_map(|times| times.into_iter().min())
-        .max();
+    let oldest_kept = [
+        "journal_deleted",
+        "journal_renamed_from",
+        "journal_renamed_to",
+    ]
+    .into_iter()
+    .filter_map(|field| times_list(observation, field))
+    .filter(|times| times.len() == JOURNAL_TIMES_CAP)
+    .filter_map(|times| times.into_iter().min())
+    .max();
     from.map(|from| oldest_kept.map_or(from, |kept| from.max(kept)))
 }
 /// The zone identifier `observation` holds, when it is a number that fits a `u32`.
@@ -3347,7 +3351,11 @@ mod tests {
     #[test]
     fn i5_a_deletion_in_an_earlier_sessions_before_window_is_not_true() {
         let mut records = base_records();
-        records.push(prefetch("FiveM.exe", Some("legacy"), &["2026-01-10T08:00:00Z"]));
+        records.push(prefetch(
+            "FiveM.exe",
+            Some("legacy"),
+            &["2026-01-10T08:00:00Z"],
+        ));
         records.push(journaled(
             r"C:\Tools\x.sys",
             whole_journal(&["2026-01-10T07:45:00Z"], &[], &[], "2026-01-10T07:00:00Z"),
@@ -3471,7 +3479,11 @@ mod tests {
     fn i5_in_ss_mode_a_candidate_not_named_shows_no_journal_time() {
         let time = "2026-01-10T08:17:23Z";
         let mut records = base_records();
-        records.push(bam("Probe.exe", r"C:\Tools\Probe.exe", "2026-01-10T10:15:00Z"));
+        records.push(bam(
+            "Probe.exe",
+            r"C:\Tools\Probe.exe",
+            "2026-01-10T10:15:00Z",
+        ));
         // The file reads as present with a valid signature, so I1 and I2 are false. Its name is
         // an executable's, so I3 is not true. Its one journal time is before every window, so I5
         // is false too.
