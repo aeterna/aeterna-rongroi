@@ -8,8 +8,8 @@
 
 A program in `%USERPROFILE%\Downloads` that is renamed while it is still running, and keeps running into a game
 session. Windows lets a running program's file be renamed in the same folder, so the name it ran under is no
-longer the name on disk. That is how a loader can hide the name it ran under: the recorded run and the process
-list hold the old name, and the file the user sees holds a new one. The change journal records the rename as an
+longer the name on disk. That is one way a program can hide the name it ran under: the file the user sees holds a new
+name, while which name Windows' records keep is the replay's to show ("What is unverified"). The change journal records the rename as an
 old-name record and a new-name record (ADR 0086, section 2). The file is Windows' own `ping.exe`, copied, so it
 is inert: it pings the loopback address and the machine has no network.
 
