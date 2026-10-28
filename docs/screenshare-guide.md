@@ -475,7 +475,9 @@ last feature-upgraded**, not first installed), the earliest installation Windows
 journal, the drive's root and `$Recycle.Bin` were created, and when FiveM's program folders were. Each is
 shown with what ordinarily resets it. A source Windows would not show without administrator rights says
 "not known": it was not read, it is not empty. Nothing in the section is compared for you, and there is no
-"machine age": the dates disagree by years on ordinary PCs.
+"machine age": the dates disagree by years on ordinary PCs. A time or date later than the scan's own time
+is shown with "later than this scan's own date" (or time) and no day count: the PC's clock was ahead when
+it was written, or is behind now, and the report does not know which (ADR 0088).
 
 When Prefetch or BAM was read, holds no entry for the names above and still reaches back before FiveM's
 folders were last written, a **statement** above the timeline puts FiveM's side and those records side by

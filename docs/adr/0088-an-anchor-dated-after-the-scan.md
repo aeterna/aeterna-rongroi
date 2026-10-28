@@ -1,7 +1,7 @@
 # ADR 0088 — An anchor dated after the scan
 
 - Status: accepted — the owner decided the four questions in "Owner questions" on 2026-10-28, each as
-  recommended ("Owner decisions")
+  recommended ("Owner decisions"). Built in PR #247 (`dev` at `a3e7ad7`), with section 1 as corrected
 - Date: 2026-10-28
 - Related: ADR 0039 (the report's time anchor), ADR 0061 (trace ages and its anchors, section 2), ADR 0073
   (a saved report; `schema` 1, additive changes), ADR 0084 decision 1 (the horizon timeline's history tag),
