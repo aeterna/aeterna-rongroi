@@ -38,8 +38,9 @@ that must read `found`.
 
 ## What is unverified
 
-- The name the process list reports for a program renamed while it runs. Not documented here; the first replay
-  shows it, and `expect.yaml` is changed then if it is `renamed.exe`.
+- Why the process list keeps the old name. The first replay (2026-10-28) showed the candidate named
+  `renamer.exe` with the path `…\Downloads\renamed.exe` (ADR 0086, "As built: J5"); that this holds on other
+  builds of Windows is not measured.
 - Whether the journal holds one old-name record and one new-name record for the rename, or more. J4 read the
   journal of one other PC, not the lab machine, and no rename was made there (ADR 0086, "Measured: J4").
 
