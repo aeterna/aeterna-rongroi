@@ -11,8 +11,16 @@
 //! a rule author has to learn. `pca` wrote both first (ADR 0020) and `bam` uses them unchanged
 //! (ADR 0023).
 
+use rongroi_host::{DriveKind, DriveMap};
+
 /// What a path was replaced with when it is not a shape SS-mode redaction can reach.
 pub const UNREDACTABLE_FORM: &str = "unredactable_form";
+
+/// The device spelling Windows gives a volume, before its number (ADR 0087 section 2).
+const DEVICE_PREFIX: &str = r"\Device\HarddiskVolume";
+
+/// The spelling a Prefetch string table gives a volume, before its creation time and serial.
+const VOLUME_PREFIX: &str = r"\VOLUME{";
 
 /// One program path a source recorded, with the newest time that source gave it.
 ///
@@ -49,6 +57,82 @@ pub fn is_drive_rooted(path: &str) -> bool {
         && bytes[0].is_ascii_alphabetic()
         && bytes[1] == b':'
         && (bytes[2] == b'\\' || bytes[2] == b'/')
+}
+
+/// The drive-rooted form of a device path, when the map names exactly one letter for it (ADR 0087
+/// section 2).
+///
+/// `\Device\HarddiskVolumeN\rest` is mapped only to a letter of kind fixed: a removable volume's
+/// number can name another volume later, so mapping it could point at a file that never was the
+/// program (ADR 0087 section 3). `\VOLUME{<creation time>-<serial>}\rest` is mapped by its eight
+/// lowercase hex serial regardless of kind, because a serial belongs to the volume rather than to
+/// its arrival order. Anything else, no match, or two matches gives `None`.
+pub fn map_device_path(map: &DriveMap, path: &str) -> Option<String> {
+    if let Some((device, rest)) = device_path(path) {
+        let mut matches = map.entries.iter().filter(|entry| {
+            entry.kind == DriveKind::Fixed && entry.device.eq_ignore_ascii_case(device)
+        });
+        let entry = matches.next()?;
+        return matches.next().is_none().then(|| mapped(entry.letter, rest));
+    }
+
+    let (serial, rest) = volume_path(path)?;
+    let mut matches = map.entries.iter().filter(|entry| entry.serial == serial);
+    let entry = matches.next()?;
+    matches.next().is_none().then(|| mapped(entry.letter, rest))
+}
+
+/// Splits `\Device\HarddiskVolumeN\rest` into the device name and `rest`, ignoring ASCII case in the
+/// fixed prefix and comparing the whole volume number.
+fn device_path(path: &str) -> Option<(&str, &str)> {
+    let bytes = path.as_bytes();
+    if bytes.len() < DEVICE_PREFIX.len()
+        || !bytes[..DEVICE_PREFIX.len()].eq_ignore_ascii_case(DEVICE_PREFIX.as_bytes())
+    {
+        return None;
+    }
+    let after_prefix = &path[DEVICE_PREFIX.len()..];
+    let digits = after_prefix.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+        return None;
+    }
+    let rest = after_prefix[digits..].strip_prefix('\\')?;
+    let end = DEVICE_PREFIX.len() + digits;
+    Some((&path[..end], rest))
+}
+
+/// Splits `\VOLUME{<anything>-<8 lowercase hex>}\rest` into the serial and `rest`, comparing the
+/// whole eight-digit serial and ignoring the creation time before it.
+fn volume_path(path: &str) -> Option<(u32, &str)> {
+    let bytes = path.as_bytes();
+    if bytes.len() < VOLUME_PREFIX.len()
+        || !bytes[..VOLUME_PREFIX.len()].eq_ignore_ascii_case(VOLUME_PREFIX.as_bytes())
+    {
+        return None;
+    }
+    let body_start = VOLUME_PREFIX.len();
+    let close = path[body_start..].find('}')? + body_start;
+    let (_, serial) = path[body_start..close].rsplit_once('-')?;
+    if serial.len() != 8
+        || !serial
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return None;
+    }
+    let serial = u32::from_str_radix(serial, 16).ok()?;
+    let rest = path[close + 1..].strip_prefix('\\')?;
+    Some((serial, rest))
+}
+
+/// `X:\rest`, the one rewrite the map performs.
+fn mapped(letter: char, rest: &str) -> String {
+    let mut path = String::with_capacity(3 + rest.len());
+    path.push(letter);
+    path.push(':');
+    path.push('\\');
+    path.push_str(rest);
+    path
 }
 
 #[cfg(test)]
