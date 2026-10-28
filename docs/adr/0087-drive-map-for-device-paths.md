@@ -1,7 +1,7 @@
 # ADR 0087 — A drive map for BAM's and Prefetch's device paths
 
 - Status: accepted — the owner decided the five questions in "Owner decisions" on 2026-10-28, each as
-  recommended; nothing is built yet (M0 first)
+  recommended; M0 measured 2026-10-28 ("Measured: M0"); M1 next
 - Date: 2026-10-27
 - Related: ADR 0010 and AGENTS.md hard rule 5 (SS mode redacts paths), ADR 0021 (the Prefetch collector;
   `volumes` withheld as a machine identifier), ADR 0023 (the BAM collector; a path that is not drive-rooted
@@ -168,6 +168,33 @@ path. Nothing about the map itself is shown in SS mode or in a standard report b
 
 Each step is its own PR into `dev`, written by an engineer run (AGENTS.md, delegated delivery).
 
+### Measured: M0 (2026-10-28)
+
+Two machines, read-only except for formatting the lab's blank second disk. No device numbers or serials are
+recorded here; the probe's raw output stays on the measuring machine's side.
+
+**Lab machine** (Windows 11 build 26300 on arm64, a virtual machine with an NVMe system disk and a USB share
+disk). Five cold boots: a first boot; a restart; a boot with a second 1 GB NVMe disk added; a boot with it
+removed; a boot with it returned.
+
+- `C:` (fixed) had the same `HarddiskVolumeN` in all five boots.
+- The second disk's volume (fixed, `E:`) had the same number both times it was present.
+- The USB share (removable, `D:`) had one number without the second disk and another number with it. A
+  removable letter's number moved because a different disk arrived, which is the reuse section 3 guards
+  against.
+- BAM held only values on `C:`'s number, each time the one `C:` mapped to; no BAM value was drive-rooted.
+
+**Windows 11 PC** (build 26220, four fixed letters, running since four days before; one snapshot, with no
+restart and no disk change, because the PC is shared).
+
+- BAM's 55 values used two device numbers, each the number of a fixed letter present at the time. No value
+  was drive-rooted, so on this build every BAM path is a device path.
+
+**Read against section 3:** a fixed volume kept its number across a restart, a disk added, and a disk
+removed and returned; a removable volume did not. Mapping BAM to fixed letters only stands, and M1 can
+start. Not measured: a restart or a disk change on the PC, a disk added or removed while Windows runs, and a
+USB disk that Windows reports as fixed.
+
 ## Owner decisions (2026-10-28, each as recommended)
 
 1. **Build the map at all** (sections 1–2). Recommended: **yes** — without it the run-then-deleted program,
@@ -195,8 +222,8 @@ Each step is its own PR into `dev`, written by an engineer run (AGENTS.md, deleg
 
 ## What is unverified
 
-- Whether a fixed volume keeps its `\Device\HarddiskVolumeN` across a restart, a disk added, and a disk
-  removed and returned (probe M0).
+- Whether a fixed volume keeps its number on a real PC across a restart or a disk change, and when a disk
+  arrives or leaves while Windows runs (M0 measured cold boots on the lab machine and one snapshot of the PC).
 - Whether BAM ever writes a drive-rooted path on other Windows builds (ADR 0023's question; M1 handles both).
 - How often `executed-program-missing-on-disk` matches once mapped paths reach it (section 2). The lab
   replay in M1 shows it on the lab machine; the change goes in the CHANGELOG.
