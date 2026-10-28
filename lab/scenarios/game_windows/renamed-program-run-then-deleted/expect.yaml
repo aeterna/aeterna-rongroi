@@ -10,3 +10,6 @@ game_windows:
     facts:
       t1: true
       i1: not_known:no_path
+      # helper.exe is known only from BAM, whose path is withheld until ADR 0087's drive map, so the change
+      # journal cannot be asked about it (ADR 0086, "Measured: J4").
+      i5: not_known:no_path

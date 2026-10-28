@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+
+# The scan is full so that recorded_files reads the change journal once (ADR 0086, J2). The file was renamed
+# while it ran, so the journal holds an old-name and a new-name record in Downloads, and I5 is true when one of
+# them falls in the window before the session. The first replay (2026-10-28) showed the process list keeping the
+# name the program started under, renamer.exe, with its new path (ADR 0086, "As built: J5").
+found: []
+full: true
+game_windows:
+  - name: renamer.exe
+    facts:
+      t1: true
+      i5: true

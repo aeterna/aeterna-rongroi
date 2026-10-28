@@ -20,7 +20,9 @@ BAM records that `helper.exe` ran. The session is a `FiveM.exe` that is still ru
 has a start and the view is computed (ADR 0076, "Amendment (2026-10-27)"). The candidate is in the 30 minutes
 before the session, so T1 is true. The scenario also asks for I1 to read `not_known:no_path`: BAM names the
 program as `\Device\HarddiskVolumeN\…`, a form the collector withholds, so the view has no path at which to
-check the file (ADR 0078, "P7 decisions" item 3). The scenario names no rule that must read `found`.
+check the file (ADR 0078, "P7 decisions" item 3). I5 reads `not_known:no_path` for the same reason: the change
+journal is asked about a file only by its path, and this path is withheld (ADR 0086, "Measured: J4"). The
+scenario names no rule that must read `found`.
 
 ## What the scenario does not show
 
