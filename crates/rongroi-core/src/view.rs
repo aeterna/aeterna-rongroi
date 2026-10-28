@@ -841,16 +841,22 @@ fn anchor_ages(report: &Report) -> Vec<AnchorAge> {
         let state = match &anchor.state {
             AnchorState::Measured { on, source, kept } => match on.parse::<jiff::civil::Date>() {
                 // The date was read, so it is shown. Its count is left out when the date is after
-                // the scan's, or the scan's own time is not known: a negative count would read as
-                // days before the scan (ADR 0088).
-                Ok(on_date) => AnchorAgeState::Measured {
-                    on: on.clone(),
-                    days_before: scan_date
-                        .filter(|scan| on_date <= *scan)
-                        .and_then(|scan| on_date.until(scan).ok())
-                        .map(|span| i64::from(span.get_days())),
-                    source: Some(source.clone()),
-                    kept: *kept,
+                // the scan's: a negative count would read as days before the scan (ADR 0088). With
+                // no scan date that cannot be told, so the anchor is not read at all (ADR 0088,
+                // section 1).
+                Ok(on_date) => match scan_date {
+                    Some(scan) => AnchorAgeState::Measured {
+                        on: on.clone(),
+                        days_before: (on_date <= scan)
+                            .then(|| on_date.until(scan).ok())
+                            .flatten()
+                            .map(|span| i64::from(span.get_days())),
+                        source: Some(source.clone()),
+                        kept: *kept,
+                    },
+                    None => AnchorAgeState::Unmeasured {
+                        reason: UnmeasuredReason::ReadFailed,
+                    },
                 },
                 // A date the report cannot read is not shown as a date, nor as a day count.
                 Err(_) => AnchorAgeState::Unmeasured {
@@ -3670,21 +3676,18 @@ mod tests {
         assert_eq!(json["source"], "HKLM", "{json}");
     }
 
-    /// With no readable scan time the date is still read and shown, and only the count is left out
-    /// (ADR 0088).
+    /// The after-scan sentence could not be known without a scan date, so an anchor is not read at all
+    /// when the scan's own time does not parse (ADR 0088, section 1).
     #[test]
-    fn an_anchor_without_a_readable_scan_time_keeps_its_date_and_no_count() {
+    fn an_anchor_without_a_readable_scan_time_is_not_read() {
         let mut report = aged_report();
         report.header.generated_at = "not-a-time".to_owned();
         report.header.anchors = vec![install_date_on("2025-11-11")];
         let ages = trace_ages(&report, Mode::SelfCheck);
         assert_eq!(
             ages.anchors[1].state,
-            AnchorAgeState::Measured {
-                on: "2025-11-11".to_owned(),
-                days_before: None,
-                source: Some("HKLM".to_owned()),
-                kept: None,
+            AnchorAgeState::Unmeasured {
+                reason: UnmeasuredReason::ReadFailed,
             }
         );
     }
