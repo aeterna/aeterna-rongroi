@@ -209,6 +209,16 @@ USB disk that Windows reports as fixed.
   `recorded_paths` runs the same collection, so `recorded_files` gets the mapped paths with no code of its own.
 - Tests were written first by engineer runs; `executed-program-missing-on-disk` gained a positive and a
   negative fixture with a mapped path.
+- The Windows host reads the letters with `SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX)`
+  and restores the thread's mode afterwards, so a card reader or removable letter with no media raises no "no
+  disk" dialog. It changes this program's own thread only (AGENTS.md hard rule 2); no test can show the
+  dialog, so this is unverified on a real reader.
+- Section 3's fixed-only rule rests on "Measured: M0" above: on the lab machine a fixed volume kept its number
+  across a restart and a disk added, removed and returned, and a removable one did not.
+- Lab replay, 2026-10-28, `cli.exe` built from this branch, with a fresh control:
+  `renamed-program-run-then-deleted` 3/3. It is now a full scan; `helper.exe`, known only from BAM, has a `C:\`
+  path, and I1 is true. I5 is `not_known:session_end_not_recorded`, because the session's game is still
+  running. `downloaded-program-with-its-zone` 3/3, with `tool.exe` listed once.
 
 ## Owner decisions (2026-10-28, each as recommended)
 
