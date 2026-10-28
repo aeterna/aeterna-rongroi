@@ -258,7 +258,8 @@
     "source": {
       "prefetch": "Prefetch",
       "bam": "BAM",
-      "pca": "PCA"
+      "pca": "PCA",
+      "usn": "NTFS change journal"
     },
     "selected": "{{count}} entries for those names; the latest is from {{date}}.",
     "no_entry_named": "no entry for FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b…_GTAProcess.exe. It holds {{count}} entries; the oldest is from {{date}} ({{days}} before this scan).",
@@ -459,6 +460,7 @@
       "i2": "no embedded signature that verifies",
       "i3": "its name does not match what the file is",
       "i4": "it ran from Temp or Downloads",
+      "i5": "the change journal recorded it being deleted or renamed near the latest session",
       "l1": "it loaded a program file from outside the usual folders",
       "l1_false": "of the files Prefetch recorded for it, none with a program's extension is outside Windows, Program Files and FiveM's folders"
     },
@@ -472,6 +474,7 @@
       "i2": "open-source tools, mods, catalog-signed Windows files",
       "i3": "updaters that keep an executable as .tmp or .dat, renamed portable tools",
       "i4": "anything downloaded and run",
+      "i5": "updates, the Recycle Bin, antivirus quarantine",
       "l1": "an add-on, overlay or codec installed in a user folder"
     },
     "value": {
@@ -522,7 +525,13 @@
         "4": "restricted sites (4)"
       },
       "zone_other": "zone {{id}}",
-      "download_host": "Downloaded from: {{host}}"
+      "download_host": "Downloaded from: {{host}}",
+      "journal": {
+        "deleted": "Deleted at: {{times}}",
+        "renamed_from": "Renamed away from this name at: {{times}}",
+        "renamed_to": "Renamed to this name at: {{times}}",
+        "more": "+ more"
+      }
     },
     "nk": {
       "session_end_not_recorded": "not known: the session's end is not recorded",
@@ -535,7 +544,10 @@
       "no_path": "not known: no path was recorded for it",
       "deferred": "not known: this version does not read it yet",
       "not_counted": "not known: no Prefetch record counted the files it loaded",
-      "earlier_session": "not known: an earlier session's end is never recorded"
+      "earlier_session": "not known: an earlier session's end is never recorded",
+      "journal_not_read": "not known: the change journal could not be read",
+      "journal_other_drive": "not known: the file is on another drive, whose change journal this program does not read",
+      "journal_folder_unknown": "not known: the file's folder could not be identified"
     },
     "clock": {
       "changed": "The clock was changed at {{at}}{{detail}}; times before and after may not be on the same clock.",

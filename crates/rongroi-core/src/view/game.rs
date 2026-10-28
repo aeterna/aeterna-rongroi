@@ -73,8 +73,7 @@ pub enum IdentityNotKnownReason {
     Unverifiable,
     /// The candidate has no program path, so nothing can be joined (ADR 0078 section 4).
     NoPath,
-    /// The fields I3 or I4 needs were not read, or I5 arrives with later work (ADR 0078 section 5,
-    /// ADR 0079 section 5).
+    /// The fields I3 or I4 needs were not read (ADR 0078 section 5).
     Deferred,
     /// No Prefetch record of the program carries `loaded_outside`, or it says
     /// `loaded_outside_unknown` (ADR 0082 section 5).
@@ -82,6 +81,25 @@ pub enum IdentityNotKnownReason {
     /// An earlier session's end is never known, so no record can be placed in it (ADR 0082
     /// section 5).
     EarlierSession,
+    /// The change journal was not read for the path, so it says nothing about it (ADR 0086
+    /// section 5).
+    JournalNotRead,
+    /// The journal is on another volume than the path's folder (ADR 0086 section 5).
+    JournalOtherDrive,
+    /// The path's folder is not one the journal can be read for (ADR 0086 section 5).
+    JournalFolderUnknown,
+    /// A latest session has no recorded end, so its during, after and before-the-scan windows are
+    /// not known (ADR 0086 section 5).
+    SessionEndNotRecorded,
+    /// The report names no scan time, so the before-the-scan window is not known (ADR 0086
+    /// section 5).
+    ScanTimeNotRecorded,
+    /// The journal does not reach back to the window (ADR 0086 section 5), as
+    /// `NotKnownReason::BeforeTraceAge` does for the other sources.
+    BeforeTraceAge {
+        /// The source whose records do not reach that far back.
+        source: String,
+    },
 }
 /// How many sessions' windows hold one of a candidate's times, out of the sessions found (R).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,6 +189,19 @@ pub struct FileDetails {
     /// The `ZoneId` of the file's `Zone.Identifier` stream, when it fits a `u32`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub zone_id: Option<u32>,
+    /// The change journal's deletion times for the file, newest first, when a whole read matched it
+    /// (ADR 0086 section 5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journal_deleted: Option<Vec<String>>,
+    /// The change journal's rename-from times for the file, newest first (ADR 0086 section 5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journal_renamed_from: Option<Vec<String>>,
+    /// The change journal's rename-to times for the file, newest first (ADR 0086 section 5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journal_renamed_to: Option<Vec<String>>,
+    /// Whether the journal holds more times for the file than its lists show (ADR 0086 section 5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journal_more: Option<bool>,
 }
 /// One program Windows recorded with a time in a game window (ADR 0078 section 4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,7 +226,8 @@ pub struct GameCandidate {
     pub i3: IdentityFact,
     /// I4: its path is under Temp or Downloads (ADR 0078 section 5).
     pub i4: IdentityFact,
-    /// I5: the change journal holds its rename or deletion (deferred, ADR 0079 section 5).
+    /// I5: the change journal holds a deletion or rename of its file in a window of a latest session
+    /// (ADR 0086 section 5).
     pub i5: IdentityFact,
     /// L1: it loaded a file with an executable's extension from outside Windows, Program Files and
     /// `FiveM`'s folders (ADR 0082 section 5).
@@ -620,8 +652,14 @@ impl<'r> RecordedFiles<'r> {
             .as_deref()
             .and_then(|path| self.by_path.get(&path.to_ascii_lowercase()).copied())
     }
-    /// I1 to I5 for `candidate`; I5 waits for its own ADR (ADR 0079 section 5).
-    fn facts(&self, candidate: &Candidate) -> [IdentityFact; 5] {
+    /// I1 to I5 for `candidate`; I5 is measured in `sessions`' latest windows and at `scan`
+    /// (ADR 0086 section 5).
+    fn facts(
+        &self,
+        candidate: &Candidate,
+        sessions: &[TimedSession],
+        scan: Option<jiff::Timestamp>,
+    ) -> [IdentityFact; 5] {
         let observation = self.joined(candidate);
         let (i1, i2) = self.time_and_signature_facts(candidate);
         [
@@ -629,7 +667,7 @@ impl<'r> RecordedFiles<'r> {
             i2,
             name_fact(candidate, observation),
             location_fact(candidate),
-            deferred(),
+            self.journal_fact(candidate, sessions, scan),
         ]
     }
 
@@ -642,6 +680,79 @@ impl<'r> RecordedFiles<'r> {
         } else {
             Unjoined::NotRun
         }
+    }
+
+    /// The reason I1 and I2 give when `candidate` has no observation of its path to join.
+    fn unjoined_reason(&self, candidate: &Candidate) -> IdentityNotKnownReason {
+        match self.unjoined(candidate) {
+            Unjoined::NoPath => IdentityNotKnownReason::NoPath,
+            Unjoined::NotRun => IdentityNotKnownReason::RecordedFilesNotRun,
+            Unjoined::NoObservation => IdentityNotKnownReason::NoObservationForPath,
+        }
+    }
+
+    /// I5 for `candidate` (ADR 0086 section 5): true when the journal holds a deletion or a rename
+    /// of its file at a time in a window of a latest session. Otherwise it says what the journal
+    /// can show of those windows, as `fact` decides them.
+    fn journal_fact(
+        &self,
+        candidate: &Candidate,
+        sessions: &[TimedSession],
+        scan: Option<jiff::Timestamp>,
+    ) -> IdentityFact {
+        let Some(observation) = self.joined(candidate) else {
+            return not_known(self.unjoined_reason(candidate));
+        };
+        match session::text(observation, "journal_match") {
+            Some("matched") => {}
+            Some("other_volume") => {
+                return not_known(IdentityNotKnownReason::JournalOtherDrive);
+            }
+            Some("folder_unknown") => {
+                return not_known(IdentityNotKnownReason::JournalFolderUnknown);
+            }
+            _ => return not_known(IdentityNotKnownReason::JournalNotRead),
+        }
+        // A read that was not whole has no deletion list, so it cannot say what was deleted.
+        let Some(deleted) = times_list(observation, "journal_deleted") else {
+            return not_known(IdentityNotKnownReason::JournalNotRead);
+        };
+        let renamed = ["journal_renamed_from", "journal_renamed_to"]
+            .into_iter()
+            .filter_map(|field| times_list(observation, field))
+            .flatten();
+        let times: Vec<jiff::Timestamp> = deleted.into_iter().chain(renamed).collect();
+        let latest: Vec<&TimedSession> = sessions.iter().filter(|session| session.latest).collect();
+        if latest
+            .iter()
+            .any(|session| times.iter().any(|time| hits(session, *time, scan).any()))
+        {
+            return IdentityFact::True;
+        }
+        // The journal must reach back to the earliest before window; one that starts later cannot
+        // show it (ADR 0086 section 5). No latest session leaves no window to reach, so it is not
+        // shown as false. This is the first reason after "no time in a window" in the table's order.
+        let earliest = latest
+            .iter()
+            .map(|session| session.start.as_second().saturating_sub(WINDOW_SECONDS))
+            .min();
+        let reaches_back = earliest
+            .zip(journal_reaches_from(observation))
+            .is_some_and(|(earliest, from)| from.as_second() <= earliest);
+        if !reaches_back {
+            return not_known(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            });
+        }
+        // Without a recorded end the during, after and before-the-scan windows are not known; the
+        // before window is, and is judged above.
+        if latest.iter().any(|session| session.end.is_none()) {
+            return not_known(IdentityNotKnownReason::SessionEndNotRecorded);
+        }
+        if scan.is_none() {
+            return not_known(IdentityNotKnownReason::ScanTimeNotRecorded);
+        }
+        IdentityFact::False
     }
 
     /// What `recorded_files` read of `candidate`'s path, from the same join as I1 and I2, or why it
@@ -667,18 +778,17 @@ impl<'r> RecordedFiles<'r> {
             trailing_data: flag_of(observation, "trailing_data"),
             embedded_pe: flag_of(observation, "embedded_pe"),
             zone_id: zone_id_of(observation),
+            journal_deleted: text_list_of(observation, "journal_deleted"),
+            journal_renamed_from: text_list_of(observation, "journal_renamed_from"),
+            journal_renamed_to: text_list_of(observation, "journal_renamed_to"),
+            journal_more: flag_of(observation, "journal_more"),
         }
     }
 
     /// I1 and I2 for `candidate`, from the `recorded_files` observation of its path.
     fn time_and_signature_facts(&self, candidate: &Candidate) -> (IdentityFact, IdentityFact) {
         let Some(observation) = self.joined(candidate) else {
-            let reason = match self.unjoined(candidate) {
-                Unjoined::NoPath => IdentityNotKnownReason::NoPath,
-                Unjoined::NotRun => IdentityNotKnownReason::RecordedFilesNotRun,
-                Unjoined::NoObservation => IdentityNotKnownReason::NoObservationForPath,
-            };
-            let fact = IdentityFact::NotKnown { reason };
+            let fact = not_known(self.unjoined_reason(candidate));
             return (fact.clone(), fact);
         };
         match session::text(observation, "identity_read") {
@@ -728,11 +838,44 @@ fn unread(read: FileRead) -> FileDetails {
         trailing_data: None,
         embedded_pe: None,
         zone_id: None,
+        journal_deleted: None,
+        journal_renamed_from: None,
+        journal_renamed_to: None,
+        journal_more: None,
     }
 }
 /// `field` of `observation` as text, when it is present and a string.
 fn text_of(observation: &Observation, field: &str) -> Option<String> {
     session::text(observation, field).map(str::to_owned)
+}
+/// The strings `field` of `observation` lists, in the order it holds them, when it is a list.
+fn text_list_of(observation: &Observation, field: &str) -> Option<Vec<String>> {
+    observation
+        .fields
+        .get(field)
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
+}
+/// The times `field` of `observation` lists, in the order it holds them, when it is a list. An
+/// entry that is not a time is skipped.
+fn times_list(observation: &Observation, field: &str) -> Option<Vec<jiff::Timestamp>> {
+    observation
+        .fields
+        .get(field)
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .filter_map(parse_time)
+                .collect()
+        })
 }
 /// `field` of `observation` as a flag, when it is present and a boolean.
 fn flag_of(observation: &Observation, field: &str) -> Option<bool> {
@@ -740,6 +883,30 @@ fn flag_of(observation: &Observation, field: &str) -> Option<bool> {
         .fields
         .get(field)
         .and_then(serde_json::Value::as_bool)
+}
+/// How many times a journal list holds when it was cut: the newest eight per kind, the bound
+/// `recorded_files` applies (`JOURNAL_TIMES_CAP` there; ADR 0086 section 3, D5).
+const JOURNAL_TIMES_CAP: usize = 8;
+
+/// The time the journal's lists reach back to (ADR 0086 section 5): `journal_from`, or, when
+/// `journal_more` says a list was cut, the later of that and the oldest time a cut list kept. A cut
+/// list hides every older time, so the journal cannot show before that kept time.
+fn journal_reaches_from(observation: &Observation) -> Option<jiff::Timestamp> {
+    let from = session::text(observation, "journal_from").and_then(parse_time);
+    if flag_of(observation, "journal_more") != Some(true) {
+        return from;
+    }
+    let oldest_kept = [
+        "journal_deleted",
+        "journal_renamed_from",
+        "journal_renamed_to",
+    ]
+    .into_iter()
+    .filter_map(|field| times_list(observation, field))
+    .filter(|times| times.len() == JOURNAL_TIMES_CAP)
+    .filter_map(|times| times.into_iter().min())
+    .max();
+    from.map(|from| oldest_kept.map_or(from, |kept| from.max(kept)))
 }
 /// The zone identifier `observation` holds, when it is a number that fits a `u32`.
 fn zone_id_of(observation: &Observation) -> Option<u32> {
@@ -764,11 +931,13 @@ fn signature_fact(observation: &Observation) -> IdentityFact {
     }
 }
 
-/// A fact whose fields the scan did not read, or which arrives with later work.
+/// A fact whose fields the scan did not read.
 fn deferred() -> IdentityFact {
-    IdentityFact::NotKnown {
-        reason: IdentityNotKnownReason::Deferred,
-    }
+    not_known(IdentityNotKnownReason::Deferred)
+}
+/// An identity fact that is not known for `reason`.
+fn not_known(reason: IdentityNotKnownReason) -> IdentityFact {
+    IdentityFact::NotKnown { reason }
 }
 /// L1 when no record counts the files it loaded from outside (ADR 0082 section 5). It is also what
 /// a view saved before L1 existed reads as.
@@ -1010,15 +1179,15 @@ fn path_under_temp_or_downloads(path: &str) -> bool {
     }
     false
 }
-/// Whether `candidate` has a true identity fact among I1 to I4 or L1, which SS mode lists it for
-/// (ADR 0078 section 9, as amended by ADR 0082 section 5). I5 is not computed yet (ADR 0079
-/// section 5).
+/// Whether `candidate` has a true identity fact among I1 to I5 or L1, which SS mode lists it for
+/// (ADR 0078 section 9, as amended by ADR 0082 section 5 and ADR 0086 decision 6).
 fn has_identity_fact(candidate: &GameCandidate) -> bool {
     [
         &candidate.i1,
         &candidate.i2,
         &candidate.i3,
         &candidate.i4,
+        &candidate.i5,
         &candidate.l1,
     ]
     .into_iter()
@@ -1351,7 +1520,7 @@ fn with_facts(
                 .any(|time| hits(session, *time, scan).any())
         })
         .count();
-    let [i1, i2, i3, i4, i5] = files.facts(candidate);
+    let [i1, i2, i3, i4, i5] = files.facts(candidate, sessions, scan);
     GameCandidate {
         name: candidate.name.clone(),
         path: candidate.path.clone(),
@@ -1501,9 +1670,8 @@ fn oldest_by_source(report: &Report) -> BTreeMap<&'static str, Option<jiff::Time
     }
     oldest
 }
-/// How many of R (near at least two sessions), I1 to I4 and L1 are true, for the view's ordering
-/// (ADR 0078 section 5, as amended by ADR 0082 section 5). I5 waits for its own ADR (ADR 0079
-/// section 5).
+/// How many of R (near at least two sessions), I1 to I5 and L1 are true, for the view's ordering
+/// (ADR 0078 section 5, as amended by ADR 0082 section 5 and ADR 0086 decision 6).
 fn identity_rank(candidate: &GameCandidate) -> usize {
     usize::from(candidate.near_sessions.near >= 2)
         + [
@@ -1511,6 +1679,7 @@ fn identity_rank(candidate: &GameCandidate) -> usize {
             &candidate.i2,
             &candidate.i3,
             &candidate.i4,
+            &candidate.i5,
             &candidate.l1,
         ]
         .into_iter()
@@ -2841,5 +3010,591 @@ mod tests {
             "Other.exe is unnamed too"
         );
         assert_eq!(ss.unnamed.during, expected);
+    }
+
+    /// A `recorded_files` observation of `path` with the change journal fields `journal` gives it, as
+    /// `recorded_files` emits them (ADR 0086 section 5). Only the fields given are present.
+    fn journaled(path: &str, journal: Vec<(&'static str, serde_json::Value)>) -> Observation {
+        let mut fields = BTreeMap::from([("path".to_owned(), serde_json::Value::from(path))]);
+        for (field, value) in journal {
+            fields.insert(field.to_owned(), value);
+        }
+        Observation {
+            collector: "recorded_files".to_owned(),
+            fields,
+        }
+    }
+
+    /// A list of times as a journal field holds it, newest first.
+    fn times_json(times: &[&str]) -> serde_json::Value {
+        serde_json::Value::Array(
+            times
+                .iter()
+                .map(|time| serde_json::Value::from(*time))
+                .collect(),
+        )
+    }
+
+    /// The journal fields of a whole read that matched: its three lists, `journal_more` false, and the
+    /// time the journal reaches back to (ADR 0086 section 5).
+    fn whole_journal(
+        deleted: &[&str],
+        renamed_from: &[&str],
+        renamed_to: &[&str],
+        from: &str,
+    ) -> Vec<(&'static str, serde_json::Value)> {
+        vec![
+            ("journal_match", "matched".into()),
+            ("journal_deleted", times_json(deleted)),
+            ("journal_renamed_from", times_json(renamed_from)),
+            ("journal_renamed_to", times_json(renamed_to)),
+            ("journal_more", false.into()),
+            ("journal_from", from.into()),
+        ]
+    }
+
+    /// The I5 of `x.sys`, the BAM candidate of `base_records` at 10:15, when `recorded_files` holds
+    /// `journal` for its path.
+    fn i5_with(journal: Vec<(&'static str, serde_json::Value)>) -> IdentityFact {
+        let mut records = base_records();
+        records.push(journaled(r"C:\Tools\x.sys", journal));
+        shown(&game_windows(&report_of(records), Mode::SelfCheck), "x.sys")
+            .i5
+            .clone()
+    }
+
+    /// The identity fact that is not known for `reason`.
+    fn not_known(reason: IdentityNotKnownReason) -> IdentityFact {
+        IdentityFact::NotKnown { reason }
+    }
+
+    /// i5: a deletion at a time in each of the four windows makes I5 true, each window on its own. The
+    /// scan is at 12:00, so 11:30 is in the before-the-scan window (ADR 0086 section 5).
+    #[test]
+    fn i5_a_deletion_in_each_window_is_true() {
+        let from = "2026-01-10T09:00:00Z";
+        assert_eq!(
+            i5_with(whole_journal(&["2026-01-10T09:45:00Z"], &[], &[], from)),
+            IdentityFact::True,
+            "the before window"
+        );
+        assert_eq!(
+            i5_with(whole_journal(&["2026-01-10T10:15:00Z"], &[], &[], from)),
+            IdentityFact::True,
+            "the during window"
+        );
+        assert_eq!(
+            i5_with(whole_journal(&["2026-01-10T10:45:00Z"], &[], &[], from)),
+            IdentityFact::True,
+            "the after window"
+        );
+        assert_eq!(
+            i5_with(whole_journal(&["2026-01-10T11:30:00Z"], &[], &[], from)),
+            IdentityFact::True,
+            "the before-the-scan window"
+        );
+    }
+
+    /// i5: a rename from or to a time in a window makes I5 true, as a deletion does (ADR 0086
+    /// section 5).
+    #[test]
+    fn i5_a_rename_from_or_to_a_window_is_true() {
+        let from = "2026-01-10T09:00:00Z";
+        assert_eq!(
+            i5_with(whole_journal(&[], &["2026-01-10T10:15:00Z"], &[], from)),
+            IdentityFact::True,
+            "renamed from"
+        );
+        assert_eq!(
+            i5_with(whole_journal(&[], &[], &["2026-01-10T10:45:00Z"], from)),
+            IdentityFact::True,
+            "renamed to"
+        );
+    }
+
+    /// i5: a matched journal with empty lists, reaching back before 09:30, is false: nothing in it
+    /// falls in a window and the journal covers them all (ADR 0086 section 5).
+    #[test]
+    fn i5_a_matched_journal_with_empty_lists_from_before_the_windows_is_false() {
+        assert_eq!(
+            i5_with(whole_journal(&[], &[], &[], "2026-01-10T09:00:00Z")),
+            IdentityFact::False
+        );
+    }
+
+    /// i5: a deletion at 08:00, outside every window, in a journal that reaches back to 07:00 is
+    /// false, not true (ADR 0086 section 5).
+    #[test]
+    fn i5_a_deletion_outside_every_window_is_not_shown_as_true() {
+        assert_eq!(
+            i5_with(whole_journal(
+                &["2026-01-10T08:00:00Z"],
+                &[],
+                &[],
+                "2026-01-10T07:00:00Z"
+            )),
+            IdentityFact::False
+        );
+    }
+
+    /// i5: with no `journal_match` the journal was not read, so I5 is not known for that reason
+    /// (ADR 0086 section 5).
+    #[test]
+    fn i5_without_a_journal_match_is_journal_not_read() {
+        assert_eq!(
+            i5_with(vec![]),
+            not_known(IdentityNotKnownReason::JournalNotRead)
+        );
+    }
+
+    /// i5: a journal on another volume is `journal_other_drive`, not a read that found nothing
+    /// (ADR 0086 section 5).
+    #[test]
+    fn i5_an_other_volume_is_journal_other_drive() {
+        assert_eq!(
+            i5_with(vec![("journal_match", "other_volume".into())]),
+            not_known(IdentityNotKnownReason::JournalOtherDrive)
+        );
+    }
+
+    /// i5: a folder the journal cannot be read for is `journal_folder_unknown` (ADR 0086 section 5).
+    #[test]
+    fn i5_an_unknown_folder_is_journal_folder_unknown() {
+        assert_eq!(
+            i5_with(vec![("journal_match", "folder_unknown".into())]),
+            not_known(IdentityNotKnownReason::JournalFolderUnknown)
+        );
+    }
+
+    /// i5: a matched journal whose read was not whole has no `journal_deleted`, so it is
+    /// `journal_not_read` (ADR 0086 section 5).
+    #[test]
+    fn i5_a_matched_journal_without_lists_is_journal_not_read() {
+        assert_eq!(
+            i5_with(vec![("journal_match", "matched".into())]),
+            not_known(IdentityNotKnownReason::JournalNotRead)
+        );
+    }
+
+    /// i5: a journal that starts after the before window's start, here 09:40 against 09:30, cannot
+    /// show the window, so I5 is `before_trace_age` from `usn` (ADR 0086 section 5).
+    #[test]
+    fn i5_a_journal_starting_after_the_before_window_is_before_trace_age() {
+        assert_eq!(
+            i5_with(whole_journal(&[], &[], &[], "2026-01-10T09:40:00Z")),
+            not_known(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            })
+        );
+    }
+
+    /// i5: a latest session with no recorded end does not know its during or after windows, so I5 is
+    /// `session_end_not_recorded` (ADR 0086 section 5). The candidate sits in the before window.
+    #[test]
+    fn i5_a_latest_session_without_an_end_is_session_end_not_recorded() {
+        let records = vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            bam("x.sys", r"C:\Tools\x.sys", "2026-01-10T09:45:00Z"),
+            journaled(
+                r"C:\Tools\x.sys",
+                whole_journal(&[], &[], &[], "2026-01-10T09:00:00Z"),
+            ),
+        ];
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(windows.sessions[0].end, None);
+        assert_eq!(
+            shown(&windows, "x.sys").i5,
+            not_known(IdentityNotKnownReason::SessionEndNotRecorded)
+        );
+    }
+
+    /// i5: a candidate with no path is `no_path` even when `recorded_files` holds a deletion for another
+    /// file (ADR 0086 section 5).
+    #[test]
+    fn i5_a_candidate_with_no_path_is_no_path_even_with_other_data() {
+        let mut records = base_records();
+        records.push(prefetch("GTA5.exe", None, &["2026-01-10T10:15:00Z"]));
+        records.push(journaled(
+            r"C:\Tools\x.sys",
+            whole_journal(&["2026-01-10T10:15:00Z"], &[], &[], "2026-01-10T09:00:00Z"),
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let gta = shown(&windows, "GTA5.exe");
+        assert_eq!(gta.path, None);
+        assert_eq!(gta.i5, not_known(IdentityNotKnownReason::NoPath));
+    }
+
+    /// i5: on a standard scan, which does not run `recorded_files`, I5 is not known for that reason
+    /// (ADR 0086 section 5).
+    #[test]
+    fn i5_on_a_standard_scan_is_recorded_files_not_run() {
+        let windows = game_windows(&report_of(base_records()), Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "x.sys").i5,
+            not_known(IdentityNotKnownReason::RecordedFilesNotRun)
+        );
+    }
+
+    /// i5: of two candidates equal in every other fact, the one with I5 true comes first. Its path sorts
+    /// after the other's, so only the rank can put it first (ADR 0086 decision 6).
+    #[test]
+    fn i5_of_equal_candidates_the_one_with_i5_true_comes_first() {
+        let records = vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            fivem_record("bam", "2026-01-10T10:30:00Z"),
+            bam("x.sys", r"C:\Tools\First\x.sys", "2026-01-10T10:15:00Z"),
+            bam("x.sys", r"C:\Tools\Second\x.sys", "2026-01-10T10:15:00Z"),
+            journaled(
+                r"C:\Tools\First\x.sys",
+                whole_journal(&[], &[], &[], "2026-01-10T09:00:00Z"),
+            ),
+            journaled(
+                r"C:\Tools\Second\x.sys",
+                whole_journal(&["2026-01-10T10:15:00Z"], &[], &[], "2026-01-10T09:00:00Z"),
+            ),
+        ];
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let same: Vec<&GameCandidate> = windows
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.name.eq_ignore_ascii_case("x.sys"))
+            .collect();
+        assert_eq!(same.len(), 2, "two x.sys candidates");
+        assert_eq!(same[0].path.as_deref(), Some(r"C:\Tools\Second\x.sys"));
+        assert_eq!(same[0].i5, IdentityFact::True);
+        assert_eq!(same[1].i5, IdentityFact::False);
+    }
+
+    /// i5: in SS mode a candidate whose only true identity fact is I5 is named, as I1 to I4 and L1 name
+    /// one (ADR 0086 decision 6).
+    #[test]
+    fn i5_in_ss_mode_a_candidate_whose_only_identity_fact_is_i5_is_named() {
+        let mut records = base_records();
+        records.push(bam(
+            "Helper.exe",
+            r"C:\Tools\Helper.exe",
+            "2026-01-10T10:15:00Z",
+        ));
+        records.push(journaled(
+            r"C:\Tools\Helper.exe",
+            whole_journal(&["2026-01-10T10:15:00Z"], &[], &[], "2026-01-10T09:00:00Z"),
+        ));
+        let report = report_of(records);
+
+        let self_mode = game_windows(&report, Mode::SelfCheck);
+        let helper = shown(&self_mode, "Helper.exe");
+        assert_eq!(helper.i5, IdentityFact::True);
+        for fact in [&helper.i1, &helper.i2, &helper.i3, &helper.i4, &helper.l1] {
+            assert_ne!(*fact, IdentityFact::True, "{fact:?}");
+        }
+        assert!(has_identity_fact(helper), "{}", helper.name);
+
+        let ss = game_windows(&report, Mode::Ss);
+
+        assert_eq!(shown(&ss, "Helper.exe").i5, IdentityFact::True);
+    }
+
+    /// `journal` with `journal_more` set: its lists were cut at the cap (ADR 0086 section 3, D5).
+    fn cut(
+        mut journal: Vec<(&'static str, serde_json::Value)>,
+    ) -> Vec<(&'static str, serde_json::Value)> {
+        journal.retain(|(field, _)| *field != "journal_more");
+        journal.push(("journal_more", true.into()));
+        journal
+    }
+
+    /// i5: the window edges are inclusive where ADR 0086 section 5 says: the before window starts at
+    /// 09:30 and the during window at 10:00, both in; the scan's window ends at 12:00, in; a time one
+    /// second before 09:30 is not.
+    #[test]
+    fn i5_a_time_at_each_window_edge_is_true() {
+        let from = "2026-01-10T09:00:00Z";
+        for (time, edge) in [
+            ("2026-01-10T09:30:00Z", "the before window's start"),
+            ("2026-01-10T10:00:00Z", "the during window's start"),
+            ("2026-01-10T10:30:00Z", "the during window's end"),
+            ("2026-01-10T11:00:00Z", "the after window's end"),
+            ("2026-01-10T12:00:00Z", "the scan"),
+        ] {
+            assert_eq!(
+                i5_with(whole_journal(&[time], &[], &[], from)),
+                IdentityFact::True,
+                "{edge}"
+            );
+        }
+        assert_eq!(
+            i5_with(whole_journal(&["2026-01-10T09:29:59Z"], &[], &[], from)),
+            IdentityFact::False,
+            "one second before the before window"
+        );
+    }
+
+    /// i5: a journal that starts exactly at the before window's start, 09:30, with empty lists is
+    /// false: it reaches the window (ADR 0086 section 5).
+    #[test]
+    fn i5_a_journal_from_exactly_the_before_window_start_is_false() {
+        assert_eq!(
+            i5_with(whole_journal(&[], &[], &[], "2026-01-10T09:30:00Z")),
+            IdentityFact::False
+        );
+    }
+
+    /// i5: a deletion in the before window of an earlier, non-latest session is not a true I5: only the
+    /// latest session's windows count (ADR 0086 section 5). The earlier session is at 08:00.
+    #[test]
+    fn i5_a_deletion_in_an_earlier_sessions_before_window_is_not_true() {
+        let mut records = base_records();
+        records.push(prefetch(
+            "FiveM.exe",
+            Some("legacy"),
+            &["2026-01-10T08:00:00Z"],
+        ));
+        records.push(journaled(
+            r"C:\Tools\x.sys",
+            whole_journal(&["2026-01-10T07:45:00Z"], &[], &[], "2026-01-10T07:00:00Z"),
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(windows.sessions.iter().filter(|s| !s.latest).count(), 1);
+        assert_eq!(shown(&windows, "x.sys").i5, IdentityFact::False);
+    }
+
+    /// i5: a latest session with no recorded end still has its before window, so a deletion at 09:45
+    /// in it makes I5 true (ADR 0086 section 5).
+    #[test]
+    fn i5_a_latest_session_without_an_end_has_its_before_window() {
+        let records = vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            bam("x.sys", r"C:\Tools\x.sys", "2026-01-10T09:45:00Z"),
+            journaled(
+                r"C:\Tools\x.sys",
+                whole_journal(&["2026-01-10T09:45:00Z"], &[], &[], "2026-01-10T09:00:00Z"),
+            ),
+        ];
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(windows.sessions[0].end, None);
+        assert_eq!(shown(&windows, "x.sys").i5, IdentityFact::True);
+    }
+
+    /// i5: when the latest session has no end and the journal starts after its before window, the reason
+    /// is `before_trace_age`, which comes before `session_end_not_recorded` (ADR 0086 section 5).
+    #[test]
+    fn i5_a_latest_session_without_an_end_and_a_late_journal_is_before_trace_age() {
+        let records = vec![
+            fivem_record("prefetch", "2026-01-10T10:00:00Z"),
+            bam("x.sys", r"C:\Tools\x.sys", "2026-01-10T09:45:00Z"),
+            journaled(
+                r"C:\Tools\x.sys",
+                whole_journal(&[], &[], &[], "2026-01-10T09:40:00Z"),
+            ),
+        ];
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "x.sys").i5,
+            not_known(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            })
+        );
+    }
+
+    /// i5: with no scan time, an empty journal that reaches the before window is
+    /// `scan_time_not_recorded`, the reason for the before-the-scan window (ADR 0086 section 5).
+    #[test]
+    fn i5_without_a_scan_time_an_empty_journal_is_scan_time_not_recorded() {
+        let mut records = base_records();
+        records.push(journaled(
+            r"C:\Tools\x.sys",
+            whole_journal(&[], &[], &[], "2026-01-10T09:00:00Z"),
+        ));
+        let mut report = report_of(records);
+        report.header.generated_at = "not a time".to_owned();
+
+        let windows = game_windows(&report, Mode::SelfCheck);
+
+        assert_eq!(
+            shown(&windows, "x.sys").i5,
+            not_known(IdentityNotKnownReason::ScanTimeNotRecorded)
+        );
+    }
+
+    /// i5: a cut list hides the times older than its oldest kept one. Here the eight kept times are all
+    /// after the scan, so the journal's effective start is 12:05, after the before window's 09:30: it
+    /// cannot show that window, so the reason is `before_trace_age`, not false (ADR 0086 section 5).
+    #[test]
+    fn i5_a_cut_journal_whose_kept_times_are_all_late_is_before_trace_age() {
+        let kept = [
+            "2026-01-10T12:40:00Z",
+            "2026-01-10T12:35:00Z",
+            "2026-01-10T12:30:00Z",
+            "2026-01-10T12:25:00Z",
+            "2026-01-10T12:20:00Z",
+            "2026-01-10T12:15:00Z",
+            "2026-01-10T12:10:00Z",
+            "2026-01-10T12:05:00Z",
+        ];
+        assert_eq!(
+            i5_with(cut(whole_journal(&kept, &[], &[], "2026-01-10T09:00:00Z"))),
+            not_known(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            })
+        );
+    }
+
+    /// i5: a cut list whose oldest kept time, 09:00, is before the before window and that holds no time
+    /// in a window, with a journal from 08:00, is false (ADR 0086 section 5).
+    #[test]
+    fn i5_a_cut_journal_whose_oldest_kept_time_is_before_the_window_is_false() {
+        let kept = [
+            "2026-01-10T09:20:00Z",
+            "2026-01-10T09:15:00Z",
+            "2026-01-10T09:10:00Z",
+            "2026-01-10T09:05:00Z",
+            "2026-01-10T09:04:00Z",
+            "2026-01-10T09:03:00Z",
+            "2026-01-10T09:02:00Z",
+            "2026-01-10T09:00:00Z",
+        ];
+        assert_eq!(
+            i5_with(cut(whole_journal(&kept, &[], &[], "2026-01-10T08:00:00Z"))),
+            IdentityFact::False
+        );
+    }
+
+    /// i5: in SS mode a candidate that names no identity fact is not named, so none of its journal times
+    /// appears in the serialised view. Its one journal time is outside every window, so I5 is false
+    /// (ADR 0086 section 5 and decision 6).
+    #[test]
+    fn i5_in_ss_mode_a_candidate_not_named_shows_no_journal_time() {
+        let time = "2026-01-10T08:17:23Z";
+        let mut records = base_records();
+        records.push(bam(
+            "Probe.exe",
+            r"C:\Tools\Probe.exe",
+            "2026-01-10T10:15:00Z",
+        ));
+        // The file reads as present with a valid signature, so I1 and I2 are false. Its name is
+        // an executable's, so I3 is not true. Its one journal time is before every window, so I5
+        // is false too.
+        let mut journal = whole_journal(&[time], &[], &[], "2026-01-10T07:00:00Z");
+        journal.push(("identity_read", "read".into()));
+        journal.push(("signature", "valid".into()));
+        records.push(journaled(r"C:\Tools\Probe.exe", journal));
+        let report = report_of(records);
+
+        let self_mode = game_windows(&report, Mode::SelfCheck);
+        assert!(!has_identity_fact(shown(&self_mode, "Probe.exe")));
+        let self_text = serde_json::to_string(&self_mode)
+            .unwrap_or_else(|error| panic!("the Self view serialises: {error}"));
+        assert!(self_text.contains(time), "the time shows in Self mode");
+        let ss = game_windows(&report, Mode::Ss);
+
+        assert!(
+            ss.candidates
+                .iter()
+                .all(|candidate| !candidate.name.eq_ignore_ascii_case("Probe.exe"))
+        );
+        let text = serde_json::to_string(&ss)
+            .unwrap_or_else(|error| panic!("the SS view serialises: {error}"));
+        assert!(!text.contains(time), "{text}");
+    }
+
+    /// i5: `FileDetails` carries the three lists, newest first as the observation holds them, and
+    /// `journal_more` (ADR 0086 section 5).
+    #[test]
+    fn i5_file_details_carry_the_journal_lists_and_more() {
+        let mut records = base_records();
+        records.push(journaled(
+            r"C:\Tools\x.sys",
+            vec![
+                ("journal_match", "matched".into()),
+                (
+                    "journal_deleted",
+                    times_json(&["2026-01-10T10:15:00Z", "2026-01-10T10:05:00Z"]),
+                ),
+                (
+                    "journal_renamed_from",
+                    times_json(&["2026-01-10T09:45:00Z"]),
+                ),
+                ("journal_renamed_to", times_json(&["2026-01-10T10:45:00Z"])),
+                ("journal_more", true.into()),
+                ("journal_from", "2026-01-10T09:00:00Z".into()),
+            ],
+        ));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let file = shown(&windows, "x.sys")
+            .file
+            .clone()
+            .unwrap_or_else(|| panic!("no file details"));
+        assert_eq!(
+            file.journal_deleted,
+            Some(vec![
+                "2026-01-10T10:15:00Z".to_owned(),
+                "2026-01-10T10:05:00Z".to_owned(),
+            ])
+        );
+        assert_eq!(
+            file.journal_renamed_from,
+            Some(vec!["2026-01-10T09:45:00Z".to_owned()])
+        );
+        assert_eq!(
+            file.journal_renamed_to,
+            Some(vec!["2026-01-10T10:45:00Z".to_owned()])
+        );
+        assert_eq!(file.journal_more, Some(true));
+    }
+
+    /// i5: a `recorded_files` observation with no journal fields leaves the journal details as they
+    /// are: none (ADR 0086 section 5).
+    #[test]
+    fn i5_file_details_without_journal_fields_hold_none() {
+        let mut records = base_records();
+        records.push(bam(
+            "Plain.exe",
+            r"C:\Tools\Plain.exe",
+            "2026-01-10T10:15:00Z",
+        ));
+        records.push(journaled(r"C:\Tools\Plain.exe", vec![]));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+
+        let file = shown(&windows, "Plain.exe")
+            .file
+            .clone()
+            .unwrap_or_else(|| panic!("no file details"));
+        assert_eq!(file.journal_deleted, None);
+        assert_eq!(file.journal_renamed_from, None);
+        assert_eq!(file.journal_renamed_to, None);
+        assert_eq!(file.journal_more, None);
+    }
+
+    /// i5: the journal reasons serialise under their `snake_case` names, the source beside
+    /// `before_trace_age` (ADR 0086 section 5).
+    #[test]
+    fn i5_journal_reasons_serialise_under_their_spec_names() {
+        assert_eq!(
+            serde_json::to_value(IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            })
+            .unwrap(),
+            serde_json::json!({"reason": "before_trace_age", "source": "usn"})
+        );
+        assert_eq!(
+            serde_json::to_value(IdentityNotKnownReason::JournalOtherDrive).unwrap(),
+            serde_json::json!({"reason": "journal_other_drive"})
+        );
     }
 }

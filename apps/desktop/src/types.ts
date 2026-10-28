@@ -342,17 +342,24 @@ export type IdentityFact =
   | { fact: "false" }
   | {
       fact: "not_known";
-      reason: {
-        reason:
-          | "recorded_files_not_run"
-          | "no_observation_for_path"
-          | "not_read"
-          | "unverifiable"
-          | "no_path"
-          | "deferred"
-          | "not_counted"
-          | "earlier_session";
-      };
+      reason:
+        | {
+            reason:
+              | "recorded_files_not_run"
+              | "no_observation_for_path"
+              | "not_read"
+              | "unverifiable"
+              | "no_path"
+              | "deferred"
+              | "not_counted"
+              | "earlier_session"
+              | "journal_not_read"
+              | "journal_other_drive"
+              | "journal_folder_unknown"
+              | "session_end_not_recorded"
+              | "scan_time_not_recorded";
+          }
+        | { reason: "before_trace_age"; source: string };
     };
 
 /** One FiveM or GTA V session, as the core found it (ADR 0062). */
@@ -397,6 +404,14 @@ export interface FileDetails {
   trailing_data?: boolean;
   embedded_pe?: boolean;
   zone_id?: number;
+  /** Change-journal times of a deletion of this file near the latest session, newest first (ADR 0086). */
+  journal_deleted?: string[];
+  /** Change-journal times of a rename away from this name near the latest session (ADR 0086). */
+  journal_renamed_from?: string[];
+  /** Change-journal times of a rename to this name near the latest session (ADR 0086). */
+  journal_renamed_to?: string[];
+  /** A journal list was cut at its cap (ADR 0086). */
+  journal_more?: boolean;
 }
 
 /** A program recorded near a game session. Evidence only: no score, no verdict (ADR 0078). */
