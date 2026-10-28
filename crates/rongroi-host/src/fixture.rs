@@ -3395,4 +3395,69 @@ usn_journal:
             utf16le("Helper.exe").as_slice()
         );
     }
+
+    /// A fixture says which letters its machine has, so a collector can be tested against a mapped
+    /// path. The device and serial are kept in the map, and its `Debug` still names neither
+    /// (ADR 0087 section 1).
+    #[test]
+    fn a_drive_map_block_is_read_and_an_absent_one_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: Q
+    device: '\Device\HarddiskVolume3'
+    serial: 3735928559
+    kind: fixed
+  - letter: X
+    device: '\Device\HarddiskVolume12'
+    serial: 195948557
+    kind: removable
+  - letter: Z
+    device: '\Device\HarddiskVolume7'
+    serial: 305419896
+    kind: other
+",
+            "inline",
+        )
+        .unwrap();
+        let expected = DriveMap {
+            entries: vec![
+                DriveMapEntry {
+                    letter: 'Q',
+                    device: r"\Device\HarddiskVolume3".to_owned(),
+                    serial: 0xDEAD_BEEF,
+                    kind: DriveKind::Fixed,
+                },
+                DriveMapEntry {
+                    letter: 'X',
+                    device: r"\Device\HarddiskVolume12".to_owned(),
+                    serial: 0x0BAD_F00D,
+                    kind: DriveKind::Removable,
+                },
+                DriveMapEntry {
+                    letter: 'Z',
+                    device: r"\Device\HarddiskVolume7".to_owned(),
+                    serial: 0x1234_5678,
+                    kind: DriveKind::Other,
+                },
+            ],
+        };
+        let map = host.drive_map().unwrap();
+        assert_eq!(map, expected);
+        let debug = format!("{map:?}");
+        assert!(!debug.contains("HarddiskVolume"), "{debug}");
+        assert!(!debug.contains("3735928559"), "{debug}");
+        assert!(!debug.to_ascii_lowercase().contains("deadbeef"), "{debug}");
+
+        // A fixture written before this section existed did not model the machine's letters. An
+        // empty list is the deliberate claim that it has none.
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        let error = silent.drive_map().unwrap_err();
+        assert!(matches!(&error, SourceError::Unsupported(_)), "{error:?}");
+        assert!(!error.to_string().contains("HarddiskVolume"), "{error}");
+        let empty =
+            FixtureHost::from_yaml_str("platform: windows\ndrive_map: []\n", "inline").unwrap();
+        assert_eq!(empty.drive_map(), Ok(DriveMap { entries: vec![] }));
+    }
 }

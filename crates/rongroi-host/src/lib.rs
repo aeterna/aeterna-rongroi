@@ -1609,4 +1609,84 @@ mod tests {
         }
         assert!(!is_refused_form(r"C:\x\y"));
     }
+
+    /// The map is the one place a device name and a serial live. Its `Debug` is what a snapshot or a
+    /// log line would write, so it names the letter and kind only (ADR 0087 section 1).
+    #[test]
+    fn a_drive_map_debug_names_each_letter_and_kind_and_no_device_or_serial() {
+        let map = DriveMap {
+            entries: vec![
+                DriveMapEntry {
+                    letter: 'Q',
+                    device: r"\Device\HarddiskVolume3".to_owned(),
+                    serial: 0xDEAD_BEEF,
+                    kind: DriveKind::Fixed,
+                },
+                DriveMapEntry {
+                    letter: 'X',
+                    device: r"\Device\HarddiskVolume12".to_owned(),
+                    serial: 0x0BAD_F00D,
+                    kind: DriveKind::Removable,
+                },
+                DriveMapEntry {
+                    letter: 'Z',
+                    device: r"\Device\HarddiskVolume7".to_owned(),
+                    serial: 0x1234_5678,
+                    kind: DriveKind::Other,
+                },
+            ],
+        };
+        let debug = format!("{map:?}");
+        for letter in ['Q', 'X', 'Z'] {
+            assert!(debug.contains(letter), "{debug}");
+        }
+        let lowercased = debug.to_ascii_lowercase();
+        for kind in ["fixed", "removable", "other"] {
+            assert!(lowercased.contains(kind), "{debug}");
+        }
+        assert!(!debug.contains("HarddiskVolume"), "{debug}");
+        assert!(!debug.contains(r"\Device"), "{debug}");
+        for serial in [0xDEAD_BEEFu32, 0x0BAD_F00D, 0x1234_5678] {
+            assert!(!debug.contains(&serial.to_string()), "{debug}");
+            assert!(!lowercased.contains(&format!("{serial:x}")), "{debug}");
+        }
+    }
+
+    /// `SourceError::Unsupported` carries free text, so the drive map's own failures must be fixed
+    /// words rather than a `format!` of the volume they were reading (ADR 0087 section 1).
+    #[test]
+    fn drive_map_errors_are_fixed_and_name_no_device_or_serial() {
+        let error = NonWindowsHost.drive_map().unwrap_err();
+        assert!(matches!(&error, SourceError::Unsupported(_)), "{error:?}");
+        let shown = error.to_string();
+        let debug = format!("{error:?}");
+        assert!(!shown.is_empty(), "{shown}");
+        for leaked in [
+            "HarddiskVolume",
+            r"\Device",
+            "3735928559",
+            "deadbeef",
+            "195948557",
+            "badf00d",
+        ] {
+            assert!(!shown.contains(leaked), "{shown}");
+            assert!(
+                !debug
+                    .to_ascii_lowercase()
+                    .contains(&leaked.to_ascii_lowercase())
+            );
+        }
+        // Nothing about the machine changes the answer: the wording is a constant.
+        assert_eq!(NonWindowsHost.drive_map().unwrap_err().to_string(), shown);
+    }
+
+    /// A host that never implements the call inherits the trait's answer, which is the same
+    /// unsupported statement as every other lookup it cannot make — never an empty map.
+    #[test]
+    fn non_windows_host_reports_no_drive_map_rather_than_an_empty_one() {
+        assert!(matches!(
+            NonWindowsHost.drive_map(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
 }
