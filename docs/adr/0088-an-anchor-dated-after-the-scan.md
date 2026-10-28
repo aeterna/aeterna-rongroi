@@ -1,11 +1,12 @@
 # ADR 0088 — An anchor dated after the scan
 
-- Status: proposed — the owner questions in "Owner questions" are open; nothing is built
+- Status: accepted — the owner decided the four questions in "Owner questions" on 2026-10-28, each as
+  recommended ("Owner decisions")
 - Date: 2026-10-28
 - Related: ADR 0039 (the report's time anchor), ADR 0061 (trace ages and its anchors, section 2), ADR 0073
   (a saved report; `schema` 1, additive changes), ADR 0084 decision 1 (the horizon timeline's history tag),
   AGENTS.md hard rule 3 (evidence, never a verdict)
-- Amends, if accepted: ADR 0061 section 2 (an anchor's `measured` state may leave out `days_before`)
+- Amends: ADR 0061 section 2 (an anchor's `measured` state may leave out `days_before`)
 
 ## Context
 
@@ -126,6 +127,15 @@ shows its date without a day count."
    date the reviewer expects there.
 4. **Wording.** en "{{date}}, later than this scan's own date" and th "{{date}} (ใหม่กว่าวันที่ของการสแกนนี้เอง)"?
    Recommended: yes, worded like `trace_ages.oldest_after_scan`.
+
+## Owner decisions
+
+Decided by the owner on 2026-10-28, each as recommended:
+
+1. `days_before` becomes optional and is left out when the anchor is dated after the scan (section 1).
+2. The view's and a saved report's `schema` stay at 1 (section 3).
+3. The horizon timeline shows `-` when the anchor it picks has no count (section 2).
+4. The wording is en "{{date}}, later than this scan's own date" and th "{{date}} (ใหม่กว่าวันที่ของการสแกนนี้เอง)".
 
 ## Alternatives weighed
 
