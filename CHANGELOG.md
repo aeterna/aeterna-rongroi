@@ -20,6 +20,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   in the ordering and names a program in SS mode, like I1 to I4. A program's file details list the journal's times.
   The full-scan consent says the journal is read for these files, and that names in it are compared on the PC and
   never kept.
+- `bam` now reports a program's path when Windows recorded it as a device path (`\Device\HarddiskVolumeN\…`)
+  on a fixed drive: the scan maps the device to today's drive letter and marks the path `path_from_device`,
+  because the letter is the one the drive has now (ADR 0087). On a removable drive, or for a device no letter
+  names, the path stays withheld as before. No device name or volume serial is reported. A mapped path is
+  redacted in SS mode like every other path; it lets `recorded_files` read the program's file, lets the
+  game-window view join BAM to other sources by path (so a program run and then deleted can show I1), and can
+  make `executed-program-missing-on-disk` match on more machines.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
