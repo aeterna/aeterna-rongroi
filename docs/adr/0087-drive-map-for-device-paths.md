@@ -1,13 +1,14 @@
 # ADR 0087 — A drive map for BAM's and Prefetch's device paths
 
-- Status: proposed — the owner questions in "Owner questions" are open; nothing is built
+- Status: accepted — the owner decided the five questions in "Owner decisions" on 2026-10-28, each as
+  recommended; nothing is built yet (M0 first)
 - Date: 2026-10-27
 - Related: ADR 0010 and AGENTS.md hard rule 5 (SS mode redacts paths), ADR 0021 (the Prefetch collector;
   `volumes` withheld as a machine identifier), ADR 0023 (the BAM collector; a path that is not drive-rooted
   is withheld), ADR 0049 (which folders SS mode treats as a profile root), ADR 0078 (programs recorded near
   a game session; "P7 decisions" item 3), ADR 0079 (`recorded_files`), ADR 0081 (`volume_path_digest`),
   ADR 0082 section 4 (the drive map it left for later), ADR 0084 (rule 9 applied), ADR 0086 (I5)
-- Amends, if accepted: ADR 0023 "The path is withheld unless it is drive-rooted" (a mapped path is
+- Amends: ADR 0023 "The path is withheld unless it is drive-rooted" (a mapped path is
   drive-rooted and is emitted); ADR 0078 "P7 decisions" item 3 (the drive map is this ADR)
 
 ## Context
@@ -167,7 +168,7 @@ path. Nothing about the map itself is shown in SS mode or in a standard report b
 
 Each step is its own PR into `dev`, written by an engineer run (AGENTS.md, delegated delivery).
 
-## Owner questions
+## Owner decisions (2026-10-28, each as recommended)
 
 1. **Build the map at all** (sections 1–2). Recommended: **yes** — without it the run-then-deleted program,
    the case I1 exists for, never gets I1 to I4. Alternative: leave BAM- and Prefetch-only candidates
