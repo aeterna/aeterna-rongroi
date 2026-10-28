@@ -4,8 +4,8 @@
 
 # The scan is full so that recorded_files reads the change journal once (ADR 0086, J2). The file was renamed
 # while it ran, so the journal holds an old-name and a new-name record in Downloads, and I5 is true when one of
-# them falls in the window before the session. The name the process list reports for a program renamed while it
-# runs is not documented here; the first replay shows it, and this expect is changed then if it is renamed.exe.
+# them falls in the window before the session. The first replay (2026-10-28) showed the process list keeping the
+# name the program started under, renamer.exe, with its new path (ADR 0086, "As built: J5").
 found: []
 full: true
 game_windows:

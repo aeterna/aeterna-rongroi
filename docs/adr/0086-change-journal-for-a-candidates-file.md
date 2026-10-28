@@ -431,16 +431,19 @@ Two lab replays (ADR 0076) on the lab machine (Windows 11 build 26300, Arm64) wi
 | `program-renamed-while-running` (new, full scan) | `renamer.exe`: T1 true; I5 true | 2 ok, 0 failed |
 | `renamed-program-run-then-deleted` | `helper.exe`: T1 true; I1 and I5 not known, no path | 3 ok, 0 failed |
 
-What the new replay showed:
+What the new replay's report showed, read once by hand beyond what `lab-check` asserts (T1 and I5):
 
-1. **A program renamed while it runs keeps its old name and gains its new path.** The process list gave the
+1. **A program renamed while it runs kept its old name and gained its new path.** The process list gave the
    candidate the name it started under, `renamer.exe`, and the path it has now, `…\Downloads\renamed.exe`; the
-   file is there, so I1 is false. The rename was matched by the file's own number, the second rule of section 2.
-2. **One rename left three records the match returned:** one old-name time and two new-name times, 2 ms apart,
-   all in the window before the session. The session's game was still running, so its end is not recorded; I5
-   is true from the before window alone (As built: J3, item 3).
-3. **BAM recorded the same program as a second candidate** with the withheld device path, whose I5 is "not known:
-   no path", as `helper.exe`'s is. A program known only from BAM gets I5 with ADR 0087's drive map.
+   file was there, so I1 was false. Why Windows keeps the old name is not established, nor whether other builds
+   do the same.
+2. **The rename appeared as one time in `journal_renamed_from` and two in `journal_renamed_to`**, all in the window
+   before the session. The session's game was still running, so its end is not recorded; I5 was true from the
+   before window alone (As built: J3, item 3). Which of section 2's two rules matched each record is not in the
+   report: the target's name was the new one, so the new-name records could match by folder and name, and every
+   record could match by the file's own number.
+3. **BAM recorded the same program as a second `renamer.exe` candidate** with the withheld device path, whose I5
+   was "not known: no path", as `helper.exe`'s is. Observed in this one replay; not asserted.
 
 The scenario that was meant to read I5 for a program run and then deleted (section "Tests", lab replay) cannot
 until then; it asserts "not known: no path" instead.
