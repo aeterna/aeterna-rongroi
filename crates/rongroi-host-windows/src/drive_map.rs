@@ -13,6 +13,9 @@ mod live {
     use rongroi_host::{DriveKind, DriveMap, DriveMapEntry, SourceError, UsnJournalSource};
 
     use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives, QueryDosDeviceW};
+    use windows::Win32::System::Diagnostics::Debug::{
+        SEM_FAILCRITICALERRORS, SEM_NOOPENFILEERRORBOX, SetThreadErrorMode, THREAD_ERROR_MODE,
+    };
     use windows::Win32::System::WindowsProgramming::{DRIVE_FIXED, DRIVE_REMOVABLE};
     use windows::core::PCWSTR;
 
@@ -93,6 +96,43 @@ mod live {
         })
     }
 
+    /// Puts the calling thread in `SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX` for as long as it
+    /// lives, so that reading a removable or card-reader letter with no media raises no "There is no
+    /// disk in the drive" dialog and does not block (ADR 0087 section 1). Only this process's own
+    /// thread is changed: the scanned machine's drives, files and registry are untouched (AGENTS.md
+    /// hard rule 2). `Drop` restores the thread's previous mode on every return path.
+    struct ErrorModeGuard {
+        old: THREAD_ERROR_MODE,
+    }
+
+    impl ErrorModeGuard {
+        /// Sets the mode, or gives `None` when Windows refuses it: the letters are then read without
+        /// the guard, as before, and no new error is reported.
+        #[allow(unsafe_code)]
+        fn set() -> Option<Self> {
+            let mut old = THREAD_ERROR_MODE::default();
+            // SAFETY: `old` is a live, writable `THREAD_ERROR_MODE` for the call to fill, and the flags
+            // change the error mode of this thread only.
+            unsafe {
+                SetThreadErrorMode(
+                    SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX,
+                    Some(&raw mut old),
+                )
+            }
+            .ok()?;
+            Some(Self { old })
+        }
+    }
+
+    impl Drop for ErrorModeGuard {
+        #[allow(unsafe_code)]
+        fn drop(&mut self) {
+            // SAFETY: `self.old` is the value the successful `SetThreadErrorMode` in `set` wrote, and
+            // `None` asks for no old value, so the call touches no memory of ours.
+            let _ = unsafe { SetThreadErrorMode(self.old, None) };
+        }
+    }
+
     /// Every letter `GetLogicalDrives` reports, read once (ADR 0087 section 1).
     #[allow(unsafe_code)]
     pub(crate) fn read() -> Result<DriveMap, SourceError> {
@@ -102,6 +142,8 @@ mod live {
         if drives == 0 {
             return Err(SourceError::Failed(LIST_FAILED_MESSAGE.to_owned()));
         }
+        // Set before the first letter is read: a card reader with no media still has a letter here.
+        let _error_mode = ErrorModeGuard::set();
         let mut entries = Vec::new();
         for index in 0..26u8 {
             if drives & (1u32 << index) == 0 {
