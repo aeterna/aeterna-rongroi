@@ -21,8 +21,10 @@ has a start and the view is computed (ADR 0076, "Amendment (2026-10-27)"). The c
 before the session, so T1 is true. The scan is a full scan (`full: true`), so `recorded_files` reads the file at
 the candidate's path and the change journal once. Since M1, ADR 0087's drive map turns the
 `\Device\HarddiskVolumeN\…` path BAM records into a drive-rooted `C:\…` path, so the view has a path at which to
-check the file: the scenario deleted it, so I1 is true. I5 is true for the same path, because the change journal
-holds its deletion near the session (ADR 0086, section 5). The scenario names no rule that must read `found`.
+check the file: the scenario deleted it, so I1 is true. I5 is `not_known:session_end_not_recorded`: the
+session's `FiveM.exe` is still running when the scan reads, so the session has no end and its windows are not
+known (ADR 0078 section 3), and ADR 0086's I5 asks about a window of the latest session. The scenario names no
+rule that must read `found`.
 
 ## What the scenario does not show
 

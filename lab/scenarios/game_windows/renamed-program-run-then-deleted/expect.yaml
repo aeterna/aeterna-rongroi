@@ -5,8 +5,9 @@
 # BAM records helper.exe's run in the window before the session. Since ADR 0087's M1, its
 # \Device\HarddiskVolumeN\ path is mapped through the drive map to a drive-rooted C:\ path, so the view has a
 # path for the file. The scan is full so that recorded_files reads the file at that path and the change journal
-# once (ADR 0086, J2): the scenario deletes the file, so I1 is true, and the journal records its deletion near
-# the session, so I5 is true.
+# once (ADR 0086, J2): the scenario deletes the file, so I1 is true. I5 is not known because the session's
+# FiveM.exe is still running when the scan reads, so the session has no end and its windows are not known
+# (ADR 0078 section 3; ADR 0086's I5 asks about a window of the latest session).
 found: []
 full: true
 game_windows:
@@ -14,4 +15,4 @@ game_windows:
     facts:
       t1: true
       i1: true
-      i5: true
+      i5: not_known:session_end_not_recorded
