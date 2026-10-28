@@ -815,6 +815,73 @@ pub trait UsnJournalSource {
     fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError>;
 }
 
+/// What kind of drive a letter is, as `GetDriveTypeW` reports it (ADR 0087 section 1 and section 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(rename_all = "snake_case"))]
+pub enum DriveKind {
+    /// `DRIVE_FIXED`: the only kind a BAM device path is mapped to (ADR 0087 section 3).
+    Fixed,
+    /// `DRIVE_REMOVABLE`.
+    Removable,
+    /// Any other kind Windows names, including a network, optical or RAM drive.
+    Other,
+}
+
+impl DriveKind {
+    /// Stable identifier used in the map's `Debug` output and by the three kinds of ADR 0087.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fixed => "fixed",
+            Self::Removable => "removable",
+            Self::Other => "other",
+        }
+    }
+}
+
+/// One drive letter present at scan time, with what a device path is mapped through (ADR 0087
+/// section 1).
+///
+/// [`Self::device`] and [`Self::serial`] are machine identifiers: they name one volume across reports
+/// (ADR 0021) and never reach a report field, a log line, an error text or a snapshot. The `Debug`
+/// output prints the letter and kind only, which is what makes that testable rather than promised.
+#[derive(Clone, PartialEq, Eq)]
+pub struct DriveMapEntry {
+    /// The letter Windows has, upper case.
+    pub letter: char,
+    /// `\Device\HarddiskVolume<digits>`, as `QueryDosDeviceW("X:")` spells it.
+    pub device: String,
+    /// The low 32 bits of the drive root's volume serial, as [`UsnJournalSource::file_id`] reports it.
+    pub serial: u32,
+    /// What `GetDriveTypeW` says the letter is.
+    pub kind: DriveKind,
+}
+
+impl std::fmt::Debug for DriveMapEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DriveMapEntry")
+            .field("letter", &self.letter)
+            .field("kind", &self.kind.as_str())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Every drive letter present at scan time (ADR 0087 section 1).
+///
+/// A volume with no letter (mounted on a folder, or not mounted) has no entry, and a volume that also
+/// has a folder mount point is mapped to its letter only. The map is read once per scan.
+#[derive(Clone, PartialEq, Eq)]
+pub struct DriveMap {
+    /// One entry per letter, in the order the host read them.
+    pub entries: Vec<DriveMapEntry>,
+}
+
+impl std::fmt::Debug for DriveMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(&self.entries).finish()
+    }
+}
+
 /// Size of one read when a file is streamed through SHA-256.
 const READ_BLOCK: usize = 64 * 1024;
 
@@ -957,6 +1024,19 @@ pub trait Host:
     /// Whether the process can use administrator rights, when known. False when the Administrators group
     /// is only deny-only in the token (UAC-filtered or restricted tokens).
     fn is_elevated(&self) -> Option<bool>;
+
+    /// Every drive letter present now, with the device and volume serial a device path is mapped
+    /// through (ADR 0087 section 1).
+    ///
+    /// The map is read once per scan. `device` and `serial` are machine identifiers and stay in
+    /// memory between this call and the collector; the map's `Debug` prints the letter and kind only.
+    /// A host that cannot list drive letters answers [`SourceError::Unsupported`] with a fixed
+    /// message, never an empty map, which would claim the machine has none.
+    fn drive_map(&self) -> Result<DriveMap, SourceError> {
+        Err(SourceError::Unsupported(
+            "no drive map on this platform".to_owned(),
+        ))
+    }
 }
 
 /// The host used when the program runs on something other than Windows: every read is unsupported.

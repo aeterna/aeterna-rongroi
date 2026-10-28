@@ -12,11 +12,12 @@ use serde::Deserialize;
 
 use crate::{
     AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
-    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, EntryTimes,
-    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
-    FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource, RegistryData,
-    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
-    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
+    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap,
+    DriveMapEntry, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
+    FirmwareSecureBoot, FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource,
+    RegistryData, RegistrySource, SignatureCheck, SignatureSource, SourceError,
+    SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState,
+    UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -91,6 +92,22 @@ struct HostFile {
     /// parent listing to carry them, so they are written here; a drive not named here is not there.
     #[serde(default)]
     drive_roots: BTreeMap<String, FixtureTimes>,
+    /// The drive letters the machine has (ADR 0087 section 1). Absent means the fixture never
+    /// modelled them, which the accessor reports as `Unsupported`; an empty list is the deliberate
+    /// claim that the machine has none.
+    #[serde(default)]
+    drive_map: Option<Vec<FixtureDrive>>,
+}
+
+/// One drive letter a fixture describes (ADR 0087 section 1). `device` and `serial` are invented,
+/// never read from a real PC.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureDrive {
+    letter: char,
+    device: String,
+    serial: u32,
+    kind: DriveKind,
 }
 
 /// One device a fixture describes (ADR 0069). `id` is a device **instance** id, as `CfgMgr32` lists it,
@@ -1199,6 +1216,8 @@ pub struct FixtureHost {
     devices: Option<Vec<DeviceRecord>>,
     /// Keyed by the lower-cased drive, `c:`.
     drive_roots: BTreeMap<String, EntryTimes>,
+    /// The letters the fixture wrote under `drive_map:`, or `None` when it never modelled them.
+    drive_map: Option<Vec<DriveMapEntry>>,
 }
 
 impl FixtureHost {
@@ -1292,6 +1311,17 @@ impl FixtureHost {
                 })
                 .transpose()?,
             drive_roots,
+            drive_map: file.drive_map.map(|described| {
+                described
+                    .into_iter()
+                    .map(|drive| DriveMapEntry {
+                        letter: drive.letter,
+                        device: drive.device,
+                        serial: drive.serial,
+                        kind: drive.kind,
+                    })
+                    .collect()
+            }),
             event_log_channels: file
                 .event_log_channels
                 .map(|channels| {
@@ -1856,6 +1886,22 @@ impl Host for FixtureHost {
 
     fn is_elevated(&self) -> Option<bool> {
         self.elevated
+    }
+
+    /// The letters the fixture wrote under `drive_map:`. No block is `Unsupported`, never an empty
+    /// map: a fixture written before this section existed did not model the machine's letters
+    /// (ADR 0087 section 1).
+    fn drive_map(&self) -> Result<DriveMap, SourceError> {
+        self.drive_map
+            .as_ref()
+            .map(|entries| DriveMap {
+                entries: entries.clone(),
+            })
+            .ok_or_else(|| {
+                SourceError::Unsupported(
+                    "this fixture host does not describe the machine's drive letters".to_owned(),
+                )
+            })
     }
 }
 
