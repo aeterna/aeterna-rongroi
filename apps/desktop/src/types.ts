@@ -93,7 +93,7 @@ export type Anchor = { anchor: AnchorKind } & (
 
 /** An anchor as the trace-ages section shows it: `boot_time` first, then the header's, in days. */
 export type AnchorAge = { anchor: "boot_time" | AnchorKind } & (
-  | { state: "measured"; on: string; days_before: number; source?: string; kept?: number }
+  | { state: "measured"; on: string; days_before?: number; source?: string; kept?: number }
   | { state: "unmeasured"; reason: UnmeasuredReason }
 );
 

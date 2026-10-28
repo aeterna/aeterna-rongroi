@@ -185,6 +185,7 @@
       "fivem_enhanced_program_folder_created": "Reset by reinstalling FiveM, removing its folder, or moving or recreating the Windows profile."
     },
     "on": "{{date}}, {{days}} before this scan",
+    "on_after_scan": "{{date}}, later than this scan's own date",
     "days_before_one": "{{count}} day",
     "days_before_other": "{{count}} days",
     "oldest": "oldest {{at}}, {{days}} before this scan",

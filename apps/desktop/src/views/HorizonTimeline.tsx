@@ -68,7 +68,9 @@ export function HorizonTimeline({ view, header, onStepClick }: Props) {
       : bootAnchor?.state === "measured"
         ? bootAnchor
         : undefined;
-  const historyTag = oldestAnchor ? `${oldestAnchor.days_before}d` : "-";
+  // An anchor dated after the scan has no count, and its tag is "-" rather than a number made up for
+  // it. The anchor is not swapped for another one to get a count (ADR 0088).
+  const historyTag = oldestAnchor?.days_before !== undefined ? `${oldestAnchor.days_before}d` : "-";
 
   // Badge status
   let badgeText = t("horizon_timeline.badge_not_found");

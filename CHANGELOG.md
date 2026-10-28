@@ -21,6 +21,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   The full-scan consent says the journal is read for these files, and that names in it are compared on the PC and
   never kept.
 
+### Fixed
+- A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
+  FiveM's folders and the cross-source line show the time without a count (or "could not show"), and an anchor dated
+  after the scan shows its date with "later than this scan's own date" and the horizon tag shows `-` (ADR 0088).
+
 ## [0.13.0] - 2026-10-27
 
 ### Added

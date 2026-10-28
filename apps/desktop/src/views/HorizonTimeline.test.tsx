@@ -84,6 +84,19 @@ describe("HorizonTimeline first step", () => {
     expect(firstStep?.querySelector(".timeline-sub")).toBeNull();
   });
 
+  // ADR 0088: an install date dated after the scan has no count. Its tag is "-", not "undefined d",
+  // and the anchor is still the install date, not the boot time beside it.
+  it("shows no anchor days when the install date has no count", () => {
+    const view = viewWithAnchors([
+      { anchor: "install_date", state: "measured", on: "2026-11-02" },
+      { anchor: "boot_time", state: "measured", on: "2025-12-28", days_before: 3 },
+    ]);
+    const { container } = render(<HorizonTimeline view={view} header={view.header} />);
+    const firstStep = container.querySelector(".timeline-step");
+    expect(firstStep?.querySelector(".timeline-tag")?.textContent).toBe("-");
+    expect(firstStep?.querySelector(".timeline-sub")?.textContent).toBe("Windows installed");
+  });
+
   it("says Last boot when only the boot time is known", () => {
     const view = viewWithAnchors([
       { anchor: "install_date", state: "unmeasured", reason: "source_absent" },
