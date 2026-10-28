@@ -224,7 +224,7 @@
 | rule | collector | role | strength | status | fixtures | baseline | retention | seen found | measured on |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
-| `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
+| `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 2 / 2 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-or-gta-v-by-name` | bam | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26100 server x64, 26220 client x64 |
 | `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
