@@ -55,6 +55,9 @@ windows-registry.workspace = true
 # under `Win32_UI_Shell`, listed; `IFileDialog::SetFileTypes` and `COMDLG_FILTERSPEC` need `Win32_UI_Shell_Common`,
 # and `CoInitializeEx`, `CoCreateInstance` and `CoTaskMemFree` are under `Win32_System_Com` (ADR 0073; read from
 # `src/Windows/Win32/UI/Shell/mod.rs` and `src/Windows/Win32/System/Com/mod.rs` in 0.62.2).
+# `SetThreadErrorMode` and its `SEM_FAILCRITICALERRORS` / `SEM_NOOPENFILEERRORBOX` flags are declared in
+# `Win32_System_Diagnostics_Debug`; the call changes this program's own thread's error mode only (ADR 0087
+# section 1).
 windows = { workspace = true, features = [
   "Wdk_System_SystemInformation",
   "Win32_Devices_DeviceAndDriverInstallation",
@@ -68,6 +71,7 @@ windows = { workspace = true, features = [
   "Win32_Storage_FileSystem",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Com",
+  "Win32_System_Diagnostics_Debug",
   "Win32_System_EventLog",
   "Win32_System_IO",
   "Win32_System_Ioctl",

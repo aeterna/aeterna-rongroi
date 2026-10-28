@@ -2078,6 +2078,66 @@ mod tests {
         );
     }
 
+    /// A BAM path the drive map turned into `X:\…` takes the same SS-mode route as a PCA path
+    /// (ADR 0087 sections 2 and 4): the account name after `Users` is replaced, and the marker that
+    /// says Windows wrote a device path stays.
+    #[test]
+    fn ss_view_redacts_a_mapped_bam_path_under_a_profile() {
+        let mut report = report();
+        let path = format!(r"C:\Users\{USER}\AppData\Local\Temp\tool.exe");
+        let mut observation = recorded(
+            "bam",
+            "tool.exe",
+            Some(&path),
+            "last_run",
+            "2026-01-10T09:30:00Z",
+        );
+        observation
+            .fields
+            .insert("path_from_device".to_owned(), serde_json::Value::from(true));
+        report.evidence = vec![Evidence {
+            rule_id: "executed-program-missing-on-disk".to_owned(),
+            collector: "bam".to_owned(),
+            strength: Strength::Context,
+            state: EvidenceState::Found {
+                observations: vec![observation],
+            },
+        }];
+
+        let ss = for_mode(&report, Mode::Ss);
+        let EvidenceState::Found { observations } = &ss.evidence[0].state else {
+            panic!("{:?}", ss.evidence[0]);
+        };
+        assert_eq!(
+            observations[0]
+                .fields
+                .get("path")
+                .and_then(serde_json::Value::as_str),
+            Some(r"%USERPROFILE%\AppData\Local\Temp\tool.exe")
+        );
+        assert_eq!(
+            observations[0]
+                .fields
+                .get("path_from_device")
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
+        let json = serde_json::to_string(&ss).unwrap();
+        assert!(!json.contains(USER), "{json}");
+
+        let own = for_mode(&report, Mode::SelfCheck);
+        let EvidenceState::Found { observations } = &own.evidence[0].state else {
+            panic!("{:?}", own.evidence[0]);
+        };
+        assert_eq!(
+            observations[0]
+                .fields
+                .get("path")
+                .and_then(serde_json::Value::as_str),
+            Some(path.as_str())
+        );
+    }
+
     /// A second path that follows a name with no separator between them is a path of its own, and its
     /// name is replaced too.
     #[test]

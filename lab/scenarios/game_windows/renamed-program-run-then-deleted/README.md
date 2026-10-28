@@ -18,23 +18,27 @@ trace shows is the recorded run, not what the program does.
 
 BAM records that `helper.exe` ran. The session is a `FiveM.exe` that is still running when the scan reads, so it
 has a start and the view is computed (ADR 0076, "Amendment (2026-10-27)"). The candidate is in the 30 minutes
-before the session, so T1 is true. The scenario also asks for I1 to read `not_known:no_path`: BAM names the
-program as `\Device\HarddiskVolumeN\…`, a form the collector withholds, so the view has no path at which to
-check the file (ADR 0078, "P7 decisions" item 3). I5 reads `not_known:no_path` for the same reason: the change
-journal is asked about a file only by its path, and this path is withheld (ADR 0086, "Measured: J4"). The
-scenario names no rule that must read `found`.
+before the session, so T1 is true. The scan is a full scan (`full: true`), so `recorded_files` reads the file at
+the candidate's path and the change journal once. Since M1, ADR 0087's drive map turns the
+`\Device\HarddiskVolumeN\…` path BAM records into a drive-rooted `C:\…` path, so the view has a path at which to
+check the file: the scenario deleted it, so I1 is true. I5 is `not_known:session_end_not_recorded`: the
+session's `FiveM.exe` is still running when the scan reads, so the session has no end and its windows are not
+known (ADR 0078 section 3), and ADR 0086's I5 asks about a window of the latest session. The scenario names no
+rule that must read `found`.
 
 ## What the scenario does not show
 
-- That the file is gone. The scenario deletes it after the session starts, but BAM's path is not drive-rooted,
-  so I1 cannot be shown and reads `not_known:no_path` instead. I5, the change journal's record of a rename or
-  deletion, is not computed by this build (ADR 0078, "As built: P6a" item 4).
-- Which drive or folder BAM's `\Device\HarddiskVolumeN\…` names. Mapping a volume to its drive letter is the
-  drive map that follows ADR 0082, not part of this scenario.
+- That the file is gone for a reason other than this scenario. The scenario deletes the file it made after the
+  session starts, so I1 is true and I5 records the deletion; no other process removes or changes it.
+- Which drive or folder BAM's `\Device\HarddiskVolumeN\…` named when Windows wrote the record. ADR 0087's drive
+  map gives the letter that volume has at scan time, and `path_from_device` says the report's path came from a
+  device path; a volume removed or reused since is outside the scenario (ADR 0087 section 3).
 - The windows during the session, after it, and before the scan. A session whose game is still running has no
   end, so those windows are "not known" (ADR 0078 section 3).
 - What the program is, who ran it, or whether it did anything. The bytes say only that it is this repository's
   build, and the recorded run says only that Windows saw it start.
 
-See [ADR 0076](../../../../docs/adr/0076-lab-replay.md) and
-[ADR 0078](../../../../docs/adr/0078-programs-recorded-near-a-game-session.md).
+See [ADR 0076](../../../../docs/adr/0076-lab-replay.md),
+[ADR 0078](../../../../docs/adr/0078-programs-recorded-near-a-game-session.md),
+[ADR 0086](../../../../docs/adr/0086-change-journal-for-a-candidates-file.md) and
+[ADR 0087](../../../../docs/adr/0087-drive-map-for-device-paths.md).

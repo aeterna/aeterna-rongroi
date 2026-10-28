@@ -12,11 +12,12 @@ use serde::Deserialize;
 
 use crate::{
     AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
-    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, EntryTimes,
-    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
-    FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource, RegistryData,
-    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
-    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
+    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap,
+    DriveMapEntry, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
+    FirmwareSecureBoot, FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource,
+    RegistryData, RegistrySource, SignatureCheck, SignatureSource, SourceError,
+    SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState,
+    UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -91,6 +92,22 @@ struct HostFile {
     /// parent listing to carry them, so they are written here; a drive not named here is not there.
     #[serde(default)]
     drive_roots: BTreeMap<String, FixtureTimes>,
+    /// The drive letters the machine has (ADR 0087 section 1). Absent means the fixture never
+    /// modelled them, which the accessor reports as `Unsupported`; an empty list is the deliberate
+    /// claim that the machine has none.
+    #[serde(default)]
+    drive_map: Option<Vec<FixtureDrive>>,
+}
+
+/// One drive letter a fixture describes (ADR 0087 section 1). `device` and `serial` are invented,
+/// never read from a real PC.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureDrive {
+    letter: char,
+    device: String,
+    serial: u32,
+    kind: DriveKind,
 }
 
 /// One device a fixture describes (ADR 0069). `id` is a device **instance** id, as `CfgMgr32` lists it,
@@ -1199,6 +1216,8 @@ pub struct FixtureHost {
     devices: Option<Vec<DeviceRecord>>,
     /// Keyed by the lower-cased drive, `c:`.
     drive_roots: BTreeMap<String, EntryTimes>,
+    /// The letters the fixture wrote under `drive_map:`, or `None` when it never modelled them.
+    drive_map: Option<Vec<DriveMapEntry>>,
 }
 
 impl FixtureHost {
@@ -1292,6 +1311,17 @@ impl FixtureHost {
                 })
                 .transpose()?,
             drive_roots,
+            drive_map: file.drive_map.map(|described| {
+                described
+                    .into_iter()
+                    .map(|drive| DriveMapEntry {
+                        letter: drive.letter,
+                        device: drive.device,
+                        serial: drive.serial,
+                        kind: drive.kind,
+                    })
+                    .collect()
+            }),
             event_log_channels: file
                 .event_log_channels
                 .map(|channels| {
@@ -1856,6 +1886,22 @@ impl Host for FixtureHost {
 
     fn is_elevated(&self) -> Option<bool> {
         self.elevated
+    }
+
+    /// The letters the fixture wrote under `drive_map:`. No block is `Unsupported`, never an empty
+    /// map: a fixture written before this section existed did not model the machine's letters
+    /// (ADR 0087 section 1).
+    fn drive_map(&self) -> Result<DriveMap, SourceError> {
+        self.drive_map
+            .as_ref()
+            .map(|entries| DriveMap {
+                entries: entries.clone(),
+            })
+            .ok_or_else(|| {
+                SourceError::Unsupported(
+                    "this fixture host does not describe the machine's drive letters".to_owned(),
+                )
+            })
     }
 }
 
@@ -3394,5 +3440,70 @@ usn_journal:
             &bytes[8 + 160 + 76..8 + 160 + 96],
             utf16le("Helper.exe").as_slice()
         );
+    }
+
+    /// A fixture says which letters its machine has, so a collector can be tested against a mapped
+    /// path. The device and serial are kept in the map, and its `Debug` still names neither
+    /// (ADR 0087 section 1).
+    #[test]
+    fn a_drive_map_block_is_read_and_an_absent_one_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: Q
+    device: '\Device\HarddiskVolume3'
+    serial: 3735928559
+    kind: fixed
+  - letter: X
+    device: '\Device\HarddiskVolume12'
+    serial: 195948557
+    kind: removable
+  - letter: Z
+    device: '\Device\HarddiskVolume7'
+    serial: 305419896
+    kind: other
+",
+            "inline",
+        )
+        .unwrap();
+        let expected = DriveMap {
+            entries: vec![
+                DriveMapEntry {
+                    letter: 'Q',
+                    device: r"\Device\HarddiskVolume3".to_owned(),
+                    serial: 0xDEAD_BEEF,
+                    kind: DriveKind::Fixed,
+                },
+                DriveMapEntry {
+                    letter: 'X',
+                    device: r"\Device\HarddiskVolume12".to_owned(),
+                    serial: 0x0BAD_F00D,
+                    kind: DriveKind::Removable,
+                },
+                DriveMapEntry {
+                    letter: 'Z',
+                    device: r"\Device\HarddiskVolume7".to_owned(),
+                    serial: 0x1234_5678,
+                    kind: DriveKind::Other,
+                },
+            ],
+        };
+        let map = host.drive_map().unwrap();
+        assert_eq!(map, expected);
+        let debug = format!("{map:?}");
+        assert!(!debug.contains("HarddiskVolume"), "{debug}");
+        assert!(!debug.contains("3735928559"), "{debug}");
+        assert!(!debug.to_ascii_lowercase().contains("deadbeef"), "{debug}");
+
+        // A fixture written before this section existed did not model the machine's letters. An
+        // empty list is the deliberate claim that it has none.
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        let error = silent.drive_map().unwrap_err();
+        assert!(matches!(&error, SourceError::Unsupported(_)), "{error:?}");
+        assert!(!error.to_string().contains("HarddiskVolume"), "{error}");
+        let empty =
+            FixtureHost::from_yaml_str("platform: windows\ndrive_map: []\n", "inline").unwrap();
+        assert_eq!(empty.drive_map(), Ok(DriveMap { entries: vec![] }));
     }
 }

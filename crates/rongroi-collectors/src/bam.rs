@@ -15,8 +15,9 @@
 //! `REG_DWORD`, on every account key measured (ADR 0023, amendment of 2026-09-14). They are counted in
 //! `metadata_values` and not read as records; see [`ACCOUNT_METADATA`].
 //!
-//! No rule reads this collector (ADR 0023), so what it sees is listed in Self mode as unmatched
-//! observations and counted, never listed, in SS mode (ADR 0014).
+//! One rule reads this collector: `rules/bam/ephemeral/executed-program-missing-on-disk` matches
+//! `disappeared_from_disk` (ADR 0087 section 2). What it sees that no rule matched is listed in Self
+//! mode as unmatched observations and counted, never listed, in SS mode (ADR 0014).
 //!
 //! # The account is never reported, and the path usually is not either
 //!
@@ -25,11 +26,13 @@
 //!   installation identifier in the middle of it — one machine, which is the linkage ADR 0021
 //!   refused to create for a volume serial number. What is reported is how many accounts had
 //!   records, which is a count and not an identifier.
-//! - **A path is emitted only when it begins with a drive letter**, the one shape
-//!   `rongroi_core::view::redact_profile_paths` can reach, exactly as `pca` decides it. BAM is expected
-//!   to spell paths in the `\Device\HarddiskVolumeN\…` form — unverified, see ADR 0023 — and such a
-//!   path carries `\Users\<account>\` with no drive letter in front of it, so it would reach an SS
-//!   viewer unredacted while the code around it says paths are redacted.
+//! - **A path is emitted only in a shape `rongroi_core::view::redact_profile_paths` can reach**: a
+//!   path BAM spelled with a drive letter, exactly as `pca` decides it, or a device path the drive
+//!   map turned into one (ADR 0087 section 2). A mapped path carries `path_from_device: true`,
+//!   because the letter is today's rather than the one Windows saw. BAM is expected to spell paths in
+//!   the `\Device\HarddiskVolumeN\…` form (ADR 0023), and such a path carries `\Users\<account>\`
+//!   with no drive letter in front of it, so a path the map cannot turn into a letter stays
+//!   withheld rather than reaching an SS viewer unredacted.
 //! - **Which of `FiveM`'s editions a path is below is emitted, and the path is not.** `fivem_edition`
 //!   (`legacy` or `enhanced`) is read from the value name in whatever form BAM spelled it, device path
 //!   included, by `crate::fivem_edition`; it is one word, and it is omitted for a path below neither of
@@ -43,12 +46,12 @@
 use std::collections::BTreeMap;
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform};
+use rongroi_host::{DriveMap, Host, Platform};
 use rongroi_parsers::bam::{self, BamEntry};
 use rongroi_parsers::error::ParseError;
 
 use crate::failure::{read_failure, reason_for};
-use crate::paths::{RecordedPath, UNREDACTABLE_FORM, file_name, is_drive_rooted};
+use crate::paths::{RecordedPath, UNREDACTABLE_FORM, file_name, is_drive_rooted, map_device_path};
 use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition};
 
 /// The key holding one subkey per user account that BAM has recorded anything for.
@@ -97,7 +100,7 @@ const REASONS: [UnmeasuredReason; 7] = [
 ///
 /// A key it could not enumerate is a gap in all of them. One value it could not read or decode is
 /// not: see the comment on [`Bam::collect`].
-const FIELDS: [Field; 16] = [
+const FIELDS: [Field; 17] = [
     Field::boolean("disappeared_from_disk"),
     Field::number("entries"),
     Field::text(fivem_edition::FIELD),
@@ -107,6 +110,7 @@ const FIELDS: [Field; 16] = [
     Field::number("moderation_state"),
     Field::text("name"),
     Field::text("path"),
+    Field::boolean("path_from_device"),
     Field::text("path_withheld"),
     Field::text("read"),
     Field::number("rejected"),
@@ -121,13 +125,14 @@ const FIELDS: [Field; 16] = [
 /// The subset a content-level reason gaps: `source_empty` and `partial` both describe a key this
 /// collector **did** enumerate, so gapping `users`, `values`, `entries`, `rejected` or `intact` —
 /// which were measured — would claim it had not (ADR 0030).
-const RECORD_FIELDS: [&str; 8] = [
+const RECORD_FIELDS: [&str; 9] = [
     "disappeared_from_disk",
     fivem_edition::FIELD,
     "last_run",
     "moderation_state",
     "name",
     "path",
+    "path_from_device",
     "path_withheld",
     "value_bytes",
 ];
@@ -180,6 +185,12 @@ impl Collector for Bam {
             };
         }
 
+        // Read once, before anything is recorded: a host that cannot give the map gives no mapping
+        // at all, which is the withholding this collector already did and adds no gap (ADR 0087
+        // section 2).
+        let drive_map = host.drive_map().ok();
+        let drive_map = drive_map.as_ref();
+
         let accounts = match host.subkeys(USER_SETTINGS_KEY) {
             // BAM is not on this machine: the service is not there, or this Windows never had it.
             // That is not the statement "no program ran" — it is the absence of the record that
@@ -193,12 +204,11 @@ impl Collector for Bam {
             Ok(Some(accounts)) => accounts,
             Err(error) => {
                 // The key is there and Windows would not hand it over. It is emitted as an
-                // observation as well as gapped, because with no rule reading this collector a
-                // `gaps` entry reaches no screen, and an artifact this program could not read is
-                // what an evader would arrange.
+                // observation as well as gapped, because a `gaps` entry alone reaches no screen, and
+                // an artifact this program could not read is what an evader would arrange.
                 return CollectorRun::Measured {
                     collector: ID.to_owned(),
-                    observations: vec![status(None, read_failure(&error))],
+                    observations: vec![status(None, read_failure(&error), None)],
                     gaps: gaps(reason_for(host, &error)),
                     discriminator_gaps: Vec::new(),
                 };
@@ -222,7 +232,7 @@ impl Collector for Bam {
                 Err(error) => {
                     // The same shape as the whole-key refusal above, and deliberately so: the only
                     // thing that would distinguish them is the account, which is withheld.
-                    observations.push(status(None, read_failure(&error)));
+                    observations.push(status(None, read_failure(&error), None));
                     first_failure = first_failure.or_else(|| Some(reason_for(host, &error)));
                     continue;
                 }
@@ -244,16 +254,22 @@ impl Collector for Bam {
                     Ok(Some(bytes)) => match bam::parse_value(&bytes) {
                         Ok(entry) => {
                             parsed += 1;
-                            observations.push(execution(host, name, bytes.len(), &entry));
+                            observations.push(execution(
+                                host,
+                                name,
+                                bytes.len(),
+                                &entry,
+                                drive_map,
+                            ));
                         }
                         Err(error) => {
                             rejected += 1;
-                            observations.push(status(Some(name), parse_failure(&error)));
+                            observations.push(status(Some(name), parse_failure(&error), drive_map));
                         }
                     },
                     Err(error) => {
                         rejected += 1;
-                        observations.push(status(Some(name), read_failure(&error)));
+                        observations.push(status(Some(name), read_failure(&error), drive_map));
                     }
                 }
             }
@@ -426,9 +442,17 @@ fn target_disappeared_from_disk(host: &dyn Host, path: &str) -> bool {
 /// `value_bytes` is how many bytes the value held. ADR 0013 names it as the first thing to check on a
 /// current Windows build — whether a value is still the 24 the write-ups describe — and it is the one
 /// number here that means the same thing on every machine.
-fn execution(host: &dyn Host, path: &str, value_bytes: usize, entry: &BamEntry) -> Observation {
+fn execution(
+    host: &dyn Host,
+    path: &str,
+    value_bytes: usize,
+    entry: &BamEntry,
+    drive_map: Option<&DriveMap>,
+) -> Observation {
+    let mapped = drive_map.and_then(|map| map_device_path(map, path));
+    let target = mapped.as_deref().unwrap_or(path);
     let mut fields = BTreeMap::new();
-    if target_disappeared_from_disk(host, path) {
+    if target_disappeared_from_disk(host, target) {
         fields.insert(
             "disappeared_from_disk".to_owned(),
             serde_json::Value::from(true),
@@ -437,7 +461,7 @@ fn execution(host: &dyn Host, path: &str, value_bytes: usize, entry: &BamEntry) 
     if let Some(name) = file_name(path) {
         fields.insert("name".to_owned(), serde_json::Value::from(name));
     }
-    insert_path(&mut fields, path);
+    insert_path(&mut fields, path, drive_map);
     // From the value name, which `insert_path` may have just withheld: one word, never the path.
     if let Some(edition) = fivem_edition::of_path(path) {
         fields.insert(
@@ -531,10 +555,10 @@ fn account_of(users: usize, counts: &Counts) -> Observation {
 /// It carries no `name` and no `value_bytes`, so a rule written for a program that ran never matches
 /// one of these, and it carries `read`, which no other observation does, so a rule written for it
 /// never matches a program that ran.
-fn status(path: Option<&str>, read: &'static str) -> Observation {
+fn status(path: Option<&str>, read: &'static str, drive_map: Option<&DriveMap>) -> Observation {
     let mut fields = BTreeMap::new();
     if let Some(path) = path {
-        insert_path(&mut fields, path);
+        insert_path(&mut fields, path, drive_map);
     }
     fields.insert("read".to_owned(), serde_json::Value::from(read));
     Observation {
@@ -545,11 +569,20 @@ fn status(path: Option<&str>, read: &'static str) -> Observation {
 
 /// Writes the path the artifact spelled, or says that it was withheld.
 ///
-/// Silently omitting it would read as "BAM recorded no path", which is never what happened: the
-/// path is the value's name and is always there.
-fn insert_path(fields: &mut BTreeMap<String, serde_json::Value>, path: &str) {
+/// A device path the drive map can turn into a letter is emitted with that letter and
+/// `path_from_device: true`, because the letter is today's rather than the one Windows saw (ADR 0087
+/// sections 2 and 3). Silently omitting a path the map did not resolve would read as "BAM recorded no
+/// path", which is never what happened: the path is the value's name and is always there.
+fn insert_path(
+    fields: &mut BTreeMap<String, serde_json::Value>,
+    path: &str,
+    drive_map: Option<&DriveMap>,
+) {
     if is_drive_rooted(path) {
         fields.insert("path".to_owned(), serde_json::Value::from(path));
+    } else if let Some(mapped) = drive_map.and_then(|map| map_device_path(map, path)) {
+        fields.insert("path".to_owned(), serde_json::Value::from(mapped));
+        fields.insert("path_from_device".to_owned(), serde_json::Value::from(true));
     } else {
         fields.insert(
             "path_withheld".to_owned(),
@@ -1132,5 +1165,182 @@ mod tests {
         let records = executions(observations);
         assert_eq!(records.len(), 1, "{records:?}");
         assert_eq!(field(records[0], "disappeared_from_disk"), None);
+    }
+
+    /// An invented fixed volume and its serial, for the drive-map tests. Devices and serials are
+    /// invented, never read from a real PC (ADR 0087 section 1).
+    const MAPPED_DEVICE: &str = r"\Device\HarddiskVolume7";
+    const MAPPED_SERIAL: u32 = 439_041_101;
+    /// An invented removable volume, whose BAM paths stay withheld (ADR 0087 section 3).
+    const REMOVABLE_DEVICE: &str = r"\Device\HarddiskVolume9";
+    const REMOVABLE_SERIAL: u32 = 439_041_102;
+    /// A device no letter names, so its BAM path stays withheld as well.
+    const UNMAPPED_DEVICE: &str = r"\Device\HarddiskVolume8";
+
+    /// A fixture machine with a fixed `C:`, a removable `D:` and BAM values spelled as device paths:
+    /// one on each letter and one on a device no letter names. `extra` is YAML written under the
+    /// account key after them, so a test can add a value that does not decode.
+    fn drive_map_host(extra: &str) -> FixtureHost {
+        let yaml = format!(
+            r"platform: windows
+drive_map:
+  - letter: C
+    device: '{MAPPED_DEVICE}'
+    serial: {MAPPED_SERIAL}
+    kind: fixed
+  - letter: D
+    device: '{REMOVABLE_DEVICE}'
+    serial: {REMOVABLE_SERIAL}
+    kind: removable
+registry:
+  '{USER_SETTINGS_KEY}\S-1-5-21-0-0-0-1001':
+    Version: 1
+    SequenceNumber: 1
+    '{MAPPED_DEVICE}\Users\fixtureuser\Downloads\mapped.exe':
+      content: '012345678901234567890123'
+    '{REMOVABLE_DEVICE}\Users\fixtureuser\Downloads\removable.exe':
+      content: '012345678901234567890123'
+    '{UNMAPPED_DEVICE}\Users\fixtureuser\Downloads\unmapped.exe':
+      content: '012345678901234567890123'
+{extra}"
+        );
+        FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+    }
+
+    /// A BAM value spelled as a device path is mapped through the drive map before it reaches
+    /// `path`: a fixed letter's path is emitted with `path_from_device`, and a removable letter's or
+    /// an unknown device's stays withheld (ADR 0087 sections 2 and 3).
+    #[test]
+    fn a_mapped_device_path_is_emitted_with_path_from_device_and_an_unmapped_one_is_withheld() {
+        let run = Bam.collect(&drive_map_host(""));
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 3, "{records:?}");
+
+        let mapped = records
+            .iter()
+            .find(|record| text(record, "name") == Some("mapped.exe"))
+            .expect("the mapped record is reported");
+        assert_eq!(
+            text(mapped, "path"),
+            Some(r"C:\Users\fixtureuser\Downloads\mapped.exe")
+        );
+        assert_eq!(field(mapped, "path_from_device"), Some(&true.into()));
+        assert_eq!(text(mapped, "path_withheld"), None);
+
+        for name in ["removable.exe", "unmapped.exe"] {
+            let record = records
+                .iter()
+                .find(|record| text(record, "name") == Some(name))
+                .unwrap_or_else(|| panic!("{name} is reported"));
+            assert_eq!(field(record, "path"), None, "{record:?}");
+            assert_eq!(text(record, "path_withheld"), Some(UNREDACTABLE_FORM));
+            assert_eq!(field(record, "path_from_device"), None, "{record:?}");
+        }
+    }
+
+    /// The device name and the serial are machine identifiers that never leave the collector (ADR
+    /// 0087 section 1), in a value that did not decode and in every `Debug` output either.
+    #[test]
+    fn no_device_name_volume_marker_or_serial_reaches_an_observation_a_read_or_a_debug() {
+        let short = r"    '\Device\HarddiskVolume7\Users\fixtureuser\Downloads\short.exe':
+      content: '0123'
+";
+        let run = Bam.collect(&drive_map_host(short));
+        let (observations, _) = measured(&run);
+
+        // The mapped record must be there before "nothing leaked" can mean anything.
+        let mapped = executions(observations)
+            .into_iter()
+            .find(|record| text(record, "name") == Some("mapped.exe"))
+            .expect("the mapped record is reported");
+        assert_eq!(field(mapped, "path_from_device"), Some(&true.into()));
+        assert_eq!(
+            text(mapped, "path"),
+            Some(r"C:\Users\fixtureuser\Downloads\mapped.exe")
+        );
+        assert_eq!(refusals(observations).len(), 1, "{observations:?}");
+
+        let mut shown = vec![
+            format!("{run:?}"),
+            format!("{:?}", Bam),
+            serde_json::to_string(&run).unwrap(),
+        ];
+        for observation in observations {
+            shown.push(format!("{observation:?}"));
+            for (name, value) in &observation.fields {
+                shown.push(name.clone());
+                shown.push(value.to_string());
+            }
+        }
+        let shown = shown.join("\n").to_ascii_lowercase();
+        let mut leaked = vec!["harddiskvolume".to_owned(), r"\volume{".to_owned()];
+        for serial in [MAPPED_SERIAL, REMOVABLE_SERIAL] {
+            leaked.push(serial.to_string());
+            leaked.push(format!("{serial:08x}"));
+        }
+        for leak in leaked {
+            assert!(
+                !shown.contains(&leak),
+                "{leak} reached the collector output: {shown}"
+            );
+        }
+
+        // The map's own `Debug` is what the fixture lets a report print of it.
+        let map = format!("{:?}", drive_map_host(short).drive_map().unwrap()).to_ascii_lowercase();
+        assert!(!map.contains("harddiskvolume"), "{map}");
+        for serial in [MAPPED_SERIAL, REMOVABLE_SERIAL] {
+            assert!(!map.contains(&serial.to_string()), "{map}");
+            assert!(!map.contains(&format!("{serial:08x}")), "{map}");
+        }
+    }
+
+    /// `recorded_paths` keeps the same mapped path `Bam::collect` emits, so `recorded_files` reads the
+    /// file the letter names (ADR 0087 section 2).
+    #[test]
+    fn recorded_paths_maps_a_device_path_the_same_way_as_the_observation() {
+        let (paths, gap) = recorded_paths(&drive_map_host("")).unwrap();
+        assert_eq!(gap, None);
+        let paths: Vec<&str> = paths
+            .iter()
+            .map(|recorded| recorded.path.as_str())
+            .collect();
+        assert_eq!(paths, [r"C:\Users\fixtureuser\Downloads\mapped.exe"]);
+    }
+
+    /// A mapped BAM path under Temp whose file is gone sets `disappeared_from_disk`, the field
+    /// `executed-program-missing-on-disk` matches (ADR 0087 section 2).
+    #[test]
+    fn a_mapped_path_under_temp_whose_file_is_gone_is_marked_disappeared() {
+        let yaml = format!(
+            r"platform: windows
+drive_map:
+  - letter: C
+    device: '{MAPPED_DEVICE}'
+    serial: {MAPPED_SERIAL}
+    kind: fixed
+registry:
+  '{USER_SETTINGS_KEY}\S-1-5-21-0-0-0-1001':
+    Version: 1
+    SequenceNumber: 1
+    '{MAPPED_DEVICE}\Users\fixtureuser\AppData\Local\Temp\loader.exe':
+      content: '012345678901234567890123'
+"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(
+            text(records[0], "path"),
+            Some(r"C:\Users\fixtureuser\AppData\Local\Temp\loader.exe")
+        );
+        assert_eq!(field(records[0], "path_from_device"), Some(&true.into()));
+        assert_eq!(
+            field(records[0], "disappeared_from_disk"),
+            Some(&true.into())
+        );
     }
 }

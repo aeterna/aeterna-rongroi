@@ -1,7 +1,7 @@
 # ADR 0087 — A drive map for BAM's and Prefetch's device paths
 
 - Status: accepted — the owner decided the five questions in "Owner decisions" on 2026-10-28, each as
-  recommended; M0 measured 2026-10-28 ("Measured: M0"); M1 next
+  recommended; M0 measured 2026-10-28 ("Measured: M0"); M1 built ("As built: M1"); M2 next
 - Date: 2026-10-27
 - Related: ADR 0010 and AGENTS.md hard rule 5 (SS mode redacts paths), ADR 0021 (the Prefetch collector;
   `volumes` withheld as a machine identifier), ADR 0023 (the BAM collector; a path that is not drive-rooted
@@ -194,6 +194,31 @@ restart and no disk change, because the PC is shared).
 removed and returned; a removable volume did not. Mapping BAM to fixed letters only stands, and M1 can
 start. Not measured: a restart or a disk change on the PC, a disk added or removed while Windows runs, and a
 USB disk that Windows reports as fixed.
+
+### As built: M1 (2026-10-28)
+
+- `Host::drive_map` (`rongroi-host`) returns `DriveMap` / `DriveMapEntry` / `DriveKind`; their `Debug` is
+  written by hand and prints the letter and kind only. The trait default and the fixture host without a
+  `drive_map:` block answer `Unsupported` with a fixed message; `drive_map: []` is a machine with no letters.
+  The Windows host (`rongroi-host-windows/src/drive_map.rs`) reads `GetLogicalDrives`, `QueryDosDeviceW` and
+  `GetDriveTypeW`, and the serial through `file_id` on the drive root; a letter whose device is not
+  `\Device\HarddiskVolume<digits>`, or whose serial cannot be read, is left out.
+- `paths::map_device_path` applies section 3 to the device form only: `\Device\…` maps to a fixed letter,
+  `\VOLUME{…}` maps by serial whatever the kind.
+- `bam` reads the map once per collection; a map it cannot read means no mapping and no new gap.
+  `recorded_paths` runs the same collection, so `recorded_files` gets the mapped paths with no code of its own.
+- Tests were written first by engineer runs; `executed-program-missing-on-disk` gained a positive and a
+  negative fixture with a mapped path.
+- The Windows host reads the letters with `SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX)`
+  and restores the thread's mode afterwards, so a card reader or removable letter with no media raises no "no
+  disk" dialog. It changes this program's own thread only (AGENTS.md hard rule 2); no test can show the
+  dialog, so this is unverified on a real reader.
+- Section 3's fixed-only rule rests on "Measured: M0" above: on the lab machine a fixed volume kept its number
+  across a restart and a disk added, removed and returned, and a removable one did not.
+- Lab replay, 2026-10-28, `cli.exe` built from this branch, with a fresh control:
+  `renamed-program-run-then-deleted` 3/3. It is now a full scan; `helper.exe`, known only from BAM, has a `C:\`
+  path, and I1 is true. I5 is `not_known:session_end_not_recorded`, because the session's game is still
+  running. `downloaded-program-with-its-zone` 3/3, with `tool.exe` listed once.
 
 ## Owner decisions (2026-10-28, each as recommended)
 

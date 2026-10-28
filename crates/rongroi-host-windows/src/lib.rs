@@ -23,6 +23,8 @@ pub mod device;
 pub mod dialog;
 pub mod save_dialog;
 
+mod drive_map;
+
 pub mod elevate;
 
 pub mod event_log;

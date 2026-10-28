@@ -142,6 +142,12 @@ impl Host for LiveHost {
     fn is_elevated(&self) -> Option<bool> {
         has_admin_rights()
     }
+
+    /// Every drive letter Windows has now, with the device and volume serial a device path is mapped
+    /// through (ADR 0087 section 1). Read once, without administrator rights, and no file is opened.
+    fn drive_map(&self) -> Result<rongroi_host::DriveMap, SourceError> {
+        crate::drive_map::read()
+    }
 }
 
 /// Whether the Administrators group is *enabled* in this process's token.
