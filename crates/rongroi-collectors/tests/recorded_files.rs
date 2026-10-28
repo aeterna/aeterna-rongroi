@@ -1879,3 +1879,59 @@ fn j2_a_path_recorded_with_slashes_is_matched_like_backslashes() {
         "2026-09-13T09:30:00Z",
     );
 }
+
+/// (M1) A BAM value spelled as a device path reaches `recorded_files` at the drive letter the map
+/// gives it, so the file it names is read instead of the record being dropped as not drive-rooted
+/// (ADR 0087 section 2). The device and serial are invented.
+#[test]
+fn m1_a_mapped_bam_device_path_is_read_at_the_letter_it_names() {
+    const DEVICE: &str = r"\Device\HarddiskVolume7";
+    const PATH: &str = r"C:\Users\fixtureuser\Downloads\mapped.exe";
+    let fixture = FixtureHost::from_yaml_str(
+        &format!(
+            r#"platform: windows
+os_build: "26100"
+env:
+  WinDir: 'C:\Windows'
+  SystemDrive: 'C:'
+  SystemRoot: 'C:\Windows'
+drive_map:
+  - letter: C
+    device: '{DEVICE}'
+    serial: 439041101
+    kind: fixed
+registry:
+  '{BAM_KEY}':
+    Version: 1
+    SequenceNumber: 1
+    '{DEVICE}\Users\fixtureuser\Downloads\mapped.exe':
+      content: '012345678901234567890123'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      content: ''
+  'C:\Users\fixtureuser\Downloads':
+    - name: 'mapped.exe'
+      content: 'fixture bytes'
+processes:
+  - pid: 4
+    name: System
+"#,
+        ),
+        "inline",
+    )
+    .unwrap();
+
+    let run = recorded_files().collect(&fixture);
+    let (observations, gaps) = measured(&run);
+
+    assert!(non_journal_gaps(gaps).is_empty(), "{gaps:?}");
+    let observation = observation_named(observations, "mapped.exe");
+    assert_eq!(text(observation, "path"), Some(PATH), "{observation:?}");
+    assert_eq!(flag(observation, "by_bam"), Some(true), "{observation:?}");
+    assert_eq!(
+        text(observation, "identity_read"),
+        Some("read"),
+        "{observation:?}"
+    );
+}

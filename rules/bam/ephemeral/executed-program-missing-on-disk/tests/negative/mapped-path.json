@@ -1,0 +1,38 @@
+{
+  "description": "BAM recorded device paths that the drive map turned into letters, but each executable is still on disk",
+  "observations": [
+    {
+      "collector": "bam",
+      "fields": {
+        "last_run": "2026-10-15T11:00:00Z",
+        "moderation_state": 0,
+        "name": "installer.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Temp\\installer.exe",
+        "path_from_device": true,
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "last_run": "2026-10-15T10:00:00Z",
+        "moderation_state": 0,
+        "name": "tool.exe",
+        "path": "D:\\Tools\\tool.exe",
+        "path_from_device": true,
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "entries": 2,
+        "intact": true,
+        "metadata_values": 2,
+        "rejected": 0,
+        "sid_withheld": "per_user_identifier",
+        "users": 1
+      }
+    }
+  ]
+}

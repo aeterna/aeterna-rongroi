@@ -1133,4 +1133,181 @@ mod tests {
         assert_eq!(records.len(), 1, "{records:?}");
         assert_eq!(field(records[0], "disappeared_from_disk"), None);
     }
+
+    /// An invented fixed volume and its serial, for the drive-map tests. Devices and serials are
+    /// invented, never read from a real PC (ADR 0087 section 1).
+    const MAPPED_DEVICE: &str = r"\Device\HarddiskVolume7";
+    const MAPPED_SERIAL: u32 = 439_041_101;
+    /// An invented removable volume, whose BAM paths stay withheld (ADR 0087 section 3).
+    const REMOVABLE_DEVICE: &str = r"\Device\HarddiskVolume9";
+    const REMOVABLE_SERIAL: u32 = 439_041_102;
+    /// A device no letter names, so its BAM path stays withheld as well.
+    const UNMAPPED_DEVICE: &str = r"\Device\HarddiskVolume8";
+
+    /// A fixture machine with a fixed `C:`, a removable `D:` and BAM values spelled as device paths:
+    /// one on each letter and one on a device no letter names. `extra` is YAML written under the
+    /// account key after them, so a test can add a value that does not decode.
+    fn drive_map_host(extra: &str) -> FixtureHost {
+        let yaml = format!(
+            r"platform: windows
+drive_map:
+  - letter: C
+    device: '{MAPPED_DEVICE}'
+    serial: {MAPPED_SERIAL}
+    kind: fixed
+  - letter: D
+    device: '{REMOVABLE_DEVICE}'
+    serial: {REMOVABLE_SERIAL}
+    kind: removable
+registry:
+  '{USER_SETTINGS_KEY}\S-1-5-21-0-0-0-1001':
+    Version: 1
+    SequenceNumber: 1
+    '{MAPPED_DEVICE}\Users\fixtureuser\Downloads\mapped.exe':
+      content: '012345678901234567890123'
+    '{REMOVABLE_DEVICE}\Users\fixtureuser\Downloads\removable.exe':
+      content: '012345678901234567890123'
+    '{UNMAPPED_DEVICE}\Users\fixtureuser\Downloads\unmapped.exe':
+      content: '012345678901234567890123'
+{extra}"
+        );
+        FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+    }
+
+    /// A BAM value spelled as a device path is mapped through the drive map before it reaches
+    /// `path`: a fixed letter's path is emitted with `path_from_device`, and a removable letter's or
+    /// an unknown device's stays withheld (ADR 0087 sections 2 and 3).
+    #[test]
+    fn a_mapped_device_path_is_emitted_with_path_from_device_and_an_unmapped_one_is_withheld() {
+        let run = Bam.collect(&drive_map_host(""));
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 3, "{records:?}");
+
+        let mapped = records
+            .iter()
+            .find(|record| text(record, "name") == Some("mapped.exe"))
+            .expect("the mapped record is reported");
+        assert_eq!(
+            text(mapped, "path"),
+            Some(r"C:\Users\fixtureuser\Downloads\mapped.exe")
+        );
+        assert_eq!(field(mapped, "path_from_device"), Some(&true.into()));
+        assert_eq!(text(mapped, "path_withheld"), None);
+
+        for name in ["removable.exe", "unmapped.exe"] {
+            let record = records
+                .iter()
+                .find(|record| text(record, "name") == Some(name))
+                .unwrap_or_else(|| panic!("{name} is reported"));
+            assert_eq!(field(record, "path"), None, "{record:?}");
+            assert_eq!(text(record, "path_withheld"), Some(UNREDACTABLE_FORM));
+            assert_eq!(field(record, "path_from_device"), None, "{record:?}");
+        }
+    }
+
+    /// The device name and the serial are machine identifiers that never leave the collector (ADR
+    /// 0087 section 1), in a value that did not decode and in every `Debug` output either.
+    #[test]
+    fn no_device_name_volume_marker_or_serial_reaches_an_observation_a_read_or_a_debug() {
+        let short = r"    '\Device\HarddiskVolume7\Users\fixtureuser\Downloads\short.exe':
+      content: '0123'
+";
+        let run = Bam.collect(&drive_map_host(short));
+        let (observations, _) = measured(&run);
+
+        // The mapped record must be there before "nothing leaked" can mean anything.
+        let mapped = executions(observations)
+            .into_iter()
+            .find(|record| text(record, "name") == Some("mapped.exe"))
+            .expect("the mapped record is reported");
+        assert_eq!(field(mapped, "path_from_device"), Some(&true.into()));
+        assert_eq!(
+            text(mapped, "path"),
+            Some(r"C:\Users\fixtureuser\Downloads\mapped.exe")
+        );
+        assert_eq!(refusals(observations).len(), 1, "{observations:?}");
+
+        let mut shown = vec![
+            format!("{run:?}"),
+            format!("{:?}", Bam),
+            serde_json::to_string(&run).unwrap(),
+        ];
+        for observation in observations {
+            shown.push(format!("{observation:?}"));
+            for (name, value) in &observation.fields {
+                shown.push(name.clone());
+                shown.push(value.to_string());
+            }
+        }
+        let shown = shown.join("\n").to_ascii_lowercase();
+        let mut leaked = vec!["harddiskvolume".to_owned(), r"\volume{".to_owned()];
+        for serial in [MAPPED_SERIAL, REMOVABLE_SERIAL] {
+            leaked.push(serial.to_string());
+            leaked.push(format!("{serial:08x}"));
+        }
+        for leak in leaked {
+            assert!(
+                !shown.contains(&leak),
+                "{leak} reached the collector output: {shown}"
+            );
+        }
+
+        // The map's own `Debug` is what the fixture lets a report print of it.
+        let map = format!("{:?}", drive_map_host(short).drive_map().unwrap()).to_ascii_lowercase();
+        assert!(!map.contains("harddiskvolume"), "{map}");
+        for serial in [MAPPED_SERIAL, REMOVABLE_SERIAL] {
+            assert!(!map.contains(&serial.to_string()), "{map}");
+            assert!(!map.contains(&format!("{serial:08x}")), "{map}");
+        }
+    }
+
+    /// `recorded_paths` keeps the same mapped path `Bam::collect` emits, so `recorded_files` reads the
+    /// file the letter names (ADR 0087 section 2).
+    #[test]
+    fn recorded_paths_maps_a_device_path_the_same_way_as_the_observation() {
+        let (paths, gap) = recorded_paths(&drive_map_host("")).unwrap();
+        assert_eq!(gap, None);
+        let paths: Vec<&str> = paths
+            .iter()
+            .map(|recorded| recorded.path.as_str())
+            .collect();
+        assert_eq!(paths, [r"C:\Users\fixtureuser\Downloads\mapped.exe"]);
+    }
+
+    /// A mapped BAM path under Temp whose file is gone sets `disappeared_from_disk`, the field
+    /// `executed-program-missing-on-disk` matches (ADR 0087 section 2).
+    #[test]
+    fn a_mapped_path_under_temp_whose_file_is_gone_is_marked_disappeared() {
+        let yaml = format!(
+            r"platform: windows
+drive_map:
+  - letter: C
+    device: '{MAPPED_DEVICE}'
+    serial: {MAPPED_SERIAL}
+    kind: fixed
+registry:
+  '{USER_SETTINGS_KEY}\S-1-5-21-0-0-0-1001':
+    Version: 1
+    SequenceNumber: 1
+    '{MAPPED_DEVICE}\Users\fixtureuser\AppData\Local\Temp\loader.exe':
+      content: '012345678901234567890123'
+"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(
+            text(records[0], "path"),
+            Some(r"C:\Users\fixtureuser\AppData\Local\Temp\loader.exe")
+        );
+        assert_eq!(field(records[0], "path_from_device"), Some(&true.into()));
+        assert_eq!(
+            field(records[0], "disappeared_from_disk"),
+            Some(&true.into())
+        );
+    }
 }
