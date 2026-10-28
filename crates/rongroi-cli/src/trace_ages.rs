@@ -122,11 +122,19 @@ pub(crate) fn section(ages: &TraceAges, bundle: &Bundle, lang: Lang) -> String {
         );
         let value = match &anchor.state {
             AnchorAgeState::Measured {
-                on, days_before, ..
+                on,
+                days_before: Some(days),
+                ..
             } => words.get(
                 "trace_ages.on",
-                &[("date", on), ("days", &words.days(*days_before))],
+                &[("date", on), ("days", &words.days(*days))],
             ),
+            // Later than the scan: the date is shown, and no day count is made up for it (ADR 0088).
+            AnchorAgeState::Measured {
+                on,
+                days_before: None,
+                ..
+            } => words.get("trace_ages.on_after_scan", &[("date", on)]),
             AnchorAgeState::Unmeasured { reason } => not_read(&words, *reason),
         };
         let _ = writeln!(out, "    - {label}: {value}");
@@ -690,6 +698,7 @@ mod tests {
             "trace_ages.anchors",
             "trace_ages.sources",
             "trace_ages.on",
+            "trace_ages.on_after_scan",
             "trace_ages.days_before_one",
             "trace_ages.days_before_other",
             "trace_ages.oldest",
@@ -790,6 +799,37 @@ mod tests {
                 .all(|pair| !(pair[0] == b'-' && pair[1].is_ascii_digit())),
             "{line}"
         );
+    }
+
+    /// An anchor dated after the scan prints its date in the later-than-the-scan words, and no day
+    /// count beside it (ADR 0088).
+    #[test]
+    fn an_anchor_dated_after_the_scan_prints_its_date_and_no_day_count() {
+        use rongroi_core::view::AnchorAge;
+        let ages = TraceAges {
+            anchors: vec![AnchorAge {
+                anchor: "install_date".to_owned(),
+                state: AnchorAgeState::Measured {
+                    on: "2026-01-12".to_owned(),
+                    days_before: None,
+                    source: Some("HKLM".to_owned()),
+                    kept: None,
+                },
+            }],
+            rows: Vec::new(),
+            folded_logs: None,
+        };
+        let bundle = Bundle::embedded().unwrap();
+        let text = section(&ages, &bundle, Lang::En);
+        let line = text
+            .lines()
+            .find(|line| line.contains("2026-01-12"))
+            .unwrap_or_else(|| panic!("no anchor line in\n{text}"));
+        assert!(
+            line.ends_with(": 2026-01-12, later than this scan's own date"),
+            "{line}"
+        );
+        assert!(!line.contains("day"), "{line}");
     }
 
     fn render_fixture(host: &str, mode: rongroi_core::model::Mode, lang: Lang) -> String {

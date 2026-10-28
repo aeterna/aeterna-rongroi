@@ -137,10 +137,15 @@ function AnchorLine({ anchor }: { anchor: AnchorAge }) {
   const { t } = useTranslation("report");
   const kept = anchor.state === "measured" ? (anchor.kept ?? "") : "";
   const label = t(`trace_ages.anchor.${anchor.anchor}`, { kept });
-  const value =
-    anchor.state === "measured"
-      ? t("trace_ages.on", { date: anchor.on, days: days(t, anchor.days_before) })
-      : notRead(t, anchor.reason);
+  // Later than the scan: the date is shown, and no day count is made up for it (ADR 0088).
+  let value: string;
+  if (anchor.state !== "measured") {
+    value = notRead(t, anchor.reason);
+  } else if (anchor.days_before !== undefined) {
+    value = t("trace_ages.on", { date: anchor.on, days: days(t, anchor.days_before) });
+  } else {
+    value = t("trace_ages.on_after_scan", { date: anchor.on });
+  }
   return (
     <li>
       {label}: {value}

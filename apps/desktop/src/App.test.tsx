@@ -337,6 +337,35 @@ describe("App", () => {
     expect(screen.queryByText("FiveM ในเครื่องนี้ เทียบกับบันทึกของ Windows ว่าโปรแกรมใดเคยรัน")).toBeNull();
   });
 
+  // ADR 0088: an install date dated after the scan keeps its date, says it is later than the scan,
+  // and shows no day count.
+  it("shows an anchor dated after the scan with its date and no day count", async () => {
+    const view = snapshot("trace_ages_elevated_ss_view");
+    const ages = view.trace_ages;
+    if (!ages) {
+      throw new Error("the snapshot has no trace ages");
+    }
+    viewOverride = {
+      ...view,
+      trace_ages: {
+        ...ages,
+        anchors: ages.anchors.map((anchor) =>
+          anchor.anchor === "install_date"
+            ? { anchor: "install_date", state: "measured", on: "2026-11-02", source: "HKLM" }
+            : anchor,
+        ),
+      },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    const anchorLine = await screen.findByText(
+      /Windows installed or last feature-upgraded \(InstallDate\): 2026-11-02/,
+    );
+    expect(anchorLine.textContent).toContain("2026-11-02, later than this scan's own date");
+    expect(anchorLine.textContent).not.toMatch(/\d+ days? before/);
+  });
+
   it("shows the timeline in SS mode with its note and the scan time", async () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));

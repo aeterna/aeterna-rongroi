@@ -185,6 +185,7 @@
       "fivem_enhanced_program_folder_created": "เปลี่ยนเมื่อติดตั้ง FiveM ใหม่ ลบโฟลเดอร์ของมัน หรือย้ายหรือสร้างโปรไฟล์ Windows ใหม่"
     },
     "on": "{{date}} ({{days}}ก่อนสแกน)",
+    "on_after_scan": "{{date}} (ใหม่กว่าวันที่ของการสแกนนี้เอง)",
     "days_before_one": "{{count}} วัน",
     "days_before_other": "{{count}} วัน",
     "oldest": "เก่าสุด {{at}} ({{days}}ก่อนสแกน)",

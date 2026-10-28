@@ -557,8 +557,9 @@ pub enum AnchorAgeState {
     Measured {
         /// The UTC date; for `boot_time`, the header's time to the second (ADR 0039).
         on: String,
-        /// Whole days between it and the scan.
-        days_before: i64,
+        /// Whole days between it and the scan; absent when its date is after the scan's date (ADR 0088).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        days_before: Option<i64>,
         /// What was read, as the header names it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         source: Option<String>,
@@ -829,7 +830,7 @@ fn anchor_ages(report: &Report) -> Vec<AnchorAge> {
                 seconds_since_boot,
             } => AnchorAgeState::Measured {
                 on: booted_at.clone(),
-                days_before: i64::try_from(seconds_since_boot / 86_400).unwrap_or(i64::MAX),
+                days_before: Some(i64::try_from(seconds_since_boot / 86_400).unwrap_or(i64::MAX)),
                 source: None,
                 kept: None,
             },
@@ -838,26 +839,24 @@ fn anchor_ages(report: &Report) -> Vec<AnchorAge> {
     }];
     for anchor in &report.header.anchors {
         let state = match &anchor.state {
-            AnchorState::Measured { on, source, kept } => {
-                let days = on
-                    .parse::<jiff::civil::Date>()
-                    .ok()
-                    .zip(scan_date)
-                    .and_then(|(on, scan)| on.until(scan).ok())
-                    .map(|span| i64::from(span.get_days()));
-                match days {
-                    Some(days_before) => AnchorAgeState::Measured {
-                        on: on.clone(),
-                        days_before,
-                        source: Some(source.clone()),
-                        kept: *kept,
-                    },
-                    // A date the report cannot put a day count on is not shown as one.
-                    None => AnchorAgeState::Unmeasured {
-                        reason: UnmeasuredReason::ReadFailed,
-                    },
-                }
-            }
+            AnchorState::Measured { on, source, kept } => match on.parse::<jiff::civil::Date>() {
+                // The date was read, so it is shown. Its count is left out when the date is after
+                // the scan's, or the scan's own time is not known: a negative count would read as
+                // days before the scan (ADR 0088).
+                Ok(on_date) => AnchorAgeState::Measured {
+                    on: on.clone(),
+                    days_before: scan_date
+                        .filter(|scan| on_date <= *scan)
+                        .and_then(|scan| on_date.until(scan).ok())
+                        .map(|span| i64::from(span.get_days())),
+                    source: Some(source.clone()),
+                    kept: *kept,
+                },
+                // A date the report cannot read is not shown as a date, nor as a day count.
+                Err(_) => AnchorAgeState::Unmeasured {
+                    reason: UnmeasuredReason::ReadFailed,
+                },
+            },
             AnchorState::Unmeasured { reason } => AnchorAgeState::Unmeasured { reason: *reason },
         };
         anchors.push(AnchorAge {
@@ -3579,7 +3578,7 @@ mod tests {
                     anchor: "boot_time".to_owned(),
                     state: AnchorAgeState::Measured {
                         on: "2026-01-07T00:00:00Z".to_owned(),
-                        days_before: 3,
+                        days_before: Some(3),
                         source: None,
                         kept: None,
                     },
@@ -3588,7 +3587,7 @@ mod tests {
                     anchor: "install_date".to_owned(),
                     state: AnchorAgeState::Measured {
                         on: "2025-11-11".to_owned(),
-                        days_before: 60,
+                        days_before: Some(60),
                         source: Some("HKLM".to_owned()),
                         kept: None,
                     },
@@ -3600,6 +3599,93 @@ mod tests {
                     },
                 },
             ]
+        );
+    }
+
+    /// An `install_date` anchor dated `on`, read from the HKLM source.
+    fn install_date_on(on: &str) -> crate::model::Anchor {
+        use crate::model::{Anchor, AnchorKind};
+        Anchor {
+            anchor: AnchorKind::InstallDate,
+            state: AnchorState::Measured {
+                on: on.to_owned(),
+                source: "HKLM".to_owned(),
+                kept: None,
+            },
+        }
+    }
+
+    /// An anchor dated after the scan keeps its date and its source and has no count, where a negative
+    /// one would read as days before the scan (ADR 0088). The scan is 2026-01-10 at 12:00 UTC.
+    #[test]
+    fn an_anchor_dated_after_the_scan_keeps_its_date_and_source_and_no_count() {
+        let mut report = aged_report();
+        report.header.anchors = vec![install_date_on("2026-01-12")];
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        assert_eq!(
+            ages.anchors[1],
+            AnchorAge {
+                anchor: "install_date".to_owned(),
+                state: AnchorAgeState::Measured {
+                    on: "2026-01-12".to_owned(),
+                    days_before: None,
+                    source: Some("HKLM".to_owned()),
+                    kept: None,
+                },
+            }
+        );
+    }
+
+    /// The scan's own day counts as `Some(0)` and an earlier day as its count, so only a date after the
+    /// scan loses its count (ADR 0088).
+    #[test]
+    fn an_anchor_on_the_scans_day_or_before_it_keeps_its_count() {
+        for (on, expected) in [("2026-01-10", Some(0)), ("2025-11-11", Some(60))] {
+            let mut report = aged_report();
+            report.header.anchors = vec![install_date_on(on)];
+            let ages = trace_ages(&report, Mode::SelfCheck);
+            assert_eq!(
+                ages.anchors[1].state,
+                AnchorAgeState::Measured {
+                    on: on.to_owned(),
+                    days_before: expected,
+                    source: Some("HKLM".to_owned()),
+                    kept: None,
+                },
+                "{on}"
+            );
+        }
+    }
+
+    /// The JSON of an anchor dated after the scan has no `days_before` key, and keeps `on` and `source`
+    /// (ADR 0088, section 3: the view's schema stays at 1).
+    #[test]
+    fn an_anchor_dated_after_the_scan_writes_no_days_before_key() {
+        let mut report = aged_report();
+        report.header.anchors = vec![install_date_on("2026-01-12")];
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        let json = serde_json::to_value(&ages.anchors[1]).unwrap();
+        assert!(json.get("days_before").is_none(), "{json}");
+        assert_eq!(json["on"], "2026-01-12", "{json}");
+        assert_eq!(json["source"], "HKLM", "{json}");
+    }
+
+    /// With no readable scan time the date is still read and shown, and only the count is left out
+    /// (ADR 0088).
+    #[test]
+    fn an_anchor_without_a_readable_scan_time_keeps_its_date_and_no_count() {
+        let mut report = aged_report();
+        report.header.generated_at = "not-a-time".to_owned();
+        report.header.anchors = vec![install_date_on("2025-11-11")];
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        assert_eq!(
+            ages.anchors[1].state,
+            AnchorAgeState::Measured {
+                on: "2025-11-11".to_owned(),
+                days_before: None,
+                source: Some("HKLM".to_owned()),
+                kept: None,
+            }
         );
     }
 
