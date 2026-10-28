@@ -53,9 +53,11 @@ Who reads the field today:
 
 `AnchorAgeState::Measured.days_before` becomes `Option<i64>`, with
 `#[serde(default, skip_serializing_if = "Option::is_none")]`, the same shape `TraceAgeState::Measured`
-already uses (`view.rs:603-607`). It is `None` when the anchor's date is later than the scan's UTC date,
-and `None` too when the scan's own time does not parse. An anchor dated the same day as the scan stays
-`Some(0)`.
+already uses (`view.rs:603-607`). It is `None` when the anchor's date is later than the scan's UTC date.
+An anchor dated the same day as the scan stays `Some(0)`. When the scan's own time does not parse, the
+anchor stays `unmeasured { read_failed }`, as it is on `dev` today: the sentence of section 2 says the date
+is later than the scan's, which the report could not know then. (Corrected 2026-10-28, before it was built:
+the draft also left the count out in that case, which would have shown that sentence without a scan date.)
 
 The anchor stays `measured`. Its date, `source` and `kept` are shown as before: the date was read, and an
 anchor dated after the scan is itself something a reviewer should see. Only the count, which would be
