@@ -6,6 +6,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Evidence, ReportHeader, ReportView, RuleText } from "../types";
 import { HorizonTimeline } from "./HorizonTimeline";
+import { Odometer } from "./HumanSummary.odometer";
+import "./HumanSummary.motion.css";
 
 interface Props {
   view: ReportView;
@@ -128,7 +130,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         >
           <div className="count">
             <span className="tally-mark">■</span>
-            <span>{view.listed.found}</span>
+            <Odometer value={view.listed.found} />
           </div>
           <div className="label">{t("summary.found")}</div>
         </button>
@@ -136,7 +138,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         <button type="button" className="tally-item tally-not_found" onClick={onSwitchToTechnical}>
           <div className="count">
             <span className="tally-mark">○</span>
-            <span>{view.listed.not_found}</span>
+            <Odometer value={view.listed.not_found} />
           </div>
           <div className="label">{t("summary.not_found")}</div>
         </button>
@@ -148,7 +150,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         >
           <div className="count">
             <span className="tally-mark">◌</span>
-            <span>{view.listed.unmeasured}</span>
+            <Odometer value={view.listed.unmeasured} />
           </div>
           <div className="label">{t("summary.unmeasured")}</div>
         </button>
