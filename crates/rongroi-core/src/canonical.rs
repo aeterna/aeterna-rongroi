@@ -295,10 +295,17 @@ mod tests {
         let fixture = include_str!("../tests/data/visual-hash-v1.json");
         let record: Value = serde_json::from_str(fixture).unwrap();
         // The literals the cross-language vector carries, checked before anything recomputes them.
-        assert_eq!(record["policy"]["policy_hash"].as_str(), Some(FIXTURE_POLICY_HASH));
+        assert_eq!(
+            record["policy"]["policy_hash"].as_str(),
+            Some(FIXTURE_POLICY_HASH)
+        );
         assert_eq!(record["visual_hash"].as_str(), Some(FIXTURE_VISUAL_HASH));
         let mut without = record.clone();
         let _ = without.as_object_mut().unwrap().remove("visual_hash");
         assert_eq!(canonical_json(&without).unwrap(), FIXTURE_CANONICAL);
-        assert_eq!(first_eight_hex_by_hand(FIXTURE_CANONICAL), visual_hash(&record).unwrap());
-    }}
+        assert_eq!(
+            first_eight_hex_by_hand(FIXTURE_CANONICAL),
+            visual_hash(&record).unwrap()
+        );
+    }
+}
