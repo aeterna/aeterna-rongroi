@@ -97,9 +97,7 @@ export function App() {
             </>
           )}
           <div className="top-title">
-            <h1 className={screen === "start" ? undefined : "visually-hidden"}>
-              {t("app.name")}
-            </h1>
+            <h1 className={screen === "start" ? undefined : "visually-hidden"}>{t("app.name")}</h1>
             {screen === "start" && <p className="muted">{t("app.tagline")}</p>}
           </div>
         </div>
