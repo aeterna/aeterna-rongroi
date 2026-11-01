@@ -165,6 +165,14 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
     }
 
     let provenance = Provenance::current();
+    // Every record this program writes is produced by the offline tool itself, interactively (the
+    // CLI is the Offline product's command line, ADR 0089 §1), never for one paired server, so the
+    // record carries no binding and no policy (ADR 0089 §2).
+    let producer = view::Producer {
+        name: view::ProducerName::RongroiOffline,
+        version: provenance.version.clone(),
+        mode: view::ProducerMode::Interactive,
+    };
     // This program is in its own process list while it scans. The engine needs to know what "this
     // program" is to separate those traces from evidence about the PC (ADR 0010); the executable's
     // digest is the one the header already carries, so it is not read twice.
@@ -189,7 +197,16 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
             saved_at: jiff::Timestamp::now().to_string(),
         };
         // Serialised once; the digest and standard output are the same bytes, with nothing after them.
-        let bytes = view::saved_record(&report, options, Some(code.clone()), times).to_bytes()?;
+        let bytes = view::saved_record(
+            &report,
+            options,
+            Some(code.clone()),
+            producer,
+            None,
+            None,
+            times,
+        )?
+        .to_bytes()?;
         eprintln!(
             "{}",
             output::saved_digest(

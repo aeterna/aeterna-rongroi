@@ -67,12 +67,23 @@ pub fn build_saved_record(
         scan_finished_at: state.scan_finished_at.clone(),
         saved_at: jiff::Timestamp::now().to_string(),
     };
+    // This app is the Offline product: it produces its own records interactively and never for one
+    // paired server, so the record carries no binding and no policy (ADR 0089 §2).
+    let producer = view::Producer {
+        name: view::ProducerName::RongroiOffline,
+        version: state.report.header.provenance.version.clone(),
+        mode: view::ProducerMode::Interactive,
+    };
     let bytes = view::saved_record(
         &state.report,
         options.unwrap_or_default(),
         code.clone(),
+        producer,
+        None,
+        None,
         times,
     )
+    .map_err(|e| e.to_string())?
     .to_bytes()
     .map_err(|e| e.to_string())?;
     let summary = SavedSummary {
