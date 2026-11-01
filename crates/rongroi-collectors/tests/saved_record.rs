@@ -93,11 +93,17 @@ fn the_record_holds_the_ss_view_every_device_and_its_header_fields() {
     let json: serde_json::Value = serde_json::from_slice(&record.to_bytes().unwrap()).unwrap();
 
     assert_eq!(json["kind"], "rongroi-saved-report");
-    assert_eq!(json["schema"], 2, "every new record is schema 2 (ADR 0089 §2)");
+    assert_eq!(
+        json["schema"], 2,
+        "every new record is schema 2 (ADR 0089 §2)"
+    );
     assert_eq!(json["case_code"], "K7Q2MX");
     assert_eq!(json["rongroi_version"], "0.0.0-test");
     assert_eq!(json["producer"]["name"], "rongroi-offline");
-    assert_eq!(json["producer"]["version"], "0.0.0-test", "the version from provenance");
+    assert_eq!(
+        json["producer"]["version"], "0.0.0-test",
+        "the version from provenance"
+    );
     assert_eq!(json["producer"]["mode"], "interactive");
     // Offline: the record was not produced for one paired server, so it says nothing about one.
     assert!(json.get("binding").is_none(), "no binding when unset");
@@ -176,7 +182,10 @@ fn the_written_visual_hash_is_the_hash_of_the_written_bytes_without_itself() {
         "the member is the hash of the record without it"
     );
     assert_eq!(hash.len(), 16);
-    assert!(hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
+    assert!(
+        hash.bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    );
 
     // A changed field is a changed record, and so a changed hash.
     let changed = record_of("baseline-consumer-win11", None, no_binding_no_policy());
@@ -202,7 +211,11 @@ fn a_set_binding_and_policy_are_carried_whole_and_count_in_the_visual_hash() {
         server_name: "Example Test Range".to_owned(),
         policy_hash: "01aa5ff1c6cebb14".to_owned(),
     };
-    let json = record_of("baseline-consumer-win11", None, (Some(binding), Some(policy)));
+    let json = record_of(
+        "baseline-consumer-win11",
+        None,
+        (Some(binding), Some(policy)),
+    );
     assert_eq!(
         json["binding"],
         serde_json::json!({
