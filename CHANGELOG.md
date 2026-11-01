@@ -27,6 +27,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   redacted in SS mode like every other path; it lets `recorded_files` read the program's file, lets the
   game-window view join BAM to other sources by path (so a program run and then deleted can show I1), and can
   make `executed-program-missing-on-disk` match on more machines.
+- The desktop window's header stays in view while a long report scrolls, and outside the start screen it has a
+  home button and a trail (`aeterna-rongroi / Self check`) beside it; a button appears after the first 200 px to
+  go back to the top (instant under reduced motion), and the "Scan as administrator" and "Full scan" buttons are
+  disabled while their request is being answered. The report, its privacy filtering and every collector are unchanged.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
