@@ -31,8 +31,9 @@ Edge component, so the property ADR 0001 protects holds. `main()` opens it after
 ### 2. The window has its own thread
 
 `scan::run` blocks the thread that calls it, so the window runs its message loop on a thread of its own and
-is closed by posting `WM_CLOSE` and joining. `Splash` closes on `Drop`, so a panic during the scan does not
-leave a window behind. A splash that cannot be created does nothing; it never stops a scan (hard rule 4).
+is closed by posting a private message (`WM_APP + 1`) and joining. The window ignores `WM_CLOSE`, so the
+person cannot close it and a handle Windows has reused is never posted to. `Splash` closes on `Drop`, so a
+panic during the scan does not leave a window behind. A splash that cannot be created does nothing; it never stops a scan (hard rule 4).
 
 ### 3. It says that a scan is running, and nothing it does not know (owner, 2026-11-01)
 
