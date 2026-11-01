@@ -38,6 +38,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   home button and a trail (`aeterna-rongroi / Self check`) beside it; a button appears after the first 200 px to
   go back to the top (instant under reduced motion), and the "Scan as administrator" and "Full scan" buttons are
   disabled while their request is being answered. The report, its privacy filtering and every collector are unchanged.
+- The desktop app shows a small native Windows window while the scan runs, on every start, so the program no longer
+  looks like it has hung: it says a scan is running, and on a full scan that reading the files of recorded programs
+  takes at most 90 seconds (the figure the full-scan question states). It is drawn by Windows with no WebView, opens
+  after the full-scan question and closes before the report window is created, and shows no progress figure because
+  the scan reports none (ADR 0092).
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
