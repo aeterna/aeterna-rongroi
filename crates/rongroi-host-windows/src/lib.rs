@@ -35,6 +35,11 @@ pub mod process;
 
 pub mod relaunch;
 
+// Not `cfg(windows)`: the parser is pure Rust, so its tests run on every platform. A2 (ADR 0091
+// section 2) will call it from the Windows live host; until then the non-Windows build has no caller.
+#[cfg_attr(not(windows), allow(dead_code))]
+mod reparse;
+
 pub mod signature;
 
 pub mod system_integrity;
