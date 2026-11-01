@@ -1239,3 +1239,221 @@ footer p {
     display: none;
   }
 }
+
+/* ==== Score and verdict versus three states of evidence (E7): the before/after comparison ==== */
+/* A made-up scoring tool beside rongroi's three states. The marks keep the app's shapes and the page's
+   existing colours — an orange square for found, a grey circle for not found, a dashed indigo circle for
+   not measured — never red or green. The segmented control is not in the markup: compare.js adds it, and
+   until it runs both panels stand one above the other, rongroi first, so the page reads with JavaScript
+   off. Only transform, opacity and stroke-dashoffset ease; reduced motion keeps every mark and the stamp
+   in their final state. */
+.cmp {
+  --cmp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cmp .seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.cmp .seg button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cmp .seg button[aria-pressed="true"] {
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.cmp .seg button:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.cmp .panels {
+  display: grid;
+  gap: 18px;
+}
+
+.cmp .panels > section {
+  padding: 6px 0;
+}
+
+.cmp .panels > section[hidden] {
+  display: none;
+}
+
+/* The invented panel: a score, a meter and a verdict stamp, all visibly labelled as a made-up picture. */
+.cmp .score {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.cmp .score .note {
+  margin: 0;
+}
+
+.cmp .tag {
+  align-self: flex-start;
+  padding: 2px 12px;
+  border: 1px solid #cfe5f8;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-family: var(--display);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.cmp .big {
+  color: var(--navy);
+  font: 700 clamp(2.8rem, 8vw, 3.2rem) / 1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+
+.cmp .meter {
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--raised);
+}
+
+.cmp .meter i {
+  display: block;
+  width: 87%;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #d99a3a, #b45309);
+}
+
+.cmp .stamp {
+  align-self: flex-start;
+  padding: 2px 14px;
+  border: 3px solid #b45309;
+  border-radius: 10px;
+  color: #b45309;
+  font: 700 1.1rem var(--display);
+  transform: rotate(-5deg);
+}
+
+/* The three rongroi states, drawn with the same marks the app uses. */
+.cmp .three {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.cmp .st {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.cmp .st svg {
+  width: 48px;
+  height: 48px;
+}
+
+.cmp .st .sh {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.cmp .st.f .sh {
+  fill: var(--found-mark);
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.cmp .st.n .sh {
+  stroke: var(--not-found);
+  stroke-dasharray: 63;
+  stroke-dashoffset: 0;
+}
+
+.cmp .st.u .sh {
+  stroke: var(--unmeasured);
+  stroke-dasharray: 4 5;
+}
+
+.cmp .st h3 {
+  margin: 0;
+  color: var(--navy);
+  font-family: var(--display);
+  font-size: 1.15rem;
+}
+
+.cmp .st p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+/* With JavaScript on, each state redraws when its panel is chosen. The base state is the final one, so
+   the no-JavaScript page already shows every mark. */
+.cmp.ready .panels > section .st.f .sh {
+  transform: scale(0);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s;
+}
+
+.cmp.ready .panels > section .st.n .sh {
+  stroke-dashoffset: 63;
+  transition: stroke-dashoffset 0.9s var(--cmp-ease) 0.15s;
+}
+
+.cmp.ready .panels > section .st.u .sh {
+  opacity: 0;
+  transition: opacity 0.6s var(--cmp-ease) 0.35s;
+}
+
+.cmp.ready .panels > section.on .st.f .sh {
+  transform: scale(1);
+}
+
+.cmp.ready .panels > section.on .st.n .sh {
+  stroke-dashoffset: 0;
+}
+
+.cmp.ready .panels > section.on .st.u .sh {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmp.ready .panels > section .st.f .sh,
+  .cmp.ready .panels > section .st.n .sh,
+  .cmp.ready .panels > section .st.u .sh {
+    transition: none;
+  }
+}

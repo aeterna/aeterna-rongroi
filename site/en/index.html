@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
-<!-- The English landing page. Two local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram); no tracker, nothing loaded from another host. Update the version on each release. -->
+<!-- The English landing page. Three local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram, compare.js for the comparison); no tracker, nothing loaded from another host. Update the version on each release. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -178,6 +178,43 @@
     </ul>
   </section>
 
+  <section class="compare" data-compare data-label-group="Choose a view" data-label-rr="rongroi" data-label-gen="Made-up picture: a generic tool" aria-labelledby="cmp-h">
+    <h2 id="cmp-h">A score and a verdict, or three states of evidence</h2>
+    <p class="lead">A made-up picture of a tool that gives a score and then a verdict (naming no product), beside rongroi's way: three states of evidence.</p>
+    <div class="cmp">
+      <div class="panels" id="cmp-panels">
+        <section id="cmp-rr" aria-label="rongroi: found, not found, not measured">
+          <div class="three">
+            <div class="st f">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><rect class="sh" x="12" y="12" width="24" height="24" rx="5"/></svg>
+              <h3>Found</h3>
+              <p>A trace was found, with the evidence and where it came from.</p>
+            </div>
+            <div class="st n">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle class="sh" cx="24" cy="24" r="10" transform="rotate(-90 24 24)"/></svg>
+              <h3>Not found</h3>
+              <p>Nothing was found, and the report says how far back that source can see.</p>
+            </div>
+            <div class="st u">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle class="sh" cx="24" cy="24" r="10"/></svg>
+              <h3>Not measured</h3>
+              <p>The check could not run, with the reason — for example, it needed administrator rights.</p>
+            </div>
+          </div>
+        </section>
+        <section id="cmp-gen" aria-label="Made-up picture: a score and then a verdict">
+          <div class="score">
+            <p class="note">A made-up picture of a generic tool, not rongroi · rongroi gives no score and no verdict</p>
+            <span class="tag">Overall risk (made-up example)</span>
+            <div class="big" id="cmp-big">87</div>
+            <div class="meter" aria-hidden="true"><i></i></div>
+            <div class="stamp">Verdict: fail</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <section>
     <h2>Every result is one of three</h2>
     <div class="states">
@@ -289,5 +326,6 @@
 </footer>
 <script src="../specimen.js" defer></script>
 <script src="../flow.js" defer></script>
+<script src="../compare.js" defer></script>
 </body>
 </html>

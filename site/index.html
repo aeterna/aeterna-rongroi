@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
-<!-- The Thai landing page. Two local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram); no tracker, nothing loaded from another host. Update the version on each release. -->
+<!-- The Thai landing page. Three local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram, compare.js for the comparison); no tracker, nothing loaded from another host. Update the version on each release. -->
 <html lang="th">
 <head>
 <meta charset="utf-8">
@@ -179,6 +179,43 @@
     </ul>
   </section>
 
+  <section class="compare" data-compare data-label-group="เลือกมุมมอง" data-label-rr="rongroi" data-label-gen="ภาพสมมติ: เครื่องมือทั่วไป" aria-labelledby="cmp-h">
+    <h2 id="cmp-h">คะแนนตัดสิน เทียบกับหลักฐานสามสถานะ</h2>
+    <p class="lead">ภาพสมมติของเครื่องมือที่ให้คะแนนแล้วตัดสิน (ไม่ระบุเจ้าใด) เทียบกับวิธีของ rongroi ที่แสดงหลักฐานสามสถานะ</p>
+    <div class="cmp">
+      <div class="panels" id="cmp-panels">
+        <section id="cmp-rr" aria-label="rongroi: เจอ ไม่เจอ ยังไม่ได้วัด">
+          <div class="three">
+            <div class="st f">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><rect class="sh" x="12" y="12" width="24" height="24" rx="5"/></svg>
+              <h3>เจอ</h3>
+              <p>เจอร่องรอย แสดงหลักฐานพร้อมบอกที่มา</p>
+            </div>
+            <div class="st n">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle class="sh" cx="24" cy="24" r="10" transform="rotate(-90 24 24)"/></svg>
+              <h3>ไม่เจอ</h3>
+              <p>ไม่เจอ และบอกว่าแหล่งนั้นย้อนดูได้ไกลแค่ไหน</p>
+            </div>
+            <div class="st u">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle class="sh" cx="24" cy="24" r="10"/></svg>
+              <h3>ยังไม่ได้วัด</h3>
+              <p>ตรวจข้อนั้นไม่ได้ พร้อมเหตุผล เช่น ต้องใช้สิทธิ์ผู้ดูแลระบบ</p>
+            </div>
+          </div>
+        </section>
+        <section id="cmp-gen" aria-label="ภาพสมมติ: คะแนนแล้วตัดสิน">
+          <div class="score">
+            <p class="note">ภาพสมมติของเครื่องมือทั่วไป ไม่ใช่ rongroi · rongroi ไม่ให้คะแนนและไม่ตัดสิน</p>
+            <span class="tag">ความเสี่ยงรวม (ตัวอย่างสมมติ)</span>
+            <div class="big" id="cmp-big">87</div>
+            <div class="meter" aria-hidden="true"><i></i></div>
+            <div class="stamp">ตัดสิน: ไม่ผ่าน</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <section>
     <h2>ผลมี 3 แบบ</h2>
     <div class="states">
@@ -290,5 +327,6 @@
 </footer>
 <script src="specimen.js" defer></script>
 <script src="flow.js" defer></script>
+<script src="compare.js" defer></script>
 </body>
 </html>
