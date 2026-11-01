@@ -45,6 +45,11 @@
   line-height: 1em;
 }
 
+/* The rows carry only `data-d`; the digit is drawn here so the strips add no text to the DOM. */
+.odometer-strip span::before {
+  content: attr(data-d);
+}
+
 /* H4: four 10px HUD corner brackets on the hero, drawn without extra markup. */
 .hero-note::before {
   content: "";

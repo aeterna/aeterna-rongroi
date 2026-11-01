@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
-<!-- The Thai landing page. One local script (specimen.js) for the specimen figure; no tracker, nothing loaded from another host. Update the version on each release. -->
+<!-- The Thai landing page. Three local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram, compare.js for the comparison); no tracker, nothing loaded from another host. Update the version on each release. -->
 <html lang="th">
 <head>
 <meta charset="utf-8">
@@ -179,6 +179,43 @@
     </ul>
   </section>
 
+  <section class="compare" data-compare data-label-group="เลือกมุมมอง" data-label-rr="rongroi" data-label-gen="ภาพสมมติ: เครื่องมือทั่วไป" aria-labelledby="cmp-h">
+    <h2 id="cmp-h">คะแนนตัดสิน เทียบกับหลักฐานสามสถานะ</h2>
+    <p class="lead">ภาพสมมติของเครื่องมือที่ให้คะแนนแล้วตัดสิน (ไม่ระบุเจ้าใด) เทียบกับวิธีของ rongroi ที่แสดงหลักฐานสามสถานะ</p>
+    <div class="cmp">
+      <div class="panels" id="cmp-panels">
+        <section id="cmp-rr" aria-label="rongroi: เจอ ไม่เจอ ยังไม่ได้วัด">
+          <div class="three">
+            <div class="st f">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><rect class="sh" x="12" y="12" width="24" height="24" rx="5"/></svg>
+              <h3>เจอ</h3>
+              <p>เจอร่องรอย แสดงหลักฐานพร้อมบอกที่มา</p>
+            </div>
+            <div class="st n">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle class="sh" cx="24" cy="24" r="10" transform="rotate(-90 24 24)"/></svg>
+              <h3>ไม่เจอ</h3>
+              <p>ไม่เจอ และบอกว่าแหล่งนั้นย้อนดูได้ไกลแค่ไหน</p>
+            </div>
+            <div class="st u">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle class="sh" cx="24" cy="24" r="10"/></svg>
+              <h3>ยังไม่ได้วัด</h3>
+              <p>ตรวจข้อนั้นไม่ได้ พร้อมเหตุผล เช่น ต้องใช้สิทธิ์ผู้ดูแลระบบ</p>
+            </div>
+          </div>
+        </section>
+        <section id="cmp-gen" aria-label="ภาพสมมติ: คะแนนแล้วตัดสิน">
+          <div class="score">
+            <p class="note">ภาพสมมติของเครื่องมือทั่วไป ไม่ใช่ rongroi · rongroi ไม่ให้คะแนนและไม่ตัดสิน</p>
+            <span class="tag">ความเสี่ยงรวม (ตัวอย่างสมมติ)</span>
+            <div class="big" id="cmp-big">87</div>
+            <div class="meter" aria-hidden="true"><i></i></div>
+            <div class="stamp">ตัดสิน: ไม่ผ่าน</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <section>
     <h2>ผลมี 3 แบบ</h2>
     <div class="states">
@@ -186,6 +223,38 @@
       <div class="state not-found"><span class="mark mark-not-found" aria-hidden="true"></span><strong>ไม่เจอ</strong><span>ไม่เจอ และบอกด้วยว่าแหล่งนั้นย้อนดูได้ไกลแค่ไหน เช่น "log นี้เก็บแค่ไม่กี่วันล่าสุด"</span></div>
       <div class="state unmeasured"><span class="mark mark-unmeasured" aria-hidden="true"></span><strong>ยังไม่ได้วัด</strong><span>ตรวจข้อนั้นไม่ได้ พร้อมเหตุผล เช่น "ต้องใช้สิทธิ์ผู้ดูแลระบบ"</span></div>
     </div>
+  </section>
+
+  <section class="dataflow">
+    <h2>ข้อมูลไหลอยู่ในเครื่องนี้เท่านั้น</h2>
+    <p>จุดวิ่งตามเส้นจากไฟล์ของ Windows ไปที่ตัวสแกนและไปที่รายงานบนจอ เส้นประไปอินเทอร์เน็ตมีเครื่องหมายกั้น จุดที่ลองไปถึงกั้นแล้วจางหาย</p>
+    <svg id="flow-svg" viewBox="0 0 900 310" role="img" aria-label="ข้อมูลจากไฟล์ของ Windows ไหลไปที่ตัวสแกนในเครื่องแล้วไปที่รายงานบนจอ ส่วนเส้นไปอินเทอร์เน็ตถูกกั้น">
+      <path id="flow-wire-a" class="df-wire" d="M250 190 L386 190"/>
+      <path id="flow-wire-b" class="df-wire" d="M514 190 L650 190"/>
+      <path id="flow-wire-c" class="df-wire df-wire-no" d="M492 142 C540 70 580 44 650 44"/>
+      <polygon class="df-head" points="386,182 400,190 386,198"/>
+      <polygon class="df-head" points="650,182 636,190 650,198"/>
+      <rect class="df-box" x="20" y="130" width="230" height="120" rx="14"/>
+      <text class="df-lab" x="135" y="182" text-anchor="middle">ไฟล์ · Registry · Log</text>
+      <text class="df-sub" x="135" y="208" text-anchor="middle">ของ Windows เครื่องนี้</text>
+      <circle class="df-core" cx="450" cy="190" r="64"/>
+      <text class="df-lab" x="450" y="186" text-anchor="middle">สแกน</text>
+      <text class="df-sub" x="450" y="208" text-anchor="middle">ในเครื่องนี้</text>
+      <rect class="df-box" x="650" y="130" width="230" height="120" rx="14"/>
+      <text class="df-lab" x="765" y="182" text-anchor="middle">รายงานบนจอ</text>
+      <text class="df-sub" x="765" y="208" text-anchor="middle">แสดงบนจอนี้เท่านั้น</text>
+      <rect class="df-box" x="650" y="14" width="230" height="60" rx="14" stroke-dasharray="6 6"/>
+      <text class="df-lab" x="765" y="50" text-anchor="middle">อินเทอร์เน็ต</text>
+      <line class="df-x" x1="572" y1="42" x2="592" y2="68"/>
+      <line class="df-x" x1="592" y1="42" x2="572" y2="68"/>
+      <circle class="df-pkt df-pkt-1" r="5" opacity="0"><animateMotion dur="2.4s" repeatCount="indefinite" begin="0s"><mpath href="#flow-wire-a"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.85;1" dur="2.4s" repeatCount="indefinite" begin="0s"/></circle>
+      <circle class="df-pkt df-pkt-1" r="5" opacity="0"><animateMotion dur="2.4s" repeatCount="indefinite" begin="0.8s"><mpath href="#flow-wire-a"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.85;1" dur="2.4s" repeatCount="indefinite" begin="0.8s"/></circle>
+      <circle class="df-pkt df-pkt-1" r="5" opacity="0"><animateMotion dur="2.4s" repeatCount="indefinite" begin="1.6s"><mpath href="#flow-wire-a"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.85;1" dur="2.4s" repeatCount="indefinite" begin="1.6s"/></circle>
+      <circle class="df-pkt df-pkt-2" r="5" opacity="0"><animateMotion dur="2.4s" repeatCount="indefinite" begin="0.4s"><mpath href="#flow-wire-b"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.85;1" dur="2.4s" repeatCount="indefinite" begin="0.4s"/></circle>
+      <circle class="df-pkt df-pkt-2" r="5" opacity="0"><animateMotion dur="2.4s" repeatCount="indefinite" begin="1.2s"><mpath href="#flow-wire-b"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.85;1" dur="2.4s" repeatCount="indefinite" begin="1.2s"/></circle>
+      <circle class="df-pkt df-pkt-x" r="5" opacity="0"><animateMotion dur="3.2s" repeatCount="indefinite" begin="0.6s" calcMode="linear" keyPoints="0;.64;.64" keyTimes="0;.55;1"><mpath href="#flow-wire-c"/></animateMotion><animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;.1;.5;.62;1" dur="3.2s" repeatCount="indefinite" begin="0.6s"/></circle>
+    </svg>
+    <p>โค้ดของโปรแกรมไม่ส่งอะไรออกไปเลย เส้นประไปอินเทอร์เน็ตในภาพจึงถูกกั้น ส่วนรุ่นที่มีหน้าต่างใช้ Microsoft WebView2 ซึ่งเป็นส่วนหนึ่งของ Windows และอาจส่งข้อมูลวินิจฉัยของ Windows ตามการตั้งค่า Windows ของคุณ ถ้าไม่อยากให้มีส่วนนี้ ใช้รุ่นบรรทัดคำสั่ง (CLI) ซึ่งไม่ใช้ WebView2 รายละเอียดอยู่ใน <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md">PRIVACY.md</a></p>
   </section>
 
   <section>
@@ -257,5 +326,7 @@
   </div>
 </footer>
 <script src="specimen.js" defer></script>
+<script src="flow.js" defer></script>
+<script src="compare.js" defer></script>
 </body>
 </html>

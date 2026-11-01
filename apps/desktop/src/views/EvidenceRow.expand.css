@@ -1,0 +1,38 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+
+/* E5: the fold a row's body opens and closes in. The body stays one grid row from `0fr` to `1fr`,
+   so it animates by height and opacity and is never display:none while it moves; the fold itself
+   may read as closed (visibility) only once the collapse has run its 200 ms. */
+.row-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 200ms ease,
+    opacity 200ms ease,
+    visibility 0s linear 200ms;
+}
+
+.row-fold[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 200ms ease,
+    opacity 200ms ease;
+}
+
+/* The folded row clips its own body, including its padding and gap, at the closed height. */
+.row-fold > .row-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-fold {
+    transition: none;
+  }
+}

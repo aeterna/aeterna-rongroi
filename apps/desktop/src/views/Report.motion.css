@@ -1,0 +1,29 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+
+/* E1: each collector group rises in once, the first time the technical view opens. Report adds the
+   reveal-on class at that moment and takes it off when the play is over, so a group is never hidden
+   while it waits for a script, and a later filter, search or view switch cannot restart the play.
+   Only transform and opacity move; the reader who asks for reduced motion gets plain groups. */
+.view-tech-wrap.reveal-on section.group {
+  animation: report-group-rise 300ms ease-out backwards;
+}
+
+@keyframes report-group-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-tech-wrap.reveal-on section.group {
+    animation: none;
+  }
+}

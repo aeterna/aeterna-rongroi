@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { withKeys } from "../keys";
 import type { Evidence, Observation, RowBand, RuleFiles, RuleText } from "../types";
 import { CodeLink } from "./CodeLink";
+import "./EvidenceRow.expand.css";
 import "./EvidenceRow.motion.css";
 
 interface Props {
@@ -45,6 +46,71 @@ export function EvidenceRow({
   const [technical, setTechnical] = useState(false);
   const shown = open || technicalAll;
   const showTechnical = technical || technicalAll;
+  const reduced = usePrefersReducedMotion();
+  // The fold that opens and closes the body keeps it in the DOM from its first expansion on, so a
+  // collapse animates and then hides it, instead of tearing it out; a row never expanded has no
+  // body at all, as before.
+  const [mounted, setMounted] = useState(item.state === "found");
+  // Whether the fold is at its open height: it holds a freshly mounted body closed for one frame,
+  // so the browser has a `0fr` start value to animate from, and drops it at once when closing.
+  const [unfolded, setUnfolded] = useState(item.state === "found");
+  // Whether the collapse has finished. It only tells the effect that the 200 ms collapse has run
+  // its course; the fold is already inert while it is closed, from the first frame.
+  const [hidden, setHidden] = useState(false);
+  const headRef = useRef<HTMLButtonElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (shown) {
+      if (hidden) {
+        setHidden(false);
+        return;
+      }
+      if (!mounted) {
+        setMounted(true);
+        return;
+      }
+      if (unfolded) {
+        return;
+      }
+      if (reduced) {
+        // Reduced motion: the fold goes straight to its final open state, no start frame.
+        setUnfolded(true);
+        return;
+      }
+      const frame = window.requestAnimationFrame(() => setUnfolded(true));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    if (!mounted) {
+      return;
+    }
+    if (unfolded) {
+      setUnfolded(false);
+      return;
+    }
+    if (hidden) {
+      return;
+    }
+    if (reduced) {
+      // Reduced motion: the fold is already at its closed state, nothing is left to time.
+      setHidden(true);
+      return;
+    }
+    // Let the fold run its full 200 ms collapse, then take the body out of the tree.
+    const timer = window.setTimeout(() => setHidden(true), 200);
+    return () => window.clearTimeout(timer);
+  }, [shown, hidden, mounted, unfolded, reduced]);
+
+  // Hand keyboard focus inside the body back to the head before it collapses, so focus is neither
+  // lost on a node about to be hidden nor left behind when the fold turns inert.
+  function toggleOpen() {
+    const active = document.activeElement;
+    if (shown && active instanceof HTMLElement && bodyRef.current?.contains(active)) {
+      headRef.current?.focus();
+    }
+    setOpen(!shown);
+  }
+
   // A reason the rule itself declared in `unmeasured_when` is a different statement from one it did
   // not, and the reason alone does not tell them apart (ADR 0027).
   const stateKey =
@@ -60,10 +126,11 @@ export function EvidenceRow({
         type="button"
         className="row-head"
         aria-expanded={shown}
+        ref={headRef}
         // Carried fix (c): while every row is already forced open by the technical switch, a click
         // here must not silently change the row's own hidden `open` state for when it is switched off.
         disabled={technicalAll}
-        onClick={() => setOpen(!shown)}
+        onClick={toggleOpen}
       >
         <span className={`mark mark-${item.state}`} aria-hidden="true" />
         <span className="title-wrap">
@@ -77,35 +144,44 @@ export function EvidenceRow({
         <span className="state">{t(`state.${stateKey}`)}</span>
         {!shown && text?.description && <span className="clamp">{text.description}</span>}
       </button>
-      {shown && (
-        <div className="row-body">
-          <TelemetryLine item={item} />
-          {text?.description && (
-            <p className="description">
-              {t("description")}: {text.description}
-            </p>
-          )}
-          <Meaning item={item} text={text} />
-          {band && <Band item={item} band={band} />}
-          <button
-            type="button"
-            className="disclosure"
-            aria-expanded={showTechnical}
-            disabled={technicalAll}
-            onClick={() => setTechnical(!technical)}
-          >
-            {t("layers.technical")}
-          </button>
-          {showTechnical && (
-            <Technical
-              item={item}
-              text={text}
-              fileBase={fileBase}
-              treeBase={treeBase}
-              linksKnown={linksKnown}
-              official={official}
-            />
-          )}
+      {mounted && (
+        // A closed fold is inert from its first frame: a freshly mounted body at `0fr` and one
+        // that has just begun collapsing are both closed, so neither reaches the accessibility
+        // tree — the collapse animates the visual body, not the inert rule.
+        <div
+          className="row-fold"
+          data-open={unfolded ? "true" : "false"}
+          inert={hidden || !unfolded}
+        >
+          <div className="row-body" ref={bodyRef}>
+            <TelemetryLine item={item} />
+            {text?.description && (
+              <p className="description">
+                {t("description")}: {text.description}
+              </p>
+            )}
+            <Meaning item={item} text={text} />
+            {band && <Band item={item} band={band} />}
+            <button
+              type="button"
+              className="disclosure"
+              aria-expanded={showTechnical}
+              disabled={technicalAll}
+              onClick={() => setTechnical(!technical)}
+            >
+              {t("layers.technical")}
+            </button>
+            {showTechnical && (
+              <Technical
+                item={item}
+                text={text}
+                fileBase={fileBase}
+                treeBase={treeBase}
+                linksKnown={linksKnown}
+                official={official}
+              />
+            )}
+          </div>
         </div>
       )}
     </li>
@@ -225,7 +301,7 @@ function CopyJsonButton({ json }: { json: string }) {
     if (copied !== "copied") {
       return;
     }
-    const timer = setTimeout(() => setCopied("idle"), 2000);
+    const timer = setTimeout(() => setCopied("idle"), 1500);
     return () => clearTimeout(timer);
   }, [copied]);
 
@@ -239,14 +315,23 @@ function CopyJsonButton({ json }: { json: string }) {
   }
 
   return (
-    <button
-      type="button"
-      className="copy-json-btn"
-      onClick={() => void onCopy()}
-      aria-label={t("layers.copy_json")}
-    >
-      {copied === "copied" ? t("layers.copied") : t("layers.copy_json")}
-    </button>
+    <>
+      {/* The label keeps saying what the button does for assistive technology; the check beside it
+          is decoration. The 1.5 s announcement of the copy lives outside, so it never joins the
+          button's own accessible name. */}
+      <button
+        type="button"
+        className={`copy-json-btn${copied === "copied" ? " copy-json-btn-copied" : ""}`}
+        onClick={() => void onCopy()}
+        aria-label={t("layers.copy_json")}
+      >
+        <span className="copy-json-check" aria-hidden="true" />
+        {copied === "copied" ? t("layers.copied") : t("layers.copy_json")}
+      </button>
+      <span className="visually-hidden" aria-live="polite">
+        {copied === "copied" ? t("layers.copied") : ""}
+      </span>
+    </>
   );
 }
 

@@ -71,6 +71,19 @@ describe("HumanSummary motion", () => {
     }
   });
 
+  it("keeps the rolling strips out of textContent, leaving only the real number", () => {
+    const { container } = render(<Odometer value={101} />);
+    expect(container.querySelector(".odometer")?.textContent).toBe("101");
+    const strips = Array.from(container.querySelectorAll(".odometer-strip"));
+    expect(strips.map((strip) => strip.textContent)).toEqual(["", "", ""]);
+    for (const strip of strips) {
+      const rows = Array.from(strip.children);
+      expect(rows.map((row) => row.getAttribute("data-d"))).toEqual(
+        Array.from({ length: 10 }, (_, digit) => String(digit)),
+      );
+    }
+  });
+
   it("shows every digit at its final place at once under reduced motion", () => {
     stubReducedMotion();
     const frame = vi.spyOn(window, "requestAnimationFrame");
