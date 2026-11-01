@@ -63,6 +63,29 @@ you agree to that separately.\n\nYes: full scan. No: standard scan.\n\n\
 ไม่ส่งอะไรออกไปไหน ในโหมด SS ชื่อเซิร์ฟเวอร์และชื่อเว็บไซต์จะแสดงก็ต่อเมื่อคุณยินยอมแยกทีละข้อ\n\n\
 Yes: สแกนแบบ Full  No: สแกนแบบมาตรฐาน";
 
+/// The splash shown while the scan runs, in both languages because no language has been chosen yet
+/// (ADR 0089). It says a scan is running and names no duration for a standard scan, because none was
+/// measured.
+const SPLASH_TITLE: &str = "aeterna-rongroi";
+const SPLASH_STANDARD_LINES: [&str; 4] = [
+    "กำลังสแกนเครื่องนี้",
+    "Scanning this PC",
+    "ทำงานบนเครื่องนี้ ไม่ส่งข้อมูลออกไปไหน",
+    "Runs on this PC. Nothing is sent anywhere.",
+];
+/// A full scan's one extra line: the 90 seconds the full-scan dialog already states, in both
+/// languages on one line to keep to the splash's five-line limit (ADR 0089).
+const SPLASH_FULL_LINE: &str = "สแกน Full: ไฟล์โปรแกรมถึง 90 วินาที / Full: 90 s";
+
+/// The splash's lines for `tier`, Thai and English together (ADR 0089).
+fn splash_lines(tier: ScanTier) -> Vec<&'static str> {
+    let mut lines = SPLASH_STANDARD_LINES.to_vec();
+    if tier == ScanTier::Full {
+        lines.push(SPLASH_FULL_LINE);
+    }
+    lines
+}
+
 /// The scan this copy runs: full only when it was started with `--full` **and** the person answered
 /// Yes in the dialog it shows now. The flag alone never reads anything (ADR 0052).
 fn chosen_tier(args: &[String], ask: impl FnOnce() -> bool) -> ScanTier {
@@ -77,6 +100,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 0. Which scan, asked in a window Windows draws, before anything is read (ADR 0052).
     let args: Vec<String> = std::env::args().skip(1).collect();
     let tier = chosen_tier(&args, ask_full);
+    // The splash is open before the scan reads anything and closes as soon as it returns; it also
+    // closes on drop, so an early return or a panic during the scan leaves no window (ADR 0089).
+    let splash = show_splash(tier);
 
     // 1. Scan before the WebView exists, so nothing the window does can change what was measured.
     let bundle = Bundle::embedded()?;
@@ -99,6 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = live_host();
     let report = scan::run(host.as_ref(), &bundle, context);
     let scan_finished_at = jiff::Timestamp::now().to_string();
+    close_splash(splash);
 
     // 2. Only now create the UI, with its profile in a per-run temporary folder. The folders earlier
     //    runs could not delete because they were stopped go first; the scan is already over.
@@ -160,6 +187,38 @@ fn live_host() -> Box<dyn Host> {
     Box::new(rongroi_host::NonWindowsHost)
 }
 
+/// What keeps the scan's splash open: the window on Windows, nothing anywhere else.
+#[cfg(windows)]
+type SplashGuard = rongroi_host_windows::splash::Splash;
+
+/// No Windows, no window to keep open.
+#[cfg(not(windows))]
+#[derive(Clone, Copy)]
+struct SplashGuard;
+
+/// Opens the splash for `tier` before the scan reads anything (ADR 0089).
+#[cfg(windows)]
+fn show_splash(tier: ScanTier) -> SplashGuard {
+    rongroi_host_windows::splash::Splash::show(SPLASH_TITLE, &splash_lines(tier))
+}
+
+/// No Windows, no splash, so a splash never stops a scan.
+#[cfg(not(windows))]
+fn show_splash(tier: ScanTier) -> SplashGuard {
+    let _ = (splash_lines(tier), SPLASH_TITLE);
+    SplashGuard
+}
+
+/// Closes the window once the scan has returned; the splash also closes on drop (ADR 0089).
+#[cfg(windows)]
+fn close_splash(splash: SplashGuard) {
+    splash.close();
+}
+
+/// No Windows, nothing to close.
+#[cfg(not(windows))]
+fn close_splash(_splash: SplashGuard) {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,6 +265,59 @@ mod tests {
                 FULL_TEXT.contains(sentence),
                 "{sentence} missing from FULL_TEXT"
             );
+        }
+    }
+
+    /// ADR 0089 section 3: a splash line has to fit the window — about 50 characters — and at most
+    /// five lines fit above the strip.
+    #[test]
+    fn the_splash_lines_fit_the_window() {
+        for tier in [ScanTier::Standard, ScanTier::Full] {
+            let lines = splash_lines(tier);
+            let count = lines.len();
+            assert!(count <= 5, "{tier:?} has {count} lines");
+            for line in lines {
+                let length = line.chars().count();
+                assert!(length <= 50, "{line} is {length} characters");
+            }
+        }
+    }
+
+    /// ADR 0089 section 3: a standard scan states no duration, because none was measured; a full scan
+    /// adds the 90 seconds the full-scan dialog already states.
+    #[test]
+    fn only_the_full_splash_names_90_seconds() {
+        for line in splash_lines(ScanTier::Standard) {
+            assert!(
+                !line.chars().any(|character| character.is_ascii_digit()),
+                "{line} has a digit"
+            );
+        }
+        let full = splash_lines(ScanTier::Full);
+        assert!(full.iter().any(|line| line.contains("90")));
+    }
+
+    /// ADR 0089 section 3: a full scan adds exactly one line to the standard scan's.
+    #[test]
+    fn the_full_splash_is_the_standard_one_with_one_more_line() {
+        let standard = splash_lines(ScanTier::Standard);
+        let full = splash_lines(ScanTier::Full);
+        assert_eq!(full.len(), standard.len() + 1);
+        assert_eq!(&full[..standard.len()], &standard[..]);
+    }
+
+    /// ADR 0089 section 3: no language has been chosen yet, so the splash carries Thai and English.
+    #[test]
+    fn the_splash_lines_carry_both_languages() {
+        for tier in [ScanTier::Standard, ScanTier::Full] {
+            let lines = splash_lines(tier);
+            let has_thai = lines.iter().any(|line| {
+                line.chars()
+                    .any(|character| ('\u{0E00}'..='\u{0E7F}').contains(&character))
+            });
+            assert!(has_thai, "{tier:?} has no Thai line");
+            let has_ascii = lines.iter().copied().any(str::is_ascii);
+            assert!(has_ascii, "{tier:?} has no ASCII line");
         }
     }
 }
