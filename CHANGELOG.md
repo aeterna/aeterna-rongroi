@@ -33,6 +33,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   administrator rights). A small script of the page's own does this; with scripts off the card reads as before, and the
   page still loads nothing from another site.
 - The saved record's 16-character digest decodes into place once when it is shown, and an opened evidence row gets one line of its rule, collector and state typed out. Both are decoration: the real digest and the whole line are in the page as text from the start, nothing is animated under reduced motion, and the record, its digest and every collector are unchanged.
+- The report summary's three counts roll into place once when it opens, its top note gets four corner marks and one light sweep, and each of the three cards under it follows a mouse with a soft light and a tilt of at most 6 degrees. These are decoration: every number and word stays in the page as text, nothing moves under reduced motion, and no count, colour meaning or collector changes.
 - Ctrl K (Cmd K on a Mac) opens a search over the report's own checks, by rule name, rule id or collector; Enter or a click on a result switches the report to its technical view with that rule searched. It reads only what the report already lists, so SS mode shows nothing more, and it has no order or ranking of its own. It is a keyboard-reachable dialog with a combobox and a list, and it has no animation when reduced motion is asked for.
 
 ### Fixed
