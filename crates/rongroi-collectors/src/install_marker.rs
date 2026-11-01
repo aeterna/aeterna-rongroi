@@ -106,11 +106,13 @@ static FIELDS: [Field; 4] = [
 /// `source_absent` is the environment variable a path starts with, not the place itself: a place that
 /// is not there is `present: false`, which is an answer. A refusal is `access_denied` whatever the
 /// token — every read here was measured with a limited token on one Windows 11 PC (ADR 0057).
-static REASONS: [UnmeasuredReason; 4] = [
+static REASONS: [UnmeasuredReason; 5] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::SourceAbsent,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Reads whether each place in [`MARKERS`] is there.

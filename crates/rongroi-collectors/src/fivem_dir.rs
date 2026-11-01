@@ -269,10 +269,12 @@ const LOCATIONS: [Location; 15] = [
 ///
 /// Neither environment variable is set, or listing a folder was denied or failed. An absent folder is
 /// not here: that edition is not installed, and the collector did look.
-const REASONS: [UnmeasuredReason; 3] = [
+const REASONS: [UnmeasuredReason; 4] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Every field this collector can emit. A folder it could not read is a gap in all of them, for the
@@ -914,8 +916,27 @@ fn proxy_dll_observations(
         .into_iter()
         .filter_map(|entry| {
             let path = format!(r"{dir}\{}", entry.name);
-            let Ok(signature) = host.file_signature(&path) else {
-                return None;
+            let signature = match host.file_signature(&path) {
+                Ok(signature) => signature,
+                // Not opened: the path does not stay on a local drive (ADR 0091). Its row stays, so a
+                // proxy DLL behind such a link is never left out of the report.
+                Err(SourceError::NotLocal(not_local)) => {
+                    let mut fields = BTreeMap::new();
+                    fields.insert(
+                        "file_unread".to_owned(),
+                        serde_json::Value::from(not_local.as_str()),
+                    );
+                    fields.insert(
+                        "location".to_owned(),
+                        serde_json::Value::from(location.name),
+                    );
+                    fields.insert("path".to_owned(), serde_json::Value::from(path));
+                    return Some(Observation {
+                        collector: ID.to_owned(),
+                        fields,
+                    });
+                }
+                Err(_) => return None,
             };
             let sig_str = match signature {
                 SignatureCheck::NoEmbeddedSignature => "no_embedded_signature",
@@ -1818,6 +1839,35 @@ filesystem:
         let d3d11 = by_name(observations, "d3d11.dll");
         assert_eq!(field(d3d11, "location"), Some(ROOT_DLLS_LOCATION));
         assert_eq!(field(d3d11, "signature"), Some("unverifiable_offline"));
+    }
+
+    /// A proxy DLL that is a link to a share is not opened, and its row stays with `file_unread`: a
+    /// refused read never leaves it out of the report (ADR 0091 section 3).
+    #[test]
+    fn a_root_proxy_dll_linked_to_a_share_keeps_its_row() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app':
+    - name: dxgi.dll
+      sha256: 2222222222222222222222222222222222222222222222222222222222222222
+      signature: { state: invalid }
+links:
+  - path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\dxgi.dll'
+    kind: symlink
+    target: '\??\UNC\server\share\dxgi.dll'
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, _) = measured(&run);
+        let dxgi = by_name(observations, "dxgi.dll");
+        assert_eq!(field(dxgi, "location"), Some(ROOT_DLLS_LOCATION));
+        assert_eq!(field(dxgi, "file_unread"), Some("link_off_local_drive"));
+        assert_eq!(dxgi.fields.get("signature"), None, "{dxgi:?}");
+        assert_eq!(dxgi.fields.get("sha256"), None, "{dxgi:?}");
     }
 
     #[test]

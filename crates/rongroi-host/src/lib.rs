@@ -1078,7 +1078,8 @@ fn split_drive(path: &str) -> Option<(char, &str)> {
 
 /// Appends the segments of `path` to `out`, dropping empty and `.` segments and letting `..` remove
 /// the segment before it. A `..` past the root is refused: Windows would stay at the root, and a path
-/// that relies on that is not one this check can vouch for.
+/// that relies on that is not one this check can vouch for. So is a segment holding `:`, `?` or `*`:
+/// a stream, a device prefix or a wildcard is not a folder name this check can follow.
 fn push_segments(out: &mut Vec<String>, path: &str) -> Result<(), NotLocal> {
     for segment in path.split(['\\', '/']) {
         match segment {
@@ -1086,6 +1087,7 @@ fn push_segments(out: &mut Vec<String>, path: &str) -> Result<(), NotLocal> {
             ".." => {
                 out.pop().ok_or(NotLocal::LinkUnsupported)?;
             }
+            name if name.contains([':', '?', '*']) => return Err(NotLocal::LinkUnsupported),
             name => out.push(name.to_owned()),
         }
     }
@@ -1242,7 +1244,10 @@ pub trait Host:
     /// Whether the file or folder at `path` is a reparse point and, for a junction, mount point or
     /// symbolic link, what it points at (ADR 0091 section 2).
     ///
-    /// `Ok(None)` is not a reparse point, or nothing is there. The data is the link's own record: the
+    /// `Ok(None)` means only "not a reparse point" or "nothing is there" (file or path not found).
+    /// Any other failure, refused access included, is an `Err`, which the check treats as a refusal. A
+    /// cloud placeholder whose data is already on the disk is not a link for this purpose; one whose
+    /// data would be fetched is [`LinkKind::Other`]. The data is the link's own record: the
     /// link is never followed, so asking cannot reach the place it points at. A host that cannot ask
     /// answers [`SourceError::Unsupported`], and [`local_read_check`] refuses the path.
     fn link_target(&self, _path: &str) -> Result<Option<LinkTarget>, SourceError> {
@@ -2235,6 +2240,65 @@ links:
             local_read_check(&host, r"C:\a.exe"),
             Err(NotLocal::NotLocalDrive)
         );
+    }
+
+    /// One fixture with one link at `C:\l` whose target is `target`.
+    #[cfg(feature = "fixture")]
+    fn one_link(target: &str) -> FixtureHost {
+        let yaml = format!(
+            "platform: windows\nlinks:\n  - path: 'C:\\l'\n    kind: mount_point\n    target: '{target}'\n"
+        );
+        FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+    }
+
+    /// Every UNC spelling a link may hold leaves the local drives, whatever its case (ADR 0091 step 3).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn every_unc_spelling_of_a_target_is_off_the_local_drive() {
+        for target in [
+            r"\??\unc\server\share",
+            r"\\?\UNC\server\share",
+            r"\\server\share",
+        ] {
+            assert_eq!(
+                local_read_check(&one_link(target), r"C:\l\a.exe"),
+                Err(NotLocal::LinkOffLocalDrive),
+                "{target}"
+            );
+        }
+    }
+
+    /// A target that is a bare drive leads to that drive's root and is followed.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_bare_drive_target_is_the_drive_root() {
+        assert_eq!(
+            local_read_check(&one_link(r"\??\D:"), r"C:\l\a.exe"),
+            Ok(())
+        );
+    }
+
+    /// A link that points at itself is followed until the limit and then refused (ADR 0091 step 4).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_link_to_itself_is_refused_at_the_limit() {
+        assert_eq!(
+            local_read_check(&one_link(r"\??\C:\l"), r"C:\l\a.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+    }
+
+    /// A target with a stream, a device prefix or a wildcard in a segment is not followed.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_target_segment_with_a_colon_or_a_wildcard_is_unsupported() {
+        for target in [r"\??\D:\a:stream", r"\??\D:\a\*", r"\??\D:\?\b"] {
+            assert_eq!(
+                local_read_check(&one_link(target), r"C:\l\a.exe"),
+                Err(NotLocal::LinkUnsupported),
+                "{target}"
+            );
+        }
     }
 
     /// The reason strings are report vocabulary, so each one is pinned.

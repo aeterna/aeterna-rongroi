@@ -116,12 +116,14 @@ static FIELDS: [Field; 18] = [
     Field::text("triggers"),
 ];
 
-static REASONS: [UnmeasuredReason; 5] = [
+static REASONS: [UnmeasuredReason; 6] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::BudgetSpent,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Reads what Windows starts by itself.

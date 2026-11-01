@@ -60,7 +60,7 @@ pub const BUDGET: Duration = Duration::from_secs(90);
 /// journal's own read stopping at its budget, which `usn` gives for the same read. `not_on_this_os` is
 /// not here: PCA says it for a Windows that never kept these files, and PCA then contributes neither a
 /// path nor a gap.
-const REASONS: [UnmeasuredReason; 8] = [
+const REASONS: [UnmeasuredReason; 9] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
@@ -69,6 +69,8 @@ const REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
     UnmeasuredReason::BudgetSpent,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Every field this collector can emit.

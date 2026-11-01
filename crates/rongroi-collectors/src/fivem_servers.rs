@@ -36,10 +36,12 @@ static FIELDS: [Field; 5] = [
     Field::number("server_folders"),
 ];
 
-static REASONS: [UnmeasuredReason; 3] = [
+static REASONS: [UnmeasuredReason; 4] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Reads the names of Enhanced's server cache folders.

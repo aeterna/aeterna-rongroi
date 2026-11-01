@@ -117,7 +117,7 @@ const COUNTED: [&str; 9] = [
     "renamed",
 ];
 
-static REASONS: [UnmeasuredReason; 8] = [
+static REASONS: [UnmeasuredReason; 9] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
@@ -126,6 +126,8 @@ static REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::BudgetSpent,
     UnmeasuredReason::ReadFailed,
     UnmeasuredReason::OtherVolume,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// One folder this collector counts records for.

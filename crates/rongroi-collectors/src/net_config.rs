@@ -84,10 +84,12 @@ static FIELDS: [Field; 18] = [
     Field::number("unparsed_rules"),
 ];
 
-static REASONS: [UnmeasuredReason; 3] = [
+static REASONS: [UnmeasuredReason; 4] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Reads the hosts file, the proxy settings and the firewall rules.

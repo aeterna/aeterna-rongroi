@@ -1238,18 +1238,42 @@ pub struct FixtureHost {
 }
 
 /// The fixture's `links:` keyed by the normalised path of each link (ADR 0091 section 2).
-fn links_by_path(links: Vec<FixtureLink>) -> BTreeMap<String, LinkTarget> {
+///
+/// A link's path must be drive-rooted, spelled with `\` only, with no empty, `.` or `..` segment: the
+/// check asks for each prefix in that one spelling, so a link written any other way would never match
+/// and a test would pass without it.
+fn links_by_path(
+    links: Vec<FixtureLink>,
+    origin: &str,
+) -> Result<BTreeMap<String, LinkTarget>, FixtureError> {
     links
         .into_iter()
         .map(|link| {
-            (
+            let bytes = link.path.as_bytes();
+            let rooted = bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+            let rest = link.path.get(2..).unwrap_or("");
+            let well_formed = rooted
+                && !link.path.contains('/')
+                && (rest.is_empty()
+                    || rest == "\\"
+                    || (rest.starts_with('\\')
+                        && rest[1..]
+                            .split('\\')
+                            .all(|segment| !matches!(segment, "" | "." | ".."))));
+            if !well_formed {
+                return Err(FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!("links: path {:?} is not a drive-rooted path", link.path),
+                });
+            }
+            Ok((
                 normalise_path(&link.path),
                 LinkTarget {
                     kind: link.kind,
                     target: link.target,
                     relative: link.relative,
                 },
-            )
+            ))
         })
         .collect()
 }
@@ -1345,7 +1369,7 @@ impl FixtureHost {
                 })
                 .transpose()?,
             drive_roots,
-            links: links_by_path(file.links),
+            links: links_by_path(file.links, origin)?,
             drive_map: file.drive_map.map(|described| {
                 described
                     .into_iter()
@@ -1632,6 +1656,8 @@ impl FilesystemSource for FixtureHost {
     /// or one that wrote no stream, is `Ok(None)`: a missing file and a missing stream are the same
     /// answer. A stream over the limit is refused as the live host refuses it.
     fn zone_identifier(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        // The local-read check first, as every read by path makes it (ADR 0091).
+        self.local_path(path)?;
         crate::zone_identifier_path(path)?;
         self.windows_filesystem()?;
         let normalised = normalise_path(&self.local_path(path)?);
