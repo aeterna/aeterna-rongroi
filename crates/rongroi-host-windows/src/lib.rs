@@ -43,6 +43,8 @@ mod reparse;
 
 pub mod signature;
 
+pub mod splash;
+
 pub mod system_integrity;
 
 pub mod tpm;

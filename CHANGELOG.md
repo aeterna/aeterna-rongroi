@@ -38,6 +38,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   home button and a trail (`aeterna-rongroi / Self check`) beside it; a button appears after the first 200 px to
   go back to the top (instant under reduced motion), and the "Scan as administrator" and "Full scan" buttons are
   disabled while their request is being answered. The report, its privacy filtering and every collector are unchanged.
+- The desktop app shows a small native Windows window while the scan runs, on every start, so the program no longer
+  looks like it has hung: it says a scan is running, and on a full scan that reading the files of recorded programs
+  takes at most 90 seconds (the figure the full-scan question states). It is drawn by Windows with no WebView, opens
+  after the full-scan question and closes before the report window is created, and shows no progress figure because
+  the scan reports none (ADR 0092).
 - Ctrl K (Cmd K on a Mac) opens a search over the report's own checks, by rule name, rule id or collector; Enter or a click on a result switches the report to its technical view with that rule searched. It reads only what the report already lists, so SS mode shows nothing more, and it has no order or ranking of its own. It is a keyboard-reachable dialog with a combobox and a list, and it has no animation when reduced motion is asked for.
 
 ### Fixed
