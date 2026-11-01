@@ -146,7 +146,9 @@ impl EnvironmentSource for LiveHost {
 mod tests {
     use rongroi_host::FilesystemSource;
     #[cfg(windows)]
-    use rongroi_host::{NotLocal, SignatureSource, SourceError, UsnJournalSource};
+    use rongroi_host::{
+        DriveKind, Host, LinkKind, NotLocal, SignatureSource, SourceError, UsnJournalSource,
+    };
 
     use crate::LiveHost;
 
@@ -292,5 +294,47 @@ mod tests {
     #[test]
     fn a_verbatim_unc_path_is_refused_by_every_read_by_path() {
         every_read_by_path_refuses(r"\\?\UNC\srv\share\x.exe");
+    }
+
+    /// A junction the test created in its own temporary folder: the link itself is reported without
+    /// being followed, the gate follows it because it stays on this drive, and every other answer is
+    /// the one a real file system gives.
+    #[cfg(windows)]
+    #[test]
+    fn a_junction_is_reported_and_followed_by_the_gate() {
+        let dir = std::env::temp_dir().join(format!("rongroi-junction-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("target");
+        std::fs::create_dir(&target).unwrap();
+        let file = target.join("file.bin");
+        std::fs::write(&file, b"x").unwrap();
+        let junction = dir.join("junction");
+        let status = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(junction.as_os_str())
+            .arg(target.as_os_str())
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        let answer = |path: &std::path::Path| LiveHost.link_target(path.to_str().unwrap());
+        assert_eq!(answer(&file), Ok(None));
+        let link = answer(&junction).unwrap().unwrap();
+        assert_eq!(link.kind, LinkKind::MountPoint);
+        assert!(link.target.starts_with(r"\??\"));
+        assert!(link.target.ends_with(target.to_str().unwrap()));
+        assert_eq!(answer(&dir.join("absent")), Ok(None));
+        // A path whose form cannot exist is missing, not refused.
+        assert_eq!(answer(&dir.join("bad<name>")), Ok(None));
+        assert_eq!(LiveHost.drive_kind('C'), Ok(DriveKind::Fixed));
+        assert!(matches!(LiveHost.list_dir(junction.to_str().unwrap()), Ok(Some(_))));
+        assert_eq!(
+            LiveHost.read_file(r"\\?\C:\x"),
+            Err(SourceError::NotLocal(NotLocal::NotDriveRooted))
+        );
+
+        // Remove the junction itself, never recursively through it, then the folder the test made.
+        std::fs::remove_dir(&junction).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

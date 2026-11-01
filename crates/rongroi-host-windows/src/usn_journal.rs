@@ -21,6 +21,10 @@ pub const ERROR_ACCESS_DENIED: u32 = 5;
 pub const ERROR_FILE_NOT_FOUND: u32 = 2;
 /// `ERROR_PATH_NOT_FOUND`.
 pub const ERROR_PATH_NOT_FOUND: u32 = 3;
+/// `ERROR_INVALID_NAME`: the path's form cannot name an object, so it cannot exist.
+pub const ERROR_INVALID_NAME: u32 = 123;
+/// `ERROR_DIRECTORY`: the path names a file where a folder is required, so it cannot exist.
+pub const ERROR_DIRECTORY: u32 = 267;
 /// `ERROR_JOURNAL_DELETE_IN_PROGRESS`: a journal is being deleted and cannot be read.
 pub const ERROR_JOURNAL_DELETE_IN_PROGRESS: u32 = 1178;
 /// `ERROR_JOURNAL_NOT_ACTIVE`: the volume has no journal. Measured on a runner's `D:` (ADR 0047).

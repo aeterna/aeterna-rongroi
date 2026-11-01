@@ -9,7 +9,9 @@ use windows::Win32::Foundation::GetLastError;
 use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetFileAttributesW};
 use windows::core::PCWSTR;
 
-use crate::usn_journal::{ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND};
+use crate::usn_journal::{
+    ERROR_DIRECTORY, ERROR_FILE_NOT_FOUND, ERROR_INVALID_NAME, ERROR_PATH_NOT_FOUND,
+};
 
 const HRESULT_FILE_NOT_FOUND: i32 = 0x8007_0002_u32.cast_signed();
 const HRESULT_PATH_NOT_FOUND: i32 = 0x8007_0003_u32.cast_signed();
@@ -188,23 +190,39 @@ impl Host for LiveHost {
     /// read never follows it.
     ///
     /// This is deliberately not gated by `LiveHost::local_read_check`: that gate calls this for every
-    /// component of a path, so calling it back would recurse. It reads the link's own record, never
-    /// through the link.
+    /// component of a path, so calling it back would recurse.
+    ///
+    /// A cloud placeholder whose read would fetch its data is [`rongroi_host::LinkKind::Other`] before
+    /// anything is opened: the placeholder compatibility mode can hide `FILE_ATTRIBUTE_REPARSE_POINT`,
+    /// so the recall and offline bits are checked first ([`crate::reparse::would_fetch`]).
     #[allow(unsafe_code)]
     fn link_target(&self, path: &str) -> Result<Option<rongroi_host::LinkTarget>, SourceError> {
         let name = wide(path);
         // SAFETY: `name` is NUL-terminated UTF-16 that outlives the call, and the call only reads
-        // the attributes Windows keeps for the path; it opens nothing and follows no link.
+        // the attributes Windows keeps for the path; it opens nothing. `GetFileAttributesW` does
+        // follow links in intermediate components, which is safe here because
+        // `rongroi_host::resolved_local_path` asks prefixes top-down and stops at the first link, so
+        // no link is crossed unchecked.
         let attributes = unsafe { GetFileAttributesW(PCWSTR(name.as_ptr())) };
         if attributes == INVALID_FILE_ATTRIBUTES {
             // SAFETY: no other call has run on this thread since the one whose error this reads.
             let last_error = unsafe { GetLastError() }.0;
             return match last_error {
-                ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => Ok(None),
+                ERROR_FILE_NOT_FOUND
+                | ERROR_PATH_NOT_FOUND
+                | ERROR_INVALID_NAME
+                | ERROR_DIRECTORY => Ok(None),
                 _ => Err(SourceError::Failed(format!(
                     "GetFileAttributesW returned {last_error:#010x}"
                 ))),
             };
+        }
+        if crate::reparse::would_fetch(attributes) {
+            return Ok(Some(rongroi_host::LinkTarget {
+                kind: rongroi_host::LinkKind::Other,
+                target: String::new(),
+                relative: false,
+            }));
         }
         if attributes & FILE_ATTRIBUTE_REPARSE_POINT == 0 {
             return Ok(None);

@@ -20,6 +20,8 @@ const IO_REPARSE_TAG_CLOUD: u32 = 0x9000_001A;
 const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
 /// `FILE_ATTRIBUTE_RECALL_ON_OPEN`: opening the placeholder would fetch its data.
 const FILE_ATTRIBUTE_RECALL_ON_OPEN: u32 = 0x0004_0000;
+/// `FILE_ATTRIBUTE_OFFLINE`: the file's data is not on this disk, so reading it would fetch it.
+const FILE_ATTRIBUTE_OFFLINE: u32 = 0x0000_1000;
 /// `SYMLINK_FLAG_RELATIVE`: the symbolic link's target is relative to its folder.
 const SYMLINK_FLAG_RELATIVE: u32 = 1;
 
@@ -31,6 +33,19 @@ const MOUNT_POINT_NAME_FIELDS_BYTES: usize = 8;
 const SYMLINK_NAME_AND_FLAGS_BYTES: usize = 12;
 
 const FIELD_PAST_END: &str = "reparse data ends inside a field";
+
+/// Whether reading a path with these `GetFileAttributesW` attributes would fetch data that is not on
+/// this disk.
+///
+/// The placeholder compatibility mode can hide `FILE_ATTRIBUTE_REPARSE_POINT`, so these bits are
+/// checked before the reparse tag is read (ADR 0091 section 2).
+pub(crate) fn would_fetch(attributes: u32) -> bool {
+    attributes
+        & (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+            | FILE_ATTRIBUTE_RECALL_ON_OPEN
+            | FILE_ATTRIBUTE_OFFLINE)
+        != 0
+}
 
 /// `N` bytes at `offset`, for reading a little-endian field.
 fn field<const N: usize>(bytes: &[u8], offset: usize) -> Result<[u8; N], String> {
@@ -68,8 +83,8 @@ fn name(path_buffer: &[u8], offset: u16, length: u16) -> Result<String, String> 
     String::from_utf16(&units).map_err(|_| "reparse name is not valid UTF-16".to_owned())
 }
 
-/// Reads the substitute name at the start of a link's path buffer, which begins `fields` bytes into
-/// `payload`.
+/// Reads the substitute name a link's name fields point at in its path buffer, which begins `fields`
+/// bytes into `payload`.
 fn read_target(
     payload: &[u8],
     fields: usize,
@@ -93,7 +108,7 @@ fn read_target(
 ///
 /// `attributes` is the `GetFileAttributesW` value for the link. It tells a cloud placeholder whose
 /// data is already on the disk from one whose read would fetch it: the former is [`Ok(None)`], read
-/// like an ordinary file, and the latter is [`LinkKind::Other`].
+/// like an ordinary file, and the latter is [`LinkKind::Other`] ([`would_fetch`]).
 ///
 /// Every field and every offset is bounds-checked, so a damaged record is an error rather than a link
 /// of some guessed kind.
@@ -111,10 +126,7 @@ pub(crate) fn parse_reparse(bytes: &[u8], attributes: u32) -> Result<Option<Link
     let payload = &payload[..data_length];
 
     if tag & IO_REPARSE_TAG_CLOUD_MASK == IO_REPARSE_TAG_CLOUD {
-        let recall = attributes
-            & (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS | FILE_ATTRIBUTE_RECALL_ON_OPEN)
-            != 0;
-        return Ok(recall.then_some(other_target()));
+        return Ok(would_fetch(attributes).then_some(other_target()));
     }
 
     match tag {
@@ -143,11 +155,10 @@ mod tests {
     use rongroi_host::{LinkKind, LinkTarget};
 
     use super::{
+        FILE_ATTRIBUTE_OFFLINE, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS, FILE_ATTRIBUTE_RECALL_ON_OPEN,
         IO_REPARSE_TAG_CLOUD, IO_REPARSE_TAG_MOUNT_POINT, IO_REPARSE_TAG_SYMLINK,
-        SYMLINK_FLAG_RELATIVE, parse_reparse,
+        SYMLINK_FLAG_RELATIVE, parse_reparse, would_fetch,
     };
-
-    const RECALL_ON_DATA_ACCESS: u32 = 0x0040_0000;
 
     /// A `REPARSE_DATA_BUFFER`: the 8-byte header, then `data`.
     fn header(tag: u32, data: &[u8]) -> Vec<u8> {
@@ -165,13 +176,15 @@ mod tests {
         path: &[u8],
         substitute_offset: u16,
         substitute_length: u16,
+        print: Option<(u16, u16)>,
         flags: Option<u32>,
     ) -> Vec<u8> {
+        let (print_offset, print_length) = print.unwrap_or((0, 0));
         let mut data = Vec::new();
         data.extend_from_slice(&substitute_offset.to_le_bytes());
         data.extend_from_slice(&substitute_length.to_le_bytes());
-        data.extend_from_slice(&0_u16.to_le_bytes());
-        data.extend_from_slice(&0_u16.to_le_bytes());
+        data.extend_from_slice(&print_offset.to_le_bytes());
+        data.extend_from_slice(&print_length.to_le_bytes());
         if let Some(flags) = flags {
             data.extend_from_slice(&flags.to_le_bytes());
         }
@@ -183,7 +196,19 @@ mod tests {
     fn link(tag: u32, name: &str, flags: Option<u32>) -> Vec<u8> {
         let path: Vec<u8> = name.encode_utf16().flat_map(u16::to_le_bytes).collect();
         let length = u16::try_from(path.len()).unwrap();
-        reparse(tag, &path, 0, length, flags)
+        reparse(tag, &path, 0, length, None, flags)
+    }
+
+    /// A link whose print name comes first in the path buffer, as `CreateSymbolicLink` writes it.
+    fn print_name_first(tag: u32, print: &str, substitute: &str, flags: Option<u32>) -> Vec<u8> {
+        let print_bytes: Vec<u8> = print.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let substitute_bytes: Vec<u8> =
+            substitute.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let print_length = u16::try_from(print_bytes.len()).unwrap();
+        let substitute_length = u16::try_from(substitute_bytes.len()).unwrap();
+        let mut path = print_bytes;
+        path.extend_from_slice(&substitute_bytes);
+        reparse(tag, &path, print_length, substitute_length, Some((0, print_length)), flags)
     }
 
     fn mount_point(name: &str) -> Vec<u8> {
@@ -252,14 +277,25 @@ mod tests {
 
     #[test]
     fn a_cloud_placeholder_that_would_be_fetched_is_other() {
+        let bytes = header(IO_REPARSE_TAG_CLOUD, &[]);
         assert_eq!(
-            parse_reparse(&header(IO_REPARSE_TAG_CLOUD, &[]), RECALL_ON_DATA_ACCESS),
+            parse_reparse(&bytes, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS),
             Ok(Some(LinkTarget {
                 kind: LinkKind::Other,
                 target: String::new(),
                 relative: false,
             }))
         );
+    }
+
+    #[test]
+    fn a_recall_or_offline_attribute_would_fetch() {
+        assert!(would_fetch(FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS));
+        assert!(would_fetch(FILE_ATTRIBUTE_RECALL_ON_OPEN));
+        assert!(would_fetch(FILE_ATTRIBUTE_OFFLINE));
+        assert!(!would_fetch(0));
+        // The reparse-point bit alone does not fetch anything.
+        assert!(!would_fetch(0x0000_0400));
     }
 
     #[test]
@@ -290,19 +326,45 @@ mod tests {
 
     #[test]
     fn a_name_offset_past_the_end_is_an_error() {
-        let bytes = reparse(IO_REPARSE_TAG_MOUNT_POINT, b"ab", 4, 2, None);
+        let bytes = reparse(IO_REPARSE_TAG_MOUNT_POINT, b"ab", 4, 2, None, None);
         assert!(parse_reparse(&bytes, 0).is_err());
     }
 
     #[test]
     fn an_odd_name_length_is_an_error() {
-        let bytes = reparse(IO_REPARSE_TAG_MOUNT_POINT, b"abc", 0, 3, None);
+        let bytes = reparse(IO_REPARSE_TAG_MOUNT_POINT, b"abc", 0, 3, None, None);
         assert!(parse_reparse(&bytes, 0).is_err());
     }
 
     #[test]
     fn a_name_that_is_not_valid_utf16_is_an_error() {
-        let bytes = reparse(IO_REPARSE_TAG_SYMLINK, &[0x00, 0xD8], 0, 2, Some(0));
+        let bytes = reparse(IO_REPARSE_TAG_SYMLINK, &[0x00, 0xD8], 0, 2, None, Some(0));
         assert!(parse_reparse(&bytes, 0).is_err());
+    }
+
+    #[test]
+    fn a_mount_point_whose_print_name_comes_first_names_its_substitute() {
+        let bytes = print_name_first(IO_REPARSE_TAG_MOUNT_POINT, r"D:\data", r"\??\D:\data", None);
+        assert_eq!(
+            parse_reparse(&bytes, 0),
+            Ok(Some(LinkTarget {
+                kind: LinkKind::MountPoint,
+                target: r"\??\D:\data".to_owned(),
+                relative: false,
+            }))
+        );
+    }
+
+    #[test]
+    fn a_symbolic_link_whose_print_name_comes_first_names_its_substitute() {
+        let bytes = print_name_first(IO_REPARSE_TAG_SYMLINK, r"C:\x", r"\??\C:\x", Some(0));
+        assert_eq!(
+            parse_reparse(&bytes, 0),
+            Ok(Some(LinkTarget {
+                kind: LinkKind::Symlink,
+                target: r"\??\C:\x".to_owned(),
+                relative: false,
+            }))
+        );
     }
 }
