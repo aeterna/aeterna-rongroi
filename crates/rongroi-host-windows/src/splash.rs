@@ -132,6 +132,7 @@ mod live {
     use windows::core::{PCWSTR, w};
 
     use super::Splash;
+    use super::WM_SPLASH_CLOSE;
 
     const WIDTH: i32 = 460;
     const HEIGHT: i32 = 240;
