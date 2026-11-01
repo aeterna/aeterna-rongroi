@@ -16,6 +16,8 @@ function prefersReducedMotion(): boolean {
 /**
  * Shows a count as digits that roll once on mount. The real number is in the DOM from the first
  * render as visually hidden text; the strips are decoration and hidden from assistive technology.
+ * Each strip row is empty markup — its digit is drawn by CSS — so the strips add nothing to
+ * `textContent` for find-in-page, copy or assistive technology.
  */
 export function Odometer({ value }: { value: number }) {
   const digits = String(value).split("");
@@ -46,7 +48,7 @@ export function Odometer({ value }: { value: number }) {
               }}
             >
               {DIGITS.map((row) => (
-                <span key={row}>{row}</span>
+                <span key={row} data-d={row} />
               ))}
             </span>
           </span>
