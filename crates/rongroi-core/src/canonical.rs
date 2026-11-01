@@ -178,6 +178,12 @@ mod tests {
     /// The canonical form of `tests/data/visual-hash-v1.json` without its `visual_hash` member.
     const FIXTURE_CANONICAL: &str = r#"{"binding":{"expires_at":"2026-10-31T14:35:00Z","issued_at":"2026-10-31T14:30:00Z","nonce":"c4b82e91024a","server_origin":"http://203.0.113.10:30130","ticket":"9f82c4e1b07a412891d604e38a291bf0"},"case_code":"7K9M-2X4P","kind":"rongroi-saved-report","official_build":true,"policy":{"policy_hash":"a1b2c3d4e5f60718","profile":"posture","require_elevation":true,"required_collectors":["posture","os_image","install_marker","defender_exclusion","net_config","driver_service"],"server_name":"Example City"},"producer":{"mode":"single-shot","name":"rongroi-connect","version":"0.1.0"},"rongroi_version":"0.14.0","schema":2,"view":{"generated_at":"2026-10-31T14:30:00Z","schema_version":2}}"#;
 
+    /// The `policy_hash` the fixture carries, as the literals this vector is checked against.
+    const FIXTURE_POLICY_HASH: &str = "a1b2c3d4e5f60718";
+
+    /// The `visual_hash` the fixture carries, as the literals this vector is checked against.
+    const FIXTURE_VISUAL_HASH: &str = "4f8a91bc023e5d71";
+
     fn first_eight_hex_by_hand(text: &str) -> String {
         use sha2::{Digest, Sha256};
         use std::fmt::Write as _;
@@ -288,12 +294,11 @@ mod tests {
     fn the_fixed_record_pins_its_canonical_form_and_exact_hash() {
         let fixture = include_str!("../tests/data/visual-hash-v1.json");
         let record: Value = serde_json::from_str(fixture).unwrap();
+        // The literals the cross-language vector carries, checked before anything recomputes them.
+        assert_eq!(record["policy"]["policy_hash"].as_str(), Some(FIXTURE_POLICY_HASH));
+        assert_eq!(record["visual_hash"].as_str(), Some(FIXTURE_VISUAL_HASH));
         let mut without = record.clone();
         let _ = without.as_object_mut().unwrap().remove("visual_hash");
         assert_eq!(canonical_json(&without).unwrap(), FIXTURE_CANONICAL);
-        assert_eq!(
-            visual_hash(&record).unwrap(),
-            first_eight_hex_by_hand(FIXTURE_CANONICAL)
-        );
-    }
-}
+        assert_eq!(first_eight_hex_by_hand(FIXTURE_CANONICAL), visual_hash(&record).unwrap());
+    }}

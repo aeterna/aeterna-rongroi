@@ -197,7 +197,7 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
             saved_at: jiff::Timestamp::now().to_string(),
         };
         // Serialised once; the digest and standard output are the same bytes, with nothing after them.
-        let bytes = view::saved_record(
+        let record = view::saved_record(
             &report,
             options,
             Some(code.clone()),
@@ -205,8 +205,11 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
             None,
             None,
             times,
-        )?
-        .to_bytes()?;
+        )?;
+        // Kept from the record itself, so the line printed is the value the saved bytes carry
+        // (ADR 0089 §2, §5).
+        let visual_hash = record.visual_hash.clone();
+        let bytes = record.to_bytes()?;
         eprintln!(
             "{}",
             output::saved_digest(
@@ -215,6 +218,7 @@ fn scan(args: &ScanArgs) -> anyhow::Result<()> {
                 &view::digest(&bytes)
             )
         );
+        eprintln!("visual_hash: {visual_hash}");
         let mut stdout = std::io::stdout().lock();
         stdout.write_all(&bytes)?;
         stdout.flush()?;

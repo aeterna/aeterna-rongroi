@@ -27,6 +27,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   redacted in SS mode like every other path; it lets `recorded_files` read the program's file, lets the
   game-window view join BAM to other sources by path (so a program run and then deleted can show I1), and can
   make `executed-program-missing-on-disk` match on more machines.
+- Saved reports are schema 2 (producer, `visual_hash`; `binding` and `policy` reserved for Connect).
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,

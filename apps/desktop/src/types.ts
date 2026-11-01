@@ -510,7 +510,7 @@ export interface CodeLinks {
   commit: string | null;
 }
 
-/** What the window shows about a saved record once it is built (ADR 0073). */
+/** What the window shows about a saved record once it is built (ADR 0073, ADR 0089 §5). */
 export interface SavedSummary {
   /** SHA-256 of the record's bytes, 64 lowercase hex characters. */
   digest: string;
@@ -518,4 +518,6 @@ export interface SavedSummary {
   size: number;
   /** The case code as shown, `XXX-XXX`, when one was typed. */
   case_code: string | null;
+  /** The record's visual check code, 16 lowercase hex characters (ADR 0089 §2). */
+  visual_hash: string;
 }

@@ -22,8 +22,9 @@ type SaveState =
   | { kind: "failed"; reason: string };
 
 /**
- * The case code and the digest of the record this screen would save, and the Save button (ADR 0073). The
- * digest is of the bytes Rust built once at consent; Save writes those bytes, nothing rebuilt.
+ * The case code, the visual check code and the digest of the record this screen would save, and the
+ * Save button (ADR 0073, ADR 0089 §5). The digest and the visual code are of the bytes Rust built once
+ * at consent; Save writes those bytes, nothing rebuilt.
  */
 export function SavedRecordBox({ saved }: { saved: SavedSummary }) {
   const { t } = useTranslation("report");
@@ -35,6 +36,9 @@ export function SavedRecordBox({ saved }: { saved: SavedSummary }) {
           {t("saved.case_code")} <strong className="case-code">{saved.case_code}</strong>
         </p>
       )}
+      <p>
+        {t("saved.visual_hash")} <strong className="visual-hash">{saved.visual_hash}</strong>
+      </p>
       <p>
         {t("saved.digest")} <strong className="digest">{shownDigest(saved.digest)}</strong>
       </p>

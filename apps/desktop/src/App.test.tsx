@@ -72,6 +72,7 @@ let clipboardWrites: string[] = [];
 let savedArgs: Record<string, unknown>[] = [];
 let saveAnswer: string | null = "C:\\Users\\player\\Documents\\rongroi-K7Q-2MX-3f9a1c2e.json";
 const DIGEST = "3f9a1c2e7b4d5a60918273645f0e1d2c3b4a5968778695a4b3c2d1e0f9a8b7c6";
+const VISUAL_HASH = "9c4d7e2a1b3f5068";
 const REPOSITORY = "https://github.com/aeterna/aeterna-rongroi";
 const COMMIT = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
 // Carried fix (d): the real descriptor before any test stubs it, so it can be restored afterwards
@@ -150,7 +151,12 @@ beforeEach(async () => {
         if (typed === "K7Q-2MU") {
           throw "a case code cannot hold 'U'";
         }
-        return { digest: DIGEST, size: 163_000, case_code: typed ? "K7Q-2MX" : null };
+        return {
+          digest: DIGEST,
+          size: 163_000,
+          case_code: typed ? "K7Q-2MX" : null,
+          visual_hash: VISUAL_HASH,
+        };
       }
       case "save_saved_record":
         return saveAnswer;
@@ -473,6 +479,8 @@ describe("App", () => {
     expect(await screen.findByText("3f9a 1c2e 7b4d 5a60")).toBeTruthy();
     expect(screen.getByText("K7Q-2MX")).toBeTruthy();
     expect(screen.getByText(DIGEST)).toBeTruthy();
+    expect(screen.getByText(VISUAL_HASH)).toBeTruthy();
+    expect(screen.getByText(/Visual check code/)).toBeTruthy();
     expect(savedArgs).toEqual([
       {
         options: { server_identity: false, account_identifier: false, download_host: false },
@@ -888,7 +896,7 @@ describe("App", () => {
       if (cmd === "build_saved_record") {
         // The record is built with the same answer the view is (ADR 0073).
         seen.push((args as Record<string, unknown>).options);
-        return { digest: DIGEST, size: 1, case_code: null };
+        return { digest: DIGEST, size: 1, case_code: null, visual_hash: VISUAL_HASH };
       }
       return selfView.header;
     });
