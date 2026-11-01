@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
-<!-- The English landing page. No script, no tracker, nothing loaded from another host. Update the version on each release. -->
+<!-- The English landing page. One local script (specimen.js) for the specimen figure; no tracker, nothing loaded from another host. Update the version on each release. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -94,39 +94,69 @@
         </a>
       </div>
     </div>
-    <figure class="specimen" aria-label="An example of the program's summary; the numbers are illustrative">
+    <figure class="specimen" id="specimen" aria-label="An example of the program's summary; the numbers are illustrative" data-msg-count="Showing {n} of {total} rows" data-msg-copied="Raw JSON copied" data-msg-copy-failed="Could not copy to the clipboard">
       <div class="specimen-head"><strong>What this scan lists</strong><span>EXAMPLE</span></div>
       <div class="specimen-search">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" placeholder="Search checks, collectors, rule IDs…" readonly value="" aria-label="Search checks">
+        <input type="search" id="specimen-q" placeholder="Search checks, collectors, rule IDs…" value="" aria-label="Search checks">
       </div>
       <div class="tally">
-        <div class="t-found"><b><span class="mark mark-found"></span>5</b><span>found</span></div>
-        <div class="t-not-found"><b><span class="mark mark-not-found"></span>12</b><span>not found</span></div>
-        <div class="t-unmeasured"><b><span class="mark mark-unmeasured"></span>3</b><span>not measured</span></div>
+        <button type="button" class="tally-box t-found" data-filter="found" aria-pressed="false"><b><span class="mark mark-found"></span>5</b><span>found</span></button>
+        <button type="button" class="tally-box t-not-found" data-filter="not_found" aria-pressed="false"><b><span class="mark mark-not-found"></span>12</b><span>not found</span></button>
+        <button type="button" class="tally-box t-unmeasured" data-filter="unmeasured" aria-pressed="false"><b><span class="mark mark-unmeasured"></span>3</b><span>not measured</span></button>
       </div>
-      <div class="specimen-row">
-        <span class="mark mark-found"></span>
-        <span class="specimen-title-wrap">
-          <span class="specimen-title">Check: Secure Boot is turned off</span>
-          <span class="badge-strength badge-strength-posture">posture</span>
-        </span>
-        <span class="pill">Found</span>
-        <span class="specimen-desc">Windows reports that UEFI Secure Boot is off.</span>
-        <div class="specimen-falsepositives">
-          <p class="specimen-falsepositives-title">
-            <svg class="icon icon-sm icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            Ordinary things that also produce this:
-          </p>
-          <ul>
-            <li>PCs that boot in legacy BIOS or CSM mode</li>
-          </ul>
+      <div id="specimen-rows">
+        <div class="specimen-row" data-state="found" data-search="Check: Secure Boot is turned off Windows reports that UEFI Secure Boot is off.">
+          <span class="mark mark-found"></span>
+          <span class="specimen-title-wrap">
+            <span class="specimen-title">Check: Secure Boot is turned off</span>
+            <span class="badge-strength badge-strength-posture">posture</span>
+          </span>
+          <span class="pill">Found</span>
+          <span class="specimen-desc">Windows reports that UEFI Secure Boot is off.</span>
+          <div class="specimen-falsepositives">
+            <p class="specimen-falsepositives-title">
+              <svg class="icon icon-sm icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Ordinary things that also produce this:
+            </p>
+            <ul>
+              <li>PCs that boot in legacy BIOS or CSM mode</li>
+            </ul>
+          </div>
+          <button type="button" class="specimen-tech-btn" data-copy data-json="{&quot;rule_id&quot;:&quot;7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7&quot;,&quot;collector&quot;:&quot;posture&quot;,&quot;strength&quot;:&quot;posture&quot;,&quot;state&quot;:&quot;found&quot;,&quot;observations&quot;:[{&quot;collector&quot;:&quot;posture&quot;,&quot;fields&quot;:{&quot;exception_chain_validation&quot;:&quot;not_configured&quot;,&quot;hvci&quot;:&quot;enabled&quot;,&quot;object_namespace_protection&quot;:&quot;not_configured&quot;,&quot;script_block_logging&quot;:&quot;not_configured&quot;,&quot;script_block_logging_pwsh&quot;:&quot;not_configured&quot;,&quot;script_block_logging_pwsh_user&quot;:&quot;not_configured&quot;,&quot;script_block_logging_user&quot;:&quot;not_configured&quot;,&quot;secure_boot&quot;:&quot;disabled&quot;,&quot;speculative_execution_mitigations&quot;:&quot;not_configured&quot;,&quot;test_signing&quot;:&quot;disabled&quot;,&quot;tpm&quot;:&quot;present&quot;,&quot;tpm_spec_version&quot;:&quot;2.0&quot;}}]}">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy raw JSON
+          </button>
         </div>
-        <div class="specimen-tech-btn">
-          <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copy raw JSON
+        <div class="specimen-row" data-state="not_found" data-search="Check: Windows test signing is turned on Current setting only. It says nothing about how the PC was configured in the past.">
+          <span class="mark mark-not-found"></span>
+          <span class="specimen-title-wrap">
+            <span class="specimen-title">Check: Windows test signing is turned on</span>
+            <span class="badge-strength badge-strength-posture">posture</span>
+          </span>
+          <span class="pill">Not found</span>
+          <span class="specimen-desc">Current setting only. It says nothing about how the PC was configured in the past.</span>
+          <button type="button" class="specimen-tech-btn" data-copy data-json="{&quot;rule_id&quot;:&quot;75162c70-a6d1-47ec-94af-be25184d5ece&quot;,&quot;collector&quot;:&quot;posture&quot;,&quot;strength&quot;:&quot;posture&quot;,&quot;state&quot;:&quot;not_found&quot;,&quot;retention&quot;:&quot;Current setting only. It says nothing about how the PC was configured in the past.&quot;}">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy raw JSON
+          </button>
+        </div>
+        <div class="specimen-row" data-state="unmeasured" data-search="Check: The firmware reports Secure Boot off while Windows reports it on Not measured: needs administrator rights">
+          <span class="mark mark-unmeasured"></span>
+          <span class="specimen-title-wrap">
+            <span class="specimen-title">Check: The firmware reports Secure Boot off while Windows reports it on</span>
+            <span class="badge-strength badge-strength-posture">posture</span>
+          </span>
+          <span class="pill">Not measured</span>
+          <span class="specimen-desc">Not measured: needs administrator rights</span>
+          <button type="button" class="specimen-tech-btn" data-copy data-json="{&quot;rule_id&quot;:&quot;5ec56c3d-da70-4acc-99d6-2c41c0b75d71&quot;,&quot;collector&quot;:&quot;posture&quot;,&quot;strength&quot;:&quot;posture&quot;,&quot;state&quot;:&quot;unmeasured&quot;,&quot;reason&quot;:&quot;not_admin&quot;,&quot;expected&quot;:true}">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy raw JSON
+          </button>
         </div>
       </div>
+      <p id="specimen-empty" class="note" hidden>No row matches this search</p>
+      <p id="specimen-live" class="visually-hidden" aria-live="polite"></p>
       <p class="note">
         <svg class="icon icon-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <span>Evidence only. This report cannot prove that a PC is clean.</span>
@@ -225,5 +255,6 @@
     <p><a href="https://github.com/aeterna/aeterna-rongroi">GitHub</a> · <a href="https://github.com/aeterna/aeterna-rongroi/releases">Releases</a> · <a href="https://github.com/aeterna/aeterna-rongroi/discussions">Discussions</a> · <a href="https://discord.gg/eZ8CNrGe2b">Discord</a> · <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md">Privacy</a></p>
   </div>
 </footer>
+<script src="../specimen.js" defer></script>
 </body>
 </html>
