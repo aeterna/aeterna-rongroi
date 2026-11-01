@@ -58,11 +58,17 @@ windows-registry.workspace = true
 # `SetThreadErrorMode` and its `SEM_FAILCRITICALERRORS` / `SEM_NOOPENFILEERRORBOX` flags are declared in
 # `Win32_System_Diagnostics_Debug`; the call changes this program's own thread's error mode only (ADR 0087
 # section 1).
+# The native splash window needs `RegisterClassW`/`WNDCLASSW` and the GDI calls that paint it —
+# `CreateSolidBrush`, `FillRect`, `DrawTextW`, `SelectObject` and `GetStockObject` — under
+# `Win32_Graphics_Gdi`; `GetModuleHandleW` is under `Win32_System_LibraryLoader`. `CreateWindowExW`,
+# `SetTimer` and `PostMessageW` come with `Win32_UI_WindowsAndMessaging`, already listed (each feature name
+# read from the `windows` 0.62.2 manifest rather than assumed).
 windows = { workspace = true, features = [
   "Wdk_System_SystemInformation",
   "Win32_Devices_DeviceAndDriverInstallation",
   "Win32_Devices_Properties",
   "Win32_Foundation",
+  "Win32_Graphics_Gdi",
   "Win32_Security",
   "Win32_Security_Cryptography",
   "Win32_Security_Cryptography_Catalog",
@@ -75,6 +81,7 @@ windows = { workspace = true, features = [
   "Win32_System_EventLog",
   "Win32_System_IO",
   "Win32_System_Ioctl",
+  "Win32_System_LibraryLoader",
   "Win32_System_Registry",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
