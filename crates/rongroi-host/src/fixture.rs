@@ -14,7 +14,8 @@ use crate::{
     AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
     DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap,
     DriveMapEntry, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
-    FirmwareSecureBoot, FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource,
+    FirmwareSecureBoot, FirmwareSource, Host, IommuTable, LinkKind, LinkTarget, Platform,
+    ProcessRecord, ProcessSource,
     RegistryData, RegistrySource, SignatureCheck, SignatureSource, SourceError,
     SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState,
     UsnReadEnd,
@@ -97,6 +98,21 @@ struct HostFile {
     /// claim that the machine has none.
     #[serde(default)]
     drive_map: Option<Vec<FixtureDrive>>,
+    /// The reparse points the machine has (ADR 0091 section 2). Absent means no path is a link.
+    #[serde(default)]
+    links: Vec<FixtureLink>,
+}
+
+/// One reparse point a fixture describes (ADR 0091 section 2): the path that is the link, what kind
+/// it is and the substitute name it holds.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureLink {
+    path: String,
+    kind: LinkKind,
+    target: String,
+    #[serde(default)]
+    relative: bool,
 }
 
 /// One drive letter a fixture describes (ADR 0087 section 1). `device` and `serial` are invented,
@@ -1218,6 +1234,8 @@ pub struct FixtureHost {
     drive_roots: BTreeMap<String, EntryTimes>,
     /// The letters the fixture wrote under `drive_map:`, or `None` when it never modelled them.
     drive_map: Option<Vec<DriveMapEntry>>,
+    /// Keyed by the normalised path of the link.
+    links: BTreeMap<String, LinkTarget>,
 }
 
 impl FixtureHost {
@@ -1311,6 +1329,20 @@ impl FixtureHost {
                 })
                 .transpose()?,
             drive_roots,
+            links: file
+                .links
+                .into_iter()
+                .map(|link| {
+                    (
+                        normalise_path(&link.path),
+                        LinkTarget {
+                            kind: link.kind,
+                            target: link.target,
+                            relative: link.relative,
+                        },
+                    )
+                })
+                .collect(),
             drive_map: file.drive_map.map(|described| {
                 described
                     .into_iter()
@@ -1344,7 +1376,7 @@ impl FixtureHost {
     /// The entry the fixture wrote for one file, after the access checks every per-file read makes.
     /// A file it never listed is a failure here, which is what hashing or checking one means.
     fn described_file(&self, path: &str) -> Result<&FixtureEntry, SourceError> {
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1357,6 +1389,13 @@ impl FixtureHost {
                     .find(|file| file.name.eq_ignore_ascii_case(name))
             })
             .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))
+    }
+
+    /// Where a read of `path` lands once its links are followed, or the refusal every read by path
+    /// makes first (ADR 0091 section 1). A fixture with no `links:` and no `drive_map:` returns the
+    /// path unchanged.
+    fn local_path(&self, path: &str) -> Result<String, SourceError> {
+        crate::resolved_local_path(self, path).map_err(SourceError::NotLocal)
     }
 
     /// The file system is only described for Windows fixtures.
@@ -1527,7 +1566,7 @@ impl RegistrySource for FixtureHost {
 impl FilesystemSource for FixtureHost {
     fn list_dir(&self, dir: &str) -> Result<Option<Vec<DirEntryInfo>>, SourceError> {
         self.windows_filesystem()?;
-        let dir = normalise_path(dir);
+        let dir = normalise_path(&self.local_path(dir)?);
         if self.is_denied(&dir) {
             return Err(SourceError::AccessDenied);
         }
@@ -1561,7 +1600,7 @@ impl FilesystemSource for FixtureHost {
     /// the fixture never described.
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1592,7 +1631,7 @@ impl FilesystemSource for FixtureHost {
     fn zone_identifier(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         crate::zone_identifier_path(path)?;
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1616,7 +1655,7 @@ impl FilesystemSource for FixtureHost {
     /// for it would put a value in the report nobody wrote (ADR 0037).
     fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1640,7 +1679,7 @@ impl FilesystemSource for FixtureHost {
     /// a refusal, because a live host does not list the parent to answer (ADR 0061).
     fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         if self.is_denied(&normalised) {
             return Err(SourceError::AccessDenied);
         }
@@ -1796,11 +1835,11 @@ impl UsnJournalSource for FixtureHost {
                 "this fixture host does not describe file identifiers".to_owned(),
             )
         })?;
-        let key = normalise_path(path);
+        let key = normalise_path(&self.local_path(path)?);
         if self.access_denied.contains(&key) {
             return Err(SourceError::AccessDenied);
         }
-        let root = format!("{}:", journal.volume.to_ascii_lowercase());
+        let root =format!("{}:", journal.volume.to_ascii_lowercase());
         if key == root {
             return Ok(Some(file_id_for(
                 NTFS_ROOT_DIRECTORY_RECORD,
@@ -1886,6 +1925,23 @@ impl Host for FixtureHost {
 
     fn is_elevated(&self) -> Option<bool> {
         self.elevated
+    }
+
+    /// The kind the fixture wrote under `drive_map:` for the letter, or `Fixed` when the fixture does
+    /// not list it, so a fixture written before ADR 0091 reads as it did.
+    fn drive_kind(&self, letter: char) -> Result<DriveKind, SourceError> {
+        Ok(self
+            .drive_map
+            .iter()
+            .flatten()
+            .find(|entry| entry.letter.eq_ignore_ascii_case(&letter))
+            .map_or(DriveKind::Fixed, |entry| entry.kind))
+    }
+
+    /// The link the fixture wrote under `links:` for the path, matched without regard to case, or
+    /// `Ok(None)` (ADR 0091 section 2).
+    fn link_target(&self, path: &str) -> Result<Option<LinkTarget>, SourceError> {
+        Ok(self.links.get(&normalise_path(path)).cloned())
     }
 
     /// The letters the fixture wrote under `drive_map:`. No block is `Unsupported`, never an empty
