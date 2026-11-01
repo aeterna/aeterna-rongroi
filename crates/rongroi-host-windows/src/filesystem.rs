@@ -327,7 +327,10 @@ mod tests {
         // A path whose form cannot exist is missing, not refused.
         assert_eq!(answer(&dir.join("bad<name>")), Ok(None));
         assert_eq!(LiveHost.drive_kind('C'), Ok(DriveKind::Fixed));
-        assert!(matches!(LiveHost.list_dir(junction.to_str().unwrap()), Ok(Some(_))));
+        assert!(matches!(
+            LiveHost.list_dir(junction.to_str().unwrap()),
+            Ok(Some(_))
+        ));
         assert_eq!(
             LiveHost.read_file(r"\\?\C:\x"),
             Err(SourceError::NotLocal(NotLocal::NotDriveRooted))

@@ -208,9 +208,7 @@ impl Host for LiveHost {
             // SAFETY: no other call has run on this thread since the one whose error this reads.
             let last_error = unsafe { GetLastError() }.0;
             return match last_error {
-                ERROR_FILE_NOT_FOUND
-                | ERROR_PATH_NOT_FOUND
-                | ERROR_INVALID_NAME
+                ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND | ERROR_INVALID_NAME
                 | ERROR_DIRECTORY => Ok(None),
                 _ => Err(SourceError::Failed(format!(
                     "GetFileAttributesW returned {last_error:#010x}"

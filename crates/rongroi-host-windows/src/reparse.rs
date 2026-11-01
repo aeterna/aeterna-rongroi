@@ -155,9 +155,9 @@ mod tests {
     use rongroi_host::{LinkKind, LinkTarget};
 
     use super::{
-        FILE_ATTRIBUTE_OFFLINE, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS, FILE_ATTRIBUTE_RECALL_ON_OPEN,
-        IO_REPARSE_TAG_CLOUD, IO_REPARSE_TAG_MOUNT_POINT, IO_REPARSE_TAG_SYMLINK,
-        SYMLINK_FLAG_RELATIVE, parse_reparse, would_fetch,
+        FILE_ATTRIBUTE_OFFLINE, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS,
+        FILE_ATTRIBUTE_RECALL_ON_OPEN, IO_REPARSE_TAG_CLOUD, IO_REPARSE_TAG_MOUNT_POINT,
+        IO_REPARSE_TAG_SYMLINK, SYMLINK_FLAG_RELATIVE, parse_reparse, would_fetch,
     };
 
     /// A `REPARSE_DATA_BUFFER`: the 8-byte header, then `data`.
@@ -202,13 +202,22 @@ mod tests {
     /// A link whose print name comes first in the path buffer, as `CreateSymbolicLink` writes it.
     fn print_name_first(tag: u32, print: &str, substitute: &str, flags: Option<u32>) -> Vec<u8> {
         let print_bytes: Vec<u8> = print.encode_utf16().flat_map(u16::to_le_bytes).collect();
-        let substitute_bytes: Vec<u8> =
-            substitute.encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let substitute_bytes: Vec<u8> = substitute
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
         let print_length = u16::try_from(print_bytes.len()).unwrap();
         let substitute_length = u16::try_from(substitute_bytes.len()).unwrap();
         let mut path = print_bytes;
         path.extend_from_slice(&substitute_bytes);
-        reparse(tag, &path, print_length, substitute_length, Some((0, print_length)), flags)
+        reparse(
+            tag,
+            &path,
+            print_length,
+            substitute_length,
+            Some((0, print_length)),
+            flags,
+        )
     }
 
     fn mount_point(name: &str) -> Vec<u8> {
