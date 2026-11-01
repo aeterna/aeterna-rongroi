@@ -99,7 +99,7 @@ function openTechnical() {
 /** A group that has finished playing (or never played) carries no animation styles of its own. */
 function expectGroupsPlain() {
   expect(document.querySelector(".view-tech-wrap")?.className).toBe("view-tech-wrap");
-  const groups = document.querySelectorAll(".view-tech-wrap section.group");
+  const groups = document.querySelectorAll<HTMLElement>(".view-tech-wrap section.group");
   expect(groups.length).toBeGreaterThan(0);
   for (const group of groups) {
     expect(group.style.animationDelay).toBe("");
@@ -116,7 +116,7 @@ describe("Report group reveal (E1)", () => {
     // run, and nothing waits for a script to become visible.
     const wrap = document.querySelector(".view-tech-wrap");
     expect(wrap?.className).toBe("view-tech-wrap");
-    const before = document.querySelectorAll(".view-tech-wrap section.group");
+    const before = document.querySelectorAll<HTMLElement>(".view-tech-wrap section.group");
     expect(before).toHaveLength(GROUP_COUNT);
     for (const group of before) {
       expect(group.style.animationDelay).toBe("");
@@ -127,7 +127,7 @@ describe("Report group reveal (E1)", () => {
     vi.useFakeTimers();
     openTechnical();
     expect(wrap?.className).toBe("view-tech-wrap reveal-on");
-    const groups = document.querySelectorAll(".view-tech-wrap section.group");
+    const groups = document.querySelectorAll<HTMLElement>(".view-tech-wrap section.group");
     expect(groups).toHaveLength(GROUP_COUNT);
     groups.forEach((group, index) => {
       expect(group.style.animationDelay).toBe(staggerDelayMs(index));
