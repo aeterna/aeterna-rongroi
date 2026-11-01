@@ -1,0 +1,36 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+
+/* H2: a soft light follows the mouse. It only brightens; it never marks found, not_found or unmeasured. */
+.glance-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.glance-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle 220px at var(--mx, 50%) var(--my, 50%),
+    rgba(142, 197, 255, 0.3),
+    transparent 70%
+  );
+  transition: opacity 180ms ease;
+}
+
+.glance-card:hover::after {
+  opacity: 1;
+}
+
+/* The hook already stays still here; this keeps the light off even before its first effect runs. */
+@media (prefers-reduced-motion: reduce) {
+  .glance-card::after {
+    display: none;
+  }
+}
