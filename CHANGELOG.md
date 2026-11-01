@@ -33,6 +33,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   administrator rights). A small script of the page's own does this; with scripts off the card reads as before, and the
   page still loads nothing from another site.
 - The saved record's 16-character digest decodes into place once when it is shown, and an opened evidence row gets one line of its rule, collector and state typed out. Both are decoration: the real digest and the whole line are in the page as text from the start, nothing is animated under reduced motion, and the record, its digest and every collector are unchanged.
+- Ctrl K (Cmd K on a Mac) opens a search over the report's own checks, by rule name, rule id or collector; Enter or a click on a result switches the report to its technical view with that rule searched. It reads only what the report already lists, so SS mode shows nothing more, and it has no order or ranking of its own. It is a keyboard-reachable dialog with a combobox and a list, and it has no animation when reduced motion is asked for.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
