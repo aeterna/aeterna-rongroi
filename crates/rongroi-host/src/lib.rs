@@ -1063,13 +1063,17 @@ pub fn bound_registry_data(data: RegistryData, limit: usize) -> Result<RegistryD
 }
 
 /// Splits `X:\rest` into the upper-case drive letter and what follows the root; `None` for any other form.
+///
+/// A bare `X:` is the drive's root too: `usn` asks for the volume's identity that way (ADR 0047).
 fn split_drive(path: &str) -> Option<(char, &str)> {
     let bytes = path.as_bytes();
-    (bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && matches!(bytes[2], b'\\' | b'/'))
-    .then(|| (char::from(bytes[0].to_ascii_uppercase()), &path[3..]))
+    let rooted = bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+    let rest = match bytes.get(2) {
+        None => "",
+        Some(b'\\' | b'/') => &path[3..],
+        Some(_) => return None,
+    };
+    rooted.then(|| (char::from(bytes[0].to_ascii_uppercase()), rest))
 }
 
 /// Appends the segments of `path` to `out`, dropping empty and `.` segments and letting `..` remove

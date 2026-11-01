@@ -15,10 +15,9 @@ use crate::{
     DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap,
     DriveMapEntry, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
     FirmwareSecureBoot, FirmwareSource, Host, IommuTable, LinkKind, LinkTarget, Platform,
-    ProcessRecord, ProcessSource,
-    RegistryData, RegistrySource, SignatureCheck, SignatureSource, SourceError,
-    SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState,
-    UsnReadEnd,
+    ProcessRecord, ProcessSource, RegistryData, RegistrySource, SignatureCheck, SignatureSource,
+    SourceError, SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource,
+    UsnJournalState, UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -1839,7 +1838,7 @@ impl UsnJournalSource for FixtureHost {
         if self.access_denied.contains(&key) {
             return Err(SourceError::AccessDenied);
         }
-        let root =format!("{}:", journal.volume.to_ascii_lowercase());
+        let root = format!("{}:", journal.volume.to_ascii_lowercase());
         if key == root {
             return Ok(Some(file_id_for(
                 NTFS_ROOT_DIRECTORY_RECORD,
