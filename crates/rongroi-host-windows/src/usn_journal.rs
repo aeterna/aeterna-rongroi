@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! The NTFS change journal of one volume, read through the two read-only control codes and nothing
-//! else (ADR 0047).
+//! The NTFS change journal of one volume, read through the read-only control codes and nothing else
+//! (ADR 0047), and the reparse record of one link, read the same way (ADR 0091 section 2).
 //!
 //! The volume is opened with `GENERIC_READ` alone. Microsoft's own example asks for write access too;
 //! ADR 0047 measured on a GitHub-hosted runner that both reads succeed without it, and a handle that
 //! cannot write is the collector's promise kept by the operating system as well as by this code.
-//! `DeviceIoControl` carries the codes that create and delete a journal as well as the two that read
-//! one, so `clippy.toml` bans it everywhere and this module calls it in one function that accepts only
-//! the two read codes. `CreateFileW` is banned the same way and called in one function that accepts
-//! only `GENERIC_READ` or `FILE_READ_ATTRIBUTES`.
+//! `DeviceIoControl` carries the codes that create and delete a journal as well as those that read
+//! one or a link's record. `clippy.toml` bans it everywhere and this module calls it in one
+//! function that accepts only the read codes. `CreateFileW` is banned the same way and called in
+//! one function that accepts only `GENERIC_READ` or `FILE_READ_ATTRIBUTES`.
 
 use rongroi_host::UsnJournalState;
 
@@ -106,6 +106,9 @@ pub fn read_input(start_usn: i64, journal_id: u64) -> [u8; READ_INPUT_LEN] {
 }
 
 #[cfg(windows)]
+pub(crate) use live::reparse_buffer;
+
+#[cfg(windows)]
 mod live {
     use std::ops::ControlFlow;
 
@@ -118,13 +121,19 @@ mod live {
         GetFileInformationByHandleEx, OPEN_EXISTING,
     };
     use windows::Win32::System::IO::DeviceIoControl;
-    use windows::Win32::System::Ioctl::{FSCTL_QUERY_USN_JOURNAL, FSCTL_READ_USN_JOURNAL};
+    use windows::Win32::System::Ioctl::{
+        FSCTL_GET_REPARSE_POINT, FSCTL_QUERY_USN_JOURNAL, FSCTL_READ_USN_JOURNAL,
+    };
     use windows::core::PCWSTR;
 
     use super::{
         ERROR_ACCESS_DENIED, ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND, Failure, QUERY_OUTPUT_LEN,
         READ_OUTPUT_LEN, classify, journal_state, read_input,
     };
+
+    /// Bytes `FSCTL_GET_REPARSE_POINT` is given to write into: 16 KiB, the largest
+    /// `REPARSE_DATA_BUFFER` Windows defines.
+    const REPARSE_OUTPUT_LEN: usize = 16 * 1024;
 
     /// A handle this module opened, closed when dropped.
     struct OwnedHandle(HANDLE);
@@ -138,11 +147,13 @@ mod live {
         }
     }
 
-    /// The only control codes this program sends to a volume. Both read (ADR 0047).
+    /// The only control codes this program sends. Every one reads: two for the change journal (ADR
+    /// 0047 first) and one for a link's own record (ADR 0091 section 2).
     #[derive(Debug, Clone, Copy)]
     enum ReadOnlyControl {
         QueryUsnJournal,
         ReadUsnJournal,
+        GetReparsePoint,
     }
 
     impl ReadOnlyControl {
@@ -150,13 +161,15 @@ mod live {
             match self {
                 Self::QueryUsnJournal => FSCTL_QUERY_USN_JOURNAL,
                 Self::ReadUsnJournal => FSCTL_READ_USN_JOURNAL,
+                Self::GetReparsePoint => FSCTL_GET_REPARSE_POINT,
             }
         }
     }
 
     /// Every `DeviceIoControl` call in this program. `clippy.toml` bans the function everywhere else,
-    /// because the same function creates and deletes change journals; this one can only send the two
-    /// codes [`ReadOnlyControl`] names (ADR 0047).
+    /// because the same function creates and deletes change journals; this one can only send the codes
+    /// [`ReadOnlyControl`] names: the two journal reads (ADR 0047 first) and the reparse-point read
+    /// (ADR 0091 section 2).
     #[allow(unsafe_code, clippy::disallowed_methods)]
     fn control(
         handle: &OwnedHandle,
@@ -172,7 +185,7 @@ mod live {
         let mut returned = 0u32;
         // SAFETY: `handle` is open. `input` and `output` are live slices and their exact lengths are
         // passed, so the call reads and writes only inside them. `returned` outlives the call. There is
-        // no OVERLAPPED, so the call completes before it returns. `control` is one of the two read codes.
+        // no OVERLAPPED, so the call completes before it returns. `control` is one of the read codes.
         unsafe {
             DeviceIoControl(
                 handle.0,
@@ -188,27 +201,31 @@ mod live {
         Ok(usize::try_from(returned).unwrap_or(0))
     }
 
-    /// The only access this program asks `CreateFileW` for. Neither can write (ADR 0047).
+    /// The only access this program asks `CreateFileW` for. None can write (ADR 0047 first; ADR 0091
+    /// section 2 adds the reparse-point read).
     #[derive(Debug, Clone, Copy)]
     enum ReadOnlyAccess {
         /// `GENERIC_READ`, for the volume handle the two control codes are sent to.
         VolumeRead,
         /// `FILE_READ_ATTRIBUTES`, for a folder whose identifiers are read.
         AttributesOnly,
+        /// `FILE_READ_ATTRIBUTES`, for a reparse point read through the link itself.
+        ReparseAttributes,
     }
 
     impl ReadOnlyAccess {
         fn mask(self) -> u32 {
             match self {
                 Self::VolumeRead => GENERIC_READ.0,
-                Self::AttributesOnly => FILE_READ_ATTRIBUTES.0,
+                Self::AttributesOnly | Self::ReparseAttributes => FILE_READ_ATTRIBUTES.0,
             }
         }
     }
 
     /// Every `CreateFileW` call in this program. `clippy.toml` bans the function everywhere else,
     /// because the same function opens for writing and creates files; this one opens an existing path
-    /// with one of the two masks [`ReadOnlyAccess`] names (ADR 0047).
+    /// with one of the masks [`ReadOnlyAccess`] names (ADR 0047 first; ADR 0091 section 2 adds the
+    /// reparse-point read).
     #[allow(unsafe_code, clippy::disallowed_methods)]
     fn open(
         path: &str,
@@ -232,6 +249,23 @@ mod live {
             )
         }?;
         Ok(OwnedHandle(handle))
+    }
+
+    /// The bytes `FSCTL_GET_REPARSE_POINT` returns for `path`, which must be a reparse point: the
+    /// handle is opened on the link itself, never on what it points at (ADR 0091 section 2).
+    pub(crate) fn reparse_buffer(path: &str) -> windows::core::Result<Vec<u8>> {
+        use windows::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+
+        let handle = open(
+            path,
+            ReadOnlyAccess::ReparseAttributes,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+        )?;
+        let mut output = vec![0u8; REPARSE_OUTPUT_LEN];
+        let returned = control(&handle, ReadOnlyControl::GetReparsePoint, &[], &mut output)?;
+        output.truncate(returned);
+        Ok(output)
     }
 
     fn win32(error: &windows::core::Error) -> Option<u32> {

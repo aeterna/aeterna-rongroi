@@ -60,13 +60,11 @@ fn name(path_buffer: &[u8], offset: u16, length: u16) -> Result<String, String> 
     let bytes = path_buffer
         .get(start..end)
         .ok_or_else(|| "reparse name lies past the end of its data".to_owned())?;
-    if !bytes.len().is_multiple_of(2) {
+    let (pairs, remainder) = bytes.as_chunks::<2>();
+    if !remainder.is_empty() {
         return Err("reparse name has an odd number of bytes".to_owned());
     }
-    let units: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-        .collect();
+    let units: Vec<u16> = pairs.iter().copied().map(u16::from_le_bytes).collect();
     String::from_utf16(&units).map_err(|_| "reparse name is not valid UTF-16".to_owned())
 }
 
@@ -108,6 +106,9 @@ pub(crate) fn parse_reparse(bytes: &[u8], attributes: u32) -> Result<Option<Link
     if data_length > payload.len() {
         return Err("reparse data is shorter than the length its header declares".to_owned());
     }
+    // Everything after the header is read from the bytes the header says it holds: a name that lies
+    // inside the buffer but past this length was not written as part of the record.
+    let payload = &payload[..data_length];
 
     if tag & IO_REPARSE_TAG_CLOUD_MASK == IO_REPARSE_TAG_CLOUD {
         let recall = attributes
@@ -243,7 +244,10 @@ mod tests {
 
     #[test]
     fn a_hydrated_cloud_placeholder_is_not_a_link() {
-        assert_eq!(parse_reparse(&header(IO_REPARSE_TAG_CLOUD, &[]), 0), Ok(None));
+        assert_eq!(
+            parse_reparse(&header(IO_REPARSE_TAG_CLOUD, &[]), 0),
+            Ok(None)
+        );
     }
 
     #[test]
@@ -268,6 +272,15 @@ mod tests {
                 relative: false,
             }))
         );
+    }
+
+    #[test]
+    fn a_name_past_the_declared_data_length_is_an_error() {
+        // `\??\D:\data` is in the buffer in full, but the header records only the four name fields:
+        // the name lies inside the returned bytes and past the data the record declares.
+        let mut bytes = mount_point(r"\??\D:\data");
+        bytes[4..6].copy_from_slice(&8_u16.to_le_bytes());
+        assert!(parse_reparse(&bytes, 0).is_err());
     }
 
     #[test]

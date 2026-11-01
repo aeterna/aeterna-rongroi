@@ -6,7 +6,7 @@
 //! section 1). Nothing is read from a file and no administrator right is needed.
 
 #[cfg(windows)]
-pub(crate) use live::read;
+pub(crate) use live::{drive_kind, read};
 
 #[cfg(windows)]
 mod live {
@@ -48,7 +48,9 @@ mod live {
         })
     }
 
-    fn drive_kind(code: u32) -> DriveKind {
+    /// Maps a `GetDriveTypeW` code to the kind the drive map and the read gate use (ADR 0087 section
+    /// 1; ADR 0091 section 2).
+    pub(crate) fn drive_kind(code: u32) -> DriveKind {
         if code == DRIVE_FIXED {
             DriveKind::Fixed
         } else if code == DRIVE_REMOVABLE {

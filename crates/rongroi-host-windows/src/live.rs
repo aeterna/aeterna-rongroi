@@ -5,11 +5,20 @@
 //! Reads the real machine. Registry keys are opened read-only; nothing is written.
 
 use rongroi_host::{Host, Platform, RegistryData, RegistrySource, SourceError};
+use windows::Win32::Foundation::GetLastError;
+use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetFileAttributesW};
+use windows::core::PCWSTR;
+
+use crate::usn_journal::{ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND};
 
 const HRESULT_FILE_NOT_FOUND: i32 = 0x8007_0002_u32.cast_signed();
 const HRESULT_PATH_NOT_FOUND: i32 = 0x8007_0003_u32.cast_signed();
 const HRESULT_ACCESS_DENIED: i32 = 0x8007_0005_u32.cast_signed();
 const CURRENT_VERSION_KEY: &str = r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+/// `GetFileAttributesW`'s value for a path it could not read.
+const INVALID_FILE_ATTRIBUTES: u32 = u32::MAX;
+/// `FILE_ATTRIBUTE_REPARSE_POINT`: the path is a reparse point (a link or another tagged record).
+const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
 
 /// The real Windows machine.
 #[derive(Debug, Default, Clone, Copy)]
@@ -48,6 +57,11 @@ fn classify<T>(result: windows_registry::Result<T>) -> Result<Option<T>, SourceE
             _ => Err(SourceError::Failed(error.message())),
         },
     }
+}
+
+/// `text` as NUL-terminated UTF-16, for a Windows wide-string call.
+fn wide(text: &str) -> Vec<u16> {
+    text.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 impl RegistrySource for LiveHost {
@@ -147,6 +161,48 @@ impl Host for LiveHost {
     /// through (ADR 0087 section 1). Read once, without administrator rights, and no file is opened.
     fn drive_map(&self) -> Result<rongroi_host::DriveMap, SourceError> {
         crate::drive_map::read()
+    }
+
+    /// `GetDriveTypeW` on the letter's root, through the same mapping the drive map uses (ADR 0091
+    /// section 2).
+    #[allow(unsafe_code)]
+    fn drive_kind(&self, letter: char) -> Result<rongroi_host::DriveKind, SourceError> {
+        let root = wide(&format!("{letter}:\\"));
+        // SAFETY: `root` is NUL-terminated UTF-16 that outlives the call, and the call only reads
+        // what kind of drive Windows reports; it opens nothing.
+        let code = unsafe { GetDriveTypeW(PCWSTR(root.as_ptr())) };
+        Ok(crate::drive_map::drive_kind(code))
+    }
+
+    /// `GetFileAttributesW`, then the link's own record when the path is a reparse point (ADR 0091
+    /// section 2). `reparse_buffer` opens the link itself and asks for its attributes only, so the
+    /// read never follows it.
+    #[allow(unsafe_code)]
+    fn link_target(&self, path: &str) -> Result<Option<rongroi_host::LinkTarget>, SourceError> {
+        let name = wide(path);
+        // SAFETY: `name` is NUL-terminated UTF-16 that outlives the call, and the call only reads
+        // the attributes Windows keeps for the path; it opens nothing and follows no link.
+        let attributes = unsafe { GetFileAttributesW(PCWSTR(name.as_ptr())) }.0;
+        if attributes == INVALID_FILE_ATTRIBUTES {
+            // SAFETY: no other call has run on this thread since the one whose error this reads.
+            let last_error = unsafe { GetLastError() }.0;
+            return match last_error {
+                ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => Ok(None),
+                _ => Err(SourceError::Failed(format!(
+                    "GetFileAttributesW returned {last_error:#010x}"
+                ))),
+            };
+        }
+        if attributes & FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+            return Ok(None);
+        }
+        let bytes = crate::usn_journal::reparse_buffer(path).map_err(|error| {
+            SourceError::Failed(format!(
+                "FSCTL_GET_REPARSE_POINT returned {:#010x}",
+                error.code().0.cast_unsigned()
+            ))
+        })?;
+        crate::reparse::parse_reparse(&bytes, attributes).map_err(SourceError::Failed)
     }
 }
 
