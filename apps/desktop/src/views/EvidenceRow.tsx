@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { withKeys } from "../keys";
 import type { Evidence, Observation, RowBand, RuleFiles, RuleText } from "../types";
 import { CodeLink } from "./CodeLink";
+import "./EvidenceRow.motion.css";
 
 interface Props {
   item: Evidence;
@@ -78,6 +79,7 @@ export function EvidenceRow({
       </button>
       {shown && (
         <div className="row-body">
+          <TelemetryLine item={item} />
           {text?.description && (
             <p className="description">
               {t("description")}: {text.description}
@@ -107,6 +109,69 @@ export function EvidenceRow({
         </div>
       )}
     </li>
+  );
+}
+
+/** Whether the platform asks for reduced motion; a missing `matchMedia` is not a reason to throw. */
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** The platform's reduced-motion setting, followed when it changes while the row is open. */
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(prefersReducedMotion);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(query.matches);
+    setReduced(query.matches);
+    if (typeof query.addEventListener !== "function") {
+      return;
+    }
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+/**
+ * One monospace line naming the rule, the collector and the row's state (H6). The whole line is in
+ * the DOM from the first render, for assistive technology and tests; the typed copy is decoration.
+ */
+function TelemetryLine({ item }: { item: Evidence }) {
+  const line = `rule ${item.rule_id} - collector ${item.collector} - state ${item.state}`;
+  const reduced = usePrefersReducedMotion();
+  const [typed, setTyped] = useState(reduced ? line : "");
+
+  useEffect(() => {
+    if (reduced) {
+      setTyped(line);
+      return;
+    }
+    setTyped("");
+    let index = 0;
+    const timer = setInterval(() => {
+      index += 1;
+      setTyped(line.slice(0, index));
+      if (index >= line.length) {
+        clearInterval(timer);
+      }
+    }, 12);
+    return () => clearInterval(timer);
+  }, [line, reduced]);
+
+  return (
+    <p className="row-telemetry">
+      <span className="row-telemetry-hidden">{line}</span>
+      <span className="row-telemetry-typed" aria-hidden="true">
+        {typed}
+      </span>
+    </p>
   );
 }
 
