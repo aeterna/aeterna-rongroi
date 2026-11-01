@@ -27,6 +27,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   redacted in SS mode like every other path; it lets `recorded_files` read the program's file, lets the
   game-window view join BAM to other sources by path (so a program run and then deleted can show I1), and can
   make `executed-program-missing-on-disk` match on more machines.
+- The saved record's 16-character digest decodes into place once when it is shown, and an opened evidence row gets one line of its rule, collector and state typed out. Both are decoration: the real digest and the whole line are in the page as text from the start, nothing is animated under reduced motion, and the record, its digest and every collector are unchanged.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
