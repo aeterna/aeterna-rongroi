@@ -67,21 +67,20 @@ Yes: สแกนแบบ Full  No: สแกนแบบมาตรฐาน"
 /// (ADR 0089). It says a scan is running and names no duration for a standard scan, because none was
 /// measured.
 const SPLASH_TITLE: &str = "aeterna-rongroi";
-const SPLASH_STANDARD_LINES: [&str; 4] = [
-    "กำลังสแกนเครื่องนี้",
-    "Scanning this PC",
-    "ทำงานบนเครื่องนี้ ไม่ส่งข้อมูลออกไปไหน",
-    "Runs on this PC. Nothing is sent anywhere.",
+const SPLASH_STANDARD_LINES: [&str; 2] = ["กำลังสแกนเครื่องนี้", "Scanning this PC"];
+/// A full scan's two extra lines, in Thai and English. The 90 seconds is a ceiling for the part that
+/// reads the files of recorded programs, not the length of the whole scan, so the line says so
+/// (ADR 0089).
+const SPLASH_FULL_LINES: [&str; 2] = [
+    "สแกนแบบ Full: ส่วนไฟล์โปรแกรมไม่เกิน 90 วินาที",
+    "Full scan: program files up to 90 seconds",
 ];
-/// A full scan's one extra line: the 90 seconds the full-scan dialog already states, in both
-/// languages on one line to keep to the splash's five-line limit (ADR 0089).
-const SPLASH_FULL_LINE: &str = "สแกน Full: ไฟล์โปรแกรมถึง 90 วินาที / Full: 90 s";
 
 /// The splash's lines for `tier`, Thai and English together (ADR 0089).
 fn splash_lines(tier: ScanTier) -> Vec<&'static str> {
     let mut lines = SPLASH_STANDARD_LINES.to_vec();
     if tier == ScanTier::Full {
-        lines.push(SPLASH_FULL_LINE);
+        lines.extend(SPLASH_FULL_LINES);
     }
     lines
 }
@@ -193,7 +192,6 @@ type SplashGuard = rongroi_host_windows::splash::Splash;
 
 /// No Windows, no window to keep open.
 #[cfg(not(windows))]
-#[derive(Clone, Copy)]
 struct SplashGuard;
 
 /// Opens the splash for `tier` before the scan reads anything (ADR 0089).
@@ -284,9 +282,9 @@ mod tests {
     }
 
     /// ADR 0089 section 3: a standard scan states no duration, because none was measured; a full scan
-    /// adds the 90 seconds the full-scan dialog already states.
+    /// states the same 90 seconds the full-scan dialog states, and only that number.
     #[test]
-    fn only_the_full_splash_names_90_seconds() {
+    fn the_full_splash_ties_its_90_seconds_to_the_dialog() {
         for line in splash_lines(ScanTier::Standard) {
             assert!(
                 !line.chars().any(|character| character.is_ascii_digit()),
@@ -295,15 +293,33 @@ mod tests {
         }
         let full = splash_lines(ScanTier::Full);
         assert!(full.iter().any(|line| line.contains("90")));
+        assert!(FULL_TEXT.contains("90"));
     }
 
-    /// ADR 0089 section 3: a full scan adds exactly one line to the standard scan's.
+    /// ADR 0089 section 3: the standard splash says only that a scan is running, in both languages.
     #[test]
-    fn the_full_splash_is_the_standard_one_with_one_more_line() {
+    fn the_standard_splash_says_only_that_a_scan_is_running() {
+        assert_eq!(
+            splash_lines(ScanTier::Standard),
+            vec!["กำลังสแกนเครื่องนี้", "Scanning this PC"]
+        );
+    }
+
+    /// ADR 0089 section 3: a full scan adds exactly two lines to the standard scan's: the Thai and
+    /// the English line about program files.
+    #[test]
+    fn the_full_splash_is_the_standard_one_with_two_more_lines() {
         let standard = splash_lines(ScanTier::Standard);
         let full = splash_lines(ScanTier::Full);
-        assert_eq!(full.len(), standard.len() + 1);
+        assert_eq!(full.len(), standard.len() + 2);
         assert_eq!(&full[..standard.len()], &standard[..]);
+        assert_eq!(
+            &full[standard.len()..],
+            &[
+                "สแกนแบบ Full: ส่วนไฟล์โปรแกรมไม่เกิน 90 วินาที",
+                "Full scan: program files up to 90 seconds",
+            ]
+        );
     }
 
     /// ADR 0089 section 3: no language has been chosen yet, so the splash carries Thai and English.
