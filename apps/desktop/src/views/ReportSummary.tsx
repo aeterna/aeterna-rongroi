@@ -5,6 +5,9 @@
 import { useTranslation } from "react-i18next";
 import type { StateFilter } from "../grouping";
 import type { ListedCounts } from "../types";
+// E2: the three tally counts roll exactly like HumanSummary's; the odometer carries its own rules —
+// the real number hidden in the DOM, strips as decoration, reduced motion shown at once, rAF undone.
+import { Odometer } from "./HumanSummary.odometer";
 
 interface Props {
   listed: ListedCounts;
@@ -37,7 +40,7 @@ export function ReportSummary({ listed, filter, onFilter }: Props) {
           >
             <span className="count">
               <span className={`mark mark-${state}`} aria-hidden="true" />
-              {count}
+              <Odometer value={count} />
             </span>
             {/* Read as one name, "7 found — …"; the grid lays the two spans out whatever is between. */}{" "}
             <span className="label">{t(`summary.${state}`)}</span>

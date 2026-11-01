@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ageTexts, codeLinks, reportView, ruleTexts } from "../api";
 import { type EvidenceGroup, groupEvidence, type StateFilter } from "../grouping";
@@ -25,10 +25,33 @@ import { CommandPalette, evidenceMatches } from "./CommandPalette";
 import { EvidenceRow } from "./EvidenceRow";
 import { GameWindowsSection } from "./GameWindows";
 import { HumanSummary } from "./HumanSummary";
+import "./Report.motion.css";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
 import { CrossSource, TraceAges } from "./TraceAges";
+
+/** E1: one rise per group, stepping 120 ms through the first eight groups; past them, no delay. */
+const REVEAL_STAGGER_STEP_MS = 120;
+const REVEAL_STAGGER_GROUPS = 8;
+/** How long one group's rise lasts. */
+const REVEAL_DURATION_MS = 300;
+/** How long a play can still be running: the last staggered group's delay plus its rise. */
+const REVEAL_LIFETIME_MS =
+  (REVEAL_STAGGER_GROUPS - 1) * REVEAL_STAGGER_STEP_MS + REVEAL_DURATION_MS;
+/** The media query that switches the whole reveal off. */
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+/** The step for one group's place in the stagger; past the eighth group, no delay at all. */
+function revealDelayMs(index: number): number {
+  return index < REVEAL_STAGGER_GROUPS ? index * REVEAL_STAGGER_STEP_MS : 0;
+}
+
+/** Reads the user's motion preference; a missing matchMedia (tests, jsdom) counts as no request. */
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
 
 interface Props {
   mode: Mode;
@@ -52,6 +75,10 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusEvidenceSignal, setFocusEvidenceSignal] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  // E1: the group stagger, on while its animation runs, and only ever for the tech view's first
+  // show; `revealPlayed` keeps the once-per-mount promise against every later re-render.
+  const [revealOn, setRevealOn] = useState(false);
+  const revealPlayed = useRef(false);
 
   useEffect(() => {
     // The way back to the top is only worth a control once the reader has left it.
@@ -60,6 +87,29 @@ export function Report({ mode, options, saved, onBack }: Props) {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    // E1: the stagger plays once per report, on the technical view's first show after the view has
+    // loaded. Under reduced motion the groups are simply there; the CSS media query answers the
+    // same request anyway, in case the reader switches while a play is on.
+    if (view === null || viewMode !== "technical" || revealPlayed.current) return;
+    revealPlayed.current = true;
+    if (prefersReducedMotion()) return;
+    setRevealOn(true);
+  }, [view, viewMode]);
+
+  useEffect(() => {
+    if (!revealOn) return undefined;
+    if (viewMode !== "technical") {
+      // Leaving the technical view mid-play ends it: with the class gone, coming back plays nothing.
+      setRevealOn(false);
+      return undefined;
+    }
+    // The class stays on exactly as long as the longest play can last, then the groups render plain
+    // and no filter, search or view toggle can restart what already played.
+    const timer = window.setTimeout(() => setRevealOn(false), REVEAL_LIFETIME_MS);
+    return () => window.clearTimeout(timer);
+  }, [revealOn, viewMode]);
 
   useEffect(() => {
     void reportView(mode, options).then(setView);
@@ -203,7 +253,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
       </div>
 
       <div
-        className="view-tech-wrap"
+        className={`view-tech-wrap${revealOn ? " reveal-on" : ""}`}
         style={{ display: viewMode === "technical" ? "block" : "none" }}
       >
         <ReportSummary listed={view.listed} filter={filter} onFilter={setFilter} />
@@ -300,7 +350,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
         {view.evidence.length > 0 && groups.length === 0 && (
           <p className="muted">{t(query ? "toolbar.search_empty" : "toolbar.filtered_empty")}</p>
         )}
-        {groups.map((group) => (
+        {groups.map((group, index) => (
           <Group
             key={group.collector}
             group={group}
@@ -312,6 +362,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
             official={official}
             technicalAll={technicalAll}
             unfold={filter === "not_found"}
+            revealDelay={revealOn ? revealDelayMs(index) : null}
           />
         ))}
 
@@ -435,6 +486,7 @@ function Group({
   linksKnown,
   official,
   technicalAll,
+  revealDelay,
   unfold,
 }: {
   group: EvidenceGroup;
@@ -445,6 +497,7 @@ function Group({
   linksKnown: boolean;
   official: boolean;
   technicalAll: boolean;
+  revealDelay: number | null;
   unfold: boolean;
 }) {
   const { t } = useTranslation("report");
@@ -471,7 +524,11 @@ function Group({
     />
   );
   return (
-    <section className="group" aria-labelledby={titleId}>
+    <section
+      className="group"
+      aria-labelledby={titleId}
+      style={revealDelay === null ? undefined : { animationDelay: `${revealDelay}ms` }}
+    >
       <div className="group-head">
         <h3 id={titleId} tabIndex={-1}>
           {t(`collector.${group.collector}`, { defaultValue: group.collector })}
