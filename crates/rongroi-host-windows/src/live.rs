@@ -146,8 +146,8 @@ impl LiveHost {
     /// The one gate before a read by path (ADR 0091 section 1): [`rongroi_host::local_read_check`] on
     /// this host, with a refusal reported as [`SourceError::NotLocal`] so a collector can say the path
     /// was not opened rather than missing.
-    pub(crate) fn local_read_check(&self, path: &str) -> Result<(), SourceError> {
-        rongroi_host::local_read_check(self, path).map_err(SourceError::NotLocal)
+    pub(crate) fn local_read_check(self, path: &str) -> Result<(), SourceError> {
+        rongroi_host::local_read_check(&self, path).map_err(SourceError::NotLocal)
     }
 }
 
