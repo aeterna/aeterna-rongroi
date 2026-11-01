@@ -125,9 +125,9 @@ mod live {
         CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GWLP_USERDATA,
         GetClientRect, GetMessageW, GetSystemMetrics, GetWindowLongPtrW, IDC_ARROW, KillTimer,
         LoadCursorW, MSG, PostQuitMessage, RegisterClassW, SM_CXSCREEN, SM_CYSCREEN, SW_SHOWNORMAL,
-        SetForegroundWindow, SetTimer, SetWindowLongPtrW, ShowWindow, TranslateMessage,
-        WM_CLOSE, WM_DESTROY, WM_ERASEBKGND, WM_PAINT, WM_TIMER, WNDCLASSW, WS_CAPTION,
-        WS_EX_TOPMOST, WS_VISIBLE,
+        SetForegroundWindow, SetTimer, SetWindowLongPtrW, ShowWindow, TranslateMessage, WM_CLOSE,
+        WM_DESTROY, WM_ERASEBKGND, WM_PAINT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_EX_TOPMOST,
+        WS_VISIBLE,
     };
     use windows::core::{PCWSTR, w};
 
