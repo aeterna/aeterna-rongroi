@@ -86,7 +86,7 @@ const ACCOUNT_METADATA: [&str; 2] = ["SequenceNumber", "Version"];
 /// every entry older than seven days at each boot, which is Microsoft's code running on schedule and
 /// not a service being off. Nothing this collector reads distinguishes "the service is disabled"
 /// from "the scavenger has run", so it does not claim to (ADR 0030).
-const REASONS: [UnmeasuredReason; 7] = [
+const REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
@@ -94,6 +94,8 @@ const REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::SourceEmpty,
     UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Every field this collector can emit.

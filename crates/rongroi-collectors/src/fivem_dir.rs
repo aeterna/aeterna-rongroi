@@ -269,10 +269,12 @@ const LOCATIONS: [Location; 15] = [
 ///
 /// Neither environment variable is set, or listing a folder was denied or failed. An absent folder is
 /// not here: that edition is not installed, and the collector did look.
-const REASONS: [UnmeasuredReason; 3] = [
+const REASONS: [UnmeasuredReason; 4] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Every field this collector can emit. A folder it could not read is a gap in all of them, for the
@@ -295,12 +297,13 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// - **a server cache folder** (`location: enhanced_server_cache`, `created_at`, `modified_at` and
 ///   `entries`, each when it could be read) — told apart from its parent's folder observation by having
 ///   no `folder` field (ADR 0053).
-const FIELDS: [Field; 26] = [
+const FIELDS: [Field; 27] = [
     Field::timestamp("app_folder_created_at"),
     Field::timestamp("created_at"),
     Field::timestamp("earliest_created_at"),
     Field::timestamp("earliest_modified_at"),
     Field::number("entries"),
+    Field::text("file_unread"),
     Field::number("files"),
     Field::number("files_without_times"),
     Field::text("folder"),
@@ -540,6 +543,7 @@ fn list_folder(
         Ok(None) => Ok(None),
         Ok(Some(entries)) => Ok(Some((folder, entries))),
         Err(SourceError::AccessDenied) => Err(UnmeasuredReason::AccessDenied),
+        Err(SourceError::NotLocal(_)) => Err(UnmeasuredReason::NotAttempted),
         Err(
             SourceError::Failed(_) | SourceError::Unsupported(_) | SourceError::TooLarge { .. },
         ) => Err(UnmeasuredReason::ReadFailed),
@@ -804,11 +808,28 @@ fn file_observations(
         .map(|entry| {
             let path = format!(r"{dir}\{}", entry.name);
             let mut fields = BTreeMap::new();
-            if let Some(sha256) = file_sha256(host, &path) {
-                fields.insert("sha256".to_owned(), serde_json::Value::from(sha256));
-            }
-            if let Ok(signature) = host.file_signature(&path) {
-                insert_signature(&mut fields, signature);
+            match host.file_sha256(&path) {
+                Ok(digest) => {
+                    if let Some(sha256) = lowercase_digest(&digest) {
+                        fields.insert("sha256".to_owned(), serde_json::Value::from(sha256));
+                    }
+                    if let Ok(signature) = host.file_signature(&path) {
+                        insert_signature(&mut fields, signature);
+                    }
+                }
+                // Not opened: the path does not stay on a local drive (ADR 0091). The row says why
+                // and nothing else reads the file.
+                Err(SourceError::NotLocal(not_local)) => {
+                    fields.insert(
+                        "file_unread".to_owned(),
+                        serde_json::Value::from(not_local.as_str()),
+                    );
+                }
+                Err(_) => {
+                    if let Ok(signature) = host.file_signature(&path) {
+                        insert_signature(&mut fields, signature);
+                    }
+                }
             }
             fields.insert(
                 "location".to_owned(),
@@ -895,8 +916,27 @@ fn proxy_dll_observations(
         .into_iter()
         .filter_map(|entry| {
             let path = format!(r"{dir}\{}", entry.name);
-            let Ok(signature) = host.file_signature(&path) else {
-                return None;
+            let signature = match host.file_signature(&path) {
+                Ok(signature) => signature,
+                // Not opened: the path does not stay on a local drive (ADR 0091). Its row stays, so a
+                // proxy DLL behind such a link is never left out of the report.
+                Err(SourceError::NotLocal(not_local)) => {
+                    let mut fields = BTreeMap::new();
+                    fields.insert(
+                        "file_unread".to_owned(),
+                        serde_json::Value::from(not_local.as_str()),
+                    );
+                    fields.insert(
+                        "location".to_owned(),
+                        serde_json::Value::from(location.name),
+                    );
+                    fields.insert("path".to_owned(), serde_json::Value::from(path));
+                    return Some(Observation {
+                        collector: ID.to_owned(),
+                        fields,
+                    });
+                }
+                Err(_) => return None,
             };
             let sig_str = match signature {
                 SignatureCheck::NoEmbeddedSignature => "no_embedded_signature",
@@ -1801,6 +1841,35 @@ filesystem:
         assert_eq!(field(d3d11, "signature"), Some("unverifiable_offline"));
     }
 
+    /// A proxy DLL that is a link to a share is not opened, and its row stays with `file_unread`: a
+    /// refused read never leaves it out of the report (ADR 0091 section 3).
+    #[test]
+    fn a_root_proxy_dll_linked_to_a_share_keeps_its_row() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app':
+    - name: dxgi.dll
+      sha256: 2222222222222222222222222222222222222222222222222222222222222222
+      signature: { state: invalid }
+links:
+  - path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\dxgi.dll'
+    kind: symlink
+    target: '\??\UNC\server\share\dxgi.dll'
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, _) = measured(&run);
+        let dxgi = by_name(observations, "dxgi.dll");
+        assert_eq!(field(dxgi, "location"), Some(ROOT_DLLS_LOCATION));
+        assert_eq!(field(dxgi, "file_unread"), Some("link_off_local_drive"));
+        assert_eq!(dxgi.fields.get("signature"), None, "{dxgi:?}");
+        assert_eq!(dxgi.fields.get("sha256"), None, "{dxgi:?}");
+    }
+
     #[test]
     fn root_proxy_dll_valid_signature_is_not_observed() {
         let host = inline(
@@ -1828,5 +1897,145 @@ filesystem:
             root_dlls.is_empty(),
             "valid signature root proxy DLL should not be emitted: {root_dlls:?}"
         );
+    }
+
+    // ADR 0091 (files are read on local drives only): the host gate `local_read_check` runs before
+    // every read by path, and `FixtureHost` answers it from the fixture's `drive_map:` (existing) and
+    // `links:` — a link whose target leaves the machine is refused before anything is opened. A file
+    // listed in the fixture's filesystem with a `sha256` proves those tests: a hash on its row would
+    // mean the gate was skipped.
+
+    /// A plugin whose own path is a symbolic link to a share is listed with its path as before, but
+    /// nothing reads through the link: no hash, no signature, and `file_unread` naming the reason
+    /// (ADR 0091 section 3). One unread file keeps the file row and is not a gap, as a file whose
+    /// hash cannot be read is not (ADR 0079's principle, here ADR 0091's).
+    #[test]
+    fn a_file_symlinked_to_a_network_share_keeps_its_path_without_a_hash_or_a_signature() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins':
+    - name: local-plugin.dll
+      sha256: 1111111111111111111111111111111111111111111111111111111111111111
+      signature: { state: no_embedded_signature }
+    - name: shared-plugin.dll
+      sha256: 3333333333333333333333333333333333333333333333333333333333333333
+      signature: { state: no_embedded_signature }
+links:
+  - path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins\shared-plugin.dll'
+    kind: symlink
+    target: '\??\UNC\server\share\shared-plugin.dll'
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        // The folder was listed and both of its files observed.
+        assert_eq!(
+            folder(observations, PLUGINS_LOCATION),
+            ("listed".to_owned(), Some(2))
+        );
+        let local = by_name(observations, "local-plugin.dll");
+        assert_eq!(field(local, "sha256"), Some("1".repeat(64).as_str()));
+        assert!(!local.fields.contains_key("file_unread"), "{local:?}");
+        let shared = by_name(observations, "shared-plugin.dll");
+        assert_eq!(path_of(shared), format!(r"{PLUGINS_DIR}\shared-plugin.dll"));
+        assert_eq!(shared.fields.get("sha256"), None, "{shared:?}");
+        assert_eq!(shared.fields.get("signature"), None, "{shared:?}");
+        assert_eq!(field(shared, "file_unread"), Some("link_off_local_drive"));
+    }
+
+    /// A link whose target is a drive letter leads as far as that letter: `Z:` is `kind: other` in
+    /// the fixture's `drive_map:` — the reading ADR 0087's map gives — so the read is refused for the
+    /// letter's kind, `not_local_drive`, and the row keeps its path (ADR 0091 sections 1 and 3).
+    #[test]
+    fn a_file_symlinked_onto_a_network_letter_says_not_local_drive() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
+drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'Z', device: '\Device\Mup', serial: 1, kind: other }
+filesystem:
+  'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins':
+    - name: mapped-plugin.dll
+      sha256: 4444444444444444444444444444444444444444444444444444444444444444
+      signature: { state: no_embedded_signature }
+links:
+  - path: 'C:\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins\mapped-plugin.dll'
+    kind: symlink
+    target: '\??\Z:\Shared\mapped-plugin.dll'
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        let mapped = by_name(observations, "mapped-plugin.dll");
+        assert_eq!(path_of(mapped), format!(r"{PLUGINS_DIR}\mapped-plugin.dll"));
+        assert_eq!(mapped.fields.get("sha256"), None, "{mapped:?}");
+        assert_eq!(mapped.fields.get("signature"), None, "{mapped:?}");
+        assert_eq!(field(mapped, "file_unread"), Some("not_local_drive"));
+    }
+
+    /// A junction that stays on a local drive is ordinary and is read through: a file whose local
+    /// path goes under `C:\Games`, a mount point to `D:\Lib` (both fixed in the fixture's
+    /// `drive_map:`), is hashed at its target as before. Nothing is refused, so the row says
+    /// `file_unread` nothing at all — and the fixture lists the file at the target, so a hash here
+    /// means the gate followed the junction and stopped before any share.
+    #[test]
+    fn a_junction_onto_a_local_drive_is_read_through_and_the_file_is_hashed() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  LOCALAPPDATA: 'C:\Games\Users\fixtureuser\AppData\Local'
+drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'D', device: '\Device\HarddiskVolume2', serial: 2, kind: fixed }
+filesystem:
+  'D:\Lib\Users\fixtureuser\AppData\Local\FiveM\FiveM.app\plugins':
+    - name: moved-plugin.dll
+      sha256: 2222222222222222222222222222222222222222222222222222222222222222
+      signature: { state: no_embedded_signature }
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+",
+        );
+        let run = FivemDir.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(
+            folder(observations, PLUGINS_LOCATION),
+            ("listed".to_owned(), Some(1))
+        );
+        let moved = by_name(observations, "moved-plugin.dll");
+        assert_eq!(
+            path_of(moved),
+            format!(
+                r"C:\Games\Users\fixtureuser\AppData\Local\{PLUGINS_RELATIVE_PATH}\moved-plugin.dll"
+            ),
+        );
+        assert_eq!(field(moved, "sha256"), Some("2".repeat(64).as_str()));
+        assert_eq!(field(moved, "signature"), Some("no_embedded_signature"));
+        assert!(!moved.fields.contains_key("file_unread"), "{moved:?}");
+    }
+
+    /// `file_unread` is emitted only where a read was refused, but it is declared whatever a
+    /// fixture produces, in the same way `every_emitted_field_is_declared` binds the run: the one
+    /// new field ADR 0091 section 3 adds, as text.
+    #[test]
+    fn file_unread_is_a_declared_text_field() {
+        let declared = FIELDS
+            .iter()
+            .find(|field| field.name == "file_unread")
+            .unwrap_or_else(|| panic!("file_unread is not in FIELDS: {FIELDS:?}"));
+        assert_eq!(declared.kind, crate::FieldKind::Text, "{declared:?}");
     }
 }

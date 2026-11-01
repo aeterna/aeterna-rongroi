@@ -89,13 +89,15 @@ const FIELDS: [Field; 21] = [
 ];
 
 /// Every reason this collector gives for not having looked at a log.
-const REASONS: [UnmeasuredReason; 6] = [
+const REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::SourceAbsent,
     UnmeasuredReason::BudgetSpent,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// The three Event Log payload fields ADR 0081 reads.

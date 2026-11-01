@@ -90,12 +90,14 @@ const FIELDS: [Field; 26] = [
     Field::boolean("trace_cleanup"),
 ];
 
-static REASONS: [UnmeasuredReason; 5] = [
+static REASONS: [UnmeasuredReason; 6] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::SourceAbsent,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Reads `PSReadLine`'s history and the two Windows `PowerShell` logs, keeping kinds (ADR 0064).
