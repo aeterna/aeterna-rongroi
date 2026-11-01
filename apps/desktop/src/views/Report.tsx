@@ -51,6 +51,15 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const [viewMode, setViewMode] = useState<"summary" | "technical">("summary");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusEvidenceSignal, setFocusEvidenceSignal] = useState(0);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    // The way back to the top is only worth a control once the reader has left it.
+    const onScroll = () => setShowScrollTop(window.scrollY > 200);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     void reportView(mode, options).then(setView);
@@ -381,6 +390,37 @@ export function Report({ mode, options, saved, onBack }: Props) {
       <button type="button" onClick={onBack}>
         {t("common:actions.back")}
       </button>
+
+      {showScrollTop && (
+        <button
+          type="button"
+          className="scroll-top"
+          aria-label={t("scroll_top")}
+          onClick={() => {
+            const reduceMotion =
+              window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+            window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+            // The button unmounts once the window is back at the top, so focus moves to the header's
+            // way home rather than falling to the body.
+            document.getElementById("home-button")?.focus({ preventScroll: true });
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 20V5" />
+            <path d="m5 12 7-7 7 7" />
+          </svg>
+        </button>
+      )}
     </section>
   );
 }

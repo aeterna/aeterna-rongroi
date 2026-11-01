@@ -60,7 +60,16 @@
     "qr_alt": "QR code for {{url}}"
   },
   "nav": {
-    "about": "About & code"
+    "about": "About & code",
+    "home": "Back to the start screen"
+  },
+  "breadcrumb": {
+    "label": "Breadcrumb",
+    "report_self": "Self check",
+    "report_ss": "Screenshare check",
+    "about": "About",
+    "consent": "Consent",
+    "declined": "Declined"
   },
   "about": {
     "title": "About this program and its code",

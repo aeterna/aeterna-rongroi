@@ -74,6 +74,7 @@
   },
   "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasuredExpected}} not measured (expected) · {{unmeasuredUnexpected}} not measured (not expected) · {{unmatched}} unmatched observations",
   "empty": "No evidence to show.",
+  "scroll_top": "Back to top",
   "summary": {
     "title": "What this scan lists",
     "found": "found — each one lists ordinary things that also produce it",
