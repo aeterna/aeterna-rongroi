@@ -292,7 +292,7 @@ pub(crate) fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
         }
         (Lang::Th, UnmeasuredReason::NotAdmin) => "ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน",
         (Lang::En, UnmeasuredReason::NotAttempted) => {
-            "this was not read — the scan stopped before reaching it"
+            "this was not read — the scan did not open it"
         }
         (Lang::Th, UnmeasuredReason::NotAttempted) => "ไม่ได้อ่านส่วนนี้ เพราะการสแกนหยุดก่อนจะถึง",
         (Lang::En, UnmeasuredReason::AccessDenied) => "Windows refused to open this",

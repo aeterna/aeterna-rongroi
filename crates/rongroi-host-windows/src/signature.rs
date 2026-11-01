@@ -163,6 +163,7 @@ impl rongroi_host::SignatureSource for crate::LiveHost {
         &self,
         path: &str,
     ) -> Result<rongroi_host::SignatureCheck, rongroi_host::SourceError> {
+        self.local_read_check(path)?;
         verify(path, OFFLINE)
     }
 }

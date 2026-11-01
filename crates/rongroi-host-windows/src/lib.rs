@@ -35,6 +35,12 @@ pub mod process;
 
 pub mod relaunch;
 
+// Not `cfg(windows)`: the parser is pure Rust, so its tests run on every platform. The Windows live
+// host calls it through `link_target` (ADR 0091 section 2); on other platforms it has no caller, so the
+// dead-code allow stays for that build only.
+#[cfg_attr(not(windows), allow(dead_code))]
+mod reparse;
+
 pub mod signature;
 
 pub mod system_integrity;
