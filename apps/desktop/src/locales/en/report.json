@@ -39,7 +39,7 @@
     "not_windows": "not running on Windows",
     "not_on_this_os": "this version of Windows does not keep this record",
     "not_admin": "Windows would not show this without administrator rights",
-    "not_attempted": "this was not read — the scan stopped before reaching it",
+    "not_attempted": "this was not read — the scan did not open it",
     "access_denied": "Windows refused to open this",
     "service_disabled": "the Windows service that writes this record is switched off",
     "source_absent": "this PC has no such record to read",
