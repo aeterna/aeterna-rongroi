@@ -89,8 +89,8 @@ function animatedDeclarations(sheet: string): Declaration[] {
 describe("micro.css (E12 micro-interactions)", () => {
   it("is imported from main.tsx after the main style sheet", () => {
     const main = readFileSync(resolve(SRC, "main.tsx"), "utf8");
-    const micro = main.indexOf("import \"./micro.css\";");
-    const styles = main.indexOf("import \"./styles.css\";");
+    const micro = main.indexOf('import "./micro.css";');
+    const styles = main.indexOf('import "./styles.css";');
     expect(micro).toBeGreaterThan(-1);
     // Both sheets style plain `button`; the press transition wins the cascade only if micro.css
     // loads after styles.css.

@@ -253,9 +253,9 @@ describe("Report summary counts (E2)", () => {
       expect(strips.getAttribute("aria-hidden")).toBe("true");
     }
     // The marks and the one-filter-per-box reading stay as they were.
-    const marks = Array.from(
-      document.querySelectorAll(".view-tech-wrap .tally-item .mark"),
-    ).map((node) => node.className);
+    const marks = Array.from(document.querySelectorAll(".view-tech-wrap .tally-item .mark")).map(
+      (node) => node.className,
+    );
     expect(marks).toEqual(["mark mark-found", "mark mark-not_found", "mark mark-unmeasured"]);
   });
 });

@@ -44,7 +44,9 @@
   background: var(--blue);
   opacity: 0.35;
   transform: scaleY(1);
-  transition: transform 160ms ease, opacity 160ms ease;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 
 .report-progress-dot:hover,

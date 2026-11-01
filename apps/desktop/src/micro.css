@@ -40,15 +40,21 @@
   /* Controls that already carry a resting shadow keep it beside the ring, never under it. */
   .choice:focus-visible,
   .scroll-top:focus-visible {
-    box-shadow: 0 0 0 3px rgba(8, 105, 176, 0.35), var(--shadow);
+    box-shadow:
+      0 0 0 3px rgba(8, 105, 176, 0.35),
+      var(--shadow);
   }
 
   .btn-ai:focus-visible {
-    box-shadow: 0 0 0 3px rgba(8, 105, 176, 0.35), 0 4px 14px -2px rgba(139, 92, 246, 0.25);
+    box-shadow:
+      0 0 0 3px rgba(8, 105, 176, 0.35),
+      0 4px 14px -2px rgba(139, 92, 246, 0.25);
   }
 
   .tally-item[aria-pressed="true"]:focus-visible {
-    box-shadow: 0 0 0 3px rgba(8, 105, 176, 0.35), 0 0 0 2px #1d2a4426;
+    box-shadow:
+      0 0 0 3px rgba(8, 105, 176, 0.35),
+      0 0 0 2px #1d2a4426;
   }
 
   /* The tally press springs back on its own 140 ms easing, transform only. */

@@ -128,16 +128,12 @@ describe("Report progress (E3)", () => {
       if (!href) throw new Error("dot without an href");
       const heading = document.getElementById(href.slice(1));
       expect(heading?.tagName).toBe("H3");
-      expect(
-        within(nav).getByRole("link", { name: heading?.textContent ?? "" }),
-      ).toBe(link);
+      expect(within(nav).getByRole("link", { name: heading?.textContent ?? "" })).toBe(link);
     }
 
     // Fewer than two groups have nothing to jump between, so no dots.
     cleanup();
-    const { container } = render(
-      <ReportProgress groups={[{ collector: "posture", rows: [] }]} />,
-    );
+    const { container } = render(<ReportProgress groups={[{ collector: "posture", rows: [] }]} />);
     expect(container.querySelector(".report-progress-line")).not.toBeNull();
     expect(container.querySelector(".report-progress-dots")).toBeNull();
   });
