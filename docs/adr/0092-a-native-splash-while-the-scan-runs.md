@@ -1,4 +1,4 @@
-# ADR 0089 — A native splash while the scan runs
+# ADR 0092 — A native splash while the scan runs
 
 - Status: accepted — the owner chose decisions 1, 4 and 5 below on 2026-11-01, each as recommended; built in
   the pull request that adds this file, and not yet seen on a Windows screen (see "What is unverified")
