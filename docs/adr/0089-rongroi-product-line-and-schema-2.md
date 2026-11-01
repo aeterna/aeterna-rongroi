@@ -1,6 +1,6 @@
 # ADR 0089 — Rongroi product line and schema 2
 
-- Status: proposed — the owner decided the product-line questions Q1–Q23 on 2026-10-28, and PoC Spike W1a reported on 2026-10-31. It becomes accepted when the owner merges this ADR. Spike lanes S2 (NUI file picker), S4 (latent event from a client), S6 (deferrals card) and S11 (other antivirus) have not run; the points that depend on them are marked unverified
+- Status: accepted — the owner decided the product-line questions Q1–Q23 on 2026-10-28, PoC Spike W1a reported on 2026-10-31, and the owner accepted this ADR on 2026-11-01. Spike lanes S2 (NUI file picker), S4 (latent event from a client), S6 (deferrals card) and S11 (other antivirus) have not run; the points that depend on them are marked unverified
 - Date: 2026-10-31 (revised 2026-11-01)
 - Related: ADR 0002 (no verdicts / evidence only), ADR 0007 (official builds and provenance), ADR 0012 (relaunch elevated), ADR 0040 (player controls client machine), ADR 0061 (anchors and trace ages), ADR 0073 (saved reports and schema 1), AGENTS.md hard rule 1 (zero network in aeterna-rongroi), hard rule 3 (evidence, never a verdict), hard rule 9 (no verified badge / no auto-ban)
 - Amends: ADR 0073 (extends `SavedRecord` to `schema: 2`, additive and backward-compatible)
