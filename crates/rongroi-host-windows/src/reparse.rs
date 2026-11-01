@@ -291,10 +291,7 @@ mod tests {
 
     #[test]
     fn a_compressed_system_file_is_read_like_a_file() {
-        assert_eq!(
-            parse_reparse(&header(IO_REPARSE_TAG_WOF, &[]), 0),
-            Ok(None)
-        );
+        assert_eq!(parse_reparse(&header(IO_REPARSE_TAG_WOF, &[]), 0), Ok(None));
     }
 
     #[test]
