@@ -43,6 +43,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   takes at most 90 seconds (the figure the full-scan question states). It is drawn by Windows with no WebView, opens
   after the full-scan question and closes before the report window is created, and shows no progress figure because
   the scan reports none (ADR 0092).
+- Ctrl K (Cmd K on a Mac) opens a search over the report's own checks, by rule name, rule id or collector; Enter or a click on a result switches the report to its technical view with that rule searched. It reads only what the report already lists, so SS mode shows nothing more, and it has no order or ranking of its own. It is a keyboard-reachable dialog with a combobox and a list, and it has no animation when reduced motion is asked for.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
