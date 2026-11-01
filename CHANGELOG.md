@@ -27,6 +27,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   redacted in SS mode like every other path; it lets `recorded_files` read the program's file, lets the
   game-window view join BAM to other sources by path (so a program run and then deleted can show I1), and can
   make `executed-program-missing-on-disk` match on more machines.
+- The landing page's example card ("What this scan lists") answers to the visitor: the search box and the three count
+  boxes filter its rows, and each row has a button that copies its raw JSON. It shows one example of each result,
+  from real rules (a found Secure Boot row, a not-found test-signing row and a not-measured row that needs
+  administrator rights). A small script of the page's own does this; with scripts off the card reads as before, and the
+  page still loads nothing from another site.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
