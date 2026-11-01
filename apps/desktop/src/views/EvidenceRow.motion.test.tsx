@@ -255,14 +255,18 @@ describe("the row body fold", () => {
     const head = container.querySelector(".row-head") as HTMLElement;
     const fold = container.querySelector(".row-fold") as HTMLElement;
     expect(fold).not.toBeNull();
+    // A found row starts unfolded, so its body is not inert before any click.
+    expect(fold.getAttribute("data-open")).toBe("true");
+    expect(fold.hasAttribute("inert")).toBe(false);
 
     act(() => {
       fireEvent.click(head);
     });
-    // The collapse animates: the body stays mounted, and only its fold turns closed.
+    // The collapse animates: the body stays mounted, and only its fold turns closed — closed
+    // already means inert, from the first frame of the collapse and not just after the timer.
     expect(fold.querySelector(".row-body")).not.toBeNull();
     expect(fold.getAttribute("data-open")).toBe("false");
-    expect(fold.hasAttribute("inert")).toBe(false);
+    expect(fold.hasAttribute("inert")).toBe(true);
 
     act(() => {
       vi.advanceTimersByTime(200);

@@ -54,7 +54,8 @@ export function EvidenceRow({
   // Whether the fold is at its open height: it holds a freshly mounted body closed for one frame,
   // so the browser has a `0fr` start value to animate from, and drops it at once when closing.
   const [unfolded, setUnfolded] = useState(item.state === "found");
-  // Whether the collapse has finished; only from then is the fold out of the accessibility tree.
+  // Whether the collapse has finished. It only tells the effect that the 200 ms collapse has run
+  // its course; the fold is already inert while it is closed, from the first frame.
   const [hidden, setHidden] = useState(false);
   const headRef = useRef<HTMLButtonElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -144,7 +145,14 @@ export function EvidenceRow({
         {!shown && text?.description && <span className="clamp">{text.description}</span>}
       </button>
       {mounted && (
-        <div className="row-fold" data-open={unfolded ? "true" : "false"} inert={hidden}>
+        // A closed fold is inert from its first frame: a freshly mounted body at `0fr` and one
+        // that has just begun collapsing are both closed, so neither reaches the accessibility
+        // tree — the collapse animates the visual body, not the inert rule.
+        <div
+          className="row-fold"
+          data-open={unfolded ? "true" : "false"}
+          inert={hidden || !unfolded}
+        >
           <div className="row-body" ref={bodyRef}>
             <TelemetryLine item={item} />
             {text?.description && (
