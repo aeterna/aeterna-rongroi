@@ -1,8 +1,8 @@
 # ADR 0090 — The antivirus products Windows reports
 
-- Status: proposed — drafted 2026-11-01 for owner decision Q21 of the product line (2026-10-28): this collector
-  is built before any server may block on a Defender rule, and until then a Defender rule gives a server a
-  warning only. The questions in "Owner decisions" are open. Spike lane S11 (does another antivirus make the
+- Status: accepted — the owner decided the three questions in "Owner decisions" on 2026-11-01, each as
+  recommended. Written for owner decision Q21 of the product line (2026-10-28): this collector is built before
+  any server may block on a Defender rule, and until then a Defender rule gives a server a warning only. Spike lane S11 (does another antivirus make the
   Defender rules fire, and why) has not run: no test machine with another antivirus yet (P4)
 - Date: 2026-11-01
 - Related: AGENTS.md hard rules 2–5 and 9, ADR 0011 (WMI declined for one value), ADR 0030 (the reasons),
@@ -226,8 +226,8 @@ beside posture rules".
 
 **This ADR is that naming, once it is accepted:** `antivirus_product` is read beside the `posture` rules about
 Microsoft Defender (section 5), so the `posture` profile runs it. Until both ADRs are accepted, neither the
-profile nor the Connect consent screen lists it. If Owner decisions question 2 is answered yes, the rule there
-also puts the collector behind a `posture` rule, and the profile runs it under either sentence.
+profile nor the Connect consent screen lists it. Owner decision 2 adds the rule there, which also puts the
+collector behind a `posture` rule, so the profile runs it under either sentence.
 
 ### 7. Privacy
 
@@ -260,7 +260,7 @@ also puts the collector behind a `posture` rule, and the profile runs it under e
 - **Baseline**: a new collector needs a `baseline-*` host that reads it (`crates/rongroi-collectors/AGENTS.md`).
   The baselines are rebuilt from a scan of the machines they describe; none is written by hand. Until then a
   rule on this collector gets a `rules/unconfronted.csv` row with its `resolved_when`.
-- **Rule fixtures**: only if Owner decisions question 2 adds a rule: positive, `products_on: 0` with Defender
+- **Rule fixtures** for owner decision 2's rule: positive, `products_on: 0` with Defender
   `off` and a third-party product `off`; negative, a third-party product `on` and Defender `off`. The negative
   is a fixture, not an allowance: the rule matches a count, never a name.
 - **Lab replay** (ADR 0076): one scenario on the lab machine, `antivirus_product/defender-only`, expects the
@@ -274,7 +274,8 @@ also puts the collector behind a `posture` rule, and the profile runs it under e
    any connection to the share it points at (section 3); `RemediationPath` beside WMI's `pathToSignedProductExe` for each product; the time to hash
    and check each file; the list straight after a sign-in; the answer with `wscsvc` stopped, if the owner allows
    stopping it on that PC. Results go into this ADR as "Measured", with no path below a profile and no GUID.
-2. **Owner decisions** below, with A0's results.
+2. A0's results against the owner decisions below; question 1 comes back to the owner only if A0 finds that
+   `RemediationPath` is not a program file.
 3. **The collector** (sections 1–4), its tests, the fixture host block, `clippy.toml`, the glossary, the
    privacy and consent texts, a CHANGELOG line. One pull request into `dev`, written by an engineer run.
 4. **The statement and the rule text** (section 5): the view, the `defender` tags, the `falsepositives`
@@ -286,7 +287,7 @@ also puts the collector behind a `posture` rule, and the profile runs it under e
 6. Only after step 4 is on a release may a server block on a Defender rule (Q21). That gate is the Server
    Kit's.
 
-## Owner decisions (open)
+## Owner decisions (decided 2026-11-01, each as recommended)
 
 1. **The source** (section 1). Recommended: **the WSC API** — documented state, no decoding, no WMI.
    Alternative: WMI `root\SecurityCenter2` `AntiVirusProduct`, which gives a named program path but an
