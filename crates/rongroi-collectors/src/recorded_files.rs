@@ -923,7 +923,54 @@ fn is_under_root(path: &str, root: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use rongroi_host::FixtureHost;
+
     use super::*;
+
+    /// A host whose only recorded path is `path`, described by BAM. `extra` holds the `drive_map:`
+    /// and `links:` blocks an ADR 0091 case needs, and `files` is the body under `filesystem:`.
+    fn bam_host(path: &str, extra: &str, files: &str) -> FixtureHost {
+        FixtureHost::from_yaml_str(
+            &format!(
+                r"platform: windows
+os_build: '26100'
+env:
+  WinDir: 'C:\Windows'
+  SystemDrive: 'C'
+  SystemRoot: 'C:\Windows'
+{extra}registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-0-0-0-1001':
+    Version: 1
+    SequenceNumber: 1
+    '{path}':
+      content_hex: '00008192b17adc01'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      content: ''
+{files}processes:
+  - pid: 4
+    name: System
+"
+            ),
+            "inline",
+        )
+        .unwrap()
+    }
+
+    fn text<'a>(observation: &'a Observation, name: &str) -> Option<&'a str> {
+        observation
+            .fields
+            .get(name)
+            .and_then(serde_json::Value::as_str)
+    }
+
+    fn observed<'a>(observations: &'a [Observation], path: &str) -> &'a Observation {
+        observations
+            .iter()
+            .find(|observation| text(observation, "path") == Some(path))
+            .unwrap_or_else(|| panic!("{path} was not observed: {observations:?}"))
+    }
 
     /// A buffer too short to hold the USN every buffer begins with is damage that `match_buffer` cannot
     /// read past, and it makes the journal partial, not a failed read (ADR 0086 section 3). The fixture
@@ -983,5 +1030,121 @@ mod tests {
         );
         scan.add(&timed);
         assert_eq!(scan.from, Some(expected));
+    }
+
+    // ADR 0091 (files are read on local drives only): the host gate `local_read_check` runs before
+    // every read by path. Each fixture lists its file with a `sha256`, so a hash on the row means the
+    // gate was skipped.
+
+    /// A file on a network letter keeps its path, but the identity read is not attempted: no hash, no
+    /// signature, `identity_read: not_attempted` and `file_unread: not_local_drive` (ADR 0091
+    /// sections 1 and 3). One unread file is not a gap, as a missing one is not (ADR 0079).
+    #[test]
+    fn a_file_on_a_network_letter_is_not_read_and_says_not_local_drive() {
+        let host = bam_host(
+            r"Z:\Apps\net.exe",
+            r"drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'Z', device: '\Device\Mup', serial: 2, kind: other }
+",
+            r"  'Z:\Apps':
+    - name: net.exe
+      content: 'fixture bytes'
+      sha256: 4444444444444444444444444444444444444444444444444444444444444444
+      signature: { state: no_embedded_signature }
+",
+        );
+        let run = RecordedFiles::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(
+            gaps.keys()
+                .all(|field| JOURNAL_FIELDS.contains(&field.as_str())),
+            "{gaps:?}"
+        );
+        let net = observed(observations, r"Z:\Apps\net.exe");
+        assert_eq!(text(net, "identity_read"), Some("not_attempted"));
+        assert_eq!(text(net, "file_unread"), Some("not_local_drive"));
+        assert_eq!(net.fields.get("sha256"), None, "{net:?}");
+        assert_eq!(net.fields.get("signature"), None, "{net:?}");
+    }
+
+    /// A file under a junction to a share keeps its path and is not read: `identity_read:
+    /// not_attempted`, `file_unread: link_off_local_drive`, and no hash or signature (ADR 0091
+    /// sections 1 and 3).
+    #[test]
+    fn a_file_behind_a_junction_to_a_share_says_link_off_local_drive() {
+        let host = bam_host(
+            r"C:\Games\shared.exe",
+            r"links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\UNC\server\share'
+",
+            r"  'C:\Games':
+    - name: shared.exe
+      content: 'fixture bytes'
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+      signature: { state: no_embedded_signature }
+",
+        );
+        let run = RecordedFiles::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(
+            gaps.keys()
+                .all(|field| JOURNAL_FIELDS.contains(&field.as_str())),
+            "{gaps:?}"
+        );
+        let shared = observed(observations, r"C:\Games\shared.exe");
+        assert_eq!(text(shared, "identity_read"), Some("not_attempted"));
+        assert_eq!(text(shared, "file_unread"), Some("link_off_local_drive"));
+        assert_eq!(shared.fields.get("sha256"), None, "{shared:?}");
+        assert_eq!(shared.fields.get("signature"), None, "{shared:?}");
+    }
+
+    /// A junction that stays on a local drive is read through: the file is listed at `D:\Lib`, both
+    /// drives are fixed, and the identity read carries the fixture's hash and signature (ADR 0091
+    /// section 1).
+    #[test]
+    fn a_file_behind_a_junction_that_stays_local_is_read() {
+        let host = bam_host(
+            r"C:\Games\moved.exe",
+            r"drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'D', device: '\Device\HarddiskVolume2', serial: 2, kind: fixed }
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+",
+            r"  'D:\Lib':
+    - name: moved.exe
+      content: 'fixture bytes'
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+      signature: { state: no_embedded_signature }
+",
+        );
+        let run = RecordedFiles::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(
+            gaps.keys()
+                .all(|field| JOURNAL_FIELDS.contains(&field.as_str())),
+            "{gaps:?}"
+        );
+        let moved = observed(observations, r"C:\Games\moved.exe");
+        assert_eq!(text(moved, "identity_read"), Some("read"), "{moved:?}");
+        assert_eq!(text(moved, "sha256"), Some("6".repeat(64).as_str()));
+        assert_eq!(text(moved, "signature"), Some("no_embedded_signature"));
+        assert!(!moved.fields.contains_key("file_unread"), "{moved:?}");
+    }
+
+    /// `file_unread` is emitted only where a read was refused, but it is declared whatever a fixture
+    /// produces: the one new field ADR 0091 section 3 adds, as text.
+    #[test]
+    fn file_unread_is_a_declared_text_field() {
+        let declared = FIELDS
+            .iter()
+            .find(|field| field.name == "file_unread")
+            .unwrap_or_else(|| panic!("file_unread is not in FIELDS: {FIELDS:?}"));
+        assert_eq!(declared.kind, crate::FieldKind::Text, "{declared:?}");
     }
 }
