@@ -30,3 +30,26 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* E5: for the 1.5 s a copy shows, the button carries a check beside "Copied". The words stay in
+   the DOM the whole time (the button aria-label and the live region), so the check is decoration. */
+.copy-json-btn-copied .copy-json-check::before {
+  content: "\2713";
+  display: inline-block;
+  margin-right: 4px;
+  font-weight: 700;
+  animation: copy-check 160ms ease-out;
+}
+
+@keyframes copy-check {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy-json-btn-copied .copy-json-check::before {
+    animation: none;
+  }
+}
