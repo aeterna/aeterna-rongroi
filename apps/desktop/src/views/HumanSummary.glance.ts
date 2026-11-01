@@ -91,7 +91,7 @@ export function useGlanceFx<T extends HTMLElement>(): RefObject<T | null> {
         query.removeEventListener("change", onMotionChange);
       }
     };
-  }, [ref]);
+  }, []);
 
   return ref;
 }
