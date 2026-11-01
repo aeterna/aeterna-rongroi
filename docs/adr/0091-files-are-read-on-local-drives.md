@@ -61,7 +61,10 @@ The check walks the path from the drive down:
      does not know): refused as `link_unsupported`. Such a placeholder is refused because reading it can make
      Windows fetch the file. A placeholder whose data is already on the disk (no recall attribute) is read
      like any file: OneDrive keeps Desktop and Downloads that way on many PCs, and refusing them would leave
-     most downloaded programs unhashed.
+     most downloaded programs unhashed. A path whose attributes carry `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`,
+     `FILE_ATTRIBUTE_RECALL_ON_OPEN` or `FILE_ATTRIBUTE_OFFLINE` is refused the same way before its reparse
+     record is read, because Windows' placeholder compatibility mode can hide the reparse attribute from a
+     program.
 4. More than eight links on one path is refused as `link_unsupported`.
 
 ### 2. Two new host calls
@@ -97,6 +100,9 @@ listing that tells "missing" from "unreadable" is refused the same way.
   read the link's own record on the local volume; a probe on the lab machine with a junction to a share
   confirms it before release.
 - That `GetDriveTypeW` on a mapped drive answers without contacting the server.
+- Which attribute bits Windows' placeholder compatibility mode leaves visible to this program. If it hid the
+  recall and offline bits as well as the reparse attribute, a placeholder whose data is not on the disk would
+  read as an ordinary file and be fetched, as it was before this ADR.
 - A link can be changed between the check and the open. The player controls the PC (ADR 0040); the check
   keeps the program off the network for the paths as they stand during the scan, and claims nothing more.
 
@@ -132,4 +138,8 @@ listing that tells "missing" from "unreadable" is refused the same way.
 - Files on optical and RAM drives are no longer read; their rows say `file_unread: not_local_drive`. Files on
   fixed and removable drives, and behind local links, are read as before.
 - OneDrive placeholders and app execution aliases are not read. Their rows say so.
+- Files under other reparse tags this program does not parse are not read either: on a PC that uses them,
+  Windows' compressed system files (WOF, CompactOS), Data Deduplication and similar files report
+  `file_unread: link_unsupported`. Refusing a tag it cannot read keeps the program off the network; the
+  cost is fewer hashes on those PCs.
 - ADR 0090's section 3 can use this check instead of its own.
