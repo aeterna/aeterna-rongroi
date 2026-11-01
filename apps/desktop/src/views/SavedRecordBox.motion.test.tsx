@@ -54,30 +54,38 @@ afterEach(() => {
 });
 
 describe("SavedRecordBox digest decode", () => {
-  it("keeps the final digest in the DOM from the first render", () => {
+  it("keeps the final digest readable and the frame decorative from the first render", () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0);
     const { container } = render(<SavedRecordBox saved={SAVED} />);
     const digest = container.querySelector(".digest");
-    expect(digest?.getAttribute("aria-label")).toBe(SHOWN);
-    expect(digest?.textContent).toBe(SHOWN);
+    const hidden = container.querySelector(".digest-final");
+    const visible = container.querySelector(".digest-frame");
+    expect(digest?.getAttribute("aria-label")).toBeNull();
+    expect(hidden?.textContent).toBe(SHOWN);
+    expect(hidden?.getAttribute("aria-hidden")).not.toBe("true");
+    expect(visible?.getAttribute("aria-hidden")).toBe("true");
+    expect(visible?.textContent).toBe(SHOWN);
     expect(container.querySelector("code")?.textContent).toBe(DIGEST);
 
     act(() => {
       vi.advanceTimersByTime(80);
     });
-    const frameText = digest?.textContent ?? "";
-    expect(digest?.getAttribute("aria-label")).toBe(SHOWN);
+    const frameText = visible?.textContent ?? "";
+    expect(hidden?.textContent).toBe(SHOWN);
+    expect(hidden?.getAttribute("aria-hidden")).not.toBe("true");
     expect(frameText).toMatch(/^[0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{4} [0-9a-f]{4}$/);
     expect(frameText).not.toBe(SHOWN);
-    expect(container.querySelector(".digest-final")?.textContent).toBe(SHOWN);
+    // The strong also carries the hidden real value, so its text is not the decorative frame alone.
+    expect(digest?.textContent).not.toBe(frameText);
     expect(container.querySelector("code")?.textContent).toBe(DIGEST);
 
     act(() => {
       vi.advanceTimersByTime(920);
     });
-    expect(digest?.textContent).toBe(SHOWN);
-    expect(container.querySelector(".digest-final")).toBeNull();
+    expect(visible?.textContent).toBe(SHOWN);
+    expect(hidden?.textContent).toBe(SHOWN);
+    expect(hidden?.getAttribute("aria-hidden")).not.toBe("true");
   });
 
   it("shows the final digest at once and schedules no decode under reduced motion", () => {
@@ -86,9 +94,13 @@ describe("SavedRecordBox digest decode", () => {
 
     const { container } = render(<SavedRecordBox saved={SAVED} />);
     const digest = container.querySelector(".digest");
-    expect(digest?.getAttribute("aria-label")).toBe(SHOWN);
-    expect(digest?.textContent).toBe(SHOWN);
-    expect(container.querySelector(".digest-final")).toBeNull();
+    const hidden = container.querySelector(".digest-final");
+    const visible = container.querySelector(".digest-frame");
+    expect(digest?.getAttribute("aria-label")).toBeNull();
+    expect(hidden?.textContent).toBe(SHOWN);
+    expect(hidden?.getAttribute("aria-hidden")).not.toBe("true");
+    expect(visible?.textContent).toBe(SHOWN);
+    expect(visible?.getAttribute("aria-hidden")).toBe("true");
     expect(setIntervalSpy).not.toHaveBeenCalled();
   });
 

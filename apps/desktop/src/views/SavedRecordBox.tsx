@@ -55,9 +55,8 @@ function decodeFrame(target: string, locked: number): string {
 }
 
 /**
- * The decorative frame the visible digest shows while decoding, or `null` when it has settled. The
- * strong's aria-label and a hidden copy keep the real value readable throughout. It runs once per
- * digest.
+ * The decorative frame the visible digest shows while decoding, or `null` when it has settled. A
+ * separate hidden span keeps the real value readable throughout. It runs once per digest.
  */
 function useDecodeFrame(digest: string): string | null {
   const [frame, setFrame] = useState<string | null>(null);
@@ -112,14 +111,12 @@ export function SavedRecordBox({ saved }: { saved: SavedSummary }) {
       )}
       <p>
         {t("saved.digest")}{" "}
-        <strong className="digest" aria-label={finalDigest}>
-          {frame ?? finalDigest}
-        </strong>
-        {frame !== null && frame !== finalDigest && (
-          <span className="digest-final" aria-hidden="true">
-            {finalDigest}
+        <strong className="digest">
+          <span className="digest-final">{finalDigest}</span>
+          <span className="digest-frame" aria-hidden="true">
+            {frame ?? finalDigest}
           </span>
-        )}
+        </strong>
       </p>
       <p className="muted">
         <code>{saved.digest}</code>

@@ -5,7 +5,8 @@
  */
 
 /* The visible digest decodes as decoration; tabular figures keep digit positions steady while it
-   does. The hidden copy keeps the final value in the DOM while the frame is showing. */
+   does. The hidden copy keeps the real value readable to assistive technology throughout, and the
+   decorative frame is hidden from it. */
 .saved-record .digest {
   font-variant-numeric: tabular-nums;
 }
@@ -20,4 +21,8 @@
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+.saved-record .digest-frame {
+  white-space: pre-wrap;
 }
