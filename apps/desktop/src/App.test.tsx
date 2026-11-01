@@ -589,6 +589,62 @@ describe("App", () => {
     expect(screen.queryByText("Scan as administrator")).toBeNull();
   });
 
+  // The header is the way back from a long report: the bottom button stays, but reaching it must not
+  // be the only way out of a report that runs for pages.
+  it("shows no home button on the start screen and one on a report screen that returns to start", async () => {
+    render(<App />);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to the start screen" })).toBeNull();
+    fireEvent.click(screen.getByText("Check my own PC"));
+    await screen.findByText("Found");
+    fireEvent.click(screen.getByRole("button", { name: "Back to the start screen" }));
+    expect(screen.getByText("What do you want to do?")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to the start screen" })).toBeNull();
+  });
+
+  // Beside the home button, the app name and the place the player is in, so a report says what it is.
+  it.each([
+    ["Check my own PC", null, "aeterna-rongroi / Self check"],
+    [
+      "Screenshare check (SS mode)",
+      "I agree — show the SS view",
+      "aeterna-rongroi / Screenshare check",
+    ],
+  ])("shows the breadcrumb for %s", async (open, agree, trail) => {
+    render(<App />);
+    fireEvent.click(await screen.findByText(open));
+    if (agree) {
+      fireEvent.click(screen.getByText(agree));
+    }
+    await screen.findByText("Found");
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe(trail);
+  });
+
+  // A relaunch ends this process; until the answer arrives, a second click must not start another.
+  it("disables the administrator restart while it is in flight and enables it after a decline", async () => {
+    let resolveElevate: (outcome: "declined") => void = () => {};
+    const pending = new Promise<"declined">((resolve) => {
+      resolveElevate = resolve;
+    });
+    render(<App />);
+    const button = await screen.findByRole("button", { name: "Scan as administrator" });
+    mockIPC((cmd) => {
+      calls.push(cmd);
+      if (cmd === "relaunch_elevated") {
+        return pending;
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    fireEvent.click(button);
+    expect(button).toHaveProperty("disabled", true);
+    await act(async () => {
+      resolveElevate("declined");
+      await pending;
+    });
+    expect(button).toHaveProperty("disabled", false);
+    expect(screen.getByText("You declined the Windows prompt. Nothing changed.")).toBeTruthy();
+  });
+
   it("switches to Thai, keeping the UNOFFICIAL BUILD token in English", async () => {
     render(<App />);
     await act(async () => {

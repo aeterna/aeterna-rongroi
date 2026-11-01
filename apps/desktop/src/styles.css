@@ -116,8 +116,12 @@ code {
   user-select: all;
 }
 
-/* Header: a floating glass bar with the name and the two controls. */
+/* Header: a floating glass bar with the name and the two controls. It stays in reach while a long
+   report scrolls, above the report's own content. */
 .top {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -130,7 +134,14 @@ code {
   backdrop-filter: blur(10px);
 }
 
-.top > div:first-child {
+.top-left {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+}
+
+.top-title {
   display: grid;
   gap: 0;
 }
@@ -264,6 +275,28 @@ button:disabled {
   background: #2c3b5c;
 }
 
+.home {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  flex: none;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.breadcrumb-current {
+  color: var(--navy);
+  font-weight: 600;
+}
+
 .copy {
   color: var(--blue);
 }
@@ -361,6 +394,24 @@ button:disabled {
 .report {
   display: grid;
   gap: 20px;
+}
+
+/* A report can run for pages; this stays in reach while the reader is away from the top. */
+.scroll-top {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  background: var(--surface-solid);
+  border: 1.5px solid var(--blue);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
 }
 
 .summary {
@@ -1201,6 +1252,10 @@ footer {
   .top {
     flex-wrap: wrap;
     border-radius: 24px;
+  }
+
+  .top-left {
+    flex-wrap: wrap;
   }
 
   .row-body {

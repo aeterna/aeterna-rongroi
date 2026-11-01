@@ -34,9 +34,23 @@ export function App() {
   // and an SS report does not ask for consent again.
   const [beforeAbout, setBeforeAbout] = useState<Exclude<Screen, "about">>("start");
   const [elevation, setElevation] = useState<ElevateOutcome | null>(null);
+  const [elevationPending, setElevationPending] = useState(false);
   const [fullScan, setFullScan] = useState<ElevateOutcome | null>(null);
+  const [fullScanPending, setFullScanPending] = useState(false);
   const [caseCodeError, setCaseCodeError] = useState<string | null>(null);
   const full = header?.scan_tier === "full";
+  const currentPlace =
+    screen === "start"
+      ? null
+      : typeof screen === "object"
+        ? screen.report === "ss"
+          ? t("breadcrumb.report_ss")
+          : t("breadcrumb.report_self")
+        : screen === "about"
+          ? t("breadcrumb.about")
+          : screen === "consent"
+            ? t("breadcrumb.consent")
+            : t("breadcrumb.declined");
 
   useEffect(() => {
     void reportHeader()
@@ -47,9 +61,42 @@ export function App() {
   return (
     <main>
       <header className="top">
-        <div>
-          <h1>{t("app.name")}</h1>
-          <p className="muted">{t("app.tagline")}</p>
+        <div className="top-left">
+          {screen !== "start" && (
+            <>
+              <button
+                type="button"
+                className="nav home"
+                aria-label={t("nav.home")}
+                onClick={() => setScreen("start")}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 10.5 12 3l9 7.5" />
+                  <path d="M5 9.5V21h14V9.5" />
+                  <path d="M9 21v-6h6v6" />
+                </svg>
+              </button>
+              <nav className="breadcrumb" aria-label={t("breadcrumb.label")}>
+                <span className="muted">{t("app.name")}</span>
+                <span aria-hidden="true"> / </span>
+                <span className="breadcrumb-current">{currentPlace}</span>
+              </nav>
+            </>
+          )}
+          <div className="top-title">
+            <h1>{t("app.name")}</h1>
+            <p className="muted">{t("app.tagline")}</p>
+          </div>
         </div>
         <div className="top-actions">
           <button
@@ -98,7 +145,24 @@ export function App() {
           {/* Only worth offering while this scan ran without the rights some checks need. */}
           {header?.elevated === false && (
             <>
-              <button type="button" onClick={() => void relaunchElevated().then(setElevation)}>
+              <button
+                type="button"
+                disabled={elevationPending}
+                onClick={() => {
+                  setElevationPending(true);
+                  void relaunchElevated().then(
+                    (outcome) => {
+                      setElevation(outcome);
+                      // A started copy ends this process; anything else may be asked again.
+                      setElevationPending(outcome === "started");
+                    },
+                    () => {
+                      setElevation("failed");
+                      setElevationPending(false);
+                    },
+                  );
+                }}
+              >
                 {t("start.elevate_button")}
               </button>
               <p className="muted">{t("start.elevate_hint")}</p>
@@ -114,7 +178,23 @@ export function App() {
           )}
           {header && !full && (
             <>
-              <button type="button" onClick={() => void relaunchFull().then(setFullScan)}>
+              <button
+                type="button"
+                disabled={fullScanPending}
+                onClick={() => {
+                  setFullScanPending(true);
+                  void relaunchFull().then(
+                    (outcome) => {
+                      setFullScan(outcome);
+                      setFullScanPending(outcome === "started");
+                    },
+                    () => {
+                      setFullScan("failed");
+                      setFullScanPending(false);
+                    },
+                  );
+                }}
+              >
                 {t("start.full_button")}
               </button>
               <p className="muted">{t("start.full_hint")}</p>
