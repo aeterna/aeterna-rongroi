@@ -1151,3 +1151,91 @@ footer p {
     padding-left: 56px;
   }
 }
+
+/* ==== Data stays on this PC (E6): the SVG data-flow diagram ==== */
+/* The diagram sits on a panel like every other figure on the page. Its wires, boxes, scan node and the
+   blocked wire's cross stand as drawn; the only moving parts are the packet dots, which are SMIL
+   animations inside the SVG itself. flow.js pauses them while the diagram is off screen or while the
+   visitor asked for reduced motion; the rule below also hides the dots for reduced motion with
+   JavaScript off, so the two cases show the same still diagram. Colours are the page's existing vars,
+   except the barrier tint, which is the same #b45309 the alert icons already use. */
+.dataflow > svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--surface);
+  border: 2px solid #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.dataflow text {
+  font-family: inherit;
+}
+
+.dataflow .df-lab {
+  font-size: 19px;
+  font-weight: 600;
+  fill: var(--text);
+}
+
+.dataflow .df-sub {
+  font-size: 14px;
+  fill: var(--muted);
+}
+
+.dataflow .df-box {
+  fill: var(--surface-solid);
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.dataflow .df-core {
+  fill: var(--blue-soft);
+  stroke: var(--blue);
+  stroke-width: 2;
+}
+
+.dataflow .df-wire {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.dataflow .df-wire-no {
+  stroke: #b45309;
+  stroke-dasharray: 6 7;
+}
+
+.dataflow .df-head {
+  fill: var(--line-strong);
+}
+
+.dataflow .df-x {
+  stroke: #b45309;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.dataflow .df-pkt {
+  stroke: none;
+}
+
+.dataflow .df-pkt-1 {
+  fill: var(--blue);
+}
+
+.dataflow .df-pkt-2 {
+  fill: var(--violet);
+}
+
+.dataflow .df-pkt-x {
+  fill: #b45309;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dataflow .df-pkt {
+    display: none;
+  }
+}
