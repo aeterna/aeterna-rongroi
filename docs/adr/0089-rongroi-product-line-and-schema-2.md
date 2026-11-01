@@ -1,7 +1,7 @@
 # ADR 0089 — Rongroi product line and schema 2
 
-- Status: accepted — the owner decided the product-line questions Q1–Q23 on 2026-10-28 and approved the PoC Spike W1a findings on 2026-10-31
-- Date: 2026-10-31
+- Status: proposed — the owner decided the product-line questions Q1–Q23 on 2026-10-28, and PoC Spike W1a reported on 2026-10-31. It becomes accepted when the owner merges this ADR. Spike lanes S2 (NUI file picker), S4 (latent event from a client), S6 (deferrals card) and S11 (other antivirus) have not run; nothing below depends on their results
+- Date: 2026-10-31 (revised 2026-11-01)
 - Related: ADR 0002 (no verdicts / evidence only), ADR 0007 (official builds and provenance), ADR 0012 (relaunch elevated), ADR 0040 (player controls client machine), ADR 0061 (anchors and trace ages), ADR 0073 (saved reports and schema 1), AGENTS.md hard rule 1 (zero network in aeterna-rongroi), hard rule 3 (evidence, never a verdict), hard rule 9 (no verified badge / no auto-ban)
 - Amends: ADR 0073 (extends `SavedRecord` to `schema: 2`, additive and backward-compatible)
 
@@ -59,7 +59,14 @@ The Rongroi ecosystem is partitioned into three distinct, decoupled products wit
 
 1. **Rongroi Offline (`aeterna/aeterna-rongroi`):** Remains strictly offline. No network crates in `Cargo.lock`. Produces and reads both Schema 1 and Schema 2 reports.
 2. **Rongroi Connect (`aeterna/aeterna-rongroi-connect`):** A lightweight single-shot client (Electron 44 + `rongroi-scan` sidecar). Connect runs with non-elevated user privileges, accepts a pairing code, displays server identity and scan scope, runs the sidecar, displays a visual hash lock, uploads the report to the paired server origin, and immediately exits.
-3. **Rongroi Server Kit (`nakara_rongroi` in `aeterna/nakara-oss`):** An open-source FiveM resource that integrates with server frameworks (Qbox, QBCore, ESX, or standalone). It mints short-lived pairing tickets, receives reports over HTTP, validates cryptographic signatures/hashes, and provides in-game staff inspection without automated bans.
+3. **Rongroi Server Kit (`nakara_rongroi` in `aeterna/nakara-oss`):** An open-source FiveM resource that integrates with server frameworks (Qbox, QBCore, ESX, or standalone). It mints short-lived, single-use pairing tickets, receives encrypted reports over HTTP, checks the ticket, nonce, expiry and report hash, and provides in-game staff inspection without automated bans.
+
+### What Connect can and cannot show
+
+The player controls the PC (ADR 0040), so a report from Connect can always be forged or edited before it is encrypted. Nothing in this ADR signs a report, and no part of it may be described as proof that a report is genuine or that a PC is clean (hard rule 9). Connect and Server Kit establish two facts only:
+
+1. **The server received this report after it opened this case** — the report carries the ticket and nonce the server issued, inside the ticket's 300-second window, and the ticket can be used once (section 5).
+2. **The report the server holds is the one the player saw** — the server recomputes `visual_hash` from what it received, and staff compare it with the 16 characters on the player's screen (section 2).
 
 ---
 
@@ -82,7 +89,7 @@ A Schema 2 record has the following shape:
     "mode": "single-shot"
   },
   "binding": {
-    "server_origin": "http://127.0.0.1:30120",
+    "server_origin": "http://203.0.113.10:30130",
     "ticket": "9f82c4e1b07a412891d604e38a291bf0",
     "nonce": "c4b82e91024a",
     "issued_at": "2026-10-31T14:30:00Z",
@@ -118,12 +125,18 @@ A Schema 2 record has the following shape:
   - `nonce`: A server-generated challenge nonce to guarantee fresh report generation.
   - `issued_at` & `expires_at`: ISO 8601 UTC timestamps enforcing the maximum ticket lifetime (300 seconds).
 * **`policy` (Optional in Schema 1, Present when produced under Server Kit policy):**
-  - `profile`: `"posture"` (standard pre-join checks), `"standard"` (full evidence suite), or `"custom"`.
+  - `profile`: one of three names, each fixing what `required_collectors` may hold:
+    - `"posture"` — the collectors behind the rules marked `posture` (machine requirements a server may gate on, Q18). The example above lists them as of this ADR.
+    - `"standard"` — the same collectors the Offline app runs in a full scan of the same `rongroi_version`.
+    - `"custom"` — a list the server picks from the collector IDs that `rongroi_version` knows. An unknown ID makes Connect refuse the policy before the consent screen.
+    Whatever the profile, Connect shows the full collector list on the consent screen, and the record carries the list that ran.
   - `required_collectors`: Array of collector IDs requested by the server and consented to by the player.
   - `require_elevation`: Boolean indicating whether administrator elevation was mandated.
   - `policy_hash`: 16-hex digest of the policy definition.
 * **`visual_hash`:**
-  - 16-character hexadecimal string representing the first 64 bits of `SHA-256(canonical_report_json)`.
+  - 16 lowercase hexadecimal characters: the first 64 bits of `SHA-256(C)`, where `C` is the record with the `visual_hash` member removed, serialized by the JSON Canonicalization Scheme (RFC 8785) and encoded as UTF-8. Removing the member first keeps the hash from covering itself.
+  - Producer and server compute it the same way; the server recomputes it from the decrypted record and stores a mismatch as a fact on the case, never as a verdict.
+  - 64 bits is sized for a person comparing two screens, not for collision resistance. Integrity of the upload in transit is checked separately with the full SHA-256 (section 4).
   - Displayed prominently in the Connect window before upload, and displayed on the staff inspection UI and in-game NUI, allowing visual confirmation during screenshares or support reviews.
 
 ---
@@ -164,8 +177,10 @@ flowchart TD
     StorageDecision -- Enhanced --> StoreFile[Store in Resource File Cache or SQL DB<br>Avoid Slow KVP Write]
 ```
 
+What travels is the encrypted envelope of section 5, not the plain JSON, and the size test below applies to the envelope.
+
 1. **Small Payload Path (Size &le; 7,168 bytes):**
-   - Connect issues a single `POST /<resource>/report` containing the complete Schema 2 JSON.
+   - Connect issues a single `POST /<resource>/report` containing the complete envelope, with header `X-Rongroi-Report-Sha256` (64 hex, SHA-256 of the envelope bytes).
    - Fits comfortably within Enhanced FXServer's 8,192-byte buffer limit.
 2. **Large Payload Path (Size > 7,168 bytes):**
    - Connect splits the payload into slices of 4,096 bytes (4 KiB).
@@ -174,11 +189,25 @@ flowchart TD
      - `X-Rongroi-Chunk-Index`: 0-based slice index.
      - `X-Rongroi-Chunk-Total`: Total slice count.
      - `X-Rongroi-Chunk-Sha256`: Hash of current slice.
+     - `X-Rongroi-Report-Sha256`: SHA-256 of the whole envelope, the same value on every slice.
    - If any slice fails due to network jitter, Connect retries up to 3 times with exponential backoff (500 ms, 1500 ms, 3000 ms).
-   - Server Kit reassembles slices in memory. Reassembly buffers carry a 60-second TTL to prevent memory leaks from abandoned uploads.
+   - Server Kit reassembles slices in memory. Reassembly buffers carry a 60-second TTL to prevent memory leaks from abandoned uploads. One upload may be open per ticket; slices for a ticket that has no open upload, or whose `Report-Sha256` differs from the first slice's, are refused.
+   - When the last slice arrives, Server Kit checks the SHA-256 of the reassembled envelope against `X-Rongroi-Report-Sha256` before it decrypts. A mismatch drops the buffer and answers `422`; Connect may restart the upload once while the ticket is still valid.
 3. **Server-Side Storage Strategy:**
    - **Legacy FXServer:** Reports may be stored in Resource KVP (write latency measured at 17–27 ms).
    - **Enhanced FXServer:** Reports MUST NOT be written synchronously to Resource KVP (write latency measured at 192–222 ms due to SQLite disk sync). Server Kit writes raw reports to the resource cache directory (`server-data/cache/rongroi-reports/<ticket>.json`) or asynchronously into the server database (`oxmysql`).
+
+---
+
+### 5. Pairing, Encryption and the Single-Use Ticket
+
+The owner decided (Q8) that reports are encrypted at the message level with a key of the Server Kit that travels inside the pairing code, and that Cfx's HTTPS is used only if the spike shows it works. Spike W1a did not test HTTPS through `users.cfx.re` (S1 fell back to message-level encryption only), so v1 sends the encrypted envelope over plain HTTP to `server_origin`.
+
+1. **Server Kit key pair:** Server Kit creates an X25519 key pair when it first starts and keeps the private key in its own resource storage. The private key never leaves the server.
+2. **Pairing code:** when staff open a case (or at a deferrals check), Server Kit shows the player a code in game: `rr1.` followed by base64url of a small JSON object holding `server_origin`, `ticket`, `nonce`, `expires_at`, `policy_hash` and the Kit's public key. The player copies and pastes it; it is not meant to be typed. Because the code reaches the player inside the game, a party on the network path cannot swap the key without also controlling the game client.
+3. **Policy fetch:** Connect reads the policy with `GET /<resource>/policy/<ticket>` from `server_origin` — the first request it makes — and refuses it unless its digest equals `policy_hash` from the code. `policy_hash` is the first 64 bits of SHA-256 over the RFC 8785 serialization of the `policy` object without its `policy_hash` member. The consent screen shows `server_origin`, the server name from the policy and the full collector list before anything runs.
+4. **Envelope:** Connect creates a fresh X25519 key pair per report, derives a key with HKDF-SHA256 (salt = ticket, info = `rongroi-connect report v1`) and encrypts the UTF-8 record with AES-256-GCM, with the ticket as additional data. The envelope is `{ "v": 1, "epk": …, "iv": …, "ct": … }` (base64url members). Node's `crypto` module is present in both FXServer editions (S3); X25519 and AES-GCM specifically were not exercised in the spike and are checked first in W2.
+5. **Single-use ticket:** a ticket moves `issued → uploading → consumed`, or to `expired`. Server Kit accepts the first `POST /report` or first chunk only while the ticket is `issued` and the server's clock is before `expires_at`; an upload that started in time may finish within the 60-second reassembly TTL. The nonce in the record must equal the one issued with the ticket. An accepted report, or a `{ "scan": "declined" }` answer, consumes the ticket; any later upload for it gets `409` and is logged on the case. Staff open a new case to scan again.
 
 ---
 
@@ -187,9 +216,10 @@ flowchart TD
 ### Positive
 - **Integrity of Offline Preserved:** `aeterna-rongroi` maintains its zero-network invariant.
 - **Cross-Edition Compatibility:** Works seamlessly across both GTA5 Legacy and GTA5Enhanced FXServer without hitting buffer truncation.
-- **Tamper Evidence:** Tickets, nonces, visual hashes, and producer metadata provide end-to-end traceability without relying on false security claims or driver rootkits.
+- **Traceability, not proof:** the ticket, nonce and `visual_hash` let staff tie a report to the case they opened and to what the player saw on screen. They do not show that the report is genuine; the player can still forge it (section 1, "What Connect can and cannot show").
 - **Fast Execution:** Posture scan flow completes end-to-end in ~1.3 seconds.
 
 ### Negative & Mitigations
 - **Binary Footprint:** Electron packaging adds ~158 MB (compressed zip) for the Connect client. Mitigation: distributed as a portable zip archive with fast extraction (6.4 s).
-- **Code Signing Dependency:** Microsoft Defender SmartScreen may warn on unsigned executables downloaded via web browsers. Mitigation: code-signing key setup scheduled before public 0.1.0 release.
+- **Unsigned releases and SmartScreen:** a file downloaded in a browser carries the Mark-of-the-Web, and SmartScreen warns on such a file until it has reputation; since August 2024 an EV certificate no longer grants that reputation at once (`docs/research/05-oss-rust-tauri-repo-practices.md`). Spike S10 copied the exe over scp, without the mark, so the browser-download path is untested. Rongroi Offline ships unsigned today and its guide tells players to click **More info → Run anyway** (`docs/screenshare-guide.md`); Connect 0.1.0 pre-alpha follows the same path. Signing through SignPath Foundation waits for a second maintainer who can act as release approver (`GOVERNANCE.md`); a paid certificate is an owner decision.
+- **Encryption without HTTPS:** v1 hides report content with the envelope of section 5, but the request line and headers (resource path, ticket, sizes) travel in clear over HTTP.
