@@ -111,7 +111,11 @@ fn write_number(number: &Number, out: &mut String) -> Result<(), CanonicalError>
 }
 
 // The range check before each cast is what makes it exact: neither cast can truncate or change sign.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::float_cmp)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::float_cmp
+)]
 fn write_integral_float(float: f64, out: &mut String) -> Result<(), CanonicalError> {
     let two_63 = 2f64.powi(63);
     let two_64 = 2f64.powi(64);
@@ -200,9 +204,13 @@ mod tests {
 
     #[test]
     fn strings_escape_only_what_jcs_escapes() {
-        let text = "\"\\\u{0000}\u{0001}\u{0008}\u{0009}\u{000a}\u{000c}\u{000d}\u{001f}\u{007f}\u{e000}";
+        let text =
+            "\"\\\u{0000}\u{0001}\u{0008}\u{0009}\u{000a}\u{000c}\u{000d}\u{001f}\u{007f}\u{e000}";
         let expected = "\"\\\"\\\\\\u0000\\u0001\\b\\t\\n\\f\\r\\u001f\u{007f}\u{e000}\"";
-        assert_eq!(canonical_json(&Value::String(text.to_owned())).unwrap(), expected);
+        assert_eq!(
+            canonical_json(&Value::String(text.to_owned())).unwrap(),
+            expected
+        );
     }
 
     #[test]
@@ -232,7 +240,10 @@ mod tests {
     #[test]
     fn a_fractional_number_is_refused() {
         assert_eq!(canonical_json(&json!(1.5)), Err(CanonicalError::NonInteger));
-        assert_eq!(canonical_json(&json!(1e300)), Err(CanonicalError::NonInteger));
+        assert_eq!(
+            canonical_json(&json!(1e300)),
+            Err(CanonicalError::NonInteger)
+        );
         assert_eq!(canonical_json(&json!(1.0)).unwrap(), "1");
     }
 
@@ -245,7 +256,10 @@ mod tests {
         assert_eq!(visual_hash(&record).unwrap(), visual_hash(&with).unwrap());
         let hash = visual_hash(&record).unwrap();
         assert_eq!(hash.len(), 16);
-        assert!(hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
+        assert!(
+            hash.bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        );
     }
 
     #[test]
@@ -253,7 +267,10 @@ mod tests {
         let original = json!({"kind": "rongroi-saved-report", "schema": 2});
         let mut changed = original.clone();
         changed["schema"] = json!(3);
-        assert_ne!(visual_hash(&original).unwrap(), visual_hash(&changed).unwrap());
+        assert_ne!(
+            visual_hash(&original).unwrap(),
+            visual_hash(&changed).unwrap()
+        );
     }
 
     #[test]
@@ -261,7 +278,10 @@ mod tests {
         let policy = json!({"profile": "posture", "policy_hash": "a1b2c3d4e5f60718"});
         let mut without = policy.clone();
         let _ = without.as_object_mut().unwrap().remove("policy_hash");
-        assert_eq!(policy_hash(&policy).unwrap(), policy_hash(&without).unwrap());
+        assert_eq!(
+            policy_hash(&policy).unwrap(),
+            policy_hash(&without).unwrap()
+        );
     }
 
     #[test]
@@ -271,6 +291,9 @@ mod tests {
         let mut without = record.clone();
         let _ = without.as_object_mut().unwrap().remove("visual_hash");
         assert_eq!(canonical_json(&without).unwrap(), FIXTURE_CANONICAL);
-        assert_eq!(visual_hash(&record).unwrap(), first_eight_hex_by_hand(FIXTURE_CANONICAL));
+        assert_eq!(
+            visual_hash(&record).unwrap(),
+            first_eight_hex_by_hand(FIXTURE_CANONICAL)
+        );
     }
 }
