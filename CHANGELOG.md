@@ -33,6 +33,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   administrator rights). A small script of the page's own does this; with scripts off the card reads as before, and the
   page still loads nothing from another site.
 - The saved record's 16-character digest decodes into place once when it is shown, and an opened evidence row gets one line of its rule, collector and state typed out. Both are decoration: the real digest and the whole line are in the page as text from the start, nothing is animated under reduced motion, and the record, its digest and every collector are unchanged.
+- The report summary's three counts roll into place once when it opens, its top note gets four corner marks and one light sweep, and each of the three cards under it follows a mouse with a soft light and a tilt of at most 6 degrees. These are decoration: every number and word stays in the page as text, nothing moves under reduced motion, and no count, colour meaning or collector changes.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
