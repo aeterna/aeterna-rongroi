@@ -64,19 +64,19 @@ you agree to that separately.\n\nYes: full scan. No: standard scan.\n\n\
 Yes: สแกนแบบ Full  No: สแกนแบบมาตรฐาน";
 
 /// The splash shown while the scan runs, in both languages because no language has been chosen yet
-/// (ADR 0089). It says a scan is running and names no duration for a standard scan, because none was
+/// (ADR 0092). It says a scan is running and names no duration for a standard scan, because none was
 /// measured.
 const SPLASH_TITLE: &str = "aeterna-rongroi";
 const SPLASH_STANDARD_LINES: [&str; 2] = ["กำลังสแกนเครื่องนี้", "Scanning this PC"];
 /// A full scan's two extra lines, in Thai and English. The 90 seconds is a ceiling for the part that
 /// reads the files of recorded programs, not the length of the whole scan, so the line says so
-/// (ADR 0089).
+/// (ADR 0092).
 const SPLASH_FULL_LINES: [&str; 2] = [
     "สแกนแบบ Full: ส่วนไฟล์โปรแกรมไม่เกิน 90 วินาที",
     "Full scan: program files up to 90 seconds",
 ];
 
-/// The splash's lines for `tier`, Thai and English together (ADR 0089).
+/// The splash's lines for `tier`, Thai and English together (ADR 0092).
 fn splash_lines(tier: ScanTier) -> Vec<&'static str> {
     let mut lines = SPLASH_STANDARD_LINES.to_vec();
     if tier == ScanTier::Full {
@@ -100,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let tier = chosen_tier(&args, ask_full);
     // The splash is open before the scan reads anything and closes as soon as it returns; it also
-    // closes on drop, so an early return or a panic during the scan leaves no window (ADR 0089).
+    // closes on drop, so an early return or a panic during the scan leaves no window (ADR 0092).
     let splash = show_splash(tier);
 
     // 1. Scan before the WebView exists, so nothing the window does can change what was measured.
@@ -194,7 +194,7 @@ type SplashGuard = rongroi_host_windows::splash::Splash;
 #[cfg(not(windows))]
 struct SplashGuard;
 
-/// Opens the splash for `tier` before the scan reads anything (ADR 0089).
+/// Opens the splash for `tier` before the scan reads anything (ADR 0092).
 #[cfg(windows)]
 fn show_splash(tier: ScanTier) -> SplashGuard {
     rongroi_host_windows::splash::Splash::show(SPLASH_TITLE, &splash_lines(tier))
@@ -207,7 +207,7 @@ fn show_splash(tier: ScanTier) -> SplashGuard {
     SplashGuard
 }
 
-/// Closes the window once the scan has returned; the splash also closes on drop (ADR 0089).
+/// Closes the window once the scan has returned; the splash also closes on drop (ADR 0092).
 #[cfg(windows)]
 fn close_splash(splash: SplashGuard) {
     splash.close();
@@ -266,7 +266,7 @@ mod tests {
         }
     }
 
-    /// ADR 0089 section 3: a splash line has to fit the window — about 50 characters — and at most
+    /// ADR 0092 section 3: a splash line has to fit the window — about 50 characters — and at most
     /// five lines fit above the strip.
     #[test]
     fn the_splash_lines_fit_the_window() {
@@ -281,7 +281,7 @@ mod tests {
         }
     }
 
-    /// ADR 0089 section 3: a standard scan states no duration, because none was measured; a full scan
+    /// ADR 0092 section 3: a standard scan states no duration, because none was measured; a full scan
     /// states the same 90 seconds the full-scan dialog states, and only that number.
     #[test]
     fn the_full_splash_ties_its_90_seconds_to_the_dialog() {
@@ -296,7 +296,7 @@ mod tests {
         assert!(FULL_TEXT.contains("90"));
     }
 
-    /// ADR 0089 section 3: the standard splash says only that a scan is running, in both languages.
+    /// ADR 0092 section 3: the standard splash says only that a scan is running, in both languages.
     #[test]
     fn the_standard_splash_says_only_that_a_scan_is_running() {
         assert_eq!(
@@ -305,7 +305,7 @@ mod tests {
         );
     }
 
-    /// ADR 0089 section 3: a full scan adds exactly two lines to the standard scan's: the Thai and
+    /// ADR 0092 section 3: a full scan adds exactly two lines to the standard scan's: the Thai and
     /// the English line about program files.
     #[test]
     fn the_full_splash_is_the_standard_one_with_two_more_lines() {
@@ -322,7 +322,7 @@ mod tests {
         );
     }
 
-    /// ADR 0089 section 3: no language has been chosen yet, so the splash carries Thai and English.
+    /// ADR 0092 section 3: no language has been chosen yet, so the splash carries Thai and English.
     #[test]
     fn the_splash_lines_carry_both_languages() {
         for tier in [ScanTier::Standard, ScanTier::Full] {
