@@ -198,6 +198,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
           header={header}
           texts={texts}
           onSwitchToTechnical={() => setViewMode("technical")}
+          mode={mode}
         />
       </div>
 

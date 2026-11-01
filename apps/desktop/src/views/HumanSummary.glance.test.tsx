@@ -105,6 +105,16 @@ function Probe() {
   );
 }
 
+/** The same card, with the hook's `enabled` argument controllable across a rerender. */
+function EnabledProbe({ enabled }: { enabled: boolean }) {
+  const ref = useGlanceFx<HTMLDivElement>(enabled);
+  return (
+    <div className="glance-card" ref={ref}>
+      <span className="glance-value">23 found</span>
+    </div>
+  );
+}
+
 beforeAll(async () => {
   await initI18n("en");
 });
@@ -141,6 +151,82 @@ describe("HumanSummary glance effects", () => {
     expect(card.style.getPropertyValue("--my")).toBe("0%");
     expect(card.style.transform).toBe("perspective(700px) rotateX(-6deg) rotateY(-6deg)");
     expect(cards.map((c) => c.textContent)).toEqual(before);
+  });
+
+  it("keeps the glance cards still in ss mode", () => {
+    stubBoundingRect();
+    const frames = queueFrames();
+    const view = snapshot("secure_boot_off_self_view");
+    const { container } = render(
+      <HumanSummary
+        view={view}
+        header={view.header}
+        texts={{}}
+        onSwitchToTechnical={vi.fn()}
+        mode="ss"
+      />,
+    );
+    // Drop the odometer's mount frames; only a pointer move could ask for more.
+    frames.pending.length = 0;
+    const cards = Array.from(container.querySelectorAll<HTMLElement>(".glance-card"));
+    expect(cards).toHaveLength(3);
+    const card = cards[0];
+    if (!card) throw new Error("no first glance card");
+
+    firePointerMove(card, "mouse", 200, 0);
+    expect(frames.pending).toHaveLength(0);
+    for (const node of cards) {
+      expect(node.style.getPropertyValue("--mx")).toBe("");
+      expect(node.style.getPropertyValue("--my")).toBe("");
+      expect(node.style.transform).toBe("");
+    }
+  });
+
+  function expectCardsTurn(mode?: "self") {
+    stubBoundingRect();
+    const frames = queueFrames();
+    const view = snapshot("secure_boot_off_self_view");
+    const props = { view, header: view.header, texts: {}, onSwitchToTechnical: vi.fn() };
+    const { container } = render(
+      mode === undefined ? <HumanSummary {...props} /> : <HumanSummary {...props} mode={mode} />,
+    );
+    frames.pending.length = 0;
+    const card = container.querySelector<HTMLElement>(".glance-card");
+    if (!card) throw new Error("no first glance card");
+
+    firePointerMove(card, "mouse", 200, 0);
+    expect(frames.pending.length).toBeGreaterThan(0);
+    frames.flush();
+    expect(card.style.getPropertyValue("--mx")).toBe("100%");
+    expect(card.style.transform).toBe("perspective(700px) rotateX(-6deg) rotateY(-6deg)");
+  }
+
+  it("still turns the glance cards with mode self", () => {
+    expectCardsTurn("self");
+  });
+
+  it("still turns the glance cards when mode is omitted", () => {
+    expectCardsTurn();
+  });
+
+  it("drops the pointer decoration when enabled turns false", () => {
+    stubBoundingRect();
+    const frames = queueFrames();
+    const { container, rerender } = render(<EnabledProbe enabled />);
+    const card = container.querySelector<HTMLElement>(".glance-card");
+    if (!card) throw new Error("no probe card");
+
+    firePointerMove(card, "mouse", 200, 0);
+    frames.flush();
+    expect(card.style.getPropertyValue("--mx")).toBe("100%");
+
+    rerender(<EnabledProbe enabled={false} />);
+    expect(card.style.getPropertyValue("--mx")).toBe("");
+    expect(card.style.getPropertyValue("--my")).toBe("");
+    expect(card.style.transform).toBe("");
+
+    firePointerMove(card, "mouse", 0, 100);
+    expect(frames.pending).toHaveLength(0);
   });
 
   it("stays still under reduced motion and re-checks on change", () => {

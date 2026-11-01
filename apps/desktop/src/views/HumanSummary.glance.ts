@@ -20,11 +20,13 @@ function prefersReducedMotion(): boolean {
  * H2 spotlight and H3 tilt for one glance card. Pointer moves set --mx/--my at most once per
  * animation frame, and the transform never turns more than {@link MAX_TILT_DEG} degrees per axis.
  * Only decoration changes: the evidence text stays in the DOM and is never rewritten here.
+ * With `enabled` false the card is left untouched, the same as under reduced motion.
  */
-export function useGlanceFx<T extends HTMLElement>(): RefObject<T | null> {
+export function useGlanceFx<T extends HTMLElement>(enabled = true): RefObject<T | null> {
   const ref = useRef<T | null>(null);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const card = ref.current;
     if (!card) return undefined;
 
@@ -91,7 +93,7 @@ export function useGlanceFx<T extends HTMLElement>(): RefObject<T | null> {
         query.removeEventListener("change", onMotionChange);
       }
     };
-  }, []);
+  }, [enabled]);
 
   return ref;
 }
