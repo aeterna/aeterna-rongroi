@@ -381,6 +381,7 @@ mod live {
 
         #[allow(unsafe_code)]
         fn file_id(&self, path: &str) -> Result<Option<FileId>, SourceError> {
+            self.local_read_check(path)?;
             let handle = match open(
                 path,
                 ReadOnlyAccess::AttributesOnly,

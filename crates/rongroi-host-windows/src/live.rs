@@ -142,6 +142,15 @@ impl RegistrySource for LiveHost {
     }
 }
 
+impl LiveHost {
+    /// The one gate before a read by path (ADR 0091 section 1): [`rongroi_host::local_read_check`] on
+    /// this host, with a refusal reported as [`SourceError::NotLocal`] so a collector can say the path
+    /// was not opened rather than missing.
+    pub(crate) fn local_read_check(&self, path: &str) -> Result<(), SourceError> {
+        rongroi_host::local_read_check(self, path).map_err(SourceError::NotLocal)
+    }
+}
+
 impl Host for LiveHost {
     fn platform(&self) -> Platform {
         Platform::Windows
@@ -177,12 +186,16 @@ impl Host for LiveHost {
     /// `GetFileAttributesW`, then the link's own record when the path is a reparse point (ADR 0091
     /// section 2). `reparse_buffer` opens the link itself and asks for its attributes only, so the
     /// read never follows it.
+    ///
+    /// This is deliberately not gated by `LiveHost::local_read_check`: that gate calls this for every
+    /// component of a path, so calling it back would recurse. It reads the link's own record, never
+    /// through the link.
     #[allow(unsafe_code)]
     fn link_target(&self, path: &str) -> Result<Option<rongroi_host::LinkTarget>, SourceError> {
         let name = wide(path);
         // SAFETY: `name` is NUL-terminated UTF-16 that outlives the call, and the call only reads
         // the attributes Windows keeps for the path; it opens nothing and follows no link.
-        let attributes = unsafe { GetFileAttributesW(PCWSTR(name.as_ptr())) }.0;
+        let attributes = unsafe { GetFileAttributesW(PCWSTR(name.as_ptr())) };
         if attributes == INVALID_FILE_ATTRIBUTES {
             // SAFETY: no other call has run on this thread since the one whose error this reads.
             let last_error = unsafe { GetLastError() }.0;

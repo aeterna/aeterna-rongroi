@@ -15,6 +15,7 @@ use crate::LiveHost;
 
 impl FilesystemSource for LiveHost {
     fn list_dir(&self, dir: &str) -> Result<Option<Vec<DirEntryInfo>>, SourceError> {
+        self.local_read_check(dir)?;
         let entries = match std::fs::read_dir(dir) {
             Ok(entries) => entries,
             // The folder is not there. That is a fact about this machine, not a failure to look, so
@@ -62,11 +63,13 @@ impl FilesystemSource for LiveHost {
     }
 
     fn file_sha256(&self, path: &str) -> Result<String, SourceError> {
+        self.local_read_check(path)?;
         rongroi_host::sha256_file(std::path::Path::new(path))
             .map_err(|error| SourceError::from_io(&error))
     }
 
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        self.local_read_check(path)?;
         // Opened for reading only, like every other read here: no truncation flag and no write share
         // request (AGENTS.md hard rule 2). Creation and last-write times are unchanged; the read can
         // move the last-access time on a PC with last-access updates enabled (ADR 0079, Measured).
@@ -87,6 +90,7 @@ impl FilesystemSource for LiveHost {
     /// section 1). Reading the stream can move the file's last-access time, as reading the file can
     /// (ADR 0079, Measured).
     fn zone_identifier(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        self.local_read_check(path)?;
         let stream = rongroi_host::zone_identifier_path(path)?;
         let file = match std::fs::File::open(&stream) {
             Ok(file) => file,
@@ -107,6 +111,7 @@ impl FilesystemSource for LiveHost {
     /// that is refused, so asking neither reads the file's contents nor stands in the way of the
     /// service writing it (ADR 0037).
     fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError> {
+        self.local_read_check(path)?;
         match std::fs::symlink_metadata(path) {
             Ok(metadata) => Ok(Some(metadata.permissions().readonly())),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -119,6 +124,7 @@ impl FilesystemSource for LiveHost {
     /// entry with no read or write access, and falls back to a listing of it when that is refused. A
     /// drive root such as `C:\` is answered the same way.
     fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError> {
+        self.local_read_check(path)?;
         match std::fs::symlink_metadata(path) {
             Ok(metadata) => Ok(Some(EntryTimes {
                 created: metadata.created().ok().and_then(rongroi_host::listed_time),
@@ -139,6 +145,8 @@ impl EnvironmentSource for LiveHost {
 #[cfg(test)]
 mod tests {
     use rongroi_host::FilesystemSource;
+    #[cfg(windows)]
+    use rongroi_host::{NotLocal, SignatureSource, SourceError, UsnJournalSource};
 
     use crate::LiveHost;
 
@@ -252,5 +260,37 @@ mod tests {
         assert_eq!(answer(&plain), Ok(None));
 
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The answer every read by path gives a path this program refuses to open (ADR 0091 section 1).
+    #[cfg(windows)]
+    fn not_drive_rooted<T>() -> Result<T, SourceError> {
+        Err(SourceError::NotLocal(NotLocal::NotDriveRooted))
+    }
+
+    /// Every host call that opens a path gives the same refusal, so a collector can report
+    /// `not_attempted` and never a missing file.
+    #[cfg(windows)]
+    fn every_read_by_path_refuses(path: &str) {
+        assert_eq!(LiveHost.list_dir(path), not_drive_rooted());
+        assert_eq!(LiveHost.file_sha256(path), not_drive_rooted());
+        assert_eq!(LiveHost.read_file(path), not_drive_rooted());
+        assert_eq!(LiveHost.zone_identifier(path), not_drive_rooted());
+        assert_eq!(LiveHost.is_read_only(path), not_drive_rooted());
+        assert_eq!(LiveHost.times(path), not_drive_rooted());
+        assert_eq!(LiveHost.file_signature(path), not_drive_rooted());
+        assert_eq!(LiveHost.file_id(path), not_drive_rooted());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_unc_path_is_refused_by_every_read_by_path() {
+        every_read_by_path_refuses(r"\\srv\share\x.exe");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_verbatim_unc_path_is_refused_by_every_read_by_path() {
+        every_read_by_path_refuses(r"\\?\UNC\srv\share\x.exe");
     }
 }
