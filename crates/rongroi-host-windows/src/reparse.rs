@@ -12,6 +12,13 @@ use rongroi_host::{LinkKind, LinkTarget};
 const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
 /// `IO_REPARSE_TAG_SYMLINK`: a symbolic link.
 const IO_REPARSE_TAG_SYMLINK: u32 = 0xA000_000C;
+/// `IO_REPARSE_TAG_WOF`: a Windows Overlay Filter file, such as a CompactOS-compressed system
+/// file. Its data is on this disk, and Windows decompresses it locally when the file is read
+/// (ADR 0091).
+const IO_REPARSE_TAG_WOF: u32 = 0x8000_0017;
+/// `IO_REPARSE_TAG_DEDUP`: a Data Deduplication file. Its data is on this disk, and Windows
+/// reassembles it locally when the file is read (ADR 0091).
+const IO_REPARSE_TAG_DEDUP: u32 = 0x8000_0013;
 /// The mask that reduces every cloud placeholder tag to one value.
 const IO_REPARSE_TAG_CLOUD_MASK: u32 = 0xFFFF_0FFF;
 /// The value [`IO_REPARSE_TAG_CLOUD_MASK`] leaves for a cloud placeholder.
@@ -108,7 +115,9 @@ fn read_target(
 ///
 /// `attributes` is the `GetFileAttributesW` value for the link. It tells a cloud placeholder whose
 /// data is already on the disk from one whose read would fetch it: the former is [`Ok(None)`], read
-/// like an ordinary file, and the latter is [`LinkKind::Other`] ([`would_fetch`]).
+/// like an ordinary file, and the latter is [`LinkKind::Other`] ([`would_fetch`]). A Windows
+/// Overlay Filter or Data Deduplication record is also [`Ok(None)`], because its data is on this
+/// disk and Windows decompresses or reassembles it locally (ADR 0091).
 ///
 /// Every field and every offset is bounds-checked, so a damaged record is an error rather than a link
 /// of some guessed kind.
@@ -130,6 +139,9 @@ pub(crate) fn parse_reparse(bytes: &[u8], attributes: u32) -> Result<Option<Link
     }
 
     match tag {
+        // The data of these two records is on this disk, so reading the file does not fetch it from
+        // anywhere: Windows decompresses or reassembles it locally (ADR 0091).
+        IO_REPARSE_TAG_WOF | IO_REPARSE_TAG_DEDUP => Ok(None),
         IO_REPARSE_TAG_MOUNT_POINT => Ok(Some(read_target(
             payload,
             MOUNT_POINT_NAME_FIELDS_BYTES,
@@ -156,8 +168,9 @@ mod tests {
 
     use super::{
         FILE_ATTRIBUTE_OFFLINE, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS,
-        FILE_ATTRIBUTE_RECALL_ON_OPEN, IO_REPARSE_TAG_CLOUD, IO_REPARSE_TAG_MOUNT_POINT,
-        IO_REPARSE_TAG_SYMLINK, SYMLINK_FLAG_RELATIVE, parse_reparse, would_fetch,
+        FILE_ATTRIBUTE_RECALL_ON_OPEN, IO_REPARSE_TAG_CLOUD, IO_REPARSE_TAG_DEDUP,
+        IO_REPARSE_TAG_MOUNT_POINT, IO_REPARSE_TAG_SYMLINK, IO_REPARSE_TAG_WOF,
+        SYMLINK_FLAG_RELATIVE, parse_reparse, would_fetch,
     };
 
     /// A `REPARSE_DATA_BUFFER`: the 8-byte header, then `data`.
@@ -273,6 +286,22 @@ mod tests {
                 target: r"\??\UNC\srv\share".to_owned(),
                 relative: false,
             }))
+        );
+    }
+
+    #[test]
+    fn a_compressed_system_file_is_read_like_a_file() {
+        assert_eq!(
+            parse_reparse(&header(IO_REPARSE_TAG_WOF, &[]), 0),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn a_deduplicated_file_is_read_like_a_file() {
+        assert_eq!(
+            parse_reparse(&header(IO_REPARSE_TAG_DEDUP, &[]), 0),
+            Ok(None)
         );
     }
 
