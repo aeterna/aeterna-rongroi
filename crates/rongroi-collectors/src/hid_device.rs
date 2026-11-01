@@ -101,6 +101,7 @@ fn unmeasured(reason: UnmeasuredReason) -> CollectorRun {
 fn reason_for(error: &SourceError) -> UnmeasuredReason {
     match error {
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+        SourceError::NotLocal(_) => UnmeasuredReason::NotAttempted,
         SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
             UnmeasuredReason::ReadFailed
         }

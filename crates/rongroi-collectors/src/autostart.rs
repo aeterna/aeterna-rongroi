@@ -30,7 +30,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, RegistryData, SignatureCheck, SourceError, is_refused_form};
+use rongroi_host::{
+    Host, NotLocal, Platform, RegistryData, SignatureCheck, SourceError, is_refused_form,
+};
 use rongroi_parsers::task;
 
 use crate::{Collector, Field, driver_service, failure, paths, prefetch};
@@ -214,31 +216,12 @@ impl Autostart {
                         // over it (ADR 0084).
                         let windows = kind == "windows";
                         fields.insert("path_kind".to_owned(), serde_json::Value::from(kind));
-                        match files.get(&path.to_ascii_lowercase()) {
-                            Some(FileState::Described { sha256, signature }) => {
-                                fields.insert(
-                                    "sha256".to_owned(),
-                                    serde_json::Value::from(sha256.clone()),
-                                );
-                                match signature {
-                                    Ok(check) => insert_signature(&mut fields, check.clone()),
-                                    Err(reason) if windows => {
-                                        insert_file_unread(&mut fields, *reason);
-                                    }
-                                    Err(reason) => note(&mut gaps, "signature", *reason),
-                                }
-                            }
-                            Some(FileState::Failed(reason)) if windows => {
-                                insert_file_unread(&mut fields, *reason);
-                            }
-                            Some(FileState::Failed(reason)) => {
-                                for field in FILE_GAP_FIELDS {
-                                    note(&mut gaps, field, *reason);
-                                }
-                            }
-                            // Not there: a registration left behind, not a gap (ADR 0048).
-                            Some(FileState::Missing) | None => {}
-                        }
+                        file_fields(
+                            files.get(&path.to_ascii_lowercase()),
+                            windows,
+                            &mut fields,
+                            &mut gaps,
+                        );
                         fields.insert("path".to_owned(), serde_json::Value::from(path));
                     }
                     Resolution::Missing => {}
@@ -352,6 +335,8 @@ enum FileState {
     },
     /// The file is not there: a registration left behind, not a gap (ADR 0048).
     Missing,
+    /// Not opened: the path does not stay on a local drive (ADR 0091).
+    NotLocal(NotLocal),
     Failed(UnmeasuredReason),
 }
 
@@ -365,6 +350,8 @@ fn describe_file(host: &dyn Host, path: &str) -> FileState {
         Err(SourceError::AccessDenied) => {
             return FileState::Failed(UnmeasuredReason::AccessDenied);
         }
+        // Refused before anything was opened, so never read as "the file is not there" (ADR 0091).
+        Err(SourceError::NotLocal(not_local)) => return FileState::NotLocal(not_local),
         Err(_) if is_missing(host, path) => return FileState::Missing,
         Err(error) => return FileState::Failed(reason(&error)),
     };
@@ -425,6 +412,59 @@ fn insert_signature(fields: &mut BTreeMap<String, serde_json::Value>, signature:
 
 /// Why a file under `%SystemRoot%` was not read, on its row (ADR 0084). The reason's `as_str` name, never
 /// a gap of the place.
+/// The fields and gaps one file's state gives its row (ADR 0060, ADR 0084, ADR 0091).
+fn file_fields(
+    state: Option<&FileState>,
+    windows: bool,
+    fields: &mut BTreeMap<String, serde_json::Value>,
+    gaps: &mut BTreeMap<String, UnmeasuredReason>,
+) {
+    match state {
+        Some(FileState::Described { sha256, signature }) => {
+            fields.insert("sha256".to_owned(), serde_json::Value::from(sha256.clone()));
+            match signature {
+                Ok(check) => insert_signature(fields, check.clone()),
+                Err(reason) if windows => {
+                    insert_file_unread(fields, *reason);
+                }
+                Err(reason) => note(gaps, "signature", *reason),
+            }
+        }
+        Some(FileState::NotLocal(not_local)) => {
+            note_not_local(fields, gaps, *not_local, windows);
+        }
+        Some(FileState::Failed(reason)) if windows => {
+            insert_file_unread(fields, *reason);
+        }
+        Some(FileState::Failed(reason)) => {
+            for field in FILE_GAP_FIELDS {
+                note(gaps, field, *reason);
+            }
+        }
+        // Not there: a registration left behind, not a gap (ADR 0048).
+        Some(FileState::Missing) | None => {}
+    }
+}
+
+/// A file not opened because it does not stay on a local drive (ADR 0091): the row says why, and
+/// outside `%SystemRoot%` its fields are not attempted.
+fn note_not_local(
+    fields: &mut BTreeMap<String, serde_json::Value>,
+    gaps: &mut BTreeMap<String, UnmeasuredReason>,
+    not_local: NotLocal,
+    windows: bool,
+) {
+    fields.insert(
+        "file_unread".to_owned(),
+        serde_json::Value::from(not_local.as_str()),
+    );
+    if !windows {
+        for field in FILE_GAP_FIELDS {
+            note(gaps, field, UnmeasuredReason::NotAttempted);
+        }
+    }
+}
+
 fn insert_file_unread(fields: &mut BTreeMap<String, serde_json::Value>, reason: UnmeasuredReason) {
     fields.insert(
         "file_unread".to_owned(),
@@ -442,6 +482,7 @@ fn lowercase_digest(digest: &str) -> Option<String> {
 fn reason(error: &SourceError) -> UnmeasuredReason {
     match error {
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+        SourceError::NotLocal(_) => UnmeasuredReason::NotAttempted,
         SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
             UnmeasuredReason::ReadFailed
         }

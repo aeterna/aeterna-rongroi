@@ -20,7 +20,8 @@ use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{
-    DirEntryInfo, Host, Platform, RegistryData, SourceError, is_refused_form, is_unusable_segment,
+    DirEntryInfo, Host, NotLocal, Platform, RegistryData, SourceError, is_refused_form,
+    is_unusable_segment,
 };
 
 use crate::{Collector, Field, paths, prefetch};
@@ -42,7 +43,8 @@ const FILE_SYSTEM_DRIVER: u32 = 2;
 /// The one field a gap is ever about.
 const HASH_FIELD: &str = "sha256";
 
-static FIELDS: [Field; 4] = [
+static FIELDS: [Field; 5] = [
+    Field::text("file_unread"),
     Field::text("path"),
     Field::text("service"),
     Field::text("sha256"),
@@ -135,6 +137,14 @@ impl Collector for DriverService {
                                     .insert(HASH_FIELD.to_owned(), serde_json::Value::from(digest));
                             }
                             Hash::Missing => {}
+                            // Not opened: the path does not stay on a local drive (ADR 0091).
+                            Hash::NotLocal(not_local) => {
+                                fields.insert(
+                                    "file_unread".to_owned(),
+                                    serde_json::Value::from(not_local.as_str()),
+                                );
+                                note(&mut gap, UnmeasuredReason::NotAttempted);
+                            }
                             Hash::Failed(reason) => note(&mut gap, reason),
                         }
                     }
@@ -258,6 +268,8 @@ enum Hash {
     Hashed(String),
     /// The file is not there: a leftover service key, not a gap.
     Missing,
+    /// Not opened: the path does not stay on a local drive (ADR 0091).
+    NotLocal(NotLocal),
     Failed(UnmeasuredReason),
 }
 
@@ -270,6 +282,8 @@ fn hash(host: &dyn Host, path: &str) -> Hash {
     match host.file_sha256(path) {
         Ok(digest) => Hash::Hashed(digest.to_ascii_lowercase()),
         Err(SourceError::AccessDenied) => Hash::Failed(UnmeasuredReason::AccessDenied),
+        // Refused before anything was opened, so never read as "the file is not there" (ADR 0091).
+        Err(SourceError::NotLocal(not_local)) => Hash::NotLocal(not_local),
         Err(_) if is_missing(host, path) => Hash::Missing,
         Err(error) => Hash::Failed(reason(&error)),
     }
@@ -322,6 +336,7 @@ fn missing_from(listing: Result<Option<Vec<DirEntryInfo>>, SourceError>, name: &
 fn reason(error: &SourceError) -> UnmeasuredReason {
     match error {
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+        SourceError::NotLocal(_) => UnmeasuredReason::NotAttempted,
         SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
             UnmeasuredReason::ReadFailed
         }

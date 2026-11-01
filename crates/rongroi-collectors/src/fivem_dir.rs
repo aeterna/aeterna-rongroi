@@ -295,12 +295,13 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// - **a server cache folder** (`location: enhanced_server_cache`, `created_at`, `modified_at` and
 ///   `entries`, each when it could be read) — told apart from its parent's folder observation by having
 ///   no `folder` field (ADR 0053).
-const FIELDS: [Field; 26] = [
+const FIELDS: [Field; 27] = [
     Field::timestamp("app_folder_created_at"),
     Field::timestamp("created_at"),
     Field::timestamp("earliest_created_at"),
     Field::timestamp("earliest_modified_at"),
     Field::number("entries"),
+    Field::text("file_unread"),
     Field::number("files"),
     Field::number("files_without_times"),
     Field::text("folder"),
@@ -540,6 +541,7 @@ fn list_folder(
         Ok(None) => Ok(None),
         Ok(Some(entries)) => Ok(Some((folder, entries))),
         Err(SourceError::AccessDenied) => Err(UnmeasuredReason::AccessDenied),
+        Err(SourceError::NotLocal(_)) => Err(UnmeasuredReason::NotAttempted),
         Err(
             SourceError::Failed(_) | SourceError::Unsupported(_) | SourceError::TooLarge { .. },
         ) => Err(UnmeasuredReason::ReadFailed),
@@ -804,11 +806,28 @@ fn file_observations(
         .map(|entry| {
             let path = format!(r"{dir}\{}", entry.name);
             let mut fields = BTreeMap::new();
-            if let Some(sha256) = file_sha256(host, &path) {
-                fields.insert("sha256".to_owned(), serde_json::Value::from(sha256));
-            }
-            if let Ok(signature) = host.file_signature(&path) {
-                insert_signature(&mut fields, signature);
+            match host.file_sha256(&path) {
+                Ok(digest) => {
+                    if let Some(sha256) = lowercase_digest(&digest) {
+                        fields.insert("sha256".to_owned(), serde_json::Value::from(sha256));
+                    }
+                    if let Ok(signature) = host.file_signature(&path) {
+                        insert_signature(&mut fields, signature);
+                    }
+                }
+                // Not opened: the path does not stay on a local drive (ADR 0091). The row says why
+                // and nothing else reads the file.
+                Err(SourceError::NotLocal(not_local)) => {
+                    fields.insert(
+                        "file_unread".to_owned(),
+                        serde_json::Value::from(not_local.as_str()),
+                    );
+                }
+                Err(_) => {
+                    if let Ok(signature) = host.file_signature(&path) {
+                        insert_signature(&mut fields, signature);
+                    }
+                }
             }
             fields.insert(
                 "location".to_owned(),
@@ -1873,10 +1892,7 @@ links:
         assert_eq!(field(local, "sha256"), Some("1".repeat(64).as_str()));
         assert!(!local.fields.contains_key("file_unread"), "{local:?}");
         let shared = by_name(observations, "shared-plugin.dll");
-        assert_eq!(
-            path_of(shared),
-            format!(r"{PLUGINS_DIR}\shared-plugin.dll")
-        );
+        assert_eq!(path_of(shared), format!(r"{PLUGINS_DIR}\shared-plugin.dll"));
         assert_eq!(shared.fields.get("sha256"), None, "{shared:?}");
         assert_eq!(shared.fields.get("signature"), None, "{shared:?}");
         assert_eq!(field(shared, "file_unread"), Some("link_off_local_drive"));
@@ -1910,10 +1926,7 @@ links:
         let (observations, gaps) = measured(&run);
         assert!(gaps.is_empty(), "{gaps:?}");
         let mapped = by_name(observations, "mapped-plugin.dll");
-        assert_eq!(
-            path_of(mapped),
-            format!(r"{PLUGINS_DIR}\mapped-plugin.dll")
-        );
+        assert_eq!(path_of(mapped), format!(r"{PLUGINS_DIR}\mapped-plugin.dll"));
         assert_eq!(mapped.fields.get("sha256"), None, "{mapped:?}");
         assert_eq!(mapped.fields.get("signature"), None, "{mapped:?}");
         assert_eq!(field(mapped, "file_unread"), Some("not_local_drive"));
@@ -1955,7 +1968,9 @@ links:
         let moved = by_name(observations, "moved-plugin.dll");
         assert_eq!(
             path_of(moved),
-            format!(r"C:\Games\{PLUGINS_RELATIVE_PATH}\moved-plugin.dll"),
+            format!(
+                r"C:\Games\Users\fixtureuser\AppData\Local\{PLUGINS_RELATIVE_PATH}\moved-plugin.dll"
+            ),
         );
         assert_eq!(field(moved, "sha256"), Some("2".repeat(64).as_str()));
         assert_eq!(field(moved, "signature"), Some("no_embedded_signature"));

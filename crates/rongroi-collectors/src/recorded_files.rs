@@ -87,7 +87,7 @@ const REASONS: [UnmeasuredReason; 8] = [
 /// record time `usn` already puts on the timeline, so a journal gap on any of them would leave
 /// `recorded_files` in the timeline's unmeasured sources on every scan without a journal (ADR 0086,
 /// As built: J2). `journal_more` says that one of the lists was cut.
-const FIELDS: [Field; 25] = [
+const FIELDS: [Field; 26] = [
     Field::boolean("by_bam"),
     Field::boolean("by_pca"),
     Field::boolean("by_process"),
@@ -95,6 +95,7 @@ const FIELDS: [Field; 25] = [
     Field::text("content_kind"),
     Field::text("download_host").sensitive(SensitiveKind::DownloadHost),
     Field::boolean("embedded_pe"),
+    Field::text("file_unread"),
     Field::text("identity_read"),
     Field::timestamp_list("journal_deleted").off_timeline(),
     Field::timestamp("journal_from").off_timeline(),
@@ -465,6 +466,15 @@ fn identity(host: &dyn Host, path: &str) -> Identity {
     match host.read_file(path) {
         Ok(Some(bytes)) => Identity::read(host, path, &bytes),
         Ok(None) => Identity::alone("missing"),
+        // Not opened: the path does not stay on a local drive (ADR 0091). Nothing was attempted, and
+        // `file_unread` says why.
+        Err(SourceError::NotLocal(not_local)) => Identity {
+            read: "not_attempted",
+            fields: BTreeMap::from([(
+                "file_unread".to_owned(),
+                serde_json::Value::from(not_local.as_str()),
+            )]),
+        },
         Err(error) => {
             // A file over the size bound still has a hash and a signature, and ADR 0079 section 3
             // keeps both beside `too_large` so a rule can still ask what the file was.
@@ -926,6 +936,16 @@ mod tests {
     use rongroi_host::FixtureHost;
 
     use super::*;
+
+    /// The observations and gaps of a measured run.
+    fn measured(run: &CollectorRun) -> (&[Observation], &BTreeMap<String, UnmeasuredReason>) {
+        match run {
+            CollectorRun::Measured {
+                observations, gaps, ..
+            } => (observations, gaps),
+            CollectorRun::Unmeasured { .. } => panic!("not measured: {run:?}"),
+        }
+    }
 
     /// A host whose only recorded path is `path`, described by BAM. `extra` holds the `drive_map:`
     /// and `links:` blocks an ADR 0091 case needs, and `files` is the body under `filesystem:`.

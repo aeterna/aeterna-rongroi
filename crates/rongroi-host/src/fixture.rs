@@ -1237,6 +1237,23 @@ pub struct FixtureHost {
     links: BTreeMap<String, LinkTarget>,
 }
 
+/// The fixture's `links:` keyed by the normalised path of each link (ADR 0091 section 2).
+fn links_by_path(links: Vec<FixtureLink>) -> BTreeMap<String, LinkTarget> {
+    links
+        .into_iter()
+        .map(|link| {
+            (
+                normalise_path(&link.path),
+                LinkTarget {
+                    kind: link.kind,
+                    target: link.target,
+                    relative: link.relative,
+                },
+            )
+        })
+        .collect()
+}
+
 impl FixtureHost {
     /// Loads `<dir>/host.yaml`. A `from:` in it is read relative to `dir`.
     pub fn load(dir: &Path) -> Result<Self, FixtureError> {
@@ -1328,20 +1345,7 @@ impl FixtureHost {
                 })
                 .transpose()?,
             drive_roots,
-            links: file
-                .links
-                .into_iter()
-                .map(|link| {
-                    (
-                        normalise_path(&link.path),
-                        LinkTarget {
-                            kind: link.kind,
-                            target: link.target,
-                            relative: link.relative,
-                        },
-                    )
-                })
-                .collect(),
+            links: links_by_path(file.links),
             drive_map: file.drive_map.map(|described| {
                 described
                     .into_iter()

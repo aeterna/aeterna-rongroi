@@ -27,6 +27,8 @@ pub fn reason_for(host: &dyn Host, error: &SourceError) -> UnmeasuredReason {
             UnmeasuredReason::NotAdmin
         }
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+        // The host chose not to open it (ADR 0091): nothing was attempted, nothing failed.
+        SourceError::NotLocal(_) => UnmeasuredReason::NotAttempted,
         SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
             UnmeasuredReason::ReadFailed
         }
@@ -42,6 +44,7 @@ pub fn read_failure(error: &SourceError) -> &'static str {
     match error {
         SourceError::AccessDenied => "access_denied",
         SourceError::TooLarge { .. } => "too_large",
+        SourceError::NotLocal(not_local) => not_local.as_str(),
         SourceError::Unsupported(_) | SourceError::Failed(_) => "failed",
     }
 }

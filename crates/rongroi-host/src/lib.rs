@@ -2173,6 +2173,8 @@ links:
     /// Builds a fixture whose `C:\l1` is a junction to `C:\l2`, and so on to `C:\end`.
     #[cfg(feature = "fixture")]
     fn chained_links(count: usize) -> FixtureHost {
+        use std::fmt::Write as _;
+
         let mut yaml = String::from("platform: windows\nlinks:\n");
         for index in 1..=count {
             let target = if index == count {
@@ -2180,9 +2182,11 @@ links:
             } else {
                 format!(r"C:\l{}", index + 1)
             };
-            yaml.push_str(&format!(
+            write!(
+                yaml,
                 "  - path: 'C:\\l{index}'\n    kind: mount_point\n    target: '\\??\\{target}'\n"
-            ));
+            )
+            .unwrap();
         }
         FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
     }

@@ -88,6 +88,7 @@ impl Collector for FivemServers {
             Err(error) => {
                 let reason = match error {
                     SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+                    SourceError::NotLocal(_) => UnmeasuredReason::NotAttempted,
                     SourceError::Failed(_)
                     | SourceError::Unsupported(_)
                     | SourceError::TooLarge { .. } => UnmeasuredReason::ReadFailed,
