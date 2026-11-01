@@ -58,7 +58,8 @@ The check walks the path from the drive down:
      `link_off_local_drive`;
    - a target that is a volume name (`\??\Volume{…}\`) or any other form, or any other reparse tag (OneDrive
      and other cloud placeholders whose data is not on the disk, app execution aliases, and tags this program
-     does not know): refused as `link_unsupported`. Such a placeholder is refused because reading it can make
+     does not know): refused as `link_unsupported`. Compressed (WOF) and deduplicated files are not links:
+     their data is on this disk, so they are read like any file. Such a placeholder is refused because reading it can make
      Windows fetch the file. A placeholder whose data is already on the disk (no recall attribute) is read
      like any file: OneDrive keeps Desktop and Downloads that way on many PCs, and refusing them would leave
      most downloaded programs unhashed. A path whose attributes carry `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`,
@@ -138,8 +139,9 @@ listing that tells "missing" from "unreadable" is refused the same way.
 - Files on optical and RAM drives are no longer read; their rows say `file_unread: not_local_drive`. Files on
   fixed and removable drives, and behind local links, are read as before.
 - OneDrive placeholders and app execution aliases are not read. Their rows say so.
-- Files under other reparse tags this program does not parse are not read either: on a PC that uses them,
-  Windows' compressed system files (WOF, CompactOS), Data Deduplication and similar files report
-  `file_unread: link_unsupported`. Refusing a tag it cannot read keeps the program off the network; the
-  cost is fewer hashes on those PCs.
+- Windows' compressed system files (`IO_REPARSE_TAG_WOF`, CompactOS) and Data Deduplication files
+  (`IO_REPARSE_TAG_DEDUP`) are read like any file: their data is on this disk and Windows decompresses or
+  reassembles it locally, unless a recall or offline attribute says otherwise, as for any path. Files under
+  other reparse tags this program does not know report `file_unread: link_unsupported`: refusing a tag it
+  cannot read keeps the program off the network, at the cost of fewer hashes on PCs that use such tags.
 - ADR 0090's section 3 can use this check instead of its own.
