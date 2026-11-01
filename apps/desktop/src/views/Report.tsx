@@ -54,8 +54,8 @@ export function Report({ mode, options, saved, onBack }: Props) {
     // The way back to the top is only worth a control once the reader has left it.
     const onScroll = () => setShowScrollTop(window.scrollY > 200);
     onScroll();
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll, { passive: true });
   }, []);
 
   useEffect(() => {
@@ -379,6 +379,9 @@ export function Report({ mode, options, saved, onBack }: Props) {
             const reduceMotion =
               window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
             window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+            // The button unmounts once the window is back at the top, so focus moves to the header's
+            // way home rather than falling to the body.
+            document.getElementById("home-button")?.focus({ preventScroll: true });
           }}
         >
           <svg

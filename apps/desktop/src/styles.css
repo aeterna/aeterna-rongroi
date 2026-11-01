@@ -82,6 +82,11 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* A focused element scrolled into view must clear the sticky header instead of hiding under it. */
+html {
+  scroll-padding-top: 96px;
+}
+
 /* Sky: a gradient with two soft clouds, fixed behind the content. */
 body {
   margin: 0;
@@ -116,6 +121,19 @@ code {
   user-select: all;
 }
 
+/* Keeps a heading in the document outline while the breadcrumb already names it on screen. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Header: a floating glass bar with the name and the two controls. It stays in reach while a long
    report scrolls, above the report's own content. */
 .top {
@@ -144,6 +162,7 @@ code {
 .top-title {
   display: grid;
   gap: 0;
+  min-width: 0;
 }
 
 .top-actions {
@@ -400,7 +419,7 @@ button:disabled {
 .scroll-top {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  bottom: 84px;
   z-index: 50;
   display: inline-flex;
   align-items: center;
@@ -1242,6 +1261,16 @@ footer {
   font-size: 0.88em;
   border-top: 1px dashed var(--line-strong);
   padding-top: 14px;
+}
+
+@media (max-width: 980px) {
+  /* Between the phone layout and the full desktop one the header wraps rather than overflows; the
+     breadcrumb gives up its single line first. */
+  .breadcrumb {
+    flex-wrap: wrap;
+    white-space: normal;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 640px) {

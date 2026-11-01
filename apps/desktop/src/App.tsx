@@ -66,6 +66,7 @@ export function App() {
             <>
               <button
                 type="button"
+                id="home-button"
                 className="nav home"
                 aria-label={t("nav.home")}
                 onClick={() => setScreen("start")}
@@ -89,13 +90,17 @@ export function App() {
               <nav className="breadcrumb" aria-label={t("breadcrumb.label")}>
                 <span className="muted">{t("app.name")}</span>
                 <span aria-hidden="true"> / </span>
-                <span className="breadcrumb-current">{currentPlace}</span>
+                <span className="breadcrumb-current" aria-current="page">
+                  {currentPlace}
+                </span>
               </nav>
             </>
           )}
           <div className="top-title">
-            <h1>{t("app.name")}</h1>
-            <p className="muted">{t("app.tagline")}</p>
+            <h1 className={screen === "start" ? undefined : "visually-hidden"}>
+              {t("app.name")}
+            </h1>
+            {screen === "start" && <p className="muted">{t("app.tagline")}</p>}
           </div>
         </div>
         <div className="top-actions">
