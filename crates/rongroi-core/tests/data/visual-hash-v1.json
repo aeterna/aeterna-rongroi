@@ -28,9 +28,9 @@
     ],
     "require_elevation": true,
     "server_name": "Example City",
-    "policy_hash": "a1b2c3d4e5f60718"
+    "policy_hash": "94b51d336f083fe5"
   },
-  "visual_hash": "4f8a91bc023e5d71",
+  "visual_hash": "5777137e45484779",
   "view": {
     "generated_at": "2026-10-31T14:30:00Z",
     "schema_version": 2
