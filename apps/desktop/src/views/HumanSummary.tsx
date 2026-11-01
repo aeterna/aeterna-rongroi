@@ -2,16 +2,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Evidence, ReportHeader, ReportView, RuleText } from "../types";
 import { HorizonTimeline } from "./HorizonTimeline";
+import { useGlanceFx } from "./HumanSummary.glance";
+import { Odometer } from "./HumanSummary.odometer";
+import "./HumanSummary.glance.css";
+import "./HumanSummary.motion.css";
 
 interface Props {
   view: ReportView;
   header: ReportHeader;
   texts: Record<string, RuleText>;
   onSwitchToTechnical: () => void;
+}
+
+/** One glance card: the evidence card with H2 spotlight and H3 tilt as decoration only. */
+function GlanceCard({ children }: { children: ReactNode }) {
+  const ref = useGlanceFx<HTMLDivElement>();
+  return (
+    <div className="glance-card" ref={ref}>
+      {children}
+    </div>
+  );
 }
 
 export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props) {
@@ -128,7 +142,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         >
           <div className="count">
             <span className="tally-mark">■</span>
-            <span>{view.listed.found}</span>
+            <Odometer value={view.listed.found} />
           </div>
           <div className="label">{t("summary.found")}</div>
         </button>
@@ -136,7 +150,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         <button type="button" className="tally-item tally-not_found" onClick={onSwitchToTechnical}>
           <div className="count">
             <span className="tally-mark">○</span>
-            <span>{view.listed.not_found}</span>
+            <Odometer value={view.listed.not_found} />
           </div>
           <div className="label">{t("summary.not_found")}</div>
         </button>
@@ -148,7 +162,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         >
           <div className="count">
             <span className="tally-mark">◌</span>
-            <span>{view.listed.unmeasured}</span>
+            <Odometer value={view.listed.unmeasured} />
           </div>
           <div className="label">{t("summary.unmeasured")}</div>
         </button>
@@ -157,7 +171,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
       {/* 3 Quick Glance Focus Cards */}
       <div className="glance-grid">
         {/* Card 1: FiveM Play */}
-        <div className="glance-card">
+        <GlanceCard>
           <div className="glance-head">
             <span className="glance-tag">
               <svg
@@ -208,10 +222,10 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
               </>
             );
           })()}
-        </div>
+        </GlanceCard>
 
         {/* Card 2: History Continuity */}
-        <div className="glance-card">
+        <GlanceCard>
           <div className="glance-head">
             <span className="glance-tag">
               <svg
@@ -239,10 +253,10 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
           <div className="glance-text">
             {hasTamper ? t("glance.history_tamper_desc") : t("glance.history_not_found_desc")}
           </div>
-        </div>
+        </GlanceCard>
 
         {/* Card 3: Findings Overview */}
-        <div className="glance-card">
+        <GlanceCard>
           <div className="glance-head">
             <span className="glance-tag">
               <svg
@@ -276,7 +290,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
                 ? t("glance.obs_unmeasured_desc")
                 : t("glance.obs_found_desc")}
           </div>
-        </div>
+        </GlanceCard>
       </div>
 
       {/* Findings Section Header & Toolbar */}

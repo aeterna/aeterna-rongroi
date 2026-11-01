@@ -32,6 +32,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   from real rules (a found Secure Boot row, a not-found test-signing row and a not-measured row that needs
   administrator rights). A small script of the page's own does this; with scripts off the card reads as before, and the
   page still loads nothing from another site.
+- The saved record's 16-character digest decodes into place once when it is shown, and an opened evidence row gets one line of its rule, collector and state typed out. Both are decoration: the real digest and the whole line are in the page as text from the start, nothing is animated under reduced motion, and the record, its digest and every collector are unchanged.
+- The report summary's three counts roll into place once when it opens, its top note gets four corner marks and one light sweep, and each of the three cards under it follows a mouse with a soft light and a tilt of at most 6 degrees. These are decoration: every number and word stays in the page as text, nothing moves under reduced motion, and no count, colour meaning or collector changes.
 - The desktop app shows a small native Windows window while the scan runs, on every start, so the program no longer
   looks like it has hung: it says a scan is running, and on a full scan that reading the files of recorded programs
   takes at most 90 seconds (the figure the full-scan question states). It is drawn by Windows with no WebView, opens
