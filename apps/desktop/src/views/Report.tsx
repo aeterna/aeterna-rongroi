@@ -26,6 +26,7 @@ import { EvidenceRow } from "./EvidenceRow";
 import { GameWindowsSection } from "./GameWindows";
 import { HumanSummary } from "./HumanSummary";
 import "./Report.motion.css";
+import { ReportProgress } from "./ReportProgress";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
@@ -189,6 +190,9 @@ export function Report({ mode, options, saved, onBack }: Props) {
         onClose={() => setPaletteOpen(false)}
         onPick={pickEvidence}
       />
+
+      {/* E3: the progress line and group dots belong to the technical view; the summary unmounts them. */}
+      {viewMode === "technical" && <ReportProgress groups={groups} />}
 
       <div className="report-mode-bar">
         <div className="view-switcher-wrap">

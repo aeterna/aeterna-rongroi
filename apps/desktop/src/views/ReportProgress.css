@@ -1,0 +1,72 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+
+/* E3: where the reader is in the technical view. Decoration only, in the app's neutral blue: the
+   line and the dots never stand for found, not_found or unmeasured. Only transform and opacity move. */
+
+/* Fixed, not sticky: sticky would take layout space and stop at the content column. The line's top
+   follows `.top`'s measured bottom, so a wrapped header never covers it. */
+.report-progress-line {
+  position: fixed;
+  right: 0;
+  left: 0;
+  top: 88px;
+  z-index: 19;
+  height: 2px;
+  background: var(--blue);
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 120ms linear;
+}
+/* One dot per collector group, at the right edge outside the content column. */
+.report-progress-dots {
+  position: fixed;
+  right: 2px;
+  top: 50%;
+  z-index: 30;
+  transform: translateY(-50%);
+}
+.report-progress-dots ol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.report-progress-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--blue);
+  opacity: 0.35;
+  transform: scaleY(1);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.report-progress-dot:hover,
+.report-progress-dot:focus-visible {
+  opacity: 0.75;
+}
+
+/* The group in view grows taller; the colour stays the same neutral blue. */
+.report-progress-dot[aria-current="true"] {
+  opacity: 1;
+  transform: scaleY(2.2);
+}
+
+.report-progress-dot:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* Reduced motion: position still follows the scroll, but nothing eases. */
+@media (prefers-reduced-motion: reduce) {
+  .report-progress-line,
+  .report-progress-dot {
+    transition: none;
+  }
+}
