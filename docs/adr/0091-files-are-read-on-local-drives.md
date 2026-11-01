@@ -6,7 +6,8 @@
   ADR 0030 (the reasons), ADR 0035 (`signature`), ADR 0048 and ADR 0060 (`is_refused_form`), ADR 0079
   (`recorded_files`), ADR 0087 (the drive map and `DriveKind`), ADR 0090 (proposed: the antivirus products
   collector, whose section 3 asks for the same rule)
-- Amends: ADR 0048, ADR 0060 and ADR 0079 (a path they resolve is read only when this ADR allows it); ADR 0047
+- Amends: ADR 0030's table of who reports which reason (`not_attempted` gains every collector that reads by
+  path); ADR 0048, ADR 0060 and ADR 0079 (a path they resolve is read only when this ADR allows it); ADR 0047
   (`usn_journal::live::open` also opens a link itself with `FILE_READ_ATTRIBUTES`, and `control` also accepts
   the read-only code `FSCTL_GET_REPARSE_POINT`; both stay the only callers `clippy.toml` allows)
 
@@ -100,6 +101,10 @@ listing that tells "missing" from "unreadable" is refused the same way.
   keeps the program off the network for the paths as they stand during the scan, and claims nothing more.
 
 ### 5. What changes for existing reports
+
+- `not_attempted`'s words were "this was not read — the scan stopped before reaching it", true only of
+  `evtx`'s budget. They become "this was not read — the scan did not open it" (Thai: "ไม่ได้อ่านส่วนนี้
+  เพราะการสแกนไม่ได้เปิดมัน"), which is true of both causes; `file_unread` on the row says which.
 
 - `usn` decided "another volume" for a watched folder reached through a junction by reading the folder's
   identity. A watched folder whose junction names a volume (`\??\Volume{…}\`) is now refused as

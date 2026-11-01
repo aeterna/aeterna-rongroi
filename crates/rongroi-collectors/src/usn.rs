@@ -620,7 +620,7 @@ impl Tally {
                     "folder".to_owned(),
                     serde_json::Value::from(FOLDER_OTHER_VOLUME),
                 );
-                // Not `not_attempted`, whose words say the scan stopped before reaching it, and not
+                // Not `not_attempted`, whose words say the scan did not open the folder, and not
                 // `read_failed`, which SS mode always lists and no rule may declare: nothing failed.
                 // This collector reads the system volume's journal alone, by design, and the folder
                 // was never within it (ADR 0047, amendment of 2026-09-30, decision 1).
