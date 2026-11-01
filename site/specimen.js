@@ -28,7 +28,7 @@
   }
 
   // A row stays while the search finds its text and the pressed box, if any, names its state.
-  function apply() {
+  function apply(announce) {
     var want = query.value.trim().toLowerCase();
     var shown = 0;
     rows.forEach(function (row) {
@@ -40,8 +40,10 @@
         shown += 1;
       }
     });
-    empty.hidden = shown === 0;
-    say(msgCount.replace("{n}", String(shown)).replace("{total}", String(rows.length)));
+    empty.hidden = shown > 0;
+    if (announce) {
+      say(msgCount.replace("{n}", String(shown)).replace("{total}", String(rows.length)));
+    }
   }
 
   // Pressing a box filters by its state; pressing the pressed one again clears the filter.
@@ -51,7 +53,7 @@
       var name = box.getAttribute("data-filter") || "";
       box.setAttribute("aria-pressed", name === filter ? "true" : "false");
     });
-    apply();
+    apply(true);
   }
 
   // The clipboard API can be absent (an insecure context, an old browser) or refuse the write. Both say
@@ -76,7 +78,7 @@
     }
   }
 
-  query.addEventListener("input", apply);
+  query.addEventListener("input", function () { apply(true); });
   boxes.forEach(function (box) {
     var name = box.getAttribute("data-filter") || "";
     box.addEventListener("click", function () { press(name); });
@@ -84,5 +86,5 @@
   Array.prototype.slice.call(figure.querySelectorAll("[data-copy]")).forEach(function (button) {
     button.addEventListener("click", function () { copy(button); });
   });
-  apply();
+  apply(false);
 })();
