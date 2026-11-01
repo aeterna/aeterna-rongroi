@@ -589,6 +589,129 @@ describe("App", () => {
     expect(screen.queryByText("Scan as administrator")).toBeNull();
   });
 
+  // The header is the way back from a long report: the bottom button stays, but reaching it must not
+  // be the only way out of a report that runs for pages.
+  it("shows no home button on the start screen and one on a report screen that returns to start", async () => {
+    render(<App />);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to the start screen" })).toBeNull();
+    fireEvent.click(screen.getByText("Check my own PC"));
+    await screen.findByText("Found");
+    fireEvent.click(screen.getByRole("button", { name: "Back to the start screen" }));
+    expect(screen.getByText("What do you want to do?")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to the start screen" })).toBeNull();
+  });
+
+  // Beside the home button, the app name and the place the player is in, so a report says what it is.
+  it.each([
+    ["Check my own PC", null, "aeterna-rongroi / Self check"],
+    [
+      "Screenshare check (SS mode)",
+      "I agree — show the SS view",
+      "aeterna-rongroi / Screenshare check",
+    ],
+  ])("shows the breadcrumb for %s", async (open, agree, trail) => {
+    render(<App />);
+    fireEvent.click(await screen.findByText(open));
+    if (agree) {
+      fireEvent.click(screen.getByText(agree));
+    }
+    await screen.findByText("Found");
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe(trail);
+  });
+
+  // The breadcrumb already names the app and the place, so a report keeps the <h1> for the heading
+  // order but hides it, and does not render the tagline a second time.
+  it("hides the app title on a report screen and leaves the start screen's title whole", async () => {
+    render(<App />);
+    const startHeading = screen.getByRole("heading", { level: 1 });
+    expect(startHeading.className).not.toContain("visually-hidden");
+    expect(
+      screen.getByText(
+        "Offline PC check for FiveM communities. Shows evidence — never says a PC is clean.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Found");
+    expect(screen.getByRole("heading", { level: 1 }).className).toContain("visually-hidden");
+    expect(
+      screen.queryByText(
+        "Offline PC check for FiveM communities. Shows evidence — never says a PC is clean.",
+      ),
+    ).toBeNull();
+  });
+
+  // The last part of the trail is the page the reader is on, and says so to assistive technology.
+  it("marks the breadcrumb's current place as the page", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Found");
+    expect(
+      screen
+        .getByRole("navigation", { name: "Breadcrumb" })
+        .querySelector(".breadcrumb-current")
+        ?.getAttribute("aria-current"),
+    ).toBe("page");
+  });
+
+  // The scroll-to-top button unmounts once the window is back at the top, so focus must move to the
+  // header's way home instead of falling to the body.
+  it("moves focus to the home button when the scroll-to-top button is used", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Found");
+
+    const originalScrollY = Object.getOwnPropertyDescriptor(window, "scrollY");
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 250 });
+    fireEvent.scroll(window);
+    const scrollTop = screen.getByRole("button", { name: "Back to top" });
+    scrollTop.focus();
+
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    try {
+      fireEvent.click(scrollTop);
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+      fireEvent.scroll(window);
+      expect(screen.queryByRole("button", { name: "Back to top" })).toBeNull();
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Back to the start screen" }),
+      );
+    } finally {
+      scrollTo.mockRestore();
+      if (originalScrollY) {
+        Object.defineProperty(window, "scrollY", originalScrollY);
+      } else {
+        Reflect.deleteProperty(window, "scrollY");
+      }
+    }
+  });
+
+  // A relaunch ends this process; until the answer arrives, a second click must not start another.
+  it("disables the administrator restart while it is in flight and enables it after a decline", async () => {
+    let resolveElevate: (outcome: "declined") => void = () => {};
+    const pending = new Promise<"declined">((resolve) => {
+      resolveElevate = resolve;
+    });
+    render(<App />);
+    const button = await screen.findByRole("button", { name: "Scan as administrator" });
+    mockIPC((cmd) => {
+      calls.push(cmd);
+      if (cmd === "relaunch_elevated") {
+        return pending;
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    fireEvent.click(button);
+    expect(button).toHaveProperty("disabled", true);
+    await act(async () => {
+      resolveElevate("declined");
+      await pending;
+    });
+    expect(button).toHaveProperty("disabled", false);
+    expect(screen.getByText("You declined the Windows prompt. Nothing changed.")).toBeTruthy();
+  });
+
   it("switches to Thai, keeping the UNOFFICIAL BUILD token in English", async () => {
     render(<App />);
     await act(async () => {

@@ -34,6 +34,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   page still loads nothing from another site.
 - The saved record's 16-character digest decodes into place once when it is shown, and an opened evidence row gets one line of its rule, collector and state typed out. Both are decoration: the real digest and the whole line are in the page as text from the start, nothing is animated under reduced motion, and the record, its digest and every collector are unchanged.
 - The report summary's three counts roll into place once when it opens, its top note gets four corner marks and one light sweep, and each of the three cards under it follows a mouse with a soft light and a tilt of at most 6 degrees. These are decoration: every number and word stays in the page as text, nothing moves under reduced motion, and no count, colour meaning or collector changes.
+- The desktop window's header stays in view while a long report scrolls, and outside the start screen it has a
+  home button and a trail (`aeterna-rongroi / Self check`) beside it; a button appears after the first 200 px to
+  go back to the top (instant under reduced motion), and the "Scan as administrator" and "Full scan" buttons are
+  disabled while their request is being answered. The report, its privacy filtering and every collector are unchanged.
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
