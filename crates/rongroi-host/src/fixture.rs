@@ -1908,6 +1908,7 @@ impl Host for FixtureHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{LinkKind, LinkTarget, NotLocal};
 
     const CERT: &str = "ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789";
 
@@ -3505,5 +3506,106 @@ drive_map:
         let empty =
             FixtureHost::from_yaml_str("platform: windows\ndrive_map: []\n", "inline").unwrap();
         assert_eq!(empty.drive_map(), Ok(DriveMap { entries: vec![] }));
+    }
+
+    /// ADR 0091: a link has a path, a kind and a target, and is relative only when the fixture says so.
+    #[test]
+    fn links_are_read_with_their_kind_target_and_relative_flag() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+  - path: 'C:\a\link'
+    kind: symlink
+    target: '..\real'
+    relative: true
+  - path: 'C:\placeholder'
+    kind: other
+    target: '\??\Volume{0b1c2d3e-0000-0000-0000-100000000000}\x'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.link_target(r"C:\Games").unwrap(),
+            Some(LinkTarget {
+                kind: LinkKind::MountPoint,
+                target: r"\??\D:\Lib".to_owned(),
+                relative: false,
+            })
+        );
+        assert_eq!(
+            host.link_target(r"C:\a\link").unwrap(),
+            Some(LinkTarget {
+                kind: LinkKind::Symlink,
+                target: r"..\real".to_owned(),
+                relative: true,
+            })
+        );
+        assert_eq!(
+            host.link_target(r"C:\placeholder").unwrap(),
+            Some(LinkTarget {
+                kind: LinkKind::Other,
+                target: r"\??\Volume{0b1c2d3e-0000-0000-0000-100000000000}\x".to_owned(),
+                relative: false,
+            })
+        );
+        assert_eq!(host.link_target(r"C:\not-a-link").unwrap(), None);
+    }
+
+    /// A link entry refuses a field no host reads, as every other fixture block does.
+    #[test]
+    fn a_link_with_an_unknown_field_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+    bogus: true
+",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+    }
+
+    /// An ordinary read's answer for a path behind a junction to a share.
+    fn off_local_drive<T>() -> Result<T, SourceError> {
+        Err(SourceError::NotLocal(NotLocal::LinkOffLocalDrive))
+    }
+
+    /// The fixture filesystem lists the file, but its links say the folder is a junction to a share,
+    /// so every per-path read refuses it before looking at the file (ADR 0091 section 1).
+    #[test]
+    fn reads_behind_a_unc_junction_are_not_local_even_when_the_file_is_listed() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\UNC\server\share'
+filesystem:
+  'C:\Games':
+    - name: x.exe
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      content: 'x'
+      signature: { state: invalid }
+      zone_identifier: '[ZoneTransfer]\r\nZoneId=3\r\n'
+",
+            "inline",
+        )
+        .unwrap();
+        let path = r"C:\Games\x.exe";
+        assert_eq!(host.file_sha256(path), off_local_drive());
+        assert_eq!(host.read_file(path), off_local_drive());
+        assert_eq!(host.list_dir(r"C:\Games"), off_local_drive());
+        assert_eq!(host.file_signature(path), off_local_drive());
+        assert_eq!(host.zone_identifier(path), off_local_drive());
     }
 }

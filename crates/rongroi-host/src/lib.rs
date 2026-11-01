@@ -1769,4 +1769,263 @@ mod tests {
             Err(SourceError::Unsupported(_))
         ));
     }
+
+    /// A fixture written before ADR 0091 models no drive map and no links, and reads as it did.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn an_old_fixture_reads_a_file_on_a_fixed_drive() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert_eq!(local_read_check(&host, r"C:\a\b.exe"), Ok(()));
+    }
+
+    /// A removable drive is local; every other kind is not (ADR 0091 step 2).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_removable_drive_is_local_and_any_other_kind_is_refused() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: E
+    device: '\Device\HarddiskVolume9'
+    serial: 1
+    kind: removable
+  - letter: Z
+    device: '\Device\HarddiskVolume10'
+    serial: 2
+    kind: other
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(local_read_check(&host, r"E:\x.exe"), Ok(()));
+        assert_eq!(
+            local_read_check(&host, r"Z:\x.exe"),
+            Err(NotLocal::NotLocalDrive)
+        );
+    }
+
+    /// Only a drive-rooted path is checked; a UNC or device path is refused before any drive is read.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_unc_or_device_path_is_not_drive_rooted() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        for path in [r"\\server\share\a.exe", r"\\?\C:\a.exe"] {
+            assert_eq!(
+                local_read_check(&host, path),
+                Err(NotLocal::NotDriveRooted),
+                "{path}"
+            );
+        }
+    }
+
+    /// A junction whose target is on another local drive is followed, and the rest of the path joins
+    /// the target (ADR 0091 step 3).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_junction_to_a_local_drive_is_followed() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(local_read_check(&host, r"C:\Games\x.exe"), Ok(()));
+    }
+
+    /// The check starts again at the target's drive, so a non-local kind there refuses the whole path.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_junction_to_a_non_local_drive_is_refused() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: D
+    device: '\Device\HarddiskVolume4'
+    serial: 7
+    kind: other
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&host, r"C:\Games\x.exe"),
+            Err(NotLocal::NotLocalDrive)
+        );
+    }
+
+    /// A junction to a share, and a symbolic link whose target is a share, both leave the local drives.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_link_to_a_share_is_off_the_local_drive() {
+        let junction = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\UNC\server\share'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&junction, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkOffLocalDrive)
+        );
+
+        let symlink = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: symlink
+    target: '\\server\share\x'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&symlink, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkOffLocalDrive)
+        );
+    }
+
+    /// A relative symbolic link resolves against the folder that holds it, so its target stays local.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_relative_symlink_is_resolved_against_its_folder() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\a\link'
+    kind: symlink
+    target: '..\real'
+    relative: true
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(local_read_check(&host, r"C:\a\link\f.exe"), Ok(()));
+    }
+
+    /// A volume name is not a drive letter, and a reparse tag this check does not know is refused too.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_volume_name_target_and_another_reparse_kind_are_unsupported() {
+        let volume = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\Volume{0b1c2d3e-0000-0000-0000-100000000000}\x'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&volume, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+
+        let other = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: other
+    target: '\??\D:\Lib'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&other, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+    }
+
+    /// Builds a fixture whose `C:\l1` is a junction to `C:\l2`, and so on to `C:\end`.
+    #[cfg(feature = "fixture")]
+    fn chained_links(count: usize) -> FixtureHost {
+        let mut yaml = String::from("platform: windows\nlinks:\n");
+        for index in 1..=count {
+            let target = if index == count {
+                r"C:\end".to_owned()
+            } else {
+                format!(r"C:\l{}", index + 1)
+            };
+            yaml.push_str(&format!(
+                "  - path: 'C:\\l{index}'\n    kind: mount_point\n    target: '\\??\\{target}'\n"
+            ));
+        }
+        FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+    }
+
+    /// Eight links are followed (ADR 0091 step 4).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn eight_links_on_a_path_are_followed() {
+        let host = chained_links(8);
+        assert_eq!(local_read_check(&host, r"C:\l1\f.exe"), Ok(()));
+    }
+
+    /// The ninth link is more than the limit allows (ADR 0091 step 4).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn more_than_eight_links_on_a_path_is_unsupported() {
+        let host = chained_links(9);
+        assert_eq!(
+            local_read_check(&host, r"C:\l1\f.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+    }
+
+    /// The drive root is a component like any other, so a link listed for `C:\` is followed first.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_link_on_the_drive_root_itself_is_followed() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: D
+    device: '\Device\HarddiskVolume4'
+    serial: 7
+    kind: other
+links:
+  - path: 'C:\'
+    kind: mount_point
+    target: '\??\D:\'
+",
+            "inline",
+        )
+        .unwrap();
+        // If the root's link were ignored, C: would be fixed and the path would be allowed.
+        assert_eq!(
+            local_read_check(&host, r"C:\a.exe"),
+            Err(NotLocal::NotLocalDrive)
+        );
+    }
+
+    /// The reason strings are report vocabulary, so each one is pinned.
+    #[test]
+    fn not_local_reasons_have_stable_identifiers() {
+        assert_eq!(NotLocal::NotDriveRooted.as_str(), "not_drive_rooted");
+        assert_eq!(NotLocal::NotLocalDrive.as_str(), "not_local_drive");
+        assert_eq!(NotLocal::LinkOffLocalDrive.as_str(), "link_off_local_drive");
+        assert_eq!(NotLocal::LinkUnsupported.as_str(), "link_unsupported");
+    }
 }
