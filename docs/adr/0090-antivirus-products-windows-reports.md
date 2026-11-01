@@ -137,25 +137,23 @@ ones is emitted as `state: other`, with the number in `state_value`.
 - **Only a file on a fixed local drive is opened.** The registering program chooses the path, so it can name a
   network share, and opening it would make this program connect to another machine, sending the account's
   credentials to it. That is network access in all but name (hard rule 1). Before the file is opened, all of
-  these must hold, in this order, and nothing is opened to check them:
-  1. `paths::is_drive_rooted` accepts it. A `\\server\share\…` or `\\?\UNC\…` path does not pass, and neither
-     does a device path. The path is then withheld with `path_withheld: "unredactable_form"`, as `bam` withholds
-     one (ADR 0023), so a server name never reaches the report.
-  2. Its letter is in `Host::drive_map` (ADR 0087) with `kind` fixed. A mapped network drive's device is not
-     `\Device\HarddiskVolume<digits>`, so it has no entry; a removable letter has one, of kind removable. Both
-     fail. ADR 0087 notes that `GetDriveTypeW` is what Windows says: a USB disk reported as fixed passes, which
-     is a local disk and not a network risk.
-  3. No part of the path is a reparse point. A folder junction, a symbolic link or a mount point can lead from a
-     fixed drive to a share. A new host call reads each component's attributes, from the drive root down,
-     without following a link, and refuses the path at the first one that carries
-     `FILE_ATTRIBUTE_REPARSE_POINT`. Whether reading a component's attributes without
-     following it can itself reach the network is **unverified**; A0 checks it against a junction to a share
-     on the lab machine before code.
+  The file is read through the host's local-drive check (ADR 0091), the one every collector that reads by
+  path uses, and this collector adds no check of its own:
+  - a `\\server\share\…` or `\\?\UNC\…` path, or a device path, is refused as `not_drive_rooted`. The path
+    is then withheld with `path_withheld: "unredactable_form"`, as `bam` withholds one (ADR 0023), so a server
+    name never reaches the report;
+  - a letter that is not a fixed or removable drive (a mapped network drive, optical, RAM) is refused as
+    `not_local_drive`;
+  - a junction, symbolic link or mount point on the way is followed only while its target stays on a local
+    drive; one that leads to a share is refused as `link_off_local_drive`, and one the program cannot show is
+    local (a volume name, a cloud placeholder whose data is not on the disk, an unknown reparse tag) as
+    `link_unsupported`.
 
-  A path that fails keeps its `path` (or `path_withheld`) and gets no `sha256` or `signature`, with
-  `file_unread` saying why: `not_drive_rooted`, `not_fixed_drive` or `reparse_point`. That is a fact about the
-  path, not a gap, so no rule turns `unmeasured` over it (ADR 0084's reasoning for `file_unread`).
-  `file_unread` is reused with three more values, and its glossary row gains this collector.
+  A refused path keeps its `path` (or `path_withheld`) and gets no `sha256` or `signature`, with
+  `file_unread` carrying ADR 0091's reason. That is a fact about the path, not a gap, so no rule turns
+  `unmeasured` over it (ADR 0084's reasoning for `file_unread`). ADR 0091's own unverified points (that the
+  attribute and reparse reads on a link to a share stay off the network) apply here too; A0 does not repeat
+  them.
 - **The name is not a key.** `display_name` is whatever the registering program wrote. It is never compared to
   a list, never used to pick Defender out, and never decides anything (section 5).
 - `display_name`, `state`, `path`, `path_kind` and the summary fields go into `CONVENTIONS.md`'s glossary;
@@ -248,9 +246,9 @@ also puts the collector behind a `posture` rule, and the profile runs it under e
 - **Collector, on `FixtureHost`**: two products, one `on` and one `off`; `products: 0`; a Server edition
   (`not_on_this_os`, no call made); a refused read (`not_admin`, `access_denied`); a failed call
   (`read_failed`); a state value outside the four (`other`, `state_value`); a UNC path `\\server\share\av.exe`
-  (`path_withheld`, `file_unread: not_drive_rooted`, nothing opened); a path on a mapped network letter with no
-  `drive_map` entry and one on a removable letter (`file_unread: not_fixed_drive`, nothing opened); a path
-  through a junction on a fixed drive (`file_unread: reparse_point`, the file not opened); in each, the fixture
+  (`path_withheld`, `file_unread: not_drive_rooted`, nothing opened); a path on a mapped network letter
+  (`file_unread: not_local_drive`, nothing opened); a path through a junction to a share
+  (`file_unread: link_off_local_drive`, the file not opened); in each, the fixture
   host fails the test if the file's content is read; a spent budget (gaps on `sha256` and `signature`); no `antivirus_products:` block
   (`Unsupported`).
 - **Every emitted field is declared** (`every_emitted_field_is_declared`, ADR 0026).
@@ -345,8 +343,8 @@ also puts the collector behind a `posture` rule, and the profile runs it under e
 - **The proposed `no-product-reports-on` rule is cleared by any registration that reports `on`**, a
   self-registered fake one included. If a server gates on it, the gate passes a PC on what a program told
   Security Center, not on what protects the PC. The rule's text says so (Owner decisions, question 2).
-- A product's file is opened only on a fixed local drive with no reparse point on the way (section 3), so a
-  registration cannot make this program open a network path. Some products' files then go unhashed, with
+- A product's file is opened only through ADR 0091's local-drive check (section 3), so a registration cannot
+  make this program open a network path through any link the program can see. Some products' files then go unhashed, with
   `file_unread` saying why.
 - The meaning of the Defender rows is still not confirmed against a PC with another antivirus. S11 on a P4
   machine is still needed before the claims in `defender-service-disabled` and ADR 0059 can be called measured.
