@@ -4,7 +4,7 @@
 
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Evidence, ReportHeader, ReportView, RuleText } from "../types";
+import type { Evidence, Mode, ReportHeader, ReportView, RuleText } from "../types";
 import { HorizonTimeline } from "./HorizonTimeline";
 import { useGlanceFx } from "./HumanSummary.glance";
 import { Odometer } from "./HumanSummary.odometer";
@@ -16,11 +16,12 @@ interface Props {
   header: ReportHeader;
   texts: Record<string, RuleText>;
   onSwitchToTechnical: () => void;
+  mode?: Mode;
 }
 
 /** One glance card: the evidence card with H2 spotlight and H3 tilt as decoration only. */
-function GlanceCard({ children }: { children: ReactNode }) {
-  const ref = useGlanceFx<HTMLDivElement>();
+function GlanceCard({ children, enabled }: { children: ReactNode; enabled: boolean }) {
+  const ref = useGlanceFx<HTMLDivElement>(enabled);
   return (
     <div className="glance-card" ref={ref}>
       {children}
@@ -28,8 +29,10 @@ function GlanceCard({ children }: { children: ReactNode }) {
   );
 }
 
-export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props) {
+export function HumanSummary({ view, header, texts, onSwitchToTechnical, mode }: Props) {
   const { t } = useTranslation("report");
+  // Pointer decoration follows the pointer in Self mode only; SS mode keeps the cards still.
+  const glanceEnabled = mode !== "ss";
   const [currentCategory, setCurrentCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
@@ -171,7 +174,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
       {/* 3 Quick Glance Focus Cards */}
       <div className="glance-grid">
         {/* Card 1: FiveM Play */}
-        <GlanceCard>
+        <GlanceCard enabled={glanceEnabled}>
           <div className="glance-head">
             <span className="glance-tag">
               <svg
@@ -225,7 +228,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         </GlanceCard>
 
         {/* Card 2: History Continuity */}
-        <GlanceCard>
+        <GlanceCard enabled={glanceEnabled}>
           <div className="glance-head">
             <span className="glance-tag">
               <svg
@@ -256,7 +259,7 @@ export function HumanSummary({ view, header, texts, onSwitchToTechnical }: Props
         </GlanceCard>
 
         {/* Card 3: Findings Overview */}
-        <GlanceCard>
+        <GlanceCard enabled={glanceEnabled}>
           <div className="glance-head">
             <span className="glance-tag">
               <svg
