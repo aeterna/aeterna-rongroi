@@ -18,6 +18,8 @@ pub struct Splash;
 
 impl Splash {
     /// Opens the window on its own thread and returns once it is on screen. `lines` are drawn centred.
+    /// Keep each line short — about 50 characters — so it ends in an ellipsis instead of being
+    /// clipped, and keep to five lines: at most five fit above the strip.
     /// Off Windows, or if the window cannot be created, the splash does nothing and never stops a scan.
     pub fn show(title: &str, lines: &[&str]) -> Splash {
         #[cfg(windows)]
@@ -46,17 +48,18 @@ impl Splash {
 #[cfg(windows)]
 #[allow(unsafe_code)]
 impl Splash {
-    /// Posts `WM_CLOSE` and joins the window's thread; both handles are taken first, so a repeat is a no-op.
+    /// Posts `WM_SPLASH_CLOSE` and joins the window's thread; both handles are taken first, so a repeat is a no-op.
     fn shut(&mut self) {
         use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
-        use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
+        use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
         if let Some(hwnd) = self.hwnd.take() {
-            // SAFETY: `hwnd` belongs to this splash's window thread; `PostMessageW` only enqueues `WM_CLOSE`.
+            // SAFETY: `hwnd` belongs to this splash's window thread; `PostMessageW` only enqueues
+            // `WM_SPLASH_CLOSE`, which the proc answers by destroying the window.
             let _ = unsafe {
                 PostMessageW(
                     Some(HWND(hwnd as *mut core::ffi::c_void)),
-                    WM_CLOSE,
+                    WM_SPLASH_CLOSE,
                     WPARAM(0),
                     LPARAM(0),
                 )
@@ -74,6 +77,12 @@ impl Drop for Splash {
         self.shut();
     }
 }
+
+/// The app-defined message that makes the window proc destroy its window. The splash cannot be
+/// closed by its user, so the handle `shut` posts to is still the splash's own, not one Windows
+/// may have reused after the user closed it.
+#[cfg(windows)]
+const WM_SPLASH_CLOSE: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 1;
 
 /// The segment advances by this many pixels per timer tick.
 #[cfg(any(windows, test))]
@@ -106,17 +115,19 @@ mod live {
 
     use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM};
     use windows::Win32::Graphics::Gdi::{
-        BeginPaint, CreateSolidBrush, DEFAULT_GUI_FONT, DT_CENTER, DT_NOPREFIX, DT_SINGLELINE,
-        DeleteObject, DrawTextW, EndPaint, FillRect, GetStockObject, HDC, HGDIOBJ, InvalidateRect,
-        PAINTSTRUCT, SelectObject, SetBkMode, SetTextColor, TRANSPARENT, UpdateWindow,
+        BeginPaint, CreateSolidBrush, DEFAULT_GUI_FONT, DT_CENTER, DT_END_ELLIPSIS, DT_NOPREFIX,
+        DT_SINGLELINE, DeleteObject, DrawTextW, EndPaint, FillRect, GetStockObject, HDC, HGDIOBJ,
+        InvalidateRect, PAINTSTRUCT, SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
+        UpdateWindow,
     };
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::UI::WindowsAndMessaging::{
         CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GWLP_USERDATA,
         GetClientRect, GetMessageW, GetSystemMetrics, GetWindowLongPtrW, IDC_ARROW, KillTimer,
         LoadCursorW, MSG, PostQuitMessage, RegisterClassW, SM_CXSCREEN, SM_CYSCREEN, SW_SHOWNORMAL,
-        SetTimer, SetWindowLongPtrW, ShowWindow, TranslateMessage, WINDOW_EX_STYLE, WM_CLOSE,
-        WM_DESTROY, WM_ERASEBKGND, WM_PAINT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_VISIBLE,
+        SetForegroundWindow, SetTimer, SetWindowLongPtrW, ShowWindow, TranslateMessage,
+        WM_CLOSE, WM_DESTROY, WM_ERASEBKGND, WM_PAINT, WM_TIMER, WNDCLASSW, WS_CAPTION,
+        WS_EX_TOPMOST, WS_VISIBLE,
     };
     use windows::core::{PCWSTR, w};
 
@@ -185,10 +196,11 @@ mod live {
 
         let state = Box::into_raw(Box::new(WindowState { lines, tick: 0 }));
         // SAFETY: both strings are NUL-terminated and outlive the call; parent, menu, and `lpParam` are
-        // null. `WS_CAPTION` without `WS_SYSMENU` gives no system buttons, and there is no resize style.
+        // null. `WS_CAPTION` without `WS_SYSMENU` gives no system buttons, and there is no resize style;
+        // `WS_EX_TOPMOST` keeps the splash above other windows while the scan runs.
         let Ok(hwnd) = (unsafe {
             CreateWindowExW(
-                WINDOW_EX_STYLE(0),
+                WS_EX_TOPMOST,
                 class_name,
                 PCWSTR(title.as_ptr()),
                 WS_CAPTION | WS_VISIBLE,
@@ -212,6 +224,8 @@ mod live {
         // SAFETY: these act on the window this thread just created; destruction releases its handles.
         unsafe {
             let _ = ShowWindow(hwnd, SW_SHOWNORMAL);
+            // The old `MessageBoxW` used `MB_SETFOREGROUND`; this is what brings the splash to front now.
+            let _ = SetForegroundWindow(hwnd);
             let _ = UpdateWindow(hwnd);
             let _ = SetTimer(Some(hwnd), TIMER_ID, TIMER_MILLISECONDS, None);
         }
@@ -226,7 +240,16 @@ mod live {
                 DispatchMessageW(&raw const message);
             }
         }
-        // SAFETY: the window is gone; this is the pointer `Box::into_raw` returned.
+        // The loop can also end when `GetMessageW` fails with -1, while the window still exists and
+        // `GWLP_USERDATA` still points at the state: detach the state before touching the window,
+        // and destroy the window here on the thread that owns it.
+        // SAFETY: `hwnd` is the window this thread created; clearing its `GWLP_USERDATA` touches
+        // only that window's own state.
+        unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0) };
+        // SAFETY: on the normal path the window is already gone and the call fails harmlessly; on
+        // the failure path the thread owns the window, so destruction runs its proc on this thread.
+        let _ = unsafe { DestroyWindow(hwnd) };
+        // SAFETY: the window can no longer reach the state; this is the pointer `Box::into_raw` returned.
         unsafe { drop(Box::from_raw(state)) };
     }
 
@@ -256,7 +279,12 @@ mod live {
             }
             // `WM_PAINT` fills every pixel, so the default erase would only flicker.
             WM_ERASEBKGND => LRESULT(1),
-            WM_CLOSE => {
+            // The splash cannot be closed by its user, and doing nothing keeps `shut` free of the
+            // stale-handle hazard: had the user closed the window, Windows could have reused the
+            // handle this proc posts back to.
+            WM_CLOSE => LRESULT(0),
+            // `shut` posts this when the scan ends; destroying here keeps the closing deliberate.
+            WM_SPLASH_CLOSE => {
                 // SAFETY: `hwnd` is this proc's window; `DestroyWindow` sends `WM_DESTROY` on this thread.
                 unsafe {
                     let _ = DestroyWindow(hwnd);
@@ -304,30 +332,36 @@ mod live {
         let mut client = RECT::default();
         // SAFETY: `hwnd` is this proc's window and both structs are writable and owned here.
         let hdc = unsafe { BeginPaint(hwnd, &raw mut paint) };
-        // SAFETY: `client` is writable and `hwnd` is live for this message.
-        let _ = unsafe { GetClientRect(hwnd, &raw mut client) };
-        // SAFETY: `hdc` and `client` are what those calls returned, and `fill` owns its brush.
-        unsafe { fill(hdc, client, BACKGROUND) };
-        // SAFETY: the state is live between window creation and `WM_DESTROY`, on this thread.
-        let pointer = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *mut WindowState;
-        if !pointer.is_null() {
-            // SAFETY: this message has exclusive use of the state; the font is a stock object and the old
-            // one is selected back before `EndPaint` releases the context.
-            unsafe {
-                let state = &mut *pointer;
-                let previous = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
-                let flags = DT_CENTER | DT_SINGLELINE | DT_NOPREFIX;
-                let _ = SetBkMode(hdc, TRANSPARENT);
-                let _ = SetTextColor(hdc, TEXT);
-                let (left, right) = (client.left + PADDING, client.right - PADDING);
-                let mut top = client.top + PADDING;
-                for line in &mut state.lines {
-                    let mut bounds = rect(left, top, right, top + LINE_HEIGHT);
-                    let _ = DrawTextW(hdc, line, &raw mut bounds, flags);
-                    top += LINE_HEIGHT;
+        // A null `hdc` would make every draw call below meaningless, but `EndPaint` still has to
+        // balance the `BeginPaint` above.
+        if !hdc.0.is_null() {
+            // SAFETY: `client` is writable and `hwnd` is live for this message.
+            let _ = unsafe { GetClientRect(hwnd, &raw mut client) };
+            // SAFETY: `hdc` and `client` are what those calls returned, and `fill` owns its brush.
+            unsafe { fill(hdc, client, BACKGROUND) };
+            // SAFETY: the state is live between window creation and `WM_DESTROY`, on this thread.
+            let pointer = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *mut WindowState;
+            if !pointer.is_null() {
+                // SAFETY: this message has exclusive use of the state; the font is a stock object and the old
+                // one is selected back before `EndPaint` releases the context.
+                unsafe {
+                    let state = &mut *pointer;
+                    let previous = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
+                    // `DT_END_ELLIPSIS` ends a line too long for the window in an ellipsis, instead
+                    // of clipping it on both sides.
+                    let flags = DT_CENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS;
+                    let _ = SetBkMode(hdc, TRANSPARENT);
+                    let _ = SetTextColor(hdc, TEXT);
+                    let (left, right) = (client.left + PADDING, client.right - PADDING);
+                    let mut top = client.top + PADDING;
+                    for line in &mut state.lines {
+                        let mut bounds = rect(left, top, right, top + LINE_HEIGHT);
+                        let _ = DrawTextW(hdc, line, &raw mut bounds, flags);
+                        top += LINE_HEIGHT;
+                    }
+                    SelectObject(hdc, previous);
+                    draw_strip(hdc, &client, state.tick);
                 }
-                SelectObject(hdc, previous);
-                draw_strip(hdc, &client, state.tick);
             }
         }
         // SAFETY: balanced with the `BeginPaint` above, on the same window and thread.
