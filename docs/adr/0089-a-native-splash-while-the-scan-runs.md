@@ -1,7 +1,7 @@
 # ADR 0089 — A native splash while the scan runs
 
-- Status: proposed — the owner chose decisions 1, 4 and 5 below on 2026-11-01, each as recommended; the code
-  is not built yet
+- Status: accepted — the owner chose decisions 1, 4 and 5 below on 2026-11-01, each as recommended; built in
+  the pull request that adds this file, and not yet seen on a Windows screen (see "What is unverified")
 - Date: 2026-11-01
 - Related: ADR 0001 (scan before the WebView exists), ADR 0010 (the program's own traces), ADR 0012 (a
   relaunch scans from the start), ADR 0052 (the full-scan question in a native dialog), AGENTS.md hard rules

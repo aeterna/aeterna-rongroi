@@ -27,6 +27,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   redacted in SS mode like every other path; it lets `recorded_files` read the program's file, lets the
   game-window view join BAM to other sources by path (so a program run and then deleted can show I1), and can
   make `executed-program-missing-on-disk` match on more machines.
+- The desktop app shows a small native Windows window while the scan runs, on every start, so the program no longer
+  looks like it has hung: it says a scan is running, and on a full scan that reading the files of recorded programs
+  takes at most 90 seconds (the figure the full-scan question states). It is drawn by Windows with no WebView, opens
+  after the full-scan question and closes before the report window is created, and shows no progress figure because
+  the scan reports none (ADR 0089).
 
 ### Fixed
 - A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
