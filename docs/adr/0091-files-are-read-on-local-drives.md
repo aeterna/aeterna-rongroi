@@ -6,7 +6,9 @@
   ADR 0030 (the reasons), ADR 0035 (`signature`), ADR 0048 and ADR 0060 (`is_refused_form`), ADR 0079
   (`recorded_files`), ADR 0087 (the drive map and `DriveKind`), ADR 0090 (proposed: the antivirus products
   collector, whose section 3 asks for the same rule)
-- Amends: ADR 0048, ADR 0060 and ADR 0079 (a path they resolve is read only when this ADR allows it)
+- Amends: ADR 0048, ADR 0060 and ADR 0079 (a path they resolve is read only when this ADR allows it); ADR 0047
+  (`usn_journal::live::open` also opens a link itself with `FILE_READ_ATTRIBUTES`, and `control` also accepts
+  the read-only code `FSCTL_GET_REPARSE_POINT`; both stay the only callers `clippy.toml` allows)
 
 ## Context
 
