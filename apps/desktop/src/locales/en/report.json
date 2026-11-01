@@ -90,6 +90,13 @@
     "clear_search": "Clear search",
     "search_empty": "No checks match your search."
   },
+  "palette": {
+    "label": "Jump to evidence",
+    "input_label": "Search evidence",
+    "list_label": "Matching evidence",
+    "results": "{{count}} matching check(s)",
+    "empty": "No checks match your search."
+  },
   "collector": {
     "posture": "Security settings of this PC",
     "powershell_text": "PowerShell's commands, as kinds of words",

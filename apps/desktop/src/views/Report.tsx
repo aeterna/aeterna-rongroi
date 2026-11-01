@@ -21,6 +21,7 @@ import type {
   SsOptions,
 } from "../types";
 import { AiExportButton } from "./AiExportButton";
+import { CommandPalette, evidenceMatches } from "./CommandPalette";
 import { EvidenceRow } from "./EvidenceRow";
 import { GameWindowsSection } from "./GameWindows";
 import { HumanSummary } from "./HumanSummary";
@@ -48,6 +49,8 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const [technicalAll, setTechnicalAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"summary" | "technical">("summary");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [focusEvidenceSignal, setFocusEvidenceSignal] = useState(0);
 
   useEffect(() => {
     void reportView(mode, options).then(setView);
@@ -72,6 +75,22 @@ export function Report({ mode, options, saved, onBack }: Props) {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (focusEvidenceSignal === 0) return;
+    document.querySelector<HTMLElement>(".group h3")?.focus();
+  }, [focusEvidenceSignal]);
+
   if (!view) {
     return null;
   }
@@ -88,27 +107,29 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const linksKnown = links !== null;
   const official = header.provenance.official;
   const query = searchQuery.trim().toLowerCase();
-  const filteredEvidence = query
-    ? view.evidence.filter((item) => {
-        const text = texts[item.rule_id];
-        if (item.rule_id.toLowerCase().includes(query)) return true;
-        if (item.collector.toLowerCase().includes(query)) return true;
-        if (text?.title?.toLowerCase().includes(query)) return true;
-        if (text?.description?.toLowerCase().includes(query)) return true;
-        if (
-          item.state === "found" &&
-          item.observations.some((obs) => JSON.stringify(obs.fields).toLowerCase().includes(query))
-        ) {
-          return true;
-        }
-        return false;
-      })
-    : view.evidence;
+  const filteredEvidence = view.evidence.filter((item) =>
+    evidenceMatches(item, texts[item.rule_id], searchQuery),
+  );
   const groups = groupEvidence(filteredEvidence, filter, view.collector_order);
+
+  function pickEvidence(item: Evidence) {
+    setSearchQuery(item.rule_id);
+    setViewMode("technical");
+    setPaletteOpen(false);
+    setFocusEvidenceSignal((signal) => signal + 1);
+  }
 
   return (
     <section className="report">
       {mode === "ss" && saved && <SavedRecordBox saved={saved} />}
+
+      <CommandPalette
+        open={paletteOpen}
+        evidence={view.evidence}
+        texts={texts}
+        onClose={() => setPaletteOpen(false)}
+        onPick={pickEvidence}
+      />
 
       <div className="report-mode-bar">
         <div className="view-switcher-wrap">
@@ -411,7 +432,9 @@ function Group({
   return (
     <section className="group" aria-labelledby={titleId}>
       <div className="group-head">
-        <h3 id={titleId}>{t(`collector.${group.collector}`, { defaultValue: group.collector })}</h3>
+        <h3 id={titleId} tabIndex={-1}>
+          {t(`collector.${group.collector}`, { defaultValue: group.collector })}
+        </h3>
         <span className="muted counts">{counts}</span>
       </div>
       <ul className="rows">
