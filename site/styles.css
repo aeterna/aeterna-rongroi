@@ -97,6 +97,21 @@ summary:focus-visible {
   border-radius: 6px;
 }
 
+/* Text for assistive technology only, kept in the layout as a 1px clipped box: the specimen's live region
+   announces row counts and copy results without adding a line the page does not already show. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Inline SVG icon styles (strict zero-emoji policy) */
 .icon {
   display: inline-block;
@@ -416,7 +431,10 @@ nav.lang a[aria-current="page"] {
   gap: 8px;
 }
 
-.tally div {
+/* The tally cells: plain divs before the script, buttons now that one box can be pressed. Both keep the
+   same box, so the rule covers each. */
+.tally div,
+.tally-box {
   background: var(--surface-solid);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -452,6 +470,32 @@ nav.lang a[aria-current="page"] {
   color: var(--unmeasured);
 }
 
+/* A tally box is a filter button, so it drops the button's own centred, system-styled look and keeps the
+   box the divs had. It fills its grid column, as the divs did. */
+.tally-box {
+  width: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.tally-box:hover {
+  border-color: var(--line-strong);
+}
+
+/* The pressed box reads as a double line and a lifted edge: a change of shape, never colour alone. */
+.tally-box[aria-pressed="true"] {
+  border-color: var(--line-strong);
+  box-shadow:
+    inset 0 0 0 1px var(--line-strong),
+    0 4px 10px -6px #2a5d9a99;
+}
+
 .specimen .note {
   margin: 0;
 }
@@ -462,6 +506,8 @@ nav.lang a[aria-current="page"] {
   align-items: center;
 }
 
+/* The field is a search field now, so it sheds WebKit's own bezel and keeps the border every other control
+   on the card has. */
 .specimen-search input {
   width: 100%;
   padding: 7px 12px 7px 32px;
@@ -472,6 +518,7 @@ nav.lang a[aria-current="page"] {
   background: var(--surface-solid);
   color: var(--text);
   box-sizing: border-box;
+  -webkit-appearance: textfield;
 }
 
 .specimen-search .search-icon {
@@ -481,6 +528,19 @@ nav.lang a[aria-current="page"] {
   width: 14px;
   height: 14px;
   pointer-events: none;
+}
+
+/* The rows sit in one wrapper now, so the gap the figure's own grid used to give them lives here.
+   A row the script hides is removed from the layout, not just from sight: the grid would otherwise
+   ignore the hidden attribute, which a display rule outranks. */
+#specimen-rows {
+  display: grid;
+  gap: 14px;
+}
+
+.specimen-row[hidden],
+#specimen-empty[hidden] {
+  display: none;
 }
 
 .specimen-row {
@@ -512,10 +572,24 @@ nav.lang a[aria-current="page"] {
   color: var(--navy);
 }
 
-.specimen-row .pill {
+.specimen-row[data-state="found"] .pill {
   color: var(--found);
   border-color: var(--found-line);
   background: var(--surface-solid);
+}
+
+/* A row that is not a finding is a plain box, and a not measured row a dashed one, as the three results
+   further down the page are: the warm tint and the inset bar belong to a found row alone. */
+.specimen-row[data-state="not_found"] {
+  border-color: var(--line);
+  background: #ffffffb3;
+  box-shadow: none;
+}
+
+.specimen-row[data-state="unmeasured"] {
+  border: 1px dashed var(--unmeasured-line);
+  background: var(--unmeasured-ground);
+  box-shadow: none;
 }
 
 .specimen-desc {
@@ -554,20 +628,41 @@ nav.lang a[aria-current="page"] {
   line-height: 1.45;
 }
 
+/* The copy control is a button too: it keeps the small framed look the div had, and gains a pointer and a
+   left-aligned label, as the div's text had. */
 .specimen-tech-btn {
   grid-column: 2 / -1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   justify-self: start;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
   font-family: inherit;
   font-size: 0.78rem;
   font-weight: 500;
+  text-align: left;
   padding: 3px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface-solid);
   color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.specimen-tech-btn:hover {
+  border-color: var(--line-strong);
+}
+
+/* Keyboard focus on the three controls the script drives: a solid ring in the links' blue, since the boxes
+   and the field sit on a panel rather than on the sky. */
+.tally-box:focus-visible,
+.specimen-tech-btn:focus-visible,
+#specimen-q:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
 }
 
 /* State marks, as in the window. */
@@ -993,6 +1088,16 @@ footer p {
     50% {
       transform: translateY(-6px) rotate(1.2deg);
     }
+  }
+}
+
+/* Nothing on the page eases when the visitor asks for less motion: the buttons and the pills change their
+   border, shadow and place at once instead. */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .tally-box,
+  .specimen-tech-btn {
+    transition: none;
   }
 }
 

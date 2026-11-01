@@ -54,10 +54,71 @@ pub enum SourceError {
         /// Most bytes this host reads for one file.
         limit: usize,
     },
+    /// The path was not opened because it does not stay on a local drive (ADR 0091).
+    ///
+    /// A separate variant rather than a `Failed`: nothing failed. The program chose not to read, and a
+    /// collector reports that choice with the reason, never as a missing or unreadable file.
+    #[error("not read, the path does not stay on a local drive: {}", .0.as_str())]
+    NotLocal(NotLocal),
     /// Anything else.
     #[error("read failed: {0}")]
     Failed(String),
 }
+
+/// Why [`local_read_check`] refused a path (ADR 0091 section 1). The identifiers are report vocabulary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotLocal {
+    /// The path is not `X:\…`: a UNC path, a device path or anything else.
+    NotDriveRooted,
+    /// The drive letter, as named or as a link leads to it, is not a fixed or removable drive.
+    NotLocalDrive,
+    /// A link on the path points at a share.
+    LinkOffLocalDrive,
+    /// A link on the path is of a kind, or has a target, that this program cannot show is local, or the
+    /// host could not read it, or there are more than eight links.
+    LinkUnsupported,
+}
+
+impl NotLocal {
+    /// Stable identifier used in reports (ADR 0091 section 3).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotDriveRooted => "not_drive_rooted",
+            Self::NotLocalDrive => "not_local_drive",
+            Self::LinkOffLocalDrive => "link_off_local_drive",
+            Self::LinkUnsupported => "link_unsupported",
+        }
+    }
+}
+
+/// The kind of reparse point [`Host::link_target`] found (ADR 0091 section 2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "fixture", derive(serde::Deserialize))]
+#[cfg_attr(feature = "fixture", serde(rename_all = "snake_case"))]
+pub enum LinkKind {
+    /// A junction or volume mount point.
+    MountPoint,
+    /// A symbolic link.
+    Symlink,
+    /// Any other reparse tag: a cloud placeholder, an app execution alias, or a tag not known here.
+    Other,
+}
+
+/// What a reparse point says about itself, read from its own data without following it (ADR 0091
+/// section 2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkTarget {
+    /// The kind of reparse point.
+    pub kind: LinkKind,
+    /// The substitute name as stored, e.g. `\??\D:\Lib`. For [`LinkKind::Other`] it is whatever text
+    /// the host has; such a link is refused by its kind and the text is not read.
+    pub target: String,
+    /// Whether the target is relative to the folder holding the link (a symbolic link flag).
+    pub relative: bool,
+}
+
+/// Most links one path may pass through before [`local_read_check`] gives up (ADR 0091 step 4).
+const MAX_LINKS_FOLLOWED: usize = 8;
 
 impl SourceError {
     /// Classifies an I/O error from a file-system read, so that every host that reads real files
@@ -1001,6 +1062,138 @@ pub fn bound_registry_data(data: RegistryData, limit: usize) -> Result<RegistryD
     }
 }
 
+/// Splits `X:\rest` into the upper-case drive letter and what follows the root; `None` for any other form.
+///
+/// A bare `X:` is the drive's root too: `usn` asks for the volume's identity that way (ADR 0047).
+fn split_drive(path: &str) -> Option<(char, &str)> {
+    let bytes = path.as_bytes();
+    let rooted = bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+    let rest = match bytes.get(2) {
+        None => "",
+        Some(b'\\' | b'/') => &path[3..],
+        Some(_) => return None,
+    };
+    rooted.then(|| (char::from(bytes[0].to_ascii_uppercase()), rest))
+}
+
+/// Appends the segments of `path` to `out`, dropping empty and `.` segments and letting `..` remove
+/// the segment before it. A `..` past the root is refused: Windows would stay at the root, and a path
+/// that relies on that is not one this check can vouch for. So is a segment holding `:`, `?` or `*`:
+/// a stream, a device prefix or a wildcard is not a folder name this check can follow.
+fn push_segments(out: &mut Vec<String>, path: &str) -> Result<(), NotLocal> {
+    for segment in path.split(['\\', '/']) {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                out.pop().ok_or(NotLocal::LinkUnsupported)?;
+            }
+            name if name.contains([':', '?', '*']) => return Err(NotLocal::LinkUnsupported),
+            name => out.push(name.to_owned()),
+        }
+    }
+    Ok(())
+}
+
+/// `X:\a\b` for a letter and its segments; `X:\` for none.
+fn join_drive_path(letter: char, segments: &[String]) -> String {
+    format!("{letter}:\\{}", segments.join("\\"))
+}
+
+/// Where a link leads, as a drive letter and segments, or why that is not known to be local
+/// (ADR 0091 section 1, step 3). `parent` is the segments of the folder holding the link.
+fn link_destination(
+    link: &LinkTarget,
+    letter: char,
+    parent: &[String],
+) -> Result<(char, Vec<String>), NotLocal> {
+    if link.kind == LinkKind::Other {
+        return Err(NotLocal::LinkUnsupported);
+    }
+    let target = link.target.as_str();
+    let lowered = target.to_ascii_lowercase();
+    let is_unc = lowered.starts_with(r"\??\unc\")
+        || lowered.starts_with(r"\\?\unc\")
+        || (target.starts_with(r"\\")
+            && !lowered.starts_with(r"\\?\")
+            && !lowered.starts_with(r"\\.\"));
+    if is_unc {
+        return Err(NotLocal::LinkOffLocalDrive);
+    }
+    if link.relative {
+        // Only a symbolic link has a relative form; a root-relative target starts again at the root.
+        if link.kind != LinkKind::Symlink {
+            return Err(NotLocal::LinkUnsupported);
+        }
+        let mut segments = if target.starts_with(['\\', '/']) {
+            Vec::new()
+        } else {
+            parent.to_vec()
+        };
+        push_segments(&mut segments, target)?;
+        return Ok((letter, segments));
+    }
+    let drive_form = if lowered.starts_with(r"\??\") {
+        &target[4..]
+    } else {
+        target
+    };
+    let (target_letter, rest) = split_drive(drive_form).ok_or(NotLocal::LinkUnsupported)?;
+    let mut segments = Vec::new();
+    push_segments(&mut segments, rest)?;
+    Ok((target_letter, segments))
+}
+
+/// The path after every link on it is followed, when each one is known to stay on a local drive
+/// (ADR 0091 section 1).
+///
+/// The walk is in the host's two calls and nothing else: for the drive root and then each prefix of
+/// the path, [`Host::link_target`] says whether it is a link, and when it is, the rest of the path is
+/// joined onto where it leads and the walk starts again from that drive. A host that reads files uses
+/// the returned path, so it reads where Windows would. A path with no link on it is returned as given.
+///
+/// Anything this cannot show is local is refused, so a failed call is a refusal and never a pass.
+pub fn resolved_local_path(host: &dyn Host, path: &str) -> Result<String, NotLocal> {
+    let mut current = path.to_owned();
+    let mut followed = 0_usize;
+    'restart: loop {
+        let (letter, rest) = split_drive(&current).ok_or(NotLocal::NotDriveRooted)?;
+        match host.drive_kind(letter) {
+            Ok(DriveKind::Fixed | DriveKind::Removable) => {}
+            Ok(DriveKind::Other) | Err(_) => return Err(NotLocal::NotLocalDrive),
+        }
+        let mut segments = Vec::new();
+        push_segments(&mut segments, rest)?;
+        for depth in 0..=segments.len() {
+            let prefix = join_drive_path(letter, &segments[..depth]);
+            let link = match host.link_target(&prefix) {
+                Ok(None) => continue,
+                Ok(Some(link)) => link,
+                Err(_) => return Err(NotLocal::LinkUnsupported),
+            };
+            followed += 1;
+            if followed > MAX_LINKS_FOLLOWED {
+                return Err(NotLocal::LinkUnsupported);
+            }
+            let parent = &segments[..depth.saturating_sub(1)];
+            let (target_letter, mut target_segments) = link_destination(&link, letter, parent)?;
+            target_segments.extend_from_slice(&segments[depth..]);
+            current = join_drive_path(target_letter, &target_segments);
+            continue 'restart;
+        }
+        return Ok(if followed == 0 {
+            path.to_owned()
+        } else {
+            current
+        });
+    }
+}
+
+/// The one gate before a read by path (ADR 0091 section 1): `Ok` when `path` is drive-rooted on a
+/// fixed or removable drive and no link on it leaves the local drives. It opens nothing.
+pub fn local_read_check(host: &dyn Host, path: &str) -> Result<(), NotLocal> {
+    resolved_local_path(host, path).map(|_| ())
+}
+
 /// A machine that collectors can read. More source traits are added as collectors need them.
 pub trait Host:
     RegistrySource
@@ -1035,6 +1228,31 @@ pub trait Host:
     fn drive_map(&self) -> Result<DriveMap, SourceError> {
         Err(SourceError::Unsupported(
             "no drive map on this platform".to_owned(),
+        ))
+    }
+
+    /// What kind of drive `letter` is, as `GetDriveTypeW` reports it (ADR 0091 section 2).
+    ///
+    /// A host that cannot tell answers [`SourceError::Unsupported`]; [`local_read_check`] then refuses
+    /// the path, because a drive of unknown kind is not shown to be local.
+    fn drive_kind(&self, _letter: char) -> Result<DriveKind, SourceError> {
+        Err(SourceError::Unsupported(
+            "no drive kinds on this platform".to_owned(),
+        ))
+    }
+
+    /// Whether the file or folder at `path` is a reparse point and, for a junction, mount point or
+    /// symbolic link, what it points at (ADR 0091 section 2).
+    ///
+    /// `Ok(None)` means only "not a reparse point" or "nothing is there" (file or path not found).
+    /// Any other failure, refused access included, is an `Err`, which the check treats as a refusal. A
+    /// cloud placeholder whose data is already on the disk is not a link for this purpose; one whose
+    /// data would be fetched is [`LinkKind::Other`]. The data is the link's own record: the
+    /// link is never followed, so asking cannot reach the place it points at. A host that cannot ask
+    /// answers [`SourceError::Unsupported`], and [`local_read_check`] refuses the path.
+    fn link_target(&self, _path: &str) -> Result<Option<LinkTarget>, SourceError> {
+        Err(SourceError::Unsupported(
+            "no reparse points on this platform".to_owned(),
         ))
     }
 }
@@ -1768,5 +1986,327 @@ mod tests {
             NonWindowsHost.drive_map(),
             Err(SourceError::Unsupported(_))
         ));
+    }
+
+    /// A fixture written before ADR 0091 models no drive map and no links, and reads as it did.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn an_old_fixture_reads_a_file_on_a_fixed_drive() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert_eq!(local_read_check(&host, r"C:\a\b.exe"), Ok(()));
+    }
+
+    /// A removable drive is local; every other kind is not (ADR 0091 step 2).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_removable_drive_is_local_and_any_other_kind_is_refused() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: E
+    device: '\Device\HarddiskVolume9'
+    serial: 1
+    kind: removable
+  - letter: Z
+    device: '\Device\HarddiskVolume10'
+    serial: 2
+    kind: other
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(local_read_check(&host, r"E:\x.exe"), Ok(()));
+        assert_eq!(
+            local_read_check(&host, r"Z:\x.exe"),
+            Err(NotLocal::NotLocalDrive)
+        );
+    }
+
+    /// Only a drive-rooted path is checked; a UNC or device path is refused before any drive is read.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_unc_or_device_path_is_not_drive_rooted() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        for path in [r"\\server\share\a.exe", r"\\?\C:\a.exe"] {
+            assert_eq!(
+                local_read_check(&host, path),
+                Err(NotLocal::NotDriveRooted),
+                "{path}"
+            );
+        }
+    }
+
+    /// A junction whose target is on another local drive is followed, and the rest of the path joins
+    /// the target (ADR 0091 step 3).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_junction_to_a_local_drive_is_followed() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(local_read_check(&host, r"C:\Games\x.exe"), Ok(()));
+    }
+
+    /// The check starts again at the target's drive, so a non-local kind there refuses the whole path.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_junction_to_a_non_local_drive_is_refused() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: D
+    device: '\Device\HarddiskVolume4'
+    serial: 7
+    kind: other
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&host, r"C:\Games\x.exe"),
+            Err(NotLocal::NotLocalDrive)
+        );
+    }
+
+    /// A junction to a share, and a symbolic link whose target is a share, both leave the local drives.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_link_to_a_share_is_off_the_local_drive() {
+        let junction = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\UNC\server\share'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&junction, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkOffLocalDrive)
+        );
+
+        let symlink = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: symlink
+    target: '\\server\share\x'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&symlink, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkOffLocalDrive)
+        );
+    }
+
+    /// A relative symbolic link resolves against the folder that holds it, so its target stays local.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_relative_symlink_is_resolved_against_its_folder() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\a\link'
+    kind: symlink
+    target: '..\real'
+    relative: true
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(local_read_check(&host, r"C:\a\link\f.exe"), Ok(()));
+    }
+
+    /// A volume name is not a drive letter, and a reparse tag this check does not know is refused too.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_volume_name_target_and_another_reparse_kind_are_unsupported() {
+        let volume = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\Volume{0b1c2d3e-0000-0000-0000-100000000000}\x'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&volume, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+
+        let other = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: other
+    target: '\??\D:\Lib'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            local_read_check(&other, r"C:\Games\x.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+    }
+
+    /// Builds a fixture whose `C:\l1` is a junction to `C:\l2`, and so on to `C:\end`.
+    #[cfg(feature = "fixture")]
+    fn chained_links(count: usize) -> FixtureHost {
+        use std::fmt::Write as _;
+
+        let mut yaml = String::from("platform: windows\nlinks:\n");
+        for index in 1..=count {
+            let target = if index == count {
+                r"C:\end".to_owned()
+            } else {
+                format!(r"C:\l{}", index + 1)
+            };
+            write!(
+                yaml,
+                "  - path: 'C:\\l{index}'\n    kind: mount_point\n    target: '\\??\\{target}'\n"
+            )
+            .unwrap();
+        }
+        FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+    }
+
+    /// Eight links are followed (ADR 0091 step 4).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn eight_links_on_a_path_are_followed() {
+        let host = chained_links(8);
+        assert_eq!(local_read_check(&host, r"C:\l1\f.exe"), Ok(()));
+    }
+
+    /// The ninth link is more than the limit allows (ADR 0091 step 4).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn more_than_eight_links_on_a_path_is_unsupported() {
+        let host = chained_links(9);
+        assert_eq!(
+            local_read_check(&host, r"C:\l1\f.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+    }
+
+    /// The drive root is a component like any other, so a link listed for `C:\` is followed first.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_link_on_the_drive_root_itself_is_followed() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: D
+    device: '\Device\HarddiskVolume4'
+    serial: 7
+    kind: other
+links:
+  - path: 'C:\'
+    kind: mount_point
+    target: '\??\D:\'
+",
+            "inline",
+        )
+        .unwrap();
+        // If the root's link were ignored, C: would be fixed and the path would be allowed.
+        assert_eq!(
+            local_read_check(&host, r"C:\a.exe"),
+            Err(NotLocal::NotLocalDrive)
+        );
+    }
+
+    /// One fixture with one link at `C:\l` whose target is `target`.
+    #[cfg(feature = "fixture")]
+    fn one_link(target: &str) -> FixtureHost {
+        let yaml = format!(
+            "platform: windows\nlinks:\n  - path: 'C:\\l'\n    kind: mount_point\n    target: '{target}'\n"
+        );
+        FixtureHost::from_yaml_str(&yaml, "inline").unwrap()
+    }
+
+    /// Every UNC spelling a link may hold leaves the local drives, whatever its case (ADR 0091 step 3).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn every_unc_spelling_of_a_target_is_off_the_local_drive() {
+        for target in [
+            r"\??\unc\server\share",
+            r"\\?\UNC\server\share",
+            r"\\server\share",
+        ] {
+            assert_eq!(
+                local_read_check(&one_link(target), r"C:\l\a.exe"),
+                Err(NotLocal::LinkOffLocalDrive),
+                "{target}"
+            );
+        }
+    }
+
+    /// A target that is a bare drive leads to that drive's root and is followed.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_bare_drive_target_is_the_drive_root() {
+        assert_eq!(
+            local_read_check(&one_link(r"\??\D:"), r"C:\l\a.exe"),
+            Ok(())
+        );
+    }
+
+    /// A link that points at itself is followed until the limit and then refused (ADR 0091 step 4).
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_link_to_itself_is_refused_at_the_limit() {
+        assert_eq!(
+            local_read_check(&one_link(r"\??\C:\l"), r"C:\l\a.exe"),
+            Err(NotLocal::LinkUnsupported)
+        );
+    }
+
+    /// A target with a stream, a device prefix or a wildcard in a segment is not followed.
+    #[cfg(feature = "fixture")]
+    #[test]
+    fn a_target_segment_with_a_colon_or_a_wildcard_is_unsupported() {
+        for target in [r"\??\D:\a:stream", r"\??\D:\a\*", r"\??\D:\?\b"] {
+            assert_eq!(
+                local_read_check(&one_link(target), r"C:\l\a.exe"),
+                Err(NotLocal::LinkUnsupported),
+                "{target}"
+            );
+        }
+    }
+
+    /// The reason strings are report vocabulary, so each one is pinned.
+    #[test]
+    fn not_local_reasons_have_stable_identifiers() {
+        assert_eq!(NotLocal::NotDriveRooted.as_str(), "not_drive_rooted");
+        assert_eq!(NotLocal::NotLocalDrive.as_str(), "not_local_drive");
+        assert_eq!(NotLocal::LinkOffLocalDrive.as_str(), "link_off_local_drive");
+        assert_eq!(NotLocal::LinkUnsupported.as_str(), "link_unsupported");
     }
 }

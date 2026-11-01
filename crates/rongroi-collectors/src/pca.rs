@@ -74,7 +74,7 @@ pub const FIRST_BUILD_WITH_PCA_FILES: u32 = 22621;
 /// `%WinDir%` is not set; this Windows is too old to keep the files; the folder is absent, or
 /// present and holding none of them; some of the lines in a file did not yield a record; or a file
 /// was denied, denied without administrator rights, or could not be read.
-const REASONS: [UnmeasuredReason; 8] = [
+const REASONS: [UnmeasuredReason; 9] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotOnThisOs,
     UnmeasuredReason::NotAdmin,
@@ -83,6 +83,8 @@ const REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::SourceEmpty,
     UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Every field this collector can emit.

@@ -1,0 +1,32 @@
+/*
+ * SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+ */
+
+/* The typed copy is decoration; the whole line stays available to assistive technology. */
+.row-telemetry {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.82em;
+  overflow-wrap: anywhere;
+}
+
+.row-telemetry-typed {
+  white-space: pre-wrap;
+}
+
+.row-telemetry-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

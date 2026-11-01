@@ -97,7 +97,7 @@ const VOLUMES_WITHHELD: &str = "machine_identifier";
 /// `%SystemRoot%` is not set; the folder is absent, or present and holding no `.pf` file; Windows
 /// is not writing application-launch records at all; some of the folder was read and some was not;
 /// or the read was denied, denied without administrator rights, or failed.
-const REASONS: [UnmeasuredReason; 8] = [
+const REASONS: [UnmeasuredReason; 9] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
@@ -106,6 +106,8 @@ const REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::SourceEmpty,
     UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Every field this collector can emit.

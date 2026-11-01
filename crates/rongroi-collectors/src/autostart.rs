@@ -30,7 +30,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, DiscriminatorGaps, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, RegistryData, SignatureCheck, SourceError, is_refused_form};
+use rongroi_host::{
+    Host, NotLocal, Platform, RegistryData, SignatureCheck, SourceError, is_refused_form,
+};
 use rongroi_parsers::task;
 
 use crate::{Collector, Field, driver_service, failure, paths, prefetch};
@@ -114,12 +116,14 @@ static FIELDS: [Field; 18] = [
     Field::text("triggers"),
 ];
 
-static REASONS: [UnmeasuredReason; 5] = [
+static REASONS: [UnmeasuredReason; 6] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::BudgetSpent,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Reads what Windows starts by itself.
@@ -214,31 +218,12 @@ impl Autostart {
                         // over it (ADR 0084).
                         let windows = kind == "windows";
                         fields.insert("path_kind".to_owned(), serde_json::Value::from(kind));
-                        match files.get(&path.to_ascii_lowercase()) {
-                            Some(FileState::Described { sha256, signature }) => {
-                                fields.insert(
-                                    "sha256".to_owned(),
-                                    serde_json::Value::from(sha256.clone()),
-                                );
-                                match signature {
-                                    Ok(check) => insert_signature(&mut fields, check.clone()),
-                                    Err(reason) if windows => {
-                                        insert_file_unread(&mut fields, *reason);
-                                    }
-                                    Err(reason) => note(&mut gaps, "signature", *reason),
-                                }
-                            }
-                            Some(FileState::Failed(reason)) if windows => {
-                                insert_file_unread(&mut fields, *reason);
-                            }
-                            Some(FileState::Failed(reason)) => {
-                                for field in FILE_GAP_FIELDS {
-                                    note(&mut gaps, field, *reason);
-                                }
-                            }
-                            // Not there: a registration left behind, not a gap (ADR 0048).
-                            Some(FileState::Missing) | None => {}
-                        }
+                        file_fields(
+                            files.get(&path.to_ascii_lowercase()),
+                            windows,
+                            &mut fields,
+                            &mut gaps,
+                        );
                         fields.insert("path".to_owned(), serde_json::Value::from(path));
                     }
                     Resolution::Missing => {}
@@ -352,6 +337,8 @@ enum FileState {
     },
     /// The file is not there: a registration left behind, not a gap (ADR 0048).
     Missing,
+    /// Not opened: the path does not stay on a local drive (ADR 0091).
+    NotLocal(NotLocal),
     Failed(UnmeasuredReason),
 }
 
@@ -365,6 +352,8 @@ fn describe_file(host: &dyn Host, path: &str) -> FileState {
         Err(SourceError::AccessDenied) => {
             return FileState::Failed(UnmeasuredReason::AccessDenied);
         }
+        // Refused before anything was opened, so never read as "the file is not there" (ADR 0091).
+        Err(SourceError::NotLocal(not_local)) => return FileState::NotLocal(not_local),
         Err(_) if is_missing(host, path) => return FileState::Missing,
         Err(error) => return FileState::Failed(reason(&error)),
     };
@@ -425,6 +414,59 @@ fn insert_signature(fields: &mut BTreeMap<String, serde_json::Value>, signature:
 
 /// Why a file under `%SystemRoot%` was not read, on its row (ADR 0084). The reason's `as_str` name, never
 /// a gap of the place.
+/// The fields and gaps one file's state gives its row (ADR 0060, ADR 0084, ADR 0091).
+fn file_fields(
+    state: Option<&FileState>,
+    windows: bool,
+    fields: &mut BTreeMap<String, serde_json::Value>,
+    gaps: &mut BTreeMap<String, UnmeasuredReason>,
+) {
+    match state {
+        Some(FileState::Described { sha256, signature }) => {
+            fields.insert("sha256".to_owned(), serde_json::Value::from(sha256.clone()));
+            match signature {
+                Ok(check) => insert_signature(fields, check.clone()),
+                Err(reason) if windows => {
+                    insert_file_unread(fields, *reason);
+                }
+                Err(reason) => note(gaps, "signature", *reason),
+            }
+        }
+        Some(FileState::NotLocal(not_local)) => {
+            note_not_local(fields, gaps, *not_local, windows);
+        }
+        Some(FileState::Failed(reason)) if windows => {
+            insert_file_unread(fields, *reason);
+        }
+        Some(FileState::Failed(reason)) => {
+            for field in FILE_GAP_FIELDS {
+                note(gaps, field, *reason);
+            }
+        }
+        // Not there: a registration left behind, not a gap (ADR 0048).
+        Some(FileState::Missing) | None => {}
+    }
+}
+
+/// A file not opened because it does not stay on a local drive (ADR 0091): the row says why, and
+/// outside `%SystemRoot%` its fields are not attempted.
+fn note_not_local(
+    fields: &mut BTreeMap<String, serde_json::Value>,
+    gaps: &mut BTreeMap<String, UnmeasuredReason>,
+    not_local: NotLocal,
+    windows: bool,
+) {
+    fields.insert(
+        "file_unread".to_owned(),
+        serde_json::Value::from(not_local.as_str()),
+    );
+    if !windows {
+        for field in FILE_GAP_FIELDS {
+            note(gaps, field, UnmeasuredReason::NotAttempted);
+        }
+    }
+}
+
 fn insert_file_unread(fields: &mut BTreeMap<String, serde_json::Value>, reason: UnmeasuredReason) {
     fields.insert(
         "file_unread".to_owned(),
@@ -442,6 +484,7 @@ fn lowercase_digest(digest: &str) -> Option<String> {
 fn reason(error: &SourceError) -> UnmeasuredReason {
     match error {
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+        SourceError::NotLocal(_) => UnmeasuredReason::NotAttempted,
         SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
             UnmeasuredReason::ReadFailed
         }
@@ -1096,6 +1139,95 @@ mod tests {
     }
 
     const ENV: &str = "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\n  windir: 'C:\\Windows'\n  ProgramFiles: 'C:\\Program Files'\n  ProgramFiles(x86): 'C:\\Program Files (x86)'\n  ProgramData: 'C:\\ProgramData'\n  LOCALAPPDATA: 'C:\\Users\\alex\\AppData\\Local'\n";
+
+    // ADR 0091 (files are read on local drives only): the host gate `local_read_check` runs before
+    // every read by path. Each fixture lists its file with a `sha256`, so a hash on the row means the
+    // gate was skipped.
+
+    /// A `Run` value on a network letter keeps its path, but nothing is read through the letter: no
+    /// hash, no signature, `file_unread: not_local_drive`, and the run place's gap on both file fields
+    /// is `not_attempted` (ADR 0091 sections 1 and 3). A refused file is not missing: a missing file
+    /// has no place gap and no `file_unread`.
+    #[test]
+    fn a_run_value_on_a_network_letter_says_not_local_drive_and_is_not_missing() {
+        let host = inline(&format!(
+            "{ENV}drive_map:\n  - {{ letter: 'C', device: '\\Device\\HarddiskVolume1', serial: 1, kind: fixed }}\n  - {{ letter: 'Z', device: '\\Device\\Mup', serial: 2, kind: other }}\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run':\n    NetTool: 'Z:\\Apps\\net.exe'\nfilesystem:\n  'Z:\\Apps':\n    - name: net.exe\n      sha256: 4444444444444444444444444444444444444444444444444444444444444444\n      signature: {{ state: no_embedded_signature }}\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart::default().collect(&host);
+        let (observations, places) = measured(&run);
+        let net = by(observations, "entry", "NetTool");
+        assert_eq!(text(net, "path"), Some(r"Z:\Apps\net.exe"));
+        assert!(!net.fields.contains_key("sha256"), "{net:?}");
+        assert!(!net.fields.contains_key("signature"), "{net:?}");
+        assert_eq!(text(net, "file_unread"), Some("not_local_drive"));
+        let gaps = place_gaps(places, RUN_LOCATION).unwrap_or_else(|| panic!("{places:?}"));
+        assert_eq!(
+            gaps.get("sha256"),
+            Some(&UnmeasuredReason::NotAttempted),
+            "{gaps:?}"
+        );
+        assert_eq!(
+            gaps.get("signature"),
+            Some(&UnmeasuredReason::NotAttempted),
+            "{gaps:?}"
+        );
+    }
+
+    /// A `Run` value under a junction to a share keeps its path and is not read: no hash, no
+    /// signature, `file_unread: link_off_local_drive`, and `not_attempted` on both file fields
+    /// (ADR 0091 sections 1 and 3). It is not called missing.
+    #[test]
+    fn a_run_value_behind_a_junction_to_a_share_says_link_off_local_drive() {
+        let host = inline(&format!(
+            "{ENV}links:\n  - path: 'C:\\Games'\n    kind: mount_point\n    target: '\\??\\UNC\\server\\share'\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run':\n    SharedTool: 'C:\\Games\\shared.exe'\nfilesystem:\n  'C:\\Games':\n    - name: shared.exe\n      sha256: 5555555555555555555555555555555555555555555555555555555555555555\n      signature: {{ state: no_embedded_signature }}\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart::default().collect(&host);
+        let (observations, places) = measured(&run);
+        let shared = by(observations, "entry", "SharedTool");
+        assert_eq!(text(shared, "path"), Some(r"C:\Games\shared.exe"));
+        assert!(!shared.fields.contains_key("sha256"), "{shared:?}");
+        assert!(!shared.fields.contains_key("signature"), "{shared:?}");
+        assert_eq!(text(shared, "file_unread"), Some("link_off_local_drive"));
+        let gaps = place_gaps(places, RUN_LOCATION).unwrap_or_else(|| panic!("{places:?}"));
+        assert_eq!(
+            gaps.get("sha256"),
+            Some(&UnmeasuredReason::NotAttempted),
+            "{gaps:?}"
+        );
+        assert_eq!(
+            gaps.get("signature"),
+            Some(&UnmeasuredReason::NotAttempted),
+            "{gaps:?}"
+        );
+    }
+
+    /// A junction that stays on a local drive is read through: the file is listed at `D:\Lib`, both
+    /// drives are fixed, and the fixture's hash and signature reach the row (ADR 0091 section 1).
+    #[test]
+    fn a_run_value_behind_a_junction_that_stays_local_is_hashed() {
+        let host = inline(&format!(
+            "{ENV}drive_map:\n  - {{ letter: 'C', device: '\\Device\\HarddiskVolume1', serial: 1, kind: fixed }}\n  - {{ letter: 'D', device: '\\Device\\HarddiskVolume2', serial: 2, kind: fixed }}\nlinks:\n  - path: 'C:\\Games'\n    kind: mount_point\n    target: '\\??\\D:\\Lib'\nregistry:\n  'HKLM\\SYSTEM\\CurrentControlSet\\Services\\kbd':\n    Type: 1\n  'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run':\n    MovedTool: 'C:\\Games\\moved.exe'\nfilesystem:\n  'D:\\Lib':\n    - name: moved.exe\n      sha256: 6666666666666666666666666666666666666666666666666666666666666666\n      signature: {{ state: no_embedded_signature }}\n  'C:\\Windows\\System32\\Tasks':\n    - name: readme\n      directory: true\n"
+        ));
+        let run = Autostart::default().collect(&host);
+        let (observations, places) = measured(&run);
+        let moved = by(observations, "entry", "MovedTool");
+        assert_eq!(text(moved, "path"), Some(r"C:\Games\moved.exe"));
+        assert_eq!(text(moved, "sha256"), Some("6".repeat(64).as_str()));
+        assert_eq!(text(moved, "signature"), Some("no_embedded_signature"));
+        assert!(!moved.fields.contains_key("file_unread"), "{moved:?}");
+        assert!(place_gaps(places, RUN_LOCATION).is_none(), "{places:?}");
+    }
+
+    /// `file_unread` is emitted only where a read was refused, but it is declared whatever a fixture
+    /// produces: the one new field ADR 0091 section 3 adds, as text.
+    #[test]
+    fn file_unread_is_a_declared_text_field() {
+        let declared = FIELDS
+            .iter()
+            .find(|field| field.name == "file_unread")
+            .unwrap_or_else(|| panic!("file_unread is not in FIELDS: {FIELDS:?}"));
+        assert_eq!(declared.kind, crate::FieldKind::Text, "{declared:?}");
+    }
 
     #[test]
     fn every_command_line_form_resolves_as_section_3_says() {

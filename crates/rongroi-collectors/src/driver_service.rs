@@ -20,7 +20,8 @@ use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{
-    DirEntryInfo, Host, Platform, RegistryData, SourceError, is_refused_form, is_unusable_segment,
+    DirEntryInfo, Host, NotLocal, Platform, RegistryData, SourceError, is_refused_form,
+    is_unusable_segment,
 };
 
 use crate::{Collector, Field, paths, prefetch};
@@ -42,18 +43,21 @@ const FILE_SYSTEM_DRIVER: u32 = 2;
 /// The one field a gap is ever about.
 const HASH_FIELD: &str = "sha256";
 
-static FIELDS: [Field; 4] = [
+static FIELDS: [Field; 5] = [
+    Field::text("file_unread"),
     Field::text("path"),
     Field::text("service"),
     Field::text("sha256"),
     Field::number("start"),
 ];
 
-static REASONS: [UnmeasuredReason; 4] = [
+static REASONS: [UnmeasuredReason; 5] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::BudgetSpent,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Reads the driver services registered on the machine.
@@ -135,6 +139,14 @@ impl Collector for DriverService {
                                     .insert(HASH_FIELD.to_owned(), serde_json::Value::from(digest));
                             }
                             Hash::Missing => {}
+                            // Not opened: the path does not stay on a local drive (ADR 0091).
+                            Hash::NotLocal(not_local) => {
+                                fields.insert(
+                                    "file_unread".to_owned(),
+                                    serde_json::Value::from(not_local.as_str()),
+                                );
+                                note(&mut gap, UnmeasuredReason::NotAttempted);
+                            }
                             Hash::Failed(reason) => note(&mut gap, reason),
                         }
                     }
@@ -258,6 +270,8 @@ enum Hash {
     Hashed(String),
     /// The file is not there: a leftover service key, not a gap.
     Missing,
+    /// Not opened: the path does not stay on a local drive (ADR 0091).
+    NotLocal(NotLocal),
     Failed(UnmeasuredReason),
 }
 
@@ -270,6 +284,8 @@ fn hash(host: &dyn Host, path: &str) -> Hash {
     match host.file_sha256(path) {
         Ok(digest) => Hash::Hashed(digest.to_ascii_lowercase()),
         Err(SourceError::AccessDenied) => Hash::Failed(UnmeasuredReason::AccessDenied),
+        // Refused before anything was opened, so never read as "the file is not there" (ADR 0091).
+        Err(SourceError::NotLocal(not_local)) => Hash::NotLocal(not_local),
         Err(_) if is_missing(host, path) => Hash::Missing,
         Err(error) => Hash::Failed(reason(&error)),
     }
@@ -322,6 +338,7 @@ fn missing_from(listing: Result<Option<Vec<DirEntryInfo>>, SourceError>, name: &
 fn reason(error: &SourceError) -> UnmeasuredReason {
     match error {
         SourceError::AccessDenied => UnmeasuredReason::AccessDenied,
+        SourceError::NotLocal(_) => UnmeasuredReason::NotAttempted,
         SourceError::Unsupported(_) | SourceError::Failed(_) | SourceError::TooLarge { .. } => {
             UnmeasuredReason::ReadFailed
         }
@@ -377,6 +394,133 @@ mod tests {
             .fields
             .get(field)
             .and_then(serde_json::Value::as_str)
+    }
+
+    fn inline(yaml: &str) -> FixtureHost {
+        FixtureHost::from_yaml_str(yaml, "inline").unwrap()
+    }
+
+    // ADR 0091 (files are read on local drives only): the host gate `local_read_check` runs before
+    // every read by path. Each fixture lists its file with a `sha256`, so a hash on the row means the
+    // gate was skipped.
+
+    /// A driver on a network letter keeps its path, but nothing is read through the letter: no hash,
+    /// `file_unread: not_local_drive`, and the gap on `sha256` is `not_attempted` (ADR 0091 sections
+    /// 1 and 3). A refused file is not missing: a missing file has no gap and no `file_unread`.
+    #[test]
+    fn a_driver_on_a_network_letter_says_not_local_drive_and_is_not_missing() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  SystemRoot: 'C:\Windows'
+drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'Z', device: '\Device\Mup', serial: 2, kind: other }
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\netdrv':
+    Type: 1
+    ImagePath: 'Z:\Drivers\netdrv.sys'
+filesystem:
+  'Z:\Drivers':
+    - name: netdrv.sys
+      sha256: 4444444444444444444444444444444444444444444444444444444444444444
+",
+        );
+        let run = DriverService::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        let netdrv = service(observations, "netdrv");
+        assert_eq!(text(netdrv, "path"), Some(r"Z:\Drivers\netdrv.sys"));
+        assert_eq!(netdrv.fields.get("sha256"), None, "{netdrv:?}");
+        assert_eq!(text(netdrv, "file_unread"), Some("not_local_drive"));
+        assert_eq!(
+            gaps.get(HASH_FIELD),
+            Some(&UnmeasuredReason::NotAttempted),
+            "{gaps:?}"
+        );
+    }
+
+    /// A driver whose file is under a junction to a share keeps its path and is not hashed, because
+    /// the link leaves the local drives: `file_unread: link_off_local_drive`, `not_attempted` on
+    /// `sha256`, and never `missing` (ADR 0091 sections 1 and 3).
+    #[test]
+    fn a_driver_behind_a_junction_to_a_share_says_link_off_local_drive() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  SystemRoot: 'C:\Windows'
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\UNC\server\share'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\sharedrv':
+    Type: 1
+    ImagePath: 'C:\Games\sharedrv.sys'
+filesystem:
+  'C:\Games':
+    - name: sharedrv.sys
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+",
+        );
+        let run = DriverService::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        let sharedrv = service(observations, "sharedrv");
+        assert_eq!(text(sharedrv, "path"), Some(r"C:\Games\sharedrv.sys"));
+        assert_eq!(sharedrv.fields.get("sha256"), None, "{sharedrv:?}");
+        assert_eq!(text(sharedrv, "file_unread"), Some("link_off_local_drive"));
+        assert_eq!(
+            gaps.get(HASH_FIELD),
+            Some(&UnmeasuredReason::NotAttempted),
+            "{gaps:?}"
+        );
+    }
+
+    /// A junction that stays on a local drive is ordinary and is read through: the file is listed at
+    /// `D:\Lib`, both drives are fixed, and the fixture's hash reaches the row (ADR 0091 section 1).
+    #[test]
+    fn a_driver_behind_a_junction_that_stays_local_is_hashed() {
+        let host = inline(
+            r"
+platform: windows
+env:
+  SystemRoot: 'C:\Windows'
+drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'D', device: '\Device\HarddiskVolume2', serial: 2, kind: fixed }
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\moveddrv':
+    Type: 1
+    ImagePath: 'C:\Games\moveddrv.sys'
+filesystem:
+  'D:\Lib':
+    - name: moveddrv.sys
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+",
+        );
+        let run = DriverService::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        let moveddrv = service(observations, "moveddrv");
+        assert_eq!(text(moveddrv, "path"), Some(r"C:\Games\moveddrv.sys"));
+        assert_eq!(text(moveddrv, "sha256"), Some("6".repeat(64).as_str()));
+        assert!(!moveddrv.fields.contains_key("file_unread"), "{moveddrv:?}");
+        assert!(gaps.is_empty(), "{gaps:?}");
+    }
+
+    /// `file_unread` is emitted only where a read was refused, but it is declared whatever a fixture
+    /// produces: the one new field ADR 0091 section 3 adds, as text.
+    #[test]
+    fn file_unread_is_a_declared_text_field() {
+        let declared = FIELDS
+            .iter()
+            .find(|field| field.name == "file_unread")
+            .unwrap_or_else(|| panic!("file_unread is not in FIELDS: {FIELDS:?}"));
+        assert_eq!(declared.kind, crate::FieldKind::Text, "{declared:?}");
     }
 
     #[test]

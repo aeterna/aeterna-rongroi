@@ -1152,7 +1152,27 @@ date: 2026-09-11
                     "usn",
                 ],
             ),
-            ("not_attempted", &["evtx"]),
+            // ADR 0091: every collector that reads by path reports it for a path the host refused.
+            (
+                "not_attempted",
+                &[
+                    "autostart",
+                    "bam",
+                    "driver_service",
+                    "event_fields",
+                    "evtx",
+                    "fivem_dir",
+                    "fivem_servers",
+                    "install_marker",
+                    "net_config",
+                    "pca",
+                    "powershell_text",
+                    "prefetch",
+                    "recorded_files",
+                    "usn",
+                    "windows_start",
+                ],
+            ),
             ("other_volume", &["usn"]),
         ] {
             for owner in owners {
@@ -1165,7 +1185,7 @@ date: 2026-09-11
                 assert!(
                     !reports(other.id(), reason),
                     "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
-                     ADR 0048 and ADR 0060, names only {owners:?} as owners",
+                     ADR 0048, ADR 0060 and ADR 0091, names only {owners:?} as owners",
                     other.id()
                 );
             }
