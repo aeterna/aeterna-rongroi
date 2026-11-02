@@ -27,8 +27,8 @@ import { GameWindowsSection } from "./GameWindows";
 import { HumanSummary } from "./HumanSummary";
 import "./Report.motion.css";
 import { usePresenter } from "./Report.presenter";
-import { ReportProgress } from "./ReportProgress";
 import { ReportPresenter } from "./ReportPresenter";
+import { ReportProgress } from "./ReportProgress";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
@@ -183,8 +183,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const query = searchQuery.trim().toLowerCase();
   // E10 picks a position in the rendered order; no row's state or identity decides which group is
   // current or dim.
-  const presenterIndex =
-    groupIds.length === 0 ? 0 : Math.min(presenter.index, groupIds.length - 1);
+  const presenterIndex = groupIds.length === 0 ? 0 : Math.min(presenter.index, groupIds.length - 1);
 
   function pickEvidence(item: Evidence) {
     setSearchQuery(item.rule_id);

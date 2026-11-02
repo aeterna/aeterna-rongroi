@@ -568,5 +568,12 @@
       "code_integrity": "Code Integrity refused a file at the same path on some drive.",
       "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed."
     }
+  },
+  "presenter": {
+    "toggle": "Presenter",
+    "prev": "Previous",
+    "next": "Next",
+    "counter": "{{current}} / {{total}}",
+    "group": "Group {{current}} of {{total}}: {{title}}"
   }
 }

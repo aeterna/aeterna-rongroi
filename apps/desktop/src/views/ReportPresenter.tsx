@@ -22,9 +22,7 @@ export function ReportPresenter({ groupIds, presenter }: Props) {
   const safeIndex = total === 0 ? 0 : Math.min(presenter.index, total - 1);
   const current = total === 0 ? 0 : safeIndex + 1;
   const currentId = groupIds[safeIndex];
-  const collector = currentId?.startsWith("group-")
-    ? currentId.slice("group-".length)
-    : currentId;
+  const collector = currentId?.startsWith("group-") ? currentId.slice("group-".length) : currentId;
   const title = collector ? t(`collector.${collector}`, { defaultValue: collector }) : "";
   const position = t("presenter.counter", {
     defaultValue: "{{current}} / {{total}}",
