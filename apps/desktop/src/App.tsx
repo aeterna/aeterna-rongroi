@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { changeScreen } from "./App.transition";
 import {
   buildSavedRecord,
   type ElevateOutcome,
@@ -11,7 +12,6 @@ import {
   relaunchFull,
   reportHeader,
 } from "./api";
-import { changeScreen } from "./App.transition";
 import { languageNames, supportedLanguages } from "./i18n";
 import type { Mode, ReportHeader, SavedSummary, SsOptions } from "./types";
 import { About } from "./views/About";
@@ -181,9 +181,7 @@ export function App() {
                 </button>
                 <p className="muted">{t("start.elevate_hint")}</p>
                 {/* Declining is a choice, so it is a plain sentence and not an alert (ADR 0012). */}
-                {elevation === "declined" && (
-                  <p className="muted">{t("start.elevate_declined")}</p>
-                )}
+                {elevation === "declined" && <p className="muted">{t("start.elevate_declined")}</p>}
                 {elevation === "failed" && <p className="note">{t("start.elevate_failed")}</p>}
               </>
             )}

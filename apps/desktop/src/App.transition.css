@@ -13,7 +13,12 @@
     view-transition-name: screen;
   }
 
-  ::view-transition-old(screen),
+  /* biome-ignore lint/correctness/noUnknownTypeSelector: the argument is a view-transition-name, not a type selector */
+  ::view-transition-old(screen) {
+    animation-duration: 0.35s;
+  }
+
+  /* biome-ignore lint/correctness/noUnknownTypeSelector: the argument is a view-transition-name, not a type selector */
   ::view-transition-new(screen) {
     animation-duration: 0.35s;
   }
