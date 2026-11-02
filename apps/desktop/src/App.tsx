@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { changeScreen } from "./App.transition";
 import {
   buildSavedRecord,
   type ElevateOutcome,
@@ -17,6 +18,7 @@ import { About } from "./views/About";
 import { Consent } from "./views/Consent";
 import { Report } from "./views/Report";
 import { UnofficialBanner } from "./views/UnofficialBanner";
+import "./App.transition.css";
 
 type Screen =
   | "start"
@@ -69,7 +71,7 @@ export function App() {
                 id="home-button"
                 className="nav home"
                 aria-label={t("nav.home")}
-                onClick={() => setScreen("start")}
+                onClick={() => changeScreen(() => setScreen("start"))}
               >
                 <svg
                   width="18"
@@ -109,7 +111,7 @@ export function App() {
               if (screen !== "about") {
                 setBeforeAbout(screen);
               }
-              setScreen("about");
+              changeScreen(() => setScreen("about"));
             }}
           >
             {t("nav.about")}
@@ -132,120 +134,134 @@ export function App() {
 
       {header && !header.provenance.official && <UnofficialBanner />}
 
-      {screen === "start" && (
-        <section className="start">
-          <h2>{t("start.title")}</h2>
-          <div className="choices">
-            <button type="button" className="choice" onClick={() => setScreen({ report: "self" })}>
-              <span className="choice-title">{t("start.self_button")}</span>
-              <span className="muted">{t("start.self_hint")}</span>
-            </button>
-            <button type="button" className="choice" onClick={() => setScreen("consent")}>
-              <span className="choice-title">{t("start.ss_button")}</span>
-              <span className="muted">{t("start.ss_hint")}</span>
-            </button>
-          </div>
-          {/* Only worth offering while this scan ran without the rights some checks need. */}
-          {header?.elevated === false && (
-            <>
+      <div className="screen">
+        {screen === "start" && (
+          <section className="start">
+            <h2>{t("start.title")}</h2>
+            <div className="choices">
               <button
                 type="button"
-                disabled={elevationPending}
-                onClick={() => {
-                  setElevationPending(true);
-                  void relaunchElevated().then(
-                    (outcome) => {
-                      setElevation(outcome);
-                      // A started copy ends this process; anything else may be asked again.
-                      setElevationPending(outcome === "started");
-                    },
-                    () => {
-                      setElevation("failed");
-                      setElevationPending(false);
-                    },
-                  );
-                }}
+                className="choice"
+                onClick={() => changeScreen(() => setScreen({ report: "self" }))}
               >
-                {t("start.elevate_button")}
+                <span className="choice-title">{t("start.self_button")}</span>
+                <span className="muted">{t("start.self_hint")}</span>
               </button>
-              <p className="muted">{t("start.elevate_hint")}</p>
-              {/* Declining is a choice, so it is a plain sentence and not an alert (ADR 0012). */}
-              {elevation === "declined" && <p className="muted">{t("start.elevate_declined")}</p>}
-              {elevation === "failed" && <p className="note">{t("start.elevate_failed")}</p>}
-            </>
-          )}
-          {/* Which scan ran, and a way to the other one: a new copy asks in a Windows dialog before it
-              reads anything, so this window never decides what is read (ADR 0052). */}
-          {header && (
-            <p className="muted">{full ? t("start.full_done") : t("start.standard_done")}</p>
-          )}
-          {header && !full && (
-            <>
               <button
                 type="button"
-                disabled={fullScanPending}
-                onClick={() => {
-                  setFullScanPending(true);
-                  void relaunchFull().then(
-                    (outcome) => {
-                      setFullScan(outcome);
-                      setFullScanPending(outcome === "started");
-                    },
-                    () => {
-                      setFullScan("failed");
-                      setFullScanPending(false);
-                    },
-                  );
-                }}
+                className="choice"
+                onClick={() => changeScreen(() => setScreen("consent"))}
               >
-                {t("start.full_button")}
+                <span className="choice-title">{t("start.ss_button")}</span>
+                <span className="muted">{t("start.ss_hint")}</span>
               </button>
-              <p className="muted">{t("start.full_hint")}</p>
-              {fullScan === "failed" && <p className="note">{t("start.full_failed")}</p>}
-            </>
-          )}
-          <p className="note">{t("start.scan_note")}</p>
-        </section>
-      )}
+            </div>
+            {/* Only worth offering while this scan ran without the rights some checks need. */}
+            {header?.elevated === false && (
+              <>
+                <button
+                  type="button"
+                  disabled={elevationPending}
+                  onClick={() => {
+                    setElevationPending(true);
+                    void relaunchElevated().then(
+                      (outcome) => {
+                        setElevation(outcome);
+                        // A started copy ends this process; anything else may be asked again.
+                        setElevationPending(outcome === "started");
+                      },
+                      () => {
+                        setElevation("failed");
+                        setElevationPending(false);
+                      },
+                    );
+                  }}
+                >
+                  {t("start.elevate_button")}
+                </button>
+                <p className="muted">{t("start.elevate_hint")}</p>
+                {/* Declining is a choice, so it is a plain sentence and not an alert (ADR 0012). */}
+                {elevation === "declined" && <p className="muted">{t("start.elevate_declined")}</p>}
+                {elevation === "failed" && <p className="note">{t("start.elevate_failed")}</p>}
+              </>
+            )}
+            {/* Which scan ran, and a way to the other one: a new copy asks in a Windows dialog before it
+                reads anything, so this window never decides what is read (ADR 0052). */}
+            {header && (
+              <p className="muted">{full ? t("start.full_done") : t("start.standard_done")}</p>
+            )}
+            {header && !full && (
+              <>
+                <button
+                  type="button"
+                  disabled={fullScanPending}
+                  onClick={() => {
+                    setFullScanPending(true);
+                    void relaunchFull().then(
+                      (outcome) => {
+                        setFullScan(outcome);
+                        setFullScanPending(outcome === "started");
+                      },
+                      () => {
+                        setFullScan("failed");
+                        setFullScanPending(false);
+                      },
+                    );
+                  }}
+                >
+                  {t("start.full_button")}
+                </button>
+                <p className="muted">{t("start.full_hint")}</p>
+                {fullScan === "failed" && <p className="note">{t("start.full_failed")}</p>}
+              </>
+            )}
+            <p className="note">{t("start.scan_note")}</p>
+          </section>
+        )}
 
-      {screen === "consent" && (
-        <Consent
-          full={full}
-          caseCodeError={caseCodeError}
-          onAgree={(options, caseCode) =>
-            // The record is built once, here, from what was agreed; the digest and a saved file are
-            // both taken from it (ADR 0073). A refused code keeps the player on this screen.
-            void buildSavedRecord(options, caseCode).then(
-              (saved) => {
-                setCaseCodeError(null);
-                setScreen({ report: "ss", options, saved });
-              },
-              (error: unknown) => setCaseCodeError(String(error)),
-            )
-          }
-          onRefuse={() => setScreen("declined")}
-        />
-      )}
+        {screen === "consent" && (
+          <Consent
+            full={full}
+            caseCodeError={caseCodeError}
+            onAgree={(options, caseCode) =>
+              // The record is built once, here, from what was agreed; the digest and a saved file are
+              // both taken from it (ADR 0073). A refused code keeps the player on this screen.
+              void buildSavedRecord(options, caseCode).then(
+                (saved) => {
+                  setCaseCodeError(null);
+                  changeScreen(() => setScreen({ report: "ss", options, saved }));
+                },
+                (error: unknown) => setCaseCodeError(String(error)),
+              )
+            }
+            onRefuse={() => changeScreen(() => setScreen("declined"))}
+          />
+        )}
 
-      {screen === "declined" && (
-        <section>
-          <h2>{t("declined.title")}</h2>
-          <p>{t("declined.body")}</p>
-        </section>
-      )}
+        {screen === "declined" && (
+          <section>
+            <h2>{t("declined.title")}</h2>
+            <p>{t("declined.body")}</p>
+          </section>
+        )}
 
-      {screen === "about" && (
-        <About header={header} headerFailed={headerFailed} onBack={() => setScreen(beforeAbout)} />
-      )}
+        {screen === "about" && (
+          <About
+            header={header}
+            headerFailed={headerFailed}
+            onBack={() => changeScreen(() => setScreen(beforeAbout))}
+          />
+        )}
 
-      {typeof screen === "object" && (
-        <Report
-          mode={screen.report}
-          options={screen.options}
-          saved={screen.saved}
-          onBack={() => setScreen("start")}
-        />
-      )}
+        {typeof screen === "object" && (
+          <Report
+            mode={screen.report}
+            options={screen.options}
+            saved={screen.saved}
+            onBack={() => changeScreen(() => setScreen("start"))}
+          />
+        )}
+      </div>
 
       <footer className="muted">{t("footer.evidence_only")}</footer>
     </main>

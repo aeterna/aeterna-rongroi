@@ -6,6 +6,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The desktop app changes screen with a soft cross-fade (View Transitions API) while the header stays in place; without the API, or with reduced motion, the change is instant.
 - `recorded_files` (full scan) reads the system drive's NTFS change journal once and, for each recorded file,
   says whether the journal holds its deletion or a rename (ADR 0086): `journal_match` (`matched`, `other_volume`,
   `folder_unknown`), the newest eight times of each kind in `journal_deleted`, `journal_renamed_from` and
