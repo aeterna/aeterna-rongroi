@@ -6,6 +6,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- SS mode report: a Presenter toggle moves through the result groups with the arrow keys and dims the others by position only; nothing is hidden (ADR 0093).
 - The desktop app changes screen with a soft cross-fade (View Transitions API) while the header stays in place; without the API, or with reduced motion, the change is instant.
 - `recorded_files` (full scan) reads the system drive's NTFS change journal once and, for each recorded file,
   says whether the journal holds its deletion or a rename (ADR 0086): `journal_match` (`matched`, `other_volume`,
