@@ -22,10 +22,10 @@ function isEditing(target: EventTarget | null): boolean {
   return target.closest("input, textarea, select, [contenteditable]") !== null;
 }
 
-/** The palette owns the keyboard while it is open, including Escape. */
+/** The command palette owns the keyboard while it is open, including Escape. */
 function paletteIsOpen(): boolean {
   if (typeof document === "undefined") return false;
-  return document.querySelector(".palette-dialog, [role=dialog]") !== null;
+  return document.querySelector(".palette-backdrop") !== null;
 }
 
 /** Keeps a position inside the groups that are on screen; an empty list has no position. */
