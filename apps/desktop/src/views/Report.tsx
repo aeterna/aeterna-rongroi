@@ -26,7 +26,9 @@ import { EvidenceRow } from "./EvidenceRow";
 import { GameWindowsSection } from "./GameWindows";
 import { HumanSummary } from "./HumanSummary";
 import "./Report.motion.css";
+import { usePresenter } from "./Report.presenter";
 import { ReportProgress } from "./ReportProgress";
+import { ReportPresenter } from "./ReportPresenter";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
@@ -151,6 +153,18 @@ export function Report({ mode, options, saved, onBack }: Props) {
     document.querySelector<HTMLElement>(".group h3")?.focus();
   }, [focusEvidenceSignal]);
 
+  // Presenter mode needs the same group order the technical view renders, and the hook has to run
+  // before the view's early return; before the view arrives there are simply no groups.
+  const groups = view
+    ? groupEvidence(
+        view.evidence.filter((item) => evidenceMatches(item, texts[item.rule_id], searchQuery)),
+        filter,
+        view.collector_order,
+      )
+    : [];
+  const groupIds = groups.map((group) => `group-${group.collector}`);
+  const presenter = usePresenter(groupIds, mode === "ss" && viewMode === "technical");
+
   if (!view) {
     return null;
   }
@@ -167,10 +181,10 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const linksKnown = links !== null;
   const official = header.provenance.official;
   const query = searchQuery.trim().toLowerCase();
-  const filteredEvidence = view.evidence.filter((item) =>
-    evidenceMatches(item, texts[item.rule_id], searchQuery),
-  );
-  const groups = groupEvidence(filteredEvidence, filter, view.collector_order);
+  // E10 picks a position in the rendered order; no row's state or identity decides which group is
+  // current or dim.
+  const presenterIndex =
+    groupIds.length === 0 ? 0 : Math.min(presenter.index, groupIds.length - 1);
 
   function pickEvidence(item: Evidence) {
     setSearchQuery(item.rule_id);
@@ -346,6 +360,9 @@ export function Report({ mode, options, saved, onBack }: Props) {
               />{" "}
               {t("toolbar.technical_all")}
             </label>
+            {mode === "ss" && viewMode === "technical" && (
+              <ReportPresenter groupIds={groupIds} presenter={presenter} />
+            )}
           </div>
         </div>
 
@@ -367,6 +384,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
             technicalAll={technicalAll}
             unfold={filter === "not_found"}
             revealDelay={revealOn ? revealDelayMs(index) : null}
+            presenter={presenter.on ? (index === presenterIndex ? "current" : "dim") : null}
           />
         ))}
 
@@ -492,6 +510,7 @@ function Group({
   technicalAll,
   revealDelay,
   unfold,
+  presenter,
 }: {
   group: EvidenceGroup;
   texts: Record<string, RuleText>;
@@ -503,6 +522,7 @@ function Group({
   technicalAll: boolean;
   revealDelay: number | null;
   unfold: boolean;
+  presenter: "current" | "dim" | null;
 }) {
   const { t } = useTranslation("report");
   const [showNotFound, setShowNotFound] = useState(false);
@@ -531,6 +551,7 @@ function Group({
     <section
       className="group"
       aria-labelledby={titleId}
+      data-presenter={presenter ?? undefined}
       style={revealDelay === null ? undefined : { animationDelay: `${revealDelay}ms` }}
     >
       <div className="group-head">
