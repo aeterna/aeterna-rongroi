@@ -6,6 +6,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Each evidence row has a Source button that opens a side drawer with the row's rule id, collector, look-back and code links; it shows nothing the row does not already show (ADR 0093).
 - `recorded_files` (full scan) reads the system drive's NTFS change journal once and, for each recorded file,
   says whether the journal holds its deletion or a rename (ADR 0086): `journal_match` (`matched`, `other_volume`,
   `folder_unknown`), the newest eight times of each kind in `journal_deleted`, `journal_renamed_from` and

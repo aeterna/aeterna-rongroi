@@ -568,5 +568,14 @@
       "code_integrity": "Code Integrity เคยปฏิเสธไฟล์ที่ path เดียวกันบนไดรฟ์ใดไดรฟ์หนึ่ง",
       "unmatched_installs": "มีการติดตั้ง service หรือ driver {{count}} รายการในช่วงนี้ ซึ่ง path ไม่ตรงกับโปรแกรมใดในรายการ"
     }
+  },
+  "sources": {
+    "button": "แหล่งที่มา",
+    "title": "แหล่งที่มา",
+    "close": "ปิด",
+    "rule": "รหัสกฎ",
+    "collector": "ตัวเก็บข้อมูล",
+    "retention": "ย้อนหลังได้",
+    "code": "อยู่ตรงไหนในโค้ด"
   }
 }
