@@ -1,0 +1,72 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+
+/* E10: presenter mode dims by position only. The dimmed groups stay in the DOM, in tab order and
+   selectable; the only change is opacity, never a blur, a hidden state or a state colour. */
+
+.presenter {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.presenter-toggle,
+.presenter-prev,
+.presenter-next {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-solid);
+  color: var(--text);
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.presenter-toggle[aria-pressed="true"] {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.presenter-prev:disabled,
+.presenter-next:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.presenter-counter {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.presenter-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.view-tech-wrap section.group[data-presenter="current"] {
+  opacity: 1;
+}
+
+.view-tech-wrap section.group[data-presenter="dim"] {
+  opacity: 0.6;
+}
+
+/* The E1 rise may still be running when presenter mode turns on; its opacity keyframes would
+   outrank the dim value, so presenter mode shows each group's final opacity at once. */
+.view-tech-wrap.reveal-on section.group[data-presenter] {
+  animation: none;
+}
+
+/* A transition may ease the change; the reader who asks for less motion gets the final state at
+   once, with no transition at all. */
+@media (prefers-reduced-motion: no-preference) {
+  .view-tech-wrap section.group[data-presenter] {
+    transition: opacity 180ms ease;
+  }
+}

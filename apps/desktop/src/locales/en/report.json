@@ -569,6 +569,13 @@
       "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed."
     }
   },
+  "presenter": {
+    "toggle": "Presenter",
+    "prev": "Previous",
+    "next": "Next",
+    "counter": "{{current}} / {{total}}",
+    "group": "Group {{current}} of {{total}}: {{title}}"
+  },
   "sources": {
     "button": "Source",
     "title": "Sources",

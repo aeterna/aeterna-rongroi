@@ -569,6 +569,13 @@
       "unmatched_installs": "มีการติดตั้ง service หรือ driver {{count}} รายการในช่วงนี้ ซึ่ง path ไม่ตรงกับโปรแกรมใดในรายการ"
     }
   },
+  "presenter": {
+    "toggle": "โหมดนำเสนอ",
+    "prev": "ก่อนหน้า",
+    "next": "ถัดไป",
+    "counter": "{{current}} / {{total}}",
+    "group": "กลุ่มที่ {{current}} จาก {{total}}: {{title}}"
+  },
   "sources": {
     "button": "แหล่งที่มา",
     "title": "แหล่งที่มา",
