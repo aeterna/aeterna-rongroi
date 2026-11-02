@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { withKeys } from "../keys";
 import type { Evidence, Observation, RowBand, RuleFiles, RuleText } from "../types";
 import { CodeLink } from "./CodeLink";
+import { SourcesButton } from "./EvidenceRow.sources";
 import "./EvidenceRow.expand.css";
 import "./EvidenceRow.motion.css";
 
@@ -144,6 +145,9 @@ export function EvidenceRow({
         <span className="state">{t(`state.${stateKey}`)}</span>
         {!shown && text?.description && <span className="clamp">{text.description}</span>}
       </button>
+      <div className="row-actions">
+        <SourcesButton item={item} text={text} fileBase={fileBase} treeBase={treeBase} />
+      </div>
       {mounted && (
         // A closed fold is inert from its first frame: a freshly mounted body at `0fr` and one
         // that has just begun collapsing are both closed, so neither reaches the accessibility

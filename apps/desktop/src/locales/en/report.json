@@ -575,5 +575,14 @@
     "next": "Next",
     "counter": "{{current}} / {{total}}",
     "group": "Group {{current}} of {{total}}: {{title}}"
+  },
+  "sources": {
+    "button": "Source",
+    "title": "Sources",
+    "close": "Close",
+    "rule": "Rule id",
+    "collector": "Collector",
+    "retention": "Look-back",
+    "code": "Where this is in the code"
   }
 }

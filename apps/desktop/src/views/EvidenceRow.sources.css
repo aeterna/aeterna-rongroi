@@ -1,0 +1,126 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+
+/* E11: the row's Source action and the Sources drawer. The drawer is a non-modal panel on the right:
+   no backdrop, no dimming and no focus trap, so the report stays readable beside it. The panel's
+   transform slides it in, and only when the reader has not asked for reduced motion. */
+
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 18px 10px;
+}
+
+/* Small and secondary beside the copy action, not another pill that competes with the row head. */
+.sources-button {
+  font-family: inherit;
+  font-size: 0.8em;
+  font-weight: 500;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sources-button:hover {
+  background: var(--raised);
+  border-color: var(--line-strong);
+}
+
+.sources-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  /* Below .palette-backdrop's 100: the Ctrl K palette stays above this drawer. */
+  z-index: 90;
+  width: min(420px, 100vw);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--surface-solid);
+  color: var(--text);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: var(--shadow);
+  transform: translateX(100%);
+}
+
+.sources-panel[data-open="true"] {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sources-panel {
+    transition: transform 0.25s ease;
+  }
+
+  .sources-button {
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+}
+
+.sources-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sources-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.sources-close {
+  flex: none;
+}
+
+.sources-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  margin: 0 0 18px;
+}
+
+.sources-facts dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.sources-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.sources-code {
+  border-top: 1px dashed var(--line-strong);
+  padding-top: 12px;
+}
+
+.sources-code h3 {
+  margin: 0 0 6px;
+  font-size: 0.95em;
+}
+
+.sources-code ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sources-code li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}

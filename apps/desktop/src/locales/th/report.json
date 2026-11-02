@@ -575,5 +575,14 @@
     "next": "ถัดไป",
     "counter": "{{current}} / {{total}}",
     "group": "กลุ่มที่ {{current}} จาก {{total}}: {{title}}"
+  },
+  "sources": {
+    "button": "แหล่งที่มา",
+    "title": "แหล่งที่มา",
+    "close": "ปิด",
+    "rule": "รหัสกฎ",
+    "collector": "ตัวเก็บข้อมูล",
+    "retention": "ย้อนหลังได้",
+    "code": "อยู่ตรงไหนในโค้ด"
   }
 }

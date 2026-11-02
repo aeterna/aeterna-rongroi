@@ -6,6 +6,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Each evidence row has a Source button that opens a side drawer with the row's rule id, collector, look-back and code links; it shows nothing the row does not already show (ADR 0093).
 - SS mode report: a Presenter toggle moves through the result groups with the arrow keys and dims the others by position only; nothing is hidden (ADR 0093).
 - The desktop app changes screen with a soft cross-fade (View Transitions API) while the header stays in place; without the API, or with reduced motion, the change is instant.
 - `recorded_files` (full scan) reads the system drive's NTFS change journal once and, for each recorded file,
