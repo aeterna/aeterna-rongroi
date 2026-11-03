@@ -398,7 +398,9 @@ button:disabled {
 .choice:hover:not(:disabled) {
   background: var(--surface-solid);
   transform: translateY(-2px);
-  box-shadow: var(--panel-edge), 0 16px 34px -14px #2a5d9a73;
+  box-shadow:
+    var(--panel-edge),
+    0 16px 34px -14px #2a5d9a73;
 }
 
 .choice:hover::after {

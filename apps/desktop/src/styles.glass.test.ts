@@ -7,9 +7,10 @@
 // the translucent panels get their light inner edge from the --panel-edge token instead.
 
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const CSS = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+const CSS = readFileSync(resolve(__dirname, "styles.css"), "utf8");
 
 describe("styles.css frosted tool panels", () => {
   it("keeps the sticky header as the only backdrop-filter", () => {
@@ -17,9 +18,7 @@ describe("styles.css frosted tool panels", () => {
   });
 
   it("defines the --panel-edge token as a light inner edge", () => {
-    expect(CSS).toMatch(
-      /--panel-edge:\s*inset 0 1px 0 #ffffffcc,\s*inset 0 0 0 1px #ffffff66;/,
-    );
+    expect(CSS).toMatch(/--panel-edge:\s*inset 0 1px 0 #ffffffcc,\s*inset 0 0 0 1px #ffffff66;/);
   });
 
   it("uses the inner edge with the soft shadow on at least three rules", () => {
