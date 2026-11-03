@@ -29,8 +29,9 @@ Root: `<figure data-scan-scene>`, exactly one per page. Words live only in the H
 | `data-scan-window` | `<input type=range min=0 max=29 value=23 hidden data-reach=16>` | days ago is 30 minus the value, so 30 to 1; `data-reach` is the lowest value the example log still holds, which is 14 days ago |
 | `data-scan-window-out` | `<output hidden>` | polite live text from `data-msg-in` or `data-msg-out`, `{n}` is days ago |
 | `data-scan-live` | root, set by script only | animation is running; CSS hides rows without `.scan-in` |
-| `.scan-in`, `.scan-active` | row, source; set by script only | reached, being read |
-| `--scan-wire` | root, set by script only | 0 to 1, progress of the read beat |
+| `.scan-in` | row, source, jump; set by script only | reached |
+| `.scan-active` | source; set by script only | being read |
+| `--scan-wire` | root, set by script only | 0 to 1, progress of the read beat; all three wires draw together with it |
 
 Beats, roughly: read 0–3 s, found 3–5 s, not found 5–7 s, not measured 7–9 s, then the end frame holds.
 
@@ -43,6 +44,7 @@ Rows, sources and copy (Thai / English). Sources: `การตั้งค่�
 - `data-msg-in`: `{n} วันก่อน: ไม่เจอในช่วงนี้` / `{n} day(s) ago: not found in this stretch`.
 - `data-msg-out`: `{n} วันก่อน: ย้อนไม่ถึง รายงานนี้บอกอะไรเรื่องช่วงนั้นไม่ได้` / `{n} day(s) ago: out of reach. This report says nothing about that stretch.`
 - Heading: `การสแกนหนึ่งรอบ` / `One scan, start to finish`. Tag: `ตัวอย่าง` / `Example`, visible in every beat and part of the root's `aria-label`, so nobody takes it for a scan of their own PC.
+- Under the slider, shown only with it, split at `data-reach`: `ย้อนไม่ถึง` / `Out of reach` on the older side, `log ยังเก็บอยู่` / `The log still holds this` on the newer side.
 - Last line: `จบตรงนี้ ไม่มีคะแนน ไม่มีคำว่าผ่านหรือไม่ผ่าน คนเป็นผู้ตัดสิน` / `It ends here: no score, no pass or fail. A person decides.`
 
 State marks use the existing `.mark-found`, `.mark-not-found`, `.mark-unmeasured`. Nothing green, no tick, no "good" colour.
