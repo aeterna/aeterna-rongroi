@@ -960,15 +960,8 @@ mod tests {
     fn check_scene_words(scene: &str) -> Result<(), String> {
         let text = squash(scene);
         let lower = text.to_lowercase();
-        for word in [
-            "clean",
-            "safe",
-            "trusted",
-            "สะอาด",
-            "ปลอดภัย",
-            "✓",
-            "✔",
-        ] {
+        for word in ["clean", "safe", "trusted", "สะอาด", "ปลอดภัย", "✓", "✔"]
+        {
             if lower.contains(word) {
                 return Err(format!("the scene says `{word}`"));
             }
@@ -1065,8 +1058,7 @@ mod tests {
         let english = scene_messages(&english)
             .unwrap_or_else(|reason| panic!("site/en/index.html: {reason}"));
         assert_eq!(
-            thai,
-            english,
+            thai, english,
             "the two pages declare different data-msg-* names"
         );
     }
