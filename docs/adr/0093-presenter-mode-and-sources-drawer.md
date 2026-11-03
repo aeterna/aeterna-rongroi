@@ -1,6 +1,6 @@
 # ADR 0093 — Presenter mode and a Sources drawer for the report
 
-- Status: proposed — drafted with the code in the pull requests that add it; the owner reads it at review
+- Status: accepted — the owner reviewed both features on a Windows build and passed them (2026-11-03)
 - Date: 2026-11-02
 - Related: ADR 0014 (SS mode lists nothing it did not need to), ADR 0052 (what the player agreed SS mode may show),
   ADR 0061 (retention of a source), AGENTS.md hard rules 3, 5 and 9
