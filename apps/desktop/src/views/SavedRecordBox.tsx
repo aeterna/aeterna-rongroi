@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { saveSavedRecord } from "../api";
+import { motionReduced } from "../motion";
 import type { SavedSummary } from "../types";
 import "./SavedRecordBox.motion.css";
 
@@ -23,14 +24,7 @@ const DECODE_STEPS = 25; // 25 × 40 ms ≈ the ~1000 ms decode.
 
 /** `true` when the reader asks for less motion; a missing `matchMedia` (tests, old webviews) means no. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return false;
-  }
-  try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
+  return motionReduced();
 }
 
 /** One random lowercase hex character. */

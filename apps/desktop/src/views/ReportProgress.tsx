@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { EvidenceGroup } from "../grouping";
+import { motionReduced } from "../motion";
 import "./ReportProgress.css";
 
 /** The id Report.tsx gives a group's `h3` and the matching `aria-labelledby`. */
@@ -17,8 +18,7 @@ function headingId(collector: string): string {
 
 /** Reads the motion preference; a missing matchMedia (tests, jsdom) is no request, never a throw. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return motionReduced();
 }
 
 interface Props {

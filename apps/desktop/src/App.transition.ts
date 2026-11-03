@@ -3,6 +3,7 @@
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
 import { flushSync } from "react-dom";
+import { motionReduced } from "./motion";
 
 /** The View Transitions API as much of it as this helper needs, so an older lib build still compiles. */
 type ViewTransitionDocument = Document & {
@@ -10,11 +11,7 @@ type ViewTransitionDocument = Document & {
 };
 
 function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
+  return motionReduced();
 }
 
 /**

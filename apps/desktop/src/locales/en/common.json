@@ -6,6 +6,11 @@
   "language": {
     "label": "Language"
   },
+  "motion": {
+    "toggle": "Animations",
+    "on": "on",
+    "off": "off"
+  },
   "start": {
     "title": "What do you want to do?",
     "self_button": "Check my own PC",

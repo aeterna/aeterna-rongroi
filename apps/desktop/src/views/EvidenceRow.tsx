@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { withKeys } from "../keys";
+import { motionReduced } from "../motion";
 import type { Evidence, Observation, RowBand, RuleFiles, RuleText } from "../types";
 import { CodeLink } from "./CodeLink";
 import { SourcesButton } from "./EvidenceRow.sources";
@@ -194,27 +195,29 @@ export function EvidenceRow({
 
 /** Whether the platform asks for reduced motion; a missing `matchMedia` is not a reason to throw. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return false;
-  }
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return motionReduced();
 }
 
 /** The platform's reduced-motion setting, followed when it changes while the row is open. */
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(prefersReducedMotion);
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
+    const query =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null;
+    const onChange = () => setReduced(motionReduced());
+    setReduced(motionReduced());
+    window.addEventListener("rongroi:motion", onChange);
+    if (query && typeof query.addEventListener === "function") {
+      query.addEventListener("change", onChange);
     }
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onChange = () => setReduced(query.matches);
-    setReduced(query.matches);
-    if (typeof query.addEventListener !== "function") {
-      return;
-    }
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
+    return () => {
+      window.removeEventListener("rongroi:motion", onChange);
+      if (query && typeof query.removeEventListener === "function") {
+        query.removeEventListener("change", onChange);
+      }
+    };
   }, []);
   return reduced;
 }
