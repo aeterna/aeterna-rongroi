@@ -7,7 +7,7 @@ Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is 
 # Landing page: a scan scene
 
 **Branch:** `feat/site-scan-scene` · **Base:** `origin/dev` · **Plan:** https://claude.ai/artifact/A6Eogf2nHxSBN7LgkWgbYT
-**Route:** opencode-go:A write, gemini-api:B Q0 and Q3 · **Gate:** G1 pending
+**Route:** opencode-go:A write, gemini-api:B Q0 and Q3 · **Gate:** Q0 done (run 20261103-214615-9c4895), G1 pending
 
 ## Goal
 
@@ -26,7 +26,7 @@ Root: `<figure data-scan-scene>`, exactly one per page. Words live only in the H
 | `data-scan-row="found\|not_found\|unmeasured"` | three result rows | visible in the finished picture |
 | `data-scan-jump="found\|not_found\|unmeasured"` | three `<button>` tallies, each showing 1 | go to that beat and stop |
 | `data-scan-play` | `<button hidden>` | pause, play, replay; label from `data-msg-play`, `-pause`, `-replay` on the root |
-| `data-scan-window` | `<input type=range min=0 max=30 value=23 hidden data-reach=16>` | 30 is today, 0 is 30 days ago, `data-reach` is the oldest day the example log still holds |
+| `data-scan-window` | `<input type=range min=0 max=29 value=23 hidden data-reach=16>` | days ago is 30 minus the value, so 30 to 1; `data-reach` is the lowest value the example log still holds, which is 14 days ago |
 | `data-scan-window-out` | `<output hidden>` | polite live text from `data-msg-in` or `data-msg-out`, `{n}` is days ago |
 | `data-scan-live` | root, set by script only | animation is running; CSS hides rows without `.scan-in` |
 | `.scan-in`, `.scan-active` | row, source; set by script only | reached, being read |
@@ -40,9 +40,9 @@ Rows, sources and copy (Thai / English). Sources: `การตั้งค่�
 - Not found: `Security log มีบันทึกว่าตัวเองถูกล้าง` / `The Security log records that it was cleared` (rule `ff967b28-984b-4de0-b361-58367ae0c2d5`), from the event log.
   Below it: `ตัวอย่าง: log นี้ย้อนได้ 14 วัน ของจริงแต่ละเครื่องไม่เท่ากัน` / `Example: this log reaches back 14 days. It differs on every PC.`
 - Not measured: the specimen card's firmware row, words as they stand on each page, reason included.
-- `data-msg-in`: `{n} วันก่อน: ไม่เจอในช่วงนี้` / `{n} days ago: not found in this stretch`.
-- `data-msg-out`: `{n} วันก่อน: ย้อนไม่ถึง รายงานนี้บอกอะไรเรื่องช่วงนั้นไม่ได้` / `{n} days ago: out of reach. This report says nothing about that stretch.`
-- Heading: `การสแกนหนึ่งรอบ` / `One scan, start to finish`. Tag: `ตัวอย่าง` / `Example`.
+- `data-msg-in`: `{n} วันก่อน: ไม่เจอในช่วงนี้` / `{n} day(s) ago: not found in this stretch`.
+- `data-msg-out`: `{n} วันก่อน: ย้อนไม่ถึง รายงานนี้บอกอะไรเรื่องช่วงนั้นไม่ได้` / `{n} day(s) ago: out of reach. This report says nothing about that stretch.`
+- Heading: `การสแกนหนึ่งรอบ` / `One scan, start to finish`. Tag: `ตัวอย่าง` / `Example`, visible in every beat and part of the root's `aria-label`, so nobody takes it for a scan of their own PC.
 - Last line: `จบตรงนี้ ไม่มีคะแนน ไม่มีคำว่าผ่านหรือไม่ผ่าน คนเป็นผู้ตัดสิน` / `It ends here: no score, no pass or fail. A person decides.`
 
 State marks use the existing `.mark-found`, `.mark-not-found`, `.mark-unmeasured`. Nothing green, no tick, no "good" colour.
@@ -69,9 +69,11 @@ Out of scope: other sections, `flow.js`, `specimen.js`, `compare.js`.
 ## L2 · the motion (`site/scan.js`, new)
 
 Done when: it plays once on first view and ends on the same picture as without script; one animation loop, which stops off screen, in a hidden tab and at the end frame; a fixed timeline, nothing random; reduced motion means no autoplay and no `data-scan-live`, with the slider still usable; any control a person touches stops autoplay for good until they press replay; keyboard reaches every control; a missing element leaves the page as written, with no error.
-It only sets classes, the hooks above and the slider's `aria-valuetext`. It builds no markup from strings.
+It removes `hidden` from the play button, slider and output, so they exist only when they work. Otherwise it only sets classes, the hooks above and the slider's `aria-valuetext`, and it relies on no selector outside the contract. It builds no markup from strings.
 Out of scope: every other file. Follow the header and style of `site/flow.js`.
 
 ## All lanes
+
+L2's runtime behaviour has no automated test, because the repo has no browser test for `site/`; the Orchestrator checks it in a browser in W2.
 
 Scratch only in `$TMPDIR`. Files outside scope refuse the run. Diff at most 400 lines. No new dependency.
