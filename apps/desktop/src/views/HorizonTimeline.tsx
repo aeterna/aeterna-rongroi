@@ -2,13 +2,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReportHeader, ReportView } from "../types";
+import "./HorizonTimeline.motion.css";
 
 interface Props {
   view: ReportView;
   header: ReportHeader;
   onStepClick?: (stepIndex: number) => void;
+}
+
+/** The step's place in the entrance stagger; the motion CSS reads it as `--i`. */
+function stepStyle(index: number): CSSProperties {
+  return { "--i": index } as CSSProperties;
 }
 
 export function HorizonTimeline({ view, header, onStepClick }: Props) {
@@ -106,13 +113,14 @@ export function HorizonTimeline({ view, header, onStepClick }: Props) {
         <span className={`timeline-badge ${badgeClass}`}>{badgeText}</span>
       </div>
 
-      <div className="timeline-track">
+      <div className="timeline-track timeline-enter">
         <div className={`timeline-line ${hasTamper ? "broken" : ""}`} />
 
         {/* Step 0: History Origin */}
         <button
           type="button"
           className={`timeline-step ${hasTamper ? "alert" : ""}`}
+          style={stepStyle(0)}
           onClick={() => onStepClick?.(0)}
         >
           <div className="timeline-dot">
@@ -135,7 +143,12 @@ export function HorizonTimeline({ view, header, onStepClick }: Props) {
         </button>
 
         {/* Step 1: Boot Time */}
-        <button type="button" className="timeline-step" onClick={() => onStepClick?.(1)}>
+        <button
+          type="button"
+          className="timeline-step"
+          style={stepStyle(1)}
+          onClick={() => onStepClick?.(1)}
+        >
           <div className="timeline-dot">
             <div className="timeline-dot-inner" />
           </div>
@@ -150,6 +163,7 @@ export function HorizonTimeline({ view, header, onStepClick }: Props) {
         <button
           type="button"
           className={`timeline-step ${fivemPlayedRecently ? "" : "muted"}`}
+          style={stepStyle(2)}
           onClick={() => onStepClick?.(2)}
         >
           <div className="timeline-dot">
@@ -163,7 +177,12 @@ export function HorizonTimeline({ view, header, onStepClick }: Props) {
         </button>
 
         {/* Step 3: Current Scan */}
-        <button type="button" className="timeline-step active" onClick={() => onStepClick?.(3)}>
+        <button
+          type="button"
+          className="timeline-step active"
+          style={stepStyle(3)}
+          onClick={() => onStepClick?.(3)}
+        >
           <div className="timeline-dot">
             <div className="timeline-dot-inner" />
           </div>
