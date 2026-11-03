@@ -24,10 +24,10 @@ Root: `<figure data-scan-scene>`, exactly one per page. Words live only in the H
 |---|---|---|
 | `data-scan-source` | three source boxes | read from in the "read" beat, one direction only |
 | `data-scan-row="found\|not_found\|unmeasured"` | three result rows | visible in the finished picture |
-| `data-scan-jump="found\|not_found\|unmeasured"` | three `<button>` tallies, each showing 1 | go to that beat and stop |
+| `data-scan-jump="found\|not_found\|unmeasured"` | three `<button disabled>` tallies, each showing 1 | go to that beat and stop; script enables them, except under reduced motion, where every row already shows |
 | `data-scan-play` | `<button hidden>` | pause, play, replay; label from `data-msg-play`, `-pause`, `-replay` on the root |
 | `data-scan-window` | `<input type=range min=0 max=29 value=23 hidden data-reach=16>` | days ago is 30 minus the value, so 30 to 1; `data-reach` is the lowest value the example log still holds, which is 14 days ago |
-| `data-scan-window-out` | `<output hidden>` | polite live text from `data-msg-in` or `data-msg-out`, `{n}` is days ago |
+| `data-scan-window-out` | `<output hidden>` | polite live text from `data-msg-in` or `data-msg-out`, `{n}` is days ago; hidden whenever the not-found row is out of sight |
 | `data-scan-live` | root, set by script only | animation is running; CSS hides rows without `.scan-in` |
 | `.scan-in` | row, source, jump; set by script only | reached |
 | `.scan-active` | source; set by script only | being read |
