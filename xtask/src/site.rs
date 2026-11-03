@@ -1159,15 +1159,15 @@ mod tests {
         // The second label also has a space after the word: a scan that ignores quotes takes that
         // whitespace for an attribute boundary.
         for label in ["x hidden", "x hidden "] {
-            let page = format!(concat!(
-                "<button data-scan-play hidden></button>",
-                "<input type=\"range\" min=\"0\" max=\"29\" value=\"23\" data-scan-window",
-                " data-reach=\"16\" aria-label=\"{label}\">",
-                "<output data-scan-window-out hidden></output>",
-                "<button data-scan-jump=\"found\" disabled></button>",
-                "<button data-scan-jump=\"not_found\" disabled></button>",
-                "<button data-scan-jump=\"unmeasured\" disabled></button>",
-            ));
+            let page = format!(
+                "<button data-scan-play hidden></button>\
+                 <input type=\"range\" min=\"0\" max=\"29\" value=\"23\" data-scan-window \
+                 data-reach=\"16\" aria-label=\"{label}\">\
+                 <output data-scan-window-out hidden></output>\
+                 <button data-scan-jump=\"found\" disabled></button>\
+                 <button data-scan-jump=\"not_found\" disabled></button>\
+                 <button data-scan-jump=\"unmeasured\" disabled></button>"
+            );
             let error = check_scene_controls(&page).unwrap_err();
             assert!(
                 error.contains("`data-scan-window` is not `hidden`"),
