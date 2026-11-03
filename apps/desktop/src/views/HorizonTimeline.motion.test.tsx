@@ -90,12 +90,7 @@ describe("HorizonTimeline entrance stagger", () => {
 
     const steps = Array.from(container.querySelectorAll<HTMLElement>(".timeline-step"));
     expect(steps).toHaveLength(4);
-    expect(steps.map((step) => step.style.getPropertyValue("--i"))).toEqual([
-      "0",
-      "1",
-      "2",
-      "3",
-    ]);
+    expect(steps.map((step) => step.style.getPropertyValue("--i"))).toEqual(["0", "1", "2", "3"]);
     // The entrance only appends its marker; the classes existing CSS and tests rely on stay.
     expect(steps.map((step) => step.classList.contains("timeline-step"))).toEqual([
       true,
