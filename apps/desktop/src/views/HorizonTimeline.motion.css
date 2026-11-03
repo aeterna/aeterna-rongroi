@@ -1,0 +1,50 @@
+/*
+ * SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+ */
+
+/* H10: the timeline draws itself in once per mount. The line grows from the left, then each step
+   follows 90 ms after the one before it. The play is decoration only: the real text is in the DOM
+   from the first frame, and the final keyframe is the ordinary resting state. */
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-enter .timeline-line {
+    transform-origin: left;
+    animation: timeline-line-grow 600ms ease-out;
+    animation-fill-mode: both;
+  }
+
+  .timeline-enter .timeline-step {
+    animation: timeline-step-in 300ms ease-out;
+    animation-fill-mode: both;
+    animation-delay: calc(var(--i, 0) * 90ms);
+  }
+
+  /* A filled-in keyframe would outrank the button's own hover lift, which is part of the resting
+     state; the individual translate property composes with the animated transform. */
+  .timeline-enter .timeline-step:hover {
+    translate: 0 -3px;
+  }
+
+  @keyframes timeline-line-grow {
+    from {
+      transform: scaleX(0);
+    }
+
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes timeline-step-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

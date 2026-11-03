@@ -6,6 +6,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The Horizon timeline draws its line and steps in once when it appears.
 - The report shows a loading skeleton with a shimmer while its data arrives.
 - Translucent panels get a light inner edge and a softer shadow; the header stays the only backdrop blur.
 - Each evidence row has a Source button that opens a side drawer with the row's rule id, collector, look-back and code links; it shows nothing the row does not already show (ADR 0093).
