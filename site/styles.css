@@ -1732,12 +1732,46 @@ footer p {
 }
 
 /* The window slider: days ago from 30 down, on a full-width line of its own so the scale's split under it
-   lines up. The thumb takes the page's blue; scan.js writes aria-valuetext, so no extra labelling is
-   needed beyond the aria-label the HTML carries. */
+   lines up. The track carries no progress fill — the browser's own one would paint the older side blue and
+   read against the labels. Left of data-reach it is the pale line colour, past it the page's blue, split at
+   16 of 29 where the scale's columns split. The thumb takes the page's blue; scan.js writes aria-valuetext,
+   so no extra labelling is needed beyond the aria-label the HTML carries. */
 .scan-controls input[type="range"] {
   flex: 1 1 100%;
   min-width: 0;
-  accent-color: var(--blue);
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+}
+
+.scan-controls input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line) 0, var(--line) calc(100% * 16 / 29), var(--blue) calc(100% * 16 / 29));
+}
+
+.scan-controls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 2px solid var(--surface-solid);
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.scan-controls input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line) 0, var(--line) calc(100% * 16 / 29), var(--blue) calc(100% * 16 / 29));
+}
+
+.scan-controls input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--surface-solid);
+  border-radius: 50%;
+  background: var(--blue);
 }
 
 /* The scale under the slider: out of reach on the older side, still held on the newer one, split where
