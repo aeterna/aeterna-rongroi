@@ -564,7 +564,7 @@ mod tests {
                 selectors: 1,
                 experimental: 1,
                 test: 1,
-                stable: 0
+                stable: 0,
             }
         );
         write_rule(&dir, "bam/a/four", "retired", None);
@@ -850,7 +850,11 @@ mod tests {
         }
         let mut rows = attr_values(scene, "data-scan-row");
         rows.sort();
-        if rows.iter().map(String::as_str).ne(["found", "not_found", "unmeasured"]) {
+        if rows
+            .iter()
+            .map(String::as_str)
+            .ne(["found", "not_found", "unmeasured"])
+        {
             return Err("the scene does not have the three result rows".to_owned());
         }
         let jump_tags: Vec<&str> = opening_tags(scene)
@@ -862,7 +866,10 @@ mod tests {
             .filter_map(|tag| attribute_value(tag, "data-scan-jump"))
             .collect();
         jumps.sort();
-        if jumps.iter().map(String::as_str).ne(["found", "not_found", "unmeasured"])
+        if jumps
+            .iter()
+            .map(String::as_str)
+            .ne(["found", "not_found", "unmeasured"])
             || !jump_tags.iter().all(|tag| tag.starts_with("<button"))
         {
             return Err("the scene does not have the three jump buttons".to_owned());
