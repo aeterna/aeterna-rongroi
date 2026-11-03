@@ -697,22 +697,36 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
     }
 
-    /// Where the attribute `name` starts in one opening tag, if the tag carries it.
+    /// Where the attribute `name` starts in one opening tag, if the tag carries it. A word inside a
+    /// quoted value is not an attribute, so `aria-label="x hidden"` does not carry `hidden`.
     fn find_attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
-        let mut rest = tag;
-        while let Some(at) = rest.find(name) {
-            let before = rest[..at]
-                .chars()
-                .next_back()
-                .is_none_or(char::is_whitespace);
-            let after = &rest[at + name.len()..];
-            let boundary = after.is_empty()
-                || after.starts_with('=')
-                || after.starts_with(|c: char| c.is_whitespace() || c == '>' || c == '/');
-            if before && boundary {
-                return Some(after);
+        let mut quote = None;
+        for (at, c) in tag.char_indices() {
+            match quote {
+                Some(open) => {
+                    if c == open {
+                        quote = None;
+                    }
+                }
+                None => {
+                    if c == '"' || c == '\'' {
+                        quote = Some(c);
+                    } else if tag[at..].starts_with(name) {
+                        let before = tag[..at]
+                            .chars()
+                            .next_back()
+                            .is_none_or(char::is_whitespace);
+                        let after = &tag[at + name.len()..];
+                        let boundary = after.is_empty()
+                            || after.starts_with('=')
+                            || after
+                                .starts_with(|c: char| c.is_whitespace() || c == '>' || c == '/');
+                        if before && boundary {
+                            return Some(after);
+                        }
+                    }
+                }
             }
-            rest = after;
         }
         None
     }
@@ -904,8 +918,8 @@ mod tests {
         Ok(())
     }
 
-    /// p2: play, slider and output are `hidden` in the HTML, and the slider carries the contract's
-    /// `type`, `min`, `max`, `value` and `data-reach`.
+    /// p2: play, slider and output are `hidden` in the HTML, the three jump buttons are `disabled`,
+    /// and the slider carries the contract's `type`, `min`, `max`, `value` and `data-reach`.
     fn check_scene_controls(page: &str) -> Result<(), String> {
         let play = tag_with(page, "data-scan-play")?;
         let slider = tag_with(page, "data-scan-window")?;
@@ -935,6 +949,28 @@ mod tests {
             if attribute_value(slider, name).as_deref() != Some(expected) {
                 return Err(format!("the scan slider's `{name}` is not `{expected}`"));
             }
+        }
+        let jump_tags: Vec<&str> = opening_tags(page)
+            .into_iter()
+            .filter(|tag| has_attribute(tag, "data-scan-jump"))
+            .collect();
+        let mut jumps: Vec<String> = jump_tags
+            .iter()
+            .filter_map(|tag| attribute_value(tag, "data-scan-jump"))
+            .collect();
+        jumps.sort();
+        if jumps
+            .iter()
+            .map(String::as_str)
+            .ne(["found", "not_found", "unmeasured"])
+        {
+            return Err("the scene does not have the three jump buttons".to_owned());
+        }
+        if let Some(tag) = jump_tags.iter().find(|tag| !has_attribute(tag, "disabled")) {
+            let jump = attribute_value(tag, "data-scan-jump").unwrap_or_default();
+            return Err(format!(
+                "the `{jump}` jump button is not `disabled` in the HTML"
+            ));
         }
         Ok(())
     }
@@ -1098,5 +1134,45 @@ mod tests {
     #[test]
     fn a_scene_that_says_a_pc_is_clean_fails_the_word_check() {
         assert!(check_scene_words("สะอาด").unwrap_err().contains("สะอาด"));
+    }
+
+    #[test]
+    fn a_jump_button_that_is_not_disabled_fails_the_control_check() {
+        let page = concat!(
+            "<button data-scan-play hidden></button>",
+            "<input type=\"range\" min=\"0\" max=\"29\" value=\"23\"",
+            " data-scan-window data-reach=\"16\" hidden>",
+            "<output data-scan-window-out hidden></output>",
+            "<button data-scan-jump=\"found\" disabled></button>",
+            "<button data-scan-jump=\"not_found\" disabled></button>",
+            "<button data-scan-jump=\"unmeasured\"></button>",
+        );
+        let error = check_scene_controls(page).unwrap_err();
+        assert!(
+            error.contains("`unmeasured` jump button is not `disabled`"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_word_inside_a_quoted_attribute_value_is_not_a_hidden_attribute() {
+        // The second label also has a space after the word: a scan that ignores quotes takes that
+        // whitespace for an attribute boundary.
+        for label in ["x hidden", "x hidden "] {
+            let page = format!(concat!(
+                "<button data-scan-play hidden></button>",
+                "<input type=\"range\" min=\"0\" max=\"29\" value=\"23\" data-scan-window",
+                " data-reach=\"16\" aria-label=\"{label}\">",
+                "<output data-scan-window-out hidden></output>",
+                "<button data-scan-jump=\"found\" disabled></button>",
+                "<button data-scan-jump=\"not_found\" disabled></button>",
+                "<button data-scan-jump=\"unmeasured\" disabled></button>",
+            ));
+            let error = check_scene_controls(&page).unwrap_err();
+            assert!(
+                error.contains("`data-scan-window` is not `hidden`"),
+                "{label}: {error}"
+            );
+        }
     }
 }
