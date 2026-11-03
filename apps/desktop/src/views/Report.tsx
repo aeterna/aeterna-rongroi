@@ -30,6 +30,7 @@ import "./Report.motion.css";
 import { usePresenter } from "./Report.presenter";
 import { ReportPresenter } from "./ReportPresenter";
 import { ReportProgress } from "./ReportProgress";
+import { ReportSkeleton } from "./ReportSkeleton";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
@@ -163,7 +164,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const presenter = usePresenter(groupIds, mode === "ss" && viewMode === "technical");
 
   if (!view) {
-    return null;
+    return <ReportSkeleton />;
   }
   const { header } = view;
   const rights =
