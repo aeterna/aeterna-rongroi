@@ -6,6 +6,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The landing page gets the same press, focus-glow and count-pulse micro-interactions as the app.
 - The Horizon timeline draws its line and steps in once when it appears.
 - The report shows a loading skeleton with a shimmer while its data arrives.
 - Translucent panels get a light inner edge and a softer shadow; the header stays the only backdrop blur.

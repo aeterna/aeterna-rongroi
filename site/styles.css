@@ -1457,3 +1457,87 @@ footer p {
     transition: none;
   }
 }
+
+/* E12 micro-interactions (web) */
+/* A press, a soft keyboard-focus ring and one small tally pulse, mirroring apps/desktop/src/micro.css
+   without importing it. Decoration only: it never scores, hides, greys out or vouches for anything,
+   never re-colours a found / not found / unmeasured mark, and changes no text or layout. Everything
+   sits inside the no-preference query, so a reader who asks for reduced motion keeps the page's
+   final, still state. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The existing colour fades stay in each list, so this press rule does not collapse them to an
+     instant flip where the shorthand wins the cascade. */
+  .btn {
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .tally-box {
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .cmp .seg button {
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+
+  /* The pill buttons press in and return on the same 120 ms ease. */
+  .btn:active,
+  .tally-box:active:not(:disabled),
+  .cmp .seg button:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Keyboard focus keeps the styles.css outline and gains a soft glow ring beside it; the ring never
+     replaces the outline and no element loses a resting shadow it already had. */
+  a:focus-visible,
+  button:focus-visible,
+  summary:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    box-shadow: 0 0 0 4px rgba(8, 105, 176, 0.3);
+  }
+
+  .btn.primary:focus-visible {
+    box-shadow:
+      0 0 0 4px rgba(8, 105, 176, 0.3),
+      0 10px 22px -10px #0869b0b3;
+  }
+
+  .btn.secondary:focus-visible {
+    box-shadow:
+      0 0 0 4px rgba(8, 105, 176, 0.3),
+      var(--shadow);
+  }
+
+  .tally-box[aria-pressed="true"]:focus-visible {
+    box-shadow:
+      0 0 0 4px rgba(8, 105, 176, 0.3),
+      inset 0 0 0 1px var(--line-strong),
+      0 4px 10px -6px #2a5d9a99;
+  }
+
+  /* The specimen's count boxes and their numerals pulse once on load, transform only. */
+  .tally-box,
+  .tally b {
+    animation: tally-pulse 220ms ease-out 1;
+  }
+
+  @keyframes tally-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.04);
+    }
+  }
+}
