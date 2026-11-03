@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { ageTexts, codeLinks, reportView, ruleTexts } from "../api";
 import { type EvidenceGroup, groupEvidence, type StateFilter } from "../grouping";
 import { withKeys } from "../keys";
+import { motionReduced } from "../motion";
 import type {
   AgeText,
   BootTime,
@@ -43,9 +44,6 @@ const REVEAL_DURATION_MS = 300;
 /** How long a play can still be running: the last staggered group's delay plus its rise. */
 const REVEAL_LIFETIME_MS =
   (REVEAL_STAGGER_GROUPS - 1) * REVEAL_STAGGER_STEP_MS + REVEAL_DURATION_MS;
-/** The media query that switches the whole reveal off. */
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-
 /** The step for one group's place in the stagger; past the eighth group, no delay at all. */
 function revealDelayMs(index: number): number {
   return index < REVEAL_STAGGER_GROUPS ? index * REVEAL_STAGGER_STEP_MS : 0;
@@ -53,8 +51,7 @@ function revealDelayMs(index: number): number {
 
 /** Reads the user's motion preference; a missing matchMedia (tests, jsdom) counts as no request. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+  return motionReduced();
 }
 
 interface Props {
@@ -471,8 +468,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
           className="scroll-top"
           aria-label={t("scroll_top")}
           onClick={() => {
-            const reduceMotion =
-              window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+            const reduceMotion = motionReduced();
             window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
             // The button unmounts once the window is back at the top, so focus moves to the header's
             // way home rather than falling to the body.

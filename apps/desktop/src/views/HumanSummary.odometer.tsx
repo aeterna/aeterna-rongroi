@@ -3,14 +3,14 @@
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
 import { useEffect, useState } from "react";
+import { motionReduced } from "../motion";
 
 /** Digits every rolling strip holds, from 0 to 9. */
 const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 /** Reads the user's motion preference; a missing matchMedia (tests, jsdom) counts as no request. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return motionReduced();
 }
 
 /**

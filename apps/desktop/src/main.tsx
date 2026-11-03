@@ -6,8 +6,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { initI18n } from "./i18n";
+import { initMotion } from "./motion";
 import "./styles.css";
 import "./micro.css";
+import "./motion-off.css";
+
+initMotion();
 
 const root = document.getElementById("root");
 if (root) {

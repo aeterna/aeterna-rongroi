@@ -13,6 +13,7 @@ import {
   reportHeader,
 } from "./api";
 import { languageNames, supportedLanguages } from "./i18n";
+import { setAnimationsOff, useAnimationsOff } from "./motion";
 import type { Mode, ReportHeader, SavedSummary, SsOptions } from "./types";
 import { About } from "./views/About";
 import { Consent } from "./views/Consent";
@@ -29,6 +30,7 @@ type Screen =
 
 export function App() {
   const { t, i18n } = useTranslation();
+  const off = useAnimationsOff();
   const [header, setHeader] = useState<ReportHeader | null>(null);
   const [headerFailed, setHeaderFailed] = useState(false);
   const [screen, setScreen] = useState<Screen>("start");
@@ -115,6 +117,17 @@ export function App() {
             }}
           >
             {t("nav.about")}
+          </button>
+          <button
+            type="button"
+            className="nav"
+            aria-pressed={!off}
+            onClick={() => setAnimationsOff(!off)}
+          >
+            {t("motion.toggle", { defaultValue: "Animations" })}:{" "}
+            {off
+              ? t("motion.off", { defaultValue: "off" })
+              : t("motion.on", { defaultValue: "on" })}
           </button>
           <label className="language">
             {t("language.label")}{" "}

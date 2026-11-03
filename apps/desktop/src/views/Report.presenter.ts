@@ -6,13 +6,11 @@
 // dims the others by position only; no group's state or identity ever decides what is current.
 
 import { useEffect, useState } from "react";
-
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+import { motionReduced } from "../motion";
 
 /** Reads the user's motion preference; a missing matchMedia (tests, jsdom) counts as no request. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+  return motionReduced();
 }
 
 /** True when the event lands in a field that owns the arrow, Home and End keys itself. */

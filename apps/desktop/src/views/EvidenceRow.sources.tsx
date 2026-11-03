@@ -8,6 +8,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { motionReduced } from "../motion";
 import type { Evidence, RuleFiles, RuleText } from "../types";
 import { CodeLink } from "./CodeLink";
 import "./EvidenceRow.sources.css";
@@ -172,10 +173,7 @@ export function SourcesButton({ item, text, fileBase, treeBase }: Props) {
 
 /** Whether the platform asks for reduced motion; a missing `matchMedia` is not a reason to throw. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return false;
-  }
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return motionReduced();
 }
 
 /**

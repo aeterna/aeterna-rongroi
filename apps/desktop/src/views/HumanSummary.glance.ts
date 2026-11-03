@@ -3,6 +3,7 @@
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
 import { type RefObject, useEffect, useRef } from "react";
+import { motionReduced } from "../motion";
 
 /** The media query that switches the whole decoration off. */
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
@@ -12,8 +13,7 @@ const MAX_TILT_DEG = 6;
 
 /** Reads the motion preference; a missing matchMedia (tests, jsdom) is no request, never a throw. */
 function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+  return motionReduced();
 }
 
 /**
@@ -74,13 +74,14 @@ export function useGlanceFx<T extends HTMLElement>(enabled = true): RefObject<T 
 
     const query =
       typeof window.matchMedia === "function" ? window.matchMedia(REDUCED_MOTION_QUERY) : null;
-    const onMotionChange = (event: MediaQueryListEvent) => {
-      reduced = event.matches;
+    const onMotionChange = () => {
+      reduced = motionReduced();
       if (reduced) reset();
     };
 
     card.addEventListener("pointermove", onPointerMove);
     card.addEventListener("pointerleave", onPointerLeave);
+    window.addEventListener("rongroi:motion", onMotionChange);
     if (query && typeof query.addEventListener === "function") {
       query.addEventListener("change", onMotionChange);
     }
@@ -89,6 +90,7 @@ export function useGlanceFx<T extends HTMLElement>(enabled = true): RefObject<T 
       reset();
       card.removeEventListener("pointermove", onPointerMove);
       card.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("rongroi:motion", onMotionChange);
       if (query && typeof query.removeEventListener === "function") {
         query.removeEventListener("change", onMotionChange);
       }
