@@ -75,6 +75,8 @@
   --mono: "Cascadia Mono", Consolas, ui-monospace, "SFMono-Regular", Menlo, monospace;
   --radius: 18px;
   --shadow: 0 10px 30px -14px #2a5d9a59;
+  /* A frosted panel catches the light on its top edge instead of paying for a second backdrop blur. */
+  --panel-edge: inset 0 1px 0 #ffffffcc, inset 0 0 0 1px #ffffff66;
   font-family: "Anuphan", "Segoe UI", "Leelawadee UI", "Noto Sans Thai", system-ui, sans-serif;
   font-size: 15.5px;
   color: var(--text);
@@ -370,7 +372,7 @@ button:disabled {
   border: 1px solid #ffffff;
   border-radius: 24px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--panel-edge), var(--shadow);
   padding: 24px 56px 24px 24px;
   font-family: inherit;
   font-weight: 400;
@@ -396,7 +398,7 @@ button:disabled {
 .choice:hover:not(:disabled) {
   background: var(--surface-solid);
   transform: translateY(-2px);
-  box-shadow: 0 16px 34px -14px #2a5d9a73;
+  box-shadow: var(--panel-edge), 0 16px 34px -14px #2a5d9a73;
 }
 
 .choice:hover::after {
@@ -439,7 +441,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid #ffffff;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--panel-edge), var(--shadow);
   padding: 20px;
 }
 
@@ -510,7 +512,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid #ffffff;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--panel-edge), var(--shadow);
   overflow: hidden;
 }
 
@@ -1065,7 +1067,7 @@ details summary {
   background: var(--surface);
   border: 1px solid #ffffff;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--panel-edge), var(--shadow);
   padding: 14px 18px;
   display: grid;
   gap: 8px;
@@ -1076,7 +1078,7 @@ details summary {
   background: var(--surface);
   border: 1px solid #ffffff;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--panel-edge), var(--shadow);
   padding: 14px 18px;
   display: grid;
   gap: 10px;
@@ -1194,7 +1196,7 @@ details summary {
   background: var(--surface);
   border: 1px solid #ffffff;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--panel-edge), var(--shadow);
   padding: 20px;
 }
 
@@ -1232,7 +1234,7 @@ details summary {
   background: var(--surface);
   border: 1px solid #ffffff;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--panel-edge), var(--shadow);
 }
 
 .consent li {
