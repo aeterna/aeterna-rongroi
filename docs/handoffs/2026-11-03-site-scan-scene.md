@@ -38,7 +38,7 @@ Beats, roughly: read 0–3 s, found 3–5 s, not found 5–7 s, not measured 7�
 Rows, sources and copy (Thai / English). Sources: `การตั้งค่า Windows` / `Windows settings`; `Event log ของ Windows` / `Windows event log`; `เฟิร์มแวร์` / `Firmware`.
 
 - Found: the specimen card's Secure Boot row, words as they stand on each page, from Windows settings.
-- Not found: `Security log มีบันทึกว่าตัวเองถูกล้าง` / `The Security log records that it was cleared` (rule `ff967b28-984b-4de0-b361-58367ae0c2d5`), from the event log.
+- Not found: `ตรวจ: Security log มีบันทึกว่าตัวเองถูกล้าง` / `Check: The Security log records that it was cleared` (rule `ff967b28-984b-4de0-b361-58367ae0c2d5`), from the event log.
   Below it: `ตัวอย่าง: log นี้ย้อนได้ 14 วัน ของจริงแต่ละเครื่องไม่เท่ากัน` / `Example: this log reaches back 14 days. It differs on every PC.`
 - Not measured: the specimen card's firmware row, words as they stand on each page, reason included.
 - `data-msg-in`: `{n} วันก่อน: ไม่เจอในช่วงนี้` / `{n} day(s) ago: not found in this stretch`.
