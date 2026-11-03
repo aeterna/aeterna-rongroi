@@ -49,7 +49,7 @@
   var want = false;      // the timeline should run (autoplay, or an explicit play)
   var armed = true;      // autoplay is still allowed, until a touch or the end takes it away
   var onscreen = false;
-  var tabVisible = true;
+  var tabVisible = !document.hidden;
   var raf = null;
   var last = 0;
 
@@ -116,6 +116,22 @@
     }
   }
 
+  // The jump buttons are disabled in the markup: the script arms them only once every check has
+  // passed, and keeps them disabled under reduced motion, where every row already shows.
+  function updateJumps() {
+    var enable = !reduce.matches;
+    jumps.forEach(function (jumpButton) {
+      jumpButton.disabled = !enable;
+    });
+  }
+
+  // The output speaks of the not-found row, so it follows that row's visibility: hidden while the
+  // live state still holds the row out of sight — during the run before its beat, after a jump to an
+  // earlier beat and after replay — and shown otherwise.
+  function updateOutBox() {
+    outBox.hidden = started && !finished && !reduce.matches && t < STARTS[1];
+  }
+
   function update() {
     var run = started && !finished && want && onscreen && tabVisible && !reduce.matches;
     if (run && raf === null) {
@@ -133,6 +149,8 @@
     } else {
       root.removeAttribute("data-scan-live");
     }
+    updateJumps();
+    updateOutBox();
     setPlayLabel();
   }
 
@@ -148,6 +166,7 @@
     }
     t += step;
     render(t);
+    updateOutBox();
     if (t >= END) {
       finished = true;
       want = false;
@@ -230,9 +249,10 @@
     if (want) {
       want = false; // hold the frame while the reader explores the stretch
     }
-    // The slider's message speaks of the not-found row; while the live state still holds that row
-    // out of sight, the slider holds the scene at the not-found beat or later, so it never describes
-    // a row nobody can see. (With reduced motion the picture stands as written and the row shows.)
+    // The slider's message speaks of the not-found row; when the live state still holds that row out
+    // of sight, the scene moves to the not-found beat so a touch of the slider does not leave the
+    // message describing a row nobody can see. It is only that one nudge: until the row is reached,
+    // updateOutBox keeps the output itself hidden.
     if (started && !finished && !reduce.matches && t < STARTS[1]) {
       t = STARTS[1];
       render(t);
@@ -259,7 +279,8 @@
   });
 
   new IntersectionObserver(function (entries) {
-    onscreen = entries[0].isIntersecting;
+    // Entries can arrive batched; the newest one carries the current visibility.
+    onscreen = entries[entries.length - 1].isIntersecting;
     mayAutoplay();
     update();
   }, { threshold: 0.1 }).observe(root);
