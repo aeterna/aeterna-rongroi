@@ -95,16 +95,17 @@
   }
 
   // The frame at t: each source is read during its second of the read beat, the wire showing the
-  // beat's progress; each row appears when its beat starts and holds the stage until the next one.
+  // beat's progress; each row appears when its beat starts and holds the stage until the next one,
+  // and its jump tally comes in with it — .scan-in is only ever "reached", and only .scan-active
+  // marks a source being read, so the rows carry no live mark of their own.
   function render(at) {
     root.style.setProperty("--scan-wire", (at >= READ_END ? 1 : at / READ_END).toFixed(4));
     NAMES.forEach(function (name, i) {
       var beatStart = STARTS[i];
-      var beatEnd = i < 2 ? STARTS[i + 1] : END;
       setMark(sources[i], "scan-in", at >= i + 1);
       setMark(sources[i], "scan-active", at >= i && at < i + 1);
       setMark(rows[i], "scan-in", at >= beatStart);
-      setMark(rows[i], "scan-active", at >= beatStart && at < beatEnd);
+      setMark(jumps[i], "scan-in", at >= beatStart);
     });
   }
 
@@ -228,6 +229,13 @@
     armed = false; // a touched control ends autoplay until replay arms it again
     if (want) {
       want = false; // hold the frame while the reader explores the stretch
+    }
+    // The slider's message speaks of the not-found row; while the live state still holds that row
+    // out of sight, the slider holds the scene at the not-found beat or later, so it never describes
+    // a row nobody can see. (With reduced motion the picture stands as written and the row shows.)
+    if (started && !finished && !reduce.matches && t < STARTS[1]) {
+      t = STARTS[1];
+      render(t);
     }
     windowText();
     update();
