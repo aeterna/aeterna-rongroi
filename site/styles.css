@@ -1096,7 +1096,9 @@ footer p {
 @media (prefers-reduced-motion: reduce) {
   .btn,
   .tally-box,
-  .specimen-tech-btn {
+  .specimen-tech-btn,
+  .scan-source,
+  .scan-play {
     transition: none;
   }
 }
@@ -1539,5 +1541,245 @@ footer p {
     50% {
       transform: scale(1.04);
     }
+  }
+}
+
+/* ==== One scan, start to finish (E13): the scan scene ==== */
+/* One example scan, drawn under the sources it was read from. Every beat of .scan-beats pairs one source
+   on the left with the result row that came from reading it on the right, joined by a wire that runs one
+   direction only, from the source to the row. The words live in the HTML; the hooks, .scan-in,
+   .scan-active, --scan-wire and data-scan-live below are set by scan.js (the 2026-11-03 site-scan-scene
+   handoff). With JavaScript off — and until scan.js runs — the finished picture stands: every row, source
+   and wire drawn, and the play button, slider and output stay hidden as written. While data-scan-live is
+   set, a row not reached yet is held out of sight but keeps its place, and the wire of the source being
+   read draws with --scan-wire (0 to 1). Colours are the page's existing vars, so the bright-sky look and
+   the AA text colours hold; the marks keep the page's shapes and never turn green. */
+.scan {
+  margin: 0;
+  padding: 20px;
+  background: var(--surface);
+  border: 2px solid #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* The tag always shows, in every beat, so no one takes the picture for a scan of their own PC. */
+.scan-tag {
+  width: fit-content;
+  margin: 0 0 12px auto;
+  font: 600 0.78rem var(--display);
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.scan-beats {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.scan-beat {
+  display: grid;
+  grid-template-columns: minmax(8.5em, 13em) 44px 1fr;
+  gap: 6px 14px;
+  align-items: center;
+}
+
+.scan-source {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-solid);
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  transition: border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+}
+
+/* Being read reads as a double line, as the pressed tally does: a change of shape, never colour alone. */
+.scan-source.scan-active {
+  border-color: var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+}
+
+/* The wire draws towards its row: stroke-dashoffset against a pathLength of 1, so --scan-wire alone sets
+   how far it has reached. Standing still, every wire is simply drawn. */
+.scan-wire {
+  width: 100%;
+  height: 12px;
+  justify-self: stretch;
+}
+
+.scan-wire-line {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-scan-scene][data-scan-live] .scan-wire-line {
+  stroke-dashoffset: 1;
+}
+
+[data-scan-scene][data-scan-live] .scan-source.scan-in + .scan-wire .scan-wire-line {
+  stroke-dashoffset: 0;
+}
+
+[data-scan-scene][data-scan-live] .scan-source.scan-active + .scan-wire .scan-wire-line {
+  stroke-dashoffset: calc(1 - var(--scan-wire, 0));
+}
+
+/* The three result rows, drawn like the specimen's rows and the three states further up the page: found
+   keeps the warm ground and its inset bar, not found a plain box, not measured a dashed one. */
+.scan-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 14px;
+  background: #ffffffb3;
+  box-shadow: none;
+  font-size: 0.9rem;
+}
+
+.scan-row[data-scan-row="found"] {
+  border-color: var(--found-line);
+  background: var(--found-ground);
+  box-shadow: inset 4px 0 0 var(--found-mark);
+}
+
+.scan-row[data-scan-row="unmeasured"] {
+  border: 1px dashed var(--unmeasured-line);
+  background: var(--unmeasured-ground);
+}
+
+.scan-row .mark {
+  margin-top: 7px;
+}
+
+.scan-words {
+  display: grid;
+  gap: 1px;
+}
+
+.scan-title {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.scan-desc {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* While the scene plays, a row the scan has not reached yet is out of sight but still occupies its grid
+   place, so the picture does not jump between beats. */
+[data-scan-scene][data-scan-live] .scan-row:not(.scan-in) {
+  visibility: hidden;
+}
+
+/* The jump tallies re-use the specimen's tally boxes, marks and state colours; only the spacing belongs
+   to the scene. */
+.scan .tally {
+  margin: 0 0 16px;
+}
+
+/* The scene's one strip of controls. Everything in it starts hidden and scan.js reveals each part only
+   where it works, so the strip itself disappears while they all are. (:has fallback: without it the
+   strip is merely a thin empty gap, and the page still reads the same.) */
+.scan-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.scan-controls:not(:has(:not([hidden]))) {
+  display: none;
+}
+
+.scan-play {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-solid);
+  color: var(--navy);
+  font: 600 0.85rem var(--display);
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.scan-play:hover {
+  border-color: var(--line-strong);
+}
+
+.scan-play:focus-visible,
+.scan-controls input[type="range"]:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* The play button's three words are written in the HTML, keyed by data-msg-use beside their data-msg-*
+   names on the root; CSS shows the one that matches the scene's state, and scan.js stays to the hooks:
+   running says pause, held says play, reached-and-held says replay. */
+.scan-controls .scan-act {
+  display: none;
+  align-items: center;
+}
+
+.scan-controls .scan-act[data-msg-use="play"] {
+  display: inline-flex;
+}
+
+[data-scan-scene][data-scan-live] .scan-act[data-msg-use="play"] {
+  display: none;
+}
+
+[data-scan-scene][data-scan-live] .scan-act[data-msg-use="pause"] {
+  display: inline-flex;
+}
+
+[data-scan-scene]:not([data-scan-live]):has(.scan-row.scan-in) .scan-act[data-msg-use="play"] {
+  display: none;
+}
+
+[data-scan-scene]:not([data-scan-live]):has(.scan-row.scan-in) .scan-act[data-msg-use="replay"] {
+  display: inline-flex;
+}
+
+/* The window slider: days ago from 30 down. The thumb takes the page's blue; scan.js writes
+   aria-valuetext, so no extra labelling is needed beyond the aria-label the HTML carries. */
+.scan-controls input[type="range"] {
+  flex: 1 1 220px;
+  min-width: 0;
+  accent-color: var(--blue);
+}
+
+.scan-window-out {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Narrow screens: the beats stack, the decorative wire steps aside and the direction shows through the
+   order of source and row and the source being read. */
+@media (max-width: 560px) {
+  .scan-beat {
+    grid-template-columns: 1fr;
+  }
+
+  .scan-wire {
+    display: none;
   }
 }
