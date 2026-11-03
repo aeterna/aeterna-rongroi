@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-03
+
 ### Added
 - The header has an Animations on/off switch that stops every decoration animation in the app and remembers the choice; it adds to, and never replaces, the system reduced-motion setting, and no result changes.
 - The landing page gets the same press, focus-glow and count-pulse micro-interactions as the app.
