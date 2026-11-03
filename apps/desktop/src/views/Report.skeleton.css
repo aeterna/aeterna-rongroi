@@ -1,0 +1,37 @@
+/* SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. */
+
+/* Placeholders for the report's own panels: neutral grey-blue, never a state colour. The blocks are
+   decoration only; the status line inside the section carries the meaning. */
+.report-skeleton {
+  display: grid;
+  gap: 20px;
+}
+
+.report-skeleton-block {
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--line);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Only transform moves; under reduced motion there is no sweep and the blocks stay as they are. */
+  .report-skeleton-block::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, #ffffffb3, transparent);
+    transform: translateX(-100%);
+    animation: report-skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes report-skeleton-shimmer {
+    to {
+      transform: translateX(100%);
+    }
+  }
+}

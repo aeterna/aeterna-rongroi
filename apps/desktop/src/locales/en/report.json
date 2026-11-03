@@ -584,5 +584,8 @@
     "collector": "Collector",
     "retention": "Look-back",
     "code": "Where this is in the code"
+  },
+  "skeleton": {
+    "loading": "Loading the report"
   }
 }
