@@ -7,6 +7,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 - The header has an Animations on/off switch that stops every decoration animation in the app and remembers the choice; it adds to, and never replaces, the system reduced-motion setting, and no result changes.
+- The landing page gets the same press, focus-glow and count-pulse micro-interactions as the app.
 - The Horizon timeline draws its line and steps in once when it appears.
 - The report shows a loading skeleton with a shimmer while its data arrives.
 - Translucent panels get a light inner edge and a softer shadow; the header stays the only backdrop blur.
