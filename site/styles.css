@@ -1685,6 +1685,20 @@ footer p {
   margin: 0 0 16px;
 }
 
+/* In the HTML every jump starts disabled: with script off it is a count in a box, not a control. So a
+   disabled jump keeps the enabled box's exact look — the browser's greyed text and dimmed form controls
+   stay out of it, and the shared tally-box hover and pointer cursor do not reach a disabled button.
+   scan.js enables a jump when script runs it, and the states come back on their own. */
+.scan .tally-box:disabled {
+  color: var(--text);
+  opacity: 1;
+  cursor: default;
+}
+
+.scan .tally-box:disabled:hover {
+  border-color: var(--line);
+}
+
 /* While the scene plays, a tally whose state has not appeared keeps its place and stays usable, with its
    number out of sight until its row does. */
 [data-scan-scene][data-scan-live] [data-scan-jump]:not(.scan-in) b {
