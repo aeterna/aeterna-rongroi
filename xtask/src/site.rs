@@ -685,11 +685,13 @@ mod tests {
 
     const SCENE_LAST_TH: &str = "จบตรงนี้ ไม่มีคะแนน ไม่มีคำว่าผ่านหรือไม่ผ่าน คนเป็นผู้ตัดสิน";
     const SCENE_LAST_EN: &str = "It ends here: no score, no pass or fail. A person decides.";
+    // REUSE-IgnoreStart
     const SCENE_SCRIPT_HEADER: &str = concat!(
         "// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors\n",
         "// SPDX-License-Identifier: GPL-3.0-or-later\n",
         "// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.\n",
     );
+    // REUSE-IgnoreEnd
 
     fn site_root() -> &'static Path {
         Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
@@ -958,7 +960,15 @@ mod tests {
     fn check_scene_words(scene: &str) -> Result<(), String> {
         let text = squash(scene);
         let lower = text.to_lowercase();
-        for word in ["clean", "safe", "trusted", "สะอาด", "ปลอดภัย", "✓", "✔"] {
+        for word in [
+            "clean",
+            "safe",
+            "trusted",
+            "สะอาด",
+            "ปลอดภัย",
+            "✓",
+            "✔",
+        ] {
             if lower.contains(word) {
                 return Err(format!("the scene says `{word}`"));
             }
@@ -1052,9 +1062,13 @@ mod tests {
         let english = std::fs::read_to_string(site_root().join("site/en/index.html")).unwrap();
         let thai =
             scene_messages(&thai).unwrap_or_else(|reason| panic!("site/index.html: {reason}"));
-        let english =
-            scene_messages(&english).unwrap_or_else(|reason| panic!("site/en/index.html: {reason}"));
-        assert_eq!(thai, english, "the two pages declare different data-msg-* names");
+        let english = scene_messages(&english)
+            .unwrap_or_else(|reason| panic!("site/en/index.html: {reason}"));
+        assert_eq!(
+            thai,
+            english,
+            "the two pages declare different data-msg-* names"
+        );
     }
 
     #[test]
@@ -1082,7 +1096,11 @@ mod tests {
 
     #[test]
     fn a_scan_script_that_fetches_fails_the_safety_check() {
-        assert!(check_scan_script_safety("fetch('/x')").unwrap_err().contains("fetch"));
+        assert!(
+            check_scan_script_safety("fetch('/x')")
+                .unwrap_err()
+                .contains("fetch")
+        );
     }
 
     #[test]
