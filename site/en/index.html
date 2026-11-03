@@ -274,8 +274,9 @@
         <button type="button" class="tally-box" data-scan-jump="unmeasured"><b><span class="mark mark-unmeasured" aria-hidden="true"></span>1</b><span>Not measured</span></button>
       </div>
       <div class="scan-controls">
-        <button type="button" class="scan-play" data-scan-play hidden><span class="scan-act" data-msg-use="play">Play</span><span class="scan-act" data-msg-use="pause">Pause</span><span class="scan-act" data-msg-use="replay">Replay</span></button>
+        <button type="button" class="scan-play" data-scan-play hidden></button>
         <input type="range" min="0" max="29" value="23" data-scan-window data-reach="16" aria-label="Days before the scan" hidden>
+        <span class="scan-window-scale" aria-hidden="true"><span>Out of reach</span><span>The log still holds this</span></span>
         <output class="scan-window-out" data-scan-window-out hidden></output>
       </div>
       <p class="scan-end">It ends here: no score, no pass or fail. A person decides.</p>
