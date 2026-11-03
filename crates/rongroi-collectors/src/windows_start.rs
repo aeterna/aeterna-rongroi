@@ -35,12 +35,14 @@ pub const SYSTEM_LOG: &str = "System.evtx";
 
 const FIELDS: [Field; 2] = [Field::number("boot_type"), Field::timestamp("started_at")];
 
-const REASONS: [UnmeasuredReason; 5] = [
+const REASONS: [UnmeasuredReason; 6] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
     UnmeasuredReason::SourceAbsent,
     UnmeasuredReason::ReadFailed,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// The `windows_start` collector.

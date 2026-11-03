@@ -1119,7 +1119,8 @@ date: 2026-09-11
     /// ADR 0047 amended that table to give `budget_spent` a second owner (`usn`, alongside `evtx`,
     /// both spending the same 30-second-budget idea on two different sources), and ADR 0048 a third
     /// (`driver_service`, spending it on hashing driver files), and ADR 0060 a fourth (`autostart`,
-    /// spending its own on hashing and checking the files that start by themselves). ADR 0047's
+    /// spending its own on hashing and checking the files that start by themselves), and ADR 0086 a
+    /// fifth (`recorded_files`, spending it on its read of the change journal). ADR 0047's
     /// amendment of 2026-09-30
     /// added `other_volume`, whose one owner is `usn`: only it reads one drive's journal for folders
     /// that can be on another. This is what that means for the
@@ -1142,9 +1143,36 @@ date: 2026-09-11
             ("service_disabled", &["prefetch"]),
             (
                 "budget_spent",
-                &["autostart", "driver_service", "event_fields", "evtx", "usn"],
+                &[
+                    "autostart",
+                    "driver_service",
+                    "event_fields",
+                    "evtx",
+                    "recorded_files",
+                    "usn",
+                ],
             ),
-            ("not_attempted", &["evtx"]),
+            // ADR 0091: every collector that reads by path reports it for a path the host refused.
+            (
+                "not_attempted",
+                &[
+                    "autostart",
+                    "bam",
+                    "driver_service",
+                    "event_fields",
+                    "evtx",
+                    "fivem_dir",
+                    "fivem_servers",
+                    "install_marker",
+                    "net_config",
+                    "pca",
+                    "powershell_text",
+                    "prefetch",
+                    "recorded_files",
+                    "usn",
+                    "windows_start",
+                ],
+            ),
             ("other_volume", &["usn"]),
         ] {
             for owner in owners {
@@ -1157,7 +1185,7 @@ date: 2026-09-11
                 assert!(
                     !reports(other.id(), reason),
                     "`{}` also reports `{reason}`; the ADR 0030 table, as amended by ADR 0047, \
-                     ADR 0048 and ADR 0060, names only {owners:?} as owners",
+                     ADR 0048, ADR 0060 and ADR 0091, names only {owners:?} as owners",
                     other.id()
                 );
             }

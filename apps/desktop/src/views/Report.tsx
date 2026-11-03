@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ageTexts, codeLinks, reportView, ruleTexts } from "../api";
 import { type EvidenceGroup, groupEvidence, type StateFilter } from "../grouping";
 import { withKeys } from "../keys";
+import { motionReduced } from "../motion";
 import type {
   AgeText,
   BootTime,
@@ -21,13 +22,37 @@ import type {
   SsOptions,
 } from "../types";
 import { AiExportButton } from "./AiExportButton";
+import { CommandPalette, evidenceMatches } from "./CommandPalette";
 import { EvidenceRow } from "./EvidenceRow";
 import { GameWindowsSection } from "./GameWindows";
 import { HumanSummary } from "./HumanSummary";
+import "./Report.motion.css";
+import { usePresenter } from "./Report.presenter";
+import { ReportPresenter } from "./ReportPresenter";
+import { ReportProgress } from "./ReportProgress";
+import { ReportSkeleton } from "./ReportSkeleton";
 import { ReportSummary } from "./ReportSummary";
 import { SavedRecordBox } from "./SavedRecordBox";
 import { Timeline } from "./Timeline";
 import { CrossSource, TraceAges } from "./TraceAges";
+
+/** E1: one rise per group, stepping 120 ms through the first eight groups; past them, no delay. */
+const REVEAL_STAGGER_STEP_MS = 120;
+const REVEAL_STAGGER_GROUPS = 8;
+/** How long one group's rise lasts. */
+const REVEAL_DURATION_MS = 300;
+/** How long a play can still be running: the last staggered group's delay plus its rise. */
+const REVEAL_LIFETIME_MS =
+  (REVEAL_STAGGER_GROUPS - 1) * REVEAL_STAGGER_STEP_MS + REVEAL_DURATION_MS;
+/** The step for one group's place in the stagger; past the eighth group, no delay at all. */
+function revealDelayMs(index: number): number {
+  return index < REVEAL_STAGGER_GROUPS ? index * REVEAL_STAGGER_STEP_MS : 0;
+}
+
+/** Reads the user's motion preference; a missing matchMedia (tests, jsdom) counts as no request. */
+function prefersReducedMotion(): boolean {
+  return motionReduced();
+}
 
 interface Props {
   mode: Mode;
@@ -48,6 +73,44 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const [technicalAll, setTechnicalAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"summary" | "technical">("summary");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [focusEvidenceSignal, setFocusEvidenceSignal] = useState(0);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  // E1: the group stagger, on while its animation runs, and only ever for the tech view's first
+  // show; `revealPlayed` keeps the once-per-mount promise against every later re-render.
+  const [revealOn, setRevealOn] = useState(false);
+  const revealPlayed = useRef(false);
+
+  useEffect(() => {
+    // The way back to the top is only worth a control once the reader has left it.
+    const onScroll = () => setShowScrollTop(window.scrollY > 200);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    // E1: the stagger plays once per report, on the technical view's first show after the view has
+    // loaded. Under reduced motion the groups are simply there; the CSS media query answers the
+    // same request anyway, in case the reader switches while a play is on.
+    if (view === null || viewMode !== "technical" || revealPlayed.current) return;
+    revealPlayed.current = true;
+    if (prefersReducedMotion()) return;
+    setRevealOn(true);
+  }, [view, viewMode]);
+
+  useEffect(() => {
+    if (!revealOn) return undefined;
+    if (viewMode !== "technical") {
+      // Leaving the technical view mid-play ends it: with the class gone, coming back plays nothing.
+      setRevealOn(false);
+      return undefined;
+    }
+    // The class stays on exactly as long as the longest play can last, then the groups render plain
+    // and no filter, search or view toggle can restart what already played.
+    const timer = window.setTimeout(() => setRevealOn(false), REVEAL_LIFETIME_MS);
+    return () => window.clearTimeout(timer);
+  }, [revealOn, viewMode]);
 
   useEffect(() => {
     void reportView(mode, options).then(setView);
@@ -72,8 +135,36 @@ export function Report({ mode, options, saved, onBack }: Props) {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (focusEvidenceSignal === 0) return;
+    document.querySelector<HTMLElement>(".group h3")?.focus();
+  }, [focusEvidenceSignal]);
+
+  // Presenter mode needs the same group order the technical view renders, and the hook has to run
+  // before the view's early return; before the view arrives there are simply no groups.
+  const groups = view
+    ? groupEvidence(
+        view.evidence.filter((item) => evidenceMatches(item, texts[item.rule_id], searchQuery)),
+        filter,
+        view.collector_order,
+      )
+    : [];
+  const groupIds = groups.map((group) => `group-${group.collector}`);
+  const presenter = usePresenter(groupIds, mode === "ss" && viewMode === "technical");
+
   if (!view) {
-    return null;
+    return <ReportSkeleton />;
   }
   const { header } = view;
   const rights =
@@ -88,27 +179,31 @@ export function Report({ mode, options, saved, onBack }: Props) {
   const linksKnown = links !== null;
   const official = header.provenance.official;
   const query = searchQuery.trim().toLowerCase();
-  const filteredEvidence = query
-    ? view.evidence.filter((item) => {
-        const text = texts[item.rule_id];
-        if (item.rule_id.toLowerCase().includes(query)) return true;
-        if (item.collector.toLowerCase().includes(query)) return true;
-        if (text?.title?.toLowerCase().includes(query)) return true;
-        if (text?.description?.toLowerCase().includes(query)) return true;
-        if (
-          item.state === "found" &&
-          item.observations.some((obs) => JSON.stringify(obs.fields).toLowerCase().includes(query))
-        ) {
-          return true;
-        }
-        return false;
-      })
-    : view.evidence;
-  const groups = groupEvidence(filteredEvidence, filter, view.collector_order);
+  // E10 picks a position in the rendered order; no row's state or identity decides which group is
+  // current or dim.
+  const presenterIndex = groupIds.length === 0 ? 0 : Math.min(presenter.index, groupIds.length - 1);
+
+  function pickEvidence(item: Evidence) {
+    setSearchQuery(item.rule_id);
+    setViewMode("technical");
+    setPaletteOpen(false);
+    setFocusEvidenceSignal((signal) => signal + 1);
+  }
 
   return (
     <section className="report">
       {mode === "ss" && saved && <SavedRecordBox saved={saved} />}
+
+      <CommandPalette
+        open={paletteOpen}
+        evidence={view.evidence}
+        texts={texts}
+        onClose={() => setPaletteOpen(false)}
+        onPick={pickEvidence}
+      />
+
+      {/* E3: the progress line and group dots belong to the technical view; the summary unmounts them. */}
+      {viewMode === "technical" && <ReportProgress groups={groups} />}
 
       <div className="report-mode-bar">
         <div className="view-switcher-wrap">
@@ -168,11 +263,12 @@ export function Report({ mode, options, saved, onBack }: Props) {
           header={header}
           texts={texts}
           onSwitchToTechnical={() => setViewMode("technical")}
+          mode={mode}
         />
       </div>
 
       <div
-        className="view-tech-wrap"
+        className={`view-tech-wrap${revealOn ? " reveal-on" : ""}`}
         style={{ display: viewMode === "technical" ? "block" : "none" }}
       >
         <ReportSummary listed={view.listed} filter={filter} onFilter={setFilter} />
@@ -261,6 +357,9 @@ export function Report({ mode, options, saved, onBack }: Props) {
               />{" "}
               {t("toolbar.technical_all")}
             </label>
+            {mode === "ss" && viewMode === "technical" && (
+              <ReportPresenter groupIds={groupIds} presenter={presenter} />
+            )}
           </div>
         </div>
 
@@ -269,7 +368,7 @@ export function Report({ mode, options, saved, onBack }: Props) {
         {view.evidence.length > 0 && groups.length === 0 && (
           <p className="muted">{t(query ? "toolbar.search_empty" : "toolbar.filtered_empty")}</p>
         )}
-        {groups.map((group) => (
+        {groups.map((group, index) => (
           <Group
             key={group.collector}
             group={group}
@@ -281,6 +380,8 @@ export function Report({ mode, options, saved, onBack }: Props) {
             official={official}
             technicalAll={technicalAll}
             unfold={filter === "not_found"}
+            revealDelay={revealOn ? revealDelayMs(index) : null}
+            presenter={presenter.on ? (index === presenterIndex ? "current" : "dim") : null}
           />
         ))}
 
@@ -360,6 +461,36 @@ export function Report({ mode, options, saved, onBack }: Props) {
       <button type="button" onClick={onBack}>
         {t("common:actions.back")}
       </button>
+
+      {showScrollTop && (
+        <button
+          type="button"
+          className="scroll-top"
+          aria-label={t("scroll_top")}
+          onClick={() => {
+            const reduceMotion = motionReduced();
+            window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+            // The button unmounts once the window is back at the top, so focus moves to the header's
+            // way home rather than falling to the body.
+            document.getElementById("home-button")?.focus({ preventScroll: true });
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 20V5" />
+            <path d="m5 12 7-7 7 7" />
+          </svg>
+        </button>
+      )}
     </section>
   );
 }
@@ -373,7 +504,9 @@ function Group({
   linksKnown,
   official,
   technicalAll,
+  revealDelay,
   unfold,
+  presenter,
 }: {
   group: EvidenceGroup;
   texts: Record<string, RuleText>;
@@ -383,7 +516,9 @@ function Group({
   linksKnown: boolean;
   official: boolean;
   technicalAll: boolean;
+  revealDelay: number | null;
   unfold: boolean;
+  presenter: "current" | "dim" | null;
 }) {
   const { t } = useTranslation("report");
   const [showNotFound, setShowNotFound] = useState(false);
@@ -409,9 +544,16 @@ function Group({
     />
   );
   return (
-    <section className="group" aria-labelledby={titleId}>
+    <section
+      className="group"
+      aria-labelledby={titleId}
+      data-presenter={presenter ?? undefined}
+      style={revealDelay === null ? undefined : { animationDelay: `${revealDelay}ms` }}
+    >
       <div className="group-head">
-        <h3 id={titleId}>{t(`collector.${group.collector}`, { defaultValue: group.collector })}</h3>
+        <h3 id={titleId} tabIndex={-1}>
+          {t(`collector.${group.collector}`, { defaultValue: group.collector })}
+        </h3>
         <span className="muted counts">{counts}</span>
       </div>
       <ul className="rows">

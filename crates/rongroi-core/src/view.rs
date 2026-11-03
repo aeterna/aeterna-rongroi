@@ -557,8 +557,9 @@ pub enum AnchorAgeState {
     Measured {
         /// The UTC date; for `boot_time`, the header's time to the second (ADR 0039).
         on: String,
-        /// Whole days between it and the scan.
-        days_before: i64,
+        /// Whole days between it and the scan; absent when its date is after the scan's date (ADR 0088).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        days_before: Option<i64>,
         /// What was read, as the header names it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         source: Option<String>,
@@ -602,7 +603,7 @@ pub enum TraceAgeState {
         /// The oldest time it still holds, as the report holds it; absent when it holds none.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         oldest: Option<String>,
-        /// Whole days between the oldest time and the scan.
+        /// Whole days between the oldest time and the scan; absent when that time is after the scan.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         days_before: Option<i64>,
         /// How much it holds.
@@ -665,7 +666,7 @@ pub struct FivemSide {
     /// The UTC date `FiveM`'s log, crash and cache folders were last written.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folders_written: Option<String>,
-    /// Whole days between that write and the scan.
+    /// Whole days between that write and the scan; absent when that write is after the scan.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folders_days_before: Option<i64>,
     /// How many Enhanced server cache folders there are.
@@ -767,9 +768,13 @@ fn scan_time(report: &Report) -> Option<jiff::Timestamp> {
     report.header.generated_at.parse().ok()
 }
 
-/// Whole days from `earlier` to `later`, rounded down.
-fn days_between(later: jiff::Timestamp, earlier: jiff::Timestamp) -> i64 {
-    (later.as_second() - earlier.as_second()).div_euclid(86_400)
+/// Whole days from `earlier` to `later`, rounded down; `None` when `earlier` is after `later`. A
+/// negative count would read as a real number of days before the scan, so it is never given.
+fn days_between(later: jiff::Timestamp, earlier: jiff::Timestamp) -> Option<i64> {
+    if earlier > later {
+        return None;
+    }
+    Some((later.as_second() - earlier.as_second()).div_euclid(86_400))
 }
 
 fn utc_date(time: jiff::Timestamp) -> String {
@@ -825,7 +830,7 @@ fn anchor_ages(report: &Report) -> Vec<AnchorAge> {
                 seconds_since_boot,
             } => AnchorAgeState::Measured {
                 on: booted_at.clone(),
-                days_before: i64::try_from(seconds_since_boot / 86_400).unwrap_or(i64::MAX),
+                days_before: Some(i64::try_from(seconds_since_boot / 86_400).unwrap_or(i64::MAX)),
                 source: None,
                 kept: None,
             },
@@ -834,26 +839,30 @@ fn anchor_ages(report: &Report) -> Vec<AnchorAge> {
     }];
     for anchor in &report.header.anchors {
         let state = match &anchor.state {
-            AnchorState::Measured { on, source, kept } => {
-                let days = on
-                    .parse::<jiff::civil::Date>()
-                    .ok()
-                    .zip(scan_date)
-                    .and_then(|(on, scan)| on.until(scan).ok())
-                    .map(|span| i64::from(span.get_days()));
-                match days {
-                    Some(days_before) => AnchorAgeState::Measured {
+            AnchorState::Measured { on, source, kept } => match on.parse::<jiff::civil::Date>() {
+                // The date was read, so it is shown. Its count is left out when the date is after
+                // the scan's: a negative count would read as days before the scan (ADR 0088). With
+                // no scan date that cannot be told, so the anchor is not read at all (ADR 0088,
+                // section 1).
+                Ok(on_date) => match scan_date {
+                    Some(scan) => AnchorAgeState::Measured {
                         on: on.clone(),
-                        days_before,
+                        days_before: (on_date <= scan)
+                            .then(|| on_date.until(scan).ok())
+                            .flatten()
+                            .map(|span| i64::from(span.get_days())),
                         source: Some(source.clone()),
                         kept: *kept,
                     },
-                    // A date the report cannot put a day count on is not shown as one.
                     None => AnchorAgeState::Unmeasured {
                         reason: UnmeasuredReason::ReadFailed,
                     },
-                }
-            }
+                },
+                // A date the report cannot read is not shown as a date, nor as a day count.
+                Err(_) => AnchorAgeState::Unmeasured {
+                    reason: UnmeasuredReason::ReadFailed,
+                },
+            },
             AnchorState::Unmeasured { reason } => AnchorAgeState::Unmeasured { reason: *reason },
         };
         anchors.push(AnchorAge {
@@ -1154,7 +1163,7 @@ fn measure(
         oldest: oldest_time.map(|(_, text)| text.to_owned()),
         days_before: oldest_time
             .zip(scan)
-            .map(|((time, _), scan)| days_between(scan, time)),
+            .and_then(|((time, _), scan)| days_between(scan, time)),
         count,
         extra: beside,
     }
@@ -1271,7 +1280,7 @@ fn fivem_side(
         FivemSide {
             editions,
             folders_written: folders.map(utc_date),
-            folders_days_before: folders.map(|time| days_between(scan, time)),
+            folders_days_before: folders.and_then(|time| days_between(scan, time)),
             server_folders,
             servers_written: servers.map(utc_date),
         },
@@ -1327,10 +1336,14 @@ fn source_line(
             count,
             ..
         }) => match oldest.parse::<jiff::Timestamp>() {
-            Ok(oldest) if oldest < t => SourceLineKind::NoEntry {
-                entries: count,
-                oldest: utc_date(oldest),
-                days_before: days_between(scan, oldest),
+            // An oldest time after the scan gives no day count, so the line could not show it.
+            Ok(oldest) if oldest < t => match days_between(scan, oldest) {
+                Some(days_before) => SourceLineKind::NoEntry {
+                    entries: count,
+                    oldest: utc_date(oldest),
+                    days_before,
+                },
+                None => SourceLineKind::CouldNotShow { entries: count },
             },
             _ => SourceLineKind::CouldNotShow { entries: count },
         },
@@ -2062,6 +2075,66 @@ mod tests {
         assert_eq!(
             own.header.profiles_directory.as_deref(),
             Some(r"D:\Profiles")
+        );
+    }
+
+    /// A BAM path the drive map turned into `X:\…` takes the same SS-mode route as a PCA path
+    /// (ADR 0087 sections 2 and 4): the account name after `Users` is replaced, and the marker that
+    /// says Windows wrote a device path stays.
+    #[test]
+    fn ss_view_redacts_a_mapped_bam_path_under_a_profile() {
+        let mut report = report();
+        let path = format!(r"C:\Users\{USER}\AppData\Local\Temp\tool.exe");
+        let mut observation = recorded(
+            "bam",
+            "tool.exe",
+            Some(&path),
+            "last_run",
+            "2026-01-10T09:30:00Z",
+        );
+        observation
+            .fields
+            .insert("path_from_device".to_owned(), serde_json::Value::from(true));
+        report.evidence = vec![Evidence {
+            rule_id: "executed-program-missing-on-disk".to_owned(),
+            collector: "bam".to_owned(),
+            strength: Strength::Context,
+            state: EvidenceState::Found {
+                observations: vec![observation],
+            },
+        }];
+
+        let ss = for_mode(&report, Mode::Ss);
+        let EvidenceState::Found { observations } = &ss.evidence[0].state else {
+            panic!("{:?}", ss.evidence[0]);
+        };
+        assert_eq!(
+            observations[0]
+                .fields
+                .get("path")
+                .and_then(serde_json::Value::as_str),
+            Some(r"%USERPROFILE%\AppData\Local\Temp\tool.exe")
+        );
+        assert_eq!(
+            observations[0]
+                .fields
+                .get("path_from_device")
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
+        let json = serde_json::to_string(&ss).unwrap();
+        assert!(!json.contains(USER), "{json}");
+
+        let own = for_mode(&report, Mode::SelfCheck);
+        let EvidenceState::Found { observations } = &own.evidence[0].state else {
+            panic!("{:?}", own.evidence[0]);
+        };
+        assert_eq!(
+            observations[0]
+                .fields
+                .get("path")
+                .and_then(serde_json::Value::as_str),
+            Some(path.as_str())
         );
     }
 
@@ -3571,7 +3644,7 @@ mod tests {
                     anchor: "boot_time".to_owned(),
                     state: AnchorAgeState::Measured {
                         on: "2026-01-07T00:00:00Z".to_owned(),
-                        days_before: 3,
+                        days_before: Some(3),
                         source: None,
                         kept: None,
                     },
@@ -3580,7 +3653,7 @@ mod tests {
                     anchor: "install_date".to_owned(),
                     state: AnchorAgeState::Measured {
                         on: "2025-11-11".to_owned(),
-                        days_before: 60,
+                        days_before: Some(60),
                         source: Some("HKLM".to_owned()),
                         kept: None,
                     },
@@ -3592,6 +3665,195 @@ mod tests {
                     },
                 },
             ]
+        );
+    }
+
+    /// An `install_date` anchor dated `on`, read from the HKLM source.
+    fn install_date_on(on: &str) -> crate::model::Anchor {
+        use crate::model::{Anchor, AnchorKind};
+        Anchor {
+            anchor: AnchorKind::InstallDate,
+            state: AnchorState::Measured {
+                on: on.to_owned(),
+                source: "HKLM".to_owned(),
+                kept: None,
+            },
+        }
+    }
+
+    /// An anchor dated after the scan keeps its date and its source and has no count, where a negative
+    /// one would read as days before the scan (ADR 0088). The scan is 2026-01-10 at 12:00 UTC.
+    #[test]
+    fn an_anchor_dated_after_the_scan_keeps_its_date_and_source_and_no_count() {
+        let mut report = aged_report();
+        report.header.anchors = vec![install_date_on("2026-01-12")];
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        assert_eq!(
+            ages.anchors[1],
+            AnchorAge {
+                anchor: "install_date".to_owned(),
+                state: AnchorAgeState::Measured {
+                    on: "2026-01-12".to_owned(),
+                    days_before: None,
+                    source: Some("HKLM".to_owned()),
+                    kept: None,
+                },
+            }
+        );
+    }
+
+    /// The scan's own day counts as `Some(0)` and an earlier day as its count, so only a date after the
+    /// scan loses its count (ADR 0088).
+    #[test]
+    fn an_anchor_on_the_scans_day_or_before_it_keeps_its_count() {
+        for (on, expected) in [("2026-01-10", Some(0)), ("2025-11-11", Some(60))] {
+            let mut report = aged_report();
+            report.header.anchors = vec![install_date_on(on)];
+            let ages = trace_ages(&report, Mode::SelfCheck);
+            assert_eq!(
+                ages.anchors[1].state,
+                AnchorAgeState::Measured {
+                    on: on.to_owned(),
+                    days_before: expected,
+                    source: Some("HKLM".to_owned()),
+                    kept: None,
+                },
+                "{on}"
+            );
+        }
+    }
+
+    /// The JSON of an anchor dated after the scan has no `days_before` key, and keeps `on` and `source`
+    /// (ADR 0088, section 3: the view's schema stays at 1).
+    #[test]
+    fn an_anchor_dated_after_the_scan_writes_no_days_before_key() {
+        let mut report = aged_report();
+        report.header.anchors = vec![install_date_on("2026-01-12")];
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        let json = serde_json::to_value(&ages.anchors[1]).unwrap();
+        assert!(json.get("days_before").is_none(), "{json}");
+        assert_eq!(json["on"], "2026-01-12", "{json}");
+        assert_eq!(json["source"], "HKLM", "{json}");
+    }
+
+    /// The after-scan sentence could not be known without a scan date, so an anchor is not read at all
+    /// when the scan's own time does not parse (ADR 0088, section 1).
+    #[test]
+    fn an_anchor_without_a_readable_scan_time_is_not_read() {
+        let mut report = aged_report();
+        report.header.generated_at = "not-a-time".to_owned();
+        report.header.anchors = vec![install_date_on("2025-11-11")];
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        assert_eq!(
+            ages.anchors[1].state,
+            AnchorAgeState::Unmeasured {
+                reason: UnmeasuredReason::ReadFailed,
+            }
+        );
+    }
+
+    /// Whole days back from the scan; no count at all for a time after it.
+    #[test]
+    fn days_between_gives_no_count_for_a_time_after_the_scan() {
+        let at = |text: &str| text.parse::<jiff::Timestamp>().unwrap();
+        assert_eq!(
+            days_between(at("2026-01-11T00:00:00Z"), at("2026-01-12T00:00:00Z")),
+            None
+        );
+        assert_eq!(
+            days_between(at("2026-01-11T00:00:00Z"), at("2026-01-11T00:00:00Z")),
+            Some(0)
+        );
+        assert_eq!(
+            days_between(at("2026-01-12T00:00:00Z"), at("2026-01-11T00:00:00Z")),
+            Some(1)
+        );
+    }
+
+    /// A time after the scan has no whole days before it: the row keeps the oldest time it holds and
+    /// shows no day count, where a negative one would mean nothing. The rows are the same as before.
+    #[test]
+    fn a_trace_age_after_the_scan_keeps_its_oldest_time_and_no_day_count() {
+        use serde_json::json;
+        let mut report = aged_report();
+        for observation in prefetch_group(&mut report) {
+            if observation.fields.contains_key("last_run") {
+                observation
+                    .fields
+                    .insert("last_run".to_owned(), json!("2026-01-11T06:00:00Z"));
+            }
+        }
+        let ages = trace_ages(&report, Mode::SelfCheck);
+        let before = trace_ages(&aged_report(), Mode::SelfCheck);
+        assert_eq!(
+            state_of_row(&ages, "prefetch", None),
+            &TraceAgeState::Measured {
+                oldest: Some("2026-01-11T06:00:00Z".to_owned()),
+                days_before: None,
+                count: 2,
+                extra: BTreeMap::from([("enable_prefetcher".to_owned(), serde_json::json!(3))]),
+            }
+        );
+        assert_eq!(ages.rows.len(), before.rows.len());
+        assert_eq!(
+            for_mode(&report, Mode::SelfCheck).evidence,
+            for_mode(&aged_report(), Mode::SelfCheck).evidence
+        );
+    }
+
+    /// `FiveM`'s folders written after the scan keep their date and show no day count; the statement
+    /// still says what it can about Prefetch.
+    #[test]
+    fn fivem_folders_written_after_the_scan_have_no_day_count() {
+        use serde_json::json;
+        let mut report = aged_report();
+        let fivem = report
+            .unmatched
+            .iter_mut()
+            .find(|group| group.collector == "fivem_dir")
+            .unwrap();
+        for observation in &mut fivem.observations {
+            if observation.fields.contains_key("latest_modified_at") {
+                observation.fields.insert(
+                    "latest_modified_at".to_owned(),
+                    json!("2026-01-11T06:00:00Z"),
+                );
+            }
+        }
+        let records = records(&report);
+        let [statement] = records.as_slice() else {
+            panic!("{records:?}");
+        };
+        assert_eq!(
+            statement.fivem.folders_written.as_deref(),
+            Some("2026-01-11")
+        );
+        assert_eq!(statement.fivem.folders_days_before, None);
+    }
+
+    /// A source whose oldest time is after the scan, but before `FiveM`'s last write, could not show
+    /// it: not a "no entry" line with a negative day count.
+    #[test]
+    fn a_source_whose_oldest_time_is_after_the_scan_could_not_show_it() {
+        use serde_json::json;
+        let mut report = aged_report();
+        for observation in prefetch_group(&mut report) {
+            if observation.fields.contains_key("last_run") {
+                observation
+                    .fields
+                    .insert("last_run".to_owned(), json!("2026-01-10T18:00:00Z"));
+            }
+        }
+        // FiveM's last write is after the scan too, so Prefetch's oldest is before it: the case
+        // NoEntry's own guard does not cover.
+        assert_eq!(
+            source_line(
+                &report,
+                "prefetch",
+                "2026-01-11T00:00:00Z".parse().unwrap(),
+                scan_time(&report).unwrap()
+            ),
+            SourceLineKind::CouldNotShow { entries: 2 }
         );
     }
 
@@ -5135,8 +5397,8 @@ mod tests {
         }
     }
 
-    /// f3: a standard scan does not run `recorded_files`, so I1 and I2 are not known for that
-    /// reason; I3 and I4 wait for F2 and I5 for its own ADR, so those three are deferred.
+    /// f3: a standard scan does not run `recorded_files`, so I1, I2 and I5 are not known for that
+    /// reason; I3 and I4 wait for F2, so those two are deferred.
     #[test]
     fn f3_a_standard_scan_leaves_every_identity_fact_not_known_with_its_reason() {
         let mut observations = legacy_sessions(&[GAME_START_3], Some(GAME_END));
@@ -5149,7 +5411,7 @@ mod tests {
         ));
         let view = game_windows(&game_report(observations), Mode::SelfCheck);
         let candidate = game_candidate(&view, "x.exe");
-        for fact in [&candidate.i1, &candidate.i2] {
+        for fact in [&candidate.i1, &candidate.i2, &candidate.i5] {
             assert_eq!(
                 *fact,
                 IdentityFact::NotKnown {
@@ -5157,7 +5419,7 @@ mod tests {
                 }
             );
         }
-        for fact in [&candidate.i3, &candidate.i4, &candidate.i5] {
+        for fact in [&candidate.i3, &candidate.i4] {
             assert_eq!(
                 *fact,
                 IdentityFact::NotKnown {
@@ -5228,7 +5490,7 @@ mod tests {
             }
         );
         assert_eq!(gone.near_sessions, NearSessions { near: 1, found: 2 });
-        for fact in [&gone.i3, &gone.i4, &gone.i5] {
+        for fact in [&gone.i3, &gone.i4] {
             assert_eq!(
                 *fact,
                 IdentityFact::NotKnown {
@@ -5236,6 +5498,12 @@ mod tests {
                 }
             );
         }
+        assert_eq!(
+            gone.i5,
+            IdentityFact::NotKnown {
+                reason: IdentityNotKnownReason::JournalNotRead,
+            }
+        );
 
         let time_only = game_candidate(&view, "time-only.exe");
         assert_eq!(
@@ -5645,6 +5913,10 @@ mod tests {
             trailing_data: None,
             embedded_pe: None,
             zone_id: None,
+            journal_deleted: None,
+            journal_renamed_from: None,
+            journal_renamed_to: None,
+            journal_more: None,
         }
     }
 
@@ -5703,6 +5975,10 @@ mod tests {
                 trailing_data: Some(false),
                 embedded_pe: Some(false),
                 zone_id: Some(3),
+                journal_deleted: None,
+                journal_renamed_from: None,
+                journal_renamed_to: None,
+                journal_more: None,
             })
         );
     }

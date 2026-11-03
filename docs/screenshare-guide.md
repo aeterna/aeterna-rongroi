@@ -1,7 +1,7 @@
 # Screenshare guide
 
 For server staff checking a player's PC over a screenshare (an SS, also called a PC check), and for the player. It covers
-aeterna-rongroi **0.13.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
+aeterna-rongroi **0.14.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
 > ⚠️ **Pre-alpha.** Seventy-seven rules ship in 0.11.0, and seventy-two of them are `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
@@ -85,7 +85,7 @@ read-only, and the one about an event log file that is not the file Windows writ
   than PowerShell, for the reason in §2.
   `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
   until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
-  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2, 0.9.0, 0.10.0, 0.11.0, 0.12.0 and 0.13.0 — but the report from
+  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2, 0.9.0, 0.10.0, 0.11.0, 0.12.0, 0.13.0 and 0.14.0 — but the report from
   `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
   use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
   (measured on a real Windows 11 machine).
@@ -105,7 +105,7 @@ change the results. The consent screen decides what is shown.
 **CLI** (in the Command Prompt from §3):
 
 ```bat
-.\aeterna-rongroi-cli-0.13.0-windows-x64.exe scan --mode ss
+.\aeterna-rongroi-cli-0.14.0-windows-x64.exe scan --mode ss
 ```
 
 Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
@@ -120,7 +120,7 @@ Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player**
 ### The header
 
 ```
-aeterna-rongroi 0.13.0
+aeterna-rongroi 0.14.0
 official build
 mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
 exe sha256: <hash>
@@ -475,7 +475,9 @@ last feature-upgraded**, not first installed), the earliest installation Windows
 journal, the drive's root and `$Recycle.Bin` were created, and when FiveM's program folders were. Each is
 shown with what ordinarily resets it. A source Windows would not show without administrator rights says
 "not known": it was not read, it is not empty. Nothing in the section is compared for you, and there is no
-"machine age": the dates disagree by years on ordinary PCs.
+"machine age": the dates disagree by years on ordinary PCs. A time or date later than the scan's own time
+is shown with "later than this scan's own date" (or time) and no day count: the PC's clock was ahead when
+it was written, or is behind now, and the report does not know which (ADR 0088).
 
 When Prefetch or BAM was read, holds no entry for the names above and still reaches back before FiveM's
 folders were last written, a **statement** above the timeline puts FiveM's side and those records side by
@@ -512,16 +514,22 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   reaches you, its SHA-256 must start with the 16 characters you noted; if it does not, it is not the report
   you watched. The match shows only that the file is what was on screen, not that the screen was honest
   (ADR 0040).
+- **The record also carries three times**: when the scan **started** (`scan_started_at`), when it
+  **finished** (`scan_finished_at`) and when the file was **saved** (`saved_at`). Read them against the call
+  you were on. A scan that finished before the session you are asking about is a scan of a different moment,
+  whatever the rows say. They are what the program wrote about itself, like the **official build** line and the
+  SHA-256 above: a modified program can write any time it likes, and a clock set wrong writes the wrong time
+  into a genuine scan. Read them as a question to ask, not as an answer.
 - **The CLI** does the same with `--case-code`: standard output is the record and the SHA-256 is printed
   above it on the screen:
 
   ```bat
-  .\aeterna-rongroi-cli-0.13.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
+  .\aeterna-rongroi-cli-0.14.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
   ```
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
   ```bat
-  .\aeterna-rongroi-cli-0.13.0-windows-x64.exe scan --mode ss --json > report.json
+  .\aeterna-rongroi-cli-0.14.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
   The consent question stays on screen, the player answers it there, and the file holds only the JSON.
@@ -532,6 +540,10 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   0.2.0, first run the SS-mode scan from §4 without `--json`, so the player answers on screen; if they
   agree, run the command above with `--yes` added. It is a second scan, so a running-program list can
   differ slightly from the one on screen.
+- **The device list** (`devices`: every PCI and input device, model numbers and times, never names or serial
+  numbers — ADR 0069, ADR 0072) is the one part of the record that describes **the machine itself**, so it
+  is the one thing you can hold beside what the player told you they play on. It is not an identity: two
+  machines can carry the same models, and a virtual machine has a list of its own.
 - A file the player sends to staff becomes the server's responsibility, including how long it is
   kept ([PRIVACY.md](../PRIVACY.md)).
 

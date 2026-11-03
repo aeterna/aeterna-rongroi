@@ -18,19 +18,30 @@
 //! first, under a 90-second budget checked between files. An unreadable file is never a gap — the
 //! whole run is gapped only when one of its sources could not be read at all, and then with that
 //! source's reason.
+//!
+//! It also reads the system volume's change journal once, before any file's bytes are read (ADR 0086).
+//! For each path it says whether the journal holds a deletion or a rename of that file: `journal_match`
+//! says whether the path could be looked for at all, `journal_deleted`, `journal_renamed_from` and
+//! `journal_renamed_to` list the times of such records, newest first and at most eight of each, and
+//! `journal_from` is the oldest record time of that read. The comparison happens inside
+//! `rongroi_parsers::usn::match_buffer`, which returns an index, a kind and a time and no name, USN or
+//! file reference, so none of those reaches an observation or a gap. The journal read has its own
+//! budget, `journal_budget`, and the file reads keep their 90 seconds.
 
-use std::cmp::Ordering;
+use std::cmp::{Ordering, Reverse};
 use std::collections::BTreeMap;
+use std::ops::ControlFlow;
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{Host, Platform, SourceError, is_refused_form};
+use rongroi_host::{Host, Platform, SourceError, UsnReadEnd, is_refused_form};
 use rongroi_parsers::content_kind::{self, FileKind};
 use rongroi_parsers::powershell_text::DownloadHost;
+use rongroi_parsers::usn::{ChangeKind, JournalMatch, MatchTarget, match_buffer, parse_buffer};
 use rongroi_parsers::{pe_version, zone_identifier};
 
-use crate::failure::read_failure;
+use crate::failure::{read_failure, reason_for};
 use crate::paths::{file_name, is_drive_rooted};
 use crate::{Collector, Field, ScanTier, SensitiveKind};
 
@@ -45,10 +56,11 @@ pub const BUDGET: Duration = Duration::from_secs(90);
 ///
 /// `not_windows` is its own answer. The rest are what one of its sources gives when that source could
 /// not be read: this collector adds no vocabulary of its own, because a gap here means exactly what
-/// the same reason means in `bam`, `pca`, `process` or `userassist`. `not_on_this_os` is not here:
-/// PCA says it for a Windows that never kept these files, and PCA then contributes neither a path nor
-/// a gap.
-const REASONS: [UnmeasuredReason; 7] = [
+/// the same reason means in `bam`, `pca`, `process` or `userassist`. `budget_spent` is the change
+/// journal's own read stopping at its budget, which `usn` gives for the same read. `not_on_this_os` is
+/// not here: PCA says it for a Windows that never kept these files, and PCA then contributes neither a
+/// path nor a gap.
+const REASONS: [UnmeasuredReason; 9] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotAdmin,
     UnmeasuredReason::AccessDenied,
@@ -56,6 +68,9 @@ const REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::SourceEmpty,
     UnmeasuredReason::Partial,
     UnmeasuredReason::ReadFailed,
+    UnmeasuredReason::BudgetSpent,
+    // A path the host refused to open, off the local drives (ADR 0091).
+    UnmeasuredReason::NotAttempted,
 ];
 
 /// Every field this collector can emit.
@@ -67,7 +82,14 @@ const REASONS: [UnmeasuredReason; 7] = [
 /// `identity_read`: a `read` carries all that apply, a `too_large` still carries the hash and
 /// signature, and every other answer carries none (ADR 0079 section 3). `download_host` is the one
 /// sensitive field, behind its own SS-mode question (ADR 0064).
-const FIELDS: [Field; 19] = [
+///
+/// The journal fields (ADR 0086 section 3) are present only when the journal was read. `journal_match`
+/// is on every path that read gives it for. All four time fields are kept off the timeline, as
+/// `run_times` is: the three lists hold up to eight times each, and `journal_from` repeats the oldest
+/// record time `usn` already puts on the timeline, so a journal gap on any of them would leave
+/// `recorded_files` in the timeline's unmeasured sources on every scan without a journal (ADR 0086,
+/// As built: J2). `journal_more` says that one of the lists was cut.
+const FIELDS: [Field; 26] = [
     Field::boolean("by_bam"),
     Field::boolean("by_pca"),
     Field::boolean("by_process"),
@@ -75,7 +97,14 @@ const FIELDS: [Field; 19] = [
     Field::text("content_kind"),
     Field::text("download_host").sensitive(SensitiveKind::DownloadHost),
     Field::boolean("embedded_pe"),
+    Field::text("file_unread"),
     Field::text("identity_read"),
+    Field::timestamp_list("journal_deleted").off_timeline(),
+    Field::timestamp("journal_from").off_timeline(),
+    Field::text("journal_match"),
+    Field::boolean("journal_more"),
+    Field::timestamp_list("journal_renamed_from").off_timeline(),
+    Field::timestamp_list("journal_renamed_to").off_timeline(),
     Field::text("name"),
     Field::boolean("on_system_drive"),
     Field::text("original_filename"),
@@ -88,6 +117,20 @@ const FIELDS: [Field; 19] = [
     Field::boolean("under_system_root"),
     Field::number("zone_id"),
 ];
+
+/// The six fields the change journal feeds. A journal gap covers these and no other field.
+const JOURNAL_FIELDS: [&str; 6] = [
+    "journal_deleted",
+    "journal_from",
+    "journal_match",
+    "journal_more",
+    "journal_renamed_from",
+    "journal_renamed_to",
+];
+
+/// The most times one list holds, newest first. A list cut at this bound sets `journal_more` (ADR 0086
+/// section 3, decision D5).
+const JOURNAL_TIMES_CAP: usize = 8;
 
 /// The source that recorded a path.
 #[derive(Debug, Clone, Copy)]
@@ -140,6 +183,11 @@ pub struct RecordedFiles {
     ///
     /// Checked between files, as `autostart` checks its own budget (ADR 0079 amendment 7).
     pub budget: Duration,
+    /// How long the change journal read may take before the journal fields say `budget_spent`.
+    ///
+    /// Checked between buffers, as the `usn` collector checks its own (ADR 0086 section 4). It is a clock
+    /// of its own: the time the read takes is given back to the file clock, so the two never share time.
+    pub journal_budget: Duration,
     /// How many files this run may read before the rest say `budget_spent`; `None` reads every one.
     ///
     /// A test-only limit, so that order is testable without a clock. The identity read applies it
@@ -151,8 +199,46 @@ impl Default for RecordedFiles {
     fn default() -> Self {
         Self {
             budget: BUDGET,
+            journal_budget: crate::usn::BUDGET,
             file_limit: None,
         }
+    }
+}
+
+impl RecordedFiles {
+    /// One observation per path, in order, each with its identity read and its journal fields. A path
+    /// that comes after the budget or the file limit is not read, and says `budget_spent`.
+    fn observations(
+        &self,
+        host: &dyn Host,
+        ordered: Vec<Candidate>,
+        journal: Vec<BTreeMap<String, serde_json::Value>>,
+        started: Instant,
+    ) -> Vec<Observation> {
+        let system_drive = system_drive(host);
+        let system_root = system_root(host);
+        let mut attempted = 0_usize;
+        ordered
+            .into_iter()
+            .zip(journal)
+            .map(|(candidate, journal_fields)| {
+                let spent = started.elapsed() >= self.budget
+                    || self.file_limit.is_some_and(|limit| attempted >= limit);
+                let identity = if spent {
+                    Identity::alone("budget_spent")
+                } else {
+                    attempted += 1;
+                    identity(host, &candidate.path)
+                };
+                observation(
+                    &candidate,
+                    system_drive,
+                    system_root.as_deref(),
+                    identity,
+                    journal_fields,
+                )
+            })
+            .collect()
     }
 }
 
@@ -252,24 +338,20 @@ impl Collector for RecordedFiles {
         let mut ordered: Vec<Candidate> = candidates.into_values().collect();
         ordered.sort_by(|left, right| order(left, right, fivem_at));
 
-        let system_drive = system_drive(host);
-        let system_root = system_root(host);
-        let mut attempted = 0_usize;
-        let observations = ordered
-            .into_iter()
-            .map(|candidate| {
-                let spent = started.elapsed() >= self.budget
-                    || self.file_limit.is_some_and(|limit| attempted >= limit);
-                let identity = if spent {
-                    Identity::alone("budget_spent")
-                } else {
-                    attempted += 1;
-                    identity(host, &candidate.path)
-                };
-                observation(&candidate, system_drive, system_root.as_deref(), identity)
-            })
-            .collect();
-        let gaps = source_gap.map(gaps).unwrap_or_default();
+        // The journal is read before any file's bytes, so this program's own reads are never among the
+        // records it compares (ADR 0086 section 1).
+        let journal_started = Instant::now();
+        let journal = read_journal(host, &ordered, self.journal_budget);
+        // The journal has its own budget, so the time its read took is given back to the file clock:
+        // the two never share time (ADR 0086 section 4).
+        let started = started
+            .checked_add(journal_started.elapsed())
+            .unwrap_or(started);
+        let observations = self.observations(host, ordered, journal.fields, started);
+        let mut gaps = source_gap.map(gaps).unwrap_or_default();
+        if let Some(reason) = journal.gap {
+            gap_journal_fields(&mut gaps, reason);
+        }
         CollectorRun::Measured {
             collector: ID.to_owned(),
             observations,
@@ -279,20 +361,25 @@ impl Collector for RecordedFiles {
     }
 }
 
+/// The gaps a source that could not be read gives: every field but the journal's. A source gap is about
+/// which paths were recorded, not about the journal, so the journal fields get a gap only from the
+/// journal itself (ADR 0086 section 3).
 fn gaps(reason: UnmeasuredReason) -> BTreeMap<String, UnmeasuredReason> {
     FIELDS
         .iter()
+        .filter(|field| !JOURNAL_FIELDS.contains(&field.name))
         .map(|field| (field.name.to_owned(), reason))
         .collect()
 }
 
-/// One recorded file: its path and name, which records pointed at it, what the read of it did, and
-/// whether it lies on the system drive and under the system root.
+/// One recorded file: its path and name, which records pointed at it, what the read of it did, whether
+/// it lies on the system drive and under the system root, and what the change journal says of it.
 fn observation(
     candidate: &Candidate,
     system_drive: Option<u8>,
     system_root: Option<&str>,
     identity: Identity,
+    journal: BTreeMap<String, serde_json::Value>,
 ) -> Observation {
     let mut fields = BTreeMap::new();
     if let Some(name) = file_name(&candidate.path) {
@@ -335,6 +422,7 @@ fn observation(
             serde_json::Value::from(is_under_root(&candidate.path, root)),
         );
     }
+    fields.extend(journal);
     Observation {
         collector: ID.to_owned(),
         fields,
@@ -380,6 +468,15 @@ fn identity(host: &dyn Host, path: &str) -> Identity {
     match host.read_file(path) {
         Ok(Some(bytes)) => Identity::read(host, path, &bytes),
         Ok(None) => Identity::alone("missing"),
+        // Not opened: the path does not stay on a local drive (ADR 0091). Nothing was attempted, and
+        // `file_unread` says why.
+        Err(SourceError::NotLocal(not_local)) => Identity {
+            read: "not_attempted",
+            fields: BTreeMap::from([(
+                "file_unread".to_owned(),
+                serde_json::Value::from(not_local.as_str()),
+            )]),
+        },
         Err(error) => {
             // A file over the size bound still has a hash and a signature, and ADR 0079 section 3
             // keeps both beside `too_large` so a rule can still ask what the file was.
@@ -508,6 +605,298 @@ fn order(left: &Candidate, right: &Candidate, fivem_at: Option<Timestamp>) -> Or
     })
 }
 
+/// What the change journal says about the run's paths (ADR 0086 sections 2 to 4).
+struct Journal {
+    /// The reason the journal fields are gapped, when the journal was not read whole.
+    gap: Option<UnmeasuredReason>,
+    /// The journal fields of each path, in the order of the candidates.
+    fields: Vec<BTreeMap<String, serde_json::Value>>,
+}
+
+impl Journal {
+    /// A journal that could not be read: every path has `reason` as its gap and no journal field.
+    fn unread(paths: usize, reason: UnmeasuredReason) -> Self {
+        Self {
+            gap: Some(reason),
+            fields: vec![BTreeMap::new(); paths],
+        }
+    }
+}
+
+/// What the journal can say about one path, as `journal_match` names it (ADR 0086 section 3).
+#[derive(Clone, Copy)]
+enum Reach {
+    /// On the system volume, under a folder the journal identifies: its records are compared.
+    Matched,
+    /// On another drive, or in a folder reached through a junction to another volume.
+    OtherVolume,
+    /// On the system volume, but its folder is missing or could not be identified.
+    FolderUnknown,
+}
+
+impl Reach {
+    /// The value of `journal_match`.
+    fn word(self) -> &'static str {
+        match self {
+            Self::Matched => "matched",
+            Self::OtherVolume => "other_volume",
+            Self::FolderUnknown => "folder_unknown",
+        }
+    }
+}
+
+/// Reads the system volume's change journal once and says what it holds for each path (ADR 0086).
+///
+/// Nothing is read when the volume or its identifier cannot be had: the whole journal is then gapped
+/// with the reason `usn` would give, and no path is looked for. The targets are built before the read,
+/// so no file's bytes are read before the journal (ADR 0086 section 1).
+fn read_journal(host: &dyn Host, candidates: &[Candidate], budget: Duration) -> Journal {
+    let (volume, root_serial) = match journal_volume(host) {
+        Ok(found) => found,
+        Err(reason) => return Journal::unread(candidates.len(), reason),
+    };
+    let mut reach = Vec::with_capacity(candidates.len());
+    let mut targets = Vec::new();
+    for (index, candidate) in candidates.iter().enumerate() {
+        let (found, target) = reach_of(host, &candidate.path, index, volume, root_serial);
+        reach.push(found);
+        targets.extend(target);
+    }
+
+    let mut scan = JournalScan::new(&targets);
+    let started = Instant::now();
+    let read = host.read_usn_journal(volume, &mut |bytes| {
+        // Checked before each buffer, as `usn` checks its own budget.
+        if started.elapsed() >= budget {
+            return ControlFlow::Break(());
+        }
+        scan.add(bytes);
+        ControlFlow::Continue(())
+    });
+    let read = match read {
+        Ok(Some(read)) => read,
+        Ok(None) => return Journal::unread(candidates.len(), UnmeasuredReason::SourceAbsent),
+        Err(error) => return Journal::unread(candidates.len(), reason_for(host, &error)),
+    };
+
+    let gap = journal_gap(scan.damaged, read.end);
+    let whole = gap.is_none();
+    let from = scan.from;
+    let mut hits = scan.hits;
+    let fields = reach
+        .into_iter()
+        .enumerate()
+        .map(|(index, reach)| {
+            let matches = hits.remove(&index).unwrap_or_default();
+            journal_fields(reach, &matches, from, whole)
+        })
+        .collect();
+    Journal { gap, fields }
+}
+
+/// The system volume's drive letter and the identifier of its root, as the journal is read from them.
+/// `%SystemRoot%` names the drive, as `usn` reads it; either one missing is the reason for the whole
+/// journal, which `usn` gives for the same failure.
+fn journal_volume(host: &dyn Host) -> Result<(char, u64), UnmeasuredReason> {
+    let volume = host
+        .env_var(crate::prefetch::SYSTEM_ROOT)
+        .as_deref()
+        .and_then(drive_of)
+        .ok_or(UnmeasuredReason::ReadFailed)?;
+    match host.file_id(&format!(r"{volume}:\")) {
+        Ok(Some(id)) => Ok((volume, id.volume_serial)),
+        Ok(None) => Err(UnmeasuredReason::ReadFailed),
+        Err(error) => Err(reason_for(host, &error)),
+    }
+}
+
+/// Where the journal would hold the records of one path, and the target that compares them when the
+/// path is on the system volume under a folder the journal identifies (ADR 0086 section 2).
+///
+/// A file that is gone has no identifier of its own; then only its folder and its name can match it.
+fn reach_of(
+    host: &dyn Host,
+    path: &str,
+    index: usize,
+    volume: char,
+    root_serial: u64,
+) -> (Reach, Option<MatchTarget>) {
+    // Windows reads `/` as `\`, and the journal's folders are named with `\`, so the path is looked up
+    // in that spelling: `C:/Tools/x.exe` is the file in `C:\Tools`.
+    let spelled = path.replace('/', r"\");
+    let path = spelled.as_str();
+    if drive_of(path) != Some(volume) {
+        return (Reach::OtherVolume, None);
+    }
+    let Some(parent) = parent_of(path) else {
+        return (Reach::FolderUnknown, None);
+    };
+    // A folder reached through a junction to another volume answers with another serial, and its
+    // records are not this volume's, so it is not compared (ADR 0047 amendment).
+    let folder = match host.file_id(&parent) {
+        Ok(Some(id)) if id.volume_serial == root_serial => id,
+        Ok(Some(_)) => return (Reach::OtherVolume, None),
+        Ok(None) | Err(_) => return (Reach::FolderUnknown, None),
+    };
+    let file = host
+        .file_id(path)
+        .ok()
+        .flatten()
+        .filter(|id| id.volume_serial == root_serial)
+        .map(|id| (id.index_64, id.id_128));
+    let name: Vec<u16> = file_name(path).unwrap_or_default().encode_utf16().collect();
+    let target = MatchTarget {
+        index,
+        parent_index_64: folder.index_64,
+        parent_id_128: folder.id_128,
+        file,
+        name,
+    };
+    (Reach::Matched, Some(target))
+}
+
+/// The folder a path names: the path up to its last separator. A drive's root is spelled `X:\`, the
+/// form `file_id` answers for the root, rather than the bare `X:`, which Windows reads as the current
+/// folder of that drive.
+fn parent_of(path: &str) -> Option<String> {
+    let cut = path.rfind(['\\', '/'])?;
+    let folder = &path[..cut];
+    Some(if folder.ends_with(':') {
+        format!(r"{folder}\")
+    } else {
+        folder.to_owned()
+    })
+}
+
+/// The drive letter a path begins with, upper-cased, as `usn` reads `%SystemRoot%`.
+fn drive_of(path: &str) -> Option<char> {
+    let mut chars = path.chars();
+    let letter = chars.next().filter(char::is_ascii_alphabetic)?;
+    (chars.next() == Some(':')).then(|| letter.to_ascii_uppercase())
+}
+
+/// The journal's buffers as `read_journal` hands them over: each buffer's matches for the targets, and
+/// the oldest record time of the first buffer.
+struct JournalScan<'a> {
+    targets: &'a [MatchTarget],
+    /// The matches of each target, by the target's index, in buffer order.
+    hits: BTreeMap<usize, Vec<JournalMatch>>,
+    /// The oldest record time of the first buffer that has a timed record, when one has.
+    from: Option<Timestamp>,
+    /// Whether a buffer was damaged or could not be read at all.
+    damaged: bool,
+}
+
+impl<'a> JournalScan<'a> {
+    fn new(targets: &'a [MatchTarget]) -> Self {
+        Self {
+            targets,
+            hits: BTreeMap::new(),
+            from: None,
+            damaged: false,
+        }
+    }
+
+    /// Takes one buffer. Its matches are kept even when it is damaged, as the records before the damage
+    /// are (ADR 0086 section 3).
+    fn add(&mut self, bytes: &[u8]) {
+        // A real journal is written in time order, so the oldest record of the first buffer that has a
+        // timed one is the oldest of the read. Until a buffer gives a time, `from` is still unset and
+        // the next buffer is looked at (ADR 0086 section 3).
+        if self.from.is_none() {
+            self.from = parse_buffer(bytes).ok().and_then(|buffer| {
+                buffer
+                    .records
+                    .iter()
+                    .filter_map(|record| record.written)
+                    .min()
+            });
+        }
+        let Ok(found) = match_buffer(bytes, self.targets) else {
+            self.damaged = true;
+            return;
+        };
+        self.damaged |= found.damage.is_some();
+        for hit in found.matches {
+            self.hits.entry(hit.target).or_default().push(hit);
+        }
+    }
+}
+
+/// Why the journal's matches are not whole, when they are not. A damaged record is `partial`, as a
+/// changed journal is: the records before the damage were compared and the ones after were not. Damage
+/// outranks how the read ended, as it does in `usn` (ADR 0086 sections 3 and 4).
+fn journal_gap(damaged: bool, end: UsnReadEnd) -> Option<UnmeasuredReason> {
+    if damaged {
+        return Some(UnmeasuredReason::Partial);
+    }
+    match end {
+        UsnReadEnd::Complete => None,
+        UsnReadEnd::JournalChanged => Some(UnmeasuredReason::Partial),
+        UsnReadEnd::Stopped => Some(UnmeasuredReason::BudgetSpent),
+    }
+}
+
+/// The journal fields of one path. `journal_match` is on every path the journal was read for, and
+/// `journal_from` whenever some buffer of the read had a timed record. The three lists and
+/// `journal_more` are only for a matched path whose read was whole, so a list is never read from a
+/// changing or cut journal (ADR 0086 section 3).
+fn journal_fields(
+    reach: Reach,
+    matches: &[JournalMatch],
+    from: Option<Timestamp>,
+    whole: bool,
+) -> BTreeMap<String, serde_json::Value> {
+    let mut fields = BTreeMap::new();
+    fields.insert(
+        "journal_match".to_owned(),
+        serde_json::Value::from(reach.word()),
+    );
+    if let Some(from) = from {
+        fields.insert(
+            "journal_from".to_owned(),
+            serde_json::Value::from(from.to_string()),
+        );
+    }
+    if matches!(reach, Reach::Matched) && whole {
+        let mut more = false;
+        for (name, kind) in [
+            ("journal_deleted", ChangeKind::Deleted),
+            ("journal_renamed_from", ChangeKind::RenamedFrom),
+            ("journal_renamed_to", ChangeKind::RenamedTo),
+        ] {
+            let (times, cut) = newest_times(matches, kind);
+            more |= cut;
+            fields.insert(name.to_owned(), serde_json::Value::from(times));
+        }
+        fields.insert("journal_more".to_owned(), serde_json::Value::from(more));
+    }
+    fields
+}
+
+/// The newest `JOURNAL_TIMES_CAP` times of one kind of match, newest first, and whether any were cut.
+/// A match with no time is dropped (ADR 0086 section 3).
+fn newest_times(matches: &[JournalMatch], kind: ChangeKind) -> (Vec<String>, bool) {
+    let mut times: Vec<Timestamp> = matches
+        .iter()
+        .filter(|found| found.kind == kind)
+        .filter_map(|found| found.written)
+        .collect();
+    times.sort_by_key(|time| Reverse(*time));
+    let cut = times.len() > JOURNAL_TIMES_CAP;
+    times.truncate(JOURNAL_TIMES_CAP);
+    (times.iter().map(ToString::to_string).collect(), cut)
+}
+
+/// Gaps the six journal fields with the journal's own `reason`. `gaps` never holds a journal field
+/// from a source (see [`gaps`]), so this is the only reason those fields can carry (ADR 0086
+/// section 4).
+fn gap_journal_fields(gaps: &mut BTreeMap<String, UnmeasuredReason>, reason: UnmeasuredReason) {
+    for field in JOURNAL_FIELDS {
+        gaps.insert(field.to_owned(), reason);
+    }
+}
+
 /// The system drive's uppercased letter, when the environment names one.
 fn system_drive(host: &dyn Host) -> Option<u8> {
     let drive = host.env_var("SystemDrive")?;
@@ -542,4 +931,242 @@ fn is_under_root(path: &str, root: &str) -> bool {
     path.len() > root.len()
         && path.starts_with(&root)
         && matches!(path.as_bytes()[root.len()], b'\\' | b'/')
+}
+
+#[cfg(test)]
+mod tests {
+    use rongroi_host::FixtureHost;
+
+    use super::*;
+
+    /// The observations and gaps of a measured run.
+    fn measured(run: &CollectorRun) -> (&[Observation], &BTreeMap<String, UnmeasuredReason>) {
+        match run {
+            CollectorRun::Measured {
+                observations, gaps, ..
+            } => (observations, gaps),
+            CollectorRun::Unmeasured { .. } => panic!("not measured: {run:?}"),
+        }
+    }
+
+    /// A host whose only recorded path is `path`, described by BAM. `extra` holds the `drive_map:`
+    /// and `links:` blocks an ADR 0091 case needs, and `files` is the body under `filesystem:`.
+    fn bam_host(path: &str, extra: &str, files: &str) -> FixtureHost {
+        FixtureHost::from_yaml_str(
+            &format!(
+                r"platform: windows
+os_build: '26100'
+env:
+  WinDir: 'C:\Windows'
+  SystemDrive: 'C'
+  SystemRoot: 'C:\Windows'
+{extra}registry:
+  'HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\S-1-5-21-0-0-0-1001':
+    Version: 1
+    SequenceNumber: 1
+    '{path}':
+      content_hex: '00008192b17adc01'
+filesystem:
+  'C:\Windows\appcompat\pca':
+    - name: PcaAppLaunchDic.txt
+      content: ''
+{files}processes:
+  - pid: 4
+    name: System
+"
+            ),
+            "inline",
+        )
+        .unwrap()
+    }
+
+    fn text<'a>(observation: &'a Observation, name: &str) -> Option<&'a str> {
+        observation
+            .fields
+            .get(name)
+            .and_then(serde_json::Value::as_str)
+    }
+
+    fn observed<'a>(observations: &'a [Observation], path: &str) -> &'a Observation {
+        observations
+            .iter()
+            .find(|observation| text(observation, "path") == Some(path))
+            .unwrap_or_else(|| panic!("{path} was not observed: {observations:?}"))
+    }
+
+    /// A buffer too short to hold the USN every buffer begins with is damage that `match_buffer` cannot
+    /// read past, and it makes the journal partial, not a failed read (ADR 0086 section 3). The fixture
+    /// always encodes well-formed buffers, so the damage is given to the scan directly.
+    #[test]
+    fn j2_a_buffer_too_short_for_its_header_is_partial() {
+        let mut scan = JournalScan::new(&[]);
+        scan.add(&[0_u8; 4]);
+        assert!(scan.damaged);
+        assert_eq!(
+            journal_gap(scan.damaged, UsnReadEnd::Complete),
+            Some(UnmeasuredReason::Partial)
+        );
+    }
+
+    /// One version 2 record of 64 bytes, written at `written`, whose name is `fx`.
+    fn usn_record(written: u64) -> Vec<u8> {
+        let mut record = vec![0_u8; 64];
+        record[0..4].copy_from_slice(&64_u32.to_le_bytes());
+        record[4..6].copy_from_slice(&2_u16.to_le_bytes());
+        record[16..24].copy_from_slice(&5_u64.to_le_bytes());
+        record[32..40].copy_from_slice(&written.to_le_bytes());
+        record[40..44].copy_from_slice(&0x8000_0000_u32.to_le_bytes());
+        record[56..58].copy_from_slice(&4_u16.to_le_bytes());
+        record[58..60].copy_from_slice(&60_u16.to_le_bytes());
+        record[60..64].copy_from_slice(&[b'f', 0, b'x', 0]);
+        record
+    }
+
+    /// A journal buffer holding exactly `record`, after the eight-byte next USN.
+    fn usn_buffer(record: &[u8]) -> Vec<u8> {
+        let mut bytes = 0_u64.to_le_bytes().to_vec();
+        bytes.extend_from_slice(record);
+        bytes
+    }
+
+    /// When the first buffer holds no timed record, `journal_from` is the oldest time of the first
+    /// buffer that has one, not nothing (ADR 0086 section 3). The first buffer's only record has a time
+    /// the parser cannot give, so the first buffer is untimed and the second buffer sets it.
+    #[test]
+    fn j2_journal_from_is_taken_from_the_first_buffer_with_a_timed_record() {
+        let untimed = usn_buffer(&usn_record(u64::MAX));
+        let timed = usn_buffer(&usn_record(134_337_654_000_000_000));
+        let expected: Timestamp = "2026-09-13T09:30:00Z"
+            .parse()
+            .expect("a valid timestamp literal");
+
+        let parsed = parse_buffer(&untimed).expect("a buffer holding its next USN");
+        assert_eq!(parsed.records.len(), 1);
+        assert_eq!(parsed.records[0].written, None);
+
+        let mut scan = JournalScan::new(&[]);
+        scan.add(&untimed);
+        assert_eq!(
+            scan.from, None,
+            "an untimed buffer must not set journal_from"
+        );
+        scan.add(&timed);
+        assert_eq!(scan.from, Some(expected));
+    }
+
+    // ADR 0091 (files are read on local drives only): the host gate `local_read_check` runs before
+    // every read by path. Each fixture lists its file with a `sha256`, so a hash on the row means the
+    // gate was skipped.
+
+    /// A file on a network letter keeps its path, but the identity read is not attempted: no hash, no
+    /// signature, `identity_read: not_attempted` and `file_unread: not_local_drive` (ADR 0091
+    /// sections 1 and 3). One unread file is not a gap, as a missing one is not (ADR 0079).
+    #[test]
+    fn a_file_on_a_network_letter_is_not_read_and_says_not_local_drive() {
+        let host = bam_host(
+            r"Z:\Apps\net.exe",
+            r"drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'Z', device: '\Device\Mup', serial: 2, kind: other }
+",
+            r"  'Z:\Apps':
+    - name: net.exe
+      content: 'fixture bytes'
+      sha256: 4444444444444444444444444444444444444444444444444444444444444444
+      signature: { state: no_embedded_signature }
+",
+        );
+        let run = RecordedFiles::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(
+            gaps.keys()
+                .all(|field| JOURNAL_FIELDS.contains(&field.as_str())),
+            "{gaps:?}"
+        );
+        let net = observed(observations, r"Z:\Apps\net.exe");
+        assert_eq!(text(net, "identity_read"), Some("not_attempted"));
+        assert_eq!(text(net, "file_unread"), Some("not_local_drive"));
+        assert_eq!(net.fields.get("sha256"), None, "{net:?}");
+        assert_eq!(net.fields.get("signature"), None, "{net:?}");
+    }
+
+    /// A file under a junction to a share keeps its path and is not read: `identity_read:
+    /// not_attempted`, `file_unread: link_off_local_drive`, and no hash or signature (ADR 0091
+    /// sections 1 and 3).
+    #[test]
+    fn a_file_behind_a_junction_to_a_share_says_link_off_local_drive() {
+        let host = bam_host(
+            r"C:\Games\shared.exe",
+            r"links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\UNC\server\share'
+",
+            r"  'C:\Games':
+    - name: shared.exe
+      content: 'fixture bytes'
+      sha256: 5555555555555555555555555555555555555555555555555555555555555555
+      signature: { state: no_embedded_signature }
+",
+        );
+        let run = RecordedFiles::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(
+            gaps.keys()
+                .all(|field| JOURNAL_FIELDS.contains(&field.as_str())),
+            "{gaps:?}"
+        );
+        let shared = observed(observations, r"C:\Games\shared.exe");
+        assert_eq!(text(shared, "identity_read"), Some("not_attempted"));
+        assert_eq!(text(shared, "file_unread"), Some("link_off_local_drive"));
+        assert_eq!(shared.fields.get("sha256"), None, "{shared:?}");
+        assert_eq!(shared.fields.get("signature"), None, "{shared:?}");
+    }
+
+    /// A junction that stays on a local drive is read through: the file is listed at `D:\Lib`, both
+    /// drives are fixed, and the identity read carries the fixture's hash and signature (ADR 0091
+    /// section 1).
+    #[test]
+    fn a_file_behind_a_junction_that_stays_local_is_read() {
+        let host = bam_host(
+            r"C:\Games\moved.exe",
+            r"drive_map:
+  - { letter: 'C', device: '\Device\HarddiskVolume1', serial: 1, kind: fixed }
+  - { letter: 'D', device: '\Device\HarddiskVolume2', serial: 2, kind: fixed }
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+",
+            r"  'D:\Lib':
+    - name: moved.exe
+      content: 'fixture bytes'
+      sha256: 6666666666666666666666666666666666666666666666666666666666666666
+      signature: { state: no_embedded_signature }
+",
+        );
+        let run = RecordedFiles::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(
+            gaps.keys()
+                .all(|field| JOURNAL_FIELDS.contains(&field.as_str())),
+            "{gaps:?}"
+        );
+        let moved = observed(observations, r"C:\Games\moved.exe");
+        assert_eq!(text(moved, "identity_read"), Some("read"), "{moved:?}");
+        assert_eq!(text(moved, "sha256"), Some("6".repeat(64).as_str()));
+        assert_eq!(text(moved, "signature"), Some("no_embedded_signature"));
+        assert!(!moved.fields.contains_key("file_unread"), "{moved:?}");
+    }
+
+    /// `file_unread` is emitted only where a read was refused, but it is declared whatever a fixture
+    /// produces: the one new field ADR 0091 section 3 adds, as text.
+    #[test]
+    fn file_unread_is_a_declared_text_field() {
+        let declared = FIELDS
+            .iter()
+            .find(|field| field.name == "file_unread")
+            .unwrap_or_else(|| panic!("file_unread is not in FIELDS: {FIELDS:?}"));
+        assert_eq!(declared.kind, crate::FieldKind::Text, "{declared:?}");
+    }
 }

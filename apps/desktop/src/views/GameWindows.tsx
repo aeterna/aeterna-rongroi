@@ -14,7 +14,7 @@ type WindowKey = "before" | "during" | "after" | "before_scan";
 const WINDOW_KEYS: WindowKey[] = ["before", "during", "after", "before_scan"];
 // Unmatched installs are counted for the three windows around a session, not for the scan's own span.
 const INSTALL_WINDOW_KEYS: ("before" | "during" | "after")[] = ["before", "during", "after"];
-type IdentityKey = "i1" | "i2" | "i3" | "i4" | "l1";
+type IdentityKey = "i1" | "i2" | "i3" | "i4" | "i5" | "l1";
 type TimeKey = "t1" | "t2" | "t3" | "t4";
 
 /** The game-window section, shown after the latest-session statement in both modes (ADR 0078). */
@@ -123,6 +123,7 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
     ["i2", candidate.i2],
     ["i3", candidate.i3],
     ["i4", candidate.i4],
+    ["i5", candidate.i5],
     ["l1", candidate.l1],
   ];
   const times: [TimeKey, TimeFact][] = [
@@ -133,7 +134,7 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
   ];
   // Unknown identity facts are said in words, never left out: an absent line would read as "no".
   const unknownFacts = identity.flatMap(([key, fact]) =>
-    fact?.fact === "not_known" ? [{ key, reason: fact.reason.reason }] : [],
+    fact?.fact === "not_known" ? [{ key, reason: fact.reason }] : [],
   );
   const unknownTimes = times.flatMap(([key, fact]) =>
     fact.fact === "not_known" ? [{ key, reason: fact.reason }] : [],
@@ -142,6 +143,13 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
   const installs = candidate.installed_at ?? [];
   const file = candidate.file;
   const recordedBy = candidate.recorded_by ?? [];
+  // The three change-journal lists of the file, in the order the details show them (ADR 0086).
+  const journal = [
+    ["deleted", file?.journal_deleted],
+    ["renamed_from", file?.journal_renamed_from],
+    ["renamed_to", file?.journal_renamed_to],
+  ] as const;
+  const journalMore = file?.journal_more === true ? ` ${t("game.file.journal.more")}` : "";
 
   return (
     <article className="game-candidate">
@@ -176,7 +184,13 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
         )}
         {unknownFacts.map(({ key, reason }) => (
           <li key={key} className="muted">
-            {`${t(`game.fact.${key}`)}: ${t(`game.nk.${reason}`)}`}
+            {`${t(`game.fact.${key}`)}: ${t(`game.nk.${reason.reason}`, {
+              // The source's words, as the cross-source statement names it (ADR 0061).
+              source:
+                reason.reason === "before_trace_age"
+                  ? t(`cross_source.source.${reason.source}`, { defaultValue: reason.source })
+                  : undefined,
+            })}`}
           </li>
         ))}
         {unknownTimes.map(({ key, reason }) => (
@@ -264,6 +278,13 @@ function CandidateCard({ candidate }: { candidate: GameCandidate }) {
               <li className="muted">
                 {t("game.file.download_host", { host: file.download_host })}
               </li>
+            )}
+            {journal.map(([kind, times]) =>
+              times && times.length > 0 ? (
+                <li key={kind} className="muted">
+                  {`${t(`game.file.journal.${kind}`, { times: times.join(", ") })}${journalMore}`}
+                </li>
+              ) : null,
             )}
           </ul>
         </details>

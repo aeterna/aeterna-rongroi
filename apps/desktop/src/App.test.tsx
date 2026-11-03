@@ -337,6 +337,35 @@ describe("App", () => {
     expect(screen.queryByText("FiveM ในเครื่องนี้ เทียบกับบันทึกของ Windows ว่าโปรแกรมใดเคยรัน")).toBeNull();
   });
 
+  // ADR 0088: an install date dated after the scan keeps its date, says it is later than the scan,
+  // and shows no day count.
+  it("shows an anchor dated after the scan with its date and no day count", async () => {
+    const view = snapshot("trace_ages_elevated_ss_view");
+    const ages = view.trace_ages;
+    if (!ages) {
+      throw new Error("the snapshot has no trace ages");
+    }
+    viewOverride = {
+      ...view,
+      trace_ages: {
+        ...ages,
+        anchors: ages.anchors.map((anchor) =>
+          anchor.anchor === "install_date"
+            ? { anchor: "install_date", state: "measured", on: "2026-11-02", source: "HKLM" }
+            : anchor,
+        ),
+      },
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
+    fireEvent.click(screen.getByText("I agree — show the SS view"));
+    const anchorLine = await screen.findByText(
+      /Windows installed or last feature-upgraded \(InstallDate\): 2026-11-02/,
+    );
+    expect(anchorLine.textContent).toContain("2026-11-02, later than this scan's own date");
+    expect(anchorLine.textContent).not.toMatch(/\d+ days? before/);
+  });
+
   it("shows the timeline in SS mode with its note and the scan time", async () => {
     render(<App />);
     fireEvent.click(await screen.findByText("Screenshare check (SS mode)"));
@@ -560,6 +589,129 @@ describe("App", () => {
     expect(screen.queryByText("Scan as administrator")).toBeNull();
   });
 
+  // The header is the way back from a long report: the bottom button stays, but reaching it must not
+  // be the only way out of a report that runs for pages.
+  it("shows no home button on the start screen and one on a report screen that returns to start", async () => {
+    render(<App />);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to the start screen" })).toBeNull();
+    fireEvent.click(screen.getByText("Check my own PC"));
+    await screen.findByText("Found");
+    fireEvent.click(screen.getByRole("button", { name: "Back to the start screen" }));
+    expect(screen.getByText("What do you want to do?")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to the start screen" })).toBeNull();
+  });
+
+  // Beside the home button, the app name and the place the player is in, so a report says what it is.
+  it.each([
+    ["Check my own PC", null, "aeterna-rongroi / Self check"],
+    [
+      "Screenshare check (SS mode)",
+      "I agree — show the SS view",
+      "aeterna-rongroi / Screenshare check",
+    ],
+  ])("shows the breadcrumb for %s", async (open, agree, trail) => {
+    render(<App />);
+    fireEvent.click(await screen.findByText(open));
+    if (agree) {
+      fireEvent.click(screen.getByText(agree));
+    }
+    await screen.findByText("Found");
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe(trail);
+  });
+
+  // The breadcrumb already names the app and the place, so a report keeps the <h1> for the heading
+  // order but hides it, and does not render the tagline a second time.
+  it("hides the app title on a report screen and leaves the start screen's title whole", async () => {
+    render(<App />);
+    const startHeading = screen.getByRole("heading", { level: 1 });
+    expect(startHeading.className).not.toContain("visually-hidden");
+    expect(
+      screen.getByText(
+        "Offline PC check for FiveM communities. Shows evidence — never says a PC is clean.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Found");
+    expect(screen.getByRole("heading", { level: 1 }).className).toContain("visually-hidden");
+    expect(
+      screen.queryByText(
+        "Offline PC check for FiveM communities. Shows evidence — never says a PC is clean.",
+      ),
+    ).toBeNull();
+  });
+
+  // The last part of the trail is the page the reader is on, and says so to assistive technology.
+  it("marks the breadcrumb's current place as the page", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Found");
+    expect(
+      screen
+        .getByRole("navigation", { name: "Breadcrumb" })
+        .querySelector(".breadcrumb-current")
+        ?.getAttribute("aria-current"),
+    ).toBe("page");
+  });
+
+  // The scroll-to-top button unmounts once the window is back at the top, so focus must move to the
+  // header's way home instead of falling to the body.
+  it("moves focus to the home button when the scroll-to-top button is used", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await screen.findByText("Found");
+
+    const originalScrollY = Object.getOwnPropertyDescriptor(window, "scrollY");
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 250 });
+    fireEvent.scroll(window);
+    const scrollTop = screen.getByRole("button", { name: "Back to top" });
+    scrollTop.focus();
+
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    try {
+      fireEvent.click(scrollTop);
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+      fireEvent.scroll(window);
+      expect(screen.queryByRole("button", { name: "Back to top" })).toBeNull();
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Back to the start screen" }),
+      );
+    } finally {
+      scrollTo.mockRestore();
+      if (originalScrollY) {
+        Object.defineProperty(window, "scrollY", originalScrollY);
+      } else {
+        Reflect.deleteProperty(window, "scrollY");
+      }
+    }
+  });
+
+  // A relaunch ends this process; until the answer arrives, a second click must not start another.
+  it("disables the administrator restart while it is in flight and enables it after a decline", async () => {
+    let resolveElevate: (outcome: "declined") => void = () => {};
+    const pending = new Promise<"declined">((resolve) => {
+      resolveElevate = resolve;
+    });
+    render(<App />);
+    const button = await screen.findByRole("button", { name: "Scan as administrator" });
+    mockIPC((cmd) => {
+      calls.push(cmd);
+      if (cmd === "relaunch_elevated") {
+        return pending;
+      }
+      throw new Error(`unexpected command ${cmd}`);
+    });
+    fireEvent.click(button);
+    expect(button).toHaveProperty("disabled", true);
+    await act(async () => {
+      resolveElevate("declined");
+      await pending;
+    });
+    expect(button).toHaveProperty("disabled", false);
+    expect(screen.getByText("You declined the Windows prompt. Nothing changed.")).toBeTruthy();
+  });
+
   it("switches to Thai, keeping the UNOFFICIAL BUILD token in English", async () => {
     render(<App />);
     await act(async () => {
@@ -739,7 +891,7 @@ describe("App", () => {
   // reading `source_empty` is a row that says nothing to the person it is about (ADR 0030).
   it.each([
     ["not_on_this_os", "this version of Windows does not keep this record"],
-    ["not_attempted", "the scan stopped before reaching it"],
+    ["not_attempted", "the scan did not open it"],
     ["service_disabled", "the Windows service that writes this record is switched off"],
     ["source_absent", "this PC has no such record to read"],
     ["source_empty", "the place this is kept is there and holds nothing"],
@@ -1455,6 +1607,69 @@ describe("App", () => {
         "recorded between the session and this scan: not known: the scan's time is not recorded",
       ),
     ).toBeTruthy();
+  });
+
+  // ADR 0086 (J3): the change journal's fact, I5, with its cause when it holds and its reason when not.
+  it("shows the change-journal fact with its causes when the journal recorded the file", async () => {
+    viewOverride = { ...selfView, game_windows: withFile({ i5: { fact: "true" } }) };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "the change journal recorded it being deleted or renamed near the latest session (updates, the Recycle Bin, antivirus quarantine)",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says the change journal is not known, with its reason, when it is on another drive", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        i5: { fact: "not_known", reason: { reason: "journal_other_drive" } },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "the change journal recorded it being deleted or renamed near the latest session: not known: the file is on another drive, whose change journal this program does not read",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("names the change journal by its words when the journal does not reach back that far", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        i5: { fact: "not_known", reason: { reason: "before_trace_age", source: "usn" } },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    expect(
+      await screen.findByText(
+        "the change journal recorded it being deleted or renamed near the latest session: not known: NTFS change journal does not reach back that far",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows the journal's deletion times in the file details, with the more marker", async () => {
+    viewOverride = {
+      ...selfView,
+      game_windows: withFile({
+        file: {
+          read: "read",
+          journal_deleted: ["2026-10-27T20:40:00Z"],
+          journal_more: true,
+        },
+      }),
+    };
+    render(<App />);
+    fireEvent.click(await screen.findByText("Check my own PC"));
+    await openFileDetails();
+    expect(screen.getByText("Deleted at: 2026-10-27T20:40:00Z + more")).toBeTruthy();
+    expect(screen.queryByText(/Renamed away from this name/)).toBeNull();
+    expect(screen.queryByText(/Renamed to this name/)).toBeNull();
   });
 
   it("gives an earlier session's start once, in its began line", async () => {

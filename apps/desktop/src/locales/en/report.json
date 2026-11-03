@@ -39,7 +39,7 @@
     "not_windows": "not running on Windows",
     "not_on_this_os": "this version of Windows does not keep this record",
     "not_admin": "Windows would not show this without administrator rights",
-    "not_attempted": "this was not read — the scan stopped before reaching it",
+    "not_attempted": "this was not read — the scan did not open it",
     "access_denied": "Windows refused to open this",
     "service_disabled": "the Windows service that writes this record is switched off",
     "source_absent": "this PC has no such record to read",
@@ -74,6 +74,7 @@
   },
   "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasuredExpected}} not measured (expected) · {{unmeasuredUnexpected}} not measured (not expected) · {{unmatched}} unmatched observations",
   "empty": "No evidence to show.",
+  "scroll_top": "Back to top",
   "summary": {
     "title": "What this scan lists",
     "found": "found — each one lists ordinary things that also produce it",
@@ -89,6 +90,13 @@
     "search_label": "Search checks",
     "clear_search": "Clear search",
     "search_empty": "No checks match your search."
+  },
+  "palette": {
+    "label": "Jump to evidence",
+    "input_label": "Search evidence",
+    "list_label": "Matching evidence",
+    "results": "{{count}} matching check(s)",
+    "empty": "No checks match your search."
   },
   "collector": {
     "posture": "Security settings of this PC",
@@ -185,9 +193,11 @@
       "fivem_enhanced_program_folder_created": "Reset by reinstalling FiveM, removing its folder, or moving or recreating the Windows profile."
     },
     "on": "{{date}}, {{days}} before this scan",
+    "on_after_scan": "{{date}}, later than this scan's own date",
     "days_before_one": "{{count}} day",
     "days_before_other": "{{count}} days",
     "oldest": "oldest {{at}}, {{days}} before this scan",
+    "oldest_after_scan": "oldest {{at}}, later than this scan's own time",
     "holds_nothing": "holds nothing with a time",
     "count": {
       "evtx": "{{count}} records",
@@ -257,7 +267,8 @@
     "source": {
       "prefetch": "Prefetch",
       "bam": "BAM",
-      "pca": "PCA"
+      "pca": "PCA",
+      "usn": "NTFS change journal"
     },
     "selected": "{{count}} entries for those names; the latest is from {{date}}.",
     "no_entry_named": "no entry for FiveM.exe, GTA5.exe, GTA5_Enhanced.exe, PlayGTAV.exe or FiveM_b…_GTAProcess.exe. It holds {{count}} entries; the oldest is from {{date}} ({{days}} before this scan).",
@@ -458,6 +469,7 @@
       "i2": "no embedded signature that verifies",
       "i3": "its name does not match what the file is",
       "i4": "it ran from Temp or Downloads",
+      "i5": "the change journal recorded it being deleted or renamed near the latest session",
       "l1": "it loaded a program file from outside the usual folders",
       "l1_false": "of the files Prefetch recorded for it, none with a program's extension is outside Windows, Program Files and FiveM's folders"
     },
@@ -471,6 +483,7 @@
       "i2": "open-source tools, mods, catalog-signed Windows files",
       "i3": "updaters that keep an executable as .tmp or .dat, renamed portable tools",
       "i4": "anything downloaded and run",
+      "i5": "updates, the Recycle Bin, antivirus quarantine",
       "l1": "an add-on, overlay or codec installed in a user folder"
     },
     "value": {
@@ -521,7 +534,13 @@
         "4": "restricted sites (4)"
       },
       "zone_other": "zone {{id}}",
-      "download_host": "Downloaded from: {{host}}"
+      "download_host": "Downloaded from: {{host}}",
+      "journal": {
+        "deleted": "Deleted at: {{times}}",
+        "renamed_from": "Renamed away from this name at: {{times}}",
+        "renamed_to": "Renamed to this name at: {{times}}",
+        "more": "+ more"
+      }
     },
     "nk": {
       "session_end_not_recorded": "not known: the session's end is not recorded",
@@ -534,7 +553,10 @@
       "no_path": "not known: no path was recorded for it",
       "deferred": "not known: this version does not read it yet",
       "not_counted": "not known: no Prefetch record counted the files it loaded",
-      "earlier_session": "not known: an earlier session's end is never recorded"
+      "earlier_session": "not known: an earlier session's end is never recorded",
+      "journal_not_read": "not known: the change journal could not be read",
+      "journal_other_drive": "not known: the file is on another drive, whose change journal this program does not read",
+      "journal_folder_unknown": "not known: the file's folder could not be identified"
     },
     "clock": {
       "changed": "The clock was changed at {{at}}{{detail}}; times before and after may not be on the same clock.",
@@ -546,5 +568,24 @@
       "code_integrity": "Code Integrity refused a file at the same path on some drive.",
       "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed."
     }
+  },
+  "presenter": {
+    "toggle": "Presenter",
+    "prev": "Previous",
+    "next": "Next",
+    "counter": "{{current}} / {{total}}",
+    "group": "Group {{current}} of {{total}}: {{title}}"
+  },
+  "sources": {
+    "button": "Source",
+    "title": "Sources",
+    "close": "Close",
+    "rule": "Rule id",
+    "collector": "Collector",
+    "retention": "Look-back",
+    "code": "Where this is in the code"
+  },
+  "skeleton": {
+    "loading": "Loading the report"
   }
 }

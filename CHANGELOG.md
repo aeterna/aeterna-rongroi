@@ -3,6 +3,65 @@
 All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.14.0] - 2026-11-03
+
+### Added
+- The header has an Animations on/off switch that stops every decoration animation in the app and remembers the choice; it adds to, and never replaces, the system reduced-motion setting, and no result changes.
+- The landing page gets the same press, focus-glow and count-pulse micro-interactions as the app.
+- The Horizon timeline draws its line and steps in once when it appears.
+- The report shows a loading skeleton with a shimmer while its data arrives.
+- Translucent panels get a light inner edge and a softer shadow; the header stays the only backdrop blur.
+- Each evidence row has a Source button that opens a side drawer with the row's rule id, collector, look-back and code links; it shows nothing the row does not already show (ADR 0093).
+- SS mode report: a Presenter toggle moves through the result groups with the arrow keys and dims the others by position only; nothing is hidden (ADR 0093).
+- The desktop app changes screen with a soft cross-fade (View Transitions API) while the header stays in place; without the API, or with reduced motion, the change is instant.
+- `recorded_files` (full scan) reads the system drive's NTFS change journal once and, for each recorded file,
+  says whether the journal holds its deletion or a rename (ADR 0086): `journal_match` (`matched`, `other_volume`,
+  `folder_unknown`), the newest eight times of each kind in `journal_deleted`, `journal_renamed_from` and
+  `journal_renamed_to`, `journal_more` when a list was cut, and `journal_from`, the oldest record the read held.
+  Names in the journal are compared inside the parser and never kept; no name, USN or file number is reported.
+  The read has its own 30-second budget, and a journal that could not be read gaps only these six fields. The
+  game-window view does not show this yet (ADR 0086 step J3).
+- The game-window view's identity fact I5 (ADR 0086): after a full scan, whether the change journal recorded a
+  program's file being deleted or renamed in a window of the latest session, with its ordinary causes (updates, the
+  Recycle Bin, antivirus quarantine); otherwise why it is not known (the journal could not be read, the file is on
+  another drive or its folder could not be identified, or the journal does not reach back to the window). It counts
+  in the ordering and names a program in SS mode, like I1 to I4. A program's file details list the journal's times.
+  The full-scan consent says the journal is read for these files, and that names in it are compared on the PC and
+  never kept.
+- `bam` now reports a program's path when Windows recorded it as a device path (`\Device\HarddiskVolumeN\…`)
+  on a fixed drive: the scan maps the device to today's drive letter and marks the path `path_from_device`,
+  because the letter is the one the drive has now (ADR 0087). On a removable drive, or for a device no letter
+  names, the path stays withheld as before. No device name or volume serial is reported. A mapped path is
+  redacted in SS mode like every other path; it lets `recorded_files` read the program's file, lets the
+  game-window view join BAM to other sources by path (so a program run and then deleted can show I1), and can
+  make `executed-program-missing-on-disk` match on more machines.
+- The landing page's example card ("What this scan lists") answers to the visitor: the search box and the three count
+  boxes filter its rows, and each row has a button that copies its raw JSON. It shows one example of each result,
+  from real rules (a found Secure Boot row, a not-found test-signing row and a not-measured row that needs
+  administrator rights). A small script of the page's own does this; with scripts off the card reads as before, and the
+  page still loads nothing from another site.
+- The saved record's 16-character digest decodes into place once when it is shown, and an opened evidence row gets one line of its rule, collector and state typed out. Both are decoration: the real digest and the whole line are in the page as text from the start, nothing is animated under reduced motion, and the record, its digest and every collector are unchanged.
+- The report summary's three counts roll into place once when it opens, its top note gets four corner marks and one light sweep, and each of the three cards under it follows a mouse with a soft light and a tilt of at most 6 degrees (Self mode only; SS mode keeps the cards still). These are decoration: every number and word stays in the page as text, nothing moves under reduced motion, and no count, colour meaning or collector changes.
+- The desktop window's header stays in view while a long report scrolls, and outside the start screen it has a
+  home button and a trail (`aeterna-rongroi / Self check`) beside it; a button appears after the first 200 px to
+  go back to the top (instant under reduced motion), and the "Scan as administrator" and "Full scan" buttons are
+  disabled while their request is being answered. The report, its privacy filtering and every collector are unchanged.
+- The desktop app shows a small native Windows window while the scan runs, on every start, so the program no longer
+  looks like it has hung: it says a scan is running, and on a full scan that reading the files of recorded programs
+  takes at most 90 seconds (the figure the full-scan question states). It is drawn by Windows with no WebView, opens
+  after the full-scan question and closes before the report window is created, and shows no progress figure because
+  the scan reports none (ADR 0092).
+- Ctrl K (Cmd K on a Mac) opens a search over the report's own checks, by rule name, rule id or collector; Enter or a click on a result switches the report to its technical view with that rule searched. It reads only what the report already lists, so SS mode shows nothing more, and it has no order or ranking of its own. It is a keyboard-reachable dialog with a combobox and a list, and it has no animation when reduced motion is asked for.
+- The landing page has a new section, "Data stays on this PC" (Thai and English): a drawing of Windows' files, the scan and the report on screen, with dots moving along the wires and the wire to the internet blocked. The dots stop when the drawing is off screen or when the visitor asks for reduced motion, and the section says what PRIVACY.md says, including the WebView2 note. A small script of the page's own does the pausing; the page still loads nothing from another site.
+- The desktop window gets small touches of motion: buttons press in, keyboard focus gets a soft ring beside its outline, the count boxes spring back when pressed, an opened evidence row folds open and shut, the copy button shows a check for a moment, the technical view's groups rise in once when it first opens, and its three counts roll like the summary's. All of it is decoration: every word and number is in the window from the start, nothing moves when reduced motion is asked for, and no result, colour meaning or collector changes.
+
+### Fixed
+- A time later than the scan's own time no longer shows a negative day count. In trace ages, a source's oldest time,
+  FiveM's folders and the cross-source line show the time without a count (or "could not show"), and an anchor dated
+  after the scan shows its date with "later than this scan's own date" and the horizon tag shows `-` (ADR 0088).
+
 ## [0.13.0] - 2026-10-27
 
 ### Added

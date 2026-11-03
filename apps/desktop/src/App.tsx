@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { changeScreen } from "./App.transition";
 import {
   buildSavedRecord,
   type ElevateOutcome,
@@ -12,11 +13,13 @@ import {
   reportHeader,
 } from "./api";
 import { languageNames, supportedLanguages } from "./i18n";
+import { setAnimationsOff, useAnimationsOff } from "./motion";
 import type { Mode, ReportHeader, SavedSummary, SsOptions } from "./types";
 import { About } from "./views/About";
 import { Consent } from "./views/Consent";
 import { Report } from "./views/Report";
 import { UnofficialBanner } from "./views/UnofficialBanner";
+import "./App.transition.css";
 
 type Screen =
   | "start"
@@ -27,6 +30,7 @@ type Screen =
 
 export function App() {
   const { t, i18n } = useTranslation();
+  const off = useAnimationsOff();
   const [header, setHeader] = useState<ReportHeader | null>(null);
   const [headerFailed, setHeaderFailed] = useState(false);
   const [screen, setScreen] = useState<Screen>("start");
@@ -34,9 +38,23 @@ export function App() {
   // and an SS report does not ask for consent again.
   const [beforeAbout, setBeforeAbout] = useState<Exclude<Screen, "about">>("start");
   const [elevation, setElevation] = useState<ElevateOutcome | null>(null);
+  const [elevationPending, setElevationPending] = useState(false);
   const [fullScan, setFullScan] = useState<ElevateOutcome | null>(null);
+  const [fullScanPending, setFullScanPending] = useState(false);
   const [caseCodeError, setCaseCodeError] = useState<string | null>(null);
   const full = header?.scan_tier === "full";
+  const currentPlace =
+    screen === "start"
+      ? null
+      : typeof screen === "object"
+        ? screen.report === "ss"
+          ? t("breadcrumb.report_ss")
+          : t("breadcrumb.report_self")
+        : screen === "about"
+          ? t("breadcrumb.about")
+          : screen === "consent"
+            ? t("breadcrumb.consent")
+            : t("breadcrumb.declined");
 
   useEffect(() => {
     void reportHeader()
@@ -47,9 +65,45 @@ export function App() {
   return (
     <main>
       <header className="top">
-        <div>
-          <h1>{t("app.name")}</h1>
-          <p className="muted">{t("app.tagline")}</p>
+        <div className="top-left">
+          {screen !== "start" && (
+            <>
+              <button
+                type="button"
+                id="home-button"
+                className="nav home"
+                aria-label={t("nav.home")}
+                onClick={() => changeScreen(() => setScreen("start"))}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 10.5 12 3l9 7.5" />
+                  <path d="M5 9.5V21h14V9.5" />
+                  <path d="M9 21v-6h6v6" />
+                </svg>
+              </button>
+              <nav className="breadcrumb" aria-label={t("breadcrumb.label")}>
+                <span className="muted">{t("app.name")}</span>
+                <span aria-hidden="true"> / </span>
+                <span className="breadcrumb-current" aria-current="page">
+                  {currentPlace}
+                </span>
+              </nav>
+            </>
+          )}
+          <div className="top-title">
+            <h1 className={screen === "start" ? undefined : "visually-hidden"}>{t("app.name")}</h1>
+            {screen === "start" && <p className="muted">{t("app.tagline")}</p>}
+          </div>
         </div>
         <div className="top-actions">
           <button
@@ -59,10 +113,21 @@ export function App() {
               if (screen !== "about") {
                 setBeforeAbout(screen);
               }
-              setScreen("about");
+              changeScreen(() => setScreen("about"));
             }}
           >
             {t("nav.about")}
+          </button>
+          <button
+            type="button"
+            className="nav"
+            aria-pressed={!off}
+            onClick={() => setAnimationsOff(!off)}
+          >
+            {t("motion.toggle", { defaultValue: "Animations" })}:{" "}
+            {off
+              ? t("motion.off", { defaultValue: "off" })
+              : t("motion.on", { defaultValue: "on" })}
           </button>
           <label className="language">
             {t("language.label")}{" "}
@@ -82,87 +147,134 @@ export function App() {
 
       {header && !header.provenance.official && <UnofficialBanner />}
 
-      {screen === "start" && (
-        <section className="start">
-          <h2>{t("start.title")}</h2>
-          <div className="choices">
-            <button type="button" className="choice" onClick={() => setScreen({ report: "self" })}>
-              <span className="choice-title">{t("start.self_button")}</span>
-              <span className="muted">{t("start.self_hint")}</span>
-            </button>
-            <button type="button" className="choice" onClick={() => setScreen("consent")}>
-              <span className="choice-title">{t("start.ss_button")}</span>
-              <span className="muted">{t("start.ss_hint")}</span>
-            </button>
-          </div>
-          {/* Only worth offering while this scan ran without the rights some checks need. */}
-          {header?.elevated === false && (
-            <>
-              <button type="button" onClick={() => void relaunchElevated().then(setElevation)}>
-                {t("start.elevate_button")}
+      <div className="screen">
+        {screen === "start" && (
+          <section className="start">
+            <h2>{t("start.title")}</h2>
+            <div className="choices">
+              <button
+                type="button"
+                className="choice"
+                onClick={() => changeScreen(() => setScreen({ report: "self" }))}
+              >
+                <span className="choice-title">{t("start.self_button")}</span>
+                <span className="muted">{t("start.self_hint")}</span>
               </button>
-              <p className="muted">{t("start.elevate_hint")}</p>
-              {/* Declining is a choice, so it is a plain sentence and not an alert (ADR 0012). */}
-              {elevation === "declined" && <p className="muted">{t("start.elevate_declined")}</p>}
-              {elevation === "failed" && <p className="note">{t("start.elevate_failed")}</p>}
-            </>
-          )}
-          {/* Which scan ran, and a way to the other one: a new copy asks in a Windows dialog before it
-              reads anything, so this window never decides what is read (ADR 0052). */}
-          {header && (
-            <p className="muted">{full ? t("start.full_done") : t("start.standard_done")}</p>
-          )}
-          {header && !full && (
-            <>
-              <button type="button" onClick={() => void relaunchFull().then(setFullScan)}>
-                {t("start.full_button")}
+              <button
+                type="button"
+                className="choice"
+                onClick={() => changeScreen(() => setScreen("consent"))}
+              >
+                <span className="choice-title">{t("start.ss_button")}</span>
+                <span className="muted">{t("start.ss_hint")}</span>
               </button>
-              <p className="muted">{t("start.full_hint")}</p>
-              {fullScan === "failed" && <p className="note">{t("start.full_failed")}</p>}
-            </>
-          )}
-          <p className="note">{t("start.scan_note")}</p>
-        </section>
-      )}
+            </div>
+            {/* Only worth offering while this scan ran without the rights some checks need. */}
+            {header?.elevated === false && (
+              <>
+                <button
+                  type="button"
+                  disabled={elevationPending}
+                  onClick={() => {
+                    setElevationPending(true);
+                    void relaunchElevated().then(
+                      (outcome) => {
+                        setElevation(outcome);
+                        // A started copy ends this process; anything else may be asked again.
+                        setElevationPending(outcome === "started");
+                      },
+                      () => {
+                        setElevation("failed");
+                        setElevationPending(false);
+                      },
+                    );
+                  }}
+                >
+                  {t("start.elevate_button")}
+                </button>
+                <p className="muted">{t("start.elevate_hint")}</p>
+                {/* Declining is a choice, so it is a plain sentence and not an alert (ADR 0012). */}
+                {elevation === "declined" && <p className="muted">{t("start.elevate_declined")}</p>}
+                {elevation === "failed" && <p className="note">{t("start.elevate_failed")}</p>}
+              </>
+            )}
+            {/* Which scan ran, and a way to the other one: a new copy asks in a Windows dialog before it
+                reads anything, so this window never decides what is read (ADR 0052). */}
+            {header && (
+              <p className="muted">{full ? t("start.full_done") : t("start.standard_done")}</p>
+            )}
+            {header && !full && (
+              <>
+                <button
+                  type="button"
+                  disabled={fullScanPending}
+                  onClick={() => {
+                    setFullScanPending(true);
+                    void relaunchFull().then(
+                      (outcome) => {
+                        setFullScan(outcome);
+                        setFullScanPending(outcome === "started");
+                      },
+                      () => {
+                        setFullScan("failed");
+                        setFullScanPending(false);
+                      },
+                    );
+                  }}
+                >
+                  {t("start.full_button")}
+                </button>
+                <p className="muted">{t("start.full_hint")}</p>
+                {fullScan === "failed" && <p className="note">{t("start.full_failed")}</p>}
+              </>
+            )}
+            <p className="note">{t("start.scan_note")}</p>
+          </section>
+        )}
 
-      {screen === "consent" && (
-        <Consent
-          full={full}
-          caseCodeError={caseCodeError}
-          onAgree={(options, caseCode) =>
-            // The record is built once, here, from what was agreed; the digest and a saved file are
-            // both taken from it (ADR 0073). A refused code keeps the player on this screen.
-            void buildSavedRecord(options, caseCode).then(
-              (saved) => {
-                setCaseCodeError(null);
-                setScreen({ report: "ss", options, saved });
-              },
-              (error: unknown) => setCaseCodeError(String(error)),
-            )
-          }
-          onRefuse={() => setScreen("declined")}
-        />
-      )}
+        {screen === "consent" && (
+          <Consent
+            full={full}
+            caseCodeError={caseCodeError}
+            onAgree={(options, caseCode) =>
+              // The record is built once, here, from what was agreed; the digest and a saved file are
+              // both taken from it (ADR 0073). A refused code keeps the player on this screen.
+              void buildSavedRecord(options, caseCode).then(
+                (saved) => {
+                  setCaseCodeError(null);
+                  changeScreen(() => setScreen({ report: "ss", options, saved }));
+                },
+                (error: unknown) => setCaseCodeError(String(error)),
+              )
+            }
+            onRefuse={() => changeScreen(() => setScreen("declined"))}
+          />
+        )}
 
-      {screen === "declined" && (
-        <section>
-          <h2>{t("declined.title")}</h2>
-          <p>{t("declined.body")}</p>
-        </section>
-      )}
+        {screen === "declined" && (
+          <section>
+            <h2>{t("declined.title")}</h2>
+            <p>{t("declined.body")}</p>
+          </section>
+        )}
 
-      {screen === "about" && (
-        <About header={header} headerFailed={headerFailed} onBack={() => setScreen(beforeAbout)} />
-      )}
+        {screen === "about" && (
+          <About
+            header={header}
+            headerFailed={headerFailed}
+            onBack={() => changeScreen(() => setScreen(beforeAbout))}
+          />
+        )}
 
-      {typeof screen === "object" && (
-        <Report
-          mode={screen.report}
-          options={screen.options}
-          saved={screen.saved}
-          onBack={() => setScreen("start")}
-        />
-      )}
+        {typeof screen === "object" && (
+          <Report
+            mode={screen.report}
+            options={screen.options}
+            saved={screen.saved}
+            onBack={() => changeScreen(() => setScreen("start"))}
+          />
+        )}
+      </div>
 
       <footer className="muted">{t("footer.evidence_only")}</footer>
     </main>

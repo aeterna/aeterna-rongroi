@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use rongroi_core::model::Mode;
 use rongroi_core::view::{
-    ClockHistory, FileRead, GameCandidate, GameSession, GameWindows, IdentityFact,
+    ClockHistory, FileDetails, FileRead, GameCandidate, GameSession, GameWindows, IdentityFact,
     IdentityNotKnownReason, NotKnownReason, TimeFact, WindowCounts,
 };
 
@@ -133,9 +133,7 @@ fn session_l1(words: &Words, session: &GameSession) -> String {
         }
         (IdentityFact::True, None) => words.get("game.fact.l1", &[]),
         (IdentityFact::False, _) => words.get("game.fact.l1_false", &[]),
-        (IdentityFact::NotKnown { reason }, _) => {
-            words.get(&format!("game.nk.{}", identity_reason(reason)), &[])
-        }
+        (IdentityFact::NotKnown { reason }, _) => identity_note(words, reason),
     }
 }
 
@@ -162,7 +160,7 @@ fn window_line(words: &Words, counts: &WindowCounts) -> String {
 }
 
 /// A candidate's name and path, then one line per fact that is true or not known, then its notes.
-/// A false fact and I5 (deferred) are not listed: a line for them would say nothing about the file.
+/// A false fact is not listed: a line for it would say nothing about the file.
 fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
     let _ = writeln!(out, "  {}", without_controls(&candidate.name));
     if let Some(path) = &candidate.path {
@@ -173,6 +171,7 @@ fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
         ("i2", &candidate.i2),
         ("i3", &candidate.i3),
         ("i4", &candidate.i4),
+        ("i5", &candidate.i5),
         ("l1", &candidate.l1),
     ];
     for (id, fact) in identities {
@@ -191,7 +190,7 @@ fn candidate_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
                     out,
                     "    ? {}: {}",
                     words.get(&format!("game.fact.{id}"), &[]),
-                    words.get(&format!("game.nk.{}", identity_reason(reason)), &[])
+                    identity_note(words, reason)
                 );
             }
         }
@@ -349,6 +348,28 @@ fn file_lines(out: &mut String, words: &Words, candidate: &GameCandidate) {
             words.get("game.file.download_host", &[("host", &host)])
         );
     }
+    journal_lines(out, words, file);
+}
+
+/// The change-journal lines of a file, one per kind of match, with its times (ADR 0086).
+fn journal_lines(out: &mut String, words: &Words, file: &FileDetails) {
+    // Each non-empty kind of journal match lists its times; a list cut at the cap says so after them.
+    let journal = [
+        ("game.file.journal.deleted", &file.journal_deleted),
+        ("game.file.journal.renamed_from", &file.journal_renamed_from),
+        ("game.file.journal.renamed_to", &file.journal_renamed_to),
+    ];
+    for (key, times) in journal {
+        let Some(times) = times.as_ref().filter(|times| !times.is_empty()) else {
+            continue;
+        };
+        let mut line = words.get(key, &[("times", &times.join(", "))]);
+        if file.journal_more == Some(true) {
+            line.push(' ');
+            line.push_str(&words.get("game.file.journal.more", &[]));
+        }
+        let _ = writeln!(out, "      {line}");
+    }
 }
 
 /// The locale key's suffix for a read outcome that says why no hash or kind follows it
@@ -415,17 +436,37 @@ fn time_reason(reason: &NotKnownReason) -> (&'static str, Option<&str>) {
     }
 }
 
-/// The locale key's reason for a file identity fact that is not known (ADR 0079, ADR 0082).
-fn identity_reason(reason: &IdentityNotKnownReason) -> &'static str {
+/// The locale key's reason for a file identity fact that is not known (ADR 0079, ADR 0082, ADR 0086
+/// section 5), and the source a `before_trace_age` names.
+fn identity_reason(reason: &IdentityNotKnownReason) -> (&'static str, Option<&str>) {
     match reason {
-        IdentityNotKnownReason::RecordedFilesNotRun => "recorded_files_not_run",
-        IdentityNotKnownReason::NoObservationForPath => "no_observation_for_path",
-        IdentityNotKnownReason::NotRead => "not_read",
-        IdentityNotKnownReason::Unverifiable => "unverifiable",
-        IdentityNotKnownReason::NoPath => "no_path",
-        IdentityNotKnownReason::Deferred => "deferred",
-        IdentityNotKnownReason::NotCounted => "not_counted",
-        IdentityNotKnownReason::EarlierSession => "earlier_session",
+        IdentityNotKnownReason::RecordedFilesNotRun => ("recorded_files_not_run", None),
+        IdentityNotKnownReason::NoObservationForPath => ("no_observation_for_path", None),
+        IdentityNotKnownReason::NotRead => ("not_read", None),
+        IdentityNotKnownReason::Unverifiable => ("unverifiable", None),
+        IdentityNotKnownReason::NoPath => ("no_path", None),
+        IdentityNotKnownReason::Deferred => ("deferred", None),
+        IdentityNotKnownReason::NotCounted => ("not_counted", None),
+        IdentityNotKnownReason::EarlierSession => ("earlier_session", None),
+        IdentityNotKnownReason::JournalNotRead => ("journal_not_read", None),
+        IdentityNotKnownReason::JournalOtherDrive => ("journal_other_drive", None),
+        IdentityNotKnownReason::JournalFolderUnknown => ("journal_folder_unknown", None),
+        IdentityNotKnownReason::SessionEndNotRecorded => ("session_end_not_recorded", None),
+        IdentityNotKnownReason::ScanTimeNotRecorded => ("scan_time_not_recorded", None),
+        IdentityNotKnownReason::BeforeTraceAge { source } => ("before_trace_age", Some(source)),
+    }
+}
+
+/// The text of a file identity fact that is not known: its reason's line, with the source a
+/// `before_trace_age` names given in words, as the trace-ages section names sources (`cross_source`).
+fn identity_note(words: &Words, reason: &IdentityNotKnownReason) -> String {
+    let (key, source) = identity_reason(reason);
+    match source {
+        Some(source) => {
+            let source = text_or_raw(words, &format!("cross_source.source.{source}"), source);
+            words.get(&format!("game.nk.{key}"), &[("source", &source)])
+        }
+        None => words.get(&format!("game.nk.{key}"), &[]),
     }
 }
 
@@ -727,6 +768,10 @@ mod tests {
             trailing_data: None,
             embedded_pe: None,
             zone_id: None,
+            journal_deleted: None,
+            journal_renamed_from: None,
+            journal_renamed_to: None,
+            journal_more: None,
         }
     }
 
@@ -920,6 +965,95 @@ mod tests {
         );
     }
 
+    /// (i5 c1) An I5 fact that holds is printed with its words and its cause, after I4 and before L1.
+    #[test]
+    fn an_i5_fact_that_holds_is_printed_with_its_cause() {
+        let mut shown = candidate("payload.exe", None);
+        shown.i5 = IdentityFact::True;
+        let view = GameWindows {
+            sessions: vec![legacy_session()],
+            candidates: vec![shown],
+            ..GameWindows::default()
+        };
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        let line = "    ■ the change journal recorded it being deleted or renamed near the latest session  (updates, the Recycle Bin, antivirus quarantine)";
+        assert!(
+            text.lines().any(|shown| shown == line),
+            "missing {line:?} in\n{text}"
+        );
+    }
+
+    /// (i5 c2) An I5 that is not known because the file is on another drive says so, with the reason.
+    #[test]
+    fn an_i5_on_another_drive_is_printed_as_not_known_with_its_reason() {
+        let mut shown = candidate("payload.exe", None);
+        shown.i5 = IdentityFact::NotKnown {
+            reason: IdentityNotKnownReason::JournalOtherDrive,
+        };
+        let view = GameWindows {
+            sessions: vec![legacy_session()],
+            candidates: vec![shown],
+            ..GameWindows::default()
+        };
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        let line = "    ? the change journal recorded it being deleted or renamed near the latest session: not known: the file is on another drive, whose change journal this program does not read";
+        assert!(
+            text.lines().any(|shown| shown == line),
+            "missing {line:?} in\n{text}"
+        );
+    }
+
+    /// (i5 c3) A journal that does not reach back to a window names its source in words, not by its
+    /// identifier: `usn` is shown as "NTFS change journal".
+    #[test]
+    fn an_i5_before_trace_age_names_the_journal_source_in_words() {
+        let mut shown = candidate("payload.exe", None);
+        shown.i5 = IdentityFact::NotKnown {
+            reason: IdentityNotKnownReason::BeforeTraceAge {
+                source: "usn".to_owned(),
+            },
+        };
+        let view = GameWindows {
+            sessions: vec![legacy_session()],
+            candidates: vec![shown],
+            ..GameWindows::default()
+        };
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        let line = "    ? the change journal recorded it being deleted or renamed near the latest session: not known: NTFS change journal does not reach back that far";
+        assert!(
+            text.lines().any(|shown| shown == line),
+            "missing {line:?} in\n{text}"
+        );
+        assert!(
+            !text.contains(" usn "),
+            "the raw source id is printed in\n{text}"
+        );
+    }
+
+    /// (i5 c4) A deletion list is printed with its times, joined by ", ", and a list cut at the cap
+    /// says "+ more" after them. An empty list is not printed at all.
+    #[test]
+    fn a_journal_deletion_list_is_printed_with_its_times_and_more() {
+        let file = FileDetails {
+            journal_deleted: Some(vec![
+                "2026-10-22T20:30:00Z".to_owned(),
+                "2026-10-22T20:10:00Z".to_owned(),
+            ]),
+            journal_renamed_from: Some(Vec::new()),
+            journal_more: Some(true),
+            ..bare(FileRead::Read)
+        };
+        let view = view_with_one_file(Some(file), &[]);
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.lines().any(|line| {
+                line == "      Deleted at: 2026-10-22T20:30:00Z, 2026-10-22T20:10:00Z + more"
+            }),
+            "{text}"
+        );
+        assert!(!text.contains("Renamed away"), "{text}");
+    }
+
     /// The text at the dotted `key` in a locale file, or `None`. Read from the file itself, not through
     /// `Words`, which falls back to English and would hide a key missing from Thai.
     fn own_text(locale: &str, key: &str) -> Option<String> {
@@ -946,6 +1080,7 @@ mod tests {
         "game.fact.i2",
         "game.fact.i3",
         "game.fact.i4",
+        "game.fact.i5",
         "game.fact.l1",
         "game.fact.t1",
         "game.fact.t2",
@@ -955,10 +1090,14 @@ mod tests {
         "game.nk.session_end_not_recorded",
         "game.nk.scan_time_not_recorded",
         "game.nk.before_trace_age",
+        "game.nk.journal_not_read",
+        "game.nk.journal_other_drive",
+        "game.nk.journal_folder_unknown",
         "game.cause.i1",
         "game.cause.i2",
         "game.cause.i3",
         "game.cause.i4",
+        "game.cause.i5",
         "game.cause.l1",
         "game.cause.t1",
         "game.cause.t2",
@@ -1018,6 +1157,12 @@ mod tests {
         "game.file.zone_name.4",
         "game.file.zone_other",
         "game.file.download_host",
+        "game.file.journal.deleted",
+        "game.file.journal.renamed_from",
+        "game.file.journal.renamed_to",
+        "game.file.journal.more",
+        // The source a `before_trace_age` names, in words (`cross_source.source.*`).
+        "cross_source.source.usn",
         // The collectors a candidate's `recorded_by` line names (`collector.<id>`).
         "collector.prefetch",
         "collector.bam",
@@ -1042,6 +1187,9 @@ mod tests {
             "deferred",
             "not_counted",
             "earlier_session",
+            "journal_not_read",
+            "journal_other_drive",
+            "journal_folder_unknown",
         ] {
             keys.push(format!("game.nk.{reason}"));
         }

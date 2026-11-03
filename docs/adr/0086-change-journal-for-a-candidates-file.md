@@ -1,8 +1,8 @@
 # ADR 0086 — The change journal for a candidate's file
 
 - Status: accepted — the owner decided the seven questions in "Owner decisions" on 2026-10-27, each as
-  recommended; nothing is built. 0.13.0 ships this ADR only, and the code follows after 0.13.0 ("Order of
-  work")
+  recommended; the owner passed section 6's text at G1 on 2026-10-28. Built: J1 to J3 and J5 ("As built"
+  sections); J4 is measured ("Measured: J4")
 - Date: 2026-10-27
 - Related: ADR 0021 (no identifier that names one file across two reports), ADR 0044 (gaps), ADR 0047 (the
   change journal, and "The privacy problem"), ADR 0052 (full scan), ADR 0061 (trace ages), ADR 0062 (the
@@ -330,3 +330,120 @@ D6 (a) and D7 (approve section 6's text at J3's G1). Step J0 is done; J1 starts 
   `has_identity_fact` include I5; the `Deferred` reason is then used by I3 and I4 only.
 - Locale keys, consent text, `PRIVACY.md` and `docs/architecture.md` change in J3.
 - ADR 0047's "It reads no file name" holds for the standard scan only; ADR 0079 section 5 is closed.
+
+## As built: J1, J2 (2026-10-28)
+
+**J1** (#243): `rongroi_parsers::usn::match_buffer` walks a buffer as `parse_buffer` does and returns, for each
+match, a target index, a kind (`Deleted`, `RenamedFrom`, `RenamedTo`) and the record's time, as section 2 says.
+A record with more than one of the three reasons gives one match per kind. Three rules were added at review,
+each so that a damaged or hostile buffer cannot make a match:
+
+1. A name whose offset points inside the record's fixed part is damage (`file_name`), so header bytes are never
+   compared as a name.
+2. An empty name never matches by name.
+3. An all-zero file reference on the target is no reference for that record version.
+
+`parse_buffer` is unchanged in what it returns; both share one walk. The fuzz target calls both.
+
+**J2** (fixture #244, collector: this ADR's J2 pull request): `recorded_files` reads the journal once, before
+any file's bytes, and emits section 3's six fields. As built, where it differs from or adds to section 3:
+
+1. **`journal_from` is off the timeline too.** Section 3 declared only the three lists so. On the timeline,
+   `journal_from` would repeat the oldest record the `usn` collector already puts there, and a full scan with
+   no journal would list `recorded_files` among the timeline's unmeasured sources.
+2. **`journal_from` is the earliest time of the first buffer that has a timed record**, the oldest record of a
+   journal written in time order.
+3. **A source gap does not reach the journal fields.** A source BAM, PCA, the process list or UserAssist could
+   not read gaps every other field, as before; the six journal fields carry only the journal's own reason.
+4. **A damaged record is `partial`**, as section 3 says, not `read_failed` as the `usn` collector gives for
+   the same damage: the records before it were compared.
+5. **The journal volume is `%SystemRoot%`'s drive**, as the `usn` collector reads it; a path on another letter is
+   `other_volume`. A path spelled with `/` is looked up with `\`, and a file at a drive's root is looked for
+   under `X:\`.
+6. **The journal read's time is given back to the file clock**, so the 30 seconds of the journal and the 90 of
+   the files never share time (section 4). The two `file_id` calls per path before the read are counted in
+   neither; they read no file.
+7. **`budget_spent` has a fifth owner**, `recorded_files`, in the owner list `cargo xtask check-rules` asserts.
+
+A name is compared with ASCII case folding only (section 2), so a recorded 8.3 short name or a name that differs
+only in a non-ASCII letter's case is not matched by name; it is matched by the file's own reference when the
+file still exists. `matched` then shows empty lists. Not measured how often this happens.
+
+## Measured: J4 (2026-10-28)
+
+One elevated full scan of `dev` at `582c93d` (x64 build), on a Windows 11 PC (build 26220) that is not a gaming PC,
+over SSH. Counts only; no path or name is recorded here.
+
+| What | Measured |
+|---|---|
+| The journal's span at the scan (`journal_from` to the scan time) | 42 minutes 56 seconds |
+| `recorded_files` paths | 232 |
+| `journal_match: matched` | 172 (155 read, 11 too large, 6 missing); every list empty, `journal_more` false on all |
+| `journal_match: folder_unknown` | 55, each recorded by UserAssist alone, its file missing: its folder no longer exists |
+| `journal_match: other_volume` | 5, on another drive letter |
+| The full scan's time after the consent answer | about 6 seconds, journal read and files together |
+
+What this shows:
+
+1. **The span matches ADR 0047's.** About 40 minutes on both PCs measured. A session that ended more than about
+   40 minutes before the scan gives I5 "not known: the NTFS change journal does not reach back that far" for
+   every candidate, as section 5 designed; I5 answers for a scan made soon after a session.
+2. **`folder_unknown` is common, and it is the folder that is gone, not unreadable**, on this PC: all 55 were old
+   UserAssist entries whose files are missing. I1 already says the file is gone; I5 cannot say when.
+3. **The test half was not done.** A test program copied, run, renamed and deleted over SSH was recorded by none
+   of BAM, PCA, the process list or UserAssist, so it never became a `recorded_files` path and the journal was not
+   asked about it. Reading I5 back for a renamed and deleted program needs an interactive run: the lab replay
+   (step J5) or the owner's PC. On the lab machine the scenario's program is known only from BAM, whose path is
+   withheld until ADR 0087's drive map, so its I5 is "not known: no path" today.
+
+## As built: J3 (2026-10-28; the owner passed G1 the same day, #246)
+
+I5 is computed in `rongroi_core::view::game` for the latest session of each edition, with the windows the time
+facts use (before `[start − 30 min, start)`, during `[start, end]`, after `(end, end + 30 min]`, before the scan
+`(end, scan]`). Where it differs from or adds to section 5:
+
+1. **The view reads the journal's state from the fields, not from gaps**, because a report carries no per-field
+   gaps for the view: no `journal_match` is `journal_not_read`; `matched` with no `journal_deleted` (a read that
+   was not whole) is `journal_not_read` too.
+2. **A cut list moves the journal's start.** `journal_more` says a list kept its newest eight and dropped older
+   times. So when it is set, the start the false check uses is the later of `journal_from` and the oldest time a
+   full list kept; a window before that is `before_trace_age`, never false.
+3. **False needs every window known.** With a latest session whose end is not recorded, a time in its before window
+   still makes I5 true, but I5 is never false: `session_end_not_recorded`. Section 5's "the earliest of those
+   windows that is known" is read this way, the stricter reading.
+4. **`scan_time_not_recorded`** is a reason section 5 did not list: with no scan time the before-the-scan window is
+   not known, as for T4. It comes after `session_end_not_recorded`.
+5. **Text.** Section 6's keys, word for word, in both languages, plus `cross_source.source.usn` ("NTFS change
+   journal") for the `before_trace_age` source and `game.file.journal.more` ("+ more" / "+ มีอีก"), which section
+   6 did not write. The CLI and the desktop show "+ more" after each list that is not empty when `journal_more`
+   is set. The consent sentence is word for word in the CLI and the full-scan dialog (present tense); the desktop's
+   after-the-scan summary (`consent.full_reads`), which is written in the past tense, says the same in the past
+   tense.
+6. `PRIVACY.md`'s SS row and full-scan list name the journal's times among a named program's file details.
+
+## As built: J5 (2026-10-28)
+
+Two lab replays (ADR 0076) on the lab machine (Windows 11 build 26300, Arm64) with the x64 build of `dev` at
+`d5c4975`:
+
+| Scenario | Expected | Result |
+|---|---|---|
+| `program-renamed-while-running` (new, full scan) | `renamer.exe`: T1 true; I5 true | 2 ok, 0 failed |
+| `renamed-program-run-then-deleted` | `helper.exe`: T1 true; I1 and I5 not known, no path | 3 ok, 0 failed |
+
+What the new replay's report showed, read once by hand beyond what `lab-check` asserts (T1 and I5):
+
+1. **A program renamed while it runs kept its old name and gained its new path.** The process list gave the
+   candidate the name it started under, `renamer.exe`, and the path it has now, `…\Downloads\renamed.exe`; the
+   file was there, so I1 was false. Why Windows keeps the old name is not established, nor whether other builds
+   do the same.
+2. **The rename appeared as one time in `journal_renamed_from` and two in `journal_renamed_to`**, all in the window
+   before the session. The session's game was still running, so its end is not recorded; I5 was true from the
+   before window alone (As built: J3, item 3). Which of section 2's two rules matched each record is not in the
+   report: the target's name was the new one, so the new-name records could match by folder and name, and every
+   record could match by the file's own number.
+3. **BAM recorded the same program as a second `renamer.exe` candidate** with the withheld device path, whose I5
+   was "not known: no path", as `helper.exe`'s is. Observed in this one replay; not asserted.
+
+The scenario that was meant to read I5 for a program run and then deleted (section "Tests", lab replay) cannot
+until then; it asserts "not known: no path" instead.

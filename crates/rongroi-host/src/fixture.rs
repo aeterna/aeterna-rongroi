@@ -5,17 +5,19 @@
 //! A fake machine described in `fixtures/hosts/<name>/host.yaml`. See `fixtures/hosts/PROVENANCE.md`.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::TryFromIntError;
 use std::path::Path;
 
 use serde::Deserialize;
 
 use crate::{
     AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
-    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, EntryTimes,
-    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
-    FirmwareSource, Host, IommuTable, Platform, ProcessRecord, ProcessSource, RegistryData,
-    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
-    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
+    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap,
+    DriveMapEntry, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
+    FirmwareSecureBoot, FirmwareSource, Host, IommuTable, LinkKind, LinkTarget, Platform,
+    ProcessRecord, ProcessSource, RegistryData, RegistrySource, SignatureCheck, SignatureSource,
+    SourceError, SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource,
+    UsnJournalState, UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -90,6 +92,37 @@ struct HostFile {
     /// parent listing to carry them, so they are written here; a drive not named here is not there.
     #[serde(default)]
     drive_roots: BTreeMap<String, FixtureTimes>,
+    /// The drive letters the machine has (ADR 0087 section 1). Absent means the fixture never
+    /// modelled them, which the accessor reports as `Unsupported`; an empty list is the deliberate
+    /// claim that the machine has none.
+    #[serde(default)]
+    drive_map: Option<Vec<FixtureDrive>>,
+    /// The reparse points the machine has (ADR 0091 section 2). Absent means no path is a link.
+    #[serde(default)]
+    links: Vec<FixtureLink>,
+}
+
+/// One reparse point a fixture describes (ADR 0091 section 2): the path that is the link, what kind
+/// it is and the substitute name it holds.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureLink {
+    path: String,
+    kind: LinkKind,
+    target: String,
+    #[serde(default)]
+    relative: bool,
+}
+
+/// One drive letter a fixture describes (ADR 0087 section 1). `device` and `serial` are invented,
+/// never read from a real PC.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureDrive {
+    letter: char,
+    device: String,
+    serial: u32,
+    kind: DriveKind,
 }
 
 /// One device a fixture describes (ADR 0069). `id` is a device **instance** id, as `CfgMgr32` lists it,
@@ -855,6 +888,13 @@ struct FixtureUsnRecords {
     first: Option<String>,
     #[serde(default)]
     last: Option<String>,
+    /// The record's own file name. Absent, it is `fx`, the name every record had before ADR 0086.
+    #[serde(default)]
+    name: Option<String>,
+    /// A folder under `folders:` whose identifier becomes the record's own file reference, so that a
+    /// record of that file can be matched by it (ADR 0086). Absent, the reference is zero.
+    #[serde(default)]
+    file: Option<String>,
 }
 
 fn default_usn_major() -> u16 {
@@ -948,30 +988,45 @@ fn filetime_of(text: &str, origin: &str) -> Result<u64, FixtureError> {
     })
 }
 
-fn encode_record(major: u16, parent: FileId, written: u64, reason: u32) -> Vec<u8> {
+/// Encodes one record. `name` is the file name as UTF-16LE bytes, placed at the name offset; the record
+/// length is the fixed part plus the name, padded with zeros to a multiple of 8 (ADR 0086). `own` is the
+/// file's own reference, zero when absent.
+fn encode_record(
+    major: u16,
+    parent: FileId,
+    own: Option<FileId>,
+    written: u64,
+    reason: u32,
+    name: &[u8],
+) -> Result<Vec<u8>, TryFromIntError> {
+    // The fixed part of each version's record, and where its file name length sits; the name offset
+    // follows the length, and the name starts right after the fixed part.
+    let (fixed, name_length_at) = if major == 2 { (60, 56) } else { (76, 72) };
+    let length = (fixed + name.len()).next_multiple_of(8);
+    let mut record = vec![0u8; length];
+    record[0..4].copy_from_slice(&u32::try_from(length)?.to_le_bytes());
+    record[4..6].copy_from_slice(&major.to_le_bytes());
+    record[name_length_at..name_length_at + 2]
+        .copy_from_slice(&u16::try_from(name.len())?.to_le_bytes());
+    record[name_length_at + 2..name_length_at + 4]
+        .copy_from_slice(&u16::try_from(fixed)?.to_le_bytes());
+    record[fixed..fixed + name.len()].copy_from_slice(name);
     if major == 2 {
-        let mut record = vec![0u8; 64];
-        record[0..4].copy_from_slice(&64u32.to_le_bytes());
-        record[4..6].copy_from_slice(&2u16.to_le_bytes());
+        if let Some(own) = own {
+            record[8..16].copy_from_slice(&own.index_64.to_le_bytes());
+        }
         record[16..24].copy_from_slice(&parent.index_64.to_le_bytes());
         record[32..40].copy_from_slice(&written.to_le_bytes());
         record[40..44].copy_from_slice(&reason.to_le_bytes());
-        record[56..58].copy_from_slice(&4u16.to_le_bytes());
-        record[58..60].copy_from_slice(&60u16.to_le_bytes());
-        record[60..64].copy_from_slice(&[b'f', 0, b'x', 0]);
-        record
     } else {
-        let mut record = vec![0u8; 80];
-        record[0..4].copy_from_slice(&80u32.to_le_bytes());
-        record[4..6].copy_from_slice(&major.to_le_bytes());
+        if let Some(own) = own {
+            record[8..24].copy_from_slice(&own.id_128);
+        }
         record[24..40].copy_from_slice(&parent.id_128);
         record[48..56].copy_from_slice(&written.to_le_bytes());
         record[56..60].copy_from_slice(&reason.to_le_bytes());
-        record[72..74].copy_from_slice(&4u16.to_le_bytes());
-        record[74..76].copy_from_slice(&76u16.to_le_bytes());
-        record[76..80].copy_from_slice(&[b'f', 0, b'x', 0]);
-        record
     }
+    Ok(record)
 }
 
 /// Turns `folders:` and `other_volume_folders:` into identifiers, rejecting an
@@ -1016,69 +1071,110 @@ fn resolve_usn_folders(
         .collect())
 }
 
-fn resolve_usn_journal(
-    described: FixtureUsnJournal,
+/// Encodes one record group, in the order its records sit in the journal. The group's parent and file
+/// must be under `folders:`, its version 2 or 3, and its `last` no earlier than its `first`.
+fn group_records(
+    group: &FixtureUsnRecords,
+    folders: &BTreeMap<String, FileId>,
     origin: &str,
-) -> Result<StoredUsnJournal, FixtureError> {
-    let folders = resolve_usn_folders(&described, origin)?;
-    let mut records = Vec::new();
-    for group in described.records {
-        let parent = match &group.parent {
-            None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
-            Some(path) => {
+) -> Result<Vec<Vec<u8>>, FixtureError> {
+    let parent = match &group.parent {
+        None => file_id_for(UNWATCHED_PARENT, JOURNAL_VOLUME_SERIAL),
+        Some(path) => *folders
+            .get(&normalise_path(path))
+            .ok_or_else(|| FixtureError::Parse {
+                path: origin.to_owned(),
+                message: format!("usn_journal record parent `{path}` is not under `folders:`"),
+            })?,
+    };
+    let own = match &group.file {
+        None => None,
+        Some(path) => {
+            Some(
                 *folders
                     .get(&normalise_path(path))
                     .ok_or_else(|| FixtureError::Parse {
                         path: origin.to_owned(),
                         message: format!(
-                            "usn_journal record parent `{path}` is not under `folders:`"
+                            "usn_journal record file `{path}` is not under `folders:`"
                         ),
-                    })?
-            }
+                    })?,
+            )
+        }
+    };
+    if group.major != 2 && group.major != 3 {
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!("usn_journal major version {} is not 2 or 3", group.major),
+        });
+    }
+    let name: Vec<u8> = group
+        .name
+        .as_deref()
+        .unwrap_or("fx")
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let reason = group
+        .reasons
+        .iter()
+        .fold(0u32, |flags, reason| flags | reason.flag());
+    let first = group
+        .first
+        .as_deref()
+        .map(|text| filetime_of(text, origin))
+        .transpose()?
+        .unwrap_or(133_000_000_000_000_000);
+    let last = group
+        .last
+        .as_deref()
+        .map(|text| filetime_of(text, origin))
+        .transpose()?
+        .unwrap_or(first);
+    if last < first {
+        let first_text = group.first.as_deref().unwrap_or("<default>");
+        let last_text = group.last.as_deref().unwrap_or("<default>");
+        return Err(FixtureError::Parse {
+            path: origin.to_owned(),
+            message: format!(
+                "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
+            ),
+        });
+    }
+    let span = last.saturating_sub(first);
+    let steps = u64::from(group.count.saturating_sub(1)).max(1);
+    let mut records = Vec::new();
+    for index in 0..group.count {
+        let written = first + span / steps * u64::from(index);
+        let written = if index + 1 == group.count {
+            last
+        } else {
+            written
         };
-        if group.major != 2 && group.major != 3 {
-            return Err(FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!("usn_journal major version {} is not 2 or 3", group.major),
-            });
-        }
-        let reason = group
-            .reasons
-            .iter()
-            .fold(0u32, |flags, reason| flags | reason.flag());
-        let first = group
-            .first
-            .as_deref()
-            .map(|text| filetime_of(text, origin))
-            .transpose()?
-            .unwrap_or(133_000_000_000_000_000);
-        let last = group
-            .last
-            .as_deref()
-            .map(|text| filetime_of(text, origin))
-            .transpose()?
-            .unwrap_or(first);
-        if last < first {
-            let first_text = group.first.as_deref().unwrap_or("<default>");
-            let last_text = group.last.as_deref().unwrap_or("<default>");
-            return Err(FixtureError::Parse {
-                path: origin.to_owned(),
-                message: format!(
-                    "usn_journal record group `last` `{last_text}` is before its `first` `{first_text}`"
-                ),
-            });
-        }
-        let span = last.saturating_sub(first);
-        let steps = u64::from(group.count.saturating_sub(1)).max(1);
-        for index in 0..group.count {
-            let written = first + span / steps * u64::from(index);
-            let written = if index + 1 == group.count {
-                last
-            } else {
-                written
-            };
-            records.push(encode_record(group.major, parent, written, reason));
-        }
+        let record =
+            encode_record(group.major, parent, own, written, reason, &name).map_err(|_| {
+                FixtureError::Parse {
+                    path: origin.to_owned(),
+                    // The name's length is the reason; the name itself is not echoed into the message.
+                    message: format!(
+                        "usn_journal record name of {} UTF-16 bytes is longer than 65535",
+                        name.len()
+                    ),
+                }
+            })?;
+        records.push(record);
+    }
+    Ok(records)
+}
+
+fn resolve_usn_journal(
+    described: &FixtureUsnJournal,
+    origin: &str,
+) -> Result<StoredUsnJournal, FixtureError> {
+    let folders = resolve_usn_folders(described, origin)?;
+    let mut records = Vec::new();
+    for group in &described.records {
+        records.extend(group_records(group, &folders, origin)?);
     }
     let first_usn: i64 = if described.trimmed { 4096 } else { 0 };
     let mut buffers = Vec::new();
@@ -1135,6 +1231,51 @@ pub struct FixtureHost {
     devices: Option<Vec<DeviceRecord>>,
     /// Keyed by the lower-cased drive, `c:`.
     drive_roots: BTreeMap<String, EntryTimes>,
+    /// The letters the fixture wrote under `drive_map:`, or `None` when it never modelled them.
+    drive_map: Option<Vec<DriveMapEntry>>,
+    /// Keyed by the normalised path of the link.
+    links: BTreeMap<String, LinkTarget>,
+}
+
+/// The fixture's `links:` keyed by the normalised path of each link (ADR 0091 section 2).
+///
+/// A link's path must be drive-rooted, spelled with `\` only, with no empty, `.` or `..` segment: the
+/// check asks for each prefix in that one spelling, so a link written any other way would never match
+/// and a test would pass without it.
+fn links_by_path(
+    links: Vec<FixtureLink>,
+    origin: &str,
+) -> Result<BTreeMap<String, LinkTarget>, FixtureError> {
+    links
+        .into_iter()
+        .map(|link| {
+            let bytes = link.path.as_bytes();
+            let rooted = bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+            let rest = link.path.get(2..).unwrap_or("");
+            let well_formed = rooted
+                && !link.path.contains('/')
+                && (rest.is_empty()
+                    || rest == "\\"
+                    || (rest.starts_with('\\')
+                        && rest[1..]
+                            .split('\\')
+                            .all(|segment| !matches!(segment, "" | "." | ".."))));
+            if !well_formed {
+                return Err(FixtureError::Parse {
+                    path: origin.to_owned(),
+                    message: format!("links: path {:?} is not a drive-rooted path", link.path),
+                });
+            }
+            Ok((
+                normalise_path(&link.path),
+                LinkTarget {
+                    kind: link.kind,
+                    target: link.target,
+                    relative: link.relative,
+                },
+            ))
+        })
+        .collect()
 }
 
 impl FixtureHost {
@@ -1228,6 +1369,18 @@ impl FixtureHost {
                 })
                 .transpose()?,
             drive_roots,
+            links: links_by_path(file.links, origin)?,
+            drive_map: file.drive_map.map(|described| {
+                described
+                    .into_iter()
+                    .map(|drive| DriveMapEntry {
+                        letter: drive.letter,
+                        device: drive.device,
+                        serial: drive.serial,
+                        kind: drive.kind,
+                    })
+                    .collect()
+            }),
             event_log_channels: file
                 .event_log_channels
                 .map(|channels| {
@@ -1242,7 +1395,7 @@ impl FixtureHost {
                 .transpose()?,
             usn_journal: file
                 .usn_journal
-                .map(|journal| resolve_usn_journal(journal, origin))
+                .map(|journal| resolve_usn_journal(&journal, origin))
                 .transpose()?,
         })
     }
@@ -1250,7 +1403,7 @@ impl FixtureHost {
     /// The entry the fixture wrote for one file, after the access checks every per-file read makes.
     /// A file it never listed is a failure here, which is what hashing or checking one means.
     fn described_file(&self, path: &str) -> Result<&FixtureEntry, SourceError> {
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1263,6 +1416,13 @@ impl FixtureHost {
                     .find(|file| file.name.eq_ignore_ascii_case(name))
             })
             .ok_or_else(|| SourceError::Failed(format!("no such file: {path}")))
+    }
+
+    /// Where a read of `path` lands once its links are followed, or the refusal every read by path
+    /// makes first (ADR 0091 section 1). A fixture with no `links:` and no `drive_map:` returns the
+    /// path unchanged.
+    fn local_path(&self, path: &str) -> Result<String, SourceError> {
+        crate::resolved_local_path(self, path).map_err(SourceError::NotLocal)
     }
 
     /// The file system is only described for Windows fixtures.
@@ -1433,7 +1593,7 @@ impl RegistrySource for FixtureHost {
 impl FilesystemSource for FixtureHost {
     fn list_dir(&self, dir: &str) -> Result<Option<Vec<DirEntryInfo>>, SourceError> {
         self.windows_filesystem()?;
-        let dir = normalise_path(dir);
+        let dir = normalise_path(&self.local_path(dir)?);
         if self.is_denied(&dir) {
             return Err(SourceError::AccessDenied);
         }
@@ -1467,7 +1627,7 @@ impl FilesystemSource for FixtureHost {
     /// the fixture never described.
     fn read_file(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1496,9 +1656,11 @@ impl FilesystemSource for FixtureHost {
     /// or one that wrote no stream, is `Ok(None)`: a missing file and a missing stream are the same
     /// answer. A stream over the limit is refused as the live host refuses it.
     fn zone_identifier(&self, path: &str) -> Result<Option<Vec<u8>>, SourceError> {
+        // The local-read check first, as every read by path makes it (ADR 0091).
+        self.local_path(path)?;
         crate::zone_identifier_path(path)?;
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1522,7 +1684,7 @@ impl FilesystemSource for FixtureHost {
     /// for it would put a value in the report nobody wrote (ADR 0037).
     fn is_read_only(&self, path: &str) -> Result<Option<bool>, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         let (dir, name) = split_parent(&normalised);
         if self.is_denied(&normalised) || self.is_denied(dir) {
             return Err(SourceError::AccessDenied);
@@ -1546,7 +1708,7 @@ impl FilesystemSource for FixtureHost {
     /// a refusal, because a live host does not list the parent to answer (ADR 0061).
     fn times(&self, path: &str) -> Result<Option<EntryTimes>, SourceError> {
         self.windows_filesystem()?;
-        let normalised = normalise_path(path);
+        let normalised = normalise_path(&self.local_path(path)?);
         if self.is_denied(&normalised) {
             return Err(SourceError::AccessDenied);
         }
@@ -1702,7 +1864,7 @@ impl UsnJournalSource for FixtureHost {
                 "this fixture host does not describe file identifiers".to_owned(),
             )
         })?;
-        let key = normalise_path(path);
+        let key = normalise_path(&self.local_path(path)?);
         if self.access_denied.contains(&key) {
             return Err(SourceError::AccessDenied);
         }
@@ -1793,11 +1955,45 @@ impl Host for FixtureHost {
     fn is_elevated(&self) -> Option<bool> {
         self.elevated
     }
+
+    /// The kind the fixture wrote under `drive_map:` for the letter, or `Fixed` when the fixture does
+    /// not list it, so a fixture written before ADR 0091 reads as it did.
+    fn drive_kind(&self, letter: char) -> Result<DriveKind, SourceError> {
+        Ok(self
+            .drive_map
+            .iter()
+            .flatten()
+            .find(|entry| entry.letter.eq_ignore_ascii_case(&letter))
+            .map_or(DriveKind::Fixed, |entry| entry.kind))
+    }
+
+    /// The link the fixture wrote under `links:` for the path, matched without regard to case, or
+    /// `Ok(None)` (ADR 0091 section 2).
+    fn link_target(&self, path: &str) -> Result<Option<LinkTarget>, SourceError> {
+        Ok(self.links.get(&normalise_path(path)).cloned())
+    }
+
+    /// The letters the fixture wrote under `drive_map:`. No block is `Unsupported`, never an empty
+    /// map: a fixture written before this section existed did not model the machine's letters
+    /// (ADR 0087 section 1).
+    fn drive_map(&self) -> Result<DriveMap, SourceError> {
+        self.drive_map
+            .as_ref()
+            .map(|entries| DriveMap {
+                entries: entries.clone(),
+            })
+            .ok_or_else(|| {
+                SourceError::Unsupported(
+                    "this fixture host does not describe the machine's drive letters".to_owned(),
+                )
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{LinkKind, LinkTarget, NotLocal};
 
     const CERT: &str = "ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789";
 
@@ -3098,5 +3294,403 @@ usn_journal:
             error.to_string().contains("other_volume_folders"),
             "{error}"
         );
+    }
+
+    /// The UTF-16LE bytes NTFS stores a file name as.
+    fn utf16le(text: &str) -> Vec<u8> {
+        text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+    }
+
+    /// ADR 0086: a `name:` is the record's file name, UTF-16LE at the name offset. A version 3 record
+    /// with a 10-character name is 76 + 20 bytes, already a multiple of 8.
+    #[test]
+    fn a_usn_record_can_carry_a_name_in_version_3() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: 'Helper.exe'\n",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let record = &buffers[0][8..];
+        assert_eq!(record.len(), 96);
+        assert_eq!(u32::from_le_bytes(record[0..4].try_into().unwrap()), 96);
+        assert_eq!(u16::from_le_bytes(record[72..74].try_into().unwrap()), 20);
+        assert_eq!(u16::from_le_bytes(record[74..76].try_into().unwrap()), 76);
+        assert_eq!(&record[76..96], utf16le("Helper.exe").as_slice());
+    }
+
+    /// ADR 0086: a version 2 name of 3 characters is 6 bytes, so the record is 60 + 6 = 66 bytes,
+    /// padded with two zero bytes to 72.
+    #[test]
+    fn an_odd_length_name_is_padded_to_a_multiple_of_8_in_version_2() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - major: 2\n      reasons: [file_delete]\n      name: 'abc'\n",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let record = &buffers[0][8..];
+        assert_eq!(record.len(), 72);
+        assert_eq!(u32::from_le_bytes(record[0..4].try_into().unwrap()), 72);
+        assert_eq!(u16::from_le_bytes(record[56..58].try_into().unwrap()), 6);
+        assert_eq!(u16::from_le_bytes(record[58..60].try_into().unwrap()), 60);
+        assert_eq!(&record[60..66], utf16le("abc").as_slice());
+        assert_eq!(&record[66..72], &[0u8; 6]);
+    }
+
+    /// ADR 0086: a `file:` naming a folder under `folders:` makes that folder's identifier the record's
+    /// own file reference: `id_128` at 8..24 in version 3, `index_64` at 8..16 in version 2. The path is
+    /// spelled in another case to show it is matched the way `folders:` is. The record's `parent:` is
+    /// the folder that holds the file, so the parent field must hold that folder and not the file; a
+    /// record with no `file:` leaves the own-reference field zero.
+    #[test]
+    fn a_record_for_a_file_carries_its_identifier_as_its_own_reference() {
+        let yaml = |major: u16, file: Option<&str>| {
+            let file_line = file.map_or(String::new(), |path| format!("      file: '{path}'\n"));
+            format!(
+                "platform: windows\nusn_journal:\n  folders:\n    'C:\\Tools': 3\n    'C:\\Tools\\Helper.exe': 9\n  records:\n    - major: {major}\n      parent: 'C:\\Tools'\n      reasons: [file_create]\n{file_line}"
+            )
+        };
+        let folder = |host: &FixtureHost| host.file_id(r"C:\Tools").unwrap().unwrap();
+        let helper = |host: &FixtureHost| host.file_id(r"C:\Tools\Helper.exe").unwrap().unwrap();
+
+        // Version 3: the file's own reference at 8..24, the parent folder's at 24..40.
+        let version_3 =
+            FixtureHost::from_yaml_str(&yaml(3, Some(r"c:\tools\helper.exe")), "inline").unwrap();
+        let (own, parent) = (helper(&version_3), folder(&version_3));
+        assert_eq!(own.index_64, 9);
+        assert_eq!(parent.index_64, 3);
+        let (read, buffers) = read_all(&version_3, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..24], &own.id_128);
+        assert_eq!(&record[24..40], &parent.id_128);
+        assert_ne!(&record[24..40], &own.id_128);
+
+        // Version 2: the file's own reference at 8..16, the parent folder's at 16..24.
+        let version_2 =
+            FixtureHost::from_yaml_str(&yaml(2, Some(r"c:\tools\helper.exe")), "inline").unwrap();
+        let (own, parent) = (helper(&version_2), folder(&version_2));
+        let (read, buffers) = read_all(&version_2, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(
+            u64::from_le_bytes(record[8..16].try_into().unwrap()),
+            own.index_64
+        );
+        assert_eq!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            parent.index_64
+        );
+        assert_ne!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            own.index_64
+        );
+
+        // No `file:`: version 3 leaves 8..24 zero and version 2 leaves 8..16 zero, while the parent
+        // is still the folder.
+        let version_3 = FixtureHost::from_yaml_str(&yaml(3, None), "inline").unwrap();
+        let (read, buffers) = read_all(&version_3, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..24], &[0u8; 16]);
+        assert_eq!(&record[24..40], &folder(&version_3).id_128);
+
+        let version_2 = FixtureHost::from_yaml_str(&yaml(2, None), "inline").unwrap();
+        let (read, buffers) = read_all(&version_2, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        let record = &buffers[0][8..];
+        assert_eq!(&record[8..16], &[0u8; 8]);
+        assert_eq!(
+            u64::from_le_bytes(record[16..24].try_into().unwrap()),
+            folder(&version_2).index_64
+        );
+    }
+
+    /// ADR 0086: a name of 'é😀' is 2 bytes for the BMP character and 4 for the surrogate pair, so its
+    /// `FileNameLength` is 6 and the version 3 record is 76 + 6 = 82, padded with zeros to 88.
+    #[test]
+    fn a_usn_record_name_with_non_ascii_and_non_bmp_characters_is_utf16le_and_padded() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: 'é😀'\n",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let record = &buffers[0][8..];
+        assert_eq!(record.len(), 88);
+        assert_eq!(u32::from_le_bytes(record[0..4].try_into().unwrap()), 88);
+        assert_eq!(u16::from_le_bytes(record[72..74].try_into().unwrap()), 6);
+        assert_eq!(u16::from_le_bytes(record[74..76].try_into().unwrap()), 76);
+        assert_eq!(&record[76..82], utf16le("é😀").as_slice());
+        assert_eq!(&record[82..88], &[0u8; 6]);
+    }
+
+    /// ADR 0086: a name whose UTF-16 form does not fit the 16-bit `FileNameLength` is refused when the
+    /// fixture loads. The message gives the encoded length and not the name, so a long name is not
+    /// echoed back into an error.
+    #[test]
+    fn a_usn_record_name_too_long_for_its_length_field_is_refused_without_echoing_it() {
+        let name = "Probe".repeat(8000);
+        let yaml = format!(
+            "platform: windows\nusn_journal:\n  records:\n    - reasons: [file_delete]\n      name: '{name}'\n"
+        );
+        let error = FixtureHost::from_yaml_str(&yaml, "inline").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid fixture host inline: usn_journal record name of 80000 UTF-16 bytes is longer than 65535"
+        );
+        assert!(!error.to_string().contains("Probe"), "{error}");
+    }
+
+    /// ADR 0086: a `file:` path that no `folders:` entry describes has no identifier to give, so it is
+    /// rejected like a `parent:` that is not under `folders:`.
+    #[test]
+    fn a_record_file_that_is_not_under_folders_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+usn_journal:
+  folders:
+    'C:\Windows\Prefetch': 7
+  records:
+    - reasons: [file_create]
+      file: 'C:\Elsewhere\Helper.exe'
+",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+        assert!(
+            error.to_string().contains("is not under `folders:`"),
+            "{error}"
+        );
+    }
+
+    /// ADR 0086: records of different lengths share one buffer, and the Next USN at the head of the
+    /// buffer is `first_usn` plus the sum of the record lengths. The walk below reads each record's own
+    /// length, so it also checks that the lengths the encoder wrote match the bytes it wrote.
+    #[test]
+    fn a_buffer_of_mixed_record_lengths_has_the_sum_of_its_lengths_as_next_usn() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+usn_journal:
+  trimmed: true
+  folders:
+    'C:\Tools\Helper.exe': 9
+  records:
+    - reasons: [close]
+      count: 2
+    - reasons: [file_delete]
+      name: 'Helper.exe'
+      file: 'C:\Tools\Helper.exe'
+    - major: 2
+      reasons: [rename_old_name]
+      name: 'abc'
+",
+            "inline",
+        )
+        .unwrap();
+        let (read, buffers) = read_all(&host, 'C');
+        assert_eq!(read.unwrap().unwrap().end, UsnReadEnd::Complete);
+        assert_eq!(buffers.len(), 1);
+        let bytes = &buffers[0];
+
+        let first_usn = 4096i64;
+        let next_usn = i64::from_le_bytes(bytes[0..8].try_into().unwrap());
+        let mut lengths = Vec::new();
+        let mut offset = 8;
+        while offset < bytes.len() {
+            let length = usize::try_from(u32::from_le_bytes(
+                bytes[offset..offset + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            lengths.push(length);
+            offset += length;
+        }
+        assert_eq!(lengths, vec![80, 80, 96, 72]);
+        assert_eq!(offset, bytes.len());
+        let total = i64::try_from(lengths.iter().sum::<usize>()).unwrap();
+        assert_eq!(next_usn, first_usn + total);
+
+        // The first two records are the default `fx` name, as before `name:` existed.
+        assert_eq!(&bytes[8 + 76..8 + 80], utf16le("fx").as_slice());
+        assert_eq!(
+            &bytes[8 + 160 + 76..8 + 160 + 96],
+            utf16le("Helper.exe").as_slice()
+        );
+    }
+
+    /// A fixture says which letters its machine has, so a collector can be tested against a mapped
+    /// path. The device and serial are kept in the map, and its `Debug` still names neither
+    /// (ADR 0087 section 1).
+    #[test]
+    fn a_drive_map_block_is_read_and_an_absent_one_is_unsupported() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+drive_map:
+  - letter: Q
+    device: '\Device\HarddiskVolume3'
+    serial: 3735928559
+    kind: fixed
+  - letter: X
+    device: '\Device\HarddiskVolume12'
+    serial: 195948557
+    kind: removable
+  - letter: Z
+    device: '\Device\HarddiskVolume7'
+    serial: 305419896
+    kind: other
+",
+            "inline",
+        )
+        .unwrap();
+        let expected = DriveMap {
+            entries: vec![
+                DriveMapEntry {
+                    letter: 'Q',
+                    device: r"\Device\HarddiskVolume3".to_owned(),
+                    serial: 0xDEAD_BEEF,
+                    kind: DriveKind::Fixed,
+                },
+                DriveMapEntry {
+                    letter: 'X',
+                    device: r"\Device\HarddiskVolume12".to_owned(),
+                    serial: 0x0BAD_F00D,
+                    kind: DriveKind::Removable,
+                },
+                DriveMapEntry {
+                    letter: 'Z',
+                    device: r"\Device\HarddiskVolume7".to_owned(),
+                    serial: 0x1234_5678,
+                    kind: DriveKind::Other,
+                },
+            ],
+        };
+        let map = host.drive_map().unwrap();
+        assert_eq!(map, expected);
+        let debug = format!("{map:?}");
+        assert!(!debug.contains("HarddiskVolume"), "{debug}");
+        assert!(!debug.contains("3735928559"), "{debug}");
+        assert!(!debug.to_ascii_lowercase().contains("deadbeef"), "{debug}");
+
+        // A fixture written before this section existed did not model the machine's letters. An
+        // empty list is the deliberate claim that it has none.
+        let silent = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        let error = silent.drive_map().unwrap_err();
+        assert!(matches!(&error, SourceError::Unsupported(_)), "{error:?}");
+        assert!(!error.to_string().contains("HarddiskVolume"), "{error}");
+        let empty =
+            FixtureHost::from_yaml_str("platform: windows\ndrive_map: []\n", "inline").unwrap();
+        assert_eq!(empty.drive_map(), Ok(DriveMap { entries: vec![] }));
+    }
+
+    /// ADR 0091: a link has a path, a kind and a target, and is relative only when the fixture says so.
+    #[test]
+    fn links_are_read_with_their_kind_target_and_relative_flag() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+  - path: 'C:\a\link'
+    kind: symlink
+    target: '..\real'
+    relative: true
+  - path: 'C:\placeholder'
+    kind: other
+    target: '\??\Volume{0b1c2d3e-0000-0000-0000-100000000000}\x'
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.link_target(r"C:\Games").unwrap(),
+            Some(LinkTarget {
+                kind: LinkKind::MountPoint,
+                target: r"\??\D:\Lib".to_owned(),
+                relative: false,
+            })
+        );
+        assert_eq!(
+            host.link_target(r"C:\a\link").unwrap(),
+            Some(LinkTarget {
+                kind: LinkKind::Symlink,
+                target: r"..\real".to_owned(),
+                relative: true,
+            })
+        );
+        assert_eq!(
+            host.link_target(r"C:\placeholder").unwrap(),
+            Some(LinkTarget {
+                kind: LinkKind::Other,
+                target: r"\??\Volume{0b1c2d3e-0000-0000-0000-100000000000}\x".to_owned(),
+                relative: false,
+            })
+        );
+        assert_eq!(host.link_target(r"C:\not-a-link").unwrap(), None);
+    }
+
+    /// A link entry refuses a field no host reads, as every other fixture block does.
+    #[test]
+    fn a_link_with_an_unknown_field_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\D:\Lib'
+    bogus: true
+",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
+    }
+
+    /// An ordinary read's answer for a path behind a junction to a share.
+    fn off_local_drive<T>() -> Result<T, SourceError> {
+        Err(SourceError::NotLocal(NotLocal::LinkOffLocalDrive))
+    }
+
+    /// The fixture filesystem lists the file, but its links say the folder is a junction to a share,
+    /// so every per-path read refuses it before looking at the file (ADR 0091 section 1).
+    #[test]
+    fn reads_behind_a_unc_junction_are_not_local_even_when_the_file_is_listed() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+links:
+  - path: 'C:\Games'
+    kind: mount_point
+    target: '\??\UNC\server\share'
+filesystem:
+  'C:\Games':
+    - name: x.exe
+      sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      content: 'x'
+      signature: { state: invalid }
+      zone_identifier: '[ZoneTransfer]\r\nZoneId=3\r\n'
+",
+            "inline",
+        )
+        .unwrap();
+        let path = r"C:\Games\x.exe";
+        assert_eq!(host.file_sha256(path), off_local_drive());
+        assert_eq!(host.read_file(path), off_local_drive());
+        assert_eq!(host.list_dir(r"C:\Games"), off_local_drive());
+        assert_eq!(host.file_signature(path), off_local_drive());
+        assert_eq!(host.zone_identifier(path), off_local_drive());
     }
 }

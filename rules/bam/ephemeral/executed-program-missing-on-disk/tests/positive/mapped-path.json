@@ -1,0 +1,29 @@
+{
+  "description": "BAM recorded a device path, the drive map turned it into a letter, and the executable under Temp is gone",
+  "observations": [
+    {
+      "collector": "bam",
+      "fields": {
+        "disappeared_from_disk": true,
+        "last_run": "2026-10-15T12:00:00Z",
+        "moderation_state": 0,
+        "name": "loader.exe",
+        "path": "C:\\Users\\fixtureuser\\AppData\\Local\\Temp\\loader.exe",
+        "path_from_device": true,
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "entries": 1,
+        "intact": true,
+        "metadata_values": 2,
+        "rejected": 0,
+        "sid_withheld": "per_user_identifier",
+        "users": 1
+      }
+    }
+  ],
+  "expect_matches": 1
+}
