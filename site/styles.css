@@ -1811,16 +1811,9 @@ footer p {
   font-size: 0.85rem;
 }
 
-/* While the scene plays, an output whose not-found row is still out of sight keeps its place out of
-   sight too, as the unreached rows above do: scan.js sets hidden on it whenever that row is out of
-   sight, and the browser's own display none on [hidden] would then lift the line out of the layout,
-   changing the figure's height between the beats and carrying the page below the figure with it.
-   Re-drawing it here only under data-scan-live turns the reserved spot back on; visibility hidden
-   keeps the text out of the accessibility tree and unclickable, which the attribute alone no longer
-   does once the line takes up room. scan.js fills the text before it hides the output, so the kept
-   place is the output's own height, and scan.js drops both data-scan-live and hidden at the not-found
-   beat, the end frame and under reduced motion, where the output then shows as written. With script
-   off, data-scan-live is never set and the whole controls strip stays display none as before. */
+/* While the scene plays, a hidden output keeps its place out of sight, so the figure's height does not
+   change and the page below it does not move. With script off data-scan-live is never set, so the
+   controls strip stays display none. */
 [data-scan-scene][data-scan-live] .scan-window-out[hidden] {
   display: block;
   visibility: hidden;
