@@ -1811,6 +1811,14 @@ footer p {
   font-size: 0.85rem;
 }
 
+/* While the scene plays, a hidden output keeps its place out of sight, so the figure's height does not
+   change and the page below it does not move. With script off data-scan-live is never set, so the
+   controls strip stays display none. */
+[data-scan-scene][data-scan-live] .scan-window-out[hidden] {
+  display: block;
+  visibility: hidden;
+}
+
 /* While the scene plays, the closing line stays out of sight — the scan has not said it is over yet —
    but keeps its place, so the picture does not jump when scan.js removes data-scan-live at the end
    frame. Script off and reduced motion never set data-scan-live, so the line stands as written there,
