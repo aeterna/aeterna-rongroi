@@ -6,32 +6,15 @@ Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is 
 
 # Landing page: a scan scene
 
-## Status (paused 2026-11-03, Claude Code - Claude Opus 5.5)
+## Status (closed 2026-11-04, Claude Code - Claude Opus 5.5)
 
-PR [#275](https://github.com/aeterna/aeterna-rongroi/pull/275) is open and not merged, so the public site has not changed. All lanes are applied on `feat/site-scan-scene`. Live table: the plan linked below.
-
-**Rules for other sessions**
-
-- Merging this PR publishes the site, because `pages.yml` deploys `site/**` from `dev`. The standing merge permission does not apply: Pik merges.
-- Product code here comes from engineer runs. A fix after review is a new run (org §10.7).
-- Worktree: `.claude/worktrees/site-scan-scene`. It belongs to this work until the PR closes.
-
-**Waiting on Pik (G2)**
-
-- Try the scene and read every word on both pages. The engineer chose the play button words and the slider's `aria-label`; neither has been seen by Pik.
-- Say whether Auto-fix is wanted on the PR. It was offered and not answered.
-
-**To pick up**
-
-1. Read CI for the PR head: `gh run list --commit <sha>`, then `gh run view <id> --json jobs`. At pause, `windows` was still running on `229f892`, `ci`, `provenance` and `pr-title` had concluded `success`, and the docs commit after it had not been read.
-2. Preview: start `rongroi-site-scan` from `aeterna/.claude/launch.json` (port 8799). Remove that entry at close.
-3. After Pik merges: check the `pages` run for that sha, open the live pages, then close the worktree and branch per org §7.3.
+Live since PR [#275](https://github.com/aeterna/aeterna-rongroi/pull/275), squash commit `d18f84b`, merged by Pik's order after G2. `pages` run 41755202503 concluded `success`, and the live Thai page played in a browser with no console error and no request off its own origin.
 
 **Not checked:** Firefox, where the slider track has its own CSS; a real reduced-motion OS setting; a screen reader; dragging and keyboard use by hand, because the controls were driven by script; the English page at 375 px through to its end frame; the fixes for the two Sonnet findings have had no second model review.
 
 **Known and left as is:** the slider's colour split ignores the thumb's travel by a few px at the ends (reasoned, not measured). `opening_tags` in the tests cuts a tag at a `>` inside an attribute value; no scene attribute holds one today. The p1, p3 and j1 helpers have no control test.
 
-**Way back:** before merge, close the PR. After merge, revert the squash commit on `dev`; Pages redeploys the old page. The scene stores nothing.
+**Way back:** revert `d18f84b` on `dev`; Pages redeploys the old page. The scene stores nothing.
 
 **Log**
 
@@ -45,7 +28,7 @@ PR [#275](https://github.com/aeterna/aeterna-rongroi/pull/275) is open and not m
 | Final checks on `229f892` | site tests 20/20; fmt, xtask clippy, reuse, unicode pass; Chromium checks in the PR |
 
 **Branch:** `feat/site-scan-scene` · **Base:** `origin/dev` · **Plan:** https://claude.ai/artifact/A6Eogf2nHxSBN7LgkWgbYT
-**Route:** opencode-go:A write, gemini-api:B Q0 and Q3 · **Gate:** Q0 done (run 20261103-214615-9c4895), G1 pending
+**Route:** opencode-go:A write, gemini-api:B Q0 and Q3 · **Gate:** Q0 run 20261103-214615-9c4895, G1 and G2 passed by Pik
 
 ## Goal
 
@@ -117,3 +100,4 @@ Out of scope: every other file. Follow the header and style of `site/flow.js`.
 L2's runtime behaviour has no automated test, because the repo has no browser test for `site/`; the Orchestrator checks it in a browser in W2.
 
 Scratch only in `$TMPDIR`. Files outside scope refuse the run. Diff at most 400 lines. No new dependency.
+| G2 and merge | Pik passed it 2026-11-04; `d18f84b`, `pages` 41755202503 `success` |
