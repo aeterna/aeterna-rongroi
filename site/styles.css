@@ -1096,7 +1096,9 @@ footer p {
 @media (prefers-reduced-motion: reduce) {
   .btn,
   .tally-box,
-  .specimen-tech-btn {
+  .specimen-tech-btn,
+  .scan-source,
+  .scan-play {
     transition: none;
   }
 }
@@ -1539,5 +1541,284 @@ footer p {
     50% {
       transform: scale(1.04);
     }
+  }
+}
+
+/* ==== One scan, start to finish: the scan scene ==== */
+/* One example scan, drawn under the sources it was read from. Every beat of .scan-beats pairs one source
+   on the left with the result row that came from reading it on the right, joined by a wire that runs one
+   direction only, from the source to the row. The words live in the HTML; the hooks, .scan-in,
+   .scan-active, --scan-wire and data-scan-live below are set by scan.js (the 2026-11-03 site-scan-scene
+   handoff). With JavaScript off — and until scan.js runs — the finished picture stands: every row, source
+   and wire drawn, and the play button, slider and output stay hidden as written. While data-scan-live is
+   set, a row the scan has not reached keeps its place out of sight, all three wires draw together with
+   --scan-wire (0 to 1 over the read beat), and a tally whose state has not appeared keeps its place with
+   its number out of sight. Colours are the page's existing vars, so the bright-sky look and
+   the AA text colours hold; the marks keep the page's shapes and never turn green. */
+.scan {
+  margin: 0;
+  padding: 20px;
+  background: var(--surface);
+  border: 2px solid #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* The tag always shows, in every beat, so no one takes the picture for a scan of their own PC. */
+.scan-tag {
+  width: fit-content;
+  margin: 0 0 12px auto;
+  font: 600 0.78rem var(--display);
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.scan-beats {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.scan-beat {
+  display: grid;
+  grid-template-columns: minmax(8.5em, 13em) 44px 1fr;
+  gap: 6px 14px;
+  align-items: center;
+}
+
+.scan-source {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-solid);
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  transition: border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+}
+
+/* Being read reads as a double line, as the pressed tally does: a change of shape, never colour alone. */
+.scan-source.scan-active {
+  border-color: var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+}
+
+/* While the scene plays the three wires draw together: stroke-dashoffset against a pathLength of 1, so
+   --scan-wire (which runs 0 to 1 over the whole read beat) alone sets how far each has reached. Standing
+   still, every wire is simply drawn. */
+.scan-wire {
+  width: 100%;
+  height: 12px;
+  justify-self: stretch;
+}
+
+.scan-wire-line {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-scan-scene][data-scan-live] .scan-wire-line {
+  stroke-dashoffset: calc(1 - var(--scan-wire, 0));
+}
+
+/* The three result rows, drawn like the specimen's rows and the three states further up the page: found
+   keeps the warm ground and its inset bar, not found a plain box, not measured a dashed one. */
+.scan-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 14px;
+  background: #ffffffb3;
+  box-shadow: none;
+  font-size: 0.9rem;
+}
+
+.scan-row[data-scan-row="found"] {
+  border-color: var(--found-line);
+  background: var(--found-ground);
+  box-shadow: inset 4px 0 0 var(--found-mark);
+}
+
+.scan-row[data-scan-row="unmeasured"] {
+  border: 1px dashed var(--unmeasured-line);
+  background: var(--unmeasured-ground);
+}
+
+.scan-row .mark {
+  margin-top: 7px;
+}
+
+.scan-words {
+  display: grid;
+  gap: 1px;
+}
+
+.scan-title {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.scan-desc {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* While the scene plays, a row the scan has not reached yet is out of sight but still occupies its grid
+   place, so the picture does not jump between beats. */
+[data-scan-scene][data-scan-live] .scan-row:not(.scan-in) {
+  visibility: hidden;
+}
+
+/* The jump tallies re-use the specimen's tally boxes, marks and state colours; only the spacing belongs
+   to the scene. */
+.scan .tally {
+  margin: 0 0 16px;
+}
+
+/* In the HTML every jump starts disabled: with script off it is a count in a box, not a control. So a
+   disabled jump keeps the enabled box's exact look — the browser's greyed text and dimmed form controls
+   stay out of it, and the shared tally-box hover and pointer cursor do not reach a disabled button.
+   scan.js enables a jump when script runs it, and the states come back on their own. */
+.scan .tally-box:disabled {
+  color: var(--text);
+  opacity: 1;
+  cursor: default;
+}
+
+.scan .tally-box:disabled:hover {
+  border-color: var(--line);
+}
+
+/* While the scene plays, a tally whose state has not appeared keeps its place and stays usable, with its
+   number out of sight until its row does. */
+[data-scan-scene][data-scan-live] [data-scan-jump]:not(.scan-in) b {
+  color: transparent;
+}
+
+/* The scene's one strip of controls. Everything in it starts hidden and scan.js reveals each part only
+   where it works, so the strip itself disappears while they all are. The scale under the slider is part
+   of the slider and never carries `hidden` of its own, so it does not count in the strip check: only the
+   strip's direct controls do. (:has fallback: without it the strip is merely a thin empty gap, and the
+   page still reads the same.) */
+.scan-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.scan-controls:not(:has(> :not([hidden]):not(.scan-window-scale))) {
+  display: none;
+}
+
+.scan-play {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-solid);
+  color: var(--navy);
+  font: 600 0.85rem var(--display);
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.scan-play:hover {
+  border-color: var(--line-strong);
+}
+
+.scan-play:focus-visible,
+.scan-controls input[type="range"]:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* The window slider: days ago from 30 down, on a full-width line of its own so the scale's split under it
+   lines up. The track carries no progress fill — the browser's own one would paint the older side blue and
+   read against the labels. Left of data-reach it is the pale line colour, past it the page's blue, split at
+   16 of 29 where the scale's columns split. The thumb takes the page's blue; scan.js writes aria-valuetext,
+   so no extra labelling is needed beyond the aria-label the HTML carries. */
+.scan-controls input[type="range"] {
+  flex: 1 1 100%;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+}
+
+.scan-controls input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line) 0, var(--line) calc(100% * 16 / 29), var(--blue) calc(100% * 16 / 29));
+}
+
+.scan-controls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 2px solid var(--surface-solid);
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.scan-controls input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line) 0, var(--line) calc(100% * 16 / 29), var(--blue) calc(100% * 16 / 29));
+}
+
+.scan-controls input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--surface-solid);
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+/* The scale under the slider: out of reach on the older side, still held on the newer one, split where
+   data-reach falls on the track. It is aria-hidden because the output already says it, and it stays out
+   of sight for as long as the slider is hidden. */
+.scan-window-scale {
+  flex-basis: 100%;
+  display: none;
+  grid-template-columns: 16fr 13fr;
+  justify-items: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.scan-controls input[type="range"]:not([hidden]) ~ .scan-window-scale {
+  display: grid;
+}
+
+.scan-window-out {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Narrow screens: the beats stack, the decorative wire steps aside and the direction shows through the
+   order of source and row and the source being read. */
+@media (max-width: 560px) {
+  .scan-beat {
+    grid-template-columns: 1fr;
+  }
+
+  .scan-wire {
+    display: none;
   }
 }

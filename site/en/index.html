@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
-<!-- The English landing page. Three local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram, compare.js for the comparison); no tracker, nothing loaded from another host. Update the version on each release. -->
+<!-- The English landing page. Four local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram, compare.js for the comparison, scan.js for the scan scene); no tracker, nothing loaded from another host. Update the version on each release. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -224,6 +224,65 @@
     </div>
   </section>
 
+  <!-- An example of one scan, not the reader's own PC (the "Example" tag stands on the picture and in the
+       figure's aria-label). All the words are written on this page, as the shared contract of
+       docs/handoffs/2026-11-03-site-scan-scene.md asks, and scan.js only plays them: with script off,
+       reduced motion, or before its beat arrives, the finished picture stands as written. The play
+       button, the slider and the output start hidden and only script uncovers them where they work. -->
+  <section>
+    <h2>One scan, start to finish</h2>
+    <figure class="scan" data-scan-scene aria-label="Example · One scan, start to finish" data-msg-play="Play" data-msg-pause="Pause" data-msg-replay="Replay" data-msg-in="{n} day(s) ago: not found in this stretch" data-msg-out="{n} day(s) ago: out of reach. This report says nothing about that stretch.">
+      <p class="scan-tag">Example</p>
+      <div class="scan-beats">
+        <div class="scan-beat">
+          <div class="scan-source" data-scan-source>Windows settings</div>
+          <svg class="scan-wire" viewBox="0 0 44 12" aria-hidden="true" focusable="false"><line class="scan-wire-line" x1="1" y1="6" x2="43" y2="6" pathLength="1"/></svg>
+          <div class="scan-row" data-scan-row="found">
+            <span class="mark mark-found" aria-hidden="true"></span>
+            <span class="scan-words">
+              <span class="scan-title">Check: Secure Boot is turned off <span class="pill">Found</span></span>
+              <span class="scan-desc">Windows reports that UEFI Secure Boot is off.</span>
+            </span>
+          </div>
+        </div>
+        <div class="scan-beat">
+          <div class="scan-source" data-scan-source>Windows event log</div>
+          <svg class="scan-wire" viewBox="0 0 44 12" aria-hidden="true" focusable="false"><line class="scan-wire-line" x1="1" y1="6" x2="43" y2="6" pathLength="1"/></svg>
+          <div class="scan-row" data-scan-row="not_found">
+            <span class="mark mark-not-found" aria-hidden="true"></span>
+            <span class="scan-words">
+              <span class="scan-title">Check: The Security log records that it was cleared <span class="pill">Not found</span></span>
+              <span class="scan-desc">Example: this log reaches back 14 days. It differs on every PC.</span>
+            </span>
+          </div>
+        </div>
+        <div class="scan-beat">
+          <div class="scan-source" data-scan-source>Firmware</div>
+          <svg class="scan-wire" viewBox="0 0 44 12" aria-hidden="true" focusable="false"><line class="scan-wire-line" x1="1" y1="6" x2="43" y2="6" pathLength="1"/></svg>
+          <div class="scan-row" data-scan-row="unmeasured">
+            <span class="mark mark-unmeasured" aria-hidden="true"></span>
+            <span class="scan-words">
+              <span class="scan-title">Check: The firmware reports Secure Boot off while Windows reports it on <span class="pill">Not measured</span></span>
+              <span class="scan-desc">Not measured: needs administrator rights</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="tally">
+        <button type="button" class="tally-box" data-scan-jump="found" disabled><b><span class="mark mark-found" aria-hidden="true"></span>1</b><span>Found</span></button>
+        <button type="button" class="tally-box" data-scan-jump="not_found" disabled><b><span class="mark mark-not-found" aria-hidden="true"></span>1</b><span>Not found</span></button>
+        <button type="button" class="tally-box" data-scan-jump="unmeasured" disabled><b><span class="mark mark-unmeasured" aria-hidden="true"></span>1</b><span>Not measured</span></button>
+      </div>
+      <div class="scan-controls">
+        <button type="button" class="scan-play" data-scan-play hidden></button>
+        <input type="range" min="0" max="29" value="23" data-scan-window data-reach="16" aria-label="Days before the scan" hidden>
+        <span class="scan-window-scale" aria-hidden="true"><span>Out of reach</span><span>The log still holds this</span></span>
+        <output class="scan-window-out" data-scan-window-out hidden></output>
+      </div>
+      <p class="scan-end">It ends here: no score, no pass or fail. A person decides.</p>
+    </figure>
+  </section>
+
   <section class="dataflow">
     <h2>Data stays on this PC</h2>
     <p>Dots travel along the wires, from Windows' files to the scanner and on to the report on screen. The dashed wire to the internet is blocked by a barrier mark; the dot that reaches it fades out.</p>
@@ -327,5 +386,6 @@
 <script src="../specimen.js" defer></script>
 <script src="../flow.js" defer></script>
 <script src="../compare.js" defer></script>
+<script src="../scan.js" defer></script>
 </body>
 </html>

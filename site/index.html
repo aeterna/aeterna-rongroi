@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md. -->
-<!-- The Thai landing page. Three local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram, compare.js for the comparison); no tracker, nothing loaded from another host. Update the version on each release. -->
+<!-- The Thai landing page. Four local scripts (specimen.js for the specimen figure, flow.js for the data-flow diagram, compare.js for the comparison, scan.js for the scan scene); no tracker, nothing loaded from another host. Update the version on each release. -->
 <html lang="th">
 <head>
 <meta charset="utf-8">
@@ -225,6 +225,65 @@
     </div>
   </section>
 
+  <!-- An example of one scan, not the reader's own PC (the ตัวอย่าง tag stands on the picture and in the
+       figure's aria-label). All the words are written on this page, as the shared contract of
+       docs/handoffs/2026-11-03-site-scan-scene.md asks, and scan.js only plays them: with script off,
+       reduced motion, or before its beat arrives, the finished picture stands as written. The play
+       button, the slider and the output start hidden and only script uncovers them where they work. -->
+  <section>
+    <h2>การสแกนหนึ่งรอบ</h2>
+    <figure class="scan" data-scan-scene aria-label="ตัวอย่าง · การสแกนหนึ่งรอบ" data-msg-play="เล่น" data-msg-pause="หยุดชั่วคราว" data-msg-replay="เล่นอีกครั้ง" data-msg-in="{n} วันก่อน: ไม่เจอในช่วงนี้" data-msg-out="{n} วันก่อน: ย้อนไม่ถึง รายงานนี้บอกอะไรเรื่องช่วงนั้นไม่ได้">
+      <p class="scan-tag">ตัวอย่าง</p>
+      <div class="scan-beats">
+        <div class="scan-beat">
+          <div class="scan-source" data-scan-source>การตั้งค่า Windows</div>
+          <svg class="scan-wire" viewBox="0 0 44 12" aria-hidden="true" focusable="false"><line class="scan-wire-line" x1="1" y1="6" x2="43" y2="6" pathLength="1"/></svg>
+          <div class="scan-row" data-scan-row="found">
+            <span class="mark mark-found" aria-hidden="true"></span>
+            <span class="scan-words">
+              <span class="scan-title">ตรวจ: Secure Boot ถูกปิดอยู่ <span class="pill">เจอ</span></span>
+              <span class="scan-desc">Windows รายงานว่า UEFI Secure Boot ถูกปิดอยู่</span>
+            </span>
+          </div>
+        </div>
+        <div class="scan-beat">
+          <div class="scan-source" data-scan-source>Event log ของ Windows</div>
+          <svg class="scan-wire" viewBox="0 0 44 12" aria-hidden="true" focusable="false"><line class="scan-wire-line" x1="1" y1="6" x2="43" y2="6" pathLength="1"/></svg>
+          <div class="scan-row" data-scan-row="not_found">
+            <span class="mark mark-not-found" aria-hidden="true"></span>
+            <span class="scan-words">
+              <span class="scan-title">ตรวจ: Security log มีบันทึกว่าตัวเองถูกล้าง <span class="pill">ไม่เจอ</span></span>
+              <span class="scan-desc">ตัวอย่าง: log นี้ย้อนได้ 14 วัน ของจริงแต่ละเครื่องไม่เท่ากัน</span>
+            </span>
+          </div>
+        </div>
+        <div class="scan-beat">
+          <div class="scan-source" data-scan-source>เฟิร์มแวร์</div>
+          <svg class="scan-wire" viewBox="0 0 44 12" aria-hidden="true" focusable="false"><line class="scan-wire-line" x1="1" y1="6" x2="43" y2="6" pathLength="1"/></svg>
+          <div class="scan-row" data-scan-row="unmeasured">
+            <span class="mark mark-unmeasured" aria-hidden="true"></span>
+            <span class="scan-words">
+              <span class="scan-title">ตรวจ: เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด <span class="pill">ยังไม่ได้วัด</span></span>
+              <span class="scan-desc">ยังไม่ได้วัด: ต้องใช้สิทธิ์ผู้ดูแลระบบ</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="tally">
+        <button type="button" class="tally-box" data-scan-jump="found" disabled><b><span class="mark mark-found" aria-hidden="true"></span>1</b><span>เจอ</span></button>
+        <button type="button" class="tally-box" data-scan-jump="not_found" disabled><b><span class="mark mark-not-found" aria-hidden="true"></span>1</b><span>ไม่เจอ</span></button>
+        <button type="button" class="tally-box" data-scan-jump="unmeasured" disabled><b><span class="mark mark-unmeasured" aria-hidden="true"></span>1</b><span>ยังไม่ได้วัด</span></button>
+      </div>
+      <div class="scan-controls">
+        <button type="button" class="scan-play" data-scan-play hidden></button>
+        <input type="range" min="0" max="29" value="23" data-scan-window data-reach="16" aria-label="วันก่อนการสแกน" hidden>
+        <span class="scan-window-scale" aria-hidden="true"><span>ย้อนไม่ถึง</span><span>log ยังเก็บอยู่</span></span>
+        <output class="scan-window-out" data-scan-window-out hidden></output>
+      </div>
+      <p class="scan-end">จบตรงนี้ ไม่มีคะแนน ไม่มีคำว่าผ่านหรือไม่ผ่าน คนเป็นผู้ตัดสิน</p>
+    </figure>
+  </section>
+
   <section class="dataflow">
     <h2>ข้อมูลไหลอยู่ในเครื่องนี้เท่านั้น</h2>
     <p>จุดวิ่งตามเส้นจากไฟล์ของ Windows ไปที่ตัวสแกนและไปที่รายงานบนจอ เส้นประไปอินเทอร์เน็ตมีเครื่องหมายกั้น จุดที่ลองไปถึงกั้นแล้วจางหาย</p>
@@ -328,5 +387,6 @@
 <script src="specimen.js" defer></script>
 <script src="flow.js" defer></script>
 <script src="compare.js" defer></script>
+<script src="scan.js" defer></script>
 </body>
 </html>
