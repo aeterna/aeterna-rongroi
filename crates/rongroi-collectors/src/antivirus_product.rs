@@ -423,7 +423,7 @@ mod tests {
             .unwrap_or_else(|| panic!("no summary observation: {observations:?}"))
     }
 
-    fn product(observations: &[Observation], name: &str) -> &Observation {
+    fn product<'a>(observations: &'a [Observation], name: &str) -> &'a Observation {
         observations
             .iter()
             .find(|observation| observation.fields["display_name"] == name)
@@ -498,6 +498,47 @@ mod tests {
     #[test]
     fn a_fixture_with_no_block_is_unmeasured() {
         let host = inline("platform: windows\n");
+        assert_eq!(
+            AntivirusProduct::default().collect(&host),
+            unmeasured(UnmeasuredReason::ReadFailed)
+        );
+    }
+
+    /// Silence about the list is never the claim that Security Center lists none: a fixture with no
+    /// block is `read_failed`, and no `products` count reaches the report (ADR 0090 section 4).
+    #[test]
+    fn a_fixture_with_no_block_is_read_failed_and_never_zero_products() {
+        let run = AntivirusProduct::default().collect(&inline("platform: windows\n"));
+        assert_eq!(run, unmeasured(UnmeasuredReason::ReadFailed));
+        let json = serde_json::to_string(&run).unwrap();
+        assert!(!json.contains("\"products\""), "{json}");
+    }
+
+    /// A refused list is `not_admin` only when this scan did not already hold administrator rights;
+    /// with them it is `access_denied`, because a restart would not change the answer.
+    #[test]
+    fn a_refused_list_is_not_admin_without_admin_rights_and_access_denied_with_them() {
+        for (elevated, reason) in [
+            (false, UnmeasuredReason::NotAdmin),
+            (true, UnmeasuredReason::AccessDenied),
+        ] {
+            let host = inline(&format!(
+                "platform: windows\nelevated: {elevated}\nantivirus_products_failure: access_denied\nantivirus_products: []\n"
+            ));
+            assert_eq!(
+                AntivirusProduct::default().collect(&host),
+                unmeasured(reason),
+                "elevated: {elevated}"
+            );
+        }
+    }
+
+    /// A list whose read failed is `read_failed`, whatever a list beside it would have said.
+    #[test]
+    fn a_failed_list_is_read_failed() {
+        let host = inline(
+            "platform: windows\nantivirus_products_failure: read_failed\nantivirus_products: []\n",
+        );
         assert_eq!(
             AntivirusProduct::default().collect(&host),
             unmeasured(UnmeasuredReason::ReadFailed)
