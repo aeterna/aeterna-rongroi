@@ -152,8 +152,7 @@ fn a_valid_request_writes_one_schema_2_record() {
         hash.bytes()
             .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
     );
-    let recomputed = rongroi_core::canonical::visual_hash(&record)
-        .expect("record hashes");
+    let recomputed = rongroi_core::canonical::visual_hash(&record).expect("record hashes");
     assert_eq!(hash, recomputed);
 }
 
@@ -164,7 +163,10 @@ fn a_binding_with_only_ticket_and_nonce_keeps_only_those_two() {
     let (exit, transport) = run_request(&request, &host());
     assert_eq!(exit, ExitKind::Success);
     let record = record_of(&transport);
-    assert_eq!(record["binding"], json!({ "ticket": TICKET, "nonce": NONCE }));
+    assert_eq!(
+        record["binding"],
+        json!({ "ticket": TICKET, "nonce": NONCE })
+    );
     assert_eq!(record["binding"].as_object().expect("binding").len(), 2);
 }
 
@@ -194,8 +196,7 @@ fn a_line_over_the_limit_fails_without_writing() {
 #[test]
 fn a_failed_write_is_failed() {
     let request = request_value(&["posture"]);
-    let transport =
-        MemoryTransport::failing_write(with_newline(line_of(&request)));
+    let transport = MemoryTransport::failing_write(with_newline(line_of(&request)));
     let (exit, transport) = run_transport(transport, &host());
     assert_eq!(exit, ExitKind::Failed);
     assert!(transport.written.is_empty());
@@ -217,8 +218,7 @@ fn collectors_outside_the_policy_are_not_called() {
     let fixture = prefetch_host();
     let (_, posture_only) = run_request(&request_value(&["posture"]), &fixture);
     let posture_record = record_of(&posture_only);
-    let (_, with_prefetch) =
-        run_request(&request_value(&["posture", "prefetch"]), &fixture);
+    let (_, with_prefetch) = run_request(&request_value(&["posture", "prefetch"]), &fixture);
     let prefetch_record = record_of(&with_prefetch);
 
     let evidence = posture_record["view"]["evidence"]

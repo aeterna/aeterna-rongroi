@@ -87,11 +87,7 @@ where
     }
 }
 
-fn run_session<F, S>(
-    transport: &mut dyn Transport,
-    scan: S,
-    now: F,
-) -> Result<(), SessionError>
+fn run_session<F, S>(transport: &mut dyn Transport, scan: S, now: F) -> Result<(), SessionError>
 where
     F: Fn() -> jiff::Timestamp,
     S: Fn(&Bundle, ScanContext, &[&str]) -> Report,
