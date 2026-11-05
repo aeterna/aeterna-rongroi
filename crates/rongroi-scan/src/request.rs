@@ -159,7 +159,13 @@ pub fn parse_request(line: &[u8]) -> Result<Request, RequestError> {
         .ok_or(RequestError::BindingMembers)?;
     if !has_allowed_members(
         binding,
-        &["ticket", "nonce", "server_origin", "issued_at", "expires_at"],
+        &[
+            "ticket",
+            "nonce",
+            "server_origin",
+            "issued_at",
+            "expires_at",
+        ],
         &["ticket", "nonce"],
     ) {
         return Err(RequestError::BindingMembers);

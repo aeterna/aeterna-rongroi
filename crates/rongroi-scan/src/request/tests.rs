@@ -4,7 +4,7 @@
 
 //! Tests for the request line validator.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::*;
 
@@ -96,7 +96,9 @@ fn removed(pointer: &str, member: &str) -> Value {
 }
 
 fn different_hash(value: &Value) -> String {
-    let hash = value["policy"]["policy_hash"].as_str().expect("policy hash is text");
+    let hash = value["policy"]["policy_hash"]
+        .as_str()
+        .expect("policy hash is text");
     let mut characters: Vec<char> = hash.chars().collect();
     characters[0] = if characters[0] == '0' { '1' } else { '0' };
     characters.into_iter().collect()
@@ -106,29 +108,71 @@ fn mutation_values() -> Vec<(&'static str, Value)> {
     cases![
         ("unknown top-level member", inserted("", "extra", json!(1))),
         ("missing top-level member", removed("", "producer")),
-        ("unknown binding member", inserted("/binding", "extra", json!(1))),
-        ("unknown policy member", inserted("/policy", "extra", json!(1))),
-        ("unknown producer member", inserted("/producer", "extra", json!(1))),
-        ("ticket uppercase", binding("ticket", json!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))),
+        (
+            "unknown binding member",
+            inserted("/binding", "extra", json!(1))
+        ),
+        (
+            "unknown policy member",
+            inserted("/policy", "extra", json!(1))
+        ),
+        (
+            "unknown producer member",
+            inserted("/producer", "extra", json!(1))
+        ),
+        (
+            "ticket uppercase",
+            binding("ticket", json!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+        ),
         ("ticket 31 chars", binding("ticket", json!("a".repeat(31)))),
         ("nonce empty", binding("nonce", json!(""))),
         ("nonce 129 chars", binding("nonce", json!("n".repeat(129)))),
-        ("nonce with space", binding("nonce", json!(format!("{SENTINEL_NONCE} ")))),
-        ("issued_at yesterday", binding("issued_at", json!("yesterday"))),
+        (
+            "nonce with space",
+            binding("nonce", json!(format!("{SENTINEL_NONCE} ")))
+        ),
+        (
+            "issued_at yesterday",
+            binding("issued_at", json!("yesterday"))
+        ),
         ("origin ftp", binding("server_origin", json!("ftp://x"))),
-        ("origin with user information", binding("server_origin", json!("http://u:p@h"))),
-        ("origin with path", binding("server_origin", json!("http://h/path"))),
-        ("origin without host", binding("server_origin", json!("http://"))),
+        (
+            "origin with user information",
+            binding("server_origin", json!("http://u:p@h"))
+        ),
+        (
+            "origin with path",
+            binding("server_origin", json!("http://h/path"))
+        ),
+        (
+            "origin without host",
+            binding("server_origin", json!("http://"))
+        ),
         ("profile other", policy("profile", json!("other"))),
-        ("require_elevation not bool", policy("require_elevation", json!("true"))),
+        (
+            "require_elevation not bool",
+            policy("require_elevation", json!("true"))
+        ),
         ("server_name empty", policy("server_name", json!(""))),
-        ("server_name 129 chars", policy("server_name", json!("x".repeat(129)))),
-        ("policy_hash wrong", hashed(json!(different_hash(&valid_value())))),
+        (
+            "server_name 129 chars",
+            policy("server_name", json!("x".repeat(129)))
+        ),
+        (
+            "policy_hash wrong",
+            hashed(json!(different_hash(&valid_value())))
+        ),
         ("policy_hash uppercase", hashed(json!("AAAAAAAAAAAAAAAA"))),
         ("policy_hash 15 chars", hashed(json!("0123456789abcde"))),
         ("collectors empty", policy("required_collectors", json!([]))),
-        ("collectors unknown id", policy("required_collectors", json!(["x"]))),
-        ("collectors duplicate id", policy("required_collectors", json!(["posture", "posture"]))),
+        (
+            "collectors unknown id",
+            policy("required_collectors", json!(["x"]))
+        ),
+        (
+            "collectors duplicate id",
+            policy("required_collectors", json!(["posture", "posture"]))
+        ),
         (
             "collectors 65 ids",
             policy(
@@ -136,11 +180,23 @@ fn mutation_values() -> Vec<(&'static str, Value)> {
                 Value::Array(vec![json!("posture"); 65]),
             ),
         ),
-        ("collectors non-string", policy("required_collectors", json!(["posture", 1]))),
-        ("producer name wrong", producer("name", json!("rongroi-offline"))),
-        ("producer mode wrong", producer("mode", json!("interactive"))),
+        (
+            "collectors non-string",
+            policy("required_collectors", json!(["posture", 1]))
+        ),
+        (
+            "producer name wrong",
+            producer("name", json!("rongroi-offline"))
+        ),
+        (
+            "producer mode wrong",
+            producer("mode", json!("interactive"))
+        ),
         ("producer version empty", producer("version", json!(""))),
-        ("producer version 33 chars", producer("version", json!("v".repeat(33)))),
+        (
+            "producer version 33 chars",
+            producer("version", json!("v".repeat(33)))
+        ),
     ]
 }
 
@@ -202,7 +258,10 @@ fn errors_never_echo_input_values() {
         let display = error.to_string();
         let debug = format!("{error:?}");
         for sentinel in [SENTINEL_TICKET, SENTINEL_NONCE, SENTINEL_ORIGIN] {
-            assert!(!display.contains(sentinel), "{name} leaked a value in Display");
+            assert!(
+                !display.contains(sentinel),
+                "{name} leaked a value in Display"
+            );
             assert!(!debug.contains(sentinel), "{name} leaked a value in Debug");
         }
     }
@@ -217,5 +276,8 @@ fn line_size_limit_is_checked_before_json() {
 
     let mut too_long = at_limit;
     too_long.push(b' ');
-    assert_eq!(parse_request(&too_long).unwrap_err(), RequestError::LineTooLong);
+    assert_eq!(
+        parse_request(&too_long).unwrap_err(),
+        RequestError::LineTooLong
+    );
 }

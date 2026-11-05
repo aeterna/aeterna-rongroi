@@ -1069,11 +1069,9 @@ mod tests {
                 }
             );
             assert_eq!(
-                not_consented,
-                !selected_collector,
+                not_consented, !selected_collector,
                 "{}: {:?}",
-                item.collector,
-                item.state
+                item.collector, item.state
             );
         }
         assert!(
@@ -1148,7 +1146,10 @@ mod tests {
     fn run_is_the_subset_scan_with_every_id() {
         let bundle = Bundle::embedded().unwrap();
         let fixture = fixture_host("prefetch-files-present");
-        let ids: Vec<&str> = crate::all().iter().map(|collector| collector.id()).collect();
+        let ids: Vec<&str> = crate::all()
+            .iter()
+            .map(|collector| collector.id())
+            .collect();
         assert_eq!(
             run(&fixture, &bundle, context(ScanTier::Standard)),
             run_selected(&fixture, &bundle, context(ScanTier::Standard), &ids)
@@ -1161,12 +1162,7 @@ mod tests {
         let bundle = Bundle::embedded().unwrap();
         let fixture = host("platform: windows\n");
         assert_eq!(
-            run_selected(
-                &fixture,
-                &bundle,
-                context(ScanTier::Standard),
-                &["posture"],
-            ),
+            run_selected(&fixture, &bundle, context(ScanTier::Standard), &["posture"],),
             run_selected(
                 &fixture,
                 &bundle,
@@ -1189,6 +1185,9 @@ mod tests {
         );
         let view = rongroi_core::view::for_mode(&report, rongroi_core::model::Mode::Ss);
         println!("{view:#?}");
-        assert!(view.scope.not_consented > 0, "no not_consented rule to read");
+        assert!(
+            view.scope.not_consented > 0,
+            "no not_consented rule to read"
+        );
     }
 }

@@ -35,7 +35,9 @@ pub enum PipeNameError {
 /// [`PipeNameError::Length`] when the token has the wrong number of characters, and
 /// [`PipeNameError::NotLowerHex`] when a token character is not `0`-`9` or `a`-`f`.
 pub fn validate(name: &str) -> Result<(), PipeNameError> {
-    let token = name.strip_prefix(PIPE_PREFIX).ok_or(PipeNameError::Prefix)?;
+    let token = name
+        .strip_prefix(PIPE_PREFIX)
+        .ok_or(PipeNameError::Prefix)?;
     if token.chars().count() != TOKEN_LEN {
         return Err(PipeNameError::Length);
     }
