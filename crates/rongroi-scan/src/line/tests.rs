@@ -113,7 +113,7 @@ fn a_zero_cap_accepts_only_an_empty_line() {
     let mut empty = Cursor::new(b"\n".to_vec());
     assert_eq!(
         read_line_capped(&mut empty, 0).expect("empty line reads"),
-        Vec::new()
+        Vec::<u8>::new()
     );
 
     let mut non_empty = Cursor::new(b"a\n".to_vec());

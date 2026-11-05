@@ -7,6 +7,7 @@
 #[cfg(windows)]
 mod pipe_client;
 
+use std::ffi::OsString;
 use std::process::ExitCode;
 
 use rongroi_host_windows::elevate::ElevateError;
@@ -47,14 +48,21 @@ enum ParseError {
 }
 
 fn main() -> ExitCode {
-    let args = match parse_args(std::env::args().skip(1)) {
-        Ok(args) => args,
-        Err(_) => {
-            eprintln!("rongroi-scan: the arguments were refused");
-            return ExitCode::from(EXIT_FAILED);
-        }
+    let Ok(args) = unicode_args(std::env::args_os().skip(1)).and_then(parse_args) else {
+        eprintln!("rongroi-scan: the arguments were refused");
+        return ExitCode::from(EXIT_FAILED);
     };
     platform_run(&args)
+}
+
+/// Converts the process's arguments to strings, refusing one that is not valid Unicode.
+///
+/// `std::env::args` panics on such an argument; a non-Unicode argument is just another argument
+/// the sidecar does not accept.
+fn unicode_args(args: impl IntoIterator<Item = OsString>) -> Result<Vec<String>, ParseError> {
+    args.into_iter()
+        .map(|arg| arg.into_string().map_err(|_| ParseError::Unknown))
+        .collect()
 }
 
 /// Parses the sidecar's arguments by hand; clap is not a dependency of this binary.
@@ -100,7 +108,7 @@ fn elevated_args(args: impl IntoIterator<Item = String>) -> Vec<String> {
 /// A failure keeps only a fixed sentence: the error can name the program's own path, and no argument
 /// value may cross the pipe or appear in the parent's output.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn elevate_report(result: Result<(), ElevateError>) -> (&'static str, u8) {
+fn elevate_report(result: &Result<(), ElevateError>) -> (&'static str, u8) {
     const REQUESTED: &str = r#"{"elevate":"requested"}"#;
     const DECLINED: &str = r#"{"elevate":"declined"}"#;
     const FAILED: &str = r#"{"elevate":"failed","message":"the elevated copy was not started"}"#;
@@ -124,8 +132,11 @@ fn platform_run(args: &Args) -> ExitCode {
 
     let host = live_host();
     if args.elevate && host.is_elevated() != Some(true) {
-        let forwarded = elevated_args(std::env::args().skip(1));
-        let (line, code) = elevate_report(relaunch_elevated_with(&forwarded, ShowWindow::Hidden));
+        let Ok(forwarded) = unicode_args(std::env::args_os().skip(1)) else {
+            return ExitKind::Failed.into();
+        };
+        let forwarded = elevated_args(forwarded);
+        let (line, code) = elevate_report(&relaunch_elevated_with(&forwarded, ShowWindow::Hidden));
         println!("{line}");
         return ExitCode::from(code);
     }
@@ -153,6 +164,30 @@ mod tests {
 
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(|arg| (*arg).to_owned()).collect()
+    }
+
+    #[test]
+    fn unicode_arguments_are_kept() {
+        assert_eq!(unicode_args([OsString::from("--pipe")]), Ok(args(&["--pipe"])));
+    }
+
+    #[test]
+    fn a_non_unicode_argument_is_refused() {
+        assert_eq!(unicode_args([non_unicode_argument()]), Err(ParseError::Unknown));
+    }
+
+    #[cfg(unix)]
+    fn non_unicode_argument() -> OsString {
+        use std::os::unix::ffi::OsStringExt;
+
+        OsString::from_vec(vec![0xff])
+    }
+
+    #[cfg(windows)]
+    fn non_unicode_argument() -> OsString {
+        use std::os::windows::ffi::OsStringExt;
+
+        OsString::from_wide(&[0xd800])
     }
 
     #[test]
@@ -233,13 +268,13 @@ mod tests {
 
     #[test]
     fn a_requested_relaunch_prints_the_requested_line_and_exits_zero() {
-        assert_eq!(elevate_report(Ok(())), (r#"{"elevate":"requested"}"#, 0));
+        assert_eq!(elevate_report(&Ok(())), (r#"{"elevate":"requested"}"#, 0));
     }
 
     #[test]
     fn a_declined_prompt_prints_the_declined_line_and_exits_three() {
         assert_eq!(
-            elevate_report(Err(ElevateError::Declined)),
+            elevate_report(&Err(ElevateError::Declined)),
             (r#"{"elevate":"declined"}"#, 3)
         );
     }
@@ -251,7 +286,7 @@ mod tests {
             ElevateError::Failed(SENTINEL.to_owned()),
             ElevateError::ExePathUnknown(SENTINEL.to_owned()),
         ] {
-            let (line, code) = elevate_report(Err(error));
+            let (line, code) = elevate_report(&Err(error));
             assert_eq!(code, EXIT_FAILED);
             let json: serde_json::Value = serde_json::from_str(line).expect("the line is JSON");
             assert_eq!(json["elevate"], "failed");
