@@ -7,6 +7,7 @@
 // Nothing here sorts, colours or compares a row.
 
 import type { TFunction } from "i18next";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   AgeText,
@@ -216,21 +217,22 @@ function RowLine({ row }: { row: TraceAge }) {
  * that was not read is never folded into "no entry", and the causes are always printed in full.
  */
 export function CrossSource({ statements }: { statements: CrossSourceStatement[] }) {
-  return (
-    <>
-      {statements.map((statement) => {
-        const key = JSON.stringify(statement);
-        switch (statement.kind) {
-          case "session":
-            return <Session key={key} statement={statement} />;
-          case "antivirus":
-            return <Antivirus key={key} statement={statement} />;
-          case "fivem_and_records":
-            return <Records key={key} statement={statement} />;
-        }
-      })}
-    </>
-  );
+  const rows: ReactNode[] = [];
+  for (const statement of statements) {
+    const key = JSON.stringify(statement);
+    switch (statement.kind) {
+      case "session":
+        rows.push(<Session key={key} statement={statement} />);
+        break;
+      case "antivirus":
+        rows.push(<Antivirus key={key} statement={statement} />);
+        break;
+      case "fivem_and_records":
+        rows.push(<Records key={key} statement={statement} />);
+        break;
+    }
+  }
+  return <>{rows}</>;
 }
 
 /** ADR 0061's statement: FiveM's side, one line per record, and the causes in full. */

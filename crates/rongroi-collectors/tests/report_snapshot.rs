@@ -874,17 +874,30 @@ fn trace_ages_limited_ss_view() {
     }
     // No ADR 0061 statement; Legacy's FiveM.exe is present, nothing runs and neither Prefetch nor BAM
     // was read, so its session is "not known" (ADR 0062 section 5) — never compared with the scan.
+    // SS mode lists a Defender-tagged row on this host, so the antivirus statement correctly appears
+    // (ADR 0090 section 5).
     assert_eq!(
         view.cross_source,
-        vec![view::CrossSourceStatement::Session(
-            view::SessionStatement {
+        vec![
+            view::CrossSourceStatement::Session(view::SessionStatement {
                 edition: "legacy".to_owned(),
                 state: view::SessionState::NotKnown {
                     prefetch: UnmeasuredReason::NotAdmin,
                     bam: UnmeasuredReason::NotAdmin,
                 },
-            }
-        )]
+            }),
+            view::CrossSourceStatement::Antivirus(view::AntivirusStatement {
+                products: vec![view::AntivirusLine {
+                    display_name: "Antivirus Microsoft Defender".to_owned(),
+                    state: "on".to_owned(),
+                    state_value: None,
+                    signature: None,
+                    signer: None,
+                    file_unread: Some("not_drive_rooted".to_owned()),
+                }],
+                not_read: None,
+            }),
+        ]
     );
     let journal = report
         .header
