@@ -198,11 +198,11 @@ fn the_written_visual_hash_is_the_hash_of_the_written_bytes_without_itself() {
 #[test]
 fn a_set_binding_and_policy_are_carried_whole_and_count_in_the_visual_hash() {
     let binding = Binding {
-        server_origin: "http://203.0.113.10:30130".to_owned(),
+        server_origin: Some("http://203.0.113.10:30130".to_owned()),
         ticket: "9f82c4e1b07a412891d604e38a291bf0".to_owned(),
         nonce: "c4b82e91024a".to_owned(),
-        issued_at: "2026-01-01T00:00:00Z".to_owned(),
-        expires_at: "2026-01-01T00:05:00Z".to_owned(),
+        issued_at: Some("2026-01-01T00:00:00Z".to_owned()),
+        expires_at: Some("2026-01-01T00:05:00Z".to_owned()),
     };
     let policy = Policy {
         profile: Profile::Posture,
