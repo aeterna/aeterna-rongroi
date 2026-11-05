@@ -151,7 +151,7 @@ A Schema 2 record has the following shape:
 1. **Separation of Privilege:**
    - The user-facing Electron shell (`rongroi-connect.exe`) runs as a standard, non-elevated user process. It does NOT request or require UAC elevation.
    - When policy requires administrative privileges (specifically for the `defender_exclusion` collector, or standard USN/event collectors), the shell invokes the sidecar (`rongroi-scan.exe`) with the `--elevate` flag using the established `elevate::relaunch_elevated` mechanism (ADR 0012).
-   - If the player declines UAC (clicks "No"), the sidecar immediately terminates with exit code 3 (`declined`). Connect intercepts this code and reports `{ "scan": "declined" }` to the server without freezing or timing out. The player may also decline on the consent screen, before any scan; Connect sends the same answer. The answer travels in the envelope of section 5 to `POST /<resource>/report`, like a report.
+   - If the player declines UAC (clicks "No"), the sidecar immediately terminates with exit code 3 (`declined`). Connect intercepts this code and reports `{ "scan": "declined", "binding": { "ticket": …, "nonce": … } }` to the server without freezing or timing out. The player may also decline on the consent screen, before any scan; Connect sends the same answer. The `binding` is what lets section 5 check the nonce on an answer as it does on a report. The answer travels in the envelope of section 5 to `POST /<resource>/report`, like a report.
 2. **Local IPC via Windows Named Pipe:**
    - Data transfer between the elevated sidecar and non-elevated Connect occurs strictly in memory over a random named pipe: `\\.\pipe\rongroi-<32hex>`. Connect creates the pipe and passes `binding` and `policy` over it; the sidecar builds the whole Schema 2 record with `rongroi-core`, `visual_hash` included, and writes it back. The ticket never appears on a command line.
    - The pipe security descriptor (ACL) restricts access exclusively to the current user SID and administrative tokens, rejecting remote connections (`PIPE_REJECT_REMOTE_CLIENTS`).
@@ -208,13 +208,13 @@ What travels is the encrypted envelope of section 5, not the plain JSON, and the
    | `409` | ticket consumed by a different envelope | no |
    | `410` | ticket expired | no |
    | `413` | over a size limit | no |
-   | `422` | hash mismatch, or the envelope does not authenticate | restart the upload while the ticket is valid |
+   | `422` | hash mismatch, the envelope does not authenticate, or an authentic record with the wrong `binding` or schema | restart the upload while the ticket is valid |
    | `429` | rate limited, with `Retry-After` | after `Retry-After` |
+   | `500` | Server Kit could not store the report; the ticket stays unconsumed | restart the upload while the ticket is valid |
 
    A direct `POST` whose reply is lost is retried like a slice; the `200` on a repeat makes that safe.
 4. **Server-Side Storage Strategy:**
-   - **Legacy FXServer:** Reports may be stored in Resource KVP (write latency measured at 17–27 ms).
-   - **Enhanced FXServer:** Reports MUST NOT be written synchronously to Resource KVP (write latency measured at 192–222 ms due to SQLite disk sync). Server Kit writes the decrypted, validated record to a file in its own resource folder (`<resource>/cache/rongroi-reports/<ticket>.json`, because `SaveResourceFile` writes only inside the resource folder; its write latency on Enhanced is unverified and measured in lane 2b) or asynchronously into the server database (`oxmysql`, used only when the server runs it; nakara-oss hard rule 5 must allow it first).
+   - Server Kit's ADR 0001, section 4, decides this and holds the measurements. On Legacy, reports, cases and the index are in Resource KVP. On Enhanced they are files in `<resource>/cache/rongroi-reports/`, because `SaveResourceFile` writes only inside the resource folder and a small KVP write there blocks a tick for about 30 ms against about 8 ms for a small file. v1 has no database backend.
 
 ---
 
@@ -230,7 +230,7 @@ The owner decided (Q8) that reports are encrypted at the message level with a ke
 5. **Single-use ticket:** the states are `issued`, `uploading`, `consumed` and `expired`.
    - `issued → uploading` when Server Kit accepts a direct `POST` or a first slice, only while the server's clock is before `expires_at`. An upload that started in time may finish while its buffer stays within the idle limit.
    - `uploading → issued` when every open buffer for the ticket is dropped: idle limit reached, `422`, or an envelope that does not authenticate. A failed upload never consumes the ticket.
-   - `→ consumed` only when an envelope authenticates (AES-GCM succeeds) and the record's nonce equals the one issued, for a report or a `{ "scan": "declined" }` answer. Only an authenticated envelope changes the ticket to `consumed`.
+   - `→ consumed` only when an envelope authenticates (AES-GCM succeeds) and the record's nonce equals the one issued, for a report or a declined answer, and the server has stored it. Only an authenticated envelope changes the ticket to `consumed`.
    - `issued → expired` at `expires_at` by the server's clock.
    - Any upload for a consumed ticket gets `409`, unless it repeats the accepted envelope (`200`), and is logged on the case. Staff open a new case to scan again.
 6. **Two paths, two rules.**

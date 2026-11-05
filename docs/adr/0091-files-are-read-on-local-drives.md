@@ -1,6 +1,7 @@
 # ADR 0091 — Files are read on local drives only
 
-- Status: proposed — the owner chose on 2026-11-01 to treat this as hardening in a normal pull request
+- Status: accepted — the owner chose on 2026-11-01 to treat this as hardening in a normal pull request and ordered the merge
+- Amended: 2026-11-05, the owner set section 4's probe for before the next release; Claude Code - Claude Opus 5.5
 - Date: 2026-11-01
 - Related: AGENTS.md hard rule 1 (no network) and hard rule 2 (read-only), ADR 0019 (reading file bytes),
   ADR 0030 (the reasons), ADR 0035 (`signature`), ADR 0048 and ADR 0060 (`is_refused_form`), ADR 0079
@@ -99,7 +100,7 @@ listing that tells "missing" from "unreadable" is refused the same way.
 
 - That `GetFileAttributesW` and `FSCTL_GET_REPARSE_POINT` on a link to a share do not reach the network. They
   read the link's own record on the local volume; a probe on the lab machine with a junction to a share
-  confirms it before release.
+  confirms it before the next release.
 - That `GetDriveTypeW` on a mapped drive answers without contacting the server.
 - Which attribute bits Windows' placeholder compatibility mode leaves visible to this program. If it hid the
   recall and offline bits as well as the reparse attribute, a placeholder whose data is not on the disk would
