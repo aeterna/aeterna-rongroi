@@ -135,7 +135,8 @@ pub struct HiddenCounts {
     /// so the only ones counted here are the `not_admin` results the scope statement carries.
     pub unmeasured_unexpected: usize,
     /// Unmatched observations. SS mode counts them instead of listing them (ADR 0014), except
-    /// `antivirus_product`, whose facts the cross-source statement carries (ADR 0090 section 5).
+    /// `antivirus_product`, whose rows never change a count whether or not its statement shows
+    /// (ADR 0090 section 5, hard rule 9).
     pub unmatched: usize,
 }
 
@@ -488,8 +489,8 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             // Counted, never listed. SS mode promises the person being screenshared that only what
             // matches a rule is shown; a raw listing of every file and process name a collector saw
             // would break that promise, and no redaction pass makes such a listing safe (ADR 0014).
-            // The antivirus products are shown by their own statement, so their observations are
-            // neither listed nor counted again as unmatched (ADR 0090 section 5).
+            // The antivirus products stay out of the count whether or not their statement shows, so
+            // that what is registered never changes a count (ADR 0090 section 5, hard rule 9).
             hidden.unmatched = report
                 .unmatched
                 .iter()
@@ -1262,7 +1263,7 @@ fn antivirus_statement(report: &Report, mode: Mode) -> Option<AntivirusStatement
         .iter()
         .filter_map(|observation| {
             // The summary row names no product; everything else is one product.
-            let display_name = text(observation, "display_name")?;
+            let display_name = shown_display_name(&text(observation, "display_name")?);
             Some(AntivirusLine {
                 display_name,
                 state: text(observation, "state").unwrap_or_default(),
@@ -1280,6 +1281,42 @@ fn antivirus_statement(report: &Report, mode: Mode) -> Option<AntivirusStatement
         products,
         not_read: None,
     })
+}
+
+/// A product's registered name, safe to show: every control or format character becomes U+FFFD, then
+/// the name is cut to 128 characters with `…` when it was longer. A newline or a bidi override there
+/// could forge a line or reorder what a reader sees, and the registering program chooses the name.
+fn shown_display_name(name: &str) -> String {
+    let mut shown: String = name
+        .chars()
+        .map(|character| {
+            if character.is_control() || is_format_character(character) {
+                '\u{FFFD}'
+            } else {
+                character
+            }
+        })
+        .collect();
+    if shown.chars().count() > 128 {
+        shown = shown.chars().take(128).collect();
+        shown.push('…');
+    }
+    shown
+}
+
+/// The format characters a registered name must not keep: the invisible ones that can reorder or
+/// join text.
+fn is_format_character(character: char) -> bool {
+    matches!(
+        character,
+        '\u{00AD}'
+            | '\u{061C}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{FEFF}'
+    )
 }
 
 /// Why the antivirus list could not be read, from the evidence row of the rule that reads it.
@@ -4424,6 +4461,76 @@ mod tests {
         report
     }
 
+    /// A report from the real embedded bundle: one measured `antivirus_product` run holding one
+    /// third-party product, plus `os_image` saying the Defender service is disabled when asked, so
+    /// that a Defender-tagged rule is found in both modes.
+    fn engine_antivirus_report(products_on: usize, defender_service_disabled: bool) -> Report {
+        let state = if products_on == 0 { "off" } else { "on" };
+        let mut runs = vec![CollectorRun::Measured {
+            collector: "antivirus_product".to_owned(),
+            observations: vec![
+                number_observation(
+                    "antivirus_product",
+                    &[
+                        ("products", serde_json::json!(1)),
+                        ("products_on", serde_json::json!(products_on)),
+                    ],
+                ),
+                antivirus_product("Example Antivirus", state, &[]),
+            ],
+            gaps: BTreeMap::new(),
+            discriminator_gaps: Vec::new(),
+        }];
+        if defender_service_disabled {
+            runs.push(CollectorRun::Measured {
+                collector: "os_image".to_owned(),
+                observations: vec![observed("os_image", &[("service_windefend", "disabled")])],
+                gaps: BTreeMap::new(),
+                discriminator_gaps: Vec::new(),
+            });
+        }
+        let mut report = crate::engine::evaluate(
+            &crate::bundle::Bundle::embedded().expect("the embedded bundle"),
+            &runs,
+            header(),
+            &crate::engine::SelfIdentity::default(),
+        );
+        // A rule whose collector is not in `runs` comes back `collector_unavailable`. These tests
+        // name their runs, so drop those rows rather than let one stand for a Defender row a real
+        // scan would have run and answered.
+        report.evidence.retain(|item| {
+            !matches!(
+                item.state,
+                EvidenceState::Unmeasured { reason: UnmeasuredReason::CollectorUnavailable, .. }
+            )
+        });
+        report
+    }
+
+    /// A measured third-party product `on` makes `no-product-reports-on` `not_found`; it is not a
+    /// Defender row, so SS mode shows no statement while Self mode shows it (ADR 0090 section 5).
+    #[test]
+    fn a_measured_third_party_product_on_shows_the_statement_in_self_mode_only() {
+        let report = engine_antivirus_report(1, false);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("Self mode shows the statement");
+        assert_eq!(statement.products.len(), 1);
+        assert_eq!(statement.products[0].state, "on");
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
+    /// `products_on: 0` makes the rule `found`, but it is still not a Defender row: SS mode shows no
+    /// statement while Self mode shows it.
+    #[test]
+    fn a_measured_zero_products_on_shows_the_statement_in_self_mode_only() {
+        let report = engine_antivirus_report(0, false);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("Self mode shows the statement");
+        assert_eq!(statement.products.len(), 1);
+        assert_eq!(statement.products[0].state, "off");
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
     /// Neither reason that means this PC has no such list makes a statement.
     #[test]
     fn not_windows_and_not_on_this_os_give_no_antivirus_statement() {
@@ -4434,6 +4541,33 @@ mod tests {
                 "{reason:?}"
             );
         }
+    }
+
+    /// A registered name can carry a bidi override or a newline, and a name too long is cut with an
+    /// ellipsis; none of those reaches a reader.
+    #[test]
+    fn a_registered_name_is_made_safe_and_cut() {
+        assert_eq!(shown_display_name("a\u{202E}b"), "a\u{FFFD}b");
+        assert_eq!(shown_display_name("a\nb"), "a\u{FFFD}b");
+        let long = "x".repeat(300);
+        let shown = shown_display_name(&long);
+        assert_eq!(shown.chars().count(), 129);
+        assert_eq!(shown.chars().take(128).collect::<String>(), "x".repeat(128));
+        assert!(shown.ends_with('…'));
+
+        // The statement uses it, while the observation stays as the collector read it.
+        let name = "a\u{202E}b\nc";
+        let report = antivirus_report(vec![antivirus_product(name, "on", &[])], None);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the statement is shown");
+        assert_eq!(statement.products[0].display_name, "a\u{FFFD}b\u{FFFD}c");
+        assert_eq!(
+            report.unmatched[0].observations[1]
+                .fields
+                .get("display_name")
+                .and_then(serde_json::Value::as_str),
+            Some(name)
+        );
     }
 
     /// No field of the statement carries the product's path, in either mode (ADR 0090 section 5).
@@ -4463,18 +4597,27 @@ mod tests {
         }
     }
 
-    /// Rule 9: the same Defender rows found, once with an empty list and once with a third-party
-    /// product `on`. Every Defender row, every count and their order are the same; only the
-    /// cross-source statement differs.
+    /// Rule 9 (ADR 0090 section 5): the same Defender rows found through the real bundle, once with
+    /// an empty list and once with a third-party product `on`, and a Defender row listed in both
+    /// modes. Every Defender row, every count and their order are the same; only the cross-source
+    /// statement differs.
     #[test]
     fn the_defender_rows_do_not_change_when_the_antivirus_list_changes() {
-        let without = defender_report(Vec::new());
-        let with = defender_report(vec![antivirus_product("Example Antivirus", "on", &[])]);
+        let without = engine_antivirus_report(0, true);
+        let with = engine_antivirus_report(1, true);
         for mode in [Mode::SelfCheck, Mode::Ss] {
             let empty = for_mode(&without, mode);
             let listed = for_mode(&with, mode);
-            assert_eq!(empty.evidence, listed.evidence, "{mode:?}");
-            assert_eq!(empty.listed, listed.listed, "{mode:?}");
+            let defender_rows = |view: &ReportView| {
+                view.evidence
+                    .iter()
+                    .filter(|item| item.collector != "antivirus_product")
+                    .cloned()
+                    .collect::<Vec<Evidence>>()
+            };
+            let rows = defender_rows(&empty);
+            assert_eq!(rows, defender_rows(&listed), "{mode:?}");
+            assert_eq!(listed_counts(&rows), listed_counts(&defender_rows(&listed)), "{mode:?}");
             assert_eq!(empty.hidden, listed.hidden, "{mode:?}");
             assert_eq!(empty.scope, listed.scope, "{mode:?}");
             let order = |view: &ReportView| {
@@ -4483,6 +4626,16 @@ mod tests {
                     .map(|item| item.rule_id.clone())
                     .collect::<Vec<_>>()
             };
+            // Only the no-product rule's own row moves between `found` and `not_found`.
+            let differing: Vec<&Evidence> = empty
+                .evidence
+                .iter()
+                .zip(&listed.evidence)
+                .filter(|(a, b)| a != b)
+                .map(|(a, _)| a)
+                .collect();
+            assert_eq!(differing.len(), 1, "{mode:?}");
+            assert_eq!(differing[0].collector, "antivirus_product", "{mode:?}");
             assert_eq!(order(&empty), order(&listed), "{mode:?}");
             assert_ne!(empty.cross_source, listed.cross_source, "{mode:?}");
             assert!(

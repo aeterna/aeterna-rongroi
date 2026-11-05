@@ -27,4 +27,4 @@ references:
   - https://learn.microsoft.com/en-us/windows/win32/api/iwscapi/nn-iwscapi-iwscproductlist
 author: aeterna-rongroi contributors
 date: 2026-11-05
-tags: [posture, antivirus_product, defender]
+tags: [posture, antivirus_product]

@@ -340,8 +340,8 @@ function Antivirus({ statement }: { statement: AntivirusStatement }) {
       <h3 id="antivirus-title">{t("antivirus.title")}</h3>
       {statement.products.length > 0 && (
         <ul>
-          {statement.products.map((product) => (
-            <li key={`${product.display_name}:${product.state}`}>
+          {statement.products.map((product, index) => (
+            <li key={index}>
               {product.display_name}: {antivirusState(t, product)}
               {product.signature && (
                 <span className="muted">
@@ -369,7 +369,7 @@ function Antivirus({ statement }: { statement: AntivirusStatement }) {
       )}
       {statement.products.length === 0 &&
         (statement.not_read ? (
-          <p>{notRead(t, statement.not_read)}</p>
+          <p>{t("antivirus.not_read", { reason: t(`reason.${statement.not_read}`) })}</p>
         ) : (
           <p>{t("antivirus.none")}</p>
         ))}

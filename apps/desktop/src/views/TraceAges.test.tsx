@@ -69,10 +69,13 @@ describe("CrossSource's antivirus statement", () => {
       name: "not read",
       statement: { kind: "antivirus", products: [], not_read: "read_failed" },
       expected: [
-        "not read — this could not be read",
+        "The list could not be read: this could not be read.",
         "A product listed here is what is registered with Windows, not proof that it scans.",
       ],
-      absent: ["Security Center lists no antivirus product."],
+      absent: [
+        "Security Center lists no antivirus product.",
+        "not read — this could not be read",
+      ],
     },
   ];
 
