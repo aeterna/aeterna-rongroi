@@ -4501,7 +4501,10 @@ mod tests {
         report.evidence.retain(|item| {
             !matches!(
                 item.state,
-                EvidenceState::Unmeasured { reason: UnmeasuredReason::CollectorUnavailable, .. }
+                EvidenceState::Unmeasured {
+                    reason: UnmeasuredReason::CollectorUnavailable,
+                    ..
+                }
             )
         });
         report
@@ -4617,7 +4620,11 @@ mod tests {
             };
             let rows = defender_rows(&empty);
             assert_eq!(rows, defender_rows(&listed), "{mode:?}");
-            assert_eq!(listed_counts(&rows), listed_counts(&defender_rows(&listed)), "{mode:?}");
+            assert_eq!(
+                listed_counts(&rows),
+                listed_counts(&defender_rows(&listed)),
+                "{mode:?}"
+            );
             assert_eq!(empty.hidden, listed.hidden, "{mode:?}");
             assert_eq!(empty.scope, listed.scope, "{mode:?}");
             let order = |view: &ReportView| {
