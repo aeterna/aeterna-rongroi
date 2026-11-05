@@ -17,6 +17,12 @@ elevated: false
 env:
   LOCALAPPDATA: 'C:\Users\fixtureuser\AppData\Local'
   APPDATA: 'C:\Users\fixtureuser\AppData\Roaming'
+# The antivirus products Windows Security Center lists (ADR 0090): Defender, reporting itself on,
+# with the `windowsdefender:` URI A0 measured instead of a program file.
+antivirus_products:
+  - display_name: Antivirus Microsoft Defender
+    state: 0
+    remediation_path: "windowsdefender://"
 # Microsoft Defender's exclusions are refused to a token without administrator rights, as measured on a
 # runner and a Windows 11 PC (ADR 0060), so `defender_exclusion` is `not_admin` here.
 access_denied:

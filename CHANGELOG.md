@@ -7,6 +7,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 - The landing page shows one example scan end in three kinds of evidence and no verdict, with a slider that shows what "not found" can and cannot say. With JavaScript off or reduced motion the finished picture stands.
+- The `antivirus_product` collector lists the antivirus products Windows Security Center reports, each product's self-reported state, and, when its path is a local file, that file's SHA-256 and signature (ADR 0090).
 
 ### Changed
 - The landing page's sample leans with the scroll and the pointer instead of floating on a loop, and the promise cards take a soft light under the pointer; both are off when the visitor asks for less motion.

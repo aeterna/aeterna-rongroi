@@ -102,6 +102,7 @@
     "posture": "Security settings of this PC",
     "powershell_text": "PowerShell's commands, as kinds of words",
     "driver_service": "Drivers registered with Windows",
+    "antivirus_product": "Antivirus products Windows lists",
     "autostart": "Programs that start by themselves (services, Run, scheduled tasks)",
     "defender_exclusion": "Microsoft Defender exclusions",
     "fivem_dir": "FiveM files",

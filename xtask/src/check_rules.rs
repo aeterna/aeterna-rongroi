@@ -1139,11 +1139,12 @@ date: 2026-09-11
         };
 
         for (reason, owners) in [
-            ("not_on_this_os", &["pca"] as &[&str]),
+            ("not_on_this_os", &["antivirus_product", "pca"] as &[&str]),
             ("service_disabled", &["prefetch"]),
             (
                 "budget_spent",
                 &[
+                    "antivirus_product",
                     "autostart",
                     "driver_service",
                     "event_fields",
@@ -1156,6 +1157,7 @@ date: 2026-09-11
             (
                 "not_attempted",
                 &[
+                    "antivirus_product",
                     "autostart",
                     "bam",
                     "driver_service",
