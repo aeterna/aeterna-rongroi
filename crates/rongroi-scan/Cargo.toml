@@ -23,6 +23,8 @@ path = "src/main.rs"
 [dependencies]
 rongroi-core.workspace = true
 rongroi-collectors.workspace = true
+rongroi-host.workspace = true
+rongroi-host-windows.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 jiff.workspace = true

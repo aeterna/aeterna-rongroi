@@ -3172,6 +3172,7 @@ dependencies = [
  "rongroi-collectors",
  "rongroi-core",
  "rongroi-host",
+ "rongroi-host-windows",
  "serde",
  "serde_json",
  "thiserror 2.0.20",

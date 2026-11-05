@@ -192,16 +192,28 @@ mod tests {
         assert_eq!(parse_args(args(&[])), Err(ParseError::Pipe));
         assert_eq!(parse_args(args(&["--pipe"])), Err(ParseError::Pipe));
         assert_eq!(parse_args(args(&["--elevate"])), Err(ParseError::Pipe));
-        assert_eq!(parse_args(args(&["--pipe", PIPE, "--pipe", PIPE])), Err(ParseError::Pipe));
-        assert_eq!(parse_args(args(&["--pipe", PIPE, "--unknown"])), Err(ParseError::Unknown));
-        assert_eq!(parse_args(args(&["--pipe", PIPE, "extra"])), Err(ParseError::Unknown));
+        assert_eq!(
+            parse_args(args(&["--pipe", PIPE, "--pipe", PIPE])),
+            Err(ParseError::Pipe)
+        );
+        assert_eq!(
+            parse_args(args(&["--pipe", PIPE, "--unknown"])),
+            Err(ParseError::Unknown)
+        );
+        assert_eq!(
+            parse_args(args(&["--pipe", PIPE, "extra"])),
+            Err(ParseError::Unknown)
+        );
         let pause = args(&["--pipe", PIPE, "--pause-at-exit"]);
         assert_eq!(parse_args(pause), Err(ParseError::Unknown));
     }
 
     #[test]
     fn the_elevated_copy_keeps_the_pipe_and_drops_elevate() {
-        assert_eq!(elevated_args(args(&["--elevate", "--pipe", PIPE])), args(&["--pipe", PIPE]));
+        assert_eq!(
+            elevated_args(args(&["--elevate", "--pipe", PIPE])),
+            args(&["--pipe", PIPE])
+        );
     }
 
     #[test]
@@ -226,7 +238,10 @@ mod tests {
 
     #[test]
     fn a_declined_prompt_prints_the_declined_line_and_exits_three() {
-        assert_eq!(elevate_report(Err(ElevateError::Declined)), (r#"{"elevate":"declined"}"#, 3));
+        assert_eq!(
+            elevate_report(Err(ElevateError::Declined)),
+            (r#"{"elevate":"declined"}"#, 3)
+        );
     }
 
     #[test]

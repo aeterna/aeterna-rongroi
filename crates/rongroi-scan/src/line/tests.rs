@@ -169,20 +169,14 @@ fn a_deadline_before_the_budget_expires_is_kept() {
     let started = Instant::now();
     let budget = Duration::from_secs(10);
     let now = started + Duration::from_secs(9);
-    assert_eq!(
-        retry_deadline(started, now, budget),
-        Some(started + budget)
-    );
+    assert_eq!(retry_deadline(started, now, budget), Some(started + budget));
 }
 
 #[test]
 fn the_deadline_itself_is_not_retried() {
     let started = Instant::now();
     let budget = Duration::from_secs(10);
-    assert_eq!(
-        retry_deadline(started, started + budget, budget),
-        None
-    );
+    assert_eq!(retry_deadline(started, started + budget, budget), None);
 }
 
 #[test]
@@ -198,8 +192,5 @@ fn a_time_after_the_deadline_is_not_retried() {
 #[test]
 fn a_zero_budget_has_no_deadline() {
     let started = Instant::now();
-    assert_eq!(
-        retry_deadline(started, started, Duration::ZERO),
-        None
-    );
+    assert_eq!(retry_deadline(started, started, Duration::ZERO), None);
 }

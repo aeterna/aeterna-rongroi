@@ -36,7 +36,10 @@ fn a_bad_pipe_name_exits_1_before_anything_else() {
             assert_eq!(output.status.code(), Some(1), "{name:?} {extra:?}");
             assert!(output.stdout.is_empty(), "{name:?} {extra:?}");
             let stderr = String::from_utf8(output.stderr).expect("standard error is UTF-8");
-            assert!(stderr.contains("arguments were refused"), "{name:?} {extra:?}: {stderr}");
+            assert!(
+                stderr.contains("arguments were refused"),
+                "{name:?} {extra:?}: {stderr}"
+            );
         }
     }
 }
@@ -56,7 +59,10 @@ fn a_missing_or_unknown_argument_exits_1() {
         assert_eq!(output.status.code(), Some(1), "{args:?}");
         assert!(output.stdout.is_empty(), "{args:?}");
         let stderr = String::from_utf8(output.stderr).expect("standard error is UTF-8");
-        assert!(stderr.contains("arguments were refused"), "{args:?}: {stderr}");
+        assert!(
+            stderr.contains("arguments were refused"),
+            "{args:?}: {stderr}"
+        );
     }
 }
 
