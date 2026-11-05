@@ -21,6 +21,8 @@ disallowed-types = [
 # accepts only the two read codes and carries the one `#[allow]`. `CreateFileW` opens for writing and creates files
 # as readily as it opens for reading; it is called in one function, `usn_journal::live::open`, which accepts only
 # `GENERIC_READ` or `FILE_READ_ATTRIBUTES` on an existing path and carries the one `#[allow]`.
+# ADR 0090: Security Center's list is read, never changed. Registering for changes, asking for
+# notifications and setting a default product all mutate what Security Center holds, so they are banned.
 disallowed-methods = [
   { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableA", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
   { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableW", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
@@ -28,4 +30,8 @@ disallowed-methods = [
   { path = "windows::Win32::System::WindowsProgramming::SetFirmwareEnvironmentVariableExW", reason = "collectors are read-only; ADR 0038 allows reading firmware variables, never writing them" },
   { path = "windows::Win32::System::IO::DeviceIoControl", reason = "collectors are read-only; ADR 0047 allows only the two change-journal read codes, through usn_journal::live::control" },
   { path = "windows::Win32::Storage::FileSystem::CreateFileW", reason = "collectors are read-only; ADR 0047 opens a volume or folder only with GENERIC_READ or FILE_READ_ATTRIBUTES, through usn_journal::live::open" },
+  { path = "windows::Win32::System::SecurityCenter::WscRegisterForChanges", reason = "ADR 0090: this program reads Security Center's list and never registers with it or changes it" },
+  { path = "windows::Win32::System::SecurityCenter::WscRegisterForUserNotifications", reason = "ADR 0090: this program reads Security Center's list and never registers with it or changes it" },
+  { path = "windows::Win32::System::SecurityCenter::WscUnRegisterChanges", reason = "ADR 0090: this program reads Security Center's list and never registers with it or changes it" },
+  { path = "windows::Win32::System::SecurityCenter::IWSCDefaultProduct::SetDefaultProduct", reason = "ADR 0090: this program reads Security Center's list and never registers with it or changes it" },
 ]

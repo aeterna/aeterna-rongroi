@@ -11,13 +11,13 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
-    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap,
-    DriveMapEntry, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
-    FirmwareSecureBoot, FirmwareSource, Host, IommuTable, LinkKind, LinkTarget, Platform,
-    ProcessRecord, ProcessSource, RegistryData, RegistrySource, SignatureCheck, SignatureSource,
-    SourceError, SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource,
-    UsnJournalState, UsnReadEnd,
+    AccountSource, AntivirusProductRecord, AntivirusProductSource, BootTimeSource, ChannelConfig,
+    ChannelConfigReader, CodeIntegrityOptions, DeviceBus, DeviceProperty, DeviceRecord,
+    DeviceSource, DirEntryInfo, DriveKind, DriveMap, DriveMapEntry, EntryTimes, EnvironmentSource,
+    EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot, FirmwareSource, Host,
+    IommuTable, LinkKind, LinkTarget, Platform, ProcessRecord, ProcessSource, RegistryData,
+    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
+    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -62,6 +62,11 @@ struct HostFile {
     code_integrity: Option<FixtureCodeIntegrity>,
     #[serde(default)]
     tpm: Option<FixtureTpm>,
+    /// The antivirus products Windows Security Center lists (ADR 0090). Absent means the fixture never
+    /// modelled them, which the accessor reports as `Unsupported`; an empty list is the deliberate
+    /// claim that Security Center lists none.
+    #[serde(default)]
+    antivirus_products: Option<Vec<FixtureAntivirusProduct>>,
     #[serde(default)]
     firmware: Option<FixtureFirmware>,
     /// What the firmware's ACPI tables say about an IOMMU (ADR 0038, amendment of 2026-10-15). Absent
@@ -317,6 +322,19 @@ struct FixtureTpm {
     present: bool,
     #[serde(default)]
     spec_version: Option<String>,
+}
+
+/// One antivirus product a fixture describes as Windows Security Center lists it (ADR 0090).
+///
+/// `state` is the raw `WSC_SECURITY_PRODUCT_STATE` value and `remediation_path` is the string as
+/// given; the host carries both through without interpreting them.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureAntivirusProduct {
+    display_name: String,
+    state: i32,
+    #[serde(default)]
+    remediation_path: String,
 }
 
 /// The firmware a fixture describes (ADR 0038). Absent means the fixture never modelled it, which the
@@ -1220,6 +1238,8 @@ pub struct FixtureHost {
     access_denied: Vec<String>,
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
+    /// The products the fixture wrote under `antivirus_products:`, or `None` when it modelled none.
+    antivirus_products: Option<Vec<AntivirusProductRecord>>,
     firmware: Option<FixtureFirmware>,
     iommu_table: Option<FixtureIommuTable>,
     processes: Option<Vec<ProcessRecord>>,
@@ -1346,6 +1366,16 @@ impl FixtureHost {
                 .collect(),
             code_integrity: file.code_integrity,
             tpm: file.tpm,
+            antivirus_products: file.antivirus_products.map(|described| {
+                described
+                    .into_iter()
+                    .map(|product| AntivirusProductRecord {
+                        display_name: product.display_name,
+                        state: product.state,
+                        remediation_path: product.remediation_path,
+                    })
+                    .collect()
+            }),
             firmware: file.firmware,
             iommu_table: file.iommu_table,
             processes: file
@@ -1788,6 +1818,21 @@ impl TpmSource for FixtureHost {
         Ok(TpmInfo {
             present: described.present,
             spec_version: described.spec_version.clone(),
+        })
+    }
+}
+
+impl AntivirusProductSource for FixtureHost {
+    /// The products the fixture lists, in file order.
+    ///
+    /// No `antivirus_products:` block is `Unsupported`, never an empty list: a fixture written before
+    /// this source existed never modelled Security Center's list, and an empty list is the deliberate
+    /// claim that Security Center lists no product (ADR 0090 section 4).
+    fn antivirus_products(&self) -> Result<Vec<AntivirusProductRecord>, SourceError> {
+        self.antivirus_products.clone().ok_or_else(|| {
+            SourceError::Unsupported(
+                "this fixture host does not describe antivirus products".to_owned(),
+            )
         })
     }
 }
@@ -2993,6 +3038,72 @@ processes:
         let host =
             FixtureHost::from_yaml_str("platform: windows\nprocesses: []\n", "inline").unwrap();
         assert_eq!(host.running_processes(), Ok(vec![]));
+    }
+
+    /// No `antivirus_products:` block never modelled Security Center's list, so it is `Unsupported`
+    /// rather than an empty list, which would claim the machine has none (ADR 0090 section 4).
+    #[test]
+    fn a_fixture_without_an_antivirus_products_block_is_unsupported() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            host.antivirus_products(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// Writing the block with nothing in it is the deliberate claim that Security Center lists no
+    /// product, unlike leaving it out.
+    #[test]
+    fn an_explicitly_empty_antivirus_product_list_is_an_answer() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nantivirus_products: []\n", "inline")
+                .unwrap();
+        assert_eq!(host.antivirus_products(), Ok(vec![]));
+    }
+
+    /// The list keeps the order the fixture wrote, and every value reaches the caller unchanged:
+    /// `remediation_path` is as written, and empty when the fixture leaves it out.
+    #[test]
+    fn antivirus_products_keep_their_order_and_values() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+antivirus_products:
+  - display_name: 'Antivirus Microsoft Defender'
+    state: 0
+    remediation_path: 'windowsdefender://threat'
+  - display_name: 'Example Antivirus'
+    state: 1
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(vec![
+                AntivirusProductRecord {
+                    display_name: "Antivirus Microsoft Defender".to_owned(),
+                    state: 0,
+                    remediation_path: "windowsdefender://threat".to_owned(),
+                },
+                AntivirusProductRecord {
+                    display_name: "Example Antivirus".to_owned(),
+                    state: 1,
+                    remediation_path: String::new(),
+                },
+            ])
+        );
+    }
+
+    /// Every fixture block refuses a key no host reads, and an antivirus product does too.
+    #[test]
+    fn an_antivirus_product_with_an_unknown_field_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nantivirus_products:\n  - display_name: 'Example Antivirus'\n    state: 0\n    bogus: true\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
     }
 
     #[test]
