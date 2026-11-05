@@ -275,7 +275,7 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
 ///
 /// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
 /// name the thing that was not seen and never the person, and say it about the record or about this
-/// program rather than about the machine's owner. The same fourteen strings are in
+/// program rather than about the machine's owner. The same fifteen strings are in
 /// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
 /// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
 /// `check-locales` there.
@@ -301,6 +301,12 @@ pub(crate) fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
             "the Windows service that writes this record is switched off"
         }
         (Lang::Th, UnmeasuredReason::ServiceDisabled) => "บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่",
+        (Lang::En, UnmeasuredReason::ServiceNotRunning) => {
+            "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it"
+        }
+        (Lang::Th, UnmeasuredReason::ServiceNotRunning) => {
+            "บริการของ Windows ที่ตอบเรื่องนี้ไม่ได้ทำงานอยู่ อาจกำลังเริ่มทำงาน การสแกนอีกครั้งภายหลังอาจอ่านได้"
+        }
         (Lang::En, UnmeasuredReason::SourceAbsent) => "this PC has no such record to read",
         (Lang::Th, UnmeasuredReason::SourceAbsent) => "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน",
         (Lang::En, UnmeasuredReason::SourceEmpty) => {

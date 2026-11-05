@@ -27,13 +27,14 @@ pub struct Observation {
 
 /// Why a collector, or one field of it, could not look.
 ///
-/// Fourteen reasons, and the split between them is the whole of how this program distinguishes "we
-/// checked and there was nothing" from "we could not check". Four of them — [`Self::NotOnThisOs`],
-/// [`Self::ServiceDisabled`], [`Self::SourceAbsent`] and [`Self::SourceEmpty`] — describe a machine
-/// that is behaving exactly as Windows ships it, and a fifth, [`Self::OtherVolume`], one whose owner
-/// put a folder on another drive. ADR 0030 records, for each one, the ordinary condition that
-/// produces it and how common that condition is. A reason that fires on an ordinary machine is worse
-/// than no reason at all, so none of them may be read as a finding.
+/// Fifteen reasons, and the split between them is the whole of how this program distinguishes "we
+/// checked and there was nothing" from "we could not check". Five of them — [`Self::NotOnThisOs`],
+/// [`Self::ServiceDisabled`], [`Self::ServiceNotRunning`], [`Self::SourceAbsent`] and
+/// [`Self::SourceEmpty`] — describe a machine that is behaving exactly as Windows ships it, and a
+/// sixth, [`Self::OtherVolume`], one whose owner put a folder on another drive. ADR 0030 records, for
+/// each one, the ordinary condition that produces it and how common that condition is. A reason that
+/// fires on an ordinary machine is worse than no reason at all, so none of them may be read as a
+/// finding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UnmeasuredReason {
@@ -61,6 +62,12 @@ pub enum UnmeasuredReason {
     /// Not "somebody removed the record": a machine whose `EnablePrefetcher` is `0` or `2` is one
     /// where Windows never wrote an application-launch record to remove (ADR 0030).
     ServiceDisabled,
+    /// The Windows service that answers this is not running.
+    ///
+    /// Measured on the lab machine 75 s after boot, with Security Center's service still starting:
+    /// the same question answered once it had started. It is a read that may succeed later, never a
+    /// switched-off setting and never an empty list (ADR 0090).
+    ServiceNotRunning,
     /// The place the artifact is kept is not on this machine.
     ///
     /// Split from [`Self::SourceEmpty`] because the two mean opposite things and one word for both
@@ -114,6 +121,7 @@ impl UnmeasuredReason {
             Self::NotAttempted => "not_attempted",
             Self::AccessDenied => "access_denied",
             Self::ServiceDisabled => "service_disabled",
+            Self::ServiceNotRunning => "service_not_running",
             Self::SourceAbsent => "source_absent",
             Self::SourceEmpty => "source_empty",
             Self::Partial => "partial",
@@ -139,19 +147,22 @@ impl UnmeasuredReason {
 
     /// Whether a view must list this reason even when the rule declared it in `unmeasured_when`.
     ///
-    /// All three say that the artifact was reachable and that the read of it did not finish:
+    /// All four say that the artifact was reachable and that the read of it did not finish:
     /// [`Self::Partial`] because some of it did not yield a record, [`Self::BudgetSpent`] because a
     /// limit **this program chose** ended the read, [`Self::ReadFailed`] because what was there could
-    /// not be read or understood. A rule author cannot declare any of them away, because none is a
-    /// fact about the machine for them to have anticipated: an ordinary Windows PC has a readable
-    /// `SecureBoot` key, so a rule saying it expects that key to be unreadable is not describing a
-    /// kind of machine, it is describing a fault — and a fault is what a reviewer needs as a row
-    /// (ADR 0030, ADR 0027).
+    /// not be read or understood, and [`Self::ServiceNotRunning`] because the service that answers
+    /// had not started. A rule author cannot declare any of them away, because none is a fact about
+    /// the machine for them to have anticipated: an ordinary Windows PC has a readable `SecureBoot`
+    /// key, so a rule saying it expects that key to be unreadable is not describing a kind of machine,
+    /// it is describing a fault — and a fault is what a reviewer needs as a row (ADR 0030, ADR 0027).
     ///
     /// `check-rules` refuses to load a rule that names one of these in `unmeasured_when`, so the
     /// declaration cannot rot back in. This is the answer for bundles that gate does not see.
     pub fn is_always_listed(self) -> bool {
-        matches!(self, Self::Partial | Self::BudgetSpent | Self::ReadFailed)
+        matches!(
+            self,
+            Self::Partial | Self::BudgetSpent | Self::ReadFailed | Self::ServiceNotRunning
+        )
     }
 }
 

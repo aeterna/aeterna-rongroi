@@ -14,6 +14,7 @@ export type UnmeasuredReason =
   | "not_attempted"
   | "access_denied"
   | "service_disabled"
+  | "service_not_running"
   | "source_absent"
   | "source_empty"
   | "partial"

@@ -42,6 +42,7 @@
     "not_attempted": "this was not read — the scan did not open it",
     "access_denied": "Windows refused to open this",
     "service_disabled": "the Windows service that writes this record is switched off",
+    "service_not_running": "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it",
     "source_absent": "this PC has no such record to read",
     "source_empty": "the place this is kept is there and holds nothing",
     "partial": "part of this was read and part of it was not",

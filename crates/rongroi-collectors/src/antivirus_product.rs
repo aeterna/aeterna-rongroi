@@ -19,7 +19,9 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
-use rongroi_host::{AntivirusProductRecord, Host, NotLocal, Platform, SignatureCheck, SourceError};
+use rongroi_host::{
+    AntivirusList, AntivirusProductRecord, Host, NotLocal, Platform, SignatureCheck, SourceError,
+};
 
 use crate::{Collector, Field, failure, fivem_dir, os_image, paths, prefetch};
 
@@ -51,7 +53,7 @@ static FIELDS: [Field; 13] = [
     Field::number("state_value"),
 ];
 
-static REASONS: [UnmeasuredReason; 7] = [
+static REASONS: [UnmeasuredReason; 8] = [
     UnmeasuredReason::NotWindows,
     UnmeasuredReason::NotOnThisOs,
     UnmeasuredReason::NotAdmin,
@@ -60,6 +62,8 @@ static REASONS: [UnmeasuredReason; 7] = [
     UnmeasuredReason::ReadFailed,
     // A path the host refused to open, off the local drives (ADR 0091).
     UnmeasuredReason::NotAttempted,
+    // Security Center's service was still starting, so there was no list to read (ADR 0090).
+    UnmeasuredReason::ServiceNotRunning,
 ];
 
 /// Reads the antivirus products Windows Security Center lists.
@@ -108,7 +112,11 @@ impl Collector for AntivirusProduct {
             return unmeasured(UnmeasuredReason::NotOnThisOs);
         }
         let products = match host.antivirus_products() {
-            Ok(products) => products,
+            Ok(AntivirusList::Products(products)) => products,
+            // The service may still be starting; a later scan may read the list (ADR 0090).
+            Ok(AntivirusList::ServiceNotRunning) => {
+                return unmeasured(UnmeasuredReason::ServiceNotRunning);
+            }
             Err(error @ SourceError::AccessDenied) => {
                 return unmeasured(failure::reason_for(host, &error));
             }
@@ -547,6 +555,19 @@ mod tests {
             AntivirusProduct::default().collect(&host),
             unmeasured(UnmeasuredReason::ReadFailed)
         );
+    }
+
+    /// The service that answers Security Center's list still starting is its own reason, and never
+    /// zero products: the list was not read, so it cannot say there is none (ADR 0090).
+    #[test]
+    fn a_service_not_running_list_is_unmeasured_and_never_zero_products() {
+        let host = inline(
+            "platform: windows\nantivirus_products_failure: service_not_running\nantivirus_products: []\n",
+        );
+        let run = AntivirusProduct::default().collect(&host);
+        assert_eq!(run, unmeasured(UnmeasuredReason::ServiceNotRunning));
+        let json = serde_json::to_string(&run).unwrap();
+        assert!(!json.contains("\"products\""), "{json}");
     }
 
     #[test]

@@ -895,12 +895,16 @@ describe("App", () => {
     expect(statements[0]?.textContent).toContain("not a finding about this PC");
   });
 
-  // Each of the fourteen reasons reaches a reader as a sentence, never as its identifier: a row
+  // Each of the fifteen reasons reaches a reader as a sentence, never as its identifier: a row
   // reading `source_empty` is a row that says nothing to the person it is about (ADR 0030).
   it.each([
     ["not_on_this_os", "this version of Windows does not keep this record"],
     ["not_attempted", "the scan did not open it"],
     ["service_disabled", "the Windows service that writes this record is switched off"],
+    [
+      "service_not_running",
+      "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it",
+    ],
     ["source_absent", "this PC has no such record to read"],
     ["source_empty", "the place this is kept is there and holds nothing"],
     ["partial", "part of this was read and part of it was not"],

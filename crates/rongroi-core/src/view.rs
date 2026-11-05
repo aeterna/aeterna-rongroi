@@ -369,10 +369,10 @@ fn scope_notes(report: &Report) -> ScopeNotes {
 ///
 /// - `not_admin` and `not_attempted` are never a row. Each is one fact about the **scan** that
 ///   applies to every rule it stopped, and each is stated once in [`ScopeNotes`].
-/// - `partial`, `budget_spent` and `read_failed` are always a row, declared or not. Each says the
-///   artifact was reachable and that the read of it did not finish, which is not something a rule
-///   author could have anticipated about the machine and so is not theirs to declare away
-///   (ADR 0030, ADR 0032).
+/// - `partial`, `budget_spent`, `read_failed` and `service_not_running` are always a row, declared or
+///   not. Each says the artifact was reachable and that the read of it did not finish, which is not
+///   something a rule author could have anticipated about the machine and so is not theirs to
+///   declare away (ADR 0030, ADR 0032, ADR 0090).
 fn ss_lists(item: &Evidence) -> bool {
     match &item.state {
         EvidenceState::Found { .. } => true,
@@ -2915,6 +2915,7 @@ mod tests {
             R::NotAttempted,
             R::AccessDenied,
             R::ServiceDisabled,
+            R::ServiceNotRunning,
             R::SourceAbsent,
             R::SourceEmpty,
             R::Partial,
@@ -2938,7 +2939,10 @@ mod tests {
             );
             assert_eq!(
                 listed,
-                matches!(reason, R::Partial | R::BudgetSpent | R::ReadFailed),
+                matches!(
+                    reason,
+                    R::Partial | R::BudgetSpent | R::ReadFailed | R::ServiceNotRunning
+                ),
                 "{}",
                 reason.as_str()
             );
@@ -4411,6 +4415,21 @@ mod tests {
         assert_eq!(statement.not_read, Some(UnmeasuredReason::ReadFailed));
     }
 
+    /// The service that answers Security Center's list not running is a reason the statement carries
+    /// as `not_read`, never an empty list (ADR 0090).
+    #[test]
+    fn a_list_whose_service_is_not_running_says_not_read() {
+        let report = antivirus_report(Vec::new(), Some(UnmeasuredReason::ServiceNotRunning));
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, Some(UnmeasuredReason::ServiceNotRunning));
+        assert_eq!(
+            serde_json::to_value(statement).unwrap()["not_read"],
+            serde_json::Value::from("service_not_running")
+        );
+    }
+
     /// A real scan puts the reason the list could not be read on the rule's evidence row, not in
     /// `unmeasured_sources`, which holds only collectors with timestamp fields (ADR 0090 section 5).
     #[test]
@@ -4461,23 +4480,39 @@ mod tests {
         report
     }
 
-    /// A report from the real embedded bundle: one measured `antivirus_product` run holding one
-    /// third-party product, plus `os_image` saying the Defender service is disabled when asked, so
-    /// that a Defender-tagged rule is found in both modes.
+    /// A report from the real embedded bundle: one measured `antivirus_product` run holding
+    /// `products_on` third-party products that report themselves `on`, plus `os_image` saying the
+    /// Defender service is disabled when asked, so that a Defender-tagged rule is found in both modes.
+    /// Zero products is an empty list, never a product row.
     fn engine_antivirus_report(products_on: usize, defender_service_disabled: bool) -> Report {
-        let state = if products_on == 0 { "off" } else { "on" };
+        let products: Vec<(&str, &str)> = (0..products_on)
+            .map(|_| ("Example Antivirus", "on"))
+            .collect();
+        engine_antivirus_report_with(&products, defender_service_disabled)
+    }
+
+    /// The same report holding `products`, each a display name and state, so a test can ask for a
+    /// product that reports itself `off` without making the list hold one when it asked for none.
+    fn engine_antivirus_report_with(
+        products: &[(&str, &str)],
+        defender_service_disabled: bool,
+    ) -> Report {
+        let products_on = products.iter().filter(|(_, state)| *state == "on").count();
+        let mut observations = vec![number_observation(
+            "antivirus_product",
+            &[
+                ("products", serde_json::json!(products.len())),
+                ("products_on", serde_json::json!(products_on)),
+            ],
+        )];
+        observations.extend(
+            products
+                .iter()
+                .map(|(name, state)| antivirus_product(name, state, &[])),
+        );
         let mut runs = vec![CollectorRun::Measured {
             collector: "antivirus_product".to_owned(),
-            observations: vec![
-                number_observation(
-                    "antivirus_product",
-                    &[
-                        ("products", serde_json::json!(1)),
-                        ("products_on", serde_json::json!(products_on)),
-                    ],
-                ),
-                antivirus_product("Example Antivirus", state, &[]),
-            ],
+            observations,
             gaps: BTreeMap::new(),
             discriminator_gaps: Vec::new(),
         }];
@@ -4526,7 +4561,7 @@ mod tests {
     /// statement while Self mode shows it.
     #[test]
     fn a_measured_zero_products_on_shows_the_statement_in_self_mode_only() {
-        let report = engine_antivirus_report(0, false);
+        let report = engine_antivirus_report_with(&[("Example Antivirus", "off")], false);
         let view = for_mode(&report, Mode::SelfCheck);
         let statement = antivirus_of(&view.cross_source).expect("Self mode shows the statement");
         assert_eq!(statement.products.len(), 1);
