@@ -426,7 +426,12 @@ mod tests {
     fn product<'a>(observations: &'a [Observation], name: &str) -> &'a Observation {
         observations
             .iter()
-            .find(|observation| observation.fields["display_name"] == name)
+            .find(|observation| {
+                observation
+                    .fields
+                    .get("display_name")
+                    .is_some_and(|value| value == name)
+            })
             .unwrap_or_else(|| panic!("no observation for {name}"))
     }
 
