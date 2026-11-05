@@ -14,10 +14,10 @@ use std::fmt::Write as _;
 use rongroi_core::bundle::Bundle;
 use rongroi_core::model::UnmeasuredReason;
 use rongroi_core::view::{
-    AnchorAgeState, AnchorName, AntivirusLine, AntivirusStatement, Comparison, CrossSourceStatement,
-    Duration, DurationUnit, LineState, RecordsStatement, Relation, SessionEnd, SessionLine,
-    SessionStart, SessionState, SessionStatement, SourceLineKind, TraceAge, TraceAgeState,
-    TraceAges,
+    AnchorAgeState, AnchorName, AntivirusLine, AntivirusStatement, Comparison,
+    CrossSourceStatement, Duration, DurationUnit, LineState, RecordsStatement, Relation,
+    SessionEnd, SessionLine, SessionStart, SessionState, SessionStatement, SourceLineKind,
+    TraceAge, TraceAgeState, TraceAges,
 };
 
 use crate::output::{Lang, reason};
