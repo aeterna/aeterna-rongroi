@@ -26,4 +26,4 @@ references:
   - https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/microsoft-defender-antivirus-windows
 author: aeterna-rongroi contributors
 date: 2026-09-21
-tags: [posture, install_marker]
+tags: [posture, install_marker, defender]

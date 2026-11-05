@@ -37,7 +37,9 @@ falsepositives:
   - The owner switching it off for a while to install or run something Defender flagged, often a game
     mod, a trainer or a tool shared on a forum, which is common advice for exactly those programs
   - Installing another antivirus product. Whether Defender records this when it steps aside is not
-    established, so this is a possibility, not a known cause
+    established, so this is a possibility, not a known cause. The report's antivirus list shows what
+    Security Center lists; a product listed there is a fact about what is registered, not proof that it
+    scans.
   - A Defender platform update, or a management tool or group policy of an employer or school
   - Troubleshooting a slow PC or a game that stutters, which forum advice often starts by disabling
     real-time scanning

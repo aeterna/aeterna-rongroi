@@ -1,0 +1,13 @@
+{
+  "description": "Security Center lists no antivirus product at all. This is a count of states, never a name.",
+  "observations": [
+    {
+      "collector": "antivirus_product",
+      "fields": {
+        "products": 0,
+        "products_on": 0
+      }
+    }
+  ],
+  "expect_matches": 1
+}

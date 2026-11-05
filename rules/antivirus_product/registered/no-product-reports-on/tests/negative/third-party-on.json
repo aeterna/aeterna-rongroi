@@ -1,0 +1,27 @@
+{
+  "description": "Security Center lists two antivirus products and one of them reports itself on, so this counts one on. This is a count of states, never a name.",
+  "observations": [
+    {
+      "collector": "antivirus_product",
+      "fields": {
+        "products": 2,
+        "products_on": 1
+      }
+    },
+    {
+      "collector": "antivirus_product",
+      "fields": {
+        "display_name": "Antivirus Microsoft Defender",
+        "state": "off"
+      }
+    },
+    {
+      "collector": "antivirus_product",
+      "fields": {
+        "display_name": "Example Antivirus",
+        "state": "on"
+      }
+    }
+  ],
+  "expect_matches": 0
+}

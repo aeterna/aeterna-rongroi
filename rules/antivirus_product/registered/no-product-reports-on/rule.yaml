@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c
+title: Windows Security Center lists no antivirus product that reports itself on
+description: >-
+  Windows Security Center lists no antivirus product that reports itself on. It counts states and
+    names no product. The other side is what matters for a server: `not_found` here means only that
+    some registration reports `on`, and any registration that reports `on` — a fake one a program made
+    for itself included — makes this `not_found`. A server that reads this rule therefore learns
+    nothing about what actually protects the PC. It is not evidence of cheating.
+status: experimental
+collector: antivirus_product
+strength: posture
+match:
+  products_on: 0
+retention: >-
+  Current state only. It says what Security Center listed when the scan ran, not what was registered
+  before then.
+unmeasured_when: [not_windows, not_on_this_os, not_admin, access_denied]
+falsepositives:
+  - A Windows image that removed Defender
+  - A lapsed third-party subscription
+  - An antivirus that does not register with Security Center
+  - Security Center not yet updated after sign-in
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/iwscapi/nn-iwscapi-iwscproductlist
+author: aeterna-rongroi contributors
+date: 2026-11-05
+tags: [posture, antivirus_product, defender]
