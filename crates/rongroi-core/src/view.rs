@@ -134,7 +134,8 @@ pub struct HiddenCounts {
     /// Rules that could not look for a reason the rule did not name. SS mode lists such a result,
     /// so the only ones counted here are the `not_admin` results the scope statement carries.
     pub unmeasured_unexpected: usize,
-    /// Unmatched observations. SS mode counts them instead of listing them (ADR 0014).
+    /// Unmatched observations. SS mode counts them instead of listing them (ADR 0014), except
+    /// `antivirus_product`, whose facts the cross-source statement carries (ADR 0090 section 5).
     pub unmatched: usize,
 }
 
@@ -235,7 +236,8 @@ pub struct ReportView {
     pub trace_ages: TraceAges,
     /// `FiveM`'s side beside Windows' records of programs that ran, when the readable sources reach
     /// back to `FiveM`'s last write (ADR 0061), at most one; then each edition's last session beside its
-    /// own folders (ADR 0062), at most one per edition. Not evidence and never counted. Additive.
+    /// own folders (ADR 0062), at most one per edition; then the antivirus products Windows lists
+    /// (ADR 0090 section 5). Not evidence and never counted. Additive.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cross_source: Vec<CrossSourceStatement>,
     /// The programs Windows recorded near the latest `FiveM` session, beside the ADR 0061 statement
@@ -456,7 +458,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             collector_order: collector_order(),
             row_bands: row_bands(report, &report.evidence),
             trace_ages: trace_ages_of(report, mode),
-            cross_source: cross_source_of(report),
+            cross_source: cross_source_of(report, mode),
             game_windows: game_windows_of(report, mode),
         },
         Mode::Ss => {
@@ -486,9 +488,12 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             // Counted, never listed. SS mode promises the person being screenshared that only what
             // matches a rule is shown; a raw listing of every file and process name a collector saw
             // would break that promise, and no redaction pass makes such a listing safe (ADR 0014).
+            // The antivirus products are shown by their own statement, so their observations are
+            // neither listed nor counted again as unmatched (ADR 0090 section 5).
             hidden.unmatched = report
                 .unmatched
                 .iter()
+                .filter(|group| group.collector != "antivirus_product")
                 .map(|group| group.observations.len())
                 .sum();
             let listed = listed_counts(&evidence);
@@ -510,7 +515,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 collector_order: collector_order(),
                 row_bands,
                 trace_ages: trace_ages_of(report, mode),
-                cross_source: cross_source_of(report),
+                cross_source: cross_source_of(report, mode),
                 game_windows: game_windows_of(report, mode),
             }
         }
@@ -634,9 +639,10 @@ pub struct FoldedLogs {
     pub not_read: u64,
 }
 
-/// Facts from different collectors printed together (ADR 0061 section 3, amended by ADR 0062 section 1)
-/// — not evidence: no state, no rule, no strength, never counted. There is at most one of the first
-/// kind and at most one session statement per edition; `kind` tells them apart.
+/// Facts from different collectors printed together (ADR 0061 section 3, amended by ADR 0062 section 1
+/// and ADR 0090 section 5) — not evidence: no state, no rule, no strength, never counted. There is at
+/// most one of the first kind, at most one session statement per edition and at most one antivirus
+/// statement; `kind` tells them apart.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CrossSourceStatement {
@@ -644,6 +650,43 @@ pub enum CrossSourceStatement {
     FivemAndRecords(RecordsStatement),
     /// One edition's last session beside its own folders (ADR 0062).
     Session(SessionStatement),
+    /// The antivirus products Windows Security Center lists (ADR 0090 section 5).
+    Antivirus(AntivirusStatement),
+}
+
+/// The antivirus products Windows Security Center lists, or why the list could not be read
+/// (ADR 0090 section 5).
+///
+/// Not evidence: no state, no rule id, never counted. It carries no path and no hash. A list that was
+/// read and held no product is the statement "lists none", with no [`Self::not_read`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AntivirusStatement {
+    /// The products Windows lists, in observation order.
+    pub products: Vec<AntivirusLine>,
+    /// Why the list could not be read; absent when it was read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub not_read: Option<UnmeasuredReason>,
+}
+
+/// One product Windows Security Center lists (ADR 0090 section 5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AntivirusLine {
+    /// The name the registering program gave.
+    pub display_name: String,
+    /// `on`, `off`, `snoozed`, `expired` or `other`.
+    pub state: String,
+    /// The raw state number, only when `state` is `other`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_value: Option<i64>,
+    /// The file's signature fact, when it was read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// The file's signer, when it was read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer: Option<String>,
+    /// Why the file was not opened or not fully read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_unread: Option<String>,
 }
 
 /// `FiveM`'s side beside Windows' records of programs that ran (ADR 0061, section 3).
@@ -748,11 +791,14 @@ pub fn trace_ages(report: &Report, mode: Mode) -> TraceAges {
     trace_ages_of(report, mode)
 }
 
-/// The cross-source statements: ADR 0061's, when its conditions hold, and one session statement per
-/// edition (ADR 0062). The same in both modes: they hold no path, no file name, no user name and no
-/// server name.
-pub fn cross_source(report: &Report, _mode: Mode) -> Vec<CrossSourceStatement> {
-    cross_source_of(report)
+/// The cross-source statements `mode` may show: ADR 0061's, when its conditions hold, one session
+/// statement per edition (ADR 0062), and ADR 0090's antivirus statement when the mode shows it.
+///
+/// The first two are the same in both modes: they hold no path, no file name, no user name and no
+/// server name. Self mode shows the antivirus statement always; SS mode shows it only beside a row
+/// the view lists from a rule tagged `defender`, and neither it nor its observations is counted.
+pub fn cross_source(report: &Report, mode: Mode) -> Vec<CrossSourceStatement> {
+    cross_source_of(report, mode)
 }
 
 /// Every observation of `collector` a trace age is read from — what a rule matched and what none did —
@@ -1171,15 +1217,78 @@ fn measure(
 }
 
 /// ADR 0061's statement, when its conditions hold, then one session statement per edition that has one
-/// (ADR 0062).
-fn cross_source_of(report: &Report) -> Vec<CrossSourceStatement> {
+/// (ADR 0062), then ADR 0090's antivirus statement when `mode` may show it.
+fn cross_source_of(report: &Report, mode: Mode) -> Vec<CrossSourceStatement> {
     let mut statements = records_statement(report);
     statements.extend(
         session::sessions(report)
             .into_iter()
             .map(CrossSourceStatement::Session),
     );
+    if let Some(statement) = antivirus_statement(report, mode) {
+        statements.push(CrossSourceStatement::Antivirus(statement));
+    }
     statements
+}
+
+/// ADR 0090's statement, when `mode` may show it and the report holds an answer: a list read with
+/// its products, or the reason it could not be read. `not_windows` and `not_on_this_os` are the two
+/// reasons the statement does not exist at all.
+fn antivirus_statement(report: &Report, mode: Mode) -> Option<AntivirusStatement> {
+    if mode == Mode::Ss && !lists_defender_row(report) {
+        return None;
+    }
+    if let Some(reason) = unmeasured_reason(report, "antivirus_product", None) {
+        return match reason {
+            UnmeasuredReason::NotWindows | UnmeasuredReason::NotOnThisOs => None,
+            reason => Some(AntivirusStatement {
+                products: Vec::new(),
+                not_read: Some(reason),
+            }),
+        };
+    }
+    let observations = observations_of(report, "antivirus_product");
+    if observations.is_empty() {
+        return None;
+    }
+    let text = |observation: &Observation, field: &str| {
+        observation
+            .fields
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    };
+    let products = observations
+        .iter()
+        .filter_map(|observation| {
+            // The summary row names no product; everything else is one product.
+            let display_name = text(observation, "display_name")?;
+            Some(AntivirusLine {
+                display_name,
+                state: text(observation, "state").unwrap_or_default(),
+                state_value: observation
+                    .fields
+                    .get("state_value")
+                    .and_then(serde_json::Value::as_i64),
+                signature: text(observation, "signature"),
+                signer: text(observation, "signer"),
+                file_unread: text(observation, "file_unread"),
+            })
+        })
+        .collect();
+    Some(AntivirusStatement {
+        products,
+        not_read: None,
+    })
+}
+
+/// Whether an SS view lists a row of a rule tagged `defender` (ADR 0090 section 5), by the same
+/// filter that decides every other row.
+fn lists_defender_row(report: &Report) -> bool {
+    report
+        .evidence
+        .iter()
+        .any(|item| report.defender_rules.contains(&item.rule_id) && ss_lists(item))
 }
 
 fn records_statement(report: &Report) -> Vec<CrossSourceStatement> {
@@ -2438,6 +2547,7 @@ mod tests {
             sensitive_fields: BTreeMap::new(),
             age_fields: BTreeMap::new(),
             timeline_selectors: BTreeMap::new(),
+            defender_rules: Vec::new(),
         }
     }
 
@@ -3867,13 +3977,14 @@ mod tests {
             .observations
     }
 
-    /// ADR 0061's statements among the cross-source statements, leaving out the session statements.
+    /// ADR 0061's statements among the cross-source statements, leaving out the session and antivirus
+    /// statements.
     fn records(report: &Report) -> Vec<RecordsStatement> {
         cross_source(report, Mode::SelfCheck)
             .into_iter()
             .filter_map(|statement| match statement {
                 CrossSourceStatement::FivemAndRecords(statement) => Some(statement),
-                CrossSourceStatement::Session(_) => None,
+                CrossSourceStatement::Session(_) | CrossSourceStatement::Antivirus(_) => None,
             })
             .collect()
     }
@@ -4052,6 +4163,287 @@ mod tests {
         }
     }
 
+    // ---- ADR 0090 section 5: the antivirus statement ----
+
+    const DEFENDER_RULE: &str = "defender-rule";
+    const DEFENDER_EXCLUSION_RULE: &str = "defender-exclusion-rule";
+
+    fn antivirus_product(
+        display_name: &str,
+        state: &str,
+        extra: &[(&str, serde_json::Value)],
+    ) -> Observation {
+        let mut fields = vec![
+            ("display_name", serde_json::Value::from(display_name)),
+            ("state", serde_json::Value::from(state)),
+        ];
+        fields.extend(extra.iter().cloned());
+        number_observation("antivirus_product", &fields)
+    }
+
+    /// A report holding an antivirus list: one summary row and `products`, or an unread list with
+    /// `not_read` and no observations at all.
+    fn antivirus_report(
+        products: Vec<Observation>,
+        not_read: Option<UnmeasuredReason>,
+    ) -> Report {
+        use serde_json::json;
+        let mut report = report();
+        report.header.generated_at = "2026-01-10T12:00:00Z".to_owned();
+        report.evidence = Vec::new();
+        report.own_traces = Vec::new();
+        report.unmatched = Vec::new();
+        report.unmeasured_sources = Vec::new();
+        if let Some(reason) = not_read {
+            report.unmeasured_sources = vec![UnmeasuredSource {
+                collector: "antivirus_product".to_owned(),
+                place: None,
+                reason,
+            }];
+            return report;
+        }
+        let on = products
+            .iter()
+            .filter(|product| {
+                product.fields.get("state").and_then(serde_json::Value::as_str) == Some("on")
+            })
+            .count();
+        let mut observations = vec![number_observation(
+            "antivirus_product",
+            &[
+                ("products", json!(products.len())),
+                ("products_on", json!(on)),
+            ],
+        )];
+        observations.extend(products);
+        report.unmatched = vec![UnmatchedGroup {
+            collector: "antivirus_product".to_owned(),
+            observations,
+        }];
+        report
+    }
+
+    fn defender_row(rule_id: &str, collector: &str) -> Evidence {
+        Evidence {
+            rule_id: rule_id.to_owned(),
+            collector: collector.to_owned(),
+            strength: Strength::Context,
+            state: EvidenceState::Found {
+                observations: vec![observed(collector, &[("name", "a record")])],
+            },
+        }
+    }
+
+    /// A report with Defender rows listed in SS mode, and the bundle ids that tag them.
+    fn defender_report(products: Vec<Observation>) -> Report {
+        let mut report = antivirus_report(products, None);
+        report.defender_rules = vec![DEFENDER_RULE.to_owned(), DEFENDER_EXCLUSION_RULE.to_owned()];
+        report.evidence = vec![
+            defender_row(DEFENDER_RULE, "evtx"),
+            Evidence {
+                rule_id: DEFENDER_EXCLUSION_RULE.to_owned(),
+                collector: "defender_exclusion".to_owned(),
+                strength: Strength::Posture,
+                state: EvidenceState::Found {
+                    observations: vec![observed(
+                        "defender_exclusion",
+                        &[("path", r"C:\Users\fixtureuser\AppData\Local\FiveM")],
+                    )],
+                },
+            },
+        ];
+        report
+    }
+
+    fn antivirus_of(statements: &[CrossSourceStatement]) -> Option<&AntivirusStatement> {
+        statements.iter().find_map(|statement| match statement {
+            CrossSourceStatement::Antivirus(statement) => Some(statement),
+            _ => None,
+        })
+    }
+
+    /// Self mode shows the list even when no Defender row exists (ADR 0090 section 5).
+    #[test]
+    fn self_mode_shows_the_antivirus_statement_with_no_defender_row() {
+        let report = antivirus_report(
+            vec![antivirus_product("Antivirus Microsoft Defender", "on", &[])],
+            None,
+        );
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("Self mode shows the statement");
+        assert_eq!(statement.not_read, None);
+        let [line] = statement.products.as_slice() else {
+            panic!("{:?}", statement.products);
+        };
+        assert_eq!(line.display_name, "Antivirus Microsoft Defender");
+        assert_eq!(line.state, "on");
+        assert_eq!(line.state_value, None);
+        assert_eq!(line.signature, None);
+        assert_eq!(line.signer, None);
+        assert_eq!(line.file_unread, None);
+    }
+
+    /// SS mode hides it when it lists no Defender row.
+    #[test]
+    fn ss_mode_hides_the_antivirus_statement_with_no_defender_row() {
+        let report = antivirus_report(
+            vec![antivirus_product("Example Antivirus", "on", &[])],
+            None,
+        );
+        assert!(antivirus_of(&for_mode(&report, Mode::SelfCheck).cross_source).is_some());
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
+    /// SS mode shows it beside a row of a Defender-tagged rule that it lists.
+    #[test]
+    fn ss_mode_shows_the_antivirus_statement_beside_a_listed_defender_row() {
+        let report = defender_report(vec![antivirus_product("Example Antivirus", "on", &[])]);
+        let view = for_mode(&report, Mode::Ss);
+        let statement =
+            antivirus_of(&view.cross_source).expect("SS mode shows it beside a Defender row");
+        let [line] = statement.products.as_slice() else {
+            panic!("{:?}", statement.products);
+        };
+        assert_eq!(line.display_name, "Example Antivirus");
+        assert_eq!(statement.not_read, None);
+    }
+
+    /// A Defender-tagged rule that is only `not_found` and not listed for SS mode does not make the
+    /// statement show.
+    #[test]
+    fn ss_mode_hides_the_antivirus_statement_when_the_defender_rule_is_only_not_found() {
+        let mut report = antivirus_report(
+            vec![antivirus_product("Example Antivirus", "on", &[])],
+            None,
+        );
+        report.defender_rules = vec![DEFENDER_RULE.to_owned()];
+        report.evidence = vec![Evidence {
+            rule_id: DEFENDER_RULE.to_owned(),
+            collector: "evtx".to_owned(),
+            strength: Strength::Context,
+            state: EvidenceState::NotFound {
+                retention: "30 days".to_owned(),
+            },
+        }];
+        assert!(antivirus_of(&for_mode(&report, Mode::SelfCheck).cross_source).is_some());
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
+    /// A list that was read with no products says "lists none": an empty list and no `not_read`.
+    #[test]
+    fn a_measured_list_with_no_products_is_an_empty_statement_without_not_read() {
+        let report = antivirus_report(Vec::new(), None);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the list was read");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, None);
+        let json = serde_json::to_value(statement).unwrap();
+        assert!(json.get("not_read").is_none(), "{json}");
+    }
+
+    /// A list that could not be read carries the reason, and no products.
+    #[test]
+    fn a_list_that_could_not_be_read_carries_read_failed() {
+        let report = antivirus_report(Vec::new(), Some(UnmeasuredReason::ReadFailed));
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, Some(UnmeasuredReason::ReadFailed));
+    }
+
+    /// Neither reason that means this PC has no such list makes a statement.
+    #[test]
+    fn not_windows_and_not_on_this_os_give_no_antivirus_statement() {
+        for reason in [UnmeasuredReason::NotWindows, UnmeasuredReason::NotOnThisOs] {
+            let report = antivirus_report(Vec::new(), Some(reason));
+            assert!(
+                antivirus_of(&for_mode(&report, Mode::SelfCheck).cross_source).is_none(),
+                "{reason:?}"
+            );
+        }
+    }
+
+    /// No field of the statement carries the product's path, in either mode (ADR 0090 section 5).
+    #[test]
+    fn the_antivirus_statement_never_holds_a_path() {
+        let product = antivirus_product(
+            "Example Antivirus",
+            "on",
+            &[
+                ("path", serde_json::Value::from(r"C:\Users\someone\av.exe")),
+                ("path_withheld", serde_json::Value::from("unredactable_form")),
+                ("sha256", serde_json::Value::from("a".repeat(64))),
+            ],
+        );
+        let report = defender_report(vec![product]);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let view = for_mode(&report, mode);
+            let statement = antivirus_of(&view.cross_source).expect("the statement is shown");
+            let json = serde_json::to_string(statement).unwrap();
+            assert!(!json.contains("someone"), "{mode:?}: {json}");
+            assert!(!json.contains("Users"), "{mode:?}: {json}");
+            assert!(!json.contains("path"), "{mode:?}: {json}");
+            assert!(!json.contains("sha256"), "{mode:?}: {json}");
+        }
+    }
+
+    /// Rule 9: the same Defender rows found, once with an empty list and once with a third-party
+    /// product `on`. Every Defender row, every count and their order are the same; only the
+    /// cross-source statement differs.
+    #[test]
+    fn the_defender_rows_do_not_change_when_the_antivirus_list_changes() {
+        let without = defender_report(Vec::new());
+        let with = defender_report(vec![antivirus_product("Example Antivirus", "on", &[])]);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let empty = for_mode(&without, mode);
+            let listed = for_mode(&with, mode);
+            assert_eq!(empty.evidence, listed.evidence, "{mode:?}");
+            assert_eq!(empty.listed, listed.listed, "{mode:?}");
+            assert_eq!(empty.hidden, listed.hidden, "{mode:?}");
+            assert_eq!(empty.scope, listed.scope, "{mode:?}");
+            let order = |view: &ReportView| {
+                view.evidence
+                    .iter()
+                    .map(|item| item.rule_id.clone())
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(order(&empty), order(&listed), "{mode:?}");
+            assert_ne!(empty.cross_source, listed.cross_source, "{mode:?}");
+            assert!(
+                antivirus_of(&empty.cross_source)
+                    .expect("the empty list is a statement")
+                    .products
+                    .is_empty(),
+                "{mode:?}"
+            );
+            assert_eq!(
+                antivirus_of(&listed.cross_source)
+                    .expect("the third-party product is a statement")
+                    .products
+                    .len(),
+                1,
+                "{mode:?}"
+            );
+        }
+    }
+
+    /// The statement and its observations are never counted as listed or hidden.
+    #[test]
+    fn the_antivirus_statement_is_never_counted() {
+        let mut without = defender_report(Vec::new());
+        // No observations at all: no statement is made.
+        without.unmatched.clear();
+        let with = defender_report(vec![antivirus_product("Example Antivirus", "on", &[])]);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let absent = for_mode(&without, mode);
+            let present = for_mode(&with, mode);
+            assert!(antivirus_of(&absent.cross_source).is_none(), "{mode:?}");
+            assert!(antivirus_of(&present.cross_source).is_some(), "{mode:?}");
+            assert_eq!(absent.listed, present.listed, "{mode:?}");
+            assert_eq!(absent.hidden, present.hidden, "{mode:?}");
+        }
+    }
+
     // ---- ADR 0062: the session statement ----
 
     fn session_report(
@@ -4109,7 +4501,8 @@ mod tests {
             .into_iter()
             .filter_map(|statement| match statement {
                 CrossSourceStatement::Session(session) => Some(session),
-                CrossSourceStatement::FivemAndRecords(_) => None,
+                CrossSourceStatement::FivemAndRecords(_)
+                | CrossSourceStatement::Antivirus(_) => None,
             })
             .collect()
     }

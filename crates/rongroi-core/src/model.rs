@@ -742,6 +742,10 @@ pub struct Report {
     /// anything (ADR 0061): "selected nothing" can be said only of a selector that was there. Additive.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub timeline_selectors: BTreeMap<String, Vec<String>>,
+    /// The ids of every rule in the bundle tagged `defender`, sorted (ADR 0090 section 5). SS mode
+    /// shows the antivirus statement only beside a listed row of one of these. Additive.
+    #[serde(default)]
+    pub defender_rules: Vec<String>,
 }
 
 #[cfg(test)]

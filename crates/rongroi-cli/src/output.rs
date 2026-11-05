@@ -1030,6 +1030,7 @@ mod tests {
                 sensitive_fields: std::collections::BTreeMap::new(),
                 age_fields: std::collections::BTreeMap::new(),
                 timeline_selectors: std::collections::BTreeMap::new(),
+                defender_rules: Vec::new(),
             },
             bundle,
         )
