@@ -49,7 +49,7 @@ mod live {
         CoUninitialize,
     };
     use windows::Win32::System::SecurityCenter::{
-        IWSCProductList, WSCProductList, WSC_SECURITY_PROVIDER_ANTIVIRUS,
+        IWSCProductList, WSC_SECURITY_PROVIDER_ANTIVIRUS, WSCProductList,
     };
     use windows::core::Error;
 
@@ -102,7 +102,9 @@ mod live {
             // SAFETY: `product` is a live item of the list. A failure here fails the whole list, as
             // an incomplete answer must (ADR 0090 section 4).
             let remediated = unsafe { product.RemediationPath() };
-            let remediation_path = remediated.map_err(call_error("RemediationPath"))?.to_string();
+            let remediation_path = remediated
+                .map_err(call_error("RemediationPath"))?
+                .to_string();
             products.push(AntivirusProductRecord {
                 display_name,
                 state,
