@@ -41,6 +41,12 @@ env:
   ProgramFiles(x86): 'C:\Program Files (x86)'
   ProgramW6432: 'C:\Program Files'
   ProgramData: 'C:\ProgramData'
+# The antivirus products Windows Security Center lists (ADR 0090): Defender, reporting itself on,
+# with the `windowsdefender:` URI A0 measured instead of a program file.
+antivirus_products:
+  - display_name: Antivirus Microsoft Defender
+    state: 0
+    remediation_path: "windowsdefender://"
 # The change journal (ADR 0047): counts and first and last times taken from the `usn` collector's own
 # reading of a GitHub-hosted Windows Server 2025 runner (windows.yml run 34930942657), rebuilt as record
 # groups that give the same observations. A runner image, not a gaming PC: it asserts the collector's

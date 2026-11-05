@@ -102,6 +102,7 @@
     "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
     "powershell_text": "คำสั่ง PowerShell เป็นชนิดของคำ",
     "driver_service": "ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows",
+    "antivirus_product": "โปรแกรมแอนติไวรัสที่ Windows ระบุ",
     "autostart": "โปรแกรมที่เริ่มทำงานเอง (service, Run, scheduled task)",
     "defender_exclusion": "exclusion ของ Microsoft Defender",
     "fivem_dir": "ไฟล์ของ FiveM",

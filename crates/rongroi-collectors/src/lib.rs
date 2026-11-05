@@ -5,6 +5,7 @@
 //! Collectors read one kind of artifact from a [`Host`] and report what they saw.
 //! Rules for writing one are in `crates/rongroi-collectors/AGENTS.md` and `CONVENTIONS.md` §3.
 
+pub mod antivirus_product;
 pub mod autostart;
 pub mod bam;
 pub mod defender_exclusion;
@@ -316,6 +317,7 @@ pub fn sensitive_kinds(tier: ScanTier) -> std::collections::BTreeSet<SensitiveKi
 /// Every collector in this build.
 pub fn all() -> Vec<Box<dyn Collector>> {
     vec![
+        Box::new(antivirus_product::AntivirusProduct::default()),
         Box::new(autostart::Autostart::default()),
         Box::new(bam::Bam),
         Box::new(defender_exclusion::DefenderExclusion),
