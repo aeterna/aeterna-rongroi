@@ -18,8 +18,10 @@
 
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   var fine = window.matchMedia("(hover: hover) and (pointer: fine)");
+  var hero = sample.closest(".hero") || sample;
   var cards = Array.prototype.slice.call(document.querySelectorAll(".ledger li"));
   var lift = 0, tiltX = 0, tiltY = 0, rx = 0, ry = 0;
+  var rect = null;
   var held = false, onScreen = true, visible = !document.hidden, raf = null;
 
   function enabled() {
@@ -29,8 +31,10 @@
   function tick() {
     raf = null;
     if (!enabled() || !onScreen || !visible) return;
-    var goalX = lift + (held ? 0 : tiltX);
-    var goalY = held ? 0 : tiltY;
+    // Typing holds the sample where it is: the lift and the pointer aim wait until focus leaves.
+    if (held) return;
+    var goalX = lift + tiltX;
+    var goalY = tiltY;
     rx += (goalX - rx) * 0.1;
     ry += (goalY - ry) * 0.1;
     var doneX = Math.abs(goalX - rx) < 0.01;
@@ -51,14 +55,20 @@
     raf = null;
     rx = 0;
     ry = 0;
+    sample.classList.remove("is-tilting");
     sample.style.removeProperty("--sp-rx");
     sample.style.removeProperty("--sp-ry");
   }
 
   function sync() {
+    rect = null;
     lift = Math.min(Math.max(window.scrollY / (window.innerHeight || 1), 0), 1) * 5;
-    if (enabled()) ease();
-    else stop();
+    if (enabled()) {
+      sample.classList.add("is-tilting");
+      ease();
+    } else {
+      stop();
+    }
   }
 
   function aim(x, y) {
@@ -67,21 +77,29 @@
     ease();
   }
 
-  sample.addEventListener("pointermove", function (event) {
+  // Listen on the hero, not the sample: once the sample tilts, its own edge can slip past a resting
+  // pointer and flip leave and enter. The cached rect keeps that edge fixed between scrolls and resizes.
+  hero.addEventListener("pointermove", function (event) {
     if (!enabled() || event.pointerType !== "mouse" || !fine.matches) return;
-    var box = sample.getBoundingClientRect();
-    var x = (event.clientX - box.left) / box.width;
-    var y = (event.clientY - box.top) / box.height;
+    if (rect === null) rect = sample.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right ||
+      event.clientY < rect.top || event.clientY > rect.bottom) {
+      aim(0, 0);
+      return;
+    }
+    var x = (event.clientX - rect.left) / rect.width;
+    var y = (event.clientY - rect.top) / rect.height;
     aim((0.5 - y) * 2.4, (x - 0.5) * 3.2);
   });
-  sample.addEventListener("pointerleave", function () { aim(0, 0); });
-  sample.addEventListener("focusin", function () {
+  hero.addEventListener("pointerleave", function () { aim(0, 0); });
+  sample.addEventListener("focusin", function (event) {
+    if (!event.target || event.target.tagName !== "INPUT") return;
     held = true;
     ease();
   });
   sample.addEventListener("focusout", function () {
     held = false;
-    aim(0, 0);
+    ease();
   });
 
   cards.forEach(function (card) {

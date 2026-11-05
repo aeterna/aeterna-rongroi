@@ -400,6 +400,11 @@ nav.lang a[aria-current="page"] {
   display: grid;
   gap: 14px;
   box-shadow: 0 30px 60px -28px #2a5d9a80;
+  transform: rotate(1.2deg);
+}
+
+/* The 3D layer only exists while the script tilts the sample: a card at rest stays on the flat plane. */
+.specimen.is-tilting {
   transform: perspective(1400px) rotateX(var(--sp-rx, 0deg)) rotateY(var(--sp-ry, 0deg)) rotate(1.2deg);
 }
 
@@ -765,17 +770,19 @@ section > p {
   box-shadow: var(--shadow);
   padding: 22px;
   position: relative;
+  isolation: isolate;
 }
 
-/* The promise cards take a soft light that follows the pointer, drawn over the card as decoration only:
-   it starts hidden and needs a fine pointer that hovers, so touch screens and reduced motion keep the card
-   still. */
+/* The promise cards take a soft light that follows the pointer, drawn over the card's ground and under
+   its text and number as decoration only: it starts hidden and needs a fine pointer that hovers, so touch
+   screens and reduced motion keep the card still. */
 .ledger li::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
+  z-index: -1;
   background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), #0869b01a, transparent 70%);
   opacity: 0;
   transition: opacity 160ms ease;
