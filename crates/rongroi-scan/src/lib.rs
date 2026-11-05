@@ -5,3 +5,4 @@
 //! Input checks for the Connect sidecar; no Windows or pipe access lives here.
 
 pub mod pipe_name;
+pub mod request;
