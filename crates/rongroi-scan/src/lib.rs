@@ -6,6 +6,7 @@
 //! access lives here.
 
 pub mod exit;
+pub mod line;
 pub mod pipe_name;
 pub mod request;
 pub mod session;
