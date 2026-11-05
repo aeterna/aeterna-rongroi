@@ -275,7 +275,7 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
 ///
 /// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
 /// name the thing that was not seen and never the person, and say it about the record or about this
-/// program rather than about the machine's owner. The same fourteen strings are in
+/// program rather than about the machine's owner. The same fifteen strings are in
 /// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
 /// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
 /// `check-locales` there.
@@ -301,6 +301,12 @@ pub(crate) fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
             "the Windows service that writes this record is switched off"
         }
         (Lang::Th, UnmeasuredReason::ServiceDisabled) => "บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่",
+        (Lang::En, UnmeasuredReason::ServiceNotRunning) => {
+            "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it"
+        }
+        (Lang::Th, UnmeasuredReason::ServiceNotRunning) => {
+            "บริการของ Windows ที่ตอบเรื่องนี้ไม่ได้ทำงานอยู่ อาจกำลังเริ่มทำงาน การสแกนอีกครั้งภายหลังอาจอ่านได้"
+        }
         (Lang::En, UnmeasuredReason::SourceAbsent) => "this PC has no such record to read",
         (Lang::Th, UnmeasuredReason::SourceAbsent) => "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน",
         (Lang::En, UnmeasuredReason::SourceEmpty) => {
@@ -380,7 +386,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
-            \x20 - โปรแกรมแอนติไวรัสที่ Windows Security Center ระบุ: ชื่อของแต่ละโปรแกรม สถานะที่มันรายงาน (ทำงานอยู่ ปิดอยู่ พักชั่วคราว หรือหมดอายุ) และเมื่อ path ที่มันให้มาเป็นไฟล์บนไดรฟ์ภายในเครื่อง จะอ่านว่าไฟล์นั้นอยู่ที่ไหน พร้อม SHA-256 และลายเซ็น (Authenticode) ของไฟล์นั้น\n\
+            \x20 - โปรแกรมแอนตี้ไวรัสที่ Windows Security Center ระบุ: ชื่อของแต่ละโปรแกรม สถานะที่มันรายงาน (ทำงานอยู่ ปิดอยู่ พักชั่วคราว หรือหมดอายุ) และเมื่อ path ที่มันให้มาเป็นไฟล์บนไดรฟ์ภายในเครื่อง จะอ่านว่าไฟล์นั้นอยู่ที่ไหน พร้อม SHA-256 และลายเซ็น (Authenticode) ของไฟล์นั้น\n\
             \x20 - อุปกรณ์ PCI ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิต อุปกรณ์ และ subsystem กับ class ที่ Windows บันทึก ไดรเวอร์ที่ผูกกับแต่ละตัว problem code และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียล เวลาเหล่านี้ใช้จับคู่รายงานสองฉบับของเครื่องนี้ได้\n\
             \x20 - เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น (HID) ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิตและรุ่น ไดรเวอร์ และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียลหรือชื่อ\n\
             \x20 - Windows เริ่มทำงานแบบไหนในแต่ละครั้งที่ log System ยังจำไว้: ตัวเลขหนึ่งตัวต่อการเริ่มทำงาน ที่บอกว่าต่อจากการปิดเครื่องแบบเต็มหรือแบบ Fast Startup และไม่อ่านอย่างอื่นของ event นั้น\n\
@@ -1030,6 +1036,7 @@ mod tests {
                 sensitive_fields: std::collections::BTreeMap::new(),
                 age_fields: std::collections::BTreeMap::new(),
                 timeline_selectors: std::collections::BTreeMap::new(),
+                defender_rules: Vec::new(),
             },
             bundle,
         )

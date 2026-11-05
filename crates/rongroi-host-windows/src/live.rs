@@ -5,7 +5,7 @@
 //! Reads the real machine. Registry keys are opened read-only; nothing is written.
 
 use rongroi_host::{
-    AntivirusProductRecord, AntivirusProductSource, Host, Platform, RegistryData, RegistrySource,
+    AntivirusList, AntivirusProductSource, Host, Platform, RegistryData, RegistrySource,
     SourceError,
 };
 use windows::Win32::Foundation::GetLastError;
@@ -240,7 +240,7 @@ impl Host for LiveHost {
 
 impl AntivirusProductSource for LiveHost {
     /// What Windows Security Center lists, read on a thread of its own (ADR 0090 section 1).
-    fn antivirus_products(&self) -> Result<Vec<AntivirusProductRecord>, SourceError> {
+    fn antivirus_products(&self) -> Result<AntivirusList, SourceError> {
         crate::security_center::products()
     }
 }

@@ -42,6 +42,7 @@
     "not_attempted": "ไม่ได้อ่านส่วนนี้ เพราะการสแกนไม่ได้เปิดมัน",
     "access_denied": "Windows ไม่อนุญาตให้เปิดอ่าน",
     "service_disabled": "บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่",
+    "service_not_running": "บริการของ Windows ที่ตอบเรื่องนี้ไม่ได้ทำงานอยู่ อาจกำลังเริ่มทำงาน การสแกนอีกครั้งภายหลังอาจอ่านได้",
     "source_absent": "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน",
     "source_empty": "มีที่เก็บข้อมูลอยู่ แต่ว่างเปล่า",
     "partial": "อ่านได้บางส่วน ไม่ครบ",
@@ -102,7 +103,7 @@
     "posture": "การตั้งค่าความปลอดภัยของเครื่อง",
     "powershell_text": "คำสั่ง PowerShell เป็นชนิดของคำ",
     "driver_service": "ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows",
-    "antivirus_product": "โปรแกรมแอนติไวรัสที่ Windows ระบุ",
+    "antivirus_product": "โปรแกรมแอนตี้ไวรัสที่ Windows ระบุ",
     "autostart": "โปรแกรมที่เริ่มทำงานเอง (service, Run, scheduled task)",
     "defender_exclusion": "exclusion ของ Microsoft Defender",
     "fivem_dir": "ไฟล์ของ FiveM",
@@ -288,6 +289,20 @@
       "windows_removes": "Windows ลบบันทึกของตัวเอง: ไฟล์ Prefetch ถูกแทนที่, รายการ BAM หมดอายุ, PCA บันทึกเฉพาะการเปิดจาก File Explorer",
       "clock": "นาฬิกาเครื่องถูกเปลี่ยน ทำให้เวลาจากแต่ละแหล่งไม่ได้อยู่บนนาฬิกาเดียวกัน"
     }
+  },
+  "antivirus": {
+    "title": "โปรแกรมแอนตี้ไวรัสที่ Windows Security Center ระบุ",
+    "state": {
+      "on": "รายงานว่าเปิดอยู่",
+      "off": "รายงานว่าปิดอยู่",
+      "snoozed": "รายงานว่าพักชั่วคราว",
+      "expired": "รายงานว่าหมดอายุ",
+      "other": "รายงานสถานะที่โปรแกรมนี้ไม่รู้จัก ({{value}})"
+    },
+    "file_unread": "ไม่ได้อ่านไฟล์ของโปรแกรมนี้ ({{reason}})",
+    "none": "Security Center ไม่ระบุโปรแกรมแอนตี้ไวรัสใดเลย",
+    "not_read": "อ่านรายการไม่ได้: {{reason}}",
+    "caveat": "โปรแกรมในรายการนี้คือสิ่งที่ลงทะเบียนกับ Windows ไว้ ไม่ใช่หลักฐานว่ามันสแกนอยู่จริง"
   },
   "session": {
     "title": "FiveM for GTA V {{edition}}: เซสชันล่าสุด เทียบกับโฟลเดอร์ของ FiveM เอง",

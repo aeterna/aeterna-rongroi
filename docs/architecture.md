@@ -82,8 +82,8 @@ An `unmeasured` result carries `expected`: whether the reason is one the rule na
 one means something they did not anticipate stopped the measurement, and it is the unmeasured result
 SS mode lists (ADR 0027).
 
-There are fourteen reasons, and the split between them is how the report separates "we checked and there
-was nothing" from "we could not check" (ADR 0030). Four describe a machine behaving exactly as Windows
+There are fifteen reasons, and the split between them is how the report separates "we checked and there
+was nothing" from "we could not check" (ADR 0030). Five describe a machine behaving exactly as Windows
 ships it, and `other_volume` one whose owner put a folder on another drive, so none of them may be read as
 a finding:
 
@@ -95,6 +95,7 @@ a finding:
 | `not_attempted` | the collector never looked; nothing was tried |
 | `access_denied` | denied with the rights already held |
 | `service_disabled` | the Windows service that writes the record is switched off |
+| `service_not_running` | the Windows service that answers is not running, and may still be starting (ADR 0090) |
 | `source_absent` | the place the artifact is kept is not on this PC |
 | `source_empty` | the place is on this PC and holds nothing |
 | `partial` | some of it was read and some of it was not |

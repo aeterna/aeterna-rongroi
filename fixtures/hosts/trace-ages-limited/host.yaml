@@ -70,3 +70,9 @@ filesystem:
 event_log_channels: {}
 usn_journal:
   state: access_denied
+# The antivirus products Windows Security Center lists (ADR 0090): Defender, reporting itself on,
+# with the `windowsdefender:` URI A0 measured instead of a program file.
+antivirus_products:
+  - display_name: Antivirus Microsoft Defender
+    state: 0
+    remediation_path: "windowsdefender://"

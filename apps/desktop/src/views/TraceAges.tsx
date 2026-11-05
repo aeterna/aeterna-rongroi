@@ -7,11 +7,14 @@
 // Nothing here sorts, colours or compares a row.
 
 import type { TFunction } from "i18next";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   AgeText,
   AnchorAge,
   AnchorName,
+  AntivirusLine,
+  AntivirusStatement,
   Comparison,
   CrossSourceStatement,
   Duration,
@@ -214,17 +217,22 @@ function RowLine({ row }: { row: TraceAge }) {
  * that was not read is never folded into "no entry", and the causes are always printed in full.
  */
 export function CrossSource({ statements }: { statements: CrossSourceStatement[] }) {
-  return (
-    <>
-      {statements.map((statement) =>
-        statement.kind === "session" ? (
-          <Session key={JSON.stringify(statement)} statement={statement} />
-        ) : (
-          <Records key={JSON.stringify(statement)} statement={statement} />
-        ),
-      )}
-    </>
-  );
+  const rows: ReactNode[] = [];
+  for (const statement of statements) {
+    const key = JSON.stringify(statement);
+    switch (statement.kind) {
+      case "session":
+        rows.push(<Session key={key} statement={statement} />);
+        break;
+      case "antivirus":
+        rows.push(<Antivirus key={key} statement={statement} />);
+        break;
+      case "fivem_and_records":
+        rows.push(<Records key={key} statement={statement} />);
+        break;
+    }
+  }
+  return <>{rows}</>;
 }
 
 /** ADR 0061's statement: FiveM's side, one line per record, and the causes in full. */
@@ -308,6 +316,66 @@ function SourceRow({ source, named }: { source: SourceLine; named: boolean }) {
       <dt>{t(`cross_source.source.${source.collector}`)}</dt>
       <dd>{line}</dd>
     </>
+  );
+}
+
+/** One product's state; an unnamed state keeps its number and is never guessed at (ADR 0090 section 2). */
+function antivirusState(t: TFunction, line: AntivirusLine): string {
+  switch (line.state) {
+    case "on":
+    case "off":
+    case "snoozed":
+    case "expired":
+      return t(`antivirus.state.${line.state}`);
+    default:
+      return t("antivirus.state.other", { value: line.state_value ?? line.state });
+  }
+}
+
+/** The antivirus products Windows Security Center lists (ADR 0090 section 5). Not evidence. */
+function Antivirus({ statement }: { statement: AntivirusStatement }) {
+  const { t } = useTranslation("report");
+  return (
+    <section className="cross-source" aria-labelledby="antivirus-title">
+      <h3 id="antivirus-title">{t("antivirus.title")}</h3>
+      {statement.products.length > 0 && (
+        <ul>
+          {statement.products.map((product, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list that is never reordered, and two registrations can read the same
+            <li key={index}>
+              {product.display_name}: {antivirusState(t, product)}
+              {product.signature && (
+                <span className="muted">
+                  <br />
+                  {t(`game.file.signature.${product.signature}`, {
+                    defaultValue: product.signature,
+                  })}
+                </span>
+              )}
+              {product.signer && (
+                <span className="muted">
+                  <br />
+                  {t("game.file.signer", { signer: product.signer })}
+                </span>
+              )}
+              {product.file_unread && (
+                <span className="muted">
+                  <br />
+                  {t("antivirus.file_unread", { reason: product.file_unread })}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {statement.products.length === 0 &&
+        (statement.not_read ? (
+          <p>{t("antivirus.not_read", { reason: t(`reason.${statement.not_read}`) })}</p>
+        ) : (
+          <p>{t("antivirus.none")}</p>
+        ))}
+      <p className="muted">{t("antivirus.caveat")}</p>
+    </section>
   );
 }
 

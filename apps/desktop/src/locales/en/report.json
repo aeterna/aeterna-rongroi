@@ -42,6 +42,7 @@
     "not_attempted": "this was not read — the scan did not open it",
     "access_denied": "Windows refused to open this",
     "service_disabled": "the Windows service that writes this record is switched off",
+    "service_not_running": "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it",
     "source_absent": "this PC has no such record to read",
     "source_empty": "the place this is kept is there and holds nothing",
     "partial": "part of this was read and part of it was not",
@@ -288,6 +289,20 @@
       "windows_removes": "Windows removing its own records: Prefetch files are replaced, BAM entries expire, PCA records only launches from File Explorer",
       "clock": "a clock that was changed, so that times from different sources are not on the same clock"
     }
+  },
+  "antivirus": {
+    "title": "Antivirus products Windows Security Center lists",
+    "state": {
+      "on": "reports itself on",
+      "off": "reports itself off",
+      "snoozed": "reports itself snoozed",
+      "expired": "reports itself expired",
+      "other": "reports a state this program does not name ({{value}})"
+    },
+    "file_unread": "its file was not read ({{reason}})",
+    "none": "Security Center lists no antivirus product.",
+    "not_read": "The list could not be read: {{reason}}.",
+    "caveat": "A product listed here is what is registered with Windows, not proof that it scans."
   },
   "session": {
     "title": "FiveM for GTA V {{edition}}: its last session, beside its own folders",

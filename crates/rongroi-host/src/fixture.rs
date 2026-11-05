@@ -11,13 +11,14 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    AccountSource, AntivirusProductRecord, AntivirusProductSource, BootTimeSource, ChannelConfig,
-    ChannelConfigReader, CodeIntegrityOptions, DeviceBus, DeviceProperty, DeviceRecord,
-    DeviceSource, DirEntryInfo, DriveKind, DriveMap, DriveMapEntry, EntryTimes, EnvironmentSource,
-    EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot, FirmwareSource, Host,
-    IommuTable, LinkKind, LinkTarget, Platform, ProcessRecord, ProcessSource, RegistryData,
-    RegistrySource, SignatureCheck, SignatureSource, SourceError, SystemIntegritySource, TpmInfo,
-    TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState, UsnReadEnd,
+    AccountSource, AntivirusList, AntivirusProductRecord, AntivirusProductSource, BootTimeSource,
+    ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DeviceBus, DeviceProperty,
+    DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap, DriveMapEntry, EntryTimes,
+    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
+    FirmwareSource, Host, IommuTable, LinkKind, LinkTarget, Platform, ProcessRecord, ProcessSource,
+    RegistryData, RegistrySource, SignatureCheck, SignatureSource, SourceError,
+    SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState,
+    UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -341,12 +342,14 @@ struct FixtureAntivirusProduct {
     remediation_path: String,
 }
 
-/// The two ways Security Center's list is asked for and not answered (ADR 0090 section 4).
+/// The ways Security Center's list is asked for and not answered (ADR 0090 section 4).
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum FixtureAntivirusProductsFailure {
     AccessDenied,
     ReadFailed,
+    /// The service that answers is not running, which may change without anything else changing.
+    ServiceNotRunning,
 }
 
 /// Turns every described antivirus product into the record a live host returns, carrying the state
@@ -367,10 +370,10 @@ fn antivirus_records(described: Vec<FixtureAntivirusProduct>) -> Vec<AntivirusPr
 fn antivirus_answer(
     described: Option<Vec<FixtureAntivirusProduct>>,
     failure: Option<FixtureAntivirusProductsFailure>,
-) -> Option<Result<Vec<AntivirusProductRecord>, FixtureAntivirusProductsFailure>> {
+) -> Option<Result<AntivirusList, FixtureAntivirusProductsFailure>> {
     match (described, failure) {
         (_, Some(failure)) => Some(Err(failure)),
-        (Some(described), None) => Some(Ok(antivirus_records(described))),
+        (Some(described), None) => Some(Ok(AntivirusList::Products(antivirus_records(described)))),
         (None, None) => None,
     }
 }
@@ -1278,7 +1281,7 @@ pub struct FixtureHost {
     tpm: Option<FixtureTpm>,
     /// Security Center's answer: the products it listed or the reason it did not answer, or `None`
     /// when the fixture modelled neither.
-    antivirus: Option<Result<Vec<AntivirusProductRecord>, FixtureAntivirusProductsFailure>>,
+    antivirus: Option<Result<AntivirusList, FixtureAntivirusProductsFailure>>,
     firmware: Option<FixtureFirmware>,
     iommu_table: Option<FixtureIommuTable>,
     processes: Option<Vec<ProcessRecord>>,
@@ -1860,8 +1863,9 @@ impl AntivirusProductSource for FixtureHost {
     /// claim that Security Center lists no product (ADR 0090 section 4).
     ///
     /// An `antivirus_products_failure:` entry is the answer whatever `antivirus_products:` holds, so a
-    /// fixture can say the list was refused or could not be read.
-    fn antivirus_products(&self) -> Result<Vec<AntivirusProductRecord>, SourceError> {
+    /// fixture can say the list was refused, could not be read, or that the service that answers was
+    /// not running.
+    fn antivirus_products(&self) -> Result<AntivirusList, SourceError> {
         match self.antivirus.as_ref() {
             Some(Err(FixtureAntivirusProductsFailure::AccessDenied)) => {
                 Err(SourceError::AccessDenied)
@@ -1869,6 +1873,9 @@ impl AntivirusProductSource for FixtureHost {
             Some(Err(FixtureAntivirusProductsFailure::ReadFailed)) => Err(SourceError::Failed(
                 "this fixture host describes an antivirus read that failed".to_owned(),
             )),
+            Some(Err(FixtureAntivirusProductsFailure::ServiceNotRunning)) => {
+                Ok(AntivirusList::ServiceNotRunning)
+            }
             Some(Ok(products)) => Ok(products.clone()),
             None => Err(SourceError::Unsupported(
                 "this fixture host does not describe antivirus products".to_owned(),
@@ -3098,7 +3105,10 @@ processes:
         let host =
             FixtureHost::from_yaml_str("platform: windows\nantivirus_products: []\n", "inline")
                 .unwrap();
-        assert_eq!(host.antivirus_products(), Ok(vec![]));
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(AntivirusList::Products(vec![]))
+        );
     }
 
     /// A fixture that says the list was refused answers with the refusal, whatever the list holds.
@@ -3130,6 +3140,21 @@ processes:
         ));
     }
 
+    /// Security Center's service not running is its own answer, not a failed read and not an empty
+    /// list, whatever list the fixture wrote beside it (ADR 0090).
+    #[test]
+    fn a_service_not_running_antivirus_product_list_is_its_own_answer() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nantivirus_products_failure: service_not_running\nantivirus_products: []\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(AntivirusList::ServiceNotRunning)
+        );
+    }
+
     /// The list keeps the order the fixture wrote, and every value reaches the caller unchanged:
     /// `remediation_path` is as written, and empty when the fixture leaves it out.
     #[test]
@@ -3149,7 +3174,7 @@ antivirus_products:
         .unwrap();
         assert_eq!(
             host.antivirus_products(),
-            Ok(vec![
+            Ok(AntivirusList::Products(vec![
                 AntivirusProductRecord {
                     display_name: "Antivirus Microsoft Defender".to_owned(),
                     state: 0,
@@ -3160,7 +3185,7 @@ antivirus_products:
                     state: 1,
                     remediation_path: String::new(),
                 },
-            ])
+            ]))
         );
     }
 

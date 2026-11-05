@@ -14,6 +14,7 @@ export type UnmeasuredReason =
   | "not_attempted"
   | "access_denied"
   | "service_disabled"
+  | "service_not_running"
   | "source_absent"
   | "source_empty"
   | "partial"
@@ -209,10 +210,30 @@ export type SessionStatement = { edition: "legacy" | "enhanced" } & (
   | { session: "not_known"; prefetch: UnmeasuredReason; bam: UnmeasuredReason }
 );
 
+/** The antivirus products Windows Security Center lists, or why the list could not be read (ADR 0090 section 5). */
+export interface AntivirusStatement {
+  products: AntivirusLine[];
+  /** Absent when the list was read. */
+  not_read?: UnmeasuredReason;
+}
+
+/** One product Windows Security Center lists (ADR 0090 section 5). */
+export interface AntivirusLine {
+  display_name: string;
+  /** `on`, `off`, `snoozed`, `expired` or `other`. */
+  state: string;
+  /** The raw state number, only when `state` is `other`. */
+  state_value?: number;
+  signature?: string;
+  signer?: string;
+  file_unread?: string;
+}
+
 /** The cross-source statements, told apart by `kind` (ADR 0061, amended by ADR 0062 section 1). */
 export type CrossSourceStatement =
   | ({ kind: "fivem_and_records" } & RecordsStatement)
-  | ({ kind: "session" } & SessionStatement);
+  | ({ kind: "session" } & SessionStatement)
+  | ({ kind: "antivirus" } & AntivirusStatement);
 
 /** One Legacy launch mode's index beside its oldest cache file (ADR 0062 section 4). */
 export interface IndexBeside {

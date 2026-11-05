@@ -31,9 +31,10 @@ falsepositives:
   - A file that was downloaded and never run
   - A detection in a file Defender removed at once
   - No time here does not mean Defender detected nothing before the log's oldest record, or that
-    another antivirus did not
+    another antivirus did not. The report's antivirus list shows what Security Center lists; a product
+    listed there is a fact about what is registered, not proof that it scans.
 references:
   - https://learn.microsoft.com/en-us/defender-endpoint/troubleshoot-microsoft-defender-antivirus
 author: aeterna-rongroi contributors
 date: 2026-09-30
-tags: [evtx, timeline]
+tags: [evtx, timeline, defender]

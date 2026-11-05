@@ -352,8 +352,9 @@ impl Vocabulary {
     /// here" and the report will list it anyway — and nothing in the rule file, in `check-baseline`
     /// or in a fixture shows it. Since ADR 0030 every reason has a producer in some collector, so
     /// that half of the check is now entirely about which collector: `not_on_this_os` is `pca` and
-    /// nothing else, `service_disabled` is `prefetch` and nothing else, `other_volume` is `usn` and
-    /// nothing else (ADR 0047, amendment of 2026-09-30), and `budget_spent` is `evtx`, `usn`,
+    /// nothing else, `service_disabled` is `prefetch` and nothing else, `service_not_running` is
+    /// `antivirus_product` and nothing else, `other_volume` is `usn` and nothing else (ADR 0047,
+    /// amendment of 2026-09-30), and `budget_spent` is `evtx`, `usn`,
     /// `driver_service` and `autostart` and nothing else (ADR 0047, ADR 0048, ADR 0060).
     ///
     /// The other half is the mirror image: a reason [`UnmeasuredReason::is_always_listed`] answers
@@ -1084,6 +1085,7 @@ date: 2026-09-11
             UnmeasuredReason::Partial,
             UnmeasuredReason::BudgetSpent,
             UnmeasuredReason::ReadFailed,
+            UnmeasuredReason::ServiceNotRunning,
         ] {
             assert!(
                 reason.is_always_listed(),
@@ -1141,6 +1143,7 @@ date: 2026-09-11
         for (reason, owners) in [
             ("not_on_this_os", &["antivirus_product", "pca"] as &[&str]),
             ("service_disabled", &["prefetch"]),
+            ("service_not_running", &["antivirus_product"]),
             (
                 "budget_spent",
                 &[

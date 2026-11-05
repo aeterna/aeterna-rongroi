@@ -12,6 +12,8 @@ use std::sync::mpsc;
 #[cfg(windows)]
 use std::time::Duration;
 
+#[cfg(windows)]
+use rongroi_host::AntivirusList;
 use rongroi_host::SourceError;
 
 /// How long the Security Center read may take before this program stops waiting. A0 measured 23 ms
@@ -22,17 +24,31 @@ const TIMEOUT: Duration = Duration::from_secs(15);
 /// `E_ACCESSDENIED`: Windows refused the call.
 const E_ACCESSDENIED: i32 = 0x8007_0005_u32.cast_signed();
 
+/// `ERROR_SERVICE_NOT_ACTIVE` as an HRESULT: the service that answers is not running.
+const ERROR_SERVICE_NOT_ACTIVE: i32 = 0x8007_0426_u32.cast_signed();
+
 /// Classifies a failed WSC API call from the HRESULT it returned.
 ///
 /// `E_ACCESSDENIED` is the one answer a caller can act on; every other code, a failed
 /// `RemediationPath` read included, is a failure that names the call and the HRESULT (ADR 0090
-/// section 4).
+/// section 4). The service not running is not among them: it is an answer, from the three calls
+/// that ask the service whether it is there (see [`is_service_not_running`]).
 pub fn classify_error(call: &str, code: i32) -> SourceError {
     if code == E_ACCESSDENIED {
         SourceError::AccessDenied
     } else {
         SourceError::Failed(format!("{call} returned {:#010x}", code.cast_unsigned()))
     }
+}
+
+/// Whether a failed WSC API call means the Security Center service is not running.
+///
+/// Measured on the lab machine 75 s after boot: the service was `Stopped` with start type
+/// `Automatic`, and `IWSCProductList::Initialize` returned `0x80070426`
+/// (`ERROR_SERVICE_NOT_ACTIVE`); after it started, the same call listed the product (ADR 0090).
+/// The program never starts or changes the service, so this answer may change on its own.
+pub fn is_service_not_running(code: i32) -> bool {
+    code == ERROR_SERVICE_NOT_ACTIVE
 }
 
 /// Every antivirus product Security Center lists, in the order it lists them (ADR 0090 section 1).
@@ -42,7 +58,7 @@ pub fn classify_error(call: &str, code: i32) -> SourceError {
 /// a failure, never a panic in the caller. A call that does not answer in time leaves the thread
 /// detached rather than hanging the scan.
 #[cfg(windows)]
-pub fn products() -> Result<Vec<rongroi_host::AntivirusProductRecord>, SourceError> {
+pub fn products() -> Result<AntivirusList, SourceError> {
     let (sender, receiver) = mpsc::channel();
     std::thread::Builder::new()
         .name("security-center".to_owned())
@@ -65,7 +81,7 @@ pub fn products() -> Result<Vec<rongroi_host::AntivirusProductRecord>, SourceErr
 #[cfg(windows)]
 #[allow(unsafe_code)]
 mod live {
-    use rongroi_host::{AntivirusProductRecord, SourceError};
+    use rongroi_host::{AntivirusList, AntivirusProductRecord, SourceError};
     use windows::Win32::System::Com::{
         CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
         CoUninitialize,
@@ -75,14 +91,14 @@ mod live {
     };
     use windows::core::Error;
 
-    use super::classify_error;
+    use super::{classify_error, is_service_not_running};
 
     /// A mapper that names `call` and carries its HRESULT into [`classify_error`].
     fn call_error(call: &'static str) -> impl FnOnce(Error) -> SourceError {
         move |error| classify_error(call, error.code().0)
     }
 
-    pub(super) fn read() -> Result<Vec<AntivirusProductRecord>, SourceError> {
+    pub(super) fn read() -> Result<AntivirusList, SourceError> {
         // SAFETY: called once on this thread, which nothing else uses; balanced by `CoUninitialize`
         // below when it succeeded. `COINIT_MULTITHREADED` because nothing here needs a message loop.
         let init = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
@@ -96,18 +112,42 @@ mod live {
         result
     }
 
-    fn read_list() -> Result<Vec<AntivirusProductRecord>, SourceError> {
+    fn read_list() -> Result<AntivirusList, SourceError> {
         // SAFETY: COM is initialised on this thread, and the class and interface are Windows' own.
         let created = unsafe { CoCreateInstance(&WSCProductList, None, CLSCTX_INPROC_SERVER) };
-        let list: IWSCProductList =
-            created.map_err(call_error("CoCreateInstance(WSCProductList)"))?;
+        let list: IWSCProductList = match created {
+            Ok(list) => list,
+            Err(error) if is_service_not_running(error.code().0) => {
+                return Ok(AntivirusList::ServiceNotRunning);
+            }
+            Err(error) => {
+                return Err(classify_error(
+                    "CoCreateInstance(WSCProductList)",
+                    error.code().0,
+                ));
+            }
+        };
         // SAFETY: `list` is a live WSC product list; `Initialize` only selects which provider type to
         // enumerate and changes nothing on the machine.
         let initialized = unsafe { list.Initialize(WSC_SECURITY_PROVIDER_ANTIVIRUS) };
-        initialized.map_err(call_error("IWSCProductList::Initialize"))?;
+        if let Err(error) = initialized {
+            if is_service_not_running(error.code().0) {
+                return Ok(AntivirusList::ServiceNotRunning);
+            }
+            return Err(classify_error(
+                "IWSCProductList::Initialize",
+                error.code().0,
+            ));
+        }
         // SAFETY: `list` is initialised for the antivirus provider and is live for this call.
         let counted = unsafe { list.Count() };
-        let count = counted.map_err(call_error("IWSCProductList::Count"))?;
+        let count = match counted {
+            Ok(count) => count,
+            Err(error) if is_service_not_running(error.code().0) => {
+                return Ok(AntivirusList::ServiceNotRunning);
+            }
+            Err(error) => return Err(classify_error("IWSCProductList::Count", error.code().0)),
+        };
         let count = u32::try_from(count)
             .map_err(|_| SourceError::Failed(format!("IWSCProductList::Count returned {count}")))?;
         let mut products = Vec::new();
@@ -133,7 +173,7 @@ mod live {
                 remediation_path,
             });
         }
-        Ok(products)
+        Ok(AntivirusList::Products(products))
     }
 }
 
@@ -141,7 +181,7 @@ mod live {
 mod tests {
     use rongroi_host::SourceError;
 
-    use super::classify_error;
+    use super::{classify_error, is_service_not_running};
 
     /// A refused read is its own answer, which a collector reports as `access_denied`, not a failure.
     #[test]
@@ -159,5 +199,13 @@ mod tests {
             classify_error("RemediationPath", 0x8000_4005_u32.cast_signed()),
             SourceError::Failed("RemediationPath returned 0x80004005".to_owned())
         );
+    }
+
+    /// `ERROR_SERVICE_NOT_ACTIVE` is not a failure to report as `read_failed`: it is the service
+    /// that answers not running, which may change by itself (ADR 0090).
+    #[test]
+    fn service_not_active_is_its_own_answer_not_a_failure() {
+        assert!(is_service_not_running(0x8007_0426_u32.cast_signed()));
+        assert!(!is_service_not_running(0x8007_0005_u32.cast_signed()));
     }
 }

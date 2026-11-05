@@ -283,6 +283,11 @@ expression: own
           "latest": "2025-12-20"
         }
       ]
+    },
+    {
+      "kind": "antivirus",
+      "products": [],
+      "not_read": "read_failed"
     }
   ]
 }

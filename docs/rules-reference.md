@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 77 |
-| SHA-256 | `f8194b3e7299807c919d53c1a528f4883b5b52fa046479ad7f70dc95e1a1ef78` |
+| Rules | 78 |
+| SHA-256 | `6199c61340df584f2e070b712a2e1cedfa3e3a0adb20b1f29a3304b3cc9003bc` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -41,6 +41,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 ## Contents
 
+- `antivirus_product`
+  - [Windows Security Center lists no antivirus product that reports itself on](#rule-4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c) — `posture` · `experimental`
 - `autostart`
   - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
 - `bam`
@@ -146,6 +148,52 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
     - [Windows started after a Fast Startup shutdown](#rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b) — `context` · `experimental`
     - [Windows started after a full shutdown or a restart](#rule-fa3e721e-98f2-4007-bbd8-133208564682) — `context` · `experimental`
 
+## Collector `antivirus_product`
+
+### `antivirus_product` / `registered`
+
+<a id="rule-4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c"></a>
+
+#### Windows Security Center lists no antivirus product that reports itself on
+
+- Id: `4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c`
+- File: [`rules/antivirus_product/registered/no-product-reports-on/rule.yaml`](../rules/antivirus_product/registered/no-product-reports-on/rule.yaml)
+- Collector: `antivirus_product`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `antivirus_product`
+- Written: 2026-11-05
+
+**About this check**
+
+Windows Security Center lists no antivirus product that reports itself on. It counts states and names no product. The other side is what matters for a server: \`not\_found\` here means only that some registration reports \`on\`, and any registration that reports \`on\` — a fake one a program made for itself included — makes this \`not\_found\`. A server that reads this rule therefore learns nothing about what actually protects the PC. It is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `products_on`: is `0`
+
+**Look-back**
+
+Current state only. It says what Security Center listed when the scan ran, not what was registered before then.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_on_this_os` — this version of Windows does not keep this record
+- `not_admin` — Windows would not show this without administrator rights
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- A Windows image that removed Defender
+- A lapsed third-party subscription
+- An antivirus that does not register with Security Center
+- Security Center not yet updated after sign-in
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/iwscapi/nn-iwscapi-iwscproductlist>
+
 ## Collector `autostart`
 
 ### `autostart` / `outside-windows`
@@ -245,7 +293,7 @@ Only what BAM still holds. Windows removes BAM entries older than seven days whe
 - Collector: `defender_exclusion`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `defender_exclusion`, `posture`
+- Tags: `defender_exclusion`, `posture`, `defender`
 - Written: 2026-09-30
 
 **About this check**
@@ -352,7 +400,7 @@ Only switches still in the Defender log as it stands. It holds up to 16 MiB by d
 
 - The PC's maker, a shop or a Windows image turning real-time protection off before the PC was handed over — measured on two GitHub-hosted runner images, each of which carried one such record from before anyone used it
 - The owner switching it off for a while to install or run something Defender flagged, often a game mod, a trainer or a tool shared on a forum, which is common advice for exactly those programs
-- Installing another antivirus product. Whether Defender records this when it steps aside is not established, so this is a possibility, not a known cause
+- Installing another antivirus product. Whether Defender records this when it steps aside is not established, so this is a possibility, not a known cause. The report's antivirus list shows what Security Center lists; a product listed there is a fact about what is registered, not proof that it scans.
 - A Defender platform update, or a management tool or group policy of an employer or school
 - Troubleshooting a slow PC or a game that stutters, which forum advice often starts by disabling real-time scanning
 
@@ -1099,7 +1147,7 @@ Current state only. It says nothing about how the PC was set up in the past.
 - Collector: `install_marker`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `posture`, `install_marker`
+- Tags: `posture`, `install_marker`, `defender`
 - Written: 2026-09-21
 
 **About this check**
@@ -1305,7 +1353,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 - Collector: `os_image`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `posture`, `os_image`
+- Tags: `posture`, `os_image`, `defender`
 - Written: 2026-09-20
 
 **About this check**
@@ -1327,7 +1375,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 **Ordinary things that also produce this**
 
-- Any third-party antivirus, which disables Defender's service when it installs itself
+- Any third-party antivirus, which disables Defender's service when it installs itself. The report's antivirus list shows what Security Center lists; a product listed there is a fact about what is registered, not proof that it scans.
 - A PC managed by an employer or a school whose policy turns Defender off
 - A tweaking script or a pre-modified Windows image the owner installed for performance
 
@@ -1344,7 +1392,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 - Collector: `os_image`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `posture`, `os_image`
+- Tags: `posture`, `os_image`, `defender`
 - Written: 2026-09-20
 
 **About this check**
@@ -2853,7 +2901,7 @@ Only the records the Code Integrity log still holds. It keeps about 1 MB by defa
 - Collector: `evtx`
 - Strength: `context`
 - Status: `experimental` — being developed
-- Tags: `evtx`, `timeline`
+- Tags: `evtx`, `timeline`, `defender`
 - Written: 2026-09-30
 
 **About this check**
@@ -2877,7 +2925,7 @@ Only the records Defender's log still holds. It keeps up to 16 MiB by default an
 - A false positive on a new or unsigned program
 - A file that was downloaded and never run
 - A detection in a file Defender removed at once
-- No time here does not mean Defender detected nothing before the log's oldest record, or that another antivirus did not
+- No time here does not mean Defender detected nothing before the log's oldest record, or that another antivirus did not. The report's antivirus list shows what Security Center lists; a product listed there is a fact about what is registered, not proof that it scans.
 
 **References**
 

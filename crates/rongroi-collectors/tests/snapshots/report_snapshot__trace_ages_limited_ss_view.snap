@@ -234,6 +234,16 @@ expression: "trace_ages_of(&report, Mode::Ss)"
       "session": "not_known",
       "prefetch": "not_admin",
       "bam": "not_admin"
+    },
+    {
+      "kind": "antivirus",
+      "products": [
+        {
+          "display_name": "Antivirus Microsoft Defender",
+          "state": "on",
+          "file_unread": "not_drive_rooted"
+        }
+      ]
     }
   ]
 }

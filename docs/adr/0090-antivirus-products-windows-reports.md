@@ -179,11 +179,10 @@ ones is emitted as `state: other`, with the number in `state_value`.
   answer never depends on it.
 - **No product listed on a client** → `Measured` with the summary observation `products: 0`. It is an answer,
   the way ADR 0011 made "no TPM" an answer, not `source_empty`. Whether Security Center can list nothing for a
-  moment after sign-in, before products register, is **unverified**; the lab machine measures it at step 4.
-- **The Security Center service (`wscsvc`) stopped or disabled** → what the API answers is **not measured**.
-  Until the lab machine shows a distinct answer (step 4), every failed call is `read_failed`, which a rule cannot
-  declare away, so SS mode lists it. If it shows a distinct answer, that becomes `service_disabled`, and `rules/AGENTS.md`'s list of
-  who reports that reason gains this collector.
+  moment after sign-in, before products register, is **unverified**: at 75 s after boot the lab machine answered with an error, not an empty list (section 4); earlier than that was not read.
+- **The Security Center service (`wscsvc`) not running** → `service_not_running`, from `0x80070426` (measured,
+  "A0, measured"). A rule cannot declare it away, so SS mode lists it. Any other failed call is `read_failed`.
+  This program never starts the service.
 - **Refused** → `not_admin` without administrator rights, `access_denied` with them.
 
 **Administrator rights.** Not needed on the development PC: A0 read the same list at Medium and at High
@@ -264,13 +263,15 @@ collector behind a `posture` rule, so the profile runs it under either sentence.
 - **View**: the statement in Self mode; in SS mode only beside a listed `defender` row; a profile path in it
   redacted; never counted.
 - **Baseline**: a new collector needs a `baseline-*` host that reads it (`crates/rongroi-collectors/AGENTS.md`).
-  The baselines are rebuilt from a scan of the machines they describe; none is written by hand. Until then a
+  The baselines are rebuilt from a scan of the machines they describe; none is written by hand. The block now
+  in the three baselines was written by hand from A0's one reading of the development PC (2026-11-05), so
+  it is what a default Windows answered there and not a scan of each machine, until they are rebuilt. Until then a
   rule on this collector gets a `rules/unconfronted.csv` row with its `resolved_when`.
 - **Rule fixtures** for owner decision 2's rule: positive, `products_on: 0` with Defender
   `off` and a third-party product `off`; negative, a third-party product `on` and Defender `off`. The negative
   is a fixture, not an allowance: the rule matches a count, never a name.
-- **Lab replay** (ADR 0076): one scenario on the lab machine, `antivirus_product/defender-only`, expects the
-  statement to list one product, `on`, with a valid signature, and expects no Defender row to change. The lab
+- **Lab replay** (ADR 0076): no scenario file. `expect.yaml` needs a rule that reads `found`, and this rule reads
+  `not_found` on the lab machine, so the check was run by hand on the replay's scan ("A0, measured"). The lab
   machine has Defender only, so it cannot show a second product.
 
 ## A0, measured
@@ -295,8 +296,21 @@ the `windows` crate does.
 evidence and that a third-party product's `RemediationPath` stays unknown until S11 (P4). The alternative,
 adding WMI for `pathToSignedReportingExe` only, stays open if S11 shows the file is needed.
 
-**Moved by the owner to step 4, on the lab machine:** the list straight after a sign-in, and the answer with
-`wscsvc` stopped. The development PC was not signed out and its service was not stopped. The junction question
+**Measured on the lab machine, 2026-11-05** (Windows 11 Arm, x64 build under emulation, Defender only, throwaway
+overlay, replay runs `20261105T072750Z-control` and two probe runs not kept as scenarios). The owner moved these
+two questions there; the development PC was not signed out and its service was not stopped.
+
+| Question | Answer |
+|---|---|
+| The list 75 s after boot, about 60 s after sign-in | `wscsvc` is `Stopped`, start type `Automatic`, and `Initialize` fails with `0x80070426` (`ERROR_SERVICE_NOT_ACTIVE`): an error, not an empty list |
+| The same, after `Start-Service wscsvc` and 20 s | one product, `Microsoft Defender Antivirus`, `state` 0, the same 18-character URI, 16 ms |
+| `Stop-Service wscsvc` while it runs, as an administrator | refused, and the service keeps running, so the list reads on |
+| WMI's class, with the service as found | one instance. Not read further; this ADR does not use WMI |
+
+So the answer is distinct and **`service_not_running` is added, not `service_disabled`**: section 4 expected the
+second, but the service here was not switched off, and that reason's sentence would be false. How long the service
+takes to start on a PC that is not this virtual machine is **unverified**, and so is a `wscsvc` set to `disabled`.
+The display name differs from the development PC's, so a name cannot be expected to stay the same. The junction question
 belongs to ADR 0091's probe, which that ADR's amendment sets before the next release; A0 did not run it.
 
 ## Order of work
@@ -312,8 +326,7 @@ belongs to ADR 0091's probe, which that ADR's amendment sets before the next rel
    privacy and consent texts, a CHANGELOG line. One pull request into `dev`, written by an engineer run.
 4. **The statement and the rule text** (section 5): the view, the `defender` tags, the `falsepositives`
    lines, the regenerated rules reference, `docs/coverage.md` by `cargo xtask coverage`, the lab scenario. One
-   pull request after step 3. The lab machine also reads the list straight after a sign-in and with `wscsvc`
-   stopped; a distinct answer amends section 4 in that pull request.
+   pull request after step 3. The lab machine's answers amended section 4 in that pull request.
 5. **S11, on a PC with another antivirus (P4)**: the list, Defender's state in it, `service_windefend`, whether
    a 5001 was written, whether the exclusions are still there, and which Defender rules fire. Its results amend
    this ADR, ADR 0059's "What is unverified" and the two rules whose text claims what another antivirus does.
@@ -361,9 +374,9 @@ belongs to ADR 0091's probe, which that ADR's amendment sets before the next rel
 - Whether reading a path component's attributes without following a link can reach the network (ADR 0091's probe, lab).
 - How Security Center checks a program that registers as an antivirus, and so how easily a registration can be
   made by something that is not one.
-- What the API answers on a Server edition, and with `wscsvc` stopped (the lab machine at step 4 for the second, nobody for the first:
+- What the API answers on a Server edition, and with `wscsvc` stopped (a `disabled` service for the second, unmeasured; nobody for the first:
   section 4 does not depend on it).
-- Whether Security Center lists nothing for a moment after sign-in (the lab machine, step 4).
+- Whether Security Center lists nothing earlier than 75 s after boot, and how long its service takes to start on a real PC.
 - How a third-party product's `state` follows its own real-time switch, and how quickly.
 
 ## Consequences

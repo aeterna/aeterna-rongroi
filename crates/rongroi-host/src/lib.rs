@@ -529,13 +529,28 @@ pub struct AntivirusProductRecord {
     pub remediation_path: String,
 }
 
+/// What Security Center answered about the antivirus products it lists (ADR 0090).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AntivirusList {
+    /// The products Security Center lists, in the order it lists them.
+    Products(Vec<AntivirusProductRecord>),
+    /// The service that answers the question is not running, so there is no list to read.
+    ///
+    /// Measured on the lab machine 75 s after boot, while the service was still starting; the same
+    /// question listed the product once it had started. An empty [`Self::Products`] list is the
+    /// different answer that Security Center lists none (ADR 0090).
+    ServiceNotRunning,
+}
+
 /// Read-only access to the antivirus products Windows Security Center lists (ADR 0090).
 pub trait AntivirusProductSource {
     /// Every antivirus product Security Center lists, in the order it lists them.
     ///
-    /// An empty list is an answer: Security Center lists no product. A host that cannot ask answers
+    /// An empty [`AntivirusList::Products`] list is an answer: Security Center lists no product.
+    /// [`AntivirusList::ServiceNotRunning`] says the service that answers is not running, which may
+    /// change without anything on the machine changing. A host that cannot ask answers
     /// [`SourceError::Unsupported`], never an empty list, which would claim the machine has none.
-    fn antivirus_products(&self) -> Result<Vec<AntivirusProductRecord>, SourceError>;
+    fn antivirus_products(&self) -> Result<AntivirusList, SourceError>;
 }
 
 /// What the platform firmware itself says about UEFI Secure Boot (ADR 0038).
@@ -1400,7 +1415,7 @@ impl TpmSource for NonWindowsHost {
 }
 
 impl AntivirusProductSource for NonWindowsHost {
-    fn antivirus_products(&self) -> Result<Vec<AntivirusProductRecord>, SourceError> {
+    fn antivirus_products(&self) -> Result<AntivirusList, SourceError> {
         Err(SourceError::Unsupported(
             "no Windows Security Center on this platform".to_owned(),
         ))
