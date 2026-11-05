@@ -196,7 +196,7 @@ row, declared or not, because each says the artifact was reachable and the read 
 Naming one of those three in `unmeasured_when` is a `check-rules` failure: the line would decide
 nothing, and a line that looks load-bearing and is not is worse than none.
 
-The fourteen reasons, and what each says to the reader, are in `docs/architecture.md`; ADR 0030 adds the
+The fifteen reasons, and what each says to the reader, are in `docs/architecture.md`; ADR 0030 adds the
 ordinary condition that produces each and how common it is. The two that most often need declaring:
 `source_absent` ("this PC has no such record to read") and `source_empty` ("the place this is kept is
 there and holds nothing"). They mean opposite things — write the one you mean. A rule on one of `usn`'s
