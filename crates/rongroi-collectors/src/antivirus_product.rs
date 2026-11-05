@@ -266,19 +266,16 @@ fn file_fields(
 
 /// Hashes `path`, then checks its signature. A refusal is never read as "the file is not there".
 fn describe_file(host: &dyn Host, path: &str) -> FileState {
-    let sha256 = match fivem_dir::file_sha256(host, path) {
-        Some(digest) => digest,
+    let Some(sha256) = fivem_dir::file_sha256(host, path) else {
         // The helper swallows the reason, so the same read is asked once more to classify it.
-        None => match host.file_sha256(path) {
-            Err(SourceError::AccessDenied) => {
-                return FileState::Failed(UnmeasuredReason::AccessDenied);
-            }
-            Err(SourceError::NotLocal(not_local)) => return FileState::NotLocal(not_local),
-            Err(_) if is_missing(host, path) => return FileState::Missing,
-            Err(error) => return FileState::Failed(reason(&error)),
+        return match host.file_sha256(path) {
+            Err(SourceError::AccessDenied) => FileState::Failed(UnmeasuredReason::AccessDenied),
+            Err(SourceError::NotLocal(not_local)) => FileState::NotLocal(not_local),
+            Err(_) if is_missing(host, path) => FileState::Missing,
+            Err(error) => FileState::Failed(reason(&error)),
             // The bytes were read, but the digest was not one `allow` can compare.
-            Ok(_) => return FileState::Failed(UnmeasuredReason::ReadFailed),
-        },
+            Ok(_) => FileState::Failed(UnmeasuredReason::ReadFailed),
+        };
     };
     let signature = host.file_signature(path).map_err(|error| reason(&error));
     FileState::Described { sha256, signature }
