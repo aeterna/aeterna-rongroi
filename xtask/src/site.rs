@@ -1155,6 +1155,20 @@ mod tests {
     }
 
     #[test]
+    fn both_pages_load_motion_and_the_styles_hold_no_looping_animation() {
+        for page in ["site/index.html", "site/en/index.html"] {
+            let text = std::fs::read_to_string(site_root().join(page)).unwrap();
+            let loads = opening_tags(&text).into_iter().any(|tag| {
+                tag.starts_with("<script")
+                    && attribute_value(tag, "src").is_some_and(|src| src.ends_with("motion.js"))
+            });
+            assert!(loads, "{page}: no script tag for motion.js");
+        }
+        let css = std::fs::read_to_string(site_root().join("site/styles.css")).unwrap();
+        assert!(!css.contains("infinite"), "site/styles.css keeps a looping animation");
+    }
+
+    #[test]
     fn a_word_inside_a_quoted_attribute_value_is_not_a_hidden_attribute() {
         // The second label also has a space after the word: a scan that ignores quotes takes that
         // whitespace for an attribute boundary.
