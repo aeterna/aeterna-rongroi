@@ -35,9 +35,7 @@ pub fn products() -> Result<Vec<rongroi_host::AntivirusProductRecord>, SourceErr
     std::thread::Builder::new()
         .name("security-center".to_owned())
         .spawn(live::read)
-        .map_err(|error| {
-            SourceError::Failed(format!("no thread for Security Center: {error}"))
-        })?
+        .map_err(|error| SourceError::Failed(format!("no thread for Security Center: {error}")))?
         .join()
         .map_err(|_| SourceError::Failed("the Security Center read stopped".to_owned()))?
 }
@@ -88,6 +86,8 @@ mod live {
         // SAFETY: `list` is initialised for the antivirus provider and is live for this call.
         let counted = unsafe { list.Count() };
         let count = counted.map_err(call_error("IWSCProductList::Count"))?;
+        let count = u32::try_from(count)
+            .map_err(|_| SourceError::Failed(format!("IWSCProductList::Count returned {count}")))?;
         let mut products = Vec::new();
         for index in 0..count {
             // SAFETY: `index` is below the count just read, and `list` is live.

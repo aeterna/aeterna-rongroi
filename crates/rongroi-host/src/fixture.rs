@@ -337,6 +337,19 @@ struct FixtureAntivirusProduct {
     remediation_path: String,
 }
 
+/// Turns every described antivirus product into the record a live host returns, carrying the state
+/// and remediation path through without interpreting them.
+fn antivirus_records(described: Vec<FixtureAntivirusProduct>) -> Vec<AntivirusProductRecord> {
+    described
+        .into_iter()
+        .map(|product| AntivirusProductRecord {
+            display_name: product.display_name,
+            state: product.state,
+            remediation_path: product.remediation_path,
+        })
+        .collect()
+}
+
 /// The firmware a fixture describes (ADR 0038). Absent means the fixture never modelled it, which the
 /// accessor reports as `Unsupported` rather than inventing a Secure Boot state.
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -1366,16 +1379,7 @@ impl FixtureHost {
                 .collect(),
             code_integrity: file.code_integrity,
             tpm: file.tpm,
-            antivirus_products: file.antivirus_products.map(|described| {
-                described
-                    .into_iter()
-                    .map(|product| AntivirusProductRecord {
-                        display_name: product.display_name,
-                        state: product.state,
-                        remediation_path: product.remediation_path,
-                    })
-                    .collect()
-            }),
+            antivirus_products: file.antivirus_products.map(antivirus_records),
             firmware: file.firmware,
             iommu_table: file.iommu_table,
             processes: file
