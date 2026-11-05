@@ -324,11 +324,13 @@ fn reason(error: &SourceError) -> UnmeasuredReason {
 }
 
 /// Keeps the reason that outranks the other: the budget first, because it says the rest was never
-/// tried, then a refusal a person can act on, then a failure nobody can — `driver_service`'s order.
+/// tried, then a refusal a person can act on, then a failure nobody can, then a path the scan did
+/// not attempt — `driver_service`'s order.
 fn note(gaps: &mut BTreeMap<String, UnmeasuredReason>, field: &str, reason: UnmeasuredReason) {
     let rank = |reason: UnmeasuredReason| match reason {
         UnmeasuredReason::BudgetSpent => 0,
         UnmeasuredReason::AccessDenied => 1,
+        UnmeasuredReason::NotAttempted => 3,
         _ => 2,
     };
     if gaps
@@ -652,6 +654,26 @@ mod tests {
                 "{field}"
             );
         }
+    }
+
+    /// One product's refused path does not hide another product's failed read: the run-wide `sha256`
+    /// gap is the failure, which outranks `not_attempted` (ADR 0090 section 4).
+    #[test]
+    fn a_refused_path_does_not_hide_a_failed_read() {
+        let host = inline(
+            "platform: windows\ndrive_map:\n  - { letter: 'C', device: '\\Device\\HarddiskVolume1', serial: 1, kind: fixed }\n  - { letter: 'Z', device: '\\Device\\Mup', serial: 2, kind: other }\nantivirus_products:\n  - display_name: 'Network Antivirus'\n    state: 0\n    remediation_path: 'Z:\\Apps\\av.exe'\n  - display_name: 'Broken Antivirus'\n    state: 0\n    remediation_path: 'C:\\Program Files\\Broken\\av.exe'\nfilesystem:\n  'Z:\\Apps':\n    - name: av.exe\n      sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\n  'C:\\Program Files\\Broken':\n    - name: av.exe\n",
+        );
+        let run = AntivirusProduct::default().collect(&host);
+        let (observations, gaps) = measured(&run);
+        let network = product(observations, "Network Antivirus");
+        assert_eq!(text(network, "file_unread"), Some("not_local_drive"));
+        let broken = product(observations, "Broken Antivirus");
+        assert_eq!(text(broken, "sha256"), None, "{broken:?}");
+        assert_eq!(
+            gaps.get("sha256"),
+            Some(&UnmeasuredReason::ReadFailed),
+            "{gaps:?}"
+        );
     }
 
     /// A missing file is a leftover registration: the path is reported and neither file field is a

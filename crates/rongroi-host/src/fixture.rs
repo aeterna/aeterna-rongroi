@@ -362,6 +362,19 @@ fn antivirus_records(described: Vec<FixtureAntivirusProduct>) -> Vec<AntivirusPr
         .collect()
 }
 
+/// Turns what a fixture wrote for Security Center's list into the one answer the accessor gives: a
+/// failure wins whatever list sits beside it, and no block at all is `None`, never an empty list.
+fn antivirus_answer(
+    described: Option<Vec<FixtureAntivirusProduct>>,
+    failure: Option<FixtureAntivirusProductsFailure>,
+) -> Option<Result<Vec<AntivirusProductRecord>, FixtureAntivirusProductsFailure>> {
+    match (described, failure) {
+        (_, Some(failure)) => Some(Err(failure)),
+        (Some(described), None) => Some(Ok(antivirus_records(described))),
+        (None, None) => None,
+    }
+}
+
 /// The firmware a fixture describes (ADR 0038). Absent means the fixture never modelled it, which the
 /// accessor reports as `Unsupported` rather than inventing a Secure Boot state.
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -1263,10 +1276,9 @@ pub struct FixtureHost {
     access_denied: Vec<String>,
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
-    /// The products the fixture wrote under `antivirus_products:`, or `None` when it modelled none.
-    antivirus_products: Option<Vec<AntivirusProductRecord>>,
-    /// How Security Center's list was not answered, when the fixture modelled that instead.
-    antivirus_products_failure: Option<FixtureAntivirusProductsFailure>,
+    /// Security Center's answer: the products it listed or the reason it did not answer, or `None`
+    /// when the fixture modelled neither.
+    antivirus: Option<Result<Vec<AntivirusProductRecord>, FixtureAntivirusProductsFailure>>,
     firmware: Option<FixtureFirmware>,
     iommu_table: Option<FixtureIommuTable>,
     processes: Option<Vec<ProcessRecord>>,
@@ -1393,8 +1405,7 @@ impl FixtureHost {
                 .collect(),
             code_integrity: file.code_integrity,
             tpm: file.tpm,
-            antivirus_products: file.antivirus_products.map(antivirus_records),
-            antivirus_products_failure: file.antivirus_products_failure,
+            antivirus: antivirus_answer(file.antivirus_products, file.antivirus_products_failure),
             firmware: file.firmware,
             iommu_table: file.iommu_table,
             processes: file
@@ -1851,16 +1862,17 @@ impl AntivirusProductSource for FixtureHost {
     /// An `antivirus_products_failure:` entry is the answer whatever `antivirus_products:` holds, so a
     /// fixture can say the list was refused or could not be read.
     fn antivirus_products(&self) -> Result<Vec<AntivirusProductRecord>, SourceError> {
-        match self.antivirus_products_failure {
-            Some(FixtureAntivirusProductsFailure::AccessDenied) => Err(SourceError::AccessDenied),
-            Some(FixtureAntivirusProductsFailure::ReadFailed) => Err(SourceError::Failed(
+        match self.antivirus.as_ref() {
+            Some(Err(FixtureAntivirusProductsFailure::AccessDenied)) => {
+                Err(SourceError::AccessDenied)
+            }
+            Some(Err(FixtureAntivirusProductsFailure::ReadFailed)) => Err(SourceError::Failed(
                 "this fixture host describes an antivirus read that failed".to_owned(),
             )),
-            None => self.antivirus_products.clone().ok_or_else(|| {
-                SourceError::Unsupported(
-                    "this fixture host does not describe antivirus products".to_owned(),
-                )
-            }),
+            Some(Ok(products)) => Ok(products.clone()),
+            None => Err(SourceError::Unsupported(
+                "this fixture host does not describe antivirus products".to_owned(),
+            )),
         }
     }
 }

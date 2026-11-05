@@ -7,7 +7,17 @@
 //! Only the list is read: the program never registers with Security Center, changes a default
 //! product or asks for notifications.
 
+#[cfg(windows)]
+use std::sync::mpsc;
+#[cfg(windows)]
+use std::time::Duration;
+
 use rongroi_host::SourceError;
+
+/// How long the Security Center read may take before this program stops waiting. A0 measured 23 ms
+/// at most; blocking was not measured.
+#[cfg(windows)]
+const TIMEOUT: Duration = Duration::from_secs(15);
 
 /// `E_ACCESSDENIED`: Windows refused the call.
 const E_ACCESSDENIED: i32 = 0x8007_0005_u32.cast_signed();
@@ -29,15 +39,27 @@ pub fn classify_error(call: &str, code: i32) -> SourceError {
 ///
 /// The COM objects live on a thread of their own, initialised there and dropped there, so this
 /// program's main thread never meets the COM state the desktop app keeps. A panic on that thread is
-/// a failure, never a panic in the caller.
+/// a failure, never a panic in the caller. A call that does not answer in time leaves the thread
+/// detached rather than hanging the scan.
 #[cfg(windows)]
 pub fn products() -> Result<Vec<rongroi_host::AntivirusProductRecord>, SourceError> {
+    let (sender, receiver) = mpsc::channel();
     std::thread::Builder::new()
         .name("security-center".to_owned())
-        .spawn(live::read)
-        .map_err(|error| SourceError::Failed(format!("no thread for Security Center: {error}")))?
-        .join()
-        .map_err(|_| SourceError::Failed("the Security Center read stopped".to_owned()))?
+        .spawn(move || {
+            // A timed-out caller has dropped the receiver, so a failed send is expected and ignored.
+            let _ = sender.send(live::read());
+        })
+        .map_err(|error| SourceError::Failed(format!("no thread for Security Center: {error}")))?;
+    match receiver.recv_timeout(TIMEOUT) {
+        Ok(answer) => answer,
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(SourceError::Failed(
+            "the Security Center read did not answer in 15 s".to_owned(),
+        )),
+        Err(mpsc::RecvTimeoutError::Disconnected) => Err(SourceError::Failed(
+            "the Security Center read stopped".to_owned(),
+        )),
+    }
 }
 
 #[cfg(windows)]
