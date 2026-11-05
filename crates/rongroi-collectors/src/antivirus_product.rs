@@ -191,7 +191,10 @@ impl AntivirusProduct {
 /// The one observation that says how many products Windows lists and how many report themselves on.
 fn summary(products: &[AntivirusProductRecord]) -> Observation {
     let mut fields = BTreeMap::new();
-    fields.insert("products".to_owned(), serde_json::Value::from(products.len()));
+    fields.insert(
+        "products".to_owned(),
+        serde_json::Value::from(products.len()),
+    );
     fields.insert(
         "products_on".to_owned(),
         serde_json::Value::from(products.iter().filter(|product| product.state == 0).count()),
@@ -328,7 +331,10 @@ fn note(gaps: &mut BTreeMap<String, UnmeasuredReason>, field: &str, reason: Unme
         UnmeasuredReason::AccessDenied => 1,
         _ => 2,
     };
-    if gaps.get(field).is_none_or(|current| rank(reason) < rank(*current)) {
+    if gaps
+        .get(field)
+        .is_none_or(|current| rank(reason) < rank(*current))
+    {
         gaps.insert(field.to_owned(), reason);
     }
 }
@@ -528,7 +534,9 @@ mod tests {
             Some(paths::UNREDACTABLE_FORM)
         );
         assert_eq!(text(defender, "file_unread"), Some("not_drive_rooted"));
-        let json = serde_json::to_string(observations).unwrap().to_ascii_lowercase();
+        let json = serde_json::to_string(observations)
+            .unwrap()
+            .to_ascii_lowercase();
         assert!(!json.contains("windowsdefender"), "{json}");
     }
 
@@ -636,8 +644,14 @@ mod tests {
         let (observations, _) = measured(&run);
         assert_eq!(summary_observation(observations).fields["products"], 2);
         assert_eq!(summary_observation(observations).fields["products_on"], 1);
-        assert_eq!(text(product(observations, "One Antivirus"), "state"), Some("on"));
-        assert_eq!(text(product(observations, "Two Antivirus"), "state"), Some("off"));
+        assert_eq!(
+            text(product(observations, "One Antivirus"), "state"),
+            Some("on")
+        );
+        assert_eq!(
+            text(product(observations, "Two Antivirus"), "state"),
+            Some("off")
+        );
     }
 
     #[test]
@@ -674,8 +688,16 @@ mod tests {
             let run = AntivirusProduct::default().collect(&fixture(name));
             let (observations, gaps) = measured(&run);
             assert!(gaps.is_empty(), "{name}: {gaps:?}");
-            assert_eq!(summary_observation(observations).fields["products"], 1, "{name}");
-            assert_eq!(summary_observation(observations).fields["products_on"], 1, "{name}");
+            assert_eq!(
+                summary_observation(observations).fields["products"],
+                1,
+                "{name}"
+            );
+            assert_eq!(
+                summary_observation(observations).fields["products_on"],
+                1,
+                "{name}"
+            );
             let defender = product(observations, "Antivirus Microsoft Defender");
             assert_eq!(text(defender, "state"), Some("on"), "{name}");
             assert_eq!(
