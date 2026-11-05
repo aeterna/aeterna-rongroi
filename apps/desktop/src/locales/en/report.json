@@ -74,6 +74,7 @@
   },
   "hidden": "Hidden in SS mode: {{notFound}} not found · {{unmeasuredExpected}} not measured (expected) · {{unmeasuredUnexpected}} not measured (not expected) · {{unmatched}} unmatched observations",
   "empty": "No evidence to show.",
+  "scroll_top": "Back to top",
   "summary": {
     "title": "What this scan lists",
     "found": "found — each one lists ordinary things that also produce it",
@@ -89,6 +90,13 @@
     "search_label": "Search checks",
     "clear_search": "Clear search",
     "search_empty": "No checks match your search."
+  },
+  "palette": {
+    "label": "Jump to evidence",
+    "input_label": "Search evidence",
+    "list_label": "Matching evidence",
+    "results": "{{count}} matching check(s)",
+    "empty": "No checks match your search."
   },
   "collector": {
     "posture": "Security settings of this PC",
@@ -561,5 +569,24 @@
       "code_integrity": "Code Integrity refused a file at the same path on some drive.",
       "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed."
     }
+  },
+  "presenter": {
+    "toggle": "Presenter",
+    "prev": "Previous",
+    "next": "Next",
+    "counter": "{{current}} / {{total}}",
+    "group": "Group {{current}} of {{total}}: {{title}}"
+  },
+  "sources": {
+    "button": "Source",
+    "title": "Sources",
+    "close": "Close",
+    "rule": "Rule id",
+    "collector": "Collector",
+    "retention": "Look-back",
+    "code": "Where this is in the code"
+  },
+  "skeleton": {
+    "loading": "Loading the report"
   }
 }

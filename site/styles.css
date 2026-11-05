@@ -97,6 +97,21 @@ summary:focus-visible {
   border-radius: 6px;
 }
 
+/* Text for assistive technology only, kept in the layout as a 1px clipped box: the specimen's live region
+   announces row counts and copy results without adding a line the page does not already show. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Inline SVG icon styles (strict zero-emoji policy) */
 .icon {
   display: inline-block;
@@ -416,7 +431,10 @@ nav.lang a[aria-current="page"] {
   gap: 8px;
 }
 
-.tally div {
+/* The tally cells: plain divs before the script, buttons now that one box can be pressed. Both keep the
+   same box, so the rule covers each. */
+.tally div,
+.tally-box {
   background: var(--surface-solid);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -452,6 +470,32 @@ nav.lang a[aria-current="page"] {
   color: var(--unmeasured);
 }
 
+/* A tally box is a filter button, so it drops the button's own centred, system-styled look and keeps the
+   box the divs had. It fills its grid column, as the divs did. */
+.tally-box {
+  width: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.tally-box:hover {
+  border-color: var(--line-strong);
+}
+
+/* The pressed box reads as a double line and a lifted edge: a change of shape, never colour alone. */
+.tally-box[aria-pressed="true"] {
+  border-color: var(--line-strong);
+  box-shadow:
+    inset 0 0 0 1px var(--line-strong),
+    0 4px 10px -6px #2a5d9a99;
+}
+
 .specimen .note {
   margin: 0;
 }
@@ -462,6 +506,8 @@ nav.lang a[aria-current="page"] {
   align-items: center;
 }
 
+/* The field is a search field now, so it sheds WebKit's own bezel and keeps the border every other control
+   on the card has. */
 .specimen-search input {
   width: 100%;
   padding: 7px 12px 7px 32px;
@@ -472,6 +518,7 @@ nav.lang a[aria-current="page"] {
   background: var(--surface-solid);
   color: var(--text);
   box-sizing: border-box;
+  -webkit-appearance: textfield;
 }
 
 .specimen-search .search-icon {
@@ -481,6 +528,19 @@ nav.lang a[aria-current="page"] {
   width: 14px;
   height: 14px;
   pointer-events: none;
+}
+
+/* The rows sit in one wrapper now, so the gap the figure's own grid used to give them lives here.
+   A row the script hides is removed from the layout, not just from sight: the grid would otherwise
+   ignore the hidden attribute, which a display rule outranks. */
+#specimen-rows {
+  display: grid;
+  gap: 14px;
+}
+
+.specimen-row[hidden],
+#specimen-empty[hidden] {
+  display: none;
 }
 
 .specimen-row {
@@ -512,10 +572,24 @@ nav.lang a[aria-current="page"] {
   color: var(--navy);
 }
 
-.specimen-row .pill {
+.specimen-row[data-state="found"] .pill {
   color: var(--found);
   border-color: var(--found-line);
   background: var(--surface-solid);
+}
+
+/* A row that is not a finding is a plain box, and a not measured row a dashed one, as the three results
+   further down the page are: the warm tint and the inset bar belong to a found row alone. */
+.specimen-row[data-state="not_found"] {
+  border-color: var(--line);
+  background: #ffffffb3;
+  box-shadow: none;
+}
+
+.specimen-row[data-state="unmeasured"] {
+  border: 1px dashed var(--unmeasured-line);
+  background: var(--unmeasured-ground);
+  box-shadow: none;
 }
 
 .specimen-desc {
@@ -554,20 +628,41 @@ nav.lang a[aria-current="page"] {
   line-height: 1.45;
 }
 
+/* The copy control is a button too: it keeps the small framed look the div had, and gains a pointer and a
+   left-aligned label, as the div's text had. */
 .specimen-tech-btn {
   grid-column: 2 / -1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   justify-self: start;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
   font-family: inherit;
   font-size: 0.78rem;
   font-weight: 500;
+  text-align: left;
   padding: 3px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface-solid);
   color: var(--text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.specimen-tech-btn:hover {
+  border-color: var(--line-strong);
+}
+
+/* Keyboard focus on the three controls the script drives: a solid ring in the links' blue, since the boxes
+   and the field sit on a panel rather than on the sky. */
+.tally-box:focus-visible,
+.specimen-tech-btn:focus-visible,
+#specimen-q:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
 }
 
 /* State marks, as in the window. */
@@ -996,6 +1091,18 @@ footer p {
   }
 }
 
+/* Nothing on the page eases when the visitor asks for less motion: the buttons and the pills change their
+   border, shadow and place at once instead. */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .tally-box,
+  .specimen-tech-btn,
+  .scan-source,
+  .scan-play {
+    transition: none;
+  }
+}
+
 @media (max-width: 960px) {
   .hero {
     grid-template-columns: 1fr;
@@ -1044,5 +1151,690 @@ footer p {
 
   ol.steps li {
     padding-left: 56px;
+  }
+}
+
+/* ==== Data stays on this PC (E6): the SVG data-flow diagram ==== */
+/* The diagram sits on a panel like every other figure on the page. Its wires, boxes, scan node and the
+   blocked wire's cross stand as drawn; the only moving parts are the packet dots, which are SMIL
+   animations inside the SVG itself. flow.js pauses them while the diagram is off screen or while the
+   visitor asked for reduced motion; the rule below also hides the dots for reduced motion with
+   JavaScript off, so the two cases show the same still diagram. Colours are the page's existing vars,
+   except the barrier tint, which is the same #b45309 the alert icons already use. */
+.dataflow > svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--surface);
+  border: 2px solid #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.dataflow text {
+  font-family: inherit;
+}
+
+.dataflow .df-lab {
+  font-size: 19px;
+  font-weight: 600;
+  fill: var(--text);
+}
+
+.dataflow .df-sub {
+  font-size: 14px;
+  fill: var(--muted);
+}
+
+.dataflow .df-box {
+  fill: var(--surface-solid);
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.dataflow .df-core {
+  fill: var(--blue-soft);
+  stroke: var(--blue);
+  stroke-width: 2;
+}
+
+.dataflow .df-wire {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.dataflow .df-wire-no {
+  stroke: #b45309;
+  stroke-dasharray: 6 7;
+}
+
+.dataflow .df-head {
+  fill: var(--line-strong);
+}
+
+.dataflow .df-x {
+  stroke: #b45309;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.dataflow .df-pkt {
+  stroke: none;
+}
+
+.dataflow .df-pkt-1 {
+  fill: var(--blue);
+}
+
+.dataflow .df-pkt-2 {
+  fill: var(--violet);
+}
+
+.dataflow .df-pkt-x {
+  fill: #b45309;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dataflow .df-pkt {
+    display: none;
+  }
+}
+
+/* ==== Score and verdict versus three states of evidence (E7): the before/after comparison ==== */
+/* A made-up scoring tool beside rongroi's three states. The marks keep the app's shapes and the page's
+   existing colours — an orange square for found, a grey circle for not found, a dashed indigo circle for
+   not measured — never red or green. The segmented control is not in the markup: compare.js adds it, and
+   until it runs both panels stand one above the other, rongroi first, so the page reads with JavaScript
+   off. Only transform, opacity and stroke-dashoffset ease; reduced motion keeps every mark and the stamp
+   in their final state. */
+.cmp {
+  --cmp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cmp .seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.cmp .seg button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cmp .seg button[aria-pressed="true"] {
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.cmp .seg button:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.cmp .panels {
+  display: grid;
+  gap: 18px;
+}
+
+.cmp .panels > section {
+  padding: 6px 0;
+}
+
+.cmp .panels > section[hidden] {
+  display: none;
+}
+
+/* The invented panel: a score, a meter and a verdict stamp, all visibly labelled as a made-up picture. */
+.cmp .score {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 560px;
+}
+
+.cmp .score .note {
+  margin: 0;
+}
+
+.cmp .tag {
+  align-self: flex-start;
+  padding: 2px 12px;
+  border: 1px solid #cfe5f8;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-family: var(--display);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.cmp .big {
+  color: var(--navy);
+  font: 700 clamp(2.8rem, 8vw, 3.2rem) / 1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+
+.cmp .meter {
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--raised);
+}
+
+.cmp .meter i {
+  display: block;
+  width: 87%;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #d99a3a, #b45309);
+}
+
+.cmp .stamp {
+  align-self: flex-start;
+  padding: 2px 14px;
+  border: 3px solid #b45309;
+  border-radius: 10px;
+  color: #b45309;
+  font: 700 1.1rem var(--display);
+  transform: rotate(-5deg);
+}
+
+/* The three rongroi states, drawn with the same marks the app uses. */
+.cmp .three {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.cmp .st {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.cmp .st svg {
+  width: 48px;
+  height: 48px;
+}
+
+.cmp .st .sh {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.cmp .st.f .sh {
+  fill: var(--found-mark);
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.cmp .st.n .sh {
+  stroke: var(--not-found);
+  stroke-dasharray: 63;
+  stroke-dashoffset: 0;
+}
+
+.cmp .st.u .sh {
+  stroke: var(--unmeasured);
+  stroke-dasharray: 4 5;
+}
+
+.cmp .st h3 {
+  margin: 0;
+  color: var(--navy);
+  font-family: var(--display);
+  font-size: 1.15rem;
+}
+
+.cmp .st p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+/* With JavaScript on, each state redraws when its panel is chosen. The base state is the final one, so
+   the no-JavaScript page already shows every mark. */
+.cmp.ready .panels > section .st.f .sh {
+  transform: scale(0);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s;
+}
+
+.cmp.ready .panels > section .st.n .sh {
+  stroke-dashoffset: 63;
+  transition: stroke-dashoffset 0.9s var(--cmp-ease) 0.15s;
+}
+
+.cmp.ready .panels > section .st.u .sh {
+  opacity: 0;
+  transition: opacity 0.6s var(--cmp-ease) 0.35s;
+}
+
+.cmp.ready .panels > section.on .st.f .sh {
+  transform: scale(1);
+}
+
+.cmp.ready .panels > section.on .st.n .sh {
+  stroke-dashoffset: 0;
+}
+
+.cmp.ready .panels > section.on .st.u .sh {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmp.ready .panels > section .st.f .sh,
+  .cmp.ready .panels > section .st.n .sh,
+  .cmp.ready .panels > section .st.u .sh {
+    transition: none;
+  }
+}
+
+/* E12 micro-interactions (web) */
+/* A press, a soft keyboard-focus ring and one small tally pulse, mirroring apps/desktop/src/micro.css
+   without importing it. Decoration only: it never scores, hides, greys out or vouches for anything,
+   never re-colours a found / not found / unmeasured mark, and changes no text or layout. Everything
+   sits inside the no-preference query, so a reader who asks for reduced motion keeps the page's
+   final, still state. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The existing colour fades stay in each list, so this press rule does not collapse them to an
+     instant flip where the shorthand wins the cascade. */
+  .btn {
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .tally-box {
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .cmp .seg button {
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease,
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+
+  /* The pill buttons press in and return on the same 120 ms ease. */
+  .btn:active,
+  .tally-box:active:not(:disabled),
+  .cmp .seg button:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Keyboard focus keeps the styles.css outline and gains a soft glow ring beside it; the ring never
+     replaces the outline and no element loses a resting shadow it already had. */
+  a:focus-visible,
+  button:focus-visible,
+  summary:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    box-shadow: 0 0 0 4px rgba(8, 105, 176, 0.3);
+  }
+
+  .btn.primary:focus-visible {
+    box-shadow:
+      0 0 0 4px rgba(8, 105, 176, 0.3),
+      0 10px 22px -10px #0869b0b3;
+  }
+
+  .btn.secondary:focus-visible {
+    box-shadow:
+      0 0 0 4px rgba(8, 105, 176, 0.3),
+      var(--shadow);
+  }
+
+  .tally-box[aria-pressed="true"]:focus-visible {
+    box-shadow:
+      0 0 0 4px rgba(8, 105, 176, 0.3),
+      inset 0 0 0 1px var(--line-strong),
+      0 4px 10px -6px #2a5d9a99;
+  }
+
+  /* The specimen's count boxes and their numerals pulse once on load, transform only. */
+  .tally-box,
+  .tally b {
+    animation: tally-pulse 220ms ease-out 1;
+  }
+
+  @keyframes tally-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.04);
+    }
+  }
+}
+
+/* ==== One scan, start to finish: the scan scene ==== */
+/* One example scan, drawn under the sources it was read from. Every beat of .scan-beats pairs one source
+   on the left with the result row that came from reading it on the right, joined by a wire that runs one
+   direction only, from the source to the row. The words live in the HTML; the hooks, .scan-in,
+   .scan-active, --scan-wire and data-scan-live below are set by scan.js (the 2026-11-03 site-scan-scene
+   handoff). With JavaScript off — and until scan.js runs — the finished picture stands: every row, source
+   and wire drawn, and the play button, slider and output stay hidden as written. While data-scan-live is
+   set, a row the scan has not reached keeps its place out of sight, all three wires draw together with
+   --scan-wire (0 to 1 over the read beat), and a tally whose state has not appeared keeps its place with
+   its number out of sight. Colours are the page's existing vars, so the bright-sky look and
+   the AA text colours hold; the marks keep the page's shapes and never turn green. */
+.scan {
+  margin: 0;
+  padding: 20px;
+  background: var(--surface);
+  border: 2px solid #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* The tag always shows, in every beat, so no one takes the picture for a scan of their own PC. */
+.scan-tag {
+  width: fit-content;
+  margin: 0 0 12px auto;
+  font: 600 0.78rem var(--display);
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.scan-beats {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.scan-beat {
+  display: grid;
+  grid-template-columns: minmax(8.5em, 13em) 44px 1fr;
+  gap: 6px 14px;
+  align-items: center;
+}
+
+.scan-source {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-solid);
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  transition: border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+}
+
+/* Being read reads as a double line, as the pressed tally does: a change of shape, never colour alone. */
+.scan-source.scan-active {
+  border-color: var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+}
+
+/* While the scene plays the three wires draw together: stroke-dashoffset against a pathLength of 1, so
+   --scan-wire (which runs 0 to 1 over the whole read beat) alone sets how far each has reached. Standing
+   still, every wire is simply drawn. */
+.scan-wire {
+  width: 100%;
+  height: 12px;
+  justify-self: stretch;
+}
+
+.scan-wire-line {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+[data-scan-scene][data-scan-live] .scan-wire-line {
+  stroke-dashoffset: calc(1 - var(--scan-wire, 0));
+}
+
+/* The three result rows, drawn like the specimen's rows and the three states further up the page: found
+   keeps the warm ground and its inset bar, not found a plain box, not measured a dashed one. */
+.scan-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 14px;
+  background: #ffffffb3;
+  box-shadow: none;
+  font-size: 0.9rem;
+}
+
+.scan-row[data-scan-row="found"] {
+  border-color: var(--found-line);
+  background: var(--found-ground);
+  box-shadow: inset 4px 0 0 var(--found-mark);
+}
+
+.scan-row[data-scan-row="unmeasured"] {
+  border: 1px dashed var(--unmeasured-line);
+  background: var(--unmeasured-ground);
+}
+
+.scan-row .mark {
+  margin-top: 7px;
+}
+
+.scan-words {
+  display: grid;
+  gap: 1px;
+}
+
+.scan-title {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.scan-desc {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* While the scene plays, a row the scan has not reached yet is out of sight but still occupies its grid
+   place, so the picture does not jump between beats. */
+[data-scan-scene][data-scan-live] .scan-row:not(.scan-in) {
+  visibility: hidden;
+}
+
+/* The jump tallies re-use the specimen's tally boxes, marks and state colours; only the spacing belongs
+   to the scene. */
+.scan .tally {
+  margin: 0 0 16px;
+}
+
+/* In the HTML every jump starts disabled: with script off it is a count in a box, not a control. So a
+   disabled jump keeps the enabled box's exact look — the browser's greyed text and dimmed form controls
+   stay out of it, and the shared tally-box hover and pointer cursor do not reach a disabled button.
+   scan.js enables a jump when script runs it, and the states come back on their own. */
+.scan .tally-box:disabled {
+  color: var(--text);
+  opacity: 1;
+  cursor: default;
+}
+
+.scan .tally-box:disabled:hover {
+  border-color: var(--line);
+}
+
+/* While the scene plays, a tally whose state has not appeared keeps its place and stays usable, with its
+   number out of sight until its row does. */
+[data-scan-scene][data-scan-live] [data-scan-jump]:not(.scan-in) b {
+  color: transparent;
+}
+
+/* The scene's one strip of controls. Everything in it starts hidden and scan.js reveals each part only
+   where it works, so the strip itself disappears while they all are. The scale under the slider is part
+   of the slider and never carries `hidden` of its own, so it does not count in the strip check: only the
+   strip's direct controls do. (:has fallback: without it the strip is merely a thin empty gap, and the
+   page still reads the same.) */
+.scan-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.scan-controls:not(:has(> :not([hidden]):not(.scan-window-scale))) {
+  display: none;
+}
+
+.scan-play {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-solid);
+  color: var(--navy);
+  font: 600 0.85rem var(--display);
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.scan-play:hover {
+  border-color: var(--line-strong);
+}
+
+.scan-play:focus-visible,
+.scan-controls input[type="range"]:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* The window slider: days ago from 30 down, on a full-width line of its own so the scale's split under it
+   lines up. The track carries no progress fill — the browser's own one would paint the older side blue and
+   read against the labels. Left of data-reach it is the pale line colour, past it the page's blue, split at
+   16 of 29 where the scale's columns split. The thumb takes the page's blue; scan.js writes aria-valuetext,
+   so no extra labelling is needed beyond the aria-label the HTML carries. */
+.scan-controls input[type="range"] {
+  flex: 1 1 100%;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+}
+
+.scan-controls input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line) 0, var(--line) calc(100% * 16 / 29), var(--blue) calc(100% * 16 / 29));
+}
+
+.scan-controls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 2px solid var(--surface-solid);
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.scan-controls input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line) 0, var(--line) calc(100% * 16 / 29), var(--blue) calc(100% * 16 / 29));
+}
+
+.scan-controls input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--surface-solid);
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+/* The scale under the slider: out of reach on the older side, still held on the newer one, split where
+   data-reach falls on the track. It is aria-hidden because the output already says it, and it stays out
+   of sight for as long as the slider is hidden. */
+.scan-window-scale {
+  flex-basis: 100%;
+  display: none;
+  grid-template-columns: 16fr 13fr;
+  justify-items: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.scan-controls input[type="range"]:not([hidden]) ~ .scan-window-scale {
+  display: grid;
+}
+
+.scan-window-out {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* While the scene plays, a hidden output keeps its place out of sight, so the figure's height does not
+   change and the page below it does not move. With script off data-scan-live is never set, so the
+   controls strip stays display none. */
+[data-scan-scene][data-scan-live] .scan-window-out[hidden] {
+  display: block;
+  visibility: hidden;
+}
+
+/* While the scene plays, the closing line stays out of sight — the scan has not said it is over yet —
+   but keeps its place, so the picture does not jump when scan.js removes data-scan-live at the end
+   frame. Script off and reduced motion never set data-scan-live, so the line stands as written there,
+   as the unreached rows above do. */
+[data-scan-scene][data-scan-live] .scan-end {
+  visibility: hidden;
+}
+
+/* Narrow screens: the beats stack, the decorative wire steps aside and the direction shows through the
+   order of source and row and the source being read. */
+@media (max-width: 560px) {
+  .scan-beat {
+    grid-template-columns: 1fr;
+  }
+
+  .scan-wire {
+    display: none;
   }
 }
