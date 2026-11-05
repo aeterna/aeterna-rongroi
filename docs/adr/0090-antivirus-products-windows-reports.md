@@ -5,6 +5,7 @@
   any server may block on a Defender rule, and until then a Defender rule gives a server a warning only. Spike lane S11 (does another antivirus make the
   Defender rules fire, and why) has not run: no test machine with another antivirus yet (P4)
 - Date: 2026-11-01
+- Amended: 2026-11-05, probe A0's results ("A0, measured") and the owner's answer to question 1 after it; Claude Code - Claude Opus 5.5
 - Related: AGENTS.md hard rules 2–5 and 9, ADR 0011 (WMI declined for one value), ADR 0030 (the reasons),
   ADR 0035 (`signature`), ADR 0052 (scan tiers), ADR 0056 (`os_image`, `service_windefend`,
   `installation_type`), ADR 0057 (`install_marker`, Defender's platform folder), ADR 0059 (Defender 5001),
@@ -79,7 +80,8 @@ The cost of the WSC API is the path. `RemediationPath` is documented only as "th
 security product", displayed in Security Center's interface. It is **not** documented to be the product's
 program file; WMI's `pathToSignedProductExe` is named as one, but is itself undocumented. Probe A0 (Order of
 work) reads both on the same PC. If `RemediationPath` does not name a program file there, the path question
-comes back to the owner (Owner decisions, question 1) before any code.
+comes back to the owner (Owner decisions, question 1) before any code. It did, and the owner kept the WSC API
+alone ("A0, measured").
 
 **Not read:**
 
@@ -121,7 +123,7 @@ ones is emitted as `state: other`, with the number in `state_value`.
 | `display_name` | text | `ProductName`, as Security Center gives it |
 | `state` | text | `on`, `off`, `snoozed`, `expired`, or `other` |
 | `state_value` | number | the raw enumeration value, only when `state` is `other` |
-| `path` | text | the product's program file, when section 1's question resolves to a drive-rooted file |
+| `path` | text | `RemediationPath`, when it names a drive-rooted file |
 | `path_withheld` | text | `unredactable_form`, in place of `path` when the path is not drive-rooted (as `bam`'s) |
 | `file_unread` | text | why the file was not opened or not fully read (below) |
 | `path_kind` | text | as `autostart`'s (ADR 0060): `windows`, `program_files`, `program_data`, `user_profile`, `other` |
@@ -161,6 +163,13 @@ ones is emitted as `state: other`, with the number in `state_value`.
   glossary row for `path_kind` gains this collector. `product_name` is not reused: it is `os_image`'s
   Windows `ProductName`, another idea.
 
+- **`RemediationPath` is read as it comes.** Nothing is expanded, unquoted or cut, because no page says what
+  form it takes. Empty: no `path`, no `path_withheld`, no `file_unread`. A URI, or anything else that is not
+  drive-rooted, takes the refused path above (`path_withheld: "unredactable_form"`, `file_unread:
+  "not_drive_rooted"`). Defender's row is that row: a name and a state, with no file evidence. No rule reads the
+  file fields.
+- **Budget: 5 seconds**, from A0's one file (about 0.7 s) and the three products expected.
+
 ### 4. Outcomes: found, nothing listed, unmeasured
 
 - **Not Windows** → `not_windows`.
@@ -170,18 +179,15 @@ ones is emitted as `state: other`, with the number in `state_value`.
   answer never depends on it.
 - **No product listed on a client** → `Measured` with the summary observation `products: 0`. It is an answer,
   the way ADR 0011 made "no TPM" an answer, not `source_empty`. Whether Security Center can list nothing for a
-  moment after sign-in, before products register, is **unverified**; A0 scans straight after a sign-in.
+  moment after sign-in, before products register, is **unverified**; the lab machine measures it at step 4.
 - **The Security Center service (`wscsvc`) stopped or disabled** → what the API answers is **not measured**.
-  Until A0 shows a distinct answer, every failed call is `read_failed`, which a rule cannot declare away, so SS
-  mode lists it. If A0 shows a distinct answer, it becomes `service_disabled`, and `rules/AGENTS.md`'s list of
+  Until the lab machine shows a distinct answer (step 4), every failed call is `read_failed`, which a rule cannot
+  declare away, so SS mode lists it. If it shows a distinct answer, that becomes `service_disabled`, and `rules/AGENTS.md`'s list of
   who reports that reason gains this collector.
 - **Refused** → `not_admin` without administrator rights, `access_denied` with them.
 
-**Administrator rights.** Expected **not** to be needed, but **unverified**: the WSC API's pages state no
-rights requirement. Spike S9 (2026-10-31) found that among the posture collectors only `defender_exclusion` needs an
-elevated scan, and the Connect sidecar's elevation rests on that. Both are inferences, not measurements of this
-API. A0 reads the list at Medium and at High integrity. If Medium is refused, ADR 0089's elevation section
-gains this collector beside `defender_exclusion`.
+**Administrator rights.** Not needed on the development PC: A0 read the same list at Medium and at High
+integrity. The Connect sidecar's elevation (ADR 0089, spike S9) gains nothing from this collector.
 
 **Fixtures.** `FixtureHost` gains an `antivirus_products:` block. A fixture with no such block answers
 `Unsupported`, never "nothing listed" (ADR 0011: a fixture's silence is not a default).
@@ -267,6 +273,32 @@ collector behind a `posture` rule, so the profile runs it under either sentence.
   statement to list one product, `on`, with a valid signature, and expects no Defender row to change. The lab
   machine has Defender only, so it cannot show a second product.
 
+## A0, measured
+
+On the development PC, 2026-11-05, Windows client edition, one product registered, by a small read-only program
+built with `windows` 0.62.2 and removed afterwards. Nothing was changed on the PC.
+
+| Question | Answer |
+|---|---|
+| The list at High integrity (label `0x3000`) | one product, `state` 0 (`ON`), 8 ms in all |
+| The list at Medium integrity (label `0x2000`) | the same product and state, 23 ms in all |
+| `ProductName` | `Antivirus Microsoft Defender`; WMI's `displayName` for the same registration is `Windows Defender`, so the two sources do not share names |
+| `RemediationPath` | an 18-character `windowsdefender:` URI, **not a program file** |
+| WMI `pathToSignedProductExe` | also a `windowsdefender:` URI, so the claim in section 1 that WMI names the program file does not hold for Defender |
+| WMI `pathToSignedReportingExe` | a file: `MsMpeng.exe` below the Program Files folder, signature `Valid`, 282,480 bytes, hash 91 ms, signature check 617 ms |
+| WMI query | 188 ms; `ProductGuid` equals WMI's `instanceGuid` |
+
+PowerShell's late binding cannot call the class (`TYPE_E_LIBNOTREGISTERED`, 0x8002801D); the vtable through
+the `windows` crate does.
+
+**Owner's answer to question 1 (2026-11-05): the WSC API alone**, knowing that Defender's row carries no file
+evidence and that a third-party product's `RemediationPath` stays unknown until S11 (P4). The alternative,
+adding WMI for `pathToSignedReportingExe` only, stays open if S11 shows the file is needed.
+
+**Moved by the owner to step 4, on the lab machine:** the list straight after a sign-in, and the answer with
+`wscsvc` stopped. The development PC was not signed out and its service was not stopped. The junction question
+belongs to ADR 0091's probe, which that ADR's amendment sets before the next release; A0 did not run it.
+
 ## Order of work
 
 1. **A0, probe** (the development PC, read-only, a counts-and-words probe): the WSC API's list at Medium and at
@@ -275,12 +307,13 @@ collector behind a `posture` rule, so the profile runs it under either sentence.
    and check each file; the list straight after a sign-in; the answer with `wscsvc` stopped, if the owner allows
    stopping it on that PC. Results go into this ADR as "Measured", with no path below a profile and no GUID.
 2. A0's results against the owner decisions below; question 1 comes back to the owner only if A0 finds that
-   `RemediationPath` is not a program file.
+   `RemediationPath` is not a program file. It did; answered 2026-11-05 ("A0, measured").
 3. **The collector** (sections 1–4), its tests, the fixture host block, `clippy.toml`, the glossary, the
    privacy and consent texts, a CHANGELOG line. One pull request into `dev`, written by an engineer run.
 4. **The statement and the rule text** (section 5): the view, the `defender` tags, the `falsepositives`
    lines, the regenerated rules reference, `docs/coverage.md` by `cargo xtask coverage`, the lab scenario. One
-   pull request after step 3.
+   pull request after step 3. The lab machine also reads the list straight after a sign-in and with `wscsvc`
+   stopped; a distinct answer amends section 4 in that pull request.
 5. **S11, on a PC with another antivirus (P4)**: the list, Defender's state in it, `service_windefend`, whether
    a 5001 was written, whether the exclusions are still there, and which Defender rules fire. Its results amend
    this ADR, ADR 0059's "What is unverified" and the two rules whose text claims what another antivirus does.
@@ -292,7 +325,7 @@ collector behind a `posture` rule, so the profile runs it under either sentence.
 1. **The source** (section 1). Recommended: **the WSC API** — documented state, no decoding, no WMI.
    Alternative: WMI `root\SecurityCenter2` `AntiVirusProduct`, which gives a named program path but an
    undocumented class and a state number nobody can decode by a published layout (section 2). Decided after A0
-   if `RemediationPath` is not a program file.
+   if `RemediationPath` is not a program file. **Answered 2026-11-05: the WSC API alone** ("A0, measured").
 2. **One `posture` rule**, `rules/antivirus_product/registered/no-product-reports-on`, `match:
    { products_on: 0 }`, `experimental`: "Windows Security Center lists no antivirus product that reports
    itself on". Recommended: **yes** — it is the machine requirement a server would gate on, it counts states and
@@ -323,14 +356,14 @@ collector behind a `posture` rule, so the profile runs it under either sentence.
 
 - Whether another antivirus makes Defender write a 5001, set `WinDefend` to `disabled`, or drop its
   exclusions (S11, P4).
-- Whether `RemediationPath` names the product's program file (A0).
-- Whether a standard account can read the list (A0).
-- Whether reading a path component's attributes without following a link can reach the network (A0, lab).
+- What a third-party product's `RemediationPath` holds. Defender's is a URI (A0); others are S11's question.
+- Whether a standard account can read the list on a PC other than the development PC. Medium integrity could there (A0).
+- Whether reading a path component's attributes without following a link can reach the network (ADR 0091's probe, lab).
 - How Security Center checks a program that registers as an antivirus, and so how easily a registration can be
   made by something that is not one.
-- What the API answers on a Server edition, and with `wscsvc` stopped (A0 for the second, nobody for the first:
+- What the API answers on a Server edition, and with `wscsvc` stopped (the lab machine at step 4 for the second, nobody for the first:
   section 4 does not depend on it).
-- Whether Security Center lists nothing for a moment after sign-in (A0).
+- Whether Security Center lists nothing for a moment after sign-in (the lab machine, step 4).
 - How a third-party product's `state` follows its own real-time switch, and how quickly.
 
 ## Consequences
