@@ -603,6 +603,7 @@ expression: "view::for_mode(&report, Mode::Ss)"
     "hid_device",
     "autostart",
     "defender_exclusion",
+    "antivirus_product",
     "fivem_dir",
     "fivem_servers",
     "net_config",
