@@ -341,6 +341,7 @@ function Antivirus({ statement }: { statement: AntivirusStatement }) {
       {statement.products.length > 0 && (
         <ul>
           {statement.products.map((product, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list that is never reordered, and two registrations can read the same
             <li key={index}>
               {product.display_name}: {antivirusState(t, product)}
               {product.signature && (

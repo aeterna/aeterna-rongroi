@@ -72,10 +72,7 @@ describe("CrossSource's antivirus statement", () => {
         "The list could not be read: this could not be read.",
         "A product listed here is what is registered with Windows, not proof that it scans.",
       ],
-      absent: [
-        "Security Center lists no antivirus product.",
-        "not read — this could not be read",
-      ],
+      absent: ["Security Center lists no antivirus product.", "not read — this could not be read"],
     },
   ];
 
