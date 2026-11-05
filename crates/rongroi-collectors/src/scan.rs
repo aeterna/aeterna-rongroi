@@ -35,17 +35,46 @@ pub struct ScanContext {
 
 /// Runs every collector against `host` and evaluates `bundle`.
 pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
+    let collectors = crate::all();
+    let ids: Vec<&str> = collectors.iter().map(|collector| collector.id()).collect();
+    scan(host, bundle, context, &collectors, &ids)
+}
+
+/// Runs the collectors named in `ids` against `host` and evaluates `bundle`.
+///
+/// A collector not named in `ids`, or above `context.tier`, is not called: its run is
+/// [`CollectorRun::Unmeasured`] with [`UnmeasuredReason::NotConsented`], exactly as a `full`
+/// collector is in a standard scan (ADR 0052). An id no collector has is ignored. [`run`] is this
+/// scan with every id, so the two cannot disagree about a collector they both call.
+pub fn run_selected(
+    host: &dyn Host,
+    bundle: &Bundle,
+    context: ScanContext,
+    ids: &[&str],
+) -> Report {
+    let collectors = crate::all();
+    scan(host, bundle, context, &collectors, ids)
+}
+
+/// The scan [`run`] and [`run_selected`] share. Every collector is visited, so a rule of one left
+/// out still has a run and can be unmeasured rather than `collector_unavailable`.
+fn scan(
+    host: &dyn Host,
+    bundle: &Bundle,
+    context: ScanContext,
+    collectors: &[Box<dyn crate::Collector>],
+    ids: &[&str],
+) -> Report {
     // Before the collectors, so that the count is read as close as possible to `generated_at`, which
     // the caller took just before this call: the `evtx` collector alone may run for 30 seconds, and
     // reading the count after it would move the start that much earlier (ADR 0039).
     let boot_time = boot_time(host, &context.generated_at);
     let profiles_directory = profiles_directory(host);
-    let collectors = crate::all();
     let tier = context.tier;
     let runs: Vec<CollectorRun> = collectors
         .iter()
         .map(|collector| {
-            if collector.tier() > tier {
+            if collector.tier() > tier || !ids.contains(&collector.id()) {
                 // Not called at all: no function of it touches the machine (ADR 0052).
                 CollectorRun::Unmeasured {
                     collector: collector.id().to_owned(),
@@ -71,9 +100,9 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
         anchors,
     };
     let mut report = engine::evaluate(bundle, &runs, header, &context.self_identity);
-    declare_times(&mut report, &collectors, &runs);
-    declare_sensitive(&mut report, &collectors);
-    declare_ages(&mut report, &collectors, bundle);
+    declare_times(&mut report, collectors, &runs);
+    declare_sensitive(&mut report, collectors);
+    declare_ages(&mut report, collectors, bundle);
     report
 }
 
@@ -1016,5 +1045,150 @@ mod tests {
             ))),
             None
         );
+    }
+
+    /// A subset scan calls only the collectors it names: every rule of a collector it left out is
+    /// unmeasured `not_consented`, the same mechanism a tier above the scan uses (ADR 0052).
+    #[test]
+    fn a_subset_scan_calls_only_the_collectors_it_names() {
+        let bundle = Bundle::embedded().unwrap();
+        let selected = ["posture", "os_image"];
+        let report = run_selected(
+            &host("platform: windows\n"),
+            &bundle,
+            context(ScanTier::Standard),
+            &selected,
+        );
+        for item in &report.evidence {
+            let selected_collector = selected.contains(&item.collector.as_str());
+            let not_consented = matches!(
+                item.state,
+                rongroi_core::model::EvidenceState::Unmeasured {
+                    reason: UnmeasuredReason::NotConsented,
+                    ..
+                }
+            );
+            assert_eq!(
+                not_consented,
+                !selected_collector,
+                "{}: {:?}",
+                item.collector,
+                item.state
+            );
+        }
+        assert!(
+            report
+                .unmatched
+                .iter()
+                .all(|group| selected.contains(&group.collector.as_str())),
+            "{:?}",
+            report.unmatched
+        );
+        for collector in selected {
+            assert!(
+                report
+                    .evidence
+                    .iter()
+                    .any(|item| item.collector == collector),
+                "{collector} has no evidence to check"
+            );
+        }
+    }
+
+    /// A subset cannot consent to a tier the player did not choose: a `full` id in `ids` at
+    /// `standard` is still `not_consented` and its collector is not called (ADR 0052).
+    #[test]
+    fn a_subset_scan_does_not_call_a_full_collector_at_standard() {
+        let bundle = Bundle::embedded().unwrap();
+        let report = run_selected(
+            &host("platform: windows\n"),
+            &bundle,
+            context(ScanTier::Standard),
+            &["fivem_servers"],
+        );
+        let full = crate::all()
+            .into_iter()
+            .find(|collector| collector.id() == "fivem_servers")
+            .expect("the subset names a collector this build has");
+        assert_eq!(full.tier(), ScanTier::Full);
+        assert!(
+            report
+                .evidence
+                .iter()
+                .any(|item| item.collector == "fivem_servers"),
+            "no fivem_servers rule in the bundle"
+        );
+        for item in report
+            .evidence
+            .iter()
+            .filter(|item| item.collector == "fivem_servers")
+        {
+            assert!(
+                matches!(
+                    item.state,
+                    rongroi_core::model::EvidenceState::Unmeasured {
+                        reason: UnmeasuredReason::NotConsented,
+                        ..
+                    }
+                ),
+                "{item:?}"
+            );
+        }
+        assert!(
+            report
+                .unmatched
+                .iter()
+                .all(|group| group.collector != "fivem_servers"),
+            "a standard subset scan holds observations of a full collector"
+        );
+    }
+
+    /// `run` is the subset scan with every id: the two agree field for field on a fixture host.
+    #[test]
+    fn run_is_the_subset_scan_with_every_id() {
+        let bundle = Bundle::embedded().unwrap();
+        let fixture = fixture_host("prefetch-files-present");
+        let ids: Vec<&str> = crate::all().iter().map(|collector| collector.id()).collect();
+        assert_eq!(
+            run(&fixture, &bundle, context(ScanTier::Standard)),
+            run_selected(&fixture, &bundle, context(ScanTier::Standard), &ids)
+        );
+    }
+
+    /// An id no collector has is ignored, never an error and never a reason to skip a collector.
+    #[test]
+    fn an_unknown_id_is_ignored() {
+        let bundle = Bundle::embedded().unwrap();
+        let fixture = host("platform: windows\n");
+        assert_eq!(
+            run_selected(
+                &fixture,
+                &bundle,
+                context(ScanTier::Standard),
+                &["posture"],
+            ),
+            run_selected(
+                &fixture,
+                &bundle,
+                context(ScanTier::Standard),
+                &["posture", "not_a_collector"],
+            )
+        );
+    }
+
+    /// Prints the SS view of a subset report so a reader can see how the rules of collectors that
+    /// were not selected are worded; the wording is the reader's to judge, not this test's.
+    #[test]
+    fn a_subset_scan_prints_its_ss_view() {
+        let bundle = Bundle::embedded().unwrap();
+        let report = run_selected(
+            &host("platform: windows\n"),
+            &bundle,
+            context(ScanTier::Standard),
+            &["posture", "os_image"],
+        );
+        let view = rongroi_core::view::for_mode(&report, rongroi_core::model::Mode::Ss);
+        println!("{view:#?}");
+        assert!(view.scope.not_consented > 0, "no not_consented rule to read");
     }
 }
