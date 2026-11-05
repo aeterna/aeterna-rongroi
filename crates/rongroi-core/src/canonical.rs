@@ -15,8 +15,9 @@ use thiserror::Error;
 /// Why a value could not be canonicalised.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum CanonicalError {
-    /// A number had no exact integer form: it held a fraction, or did not fit `i64`/`u64`.
-    #[error("a record number must be an integer that fits i64 or u64")]
+    /// A number had no integral form JavaScript prints the same way: it held a fraction, or its
+    /// magnitude was 1e21 or more.
+    #[error("a record number must be an integer with magnitude below 1e21")]
     NonInteger,
 }
 
@@ -25,12 +26,17 @@ pub enum CanonicalError {
 /// Object keys are ordered by UTF-16 code units, not by their UTF-8 bytes: an astral character's
 /// first surrogate (`U+D83D`) sorts before a BMP character such as `U+E000`, though its code point
 /// and UTF-8 bytes sort after. Strings escape only `"`, `\` and `U+0000`–`U+001F`; every other
-/// character, ASCII or not, is written as UTF-8. Numbers must be integers: the record model holds
-/// none of the floats RFC 8785's number rule would cover (ADR 0089 §2).
+/// character, ASCII or not, is written as UTF-8. Numbers must be integral: the record model holds
+/// no fractional values (ADR 0089 §2), and RFC 8785's number rule routes every value through an
+/// IEEE double. An integer whose magnitude is at most 2^53 is written exactly; a larger one is
+/// written as its nearest `f64`, the digits JavaScript prints. An integral float below 1e21 is
+/// written the same way, and `-0.0` as `0`.
 ///
 /// # Errors
 ///
-/// [`CanonicalError::NonInteger`] when a number is not an integer, or does not fit `i64`/`u64`.
+/// [`CanonicalError::NonInteger`] when a number has a fraction, or its magnitude is 1e21 or more.
+/// Both are refused on purpose: JavaScript's `JSON.stringify` spells those forms differently, so
+/// `visual_hash` would not match what the server recomputes.
 pub fn canonical_json(value: &Value) -> Result<String, CanonicalError> {
     let mut out = String::new();
     write_value(value, &mut out)?;
@@ -100,9 +106,11 @@ fn write_string(text: &str, out: &mut String) {
 }
 
 fn write_number(number: &Number, out: &mut String) -> Result<(), CanonicalError> {
-    if number.is_i64() || number.is_u64() {
-        out.push_str(&number.to_string());
-        return Ok(());
+    if let Some(value) = number.as_i64() {
+        return write_integer(value, out);
+    }
+    if let Some(value) = number.as_u64() {
+        return write_unsigned_integer(value, out);
     }
     if let Some(float) = number.as_f64() {
         return write_integral_float(float, out);
@@ -110,24 +118,41 @@ fn write_number(number: &Number, out: &mut String) -> Result<(), CanonicalError>
     Err(CanonicalError::NonInteger)
 }
 
-// The range check before each cast is what makes it exact: neither cast can truncate or change sign.
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::float_cmp
-)]
+// 2^53 is the largest integer an IEEE double holds exactly; above it JavaScript rounds, so this
+// file must round too or the two `visual_hash` values disagree.
+const MAX_EXACT_INTEGER: u64 = 1u64 << 53;
+
+#[allow(clippy::cast_precision_loss)]
+fn write_integer(value: i64, out: &mut String) -> Result<(), CanonicalError> {
+    if value.unsigned_abs() <= MAX_EXACT_INTEGER {
+        let _ = write!(out, "{value}");
+        return Ok(());
+    }
+    write_integral_float(value as f64, out)
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn write_unsigned_integer(value: u64, out: &mut String) -> Result<(), CanonicalError> {
+    if value <= MAX_EXACT_INTEGER {
+        let _ = write!(out, "{value}");
+        return Ok(());
+    }
+    write_integral_float(value as f64, out)
+}
+
+// `{}` on an `f64` gives the shortest round-trip digits zero-padded past the exponent, which is
+// what JavaScript prints below 1e21. From 1e21 JavaScript switches to exponent notation, so those
+// values are refused rather than printed in a form the server cannot match.
+#[allow(clippy::float_cmp)]
 fn write_integral_float(float: f64, out: &mut String) -> Result<(), CanonicalError> {
-    let two_63 = 2f64.powi(63);
-    let two_64 = 2f64.powi(64);
-    if float.fract() != 0.0 {
+    if float.fract() != 0.0 || float.abs() >= 1e21 {
         return Err(CanonicalError::NonInteger);
     }
-    if (0.0..two_64).contains(&float) {
-        let _ = write!(out, "{}", float as u64);
-    } else if (-two_63..0.0).contains(&float) {
-        let _ = write!(out, "{}", float as i64);
+    if float == 0.0 {
+        // Both zeros print as `0` in JavaScript; `{}` would write `-0` for negative zero.
+        out.push('0');
     } else {
-        return Err(CanonicalError::NonInteger);
+        let _ = write!(out, "{float}");
     }
     Ok(())
 }
@@ -233,13 +258,46 @@ mod tests {
         let value = Value::Array(vec![
             Value::from(0i64),
             Value::from(-1i64),
-            Value::from(i64::MIN),
-            Value::from(i64::MAX),
-            Value::from(u64::MAX),
+            Value::from(-(1i64 << 53)),
+            Value::from(1i64 << 53),
         ]);
         assert_eq!(
             canonical_json(&value).unwrap(),
-            "[0,-1,-9223372036854775808,9223372036854775807,18446744073709551615]"
+            "[0,-1,-9007199254740992,9007199254740992]"
+        );
+    }
+
+    #[test]
+    fn integers_beyond_two_to_the_53_round_like_javascript() {
+        let cases = [
+            (json!(9_007_199_254_740_992i64), "9007199254740992"),
+            (json!(9_007_199_254_740_993i64), "9007199254740992"),
+            (json!(9_007_199_254_740_995i64), "9007199254740996"),
+            (json!(u64::MAX), "18446744073709552000"),
+            (json!(i64::MIN), "-9223372036854776000"),
+        ];
+        for (value, expected) in cases {
+            assert_eq!(canonical_json(&value).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn integral_floats_follow_javascript() {
+        let large: Value = serde_json::from_str("12345678901234567890.0").unwrap();
+        assert_eq!(canonical_json(&large).unwrap(), "12345678901234567000");
+        assert_eq!(canonical_json(&json!(1.0)).unwrap(), "1");
+        assert_eq!(canonical_json(&json!(-0.0)).unwrap(), "0");
+    }
+
+    #[test]
+    fn values_below_one_e21_are_written_but_one_e21_is_refused() {
+        assert_eq!(
+            canonical_json(&json!(1e20)).unwrap(),
+            "100000000000000000000"
+        );
+        assert_eq!(
+            canonical_json(&json!(1e21)),
+            Err(CanonicalError::NonInteger)
         );
     }
 
