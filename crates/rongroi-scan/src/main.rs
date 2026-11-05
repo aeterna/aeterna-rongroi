@@ -168,12 +168,18 @@ mod tests {
 
     #[test]
     fn unicode_arguments_are_kept() {
-        assert_eq!(unicode_args([OsString::from("--pipe")]), Ok(args(&["--pipe"])));
+        assert_eq!(
+            unicode_args([OsString::from("--pipe")]),
+            Ok(args(&["--pipe"]))
+        );
     }
 
     #[test]
     fn a_non_unicode_argument_is_refused() {
-        assert_eq!(unicode_args([non_unicode_argument()]), Err(ParseError::Unknown));
+        assert_eq!(
+            unicode_args([non_unicode_argument()]),
+            Err(ParseError::Unknown)
+        );
     }
 
     #[cfg(unix)]
