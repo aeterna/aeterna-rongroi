@@ -1165,7 +1165,10 @@ mod tests {
             assert!(loads, "{page}: no script tag for motion.js");
         }
         let css = std::fs::read_to_string(site_root().join("site/styles.css")).unwrap();
-        assert!(!css.contains("infinite"), "site/styles.css keeps a looping animation");
+        assert!(
+            !css.contains("infinite"),
+            "site/styles.css keeps a looping animation"
+        );
     }
 
     #[test]
