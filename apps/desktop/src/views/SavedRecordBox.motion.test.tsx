@@ -12,7 +12,12 @@ import { SavedRecordBox } from "./SavedRecordBox";
 
 const DIGEST = "3f9a1c2e7b4d5a60918273645f0e1d2c3b4a5968778695a4b3c2d1e0f9a8b7c6";
 const SHOWN = "3f9a 1c2e 7b4d 5a60";
-const SAVED = { digest: DIGEST, size: 163_000, case_code: null };
+const SAVED = {
+  digest: DIGEST,
+  size: 163_000,
+  case_code: null,
+  visual_hash: "5777137e45484779",
+};
 
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
 
