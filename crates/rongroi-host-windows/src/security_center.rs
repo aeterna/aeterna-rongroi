@@ -134,7 +134,10 @@ mod live {
             if is_service_not_running(error.code().0) {
                 return Ok(AntivirusList::ServiceNotRunning);
             }
-            return Err(classify_error("IWSCProductList::Initialize", error.code().0));
+            return Err(classify_error(
+                "IWSCProductList::Initialize",
+                error.code().0,
+            ));
         }
         // SAFETY: `list` is initialised for the antivirus provider and is live for this call.
         let counted = unsafe { list.Count() };

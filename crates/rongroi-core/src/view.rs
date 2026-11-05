@@ -4423,7 +4423,10 @@ mod tests {
         let view = for_mode(&report, Mode::SelfCheck);
         let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
         assert!(statement.products.is_empty());
-        assert_eq!(statement.not_read, Some(UnmeasuredReason::ServiceNotRunning));
+        assert_eq!(
+            statement.not_read,
+            Some(UnmeasuredReason::ServiceNotRunning)
+        );
         assert_eq!(
             serde_json::to_value(statement).unwrap()["not_read"],
             serde_json::Value::from("service_not_running")

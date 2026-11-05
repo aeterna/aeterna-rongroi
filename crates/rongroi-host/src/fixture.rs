@@ -3105,7 +3105,10 @@ processes:
         let host =
             FixtureHost::from_yaml_str("platform: windows\nantivirus_products: []\n", "inline")
                 .unwrap();
-        assert_eq!(host.antivirus_products(), Ok(AntivirusList::Products(vec![])));
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(AntivirusList::Products(vec![]))
+        );
     }
 
     /// A fixture that says the list was refused answers with the refusal, whatever the list holds.
@@ -3146,7 +3149,10 @@ processes:
             "inline",
         )
         .unwrap();
-        assert_eq!(host.antivirus_products(), Ok(AntivirusList::ServiceNotRunning));
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(AntivirusList::ServiceNotRunning)
+        );
     }
 
     /// The list keeps the order the fixture wrote, and every value reaches the caller unchanged:
