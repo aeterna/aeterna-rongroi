@@ -178,7 +178,7 @@ fn mutation_values() -> Vec<(&'static str, Value)> {
             policy(
                 "required_collectors",
                 Value::Array(vec![json!("posture"); 65]),
-            ),
+            )
         ),
         (
             "collectors non-string",
