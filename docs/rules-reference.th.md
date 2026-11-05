@@ -17,7 +17,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 |---|---|
 | รูปแบบ rule | 4 |
 | จำนวน rule | 78 |
-| SHA-256 | `366a8ebcff12cea7c8daf0d62e04f8d309a5cc87f01757f82e2edb51db61561b` |
+| SHA-256 | `6199c61340df584f2e070b712a2e1cedfa3e3a0adb20b1f29a3304b3cc9003bc` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -158,7 +158,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 - collector: `antivirus_product`
 - strength: `posture` — สถานะเครื่อง
 - status: `experimental` — อยู่ระหว่างพัฒนา
-- tag: `posture`, `antivirus_product`, `defender`
+- tag: `posture`, `antivirus_product`
 - เขียนเมื่อ: 2026-11-05
 
 **เกี่ยวกับการตรวจนี้**

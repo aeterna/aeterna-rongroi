@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 78 |
-| SHA-256 | `366a8ebcff12cea7c8daf0d62e04f8d309a5cc87f01757f82e2edb51db61561b` |
+| SHA-256 | `6199c61340df584f2e070b712a2e1cedfa3e3a0adb20b1f29a3304b3cc9003bc` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -161,7 +161,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - Collector: `antivirus_product`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `posture`, `antivirus_product`, `defender`
+- Tags: `posture`, `antivirus_product`
 - Written: 2026-11-05
 
 **About this check**
