@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 77
+      "rule_count": 78
     },
     "platform": "windows",
     "os_build": "26100",
@@ -79,6 +79,14 @@ expression: view
     ]
   },
   "evidence": [
+    {
+      "rule_id": "4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c",
+      "collector": "antivirus_product",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
     {
       "rule_id": "72820eaf-1469-4ea7-bb0f-17f145d26dfc",
       "collector": "autostart",
@@ -347,7 +355,7 @@ expression: view
   "listed": {
     "found": 5,
     "not_found": 12,
-    "unmeasured": 8
+    "unmeasured": 9
   },
   "hidden": {
     "not_found": 13,
@@ -866,6 +874,11 @@ expression: view
           "latest": "2025-12-20"
         }
       ]
+    },
+    {
+      "kind": "antivirus",
+      "products": [],
+      "not_read": "read_failed"
     }
   ]
 }

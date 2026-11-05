@@ -19,7 +19,7 @@
 
 | status | count |
 | --- | ---: |
-| experimental | 66 |
+| experimental | 67 |
 | test | 5 |
 | stable | 6 |
 | deprecated | 0 |
@@ -28,7 +28,7 @@
 
 | baseline | count |
 | --- | ---: |
-| confronted | 44 |
+| confronted | 45 |
 | known fp | 2 |
 | unconfronted | 31 |
 | known fp; unconfronted | 0 |
@@ -39,14 +39,14 @@
 | --- | ---: |
 | documented | 18 |
 | stated | 17 |
-| none | 42 |
+| none | 43 |
 
 ### Rules seen found
 
 | seen | count |
 | --- | ---: |
 | found | 16 |
-| never | 61 |
+| never | 62 |
 
 ### Ledger rows by kind
 
@@ -57,8 +57,9 @@
 
 ## Gaps
 
-### Rules never seen found outside a fixture (61)
+### Rules never seen found outside a fixture (62)
 
+- `antivirus_product/registered/no-product-reports-on`
 - `bam/ephemeral/executed-program-missing-on-disk`
 - `bam/timeline/fivem-game-process-by-name`
 - `bam/timeline/fivem-or-gta-v-by-name`
@@ -155,8 +156,9 @@
 - `fivem_dir/root-dlls/unsigned-root-proxy-dll` — added 2026-10-17; resolved when: A baseline's FiveM.app folder holds a proxy DLL measured on a real machine from a published release (such as a signed graphics mod or overlay placed in FiveM.app), with a PROVENANCE row saying where it came from, the date and the Windows build. Not a file invented to stand for a proxy DLL.
 - `usn/identity/digitalentitlements-file-deleted` — added 2026-10-17; resolved when: A baseline's `usn_journal:` block is rebuilt from a reading of a machine this project may publish taken with this collector, with its PROVENANCE row, listing DigitalEntitlements as identified — with no `deleted` record, which confronts this rule, or with one and a `known-fps.csv` row saying what produced it.
 
-### Collectors never measured (5)
+### Collectors never measured (6)
 
+- `antivirus_product`
 - `fivem_dir`
 - `install_marker`
 - `net_config`
@@ -204,8 +206,9 @@
 - `powershell_text`
 - `usn`
 
-### Collectors with no `rules/ages` file (12)
+### Collectors with no `rules/ages` file (13)
 
+- `antivirus_product`
 - `autostart`
 - `defender_exclusion`
 - `driver_service`
@@ -223,6 +226,7 @@
 
 | rule | collector | role | strength | status | fixtures | baseline | retention | seen found | measured on |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `antivirus_product/registered/no-product-reports-on` | antivirus_product | evidence | posture | experimental | 2 / 1 | confronted | none | never | never |
 | `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
 | `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 2 / 2 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
