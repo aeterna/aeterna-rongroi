@@ -8,6 +8,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ### Added
 - The landing page shows one example scan end in three kinds of evidence and no verdict, with a slider that shows what "not found" can and cannot say. With JavaScript off or reduced motion the finished picture stands.
 
+### Changed
+- The landing page's sample leans with the scroll and the pointer instead of floating on a loop, and the promise cards take a soft light under the pointer; both are off when the visitor asks for less motion.
+
 ## [0.14.0] - 2026-11-03
 
 ### Added

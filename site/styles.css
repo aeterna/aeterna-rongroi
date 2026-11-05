@@ -403,6 +403,11 @@ nav.lang a[aria-current="page"] {
   transform: rotate(1.2deg);
 }
 
+/* The 3D layer only exists while the script tilts the sample: a card at rest stays on the flat plane. */
+.specimen.is-tilting {
+  transform: perspective(1400px) rotateX(var(--sp-rx, 0deg)) rotateY(var(--sp-ry, 0deg)) rotate(1.2deg);
+}
+
 .specimen-head {
   display: flex;
   justify-content: space-between;
@@ -764,6 +769,29 @@ section > p {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 22px;
+  position: relative;
+  isolation: isolate;
+}
+
+/* The promise cards take a soft light that follows the pointer, drawn over the card's ground and under
+   its text and number as decoration only: it starts hidden and needs a fine pointer that hovers, so touch
+   screens and reduced motion keep the card still. */
+.ledger li::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), #0869b01a, transparent 70%);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .ledger li:hover::after {
+    opacity: 1;
+  }
 }
 
 .ledger li::before {
@@ -1051,16 +1079,14 @@ footer p {
   margin: 4px 0;
 }
 
-/* One entrance for the hero, staggered, and a slow float on the sample; nothing else moves. */
+/* One entrance for the hero, staggered; nothing else moves. */
 @media (prefers-reduced-motion: no-preference) {
   .hero > * {
     animation: rise 520ms ease-out both;
   }
 
   .hero > .specimen {
-    animation:
-      rise-tilted 520ms ease-out 120ms both,
-      float 6s ease-in-out 700ms infinite;
+    animation: rise-tilted 520ms ease-out 120ms both;
   }
 
   @keyframes rise {
@@ -1073,20 +1099,7 @@ footer p {
   @keyframes rise-tilted {
     from {
       opacity: 0;
-      transform: translateY(12px) rotate(1.2deg);
-    }
-    to {
-      transform: rotate(1.2deg);
-    }
-  }
-
-  @keyframes float {
-    0%,
-    100% {
-      transform: rotate(1.2deg);
-    }
-    50% {
-      transform: translateY(-6px) rotate(1.2deg);
+      translate: 0 12px;
     }
   }
 }
