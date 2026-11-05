@@ -83,9 +83,10 @@ swap looks the same.
 
 Of the **antivirus products Windows Security Center lists** (ADR 0090), it reads the name each product
 registers and the state it reports — on, off, snoozed or expired. When the path Security Center gives is a
-file on a local drive, it reads that path, with your user name hidden, and the file's SHA-256 and embedded
-signature. A path that is not a file on a local drive, such as Defender's `windowsdefender:` URI or a
-network share, is withheld whole and never shown.
+file on a local drive, it reads that path, with your user name hidden in SS mode, and the file's SHA-256 and
+embedded signature. A path that does not start with a drive letter, such as Defender's `windowsdefender:` URI
+or a network share, is withheld whole and never shown. A path on a mapped network drive is shown, and its file
+is not opened.
 
 Of **what Windows starts by itself** it reads three places (ADR 0060):
 

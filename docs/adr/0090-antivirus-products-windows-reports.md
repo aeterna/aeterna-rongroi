@@ -134,8 +134,8 @@ ones is emitted as `state: other`, with the number in `state_value`.
 - **Hashing and signatures** use the existing `SignatureSource` and hashing code, under a wall-clock budget of
   its own checked before each file, with a `budget_spent` gap on `sha256` and `signature` when it runs out, as
   `driver_service` does. A product's file under `%SystemRoot%` is checked like any other (ADR 0084). The
-  budget's number is set in the pull request, after A0 times the files; a PC is expected to list one to three
-  products, so it should be small. **Unverified** until measured.
+  budget is 5 seconds (below); a PC is expected to list one to three products, which is **unverified**
+  beyond the one on the development PC.
 - **Only a file on a fixed local drive is opened.** The registering program chooses the path, so it can name a
   network share, and opening it would make this program connect to another machine, sending the account's
   credentials to it. That is network access in all but name (hard rule 1). Before the file is opened, all of
@@ -151,9 +151,9 @@ ones is emitted as `state: other`, with the number in `state_value`.
     local (a volume name, a cloud placeholder whose data is not on the disk, an unknown reparse tag) as
     `link_unsupported`.
 
-  A refused path keeps its `path` (or `path_withheld`) and gets no `sha256` or `signature`, with
-  `file_unread` carrying ADR 0091's reason. That is a fact about the path, not a gap, so no rule turns
-  `unmeasured` over it (ADR 0084's reasoning for `file_unread`). ADR 0091's own unverified points (that the
+  A refused path keeps its `path` and gets no `sha256` or `signature`, with `file_unread` carrying ADR 0091's
+  reason and `not_attempted` as the gap on both fields, as `driver_service` and `autostart` report it. A path
+  that is not drive-rooted never reaches the file read: it has `path_withheld` and `file_unread`, and no gap. ADR 0091's own unverified points (that the
   attribute and reparse reads on a link to a share stay off the network) apply here too; A0 does not repeat
   them.
 - **The name is not a key.** `display_name` is whatever the registering program wrote. It is never compared to
