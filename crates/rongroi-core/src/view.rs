@@ -4183,10 +4183,7 @@ mod tests {
 
     /// A report holding an antivirus list: one summary row and `products`, or an unread list with
     /// `not_read` and no observations at all.
-    fn antivirus_report(
-        products: Vec<Observation>,
-        not_read: Option<UnmeasuredReason>,
-    ) -> Report {
+    fn antivirus_report(products: Vec<Observation>, not_read: Option<UnmeasuredReason>) -> Report {
         use serde_json::json;
         let mut report = report();
         report.header.generated_at = "2026-01-10T12:00:00Z".to_owned();
@@ -4205,7 +4202,11 @@ mod tests {
         let on = products
             .iter()
             .filter(|product| {
-                product.fields.get("state").and_then(serde_json::Value::as_str) == Some("on")
+                product
+                    .fields
+                    .get("state")
+                    .and_then(serde_json::Value::as_str)
+                    == Some("on")
             })
             .count();
         let mut observations = vec![number_observation(
@@ -4371,7 +4372,10 @@ mod tests {
             "on",
             &[
                 ("path", serde_json::Value::from(r"C:\Users\someone\av.exe")),
-                ("path_withheld", serde_json::Value::from("unredactable_form")),
+                (
+                    "path_withheld",
+                    serde_json::Value::from("unredactable_form"),
+                ),
                 ("sha256", serde_json::Value::from("a".repeat(64))),
             ],
         );
@@ -4501,8 +4505,9 @@ mod tests {
             .into_iter()
             .filter_map(|statement| match statement {
                 CrossSourceStatement::Session(session) => Some(session),
-                CrossSourceStatement::FivemAndRecords(_)
-                | CrossSourceStatement::Antivirus(_) => None,
+                CrossSourceStatement::FivemAndRecords(_) | CrossSourceStatement::Antivirus(_) => {
+                    None
+                }
             })
             .collect()
     }
