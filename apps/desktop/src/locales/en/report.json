@@ -368,6 +368,7 @@
   "saved": {
     "label": "Saved report",
     "case_code": "Case code:",
+    "visual_hash": "Visual check code",
     "digest": "Report SHA-256 — staff, note these 16:",
     "note": "This is the SHA-256 of the file Save writes: the view on this screen, the device list and the case code. A file whose SHA-256 starts the same is this report. It does not prove the screen was honest.",
     "button": "Save this report",

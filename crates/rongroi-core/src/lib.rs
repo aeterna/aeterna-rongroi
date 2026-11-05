@@ -10,6 +10,7 @@
 
 pub mod ages;
 pub mod bundle;
+pub mod canonical;
 pub mod digest;
 pub mod engine;
 pub mod loaded_files;

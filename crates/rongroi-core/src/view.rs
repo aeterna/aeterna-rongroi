@@ -18,9 +18,9 @@ pub use game::{
     TimeFact, WINDOW_SECONDS, WindowCounts, game_windows,
 };
 pub use saved::{
-    CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,
-    SHOWN_DIGEST_LEN, SavedRecord, SavedTimes, canonical_case_code, digest, saved_record,
-    shown_case_code,
+    Binding, CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, Policy, Producer, ProducerMode,
+    ProducerName, Profile, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA, SHOWN_DIGEST_LEN, SavedRecord,
+    SavedRecordError, SavedTimes, canonical_case_code, digest, saved_record, shown_case_code,
 };
 pub use session::{
     AnchorName, Comparison, Duration, DurationUnit, IndexBeside, LineState, Relation, SessionEnd,
