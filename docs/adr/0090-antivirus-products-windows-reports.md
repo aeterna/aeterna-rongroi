@@ -264,13 +264,16 @@ collector behind a `posture` rule, so the profile runs it under either sentence.
 - **View**: the statement in Self mode; in SS mode only beside a listed `defender` row; a profile path in it
   redacted; never counted.
 - **Baseline**: a new collector needs a `baseline-*` host that reads it (`crates/rongroi-collectors/AGENTS.md`).
-  The baselines are rebuilt from a scan of the machines they describe; none is written by hand. Until then a
+  The baselines are rebuilt from a scan of the machines they describe; none is written by hand. The block now
+  in the three baselines was written by hand from A0's one reading of the development PC (2026-11-05), so
+  it is what a default Windows answered there and not a scan of each machine, until they are rebuilt. Until then a
   rule on this collector gets a `rules/unconfronted.csv` row with its `resolved_when`.
 - **Rule fixtures** for owner decision 2's rule: positive, `products_on: 0` with Defender
   `off` and a third-party product `off`; negative, a third-party product `on` and Defender `off`. The negative
   is a fixture, not an allowance: the rule matches a count, never a name.
 - **Lab replay** (ADR 0076): one scenario on the lab machine, `antivirus_product/defender-only`, expects the
-  statement to list one product, `on`, with a valid signature, and expects no Defender row to change. The lab
+  statement to list one product, `on`, with no file fields (A0: Defender's `RemediationPath` is a URI), and
+  expects no Defender row to change. The lab
   machine has Defender only, so it cannot show a second product.
 
 ## A0, measured
