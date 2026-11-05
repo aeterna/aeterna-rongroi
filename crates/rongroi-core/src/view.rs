@@ -1238,7 +1238,7 @@ fn antivirus_statement(report: &Report, mode: Mode) -> Option<AntivirusStatement
     if mode == Mode::Ss && !lists_defender_row(report) {
         return None;
     }
-    if let Some(reason) = unmeasured_reason(report, "antivirus_product", None) {
+    if let Some(reason) = antivirus_unmeasured(report) {
         return match reason {
             UnmeasuredReason::NotWindows | UnmeasuredReason::NotOnThisOs => None,
             reason => Some(AntivirusStatement {
@@ -1279,6 +1279,23 @@ fn antivirus_statement(report: &Report, mode: Mode) -> Option<AntivirusStatement
     Some(AntivirusStatement {
         products,
         not_read: None,
+    })
+}
+
+/// Why the antivirus list could not be read, from the evidence row of the rule that reads it.
+///
+/// A real scan fills `unmeasured_sources` only for collectors with timestamp fields, so the reason is
+/// not there for `antivirus_product`; the engine leaves it on the rule's evidence instead (ADR 0090
+/// section 5).
+fn antivirus_unmeasured(report: &Report) -> Option<UnmeasuredReason> {
+    report.evidence.iter().find_map(|item| {
+        if item.collector != "antivirus_product" {
+            return None;
+        }
+        match item.state {
+            EvidenceState::Unmeasured { reason, .. } => Some(reason),
+            _ => None,
+        }
     })
 }
 
@@ -1985,7 +2002,7 @@ mod tests {
 
     use super::*;
     use crate::bundle::BundleInfo;
-    use crate::model::{Observation, UnmatchedGroup, UnmeasuredReason};
+    use crate::model::{CollectorRun, Observation, UnmatchedGroup, UnmeasuredReason};
     use crate::provenance::Provenance;
 
     const USER: &str = "fixtureuser";
@@ -4167,6 +4184,7 @@ mod tests {
 
     const DEFENDER_RULE: &str = "defender-rule";
     const DEFENDER_EXCLUSION_RULE: &str = "defender-exclusion-rule";
+    const NO_PRODUCT_REPORTS_ON: &str = "4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c";
 
     fn antivirus_product(
         display_name: &str,
@@ -4192,10 +4210,14 @@ mod tests {
         report.unmatched = Vec::new();
         report.unmeasured_sources = Vec::new();
         if let Some(reason) = not_read {
-            report.unmeasured_sources = vec![UnmeasuredSource {
+            report.evidence = vec![Evidence {
+                rule_id: "antivirus-rule".to_owned(),
                 collector: "antivirus_product".to_owned(),
-                place: None,
-                reason,
+                strength: Strength::Posture,
+                state: EvidenceState::Unmeasured {
+                    reason,
+                    expected: false,
+                },
             }];
             return report;
         }
@@ -4350,6 +4372,56 @@ mod tests {
         let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
         assert!(statement.products.is_empty());
         assert_eq!(statement.not_read, Some(UnmeasuredReason::ReadFailed));
+    }
+
+    /// A real scan puts the reason the list could not be read on the rule's evidence row, not in
+    /// `unmeasured_sources`, which holds only collectors with timestamp fields (ADR 0090 section 5).
+    #[test]
+    fn a_real_scan_states_read_failed_from_the_antivirus_evidence_row() {
+        let report = engine_report(UnmeasuredReason::ReadFailed);
+        assert!(report.unmeasured_sources.is_empty());
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, Some(UnmeasuredReason::ReadFailed));
+    }
+
+    /// The same for a scan without administrator rights: the reason reaches the statement from the
+    /// evidence row the rule gave it.
+    #[test]
+    fn a_real_scan_states_not_admin_from_the_antivirus_evidence_row() {
+        let report = engine_report(UnmeasuredReason::NotAdmin);
+        assert!(report.unmeasured_sources.is_empty());
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, Some(UnmeasuredReason::NotAdmin));
+    }
+
+    /// A report built through the engine from the rule `no-product-reports-on` and an unmeasured
+    /// `antivirus_product` run, as a real scan builds it.
+    fn engine_report(reason: UnmeasuredReason) -> Report {
+        let bundle = crate::bundle::Bundle::embedded().expect("the embedded bundle");
+        let report = crate::engine::evaluate(
+            &bundle,
+            &[CollectorRun::Unmeasured {
+                collector: "antivirus_product".to_owned(),
+                reason,
+            }],
+            header(),
+            &crate::engine::SelfIdentity::default(),
+        );
+        assert!(
+            report.evidence.iter().any(|item| {
+                item.rule_id == NO_PRODUCT_REPORTS_ON
+                    && matches!(
+                        item.state,
+                        EvidenceState::Unmeasured { reason: got, .. } if got == reason
+                    )
+            }),
+            "{reason:?} is not on the no-product-reports-on rule's evidence row"
+        );
+        report
     }
 
     /// Neither reason that means this PC has no such list makes a statement.

@@ -14,9 +14,10 @@ use std::fmt::Write as _;
 use rongroi_core::bundle::Bundle;
 use rongroi_core::model::UnmeasuredReason;
 use rongroi_core::view::{
-    AnchorAgeState, AnchorName, Comparison, CrossSourceStatement, Duration, DurationUnit,
-    LineState, RecordsStatement, Relation, SessionEnd, SessionLine, SessionStart, SessionState,
-    SessionStatement, SourceLineKind, TraceAge, TraceAgeState, TraceAges,
+    AnchorAgeState, AnchorName, AntivirusLine, AntivirusStatement, Comparison, CrossSourceStatement,
+    Duration, DurationUnit, LineState, RecordsStatement, Relation, SessionEnd, SessionLine,
+    SessionStart, SessionState, SessionStatement, SourceLineKind, TraceAge, TraceAgeState,
+    TraceAges,
 };
 
 use crate::output::{Lang, reason};
@@ -343,6 +344,9 @@ pub(crate) fn statement(statements: &[CrossSourceStatement], lang: Lang) -> Stri
             CrossSourceStatement::Session(statement) => {
                 session_statement(&mut out, &words, statement);
             }
+            CrossSourceStatement::Antivirus(statement) => {
+                antivirus_statement(&mut out, &words, statement);
+            }
         }
     }
     out
@@ -605,6 +609,86 @@ fn session_statement(out: &mut String, words: &Words, statement: &SessionStateme
     }
 }
 
+/// One product's state words. A value outside the four the ADR names keeps its number and is not
+/// guessed at (ADR 0090 section 2).
+fn antivirus_state(words: &Words, line: &AntivirusLine) -> String {
+    match line.state.as_str() {
+        "on" | "off" | "snoozed" | "expired" => {
+            words.get(&format!("antivirus.state.{}", line.state), &[])
+        }
+        _ => {
+            let value = line
+                .state_value
+                .map_or_else(|| line.state.clone(), |value| value.to_string());
+            words.get("antivirus.state.other", &[("value", &value)])
+        }
+    }
+}
+
+/// The words the CLI already uses for a signature, or the raw value when this build has no key for
+/// it: a value it does not name is still shown, never dropped.
+fn signature_text(words: &Words, signature: &str) -> String {
+    let text = words.get(&format!("game.file.signature.{signature}"), &[]);
+    if text.is_empty() {
+        without_controls(signature)
+    } else {
+        text
+    }
+}
+
+/// A value from a product's own name or file, with every control character replaced by U+FFFD: a
+/// newline or an escape sequence there could forge a line or drive the terminal it is printed to.
+fn without_controls(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| if c.is_control() { '\u{FFFD}' } else { c })
+        .collect()
+}
+
+/// The antivirus statement (ADR 0090 section 5): its title, one line per product with its state and
+/// what was read of its file, then "lists none" or why the list could not be read, and the caveat.
+fn antivirus_statement(out: &mut String, words: &Words, statement: &AntivirusStatement) {
+    let _ = writeln!(out, "\n{}", words.get("antivirus.title", &[]));
+    for product in &statement.products {
+        let name = without_controls(&product.display_name);
+        let _ = writeln!(out, "  - {name}: {}", antivirus_state(words, product));
+        if let Some(signature) = &product.signature {
+            let _ = writeln!(out, "    {}", signature_text(words, signature));
+        }
+        if let Some(signer) = &product.signer {
+            let signer = without_controls(signer);
+            let _ = writeln!(
+                out,
+                "    {}",
+                words.get("game.file.signer", &[("signer", &signer)])
+            );
+        }
+        if let Some(reason) = &product.file_unread {
+            let reason = without_controls(reason);
+            let _ = writeln!(
+                out,
+                "    {}",
+                words.get("antivirus.file_unread", &[("reason", &reason)])
+            );
+        }
+    }
+    if statement.products.is_empty() {
+        match statement.not_read {
+            Some(reason) => {
+                let _ = writeln!(
+                    out,
+                    "    {}",
+                    words.get("antivirus.not_read", &[("reason", words.reason(reason))])
+                );
+            }
+            None => {
+                let _ = writeln!(out, "    {}", words.get("antivirus.none", &[]));
+            }
+        }
+    }
+    let _ = writeln!(out, "    {}", words.get("antivirus.caveat", &[]));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -725,6 +809,21 @@ mod tests {
             "cross_source.not_read",
             "cross_source.switched_off",
             "cross_source.causes_intro",
+            "antivirus.title",
+            "antivirus.state.on",
+            "antivirus.state.off",
+            "antivirus.state.snoozed",
+            "antivirus.state.expired",
+            "antivirus.state.other",
+            "antivirus.file_unread",
+            "antivirus.none",
+            "antivirus.not_read",
+            "antivirus.caveat",
+            "game.file.signature.valid",
+            "game.file.signature.invalid",
+            "game.file.signature.no_embedded_signature",
+            "game.file.signature.unverifiable_offline",
+            "game.file.signer",
         ]
         .map(str::to_owned)
         .to_vec();
@@ -988,5 +1087,115 @@ mod tests {
             assert!(off.contains(expected), "missing {expected:?} in\n{off}");
         }
         assert!(!off.contains("any later time as after it"), "{off}");
+    }
+
+    /// The antivirus statement as a reader gets it (ADR 0090 section 5): the title, each product with
+    /// its state and what was read of its file, an unnamed state with its number, and the caveat.
+    #[test]
+    fn the_antivirus_statement_lists_each_product_with_its_state_and_file() {
+        let cross = CrossSourceStatement::Antivirus(AntivirusStatement {
+            products: vec![
+                AntivirusLine {
+                    display_name: "Antivirus Microsoft Defender".to_owned(),
+                    state: "on".to_owned(),
+                    state_value: None,
+                    signature: Some("valid".to_owned()),
+                    signer: Some("Microsoft Windows".to_owned()),
+                    file_unread: Some("budget_spent".to_owned()),
+                },
+                AntivirusLine {
+                    display_name: "Example Antivirus".to_owned(),
+                    state: "other".to_owned(),
+                    state_value: Some(7),
+                    signature: None,
+                    signer: None,
+                    file_unread: None,
+                },
+            ],
+            not_read: None,
+        });
+        let text = statement(std::slice::from_ref(&cross), Lang::En);
+        for expected in [
+            "Antivirus products Windows Security Center lists",
+            "  - Antivirus Microsoft Defender: reports itself on",
+            "    Embedded signature: verifies",
+            "    Signer: Microsoft Windows",
+            "    its file was not read (budget_spent)",
+            "  - Example Antivirus: reports a state this program does not name (7)",
+            "A product listed here is what is registered with Windows, not proof that it scans.",
+        ] {
+            assert!(text.contains(expected), "missing {expected:?} in\n{text}");
+        }
+        assert!(
+            !text.contains("Security Center lists no antivirus product."),
+            "{text}"
+        );
+
+        let thai = statement(&[cross], Lang::Th);
+        for expected in [
+            "โปรแกรมแอนตี้ไวรัสที่ Windows Security Center ระบุ",
+            "  - Antivirus Microsoft Defender: รายงานว่าเปิดอยู่",
+            "    ลายเซ็นในไฟล์: ตรวจผ่าน",
+            "    ผู้เซ็น: Microsoft Windows",
+            "    ไม่ได้อ่านไฟล์ของโปรแกรมนี้ (budget_spent)",
+            "  - Example Antivirus: รายงานสถานะที่โปรแกรมนี้ไม่รู้จัก (7)",
+            "โปรแกรมในรายการนี้คือสิ่งที่ลงทะเบียนกับ Windows ไว้ ไม่ใช่หลักฐานว่ามันสแกนอยู่จริง",
+        ] {
+            assert!(thai.contains(expected), "missing {expected:?} in\n{thai}");
+        }
+    }
+
+    /// A list that was read and held no product says Security Center lists none, not that it could not
+    /// be read.
+    #[test]
+    fn an_antivirus_list_with_no_product_says_security_center_lists_none() {
+        let cross = CrossSourceStatement::Antivirus(AntivirusStatement {
+            products: Vec::new(),
+            not_read: None,
+        });
+        let text = statement(&[cross], Lang::En);
+        assert!(
+            text.contains("    Security Center lists no antivirus product."),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "A product listed here is what is registered with Windows, not proof that it scans."
+            ),
+            "{text}"
+        );
+        assert!(!text.contains("The list could not be read:"), "{text}");
+    }
+
+    /// A list that could not be read states the reason in the same words the other statements use.
+    #[test]
+    fn an_antivirus_list_that_could_not_be_read_states_the_reason() {
+        for (reason, expected) in [
+            (
+                UnmeasuredReason::ReadFailed,
+                "The list could not be read: this could not be read.",
+            ),
+            (
+                UnmeasuredReason::NotAdmin,
+                "The list could not be read: Windows would not show this without administrator rights.",
+            ),
+        ] {
+            let cross = CrossSourceStatement::Antivirus(AntivirusStatement {
+                products: Vec::new(),
+                not_read: Some(reason),
+            });
+            let text = statement(&[cross], Lang::En);
+            assert!(text.contains(expected), "missing {expected:?} in\n{text}");
+            assert!(
+                !text.contains("Security Center lists no antivirus product."),
+                "{text}"
+            );
+            assert!(
+                text.contains(
+                    "A product listed here is what is registered with Windows, not proof that it scans."
+                ),
+                "{text}"
+            );
+        }
     }
 }

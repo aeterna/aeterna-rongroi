@@ -12,6 +12,8 @@ import type {
   AgeText,
   AnchorAge,
   AnchorName,
+  AntivirusLine,
+  AntivirusStatement,
   Comparison,
   CrossSourceStatement,
   Duration,
@@ -216,13 +218,17 @@ function RowLine({ row }: { row: TraceAge }) {
 export function CrossSource({ statements }: { statements: CrossSourceStatement[] }) {
   return (
     <>
-      {statements.map((statement) =>
-        statement.kind === "session" ? (
-          <Session key={JSON.stringify(statement)} statement={statement} />
-        ) : (
-          <Records key={JSON.stringify(statement)} statement={statement} />
-        ),
-      )}
+      {statements.map((statement) => {
+        const key = JSON.stringify(statement);
+        switch (statement.kind) {
+          case "session":
+            return <Session key={key} statement={statement} />;
+          case "antivirus":
+            return <Antivirus key={key} statement={statement} />;
+          case "fivem_and_records":
+            return <Records key={key} statement={statement} />;
+        }
+      })}
     </>
   );
 }
@@ -308,6 +314,65 @@ function SourceRow({ source, named }: { source: SourceLine; named: boolean }) {
       <dt>{t(`cross_source.source.${source.collector}`)}</dt>
       <dd>{line}</dd>
     </>
+  );
+}
+
+/** One product's state; an unnamed state keeps its number and is never guessed at (ADR 0090 section 2). */
+function antivirusState(t: TFunction, line: AntivirusLine): string {
+  switch (line.state) {
+    case "on":
+    case "off":
+    case "snoozed":
+    case "expired":
+      return t(`antivirus.state.${line.state}`);
+    default:
+      return t("antivirus.state.other", { value: line.state_value ?? line.state });
+  }
+}
+
+/** The antivirus products Windows Security Center lists (ADR 0090 section 5). Not evidence. */
+function Antivirus({ statement }: { statement: AntivirusStatement }) {
+  const { t } = useTranslation("report");
+  return (
+    <section className="cross-source" aria-labelledby="antivirus-title">
+      <h3 id="antivirus-title">{t("antivirus.title")}</h3>
+      {statement.products.length > 0 && (
+        <ul>
+          {statement.products.map((product) => (
+            <li key={`${product.display_name}:${product.state}`}>
+              {product.display_name}: {antivirusState(t, product)}
+              {product.signature && (
+                <span className="muted">
+                  <br />
+                  {t(`game.file.signature.${product.signature}`, {
+                    defaultValue: product.signature,
+                  })}
+                </span>
+              )}
+              {product.signer && (
+                <span className="muted">
+                  <br />
+                  {t("game.file.signer", { signer: product.signer })}
+                </span>
+              )}
+              {product.file_unread && (
+                <span className="muted">
+                  <br />
+                  {t("antivirus.file_unread", { reason: product.file_unread })}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {statement.products.length === 0 &&
+        (statement.not_read ? (
+          <p>{notRead(t, statement.not_read)}</p>
+        ) : (
+          <p>{t("antivirus.none")}</p>
+        ))}
+      <p className="muted">{t("antivirus.caveat")}</p>
+    </section>
   );
 }
 
