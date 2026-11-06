@@ -46,6 +46,13 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
 /// [`CollectorRun::Unmeasured`] with [`UnmeasuredReason::NotConsented`], exactly as a `full`
 /// collector is in a standard scan (ADR 0052). An id no collector has is ignored. [`run`] is this
 /// scan with every id, so the two cannot disagree about a collector they both call.
+///
+/// A list that does not name every collector reads only what the collectors it names read: the
+/// header's `boot_time` is `BootTime::default()` (not attempted) and it has no anchors, so the
+/// installation date, Setup's subkeys, the drive root, `$Recycle.Bin` and FiveM's folders are not
+/// read (ADR 0061). The header's `profiles_directory` is read only when `ids` names a collector that
+/// uses it, `autostart` or `antivirus_product` (ADR 0049). A list naming every collector reads all
+/// of these, exactly as [`run`] does.
 pub fn run_selected(
     host: &dyn Host,
     bundle: &Bundle,
@@ -65,11 +72,22 @@ fn scan(
     collectors: &[Box<dyn crate::Collector>],
     ids: &[&str],
 ) -> Report {
+    let every_collector = collectors.iter().all(|collector| ids.contains(&collector.id()));
     // Before the collectors, so that the count is read as close as possible to `generated_at`, which
     // the caller took just before this call: the `evtx` collector alone may run for 30 seconds, and
-    // reading the count after it would move the start that much earlier (ADR 0039).
-    let boot_time = boot_time(host, &context.generated_at);
-    let profiles_directory = profiles_directory(host);
+    // reading the count after it would move the start that much earlier (ADR 0039). A subset did not
+    // name the start, so it is not read and the header says it was not attempted.
+    let boot_time = if every_collector {
+        boot_time(host, &context.generated_at)
+    } else {
+        BootTime::default()
+    };
+    let reads_profiles = every_collector || ids.iter().copied().any(reads_profiles_directory);
+    let profiles_directory = if reads_profiles {
+        profiles_directory(host)
+    } else {
+        None
+    };
     let tier = context.tier;
     let runs: Vec<CollectorRun> = collectors
         .iter()
@@ -85,7 +103,11 @@ fn scan(
             }
         })
         .collect();
-    let anchors = anchors(host, &runs, &context.generated_at);
+    let anchors = if every_collector {
+        anchors(host, &runs, &context.generated_at)
+    } else {
+        Vec::new()
+    };
     let header = ReportHeader {
         schema_version: REPORT_SCHEMA_VERSION,
         provenance: context.provenance,
@@ -104,6 +126,12 @@ fn scan(
     declare_sensitive(&mut report, collectors);
     declare_ages(&mut report, collectors, bundle);
     report
+}
+
+/// Whether a collector reads `ProfilesDirectory` itself, so a scan naming it may also read the
+/// header's copy.
+fn reads_profiles_directory(id: &str) -> bool {
+    matches!(id, "autostart" | "antivirus_product")
 }
 
 /// Copies into the report how each collector's observations say how far back its source reaches
@@ -1153,6 +1181,72 @@ mod tests {
         assert_eq!(
             run(&fixture, &bundle, context(ScanTier::Standard)),
             run_selected(&fixture, &bundle, context(ScanTier::Standard), &ids)
+        );
+    }
+
+    /// A subset names collectors, not machine-wide facts: it reads no anchors and tries no boot-time
+    /// count, while [`run`] on the same host reads both. With every id the two scans agree.
+    #[test]
+    fn a_subset_scan_reads_no_anchors_or_boot_time() {
+        let bundle = Bundle::embedded().unwrap();
+        let fixture = fixture_host("trace-ages-elevated");
+        let subset = run_selected(&fixture, &bundle, context(ScanTier::Standard), &["posture"]);
+        assert!(
+            subset.header.anchors.is_empty(),
+            "a subset read anchors: {:?}",
+            subset.header.anchors
+        );
+        assert_eq!(
+            subset.header.boot_time,
+            BootTime::Unmeasured {
+                reason: UnmeasuredReason::NotAttempted
+            },
+            "a subset read the boot-time count"
+        );
+
+        let full = run(&fixture, &bundle, context(ScanTier::Standard));
+        assert!(!full.header.anchors.is_empty(), "the fixture must make anchors readable");
+        assert!(
+            full.header.anchors.iter().any(|anchor| {
+                matches!(anchor.state, AnchorState::Measured { .. })
+            }),
+            "the fixture must make an anchor readable: {:?}",
+            full.header.anchors
+        );
+        assert!(
+            matches!(full.header.boot_time, BootTime::Measured { .. }),
+            "the fixture must make boot time readable: {:?}",
+            full.header.boot_time
+        );
+
+        let ids: Vec<&str> = crate::all()
+            .iter()
+            .map(|collector| collector.id())
+            .collect();
+        assert_eq!(full, run_selected(&fixture, &bundle, context(ScanTier::Standard), &ids));
+    }
+
+    /// A subset reads `ProfilesDirectory` only for a collector that uses it; a subset naming neither
+    /// of them leaves the header's copy absent.
+    #[test]
+    fn a_subset_reads_the_profiles_directory_only_for_a_collector_that_uses_it() {
+        let bundle = Bundle::embedded().unwrap();
+        let fixture = host(
+            "platform: windows\nenv:\n  SystemDrive: 'D:'\nregistry:\n  'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList':\n    ProfilesDirectory: '%SystemDrive%\\Profiles'\n",
+        );
+        let posture = run_selected(&fixture, &bundle, context(ScanTier::Standard), &["posture"]);
+        assert_eq!(posture.header.profiles_directory, None);
+
+        let autostart =
+            run_selected(&fixture, &bundle, context(ScanTier::Standard), &["autostart"]);
+        assert_eq!(autostart.header.profiles_directory.as_deref(), Some(r"D:\Profiles"));
+
+        assert_eq!(
+            run(&fixture, &bundle, context(ScanTier::Standard))
+                .header
+                .profiles_directory
+                .as_deref(),
+            Some(r"D:\Profiles")
         );
     }
 
