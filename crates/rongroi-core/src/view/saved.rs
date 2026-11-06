@@ -140,17 +140,25 @@ pub struct Producer {
 /// record was produced for a paired server; the Offline app and the CLI have none.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Binding {
-    /// The exact `scheme://host:port` origin the record may be sent to.
-    pub server_origin: String,
+    /// The exact `scheme://host:port` origin the record may be sent to; absent when the client did
+    /// not send it. A copy the report states about itself — the server decides by its own record of
+    /// the ticket (ADR 0089 §2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_origin: Option<String>,
     /// The single-use ticket Server Kit issued (ADR 0089 §5).
     pub ticket: String,
     /// The value the player's pairing code carried, copied through Connect; it ties the record to
     /// the case, not the scan it recorded (ADR 0089 §2).
     pub nonce: String,
-    /// When the ticket's lifetime began.
-    pub issued_at: String,
-    /// When the ticket's lifetime ends; the server decides expiry by its own clock (ADR 0089 §5).
-    pub expires_at: String,
+    /// When the ticket's lifetime began; absent when the client did not send it. A copy the report
+    /// states about itself — the server decides by its own record of the ticket (ADR 0089 §2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issued_at: Option<String>,
+    /// When the ticket's lifetime ends; absent when the client did not send it. A copy the report
+    /// states about itself — the server decides expiry by its own record of the ticket (ADR 0089
+    /// §2, §5).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
 }
 
 /// Which named profile a policy came under (ADR 0089 §2). Each name fixes what
@@ -397,6 +405,63 @@ mod tests {
         assert_eq!(
             digest(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn a_binding_with_only_ticket_and_nonce_serializes_to_those_two_members() {
+        let binding = Binding {
+            server_origin: None,
+            ticket: "9f82c4e1b07a412891d604e38a291bf0".to_owned(),
+            nonce: "c4b82e91024a".to_owned(),
+            issued_at: None,
+            expires_at: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&binding).unwrap(),
+            serde_json::json!({
+                "ticket": "9f82c4e1b07a412891d604e38a291bf0",
+                "nonce": "c4b82e91024a",
+            })
+        );
+    }
+
+    #[test]
+    fn a_binding_without_the_copied_members_changes_the_visual_hash() {
+        let minimal = Binding {
+            server_origin: None,
+            ticket: "9f82c4e1b07a412891d604e38a291bf0".to_owned(),
+            nonce: "c4b82e91024a".to_owned(),
+            issued_at: None,
+            expires_at: None,
+        };
+        let full = Binding {
+            server_origin: Some("http://203.0.113.10:30130".to_owned()),
+            ticket: "9f82c4e1b07a412891d604e38a291bf0".to_owned(),
+            nonce: "c4b82e91024a".to_owned(),
+            issued_at: Some("2026-10-31T14:30:00Z".to_owned()),
+            expires_at: Some("2026-10-31T14:35:00Z".to_owned()),
+        };
+        assert_eq!(
+            serde_json::to_value(&full).unwrap(),
+            serde_json::json!({
+                "server_origin": "http://203.0.113.10:30130",
+                "ticket": "9f82c4e1b07a412891d604e38a291bf0",
+                "nonce": "c4b82e91024a",
+                "issued_at": "2026-10-31T14:30:00Z",
+                "expires_at": "2026-10-31T14:35:00Z",
+            })
+        );
+        let record = |binding: &Binding| {
+            serde_json::json!({
+                "kind": SAVED_RECORD_KIND,
+                "schema": SAVED_RECORD_SCHEMA,
+                "binding": binding,
+            })
+        };
+        assert_ne!(
+            canonical::visual_hash(&record(&minimal)).unwrap(),
+            canonical::visual_hash(&record(&full)).unwrap()
         );
     }
 }

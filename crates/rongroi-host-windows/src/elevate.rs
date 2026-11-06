@@ -71,14 +71,46 @@ fn quote(arg: &str) -> String {
     out
 }
 
+/// The window state of the elevated copy of this program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShowWindow {
+    /// A normal, visible window.
+    Normal,
+    /// No visible window.
+    Hidden,
+}
+
+/// Returns the `nShow` value that `ShellExecuteExW` expects for `state`.
+///
+/// `SW_SHOWNORMAL` is 1 and `SW_HIDE` is 0. The numbers are kept here, outside the `unsafe` call, so the
+/// mapping is tested on every operating system.
+pub fn show_command(state: ShowWindow) -> i32 {
+    match state {
+        ShowWindow::Normal => 1,
+        ShowWindow::Hidden => 0,
+    }
+}
+
 /// Asks Windows to start this program again with administrator rights, passing it `args`.
+///
+/// The new process opens in a normal window; [`relaunch_elevated_with`] chooses another state.
 ///
 /// Returns once the relaunch has been *requested*. It does not wait for the new process and it does not
 /// end this one; the caller decides when to exit (ADR 0012). Windows shows its consent prompt first, and
 /// dismissing that prompt gives [`ElevateError::Declined`] — a normal outcome, not a fault.
 #[cfg(windows)]
-#[allow(unsafe_code)]
 pub fn relaunch_elevated(args: &[String]) -> Result<(), ElevateError> {
+    relaunch_elevated_with(args, ShowWindow::Normal)
+}
+
+/// Asks Windows to start this program again with administrator rights, passing it `args`.
+///
+/// `show` chooses the window state of the new process; [`relaunch_elevated`] is the same request with a
+/// normal window. Like [`relaunch_elevated`], it returns once the relaunch has been *requested*, without
+/// waiting for the new process or ending this one.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+pub fn relaunch_elevated_with(args: &[String], show: ShowWindow) -> Result<(), ElevateError> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
 
@@ -90,8 +122,6 @@ pub fn relaunch_elevated(args: &[String]) -> Result<(), ElevateError> {
     /// `HRESULT_FROM_WIN32(ERROR_CANCELLED)` — 1223, what Windows reports when the person dismisses the
     /// consent prompt.
     const HRESULT_ERROR_CANCELLED: i32 = 0x8007_04C7_u32.cast_signed();
-    /// `SW_SHOWNORMAL`, written out rather than imported with its `SHOW_WINDOW_CMD` wrapper.
-    const SW_SHOWNORMAL: i32 = 1;
 
     /// A NUL-terminated UTF-16 copy, as the `W` entry points expect.
     fn wide(text: &OsStr) -> Vec<u16> {
@@ -119,7 +149,7 @@ pub fn relaunch_elevated(args: &[String]) -> Result<(), ElevateError> {
         lpVerb: PCWSTR(verb.as_ptr()),
         lpFile: PCWSTR(file.as_ptr()),
         lpParameters: PCWSTR(parameters.as_ptr()),
-        nShow: SW_SHOWNORMAL,
+        nShow: show_command(show),
         ..Default::default()
     };
 
@@ -192,5 +222,15 @@ mod tests {
     #[test]
     fn an_empty_argument_survives_as_an_empty_quoted_string() {
         assert_eq!(command_line(&[String::new()]), r#""""#);
+    }
+
+    #[test]
+    fn a_normal_window_uses_sw_shownormal() {
+        assert_eq!(show_command(ShowWindow::Normal), 1);
+    }
+
+    #[test]
+    fn a_hidden_window_uses_sw_hide() {
+        assert_eq!(show_command(ShowWindow::Hidden), 0);
     }
 }
