@@ -49,7 +49,7 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
 ///
 /// A list that does not name every collector reads only what the collectors it names read: the
 /// header's `boot_time` is `BootTime::default()` (not attempted) and it has no anchors, so the
-/// installation date, Setup's subkeys, the drive root, `$Recycle.Bin` and FiveM's folders are not
+/// installation date, Setup's subkeys, the drive root, `$Recycle.Bin` and `FiveM`'s folders are not
 /// read (ADR 0061). The header's `profiles_directory` is always read, however short `ids` is, for
 /// path redaction only (ADR 0049). A list naming every collector reads all of these, exactly as
 /// [`run`] does.
