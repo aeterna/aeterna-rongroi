@@ -245,6 +245,23 @@ fn known_collector_ids_are_exactly_the_built_collectors_sorted() {
 }
 
 #[test]
+fn full_tier_collectors_are_refused_and_a_standard_one_is_accepted() {
+    for id in ["powershell_text", "fivem_servers", "recorded_files"] {
+        let value = policy("required_collectors", json!([id]));
+        assert_eq!(
+            parse_request(&line_of(&value)).expect_err("a full-tier collector is refused"),
+            RequestError::FullTierCollector,
+            "{id} is refused"
+        );
+    }
+    let standard = policy("required_collectors", json!(["posture"]));
+    assert!(
+        parse_request(&line_of(&standard)).is_ok(),
+        "a standard-tier collector is accepted"
+    );
+}
+
+#[test]
 fn invalid_requests_are_refused() {
     for (name, line) in mutation_lines() {
         assert!(parse_request(&line).is_err(), "{name} is refused");

@@ -8,6 +8,7 @@
 mod pipe_client;
 
 use std::ffi::OsString;
+use std::io::Write;
 use std::process::ExitCode;
 
 use rongroi_host_windows::elevate::ElevateError;
@@ -49,7 +50,10 @@ enum ParseError {
 
 fn main() -> ExitCode {
     let Ok(args) = unicode_args(std::env::args_os().skip(1)).and_then(parse_args) else {
-        eprintln!("rongroi-scan: the arguments were refused");
+        let _ = writeln!(
+            std::io::stderr().lock(),
+            "rongroi-scan: the arguments were refused"
+        );
         return ExitCode::from(EXIT_FAILED);
     };
     platform_run(&args)
@@ -137,7 +141,7 @@ fn platform_run(args: &Args) -> ExitCode {
         };
         let forwarded = elevated_args(forwarded);
         let (line, code) = elevate_report(&relaunch_elevated_with(&forwarded, ShowWindow::Hidden));
-        println!("{line}");
+        let _ = writeln!(std::io::stdout().lock(), "{line}");
         return ExitCode::from(code);
     }
 
@@ -152,7 +156,10 @@ fn platform_run(args: &Args) -> ExitCode {
 
 #[cfg(not(windows))]
 fn platform_run(_args: &Args) -> ExitCode {
-    eprintln!("rongroi-scan is a Windows program; it cannot run on this system.");
+    let _ = writeln!(
+        std::io::stderr().lock(),
+        "rongroi-scan is a Windows program; it cannot run on this system."
+    );
     ExitCode::from(EXIT_FAILED)
 }
 

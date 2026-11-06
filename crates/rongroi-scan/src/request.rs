@@ -6,6 +6,7 @@
 
 use std::collections::BTreeSet;
 
+use rongroi_collectors::ScanTier;
 use rongroi_core::view::{Binding, Policy, Producer, ProducerMode, ProducerName, Profile};
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -85,6 +86,9 @@ pub enum RequestError {
     /// The required collector list is empty, too long, unknown or repeated.
     #[error("required collectors are empty, too long, unknown or repeated")]
     RequiredCollectors,
+    /// A required collector is only read in a full scan, and the sidecar only runs standard scans.
+    #[error("required collector is only read in a full scan")]
+    FullTierCollector,
     /// The producer name is not `rongroi-connect`.
     #[error("producer name is not rongroi-connect")]
     ProducerName,
@@ -355,6 +359,14 @@ fn validate_collectors(ids: &[String]) -> Result<(), RequestError> {
         if !known.contains(&id.as_str()) || !seen.insert(id.as_str()) {
             return Err(RequestError::RequiredCollectors);
         }
+    }
+    let full: BTreeSet<&str> = rongroi_collectors::all()
+        .iter()
+        .filter(|collector| collector.tier() == ScanTier::Full)
+        .map(|collector| collector.id())
+        .collect();
+    if ids.iter().any(|id| full.contains(id.as_str())) {
+        return Err(RequestError::FullTierCollector);
     }
     Ok(())
 }
