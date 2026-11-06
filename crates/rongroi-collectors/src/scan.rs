@@ -72,7 +72,9 @@ fn scan(
     collectors: &[Box<dyn crate::Collector>],
     ids: &[&str],
 ) -> Report {
-    let every_collector = collectors.iter().all(|collector| ids.contains(&collector.id()));
+    let every_collector = collectors
+        .iter()
+        .all(|collector| ids.contains(&collector.id()));
     // Before the collectors, so that the count is read as close as possible to `generated_at`, which
     // the caller took just before this call: the `evtx` collector alone may run for 30 seconds, and
     // reading the count after it would move the start that much earlier (ADR 0039). A subset did not
@@ -1196,11 +1198,15 @@ mod tests {
         );
 
         let full = run(&fixture, &bundle, context(ScanTier::Standard));
-        assert!(!full.header.anchors.is_empty(), "the fixture must make anchors readable");
         assert!(
-            full.header.anchors.iter().any(|anchor| {
-                matches!(anchor.state, AnchorState::Measured { .. })
-            }),
+            !full.header.anchors.is_empty(),
+            "the fixture must make anchors readable"
+        );
+        assert!(
+            full.header
+                .anchors
+                .iter()
+                .any(|anchor| { matches!(anchor.state, AnchorState::Measured { .. }) }),
             "the fixture must make an anchor readable: {:?}",
             full.header.anchors
         );
@@ -1214,7 +1220,10 @@ mod tests {
             .iter()
             .map(|collector| collector.id())
             .collect();
-        assert_eq!(full, run_selected(&fixture, &bundle, context(ScanTier::Standard), &ids));
+        assert_eq!(
+            full,
+            run_selected(&fixture, &bundle, context(ScanTier::Standard), &ids)
+        );
     }
 
     /// A subset reads `ProfilesDirectory` even when it names no collector that uses it: the SS view
@@ -1231,9 +1240,16 @@ mod tests {
             Some(r"D:\Profiles")
         );
 
-        let autostart =
-            run_selected(&fixture, &bundle, context(ScanTier::Standard), &["autostart"]);
-        assert_eq!(autostart.header.profiles_directory.as_deref(), Some(r"D:\Profiles"));
+        let autostart = run_selected(
+            &fixture,
+            &bundle,
+            context(ScanTier::Standard),
+            &["autostart"],
+        );
+        assert_eq!(
+            autostart.header.profiles_directory.as_deref(),
+            Some(r"D:\Profiles")
+        );
 
         assert_eq!(
             run(&fixture, &bundle, context(ScanTier::Standard))
