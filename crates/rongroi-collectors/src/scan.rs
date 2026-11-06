@@ -50,9 +50,9 @@ pub fn run(host: &dyn Host, bundle: &Bundle, context: ScanContext) -> Report {
 /// A list that does not name every collector reads only what the collectors it names read: the
 /// header's `boot_time` is `BootTime::default()` (not attempted) and it has no anchors, so the
 /// installation date, Setup's subkeys, the drive root, `$Recycle.Bin` and FiveM's folders are not
-/// read (ADR 0061). The header's `profiles_directory` is read only when `ids` names a collector that
-/// uses it, `autostart` or `antivirus_product` (ADR 0049). A list naming every collector reads all
-/// of these, exactly as [`run`] does.
+/// read (ADR 0061). The header's `profiles_directory` is always read, however short `ids` is, for
+/// path redaction only (ADR 0049). A list naming every collector reads all of these, exactly as
+/// [`run`] does.
 pub fn run_selected(
     host: &dyn Host,
     bundle: &Bundle,
@@ -82,12 +82,9 @@ fn scan(
     } else {
         BootTime::default()
     };
-    let reads_profiles = every_collector || ids.iter().copied().any(reads_profiles_directory);
-    let profiles_directory = if reads_profiles {
-        profiles_directory(host)
-    } else {
-        None
-    };
+    // Read however short the subset is: the SS view replaces user names in every path with it, so a
+    // record that omitted it could show a user name (ADR 0049).
+    let profiles_directory = profiles_directory(host);
     let tier = context.tier;
     let runs: Vec<CollectorRun> = collectors
         .iter()
@@ -126,12 +123,6 @@ fn scan(
     declare_sensitive(&mut report, collectors);
     declare_ages(&mut report, collectors, bundle);
     report
-}
-
-/// Whether a collector reads `ProfilesDirectory` itself, so a scan naming it may also read the
-/// header's copy.
-fn reads_profiles_directory(id: &str) -> bool {
-    matches!(id, "autostart" | "antivirus_product")
 }
 
 /// Copies into the report how each collector's observations say how far back its source reaches
@@ -1226,16 +1217,19 @@ mod tests {
         assert_eq!(full, run_selected(&fixture, &bundle, context(ScanTier::Standard), &ids));
     }
 
-    /// A subset reads `ProfilesDirectory` only for a collector that uses it; a subset naming neither
-    /// of them leaves the header's copy absent.
+    /// A subset reads `ProfilesDirectory` even when it names no collector that uses it: the SS view
+    /// replaces user names in every path with it, so a posture-only subset reads it too.
     #[test]
-    fn a_subset_reads_the_profiles_directory_only_for_a_collector_that_uses_it() {
+    fn a_subset_reads_the_profiles_directory_even_for_a_posture_only_scan() {
         let bundle = Bundle::embedded().unwrap();
         let fixture = host(
             "platform: windows\nenv:\n  SystemDrive: 'D:'\nregistry:\n  'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList':\n    ProfilesDirectory: '%SystemDrive%\\Profiles'\n",
         );
         let posture = run_selected(&fixture, &bundle, context(ScanTier::Standard), &["posture"]);
-        assert_eq!(posture.header.profiles_directory, None);
+        assert_eq!(
+            posture.header.profiles_directory.as_deref(),
+            Some(r"D:\Profiles")
+        );
 
         let autostart =
             run_selected(&fixture, &bundle, context(ScanTier::Standard), &["autostart"]);
