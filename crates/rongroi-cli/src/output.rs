@@ -1110,6 +1110,41 @@ mod tests {
         assert!(text.contains(&selector.rule.falsepositives[0]), "{text}");
     }
 
+    /// A session end is a time BAM recorded for an edition: it prints its own label in both languages,
+    /// never the label of the scan's boot anchor (ADR 0051, ADR 0062 section 5).
+    #[test]
+    fn a_session_end_prints_its_own_label_and_not_windows_started() {
+        let (_, bundle) = report(true);
+        // Read from its serialised form: a test that names the new `EntrySource` variant would not
+        // compile on the current code, and this one should fail on what it asserts.
+        let timeline: Timeline = serde_json::from_value(serde_json::json!({
+            "entries": [{
+                "at": "2026-01-10T10:30:00Z",
+                "collector": "bam",
+                "field": "last_run",
+                "place": null,
+                "source": { "kind": "session_end", "edition": "legacy" },
+                "subject": null
+            }],
+            "bands": [],
+            "unmeasured": []
+        }))
+        .expect("a session end is a timeline entry");
+        for (lang, label) in [(Lang::En, "ended"), (Lang::Th, "จบ")] {
+            let text = timeline_section(&timeline, &bundle, lang);
+            let line = text
+                .lines()
+                .find(|line| line.starts_with("    2026-01-10T10:30:00Z  "))
+                .unwrap_or_else(|| panic!("{text}"));
+            assert!(line.contains(label) && line.contains("(BAM)"), "{line}");
+            assert!(!line.contains(text_timeline(lang, "boot_anchor")), "{line}");
+            assert!(
+                !line.contains("Windows started") && !line.contains("Windows เริ่มทำงานครั้งล่าสุด"),
+                "{line}"
+            );
+        }
+    }
+
     #[test]
     fn unofficial_build_is_announced() {
         let (report, bundle) = report(false);

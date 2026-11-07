@@ -3184,6 +3184,242 @@ mod tests {
         );
     }
 
+    // ---- ADR 0062 section 5 on the timeline: where a session ended ----
+    //
+    // A session's end that BAM recorded is one entry per edition, not an anchor. The session helpers
+    // (`session_report`, `prefetch_runs`, `bam_end`, `run`) are defined with the session tests below.
+
+    /// The session-end entries of `timeline`, each in its serialised form. Read this way the tests
+    /// build on the current `EntrySource`, and fail on its missing variant rather than on a compile.
+    fn session_end_entries(timeline: &Timeline) -> Vec<serde_json::Value> {
+        timeline
+            .entries
+            .iter()
+            .filter_map(|entry| serde_json::to_value(entry).ok())
+            .filter(|entry| entry["source"]["kind"] == "session_end")
+            .collect()
+    }
+
+    /// `report` with the time fields the real report declares for Prefetch and BAM: the timeline reads
+    /// a source's times only through what the report declares.
+    fn with_declared_session_times(mut report: Report) -> Report {
+        report.timestamp_fields = BTreeMap::from([
+            ("prefetch".to_owned(), vec!["last_run".to_owned()]),
+            ("bam".to_owned(), vec!["last_run".to_owned()]),
+        ]);
+        report
+    }
+
+    /// A Legacy session that BAM ended: one session-end entry, at BAM's time exactly as the report holds
+    /// it, from BAM, with its edition — in Self mode and in SS mode alike.
+    #[test]
+    fn a_session_bam_ended_is_one_timeline_entry_for_its_edition_in_both_modes() {
+        let report = with_declared_session_times(session_report(
+            vec![
+                prefetch_runs("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+                // Fractional seconds: the entry must keep the report's text, not a re-formatted time.
+                bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00.250Z"),
+            ],
+            &[],
+        ));
+        let sessions = sessions_of(&report);
+        let (_, end, _, _, _) = known(&sessions[0]);
+        assert_eq!(
+            *end,
+            SessionEnd::Bam {
+                at: "2026-01-10T10:30:00.250Z".to_owned()
+            }
+        );
+        for (label, mode) in [("self", Mode::SelfCheck), ("ss", Mode::Ss)] {
+            let ends = session_end_entries(&timeline(&report, mode));
+            assert_eq!(ends.len(), 1, "{label}: {ends:?}");
+            assert_eq!(ends[0]["at"], "2026-01-10T10:30:00.250Z", "{label}");
+            assert_eq!(ends[0]["collector"], "bam", "{label}");
+            assert_eq!(
+                ends[0]["source"],
+                serde_json::json!({"kind": "session_end", "edition": "legacy"}),
+                "{label}"
+            );
+        }
+    }
+
+    /// A session whose end is not BAM's time — still running, not recorded, not read — and no session
+    /// at all, has no session-end entry in either mode. Each case first checks the state the session
+    /// really holds, so the empty timeline is not an empty fixture.
+    #[test]
+    fn a_session_end_that_is_not_bams_time_has_no_timeline_entry() {
+        let cases: Vec<(&str, Report, Option<SessionEnd>)> = vec![
+            (
+                "still running",
+                session_report(
+                    vec![
+                        run(
+                            "process",
+                            "FiveM.exe",
+                            "legacy",
+                            "started_at",
+                            "2026-01-10T10:00:00Z",
+                        ),
+                        bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00Z"),
+                    ],
+                    &[],
+                ),
+                Some(SessionEnd::StillRunning),
+            ),
+            (
+                "BAM's time is before the start",
+                session_report(
+                    vec![
+                        prefetch_runs("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+                        bam_end("FiveM.exe", "legacy", "2026-01-10T09:00:00Z"),
+                    ],
+                    &[],
+                ),
+                Some(SessionEnd::NotRecorded),
+            ),
+            (
+                "BAM read and holding no time for the edition",
+                session_report(
+                    vec![prefetch_runs(
+                        "FiveM.exe",
+                        Some("legacy"),
+                        &["2026-01-10T10:00:00Z"],
+                    )],
+                    &[],
+                ),
+                Some(SessionEnd::NotRecorded),
+            ),
+            (
+                "BAM not read",
+                session_report(
+                    vec![prefetch_runs(
+                        "FiveM.exe",
+                        Some("legacy"),
+                        &["2026-01-10T10:00:00Z"],
+                    )],
+                    &[("bam", UnmeasuredReason::NotAdmin)],
+                ),
+                Some(SessionEnd::NotRead {
+                    reason: UnmeasuredReason::NotAdmin,
+                }),
+            ),
+            ("no session", session_report(Vec::new(), &[]), None),
+        ];
+        for (label, report, expected) in cases {
+            let report = with_declared_session_times(report);
+            let sessions = sessions_of(&report);
+            match expected {
+                Some(end) => {
+                    let [session] = sessions.as_slice() else {
+                        panic!("{label}: {sessions:?}");
+                    };
+                    assert_eq!(*known(session).1, end, "{label}");
+                }
+                None => assert!(sessions.is_empty(), "{label}: {sessions:?}"),
+            }
+            for mode in [Mode::SelfCheck, Mode::Ss] {
+                let ends = session_end_entries(&timeline(&report, mode));
+                assert!(ends.is_empty(), "{label}: {ends:?}");
+            }
+        }
+    }
+
+    /// Each edition whose session BAM ended gets its own entry, in time order, with its own edition.
+    #[test]
+    fn each_edition_with_a_bam_end_gets_its_own_entry() {
+        let report = with_declared_session_times(session_report(
+            vec![
+                prefetch_runs("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+                bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00Z"),
+                prefetch_runs("FiveM.exe", Some("enhanced"), &["2026-01-10T11:00:00Z"]),
+                bam_end("FiveM.exe", "enhanced", "2026-01-10T11:20:00Z"),
+            ],
+            &[],
+        ));
+        let sessions = sessions_of(&report);
+        let [legacy, enhanced] = sessions.as_slice() else {
+            panic!("{sessions:?}");
+        };
+        assert_eq!(
+            *known(legacy).1,
+            SessionEnd::Bam {
+                at: "2026-01-10T10:30:00Z".to_owned()
+            }
+        );
+        assert_eq!(
+            *known(enhanced).1,
+            SessionEnd::Bam {
+                at: "2026-01-10T11:20:00Z".to_owned()
+            }
+        );
+        for (label, mode) in [("self", Mode::SelfCheck), ("ss", Mode::Ss)] {
+            let ends = session_end_entries(&timeline(&report, mode));
+            assert!(
+                ends.iter().all(|end| end["collector"] == "bam"),
+                "{label}: {ends:?}"
+            );
+            let got: Vec<(&str, serde_json::Value)> = ends
+                .iter()
+                .map(|end| (end["at"].as_str().unwrap_or_default(), end["source"].clone()))
+                .collect();
+            assert_eq!(
+                got,
+                vec![
+                    (
+                        "2026-01-10T10:30:00Z",
+                        serde_json::json!({"kind": "session_end", "edition": "legacy"}),
+                    ),
+                    (
+                        "2026-01-10T11:20:00Z",
+                        serde_json::json!({"kind": "session_end", "edition": "enhanced"}),
+                    ),
+                ],
+                "{label}"
+            );
+        }
+    }
+
+    /// Beside a session end the scan's own times stay what they were: one `generated_at` and one
+    /// `boot_time`, both anchors, and the session end is a further entry, not a third anchor.
+    #[test]
+    fn a_session_end_is_added_beside_the_scans_own_anchors_which_stay_as_they_were() {
+        let mut report = aged_report();
+        report.header.boot_time = crate::model::BootTime::Measured {
+            booted_at: "2026-01-09T08:00:00Z".to_owned(),
+            seconds_since_boot: 100_800,
+        };
+        report.unmatched.push(UnmatchedGroup {
+            collector: "prefetch".to_owned(),
+            observations: vec![prefetch_runs(
+                "FiveM.exe",
+                Some("legacy"),
+                &["2026-01-10T10:00:00Z"],
+            )],
+        });
+        report.unmatched.push(UnmatchedGroup {
+            collector: "bam".to_owned(),
+            observations: vec![bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00Z")],
+        });
+        let report = with_declared_session_times(report);
+        for (label, mode) in [("self", Mode::SelfCheck), ("ss", Mode::Ss)] {
+            let timeline = timeline(&report, mode);
+            let anchors: Vec<(&str, &str)> = timeline
+                .entries
+                .iter()
+                .filter(|entry| entry.source == EntrySource::Anchor)
+                .map(|entry| (entry.field.as_str(), entry.at.as_str()))
+                .collect();
+            assert_eq!(
+                anchors,
+                vec![
+                    ("generated_at", "2026-01-10T12:00:00Z"),
+                    ("boot_time", "2026-01-09T08:00:00Z"),
+                ]
+            );
+            assert_eq!(session_end_entries(&timeline).len(), 1, "{label}");
+        }
+    }
+
     /// A band scoped to one place is read only from the observation about that place.
     #[test]
     fn a_band_scoped_to_a_place_comes_from_that_place_only() {
