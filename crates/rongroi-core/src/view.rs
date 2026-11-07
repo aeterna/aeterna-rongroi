@@ -1626,18 +1626,18 @@ fn bam_session_end_entries(
     let declared = report
         .timestamp_fields
         .get("bam")
-        .is_some_and(|fields| fields.iter().any(|field| field == session::BAM_END_FIELD));
+        .is_some_and(|fields| fields.iter().any(|field| field == session::LAST_RUN_FIELD));
     if !declared {
         return Vec::new();
     }
     session::bam_session_ends(report)
         .into_iter()
         .filter_map(|(edition, observation)| {
-            let at = time_of(observation, session::BAM_END_FIELD)?;
+            let at = time_of(observation, session::LAST_RUN_FIELD)?;
             Some(TimelineEntry {
                 at: at.to_owned(),
                 collector: Some(observation.collector.clone()),
-                field: session::BAM_END_FIELD.to_owned(),
+                field: session::LAST_RUN_FIELD.to_owned(),
                 place: place_of(report, observation).map(&redact),
                 source: EntrySource::SessionEnd {
                     edition: edition.to_owned(),

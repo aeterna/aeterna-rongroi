@@ -35,7 +35,9 @@ function timelineOf(entries: TimelineEntry[]): TimelineData {
 
 /** The text of each shown time, in the order the timeline shows them. */
 function shownEntries(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll(".entries li")).map((item) => item.textContent ?? "");
+  return Array.from(container.querySelectorAll(".entries li")).map(
+    (item) => item.textContent ?? "",
+  );
 }
 
 beforeAll(async () => {

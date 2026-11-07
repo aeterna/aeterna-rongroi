@@ -27,8 +27,9 @@ pub(super) const EDITIONS: [&str; 2] = ["legacy", "enhanced"];
 /// The observation field `process`, `bam` and `prefetch` carry the edition in (ADR 0062).
 const EDITION_FIELD: &str = "fivem_edition";
 
-/// The field BAM's time for an edition is in, and the session's end is read from (ADR 0062 section 5).
-pub(super) const BAM_END_FIELD: &str = "last_run";
+/// The field Prefetch's and BAM's last-run time for an edition is in. A session's end is BAM's value
+/// in this field (ADR 0062 section 5); Prefetch's value is read from it as an anchor, not as an end.
+pub(super) const LAST_RUN_FIELD: &str = "last_run";
 
 /// `fivem_dir`'s places this statement reads (ADR 0053).
 const LEGACY_LOGS: &str = "legacy_logs";
@@ -432,11 +433,11 @@ fn session_anchors<'r>(
     let prefetch = if prefetch_reason == Some(UnmeasuredReason::ServiceDisabled) {
         None
     } else {
-        anchors(report, "prefetch", edition, BAM_END_FIELD)
+        anchors(report, "prefetch", edition, LAST_RUN_FIELD)
             .into_iter()
             .max_by_key(|(time, _, _, _)| *time)
     };
-    let bam = anchors(report, "bam", edition, BAM_END_FIELD)
+    let bam = anchors(report, "bam", edition, LAST_RUN_FIELD)
         .into_iter()
         .max_by_key(|(time, _, _, _)| *time);
     let prefetch_unread = match prefetch_reason {
