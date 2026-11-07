@@ -13,6 +13,8 @@ use rongroi_core::model::{
 };
 use rongroi_core::view::{EntrySource, ReportView, RowBand, Timeline};
 
+use crate::trace_ages::Words;
+
 /// Output language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Lang {
@@ -845,11 +847,19 @@ fn timeline_section(timeline: &Timeline, bundle: &Bundle, lang: Lang) -> String 
             .text(id, lang.code())
             .map_or_else(|| id.to_owned(), |text| text.title)
     };
+    let words = Words::new(lang);
     let mut selectors: Vec<&str> = Vec::new();
     for entry in &timeline.entries {
         let what = match (&entry.source, entry.field.as_str()) {
             (EntrySource::Anchor, "generated_at") => text(lang, "scan_time").to_owned(),
             (EntrySource::Anchor, _) => text(lang, "boot_anchor").to_owned(),
+            // Its own label, in the session statement's words: the edition, then BAM's end.
+            (EntrySource::SessionEnd { edition }, _) => format!(
+                "{} {}: {}",
+                words.get("session.session", &[]),
+                words.get(&format!("session.edition.{edition}"), &[]),
+                words.get("session.end.bam", &[("at", entry.at.as_str())]),
+            ),
             (source, field) => {
                 let from = match source {
                     EntrySource::Evidence { rule_id } => format!(" ({})", title(rule_id)),
@@ -859,7 +869,10 @@ fn timeline_section(timeline: &Timeline, bundle: &Bundle, lang: Lang) -> String 
                         }
                         format!(" ({})", title(selector_id))
                     }
-                    EntrySource::Anchor | EntrySource::Observation => String::new(),
+                    // A session end is labelled above, and never reaches this arm.
+                    EntrySource::Anchor
+                    | EntrySource::SessionEnd { .. }
+                    | EntrySource::Observation => String::new(),
                 };
                 format!(
                     "[{}{}] {field}{from}",
@@ -1143,6 +1156,25 @@ mod tests {
                 "{line}"
             );
         }
+        // Two editions' session ends read differently by edition name alone.
+        let enhanced: Timeline = serde_json::from_value(serde_json::json!({
+            "entries": [{
+                "at": "2026-01-10T10:30:00Z",
+                "collector": "bam",
+                "field": "last_run",
+                "place": null,
+                "source": { "kind": "session_end", "edition": "enhanced" },
+                "subject": null
+            }],
+            "bands": [],
+            "unmeasured": []
+        }))
+        .expect("a session end is a timeline entry");
+        let legacy_line = timeline_section(&timeline, &bundle, Lang::En);
+        let enhanced_line = timeline_section(&enhanced, &bundle, Lang::En);
+        assert!(legacy_line.contains("Legacy: ended"), "{legacy_line}");
+        assert!(enhanced_line.contains("Enhanced: ended"), "{enhanced_line}");
+        assert_ne!(legacy_line, enhanced_line);
     }
 
     #[test]

@@ -287,6 +287,12 @@ pub enum EntrySource {
         /// The timeline selector, for its text and ordinary causes.
         selector_id: String,
     },
+    /// The end of an edition's latest session, where BAM recorded it (ADR 0062 section 5). Not an
+    /// anchor: it is the session's own time, and the scan's times are left as they were.
+    SessionEnd {
+        /// `legacy` or `enhanced`.
+        edition: String,
+    },
     /// An unmatched observation. Self mode only.
     Observation,
 }
@@ -1594,6 +1600,7 @@ fn timeline_of(report: &Report, mode: Mode) -> Timeline {
             });
         }
     }
+    entries.extend(bam_session_end_entries(report, redact));
     // Stable: entries with one time and one collector keep the order they were reached in.
     entries.sort_by_cached_key(|entry| {
         (
@@ -1607,6 +1614,38 @@ fn timeline_of(report: &Report, mode: Mode) -> Timeline {
         bands: bands(report, redact),
         unmeasured: report.unmeasured_sources.clone(),
     }
+}
+
+/// One entry per edition whose latest session BAM ended (ADR 0062 section 5), at BAM's time as the
+/// report holds it. The session logic picks the observation; the timeline only shows it. Read only
+/// where the report declares BAM's time field, as every other time is.
+fn bam_session_end_entries(
+    report: &Report,
+    redact: impl Fn(String) -> String,
+) -> Vec<TimelineEntry> {
+    let declared = report
+        .timestamp_fields
+        .get("bam")
+        .is_some_and(|fields| fields.iter().any(|field| field == session::BAM_END_FIELD));
+    if !declared {
+        return Vec::new();
+    }
+    session::bam_session_ends(report)
+        .into_iter()
+        .filter_map(|(edition, observation)| {
+            let at = time_of(observation, session::BAM_END_FIELD)?;
+            Some(TimelineEntry {
+                at: at.to_owned(),
+                collector: Some(observation.collector.clone()),
+                field: session::BAM_END_FIELD.to_owned(),
+                place: place_of(report, observation).map(&redact),
+                source: EntrySource::SessionEnd {
+                    edition: edition.to_owned(),
+                },
+                subject: subject_of(observation).map(&redact),
+            })
+        })
+        .collect()
 }
 
 /// Every observation `mode` may take times from, with where it came from, in the order that decides
@@ -3224,10 +3263,11 @@ mod tests {
         ));
         let sessions = sessions_of(&report);
         let (_, end, _, _, _) = known(&sessions[0]);
+        // The session statement holds BAM's time to the second; the entry keeps the report's text.
         assert_eq!(
             *end,
             SessionEnd::Bam {
-                at: "2026-01-10T10:30:00.250Z".to_owned()
+                at: "2026-01-10T10:30:00Z".to_owned()
             }
         );
         for (label, mode) in [("self", Mode::SelfCheck), ("ss", Mode::Ss)] {
@@ -3360,7 +3400,12 @@ mod tests {
             );
             let got: Vec<(&str, serde_json::Value)> = ends
                 .iter()
-                .map(|end| (end["at"].as_str().unwrap_or_default(), end["source"].clone()))
+                .map(|end| {
+                    (
+                        end["at"].as_str().unwrap_or_default(),
+                        end["source"].clone(),
+                    )
+                })
                 .collect();
             assert_eq!(
                 got,
@@ -3409,11 +3454,12 @@ mod tests {
                 .filter(|entry| entry.source == EntrySource::Anchor)
                 .map(|entry| (entry.field.as_str(), entry.at.as_str()))
                 .collect();
+            // In time order: Windows started before this scan ran.
             assert_eq!(
                 anchors,
                 vec![
-                    ("generated_at", "2026-01-10T12:00:00Z"),
                     ("boot_time", "2026-01-09T08:00:00Z"),
+                    ("generated_at", "2026-01-10T12:00:00Z"),
                 ]
             );
             assert_eq!(session_end_entries(&timeline).len(), 1, "{label}");

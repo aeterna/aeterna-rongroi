@@ -12,10 +12,7 @@ import i18n, { initI18n } from "../i18n";
 import type { Timeline as TimelineData, TimelineEntry } from "../types";
 import { Timeline } from "./Timeline";
 
-/**
- * A session-end entry as the core serialises it. `types.ts` does not name the kind yet, so the entry
- * is built with a cast; its shape is the one the Rust tests pin.
- */
+/** A session-end entry as the core serialises it: BAM's end for one edition. */
 function sessionEnd(edition: string, at: string): TimelineEntry {
   return {
     at,
@@ -24,7 +21,7 @@ function sessionEnd(edition: string, at: string): TimelineEntry {
     place: null,
     subject: null,
     source: { kind: "session_end", edition },
-  } as unknown as TimelineEntry;
+  };
 }
 
 /** One of the scan's own times, as an anchor. */
@@ -98,5 +95,10 @@ describe("Timeline session end", () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]).toContain("ended 2026-01-10T10:30:00Z (BAM)");
     expect(entries[1]).toContain("ended 2026-01-10T11:20:00Z (BAM)");
+    // The two labels differ by edition name alone.
+    expect(entries[0]).toContain("Legacy");
+    expect(entries[1]).toContain("Enhanced");
+    expect(entries[0]).not.toContain("Enhanced");
+    expect(entries[1]).not.toContain("Legacy");
   });
 });

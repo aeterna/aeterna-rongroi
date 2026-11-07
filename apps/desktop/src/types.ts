@@ -292,6 +292,7 @@ export type EntrySource =
   | { kind: "anchor" }
   | { kind: "evidence"; rule_id: string }
   | { kind: "selector"; selector_id: string }
+  | { kind: "session_end"; edition: string }
   | { kind: "observation" };
 
 /** One time value on the timeline. `collector` is null for the scan's own times. */
