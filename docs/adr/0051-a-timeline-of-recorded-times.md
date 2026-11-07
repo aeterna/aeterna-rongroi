@@ -205,3 +205,25 @@ Decision 1 still holds for rules: no `role: evidence` file on these collectors m
   timeline shows.
 - **Not done.** The desktop filter is by collector only, not by place, and nothing measures how long an
   ordinary PC's Self-mode timeline is.
+
+## Amendment (2026-11-07) — the session's end is a timeline entry
+
+ADR 0072 tells the reviewer to read a device's times "beside the session on the timeline", but the timeline drew
+no session. It now holds one more kind of entry, **session end** (`EntrySource::SessionEnd { edition }`): for each
+FiveM edition whose latest session ADR 0062 ended with BAM (`SessionEnd::Bam`), one entry at that BAM
+observation's `last_run`, as the report holds it, with the BAM observation's place and subject (redacted in SS
+mode as every entry is). Nothing else is added: the scan's start is already the `generated_at` anchor.
+
+- **Not an anchor.** An anchor is the scan's own time (glossary); a session's end is a time Windows recorded
+  about FiveM. It gets its own source so neither word means two things.
+- **Taken, not computed.** The entry is the observation ADR 0062's session logic already picked, read through
+  the same function as the session statement, so the two cannot disagree. Section 1 ("nothing is computed")
+  still holds for the timeline itself: it compares, counts and filters nothing, and section 6 is unchanged —
+  no colour, no count, no "near the session" marking.
+- **No new data in SS mode.** The same BAM record of FiveM's names is already selected in both modes by the
+  section 4 selectors; the session-end entry may show that time a second time under its own label.
+- **Shown** in the CLI and the desktop with the session statement's own words (`session.session`, the edition
+  name, `session.end.bam`), never with the "Windows started" label.
+- **Not done.** No start-of-session entry, no `scan_finished_at` / `saved_at` (they are not in the report), and
+  no device-to-session comparison: that is ADR 0072's reviewer reading, and any `device_windows` view waits until
+  real reviews show what the reviewer cannot answer from the timeline alone.

@@ -135,6 +135,15 @@ function Entry({ entry, texts }: { entry: TimelineEntry; texts: Record<string, R
       </strong>
     );
   }
+  // Its own label, in the session statement's words: the edition, then BAM's end (ADR 0062 section 5).
+  if (source.kind === "session_end") {
+    return (
+      <>
+        {t("session.session")} {t(`session.edition.${source.edition}`)}:{" "}
+        {t("session.end.bam", { at: entry.at })}
+      </>
+    );
+  }
   const where = [
     entry.collector ? t(`collector.${entry.collector}`, { defaultValue: entry.collector }) : null,
     entry.place,
