@@ -46,19 +46,58 @@ struct NameEntry {
 /// The table measured in ADR 0094 section 4. A name added here needs a new measurement and a line
 /// in that ADR's amendments.
 const NAMES: [NameEntry; 13] = [
-    NameEntry { name: "svchost.exe", folders: &[SYSTEM32, SYSWOW64] },
-    NameEntry { name: "explorer.exe", folders: &[WINDOWS_ROOT, SYSWOW64] },
-    NameEntry { name: "lsass.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "csrss.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "smss.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "wininit.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "winlogon.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "services.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "dwm.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "conhost.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "taskhostw.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "RuntimeBroker.exe", folders: &[SYSTEM32] },
-    NameEntry { name: "spoolsv.exe", folders: &[SYSTEM32] },
+    NameEntry {
+        name: "svchost.exe",
+        folders: &[SYSTEM32, SYSWOW64],
+    },
+    NameEntry {
+        name: "explorer.exe",
+        folders: &[WINDOWS_ROOT, SYSWOW64],
+    },
+    NameEntry {
+        name: "lsass.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "csrss.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "smss.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "wininit.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "winlogon.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "services.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "dwm.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "conhost.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "taskhostw.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "RuntimeBroker.exe",
+        folders: &[SYSTEM32],
+    },
+    NameEntry {
+        name: "spoolsv.exe",
+        folders: &[SYSTEM32],
+    },
 ];
 
 /// The folders a table name is expected in, or `None` when the name is not in the table.
@@ -133,7 +172,10 @@ fn drive_segments(path: &str) -> Option<(u8, Vec<&str>)> {
         return None;
     }
     let segments: Vec<&str> = segments.collect();
-    if segments.iter().any(|segment| segment.is_empty() || is_unusable_segment(segment)) {
+    if segments
+        .iter()
+        .any(|segment| segment.is_empty() || is_unusable_segment(segment))
+    {
         return None;
     }
     Some((drive, segments))
@@ -365,10 +407,19 @@ mod tests {
     fn prefetch_reads_the_executables_own_entry() {
         let system32 = format!(r"{VOLUME}\WINDOWS\SYSTEM32\SVCHOST.EXE");
         let elsewhere = format!(r"{VOLUME}\PROGRAMDATA\X\SVCHOST.EXE");
-        assert_eq!(of_prefetch("SVCHOST.EXE", &table(&[&system32]), SYSTEM_ROOT), Some(false));
-        assert_eq!(of_prefetch("svchost.exe", &table(&[&elsewhere]), SYSTEM_ROOT), Some(true));
+        assert_eq!(
+            of_prefetch("SVCHOST.EXE", &table(&[&system32]), SYSTEM_ROOT),
+            Some(false)
+        );
+        assert_eq!(
+            of_prefetch("svchost.exe", &table(&[&elsewhere]), SYSTEM_ROOT),
+            Some(true)
+        );
         // The name in the header and the entry differ only in case.
-        assert_eq!(of_prefetch("Svchost.Exe", &table(&[&system32]), SYSTEM_ROOT), Some(false));
+        assert_eq!(
+            of_prefetch("Svchost.Exe", &table(&[&system32]), SYSTEM_ROOT),
+            Some(false)
+        );
     }
 
     #[test]

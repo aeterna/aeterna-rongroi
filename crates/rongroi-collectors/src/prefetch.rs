@@ -720,7 +720,7 @@ fn executable_name(executable: &str) -> Option<String> {
 mod tests {
     use std::path::PathBuf;
 
-    use rongroi_host::{FixtureHost, NonWindowsHost};
+    use rongroi_host::{EnvironmentSource, FixtureHost, NonWindowsHost};
     use rongroi_parsers::prefetch::PrefetchRun;
 
     use super::*;
@@ -1047,10 +1047,7 @@ mod tests {
             "SVCHOST.EXE",
             vec![format!(r"{VOLUME}\WINDOWS\SYSTEM32\SVCHOST.EXE")],
         );
-        let other = record_loading(
-            "CMD.EXE",
-            vec![format!(r"{VOLUME}\PROGRAMDATA\X\CMD.EXE")],
-        );
+        let other = record_loading("CMD.EXE", vec![format!(r"{VOLUME}\PROGRAMDATA\X\CMD.EXE")]);
         assert_eq!(system_name_of(&host, &elsewhere), Some(true));
         assert_eq!(system_name_of(&host, &expected), Some(false));
         assert_eq!(system_name_of(&host, &other), None);
@@ -1473,6 +1470,8 @@ mod tests {
     const SYSTEM: &str = r"\VOLUME{01d0000000000000-aaaaaaaa}";
     /// The device prefix of a second volume on the same machine.
     const OTHER: &str = r"\VOLUME{01d0000000000000-bbbbbbbb}";
+    /// The device prefix the Prefetch system-name tests spell their string-table entries with.
+    const VOLUME: &str = r"\VOLUME{01d00000000000000-0000abcd}";
 
     /// `ntdll.dll` in `\Windows\System32` on the given volume: the entry that names the system volume.
     fn ntdll_on(volume: &str) -> String {
