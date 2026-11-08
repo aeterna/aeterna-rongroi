@@ -42,10 +42,14 @@ const FILES: [(&str, &str, &str); 4] = [
 ];
 
 /// The licence lines every generated copy starts with.
+// REUSE-IgnoreStart
+// These are text written into the generated SVGs, not this file's licence; REUSE would read the
+// closing `-->` as part of the licence expression.
 const SPDX: &str = concat!(
     "<!-- SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors -->\n",
     "<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->\n",
 );
+// REUSE-IgnoreEnd
 
 /// The template's licence, kept on the generated copy, and the template it was made from.
 fn header(template: &str) -> String {
