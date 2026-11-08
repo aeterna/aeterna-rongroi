@@ -68,6 +68,14 @@ For screenshare review with user path redaction:
 
 ## 🏗️ Forensic Architecture
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-en-dark.svg">
+  <img alt="Six Windows sources (USN Journal, Prefetch/BAM/PCA, Authenticode, LOLDrivers, event logs, HID) feed traces into the offline Rust core and its rules, which produce a three-layer report; a file vanishes but its trace still reaches the report; the wire to the internet is cut." src="docs/assets/architecture-en-light.svg" width="960">
+</picture>
+
+<details>
+<summary>The same flow as a Mermaid diagram</summary>
+
 ```mermaid
 flowchart TD
     subgraph Sources["Windows Artifacts (Local Read-Only)"]
@@ -105,6 +113,8 @@ flowchart TD
     class COLLECT,RULES,TIME core;
     class L1,L2,L3 pres;
 ```
+
+</details>
 
 ---
 

@@ -16,6 +16,7 @@ mod loldrivers;
 mod measured;
 mod new_locale;
 mod new_rule;
+mod readme_diagram;
 mod release;
 mod release_check;
 mod release_notes;
@@ -44,6 +45,8 @@ enum Command {
     CheckPinExpiry(certificate_pins::Args),
     /// Write the rule reference pages in `docs/` from the rules bundle; `--check` fails if they are stale.
     RulesReference(rules_reference::Args),
+    /// Write the light and dark README architecture diagrams from the template; `--check` fails if they are stale.
+    ReadmeDiagram(readme_diagram::Args),
     /// Write docs/coverage.md from the rules, baseline lists, retention texts and the measurement ledger; `--check` fails if it is stale.
     Coverage(coverage::Args),
     /// Check one lab-replay scan against a scenario's `expect.yaml` (ADR 0076): `cargo xtask lab-check --expect <path> --scan <path>`.
@@ -85,6 +88,7 @@ fn main() -> anyhow::Result<()> {
         Command::CheckBaseline => check_baseline::run(&root),
         Command::CheckPinExpiry(args) => certificate_pins::run_expiry(&root, &args),
         Command::RulesReference(args) => rules_reference::run(&root, &args),
+        Command::ReadmeDiagram(args) => readme_diagram::run(&root, &args),
         Command::Coverage(args) => coverage::run(&root, &args),
         Command::LabCheck(args) => lab_check::run(&root, &args),
         Command::CheckLocales => check_locales::run(&root),
