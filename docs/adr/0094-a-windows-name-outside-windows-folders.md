@@ -1,7 +1,8 @@
 # ADR 0094 — A Windows program's name outside Windows' folders
 
 - Status: accepted — the owner chose the five recommendations behind this ADR on 2026-11-08 (D1–D5 of the plan
-  "Rongroi Trace Gaps & Motion") and approved this text on 2026-11-08 (G1 of wave W2). No code is written yet
+  "Rongroi Trace Gaps & Motion") and approved this text on 2026-11-08 (G1 of wave W2). Built in the pull request that adds the three
+  rules (wave W2, lane A); see the amendment below
 - Date: 2026-11-08
 - Related: AGENTS.md hard rules 3, 5, 6 and 9, ADR 0009 and ADR 0010 (the `fivem_dir` and `process` sources,
   and why neither shipped a rule without a cited source), ADR 0014 (unmatched observations), ADR 0021 and ADR 0023 (Prefetch and BAM paths),
@@ -190,3 +191,25 @@ nothing about cheats.
 - `docs/rules-reference*.md` are regenerated (`cargo xtask rules-reference`), and the rule count in the
   README changes with them.
 - The landing page sentence changes, as stated under "Amends".
+
+## Amendment of 2026-11-09 — what the build found
+
+Written when the collectors and the rules landed. The decision does not change. A second model reviewed the
+build (Q3), and its review named four limits that the rules now state in their descriptions or false positives:
+
+- **A volume without a drive letter is compared as if it were the Windows drive.** Prefetch's `\VOLUME{…}`
+  prefix is not mapped to a drive. BAM's `\Device\HarddiskVolumeN` path is mapped onto `%SystemRoot%`'s drive
+  when the drive map could not give it a letter, which includes an unplugged or folder-mounted volume.
+  A copy under another volume's `\Windows\System32` therefore reads `false`. This is a missed case, never a
+  false match.
+- **Servicing folders are excused at any depth and on any drive.** This follows section 4's "never `true`".
+  `X:\$WinREAgent\…` on a removable drive is excused too.
+- **Windows on ARM.** `SysArm32` and `SysChpe32` were not measured, because the measurement in section 4 is
+  x64. A program run from them can read `true`, and both rules list this as a false positive. A
+  measurement on an ARM machine and an amendment would add them to the table.
+- **The README's rule count.** The README prose keeps the count of the latest release until the next release.
+  The architecture diagram (`cargo xtask readme-diagram`) shows the bundle's count, which is checked in CI.
+
+The landing-page sentence under "Amends" changes in this pull request. A change under `site/` deploys the
+public site when it is merged into `dev`, so the owner approves that merge.
+
