@@ -69,8 +69,8 @@ For screenshare review with user path redaction:
 ## 🏗️ Forensic Architecture
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="Six Windows sources (USN Journal, Prefetch/BAM/PCA, Authenticode, LOLDrivers, event logs, HID) feed traces into the offline Rust core and its rules, which produce a three-layer report; a file vanishes but its trace still reaches the report; the wire to the internet is cut." src="docs/assets/architecture-light.svg" width="960">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-en-dark.svg">
+  <img alt="Six Windows sources (USN Journal, Prefetch/BAM/PCA, Authenticode, LOLDrivers, event logs, HID) feed traces into the offline Rust core and its rules, which produce a three-layer report; a file vanishes but its trace still reaches the report; the wire to the internet is cut." src="docs/assets/architecture-en-light.svg" width="960">
 </picture>
 
 <details>

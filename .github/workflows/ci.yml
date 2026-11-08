@@ -50,7 +50,10 @@ jobs:
               exit 0
             fi
             changed=$(git diff --name-only HEAD^1 HEAD)
-            if ! grep -q -v -E '^(\.github/workflows/pages\.yml|\.github/ISSUE_TEMPLATE/|docs/|site/|LICENSES/|.*\.md$|_typos\.toml$)' <<<"$changed"; then
+            # docs/assets/ holds the README diagrams `cargo xtask readme-diagram --check` compares, so a
+            # change there is not docs-only.
+            if ! grep -q -E '^docs/assets/' <<<"$changed" && \
+               ! grep -q -v -E '^(\.github/workflows/pages\.yml|\.github/ISSUE_TEMPLATE/|docs/|site/|LICENSES/|.*\.md$|_typos\.toml$)' <<<"$changed"; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
               echo "PR changes only docs/site/text: fast-pass Rust compile and tests."
               exit 0

@@ -69,8 +69,8 @@
 ## 🏗️ สถาปัตยกรรมทางนิติวิทยาศาสตร์คอมพิวเตอร์ (Forensic Architecture)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img alt="แหล่งข้อมูล 6 แหล่งใน Windows (USN Journal, Prefetch/BAM/PCA, Authenticode, LOLDrivers, Event Logs, HID) ส่งร่องรอยเข้า Rust core ที่ทำงาน offline พร้อม rule ทั้งหมด แล้วออกเป็นรายงาน 3 ชั้น ไฟล์ตัวหนึ่งหายไปแต่ร่องรอยยังไปถึงรายงาน และเส้นไป internet ถูกตัด" src="docs/assets/architecture-light.svg" width="960">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-th-dark.svg">
+  <img alt="แหล่งข้อมูล 6 แหล่งใน Windows (USN Journal, Prefetch/BAM/PCA, Authenticode, LOLDrivers, Event Logs, HID) ส่งร่องรอยเข้า Rust core ที่ทำงาน offline พร้อม rule ทั้งหมด แล้วออกเป็นรายงาน 3 ชั้น ไฟล์ตัวหนึ่งหายไปแต่ร่องรอยยังไปถึงรายงาน และเส้นไป internet ถูกตัด" src="docs/assets/architecture-th-light.svg" width="960">
 </picture>
 
 <details>
