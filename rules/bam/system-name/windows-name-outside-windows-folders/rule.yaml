@@ -10,7 +10,8 @@ description: >-
   of the other names are only in System32. This row shows where the program ran from, not what it
   does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation
   on another drive, and a tool that ships its own copy of a Windows program under the same name all
-  produce it.
+  produce it. A path BAM recorded on a volume without a drive letter is compared as if it were on the
+  Windows drive.
 status: experimental
 collector: bam
 strength: context
@@ -26,6 +27,7 @@ falsepositives:
   - An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
   - A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
   - A tool that ships its own copy of a Windows program under the same name
+  - A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
 references:
   - https://attack.mitre.org/techniques/T1036/005/
 author: aeterna-rongroi contributors

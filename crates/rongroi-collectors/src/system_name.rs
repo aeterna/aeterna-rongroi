@@ -227,8 +227,10 @@ pub fn of_path(path: &str, system_root: &str) -> Option<bool> {
 /// The executable's own entry is the string-table entry whose last segment is the executable's
 /// name, compared without ASCII case, as `fivem_edition::of_prefetch` reads it. Every such entry
 /// must give the same answer; when they disagree there is no value. The entry's folder is the part
-/// below its `\VOLUME{…}` prefix, compared with `system_root` minus its drive letter. The entry
-/// itself is never emitted.
+/// below its `\VOLUME{…}` prefix, compared with `system_root` minus its drive letter. The volume
+/// prefix is not mapped to a drive letter, so the entry is compared as if it were on
+/// `%SystemRoot%`'s drive (a copy under another volume's `\Windows\System32` reads `false`). The
+/// entry itself is never emitted.
 pub fn of_prefetch(executable: &str, loaded_files: &[String], system_root: &str) -> Option<bool> {
     let executable = executable.trim();
     if executable.is_empty() {
@@ -321,6 +323,52 @@ mod tests {
             (r"C:\$WINDOWS.~BT\smss.exe", Some(false)),
             (r"C:\$WinREAgent\Sources\wininit.exe", Some(false)),
         ]);
+    }
+
+    /// An expected folder is matched exactly. A folder below it, or one that only starts with its
+    /// name, is elsewhere.
+    #[test]
+    fn an_expected_folder_matches_exactly_not_by_prefix() {
+        paths(&[
+            (r"C:\Windows\Temp\explorer.exe", Some(true)),
+            (r"C:\Windows\System32\drivers\svchost.exe", Some(true)),
+        ]);
+    }
+
+    /// A servicing folder is matched by whole segment: `WinSxSX` is not `WinSxS`.
+    #[test]
+    fn a_servicing_folder_matches_by_whole_segment() {
+        paths(&[
+            (r"C:\Windows\WinSxSX\svchost.exe", Some(true)),
+            (r"C:\$WINDOWS.~BTX\smss.exe", Some(true)),
+        ]);
+    }
+
+    /// `%SystemRoot%` written with a trailing backslash is the same root, not an unreadable path.
+    #[test]
+    fn a_system_root_with_a_trailing_backslash_is_the_same_root() {
+        assert_eq!(
+            of_path(r"C:\Windows\System32\svchost.exe", r"C:\Windows\"),
+            Some(false)
+        );
+    }
+
+    /// Pins current behaviour: the Prefetch volume prefix is not mapped to a drive letter, so an
+    /// entry under any `\VOLUME{…}` is compared as if it were on `%SystemRoot%`'s drive. A copy under
+    /// another volume's `\Windows\System32` therefore reads `false`, not "elsewhere".
+    #[test]
+    fn prefetch_takes_a_different_volume_to_be_the_system_drive() {
+        const OTHER_VOLUME: &str = r"\VOLUME{01d00000000000000-0000ffff}";
+        let system32 = format!(r"{OTHER_VOLUME}\WINDOWS\SYSTEM32\SVCHOST.EXE");
+        let elsewhere = format!(r"{OTHER_VOLUME}\PROGRAMDATA\X\SVCHOST.EXE");
+        assert_eq!(
+            of_prefetch("svchost.exe", &table(&[&system32]), SYSTEM_ROOT),
+            Some(false)
+        );
+        assert_eq!(
+            of_prefetch("svchost.exe", &table(&[&elsewhere]), SYSTEM_ROOT),
+            Some(true)
+        );
     }
 
     /// Windows reports these paths in mixed case; the comparison ignores ASCII case.

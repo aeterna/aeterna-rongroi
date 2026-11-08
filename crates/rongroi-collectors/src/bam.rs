@@ -624,7 +624,9 @@ fn insert_path(
 /// A device path has no drive letter to compare with `%SystemRoot%`, and the letter is exactly what
 /// the drive map could not supply — that is why `insert_path` withheld the path. The table's
 /// expected folders are on `%SystemRoot%`'s drive, so the folder below the device is compared there.
-/// The rewritten path is used for this one question and is never emitted (ADR 0094).
+/// It applies to any `\Device\HarddiskVolumeN` path the drive map did not turn into a drive letter,
+/// an unplugged or folder-mounted volume included, and such a volume is taken to be `%SystemRoot%`'s
+/// drive. The rewritten path is used for this one question and is never emitted (ADR 0094).
 fn on_system_drive(path: &str, system_root: &str) -> Option<String> {
     const VOLUME_PREFIX: &str = "HarddiskVolume";
     let mut segments = path.split(['\\', '/']);
@@ -923,6 +925,55 @@ registry:
         assert_eq!(field(records[0], "path"), None);
         assert_eq!(text(records[0], "path_withheld"), Some(UNREDACTABLE_FORM));
         assert_eq!(field(records[0], system_name::FIELD), Some(&true.into()));
+    }
+
+    /// A volume's device path is read as the system drive's only when it is a `HarddiskVolumeN`
+    /// with a number and a tail below it, under a `%SystemRoot%` that starts with a drive letter.
+    /// Every other shape gives no path to compare (ADR 0094).
+    #[test]
+    fn on_system_drive_rewrites_only_a_harddiskvolume_below_a_drive_root() {
+        assert_eq!(
+            on_system_drive(
+                r"\Device\HarddiskVolume3\Windows\System32\svchost.exe",
+                r"C:\Windows"
+            )
+            .as_deref(),
+            Some(r"C:\Windows\System32\svchost.exe")
+        );
+        for path in [
+            r"\Device\Mup\srv\x.exe",
+            r"\Device\HarddiskVolume\x.exe",
+            r"\Device\HarddiskVolumeShadowCopy1\x.exe",
+            r"\Device\HarddiskVolume3",
+        ] {
+            assert_eq!(on_system_drive(path, r"C:\Windows"), None, "{path}");
+        }
+        for system_root in [r"\\srv\x", "C"] {
+            let path = r"\Device\HarddiskVolume3\Windows\x.exe";
+            assert_eq!(on_system_drive(path, system_root), None, "{system_root}");
+        }
+    }
+
+    /// A device path below a volume with no drive letter is compared as if it were on
+    /// `%SystemRoot%`'s drive, so a system folder under it is not elsewhere (ADR 0094).
+    #[test]
+    fn a_device_path_in_the_system_folders_is_not_elsewhere() {
+        let yaml = format!(
+            r"platform: windows
+env:
+  SystemRoot: 'C:\Windows'
+registry:
+  '{USER_SETTINGS_KEY}\S-1-5-21-0-0-0-1001':
+    '\Device\HarddiskVolume3\Windows\System32\svchost.exe':
+      content: '012345678901234567890123'
+"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(field(records[0], system_name::FIELD), Some(&false.into()));
     }
 
     /// **Every account key measured on Windows 11 holds `Version` and `SequenceNumber`, two
