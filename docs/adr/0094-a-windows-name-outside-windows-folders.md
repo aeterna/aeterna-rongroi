@@ -1,8 +1,7 @@
 # ADR 0094 — A Windows program's name outside Windows' folders
 
-- Status: proposed. The owner chose the five recommendations behind this ADR on 2026-11-08 (D1–D5 of the plan
-  "Rongroi Trace Gaps & Motion"). The text below is approved when the pull request that builds it is reviewed
-  (G1 of wave W2). No code is written yet
+- Status: accepted — the owner chose the five recommendations behind this ADR on 2026-11-08 (D1–D5 of the plan
+  "Rongroi Trace Gaps & Motion") and approved this text on 2026-11-08 (G1 of wave W2). No code is written yet
 - Date: 2026-11-08
 - Related: AGENTS.md hard rules 3, 5, 6 and 9, ADR 0009 and ADR 0010 (the `fivem_dir` and `process` sources,
   and why neither shipped a rule without a cited source), ADR 0014 (unmatched observations), ADR 0021 and ADR 0023 (Prefetch and BAM paths),
