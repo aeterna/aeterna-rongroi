@@ -237,7 +237,7 @@
 | `antivirus_product/registered/no-product-reports-on` | antivirus_product | evidence | posture | experimental | 2 / 1 | confronted | none | never | never |
 | `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
 | `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 2 / 2 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
-| `bam/system-name/windows-name-outside-windows-folders` | bam | evidence | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
+| `bam/system-name/windows-name-outside-windows-folders` | bam | evidence | context | experimental | 1 / 2 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-or-gta-v-by-name` | bam | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26100 server x64, 26220 client x64 |
 | `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
@@ -300,7 +300,7 @@
 | `powershell_text/history/trace-cleanup` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
 | `powershell_text/timeline/download-then-execute-times` | powershell_text | timeline | context | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
 | `prefetch/file-attributes/prefetch-file-read-only` | prefetch | evidence | tamper | experimental | 2 / 2 | confronted | stated | never | 26220 client x64 |
-| `prefetch/system-name/windows-name-outside-windows-folders` | prefetch | evidence | context | experimental | 1 / 1 | unconfronted | stated | never | 26220 client x64 |
+| `prefetch/system-name/windows-name-outside-windows-folders` | prefetch | evidence | context | experimental | 1 / 2 | unconfronted | stated | never | 26220 client x64 |
 | `prefetch/timeline/fivem-game-process-by-name` | prefetch | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26220 client x64 |
 | `prefetch/timeline/fivem-or-gta-v-by-name` | prefetch | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26220 client x64 |
 | `process/system-name/windows-name-outside-windows-folders` | process | evidence | context | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |

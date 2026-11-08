@@ -17,7 +17,7 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 |---|---|
 | รูปแบบ rule | 4 |
 | จำนวน rule | 81 |
-| SHA-256 | `5f8cca2cfa6d943157b9456cb8447ea513ea33dc516a17da24c9d5483ecad4f0` |
+| SHA-256 | `a7772fc1752d577ae4f77ce8c13a28ce4602429765f313540194f383aef863f6` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -299,7 +299,7 @@ Windows Background Activity Moderator (BAM) บันทึกประวัต
 
 **เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
 
-The Windows Background Activity Moderator (BAM) recorded execution of a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the recorded file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it.
+The Windows Background Activity Moderator (BAM) recorded execution of a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the recorded file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it. A path BAM recorded on a volume without a drive letter is compared as if it were on the Windows drive.
 
 **ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
 
@@ -320,6 +320,7 @@ Only what BAM still holds. Windows removes BAM entries older than seven days whe
 - An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
 - A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
 - A tool that ships its own copy of a Windows program under the same name
+- A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
 
 **แหล่งอ้างอิง**
 
@@ -2523,7 +2524,7 @@ Windows ถูกสั่งให้ปิดการป้องกัน Sp
 
 **เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
 
-Windows' Prefetch recorded a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the executable it ran from is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it.
+Windows' Prefetch recorded a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the executable it ran from is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it. The recorded volume is not mapped to a drive, so it is compared as if it were on the Windows drive.
 
 **ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
 
@@ -2545,6 +2546,7 @@ Only the Prefetch files still in the folder, and only the most recent run each o
 - An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
 - A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
 - A tool that ships its own copy of a Windows program under the same name
+- A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
 
 **แหล่งอ้างอิง**
 
