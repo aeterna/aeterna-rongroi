@@ -106,7 +106,7 @@ fn render_files(root: &Path) -> anyhow::Result<Vec<(&'static str, String)>> {
                 .replace("\r\n", "\n");
             Ok((
                 *path,
-                render(*template_path, &template, rules, loldrivers, *palette),
+                render(template_path, &template, rules, loldrivers, palette),
             ))
         })
         .collect()
@@ -196,8 +196,10 @@ mod tests {
     const EN_TEMPLATE_TEXT: &str = include_str!("../../docs/assets/architecture.template.en.svg");
     const TH_TEMPLATE_TEXT: &str = include_str!("../../docs/assets/architecture.template.th.svg");
 
-    const TEMPLATES: [(&str, &str); 2] =
-        [(EN_TEMPLATE, EN_TEMPLATE_TEXT), (TH_TEMPLATE, TH_TEMPLATE_TEXT)];
+    const TEMPLATES: [(&str, &str); 2] = [
+        (EN_TEMPLATE, EN_TEMPLATE_TEXT),
+        (TH_TEMPLATE, TH_TEMPLATE_TEXT),
+    ];
 
     const TEST_RULE: &str = "id: 7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7\ntitle: Secure Boot is turned off\ndescription: Windows reports that Secure Boot is off.\nstatus: test\ncollector: posture\nstrength: posture\nmatch:\n  secure_boot: disabled\nretention: Current setting only.\nfalsepositives: [Legacy BIOS]\nauthor: tests\ndate: 2026-09-11\ntags: [posture, boot]\n";
 
@@ -274,7 +276,10 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let csv = fs::read_to_string(root.join(DATA_FILE)).expect("read the committed data file");
         let non_empty = csv.lines().filter(|line| !line.trim().is_empty()).count();
-        assert!(non_empty > 1, "the data file has a header and at least one row");
+        assert!(
+            non_empty > 1,
+            "the data file has a header and at least one row"
+        );
         assert_eq!(loldrivers_rows(&csv), non_empty - 1);
     }
 
@@ -374,7 +379,10 @@ mod tests {
 
         let error = run(&tmp.0, &Args { check: true }).unwrap_err().to_string();
         assert!(error.contains("out of date"), "{error}");
-        assert!(error.contains("does not match what the template produces"), "{error}");
+        assert!(
+            error.contains("does not match what the template produces"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -405,7 +413,10 @@ mod tests {
         tmp.write(EN_TEMPLATE, &EN_TEMPLATE_TEXT.replace('\n', "\r\n"));
         run(&tmp.0, &Args { check: false }).unwrap();
         let written = fs::read_to_string(tmp.0.join(EN_LIGHT_FILE)).unwrap();
-        assert!(!written.contains('\r'), "CRLF from the template reached the copy");
+        assert!(
+            !written.contains('\r'),
+            "CRLF from the template reached the copy"
+        );
 
         let path = tmp.0.join(TH_DARK_FILE);
         let committed = fs::read_to_string(&path).unwrap().replace('\n', "\r\n");
