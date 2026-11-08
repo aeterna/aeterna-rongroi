@@ -90,7 +90,7 @@ fn render_files(root: &Path) -> anyhow::Result<Vec<(&'static str, String)>> {
     let loldrivers = loldrivers_rows(&csv);
     Ok(FILES
         .iter()
-        .map(|(path, palette)| (*path, render(&template, rules, loldrivers, *palette)))
+        .map(|(path, palette)| (*path, render(&template, rules, loldrivers, palette)))
         .collect())
 }
 
@@ -205,7 +205,10 @@ mod tests {
         let light = render(ACTUAL_TEMPLATE, 77, 1847, LIGHT);
         let dark = render(ACTUAL_TEMPLATE, 77, 1847, DARK);
         assert_ne!(light, dark);
-        assert_eq!(light.replace(LIGHT, "/*PALETTE*/"), dark.replace(DARK, "/*PALETTE*/"));
+        assert_eq!(
+            light.replace(LIGHT, "/*PALETTE*/"),
+            dark.replace(DARK, "/*PALETTE*/")
+        );
     }
 
     /// A directory under the OS temp dir, unique per test, deleted on drop.
@@ -247,7 +250,10 @@ mod tests {
             DATA_FILE,
             "# rebuilt from upstream\nsha256,loldrivers_id,file_name\n# one driver\n0000000000000000000000000000000000000000000000000000000000000000,00000000-0000-0000-0000-000000000000,example.sys\n",
         );
-        tmp.write("rules/posture/boot/secure-boot-disabled/rule.yaml", TEST_RULE);
+        tmp.write(
+            "rules/posture/boot/secure-boot-disabled/rule.yaml",
+            TEST_RULE,
+        );
         tmp
     }
 
