@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 10ca3ec3-f0c0-426d-9430-39fcd09c6897
+title: Running program has a Windows program's name outside Windows' folders
+description: >-
+  A program running at the time of the scan has the name of a Windows program, such as svchost.exe
+  or lsass.exe, but its file is not in the folder Windows keeps that program in. Windows' own copy of
+  svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row
+  shows where the program runs from, not what it does. It is not proof of anything on its own: an
+  interrupted Windows update, a Windows installation on another drive, and a tool that ships its own
+  copy of a Windows program under the same name all produce it.
+status: experimental
+collector: process
+strength: context
+# No `allow`: nothing is excused by name, hash or certificate. The expected folders are in the
+# collector, and this rule reports what differs from them (ADR 0094).
+match:
+  system_name_elsewhere: true
+retention: >-
+  Only the programs running at the moment of the scan. A program that has already exited is not
+  listed, and nothing older is kept here.
+# `access_denied` is Windows refusing to list the running processes. A process whose path could not
+# be read carries no `system_name_elsewhere`: it is not matched, and it is not counted as unmeasured,
+# because a field the collector left out for one item is not a gap.
+unmeasured_when: [not_windows, access_denied]
+falsepositives:
+  - An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+  - A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+  - A tool that ships its own copy of a Windows program under the same name
+references:
+  - https://attack.mitre.org/techniques/T1036/005/
+author: aeterna-rongroi contributors
+date: 2026-11-09
+tags: [process, masquerading]

@@ -1,0 +1,27 @@
+{
+  "description": "BAM recorded execution of a svchost.exe in System32, the folder the table expects for that name",
+  "observations": [
+    {
+      "collector": "bam",
+      "fields": {
+        "last_run": "2026-10-15T10:00:00Z",
+        "moderation_state": 0,
+        "name": "svchost.exe",
+        "path": "C:\\Windows\\System32\\svchost.exe",
+        "system_name_elsewhere": false,
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "entries": 1,
+        "intact": true,
+        "metadata_values": 2,
+        "rejected": 0,
+        "sid_withheld": "per_user_identifier",
+        "users": 1
+      }
+    }
+  ]
+}
