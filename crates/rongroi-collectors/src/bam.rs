@@ -37,6 +37,10 @@
 //!   (`legacy` or `enhanced`) is read from the value name in whatever form BAM spelled it, device path
 //!   included, by `crate::fivem_edition`; it is one word, and it is omitted for a path below neither of
 //!   `FiveM`'s program folders (ADR 0062).
+//! - **Whether a table name ran outside its expected folders is emitted, and the path is not.**
+//!   `system_name_elsewhere` is read from the value name in whatever form BAM spelled it, device path
+//!   included, by `crate::system_name`; it is one boolean, it is still emitted when the path is
+//!   withheld, and it is omitted for a name outside the table or without `%SystemRoot%` (ADR 0094).
 //! - **The undecoded tail of a value is never emitted**, under any name. `rongroi_parsers::bam`
 //!   keeps bytes 12.. verbatim and gives them no meaning; naming them here would put a guess into
 //!   evidence a server admin is asked to trust (ADR 0013). How many bytes the value held is
@@ -52,7 +56,8 @@ use rongroi_parsers::error::ParseError;
 
 use crate::failure::{read_failure, reason_for};
 use crate::paths::{RecordedPath, UNREDACTABLE_FORM, file_name, is_drive_rooted, map_device_path};
-use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition};
+use crate::prefetch::SYSTEM_ROOT;
+use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition, system_name};
 
 /// The key holding one subkey per user account that BAM has recorded anything for.
 pub const USER_SETTINGS_KEY: &str =
@@ -101,8 +106,10 @@ const REASONS: [UnmeasuredReason; 8] = [
 /// Every field this collector can emit.
 ///
 /// A key it could not enumerate is a gap in all of them. One value it could not read or decode is
-/// not: see the comment on [`Bam::collect`].
-const FIELDS: [Field; 17] = [
+/// not: see the comment on [`Bam::collect`]. `system_name_elsewhere` is omitted on the same terms
+/// as `fivem_edition`: the name is outside the table, or the machine does not name `%SystemRoot%`
+/// (ADR 0094).
+const FIELDS: [Field; 18] = [
     Field::boolean("disappeared_from_disk"),
     Field::number("entries"),
     Field::text(fivem_edition::FIELD),
@@ -117,6 +124,7 @@ const FIELDS: [Field; 17] = [
     Field::text("read"),
     Field::number("rejected"),
     Field::text("sid_withheld"),
+    Field::boolean(system_name::FIELD),
     Field::number("users"),
     Field::number("value_bytes"),
     Field::number("values"),
@@ -127,7 +135,7 @@ const FIELDS: [Field; 17] = [
 /// The subset a content-level reason gaps: `source_empty` and `partial` both describe a key this
 /// collector **did** enumerate, so gapping `users`, `values`, `entries`, `rejected` or `intact` —
 /// which were measured — would claim it had not (ADR 0030).
-const RECORD_FIELDS: [&str; 9] = [
+const RECORD_FIELDS: [&str; 10] = [
     "disappeared_from_disk",
     fivem_edition::FIELD,
     "last_run",
@@ -136,6 +144,7 @@ const RECORD_FIELDS: [&str; 9] = [
     "path",
     "path_from_device",
     "path_withheld",
+    system_name::FIELD,
     "value_bytes",
 ];
 
@@ -192,6 +201,7 @@ impl Collector for Bam {
         // section 2).
         let drive_map = host.drive_map().ok();
         let drive_map = drive_map.as_ref();
+        let system_root = host.env_var(SYSTEM_ROOT);
 
         let accounts = match host.subkeys(USER_SETTINGS_KEY) {
             // BAM is not on this machine: the service is not there, or this Windows never had it.
@@ -262,6 +272,7 @@ impl Collector for Bam {
                                 bytes.len(),
                                 &entry,
                                 drive_map,
+                                system_root.as_deref(),
                             ));
                         }
                         Err(error) => {
@@ -450,6 +461,7 @@ fn execution(
     value_bytes: usize,
     entry: &BamEntry,
     drive_map: Option<&DriveMap>,
+    system_root: Option<&str>,
 ) -> Observation {
     let mapped = drive_map.and_then(|map| map_device_path(map, path));
     let target = mapped.as_deref().unwrap_or(path);
@@ -470,6 +482,20 @@ fn execution(
             fivem_edition::FIELD.to_owned(),
             serde_json::Value::from(edition.as_str()),
         );
+    }
+    // From the same value name: one boolean, and no part of the path, whether `insert_path` emitted
+    // it or withheld it (ADR 0094).
+    if let Some(system_root) = system_root {
+        let elsewhere = system_name::of_path(target, system_root).or_else(|| {
+            on_system_drive(path, system_root)
+                .and_then(|path| system_name::of_path(&path, system_root))
+        });
+        if let Some(elsewhere) = elsewhere {
+            fields.insert(
+                system_name::FIELD.to_owned(),
+                serde_json::Value::from(elsewhere),
+            );
+        }
     }
     // The instant BAM stored, as it stored it. A `FILETIME` of zero is 1601-01-01 and reaches the
     // report as that: whether it means "never ran" is a judgement for a rule, and a collector that
@@ -591,6 +617,37 @@ fn insert_path(
             serde_json::Value::from(UNREDACTABLE_FORM),
         );
     }
+}
+
+/// `path` below `system_root`'s drive when BAM spelled it from a volume's device.
+///
+/// A device path has no drive letter to compare with `%SystemRoot%`, and the letter is exactly what
+/// the drive map could not supply — that is why `insert_path` withheld the path. The table's
+/// expected folders are on `%SystemRoot%`'s drive, so the folder below the device is compared there.
+/// The rewritten path is used for this one question and is never emitted (ADR 0094).
+fn on_system_drive(path: &str, system_root: &str) -> Option<String> {
+    const VOLUME_PREFIX: &str = "HarddiskVolume";
+    let mut segments = path.split(['\\', '/']);
+    if segments.next() != Some("") || !segments.next()?.eq_ignore_ascii_case("Device") {
+        return None;
+    }
+    let volume = segments.next()?;
+    let prefix = volume.get(..VOLUME_PREFIX.len())?;
+    let number = &volume[VOLUME_PREFIX.len()..];
+    if !prefix.eq_ignore_ascii_case(VOLUME_PREFIX)
+        || number.is_empty()
+        || !number.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let rest: Vec<&str> = segments.collect();
+    if rest.is_empty() || rest.iter().any(|segment| segment.is_empty()) {
+        return None;
+    }
+    let drive = system_root.get(..2)?;
+    let bytes = drive.as_bytes();
+    (bytes[0].is_ascii_alphabetic() && bytes[1] == b':')
+        .then(|| format!("{drive}\\{}", rest.join("\\")))
 }
 
 /// Value of the `read` field for a value whose bytes arrived and did not decode.
@@ -791,6 +848,81 @@ mod tests {
                 "{leaked} reached an observation: {json}"
             );
         }
+    }
+
+    /// The boolean comes from the value name in whatever form BAM spelled it: a drive path is
+    /// compared below the machine's `%SystemRoot%`, and a name outside the table has none (ADR 0094).
+    #[test]
+    fn a_record_says_whether_a_table_name_ran_outside_its_windows_folders() {
+        let yaml = format!(
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\nregistry:\n  '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1001':\n    \
+             'C:\\ProgramData\\x\\svchost.exe':\n      content: '012345678901234567890123'\n    \
+             'C:\\Windows\\System32\\svchost.exe':\n      content: '012345678901234567890123'\n    \
+             'C:\\ProgramData\\x\\notepad.exe':\n      content: '012345678901234567890123'\n"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+        let run = Bam.collect(&host);
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+
+        let mut records: Vec<(Option<&str>, Option<bool>)> = executions(observations)
+            .iter()
+            .map(|record| {
+                (
+                    text(record, "name"),
+                    field(record, system_name::FIELD).and_then(serde_json::Value::as_bool),
+                )
+            })
+            .collect();
+        records.sort_unstable();
+        assert_eq!(
+            records,
+            [
+                (Some("notepad.exe"), None),
+                (Some("svchost.exe"), Some(false)),
+                (Some("svchost.exe"), Some(true)),
+            ]
+        );
+    }
+
+    /// Without `%SystemRoot%` there is nothing to compare the value name with, so the field is
+    /// omitted rather than compared with an assumed `C:\Windows` (ADR 0094).
+    #[test]
+    fn a_record_omits_the_system_name_without_a_system_root() {
+        let yaml = format!(
+            "platform: windows\nregistry:\n  '{USER_SETTINGS_KEY}\\S-1-5-21-0-0-0-1001':\n    \
+             'C:\\ProgramData\\x\\svchost.exe':\n      content: '012345678901234567890123'\n"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(field(records[0], system_name::FIELD), None);
+    }
+
+    /// A device path has no letter for the drive map to supply, so its path stays withheld — and the
+    /// boolean is still emitted, because it is one word and carries no account name (ADR 0094).
+    #[test]
+    fn a_withheld_record_still_says_whether_the_name_is_elsewhere() {
+        let yaml = format!(
+            r"platform: windows
+env:
+  SystemRoot: 'C:\Windows'
+registry:
+  '{USER_SETTINGS_KEY}\S-1-5-21-0-0-0-1001':
+    '\Device\HarddiskVolume3\ProgramData\x\svchost.exe':
+      content: '012345678901234567890123'
+"
+        );
+        let host = FixtureHost::from_yaml_str(&yaml, "inline").unwrap();
+        let run = Bam.collect(&host);
+        let (observations, _) = measured(&run);
+        let records = executions(observations);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(field(records[0], "path"), None);
+        assert_eq!(text(records[0], "path_withheld"), Some(UNREDACTABLE_FORM));
+        assert_eq!(field(records[0], system_name::FIELD), Some(&true.into()));
     }
 
     /// **Every account key measured on Windows 11 holds `Version` and `SequenceNumber`, two

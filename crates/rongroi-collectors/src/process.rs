@@ -18,7 +18,8 @@ use rongroi_core::model::{CollectorRun, Observation, UnmeasuredReason};
 use rongroi_host::{Host, Platform, ProcessRecord, SourceError};
 
 use crate::paths::RecordedPath;
-use crate::{Collector, Field, fivem_edition};
+use crate::prefetch::SYSTEM_ROOT;
+use crate::{Collector, Field, fivem_edition, system_name};
 
 const ID: &str = "process";
 
@@ -38,13 +39,16 @@ const REASONS: [UnmeasuredReason; 3] = [
 /// so it is an `Unmeasured` run rather than a gap, and an unresolved image path omits `path` on that
 /// one process without saying anything about the rest (ADR 0010). `fivem_edition` is omitted on the
 /// same terms, and on every process whose path is below neither of `FiveM`'s program folders (ADR 0062).
-/// An unread creation time omits `started_at` the same way (ADR 0062). `started_at` is read for
-/// ADR 0062's session statement only and is not a timeline time (owner decision 8, 2026-10-02).
-const FIELDS: [Field; 4] = [
+/// `system_name_elsewhere` is omitted the same way: without a path, without `%SystemRoot%`, or for a
+/// name outside the table (ADR 0094). An unread creation time omits `started_at` the same way (ADR
+/// 0062). `started_at` is read for ADR 0062's session statement only and is not a timeline time
+/// (owner decision 8, 2026-10-02).
+const FIELDS: [Field; 5] = [
     Field::text(fivem_edition::FIELD),
     Field::text("name"),
     Field::text("path"),
     Field::timestamp("started_at").off_timeline(),
+    Field::boolean(system_name::FIELD),
 ];
 
 /// The `process` collector.
@@ -72,10 +76,14 @@ impl Collector for Process {
             };
         }
 
+        let system_root = host.env_var(SYSTEM_ROOT);
         match host.running_processes() {
             Ok(processes) => CollectorRun::Measured {
                 collector: ID.to_owned(),
-                observations: processes.iter().map(observation).collect(),
+                observations: processes
+                    .iter()
+                    .map(|process| observation(process, system_root.as_deref()))
+                    .collect(),
                 gaps: BTreeMap::new(),
                 discriminator_gaps: Vec::new(),
             },
@@ -93,8 +101,9 @@ impl Collector for Process {
 ///
 /// A path that could not be resolved omits that one field. `gaps` describes the whole run, so a
 /// single unresolved path must not land there; the process itself is never dropped and a path is
-/// never invented (ADR 0010).
-fn observation(process: &ProcessRecord) -> Observation {
+/// never invented (ADR 0010). `system_name_elsewhere` is likewise omitted for a name outside the
+/// table, or when the machine does not name `%SystemRoot%`.
+fn observation(process: &ProcessRecord, system_root: Option<&str>) -> Observation {
     let mut fields = BTreeMap::new();
     fields.insert(
         "name".to_owned(),
@@ -107,6 +116,16 @@ fn observation(process: &ProcessRecord) -> Observation {
             fields.insert(
                 fivem_edition::FIELD.to_owned(),
                 serde_json::Value::from(edition.as_str()),
+            );
+        }
+        // From the same path, compared below the machine's own `%SystemRoot%`: one boolean, and no
+        // folder or path the table's names were found in reaches the observation (ADR 0094).
+        if let Some(system_root) = system_root
+            && let Some(elsewhere) = system_name::of_path(path, system_root)
+        {
+            fields.insert(
+                system_name::FIELD.to_owned(),
+                serde_json::Value::from(elsewhere),
             );
         }
     }
@@ -191,6 +210,13 @@ mod tests {
             .fields
             .get(name)
             .and_then(serde_json::Value::as_str)
+    }
+
+    fn boolean(observation: &Observation, name: &str) -> Option<bool> {
+        observation
+            .fields
+            .get(name)
+            .and_then(serde_json::Value::as_bool)
     }
 
     #[test]
@@ -324,6 +350,50 @@ processes:
             editions,
             [Some("legacy"), Some("legacy"), Some("enhanced"), None, None]
         );
+    }
+
+    /// The boolean comes from the path the observation already carries, compared below the machine's
+    /// `%SystemRoot%`; a name outside the table has none (ADR 0094).
+    #[test]
+    fn a_process_says_whether_a_table_name_ran_outside_its_windows_folders() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+env:
+  SystemRoot: 'C:\Windows'
+processes:
+  - pid: 1
+    name: svchost.exe
+    path: 'C:\ProgramData\x\svchost.exe'
+  - pid: 2
+    name: svchost.exe
+    path: 'C:\Windows\System32\svchost.exe'
+  - pid: 3
+    name: notepad.exe
+    path: 'C:\ProgramData\x\notepad.exe'
+",
+            "inline",
+        )
+        .unwrap();
+        let run = Process.collect(&host);
+        let elsewhere: Vec<Option<bool>> = measured(&run)
+            .iter()
+            .map(|observation| boolean(observation, system_name::FIELD))
+            .collect();
+        assert_eq!(elsewhere, [Some(true), Some(false), None]);
+    }
+
+    /// Without `%SystemRoot%` there is nothing to compare the path with, so the field is omitted
+    /// rather than compared with an assumed `C:\Windows` (ADR 0094).
+    #[test]
+    fn a_process_omits_the_system_name_without_a_system_root() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nprocesses:\n  - pid: 1\n    name: svchost.exe\n    path: 'C:\\ProgramData\\x\\svchost.exe'\n",
+            "inline",
+        )
+        .unwrap();
+        let run = Process.collect(&host);
+        assert_eq!(boolean(&measured(&run)[0], system_name::FIELD), None);
     }
 
     #[test]

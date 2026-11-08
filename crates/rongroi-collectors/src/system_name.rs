@@ -88,14 +88,14 @@ fn folder_is_below_root(folder: &[&str], root: &[&str], relative: Folder) -> boo
 fn servicing_below_root(folder: &[&str], root: &[&str]) -> bool {
     SERVICING_BELOW_SYSTEM_ROOT
         .iter()
-        .any(|relative| folder_is_below_root(folder, root, *relative))
+        .any(|relative| folder_is_below_root(folder, root, relative))
 }
 
 /// Whether `folder` is below one of the servicing folders at a drive's root.
 fn servicing_below_drive_root(folder: &[&str]) -> bool {
     SERVICING_BELOW_DRIVE_ROOT
         .iter()
-        .any(|relative| folder_is_below_root(folder, &[], *relative))
+        .any(|relative| folder_is_below_root(folder, &[], relative))
 }
 
 /// Whether `folder` is an expected or servicing folder for `name`, or `None` when the name is not
@@ -111,7 +111,7 @@ fn folder_is_inside(
     let under_root = on_system_drive
         && (folders
             .iter()
-            .any(|relative| folder_is(folder, root, *relative))
+            .any(|relative| folder_is(folder, root, relative))
             || servicing_below_root(folder, root));
     Some(under_root || servicing_below_drive_root(folder))
 }
@@ -292,7 +292,7 @@ mod tests {
         ]);
     }
 
-    /// Only the two names the measurement found in SysWOW64 are expected there.
+    /// Only the two names the measurement found in `SysWOW64` are expected there.
     #[test]
     fn syswow64_is_expected_only_for_svchost_and_explorer() {
         paths(&[
