@@ -99,6 +99,12 @@ jobs:
       - name: Coverage table matches the rules and the ledger
         if: steps.scope.outputs.skip != 'true'
         run: cargo xtask coverage --check
+      # docs/assets/architecture-light.svg and -dark.svg are written from architecture.template.svg with the
+      # rule and LOLDrivers counts. A rule added or removed without rerunning `cargo xtask readme-diagram`
+      # fails here, so the README never shows a stale count.
+      - name: README architecture diagrams match the template and the counts
+        if: steps.scope.outputs.skip != 'true'
+        run: cargo xtask readme-diagram --check
       # The vulnerable-driver data file is rebuilt from LOLDrivers at the commit its PROVENANCE.md names and
       # compared with the committed file (ADR 0048). Only `yaml/` is fetched, one commit deep, and the step
       # fails if any other file lands on disk. A pull request fetches only when it changes the data file's

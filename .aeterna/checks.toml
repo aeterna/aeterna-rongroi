@@ -40,7 +40,7 @@ deps = [".config/nextest.toml", "Cargo.toml", "crates/**/snapshots/*.snap", "fix
 # after coverage; the commands are the same.
 [[checks]]
 name = "rule-gates"
-cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-rules && cargo xtask check-baseline && cargo xtask rules-reference --check && cargo xtask coverage --check'
+cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-rules && cargo xtask check-baseline && cargo xtask rules-reference --check && cargo xtask coverage --check && cargo xtask readme-diagram --check'
 timeout = 600
 deps = [".cargo/config.toml", "docs/coverage.md", "docs/rules-reference.md", "docs/rules-reference.th.md", "fixtures/**", "rules/**", "xtask/**"]
 
