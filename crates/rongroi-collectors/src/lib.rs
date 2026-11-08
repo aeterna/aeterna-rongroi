@@ -29,6 +29,7 @@ pub mod prefetch;
 pub mod process;
 pub mod recorded_files;
 pub mod scan;
+pub mod system_name;
 pub mod userassist;
 pub mod usn;
 pub mod windows_start;
