@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 78 |
-| SHA-256 | `6199c61340df584f2e070b712a2e1cedfa3e3a0adb20b1f29a3304b3cc9003bc` |
+| Rules | 81 |
+| SHA-256 | `5f8cca2cfa6d943157b9456cb8447ea513ea33dc516a17da24c9d5483ecad4f0` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -47,6 +47,7 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
 - `bam`
   - [Program recorded by BAM from temporary or removable path is missing from disk](#rule-14afcc4e-5567-424d-8502-dae7b65a1af8) — `context` · `experimental`
+  - [Program recorded by BAM has a Windows program's name outside Windows' folders](#rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c) — `context` · `experimental`
 - `defender_exclusion`
   - [A Microsoft Defender exclusion covers a FiveM folder](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
@@ -110,6 +111,9 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A command in the PowerShell history cleared a log, the history or Prefetch](#rule-8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d) — `tamper` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+  - [Prefetch recorded a program with a Windows program's name outside Windows' folders](#rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22) — `context` · `experimental`
+- `process`
+  - [Running program has a Windows program's name outside Windows' folders](#rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897) — `context` · `experimental`
 - `usn`
   - [The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
@@ -279,6 +283,48 @@ Only what BAM still holds. Windows removes BAM entries older than seven days whe
 - Executables downloaded and run from Downloads that the user manually deleted afterwards
 - Temporary files cleaned up by Windows Storage Sense, disk cleanup tools, or browser cleaners
 - Executables run from a removable USB flash drive or portable disk that has since been unplugged
+
+### `bam` / `system-name`
+
+<a id="rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c"></a>
+
+#### Program recorded by BAM has a Windows program's name outside Windows' folders
+
+- Id: `2d2a6e08-f0db-43e9-b551-3b54b3b5f31c`
+- File: [`rules/bam/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/bam/system-name/windows-name-outside-windows-folders/rule.yaml)
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `masquerading`
+- Written: 2026-11-09
+
+**About this check**
+
+The Windows Background Activity Moderator (BAM) recorded execution of a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the recorded file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it.
+
+**Matches when all of these hold for one observation**
+
+- `system_name_elsewhere`: is `true`
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older execution leaves no entry here.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+
+**References**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
 
 ## Collector `defender_exclusion`
 
@@ -2411,6 +2457,92 @@ The attribute as it is at the moment of the scan, on the Prefetch files still in
 
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
+
+### `prefetch` / `system-name`
+
+<a id="rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22"></a>
+
+#### Prefetch recorded a program with a Windows program's name outside Windows' folders
+
+- Id: `735c6a6f-ce81-4026-8849-bbcd5a2cfa22`
+- File: [`rules/prefetch/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/prefetch/system-name/windows-name-outside-windows-folders/rule.yaml)
+- Collector: `prefetch`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `prefetch`, `masquerading`
+- Written: 2026-11-09
+
+**About this check**
+
+Windows' Prefetch recorded a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the executable it ran from is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it.
+
+**Matches when all of these hold for one observation**
+
+- `system_name_elsewhere`: is `true`
+
+**Look-back**
+
+Only the Prefetch files still in the folder, and only the most recent run each one records. Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+- `service_disabled` — the Windows service that writes this record is switched off
+
+**Ordinary things that also produce this**
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+
+**References**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
+
+## Collector `process`
+
+### `process` / `system-name`
+
+<a id="rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897"></a>
+
+#### Running program has a Windows program's name outside Windows' folders
+
+- Id: `10ca3ec3-f0c0-426d-9430-39fcd09c6897`
+- File: [`rules/process/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/process/system-name/windows-name-outside-windows-folders/rule.yaml)
+- Collector: `process`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `process`, `masquerading`
+- Written: 2026-11-09
+
+**About this check**
+
+A program running at the time of the scan has the name of a Windows program, such as svchost.exe or lsass.exe, but its file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program runs from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it.
+
+**Matches when all of these hold for one observation**
+
+- `system_name_elsewhere`: is `true`
+
+**Look-back**
+
+Only the programs running at the moment of the scan. A program that has already exited is not listed, and nothing older is kept here.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+
+**References**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
 
 ## Collector `usn`
 
