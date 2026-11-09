@@ -1,0 +1,14 @@
+{
+  "description": "A running svchost.exe, a name in the table, whose file is under C:\\ProgramData\\x\\ rather than in System32 or SysWOW64",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "svchost.exe",
+        "path": "C:\\ProgramData\\x\\svchost.exe",
+        "system_name_elsewhere": true
+      }
+    }
+  ],
+  "expect_matches": 1
+}

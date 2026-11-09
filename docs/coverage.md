@@ -19,7 +19,7 @@
 
 | status | count |
 | --- | ---: |
-| experimental | 67 |
+| experimental | 70 |
 | test | 5 |
 | stable | 6 |
 | deprecated | 0 |
@@ -28,9 +28,9 @@
 
 | baseline | count |
 | --- | ---: |
-| confronted | 45 |
+| confronted | 46 |
 | known fp | 2 |
-| unconfronted | 31 |
+| unconfronted | 33 |
 | known fp; unconfronted | 0 |
 
 ### Rules by retention
@@ -38,15 +38,15 @@
 | retention | count |
 | --- | ---: |
 | documented | 18 |
-| stated | 17 |
-| none | 43 |
+| stated | 19 |
+| none | 44 |
 
 ### Rules seen found
 
 | seen | count |
 | --- | ---: |
 | found | 16 |
-| never | 62 |
+| never | 65 |
 
 ### Ledger rows by kind
 
@@ -57,10 +57,11 @@
 
 ## Gaps
 
-### Rules never seen found outside a fixture (62)
+### Rules never seen found outside a fixture (65)
 
 - `antivirus_product/registered/no-product-reports-on`
 - `bam/ephemeral/executed-program-missing-on-disk`
+- `bam/system-name/windows-name-outside-windows-folders`
 - `bam/timeline/fivem-game-process-by-name`
 - `bam/timeline/fivem-or-gta-v-by-name`
 - `evtx/defender/defender-real-time-protection-turned-off`
@@ -108,8 +109,10 @@
 - `powershell_text/history/trace-cleanup`
 - `powershell_text/timeline/download-then-execute-times`
 - `prefetch/file-attributes/prefetch-file-read-only`
+- `prefetch/system-name/windows-name-outside-windows-folders`
 - `prefetch/timeline/fivem-game-process-by-name`
 - `prefetch/timeline/fivem-or-gta-v-by-name`
+- `process/system-name/windows-name-outside-windows-folders`
 - `usn/enhanced-asi/files-deleted`
 - `usn/enhanced-asi/files-renamed`
 - `usn/identity/digitalentitlements-file-deleted`
@@ -122,7 +125,7 @@
 - `windows_start/timeline/fast-startup-start`
 - `windows_start/timeline/full-start`
 
-### Rules on the unconfronted list (31)
+### Rules on the unconfronted list (33)
 
 - `evtx/log-clearing/event-log-file-cleared` — added 2026-09-13; resolved when: A baseline carries a System channel captured under the same conditions as the rule above, with its PROVENANCE row. MEASURED 2026-09-13 on one real Windows 11 machine (build 26220, elevated scan): across 156 record groups on its System channel, NOT ONE was written by Microsoft-Windows-Eventlog. The doubt this row carried is settled in the unhelpful direction — an ordinary System log does not appear to confront this rule, so vendoring one would not close this row and might show that nothing can. Before capturing anything, check a second machine: if that also holds no Microsoft-Windows-Eventlog record on System, the question to answer is whether this rule can be confronted at all, not which fixture to add. UPDATED 2026-09-14: a second ordinary Windows 11 machine (build 26200, elevated scan) DID hold a Microsoft-Windows-Eventlog record on System — event 30, once — so an ordinary System log can confront this rule at two conditions of three, and the question above of whether it can be confronted at all is answered yes. DECIDED 2026-09-14 by the owner: no machine is built for the capture for now; the negative fixture `an-ordinary-system-log.json` carries that measured shape, and widening the rule to event 30 was tried and fails `cargo xtask check-rules`.
 - `evtx/log-clearing/security-audit-log-cleared` — added 2026-09-13; resolved when: A baseline carries a Security channel whose records this project is allowed to publish. fixtures/evtx/PROVENANCE.md forbids capturing from a player machine and says why: a Security record routinely carries a user name, a host name, a source IP, a SID and a command line, records cannot be redacted in place because each is checksummed within its chunk, and both the rendered-record and raw-string scans must be run before anything is vendored. So the capture has to come from a Windows 11 installation made for this purpose — throwaway local account, no network sign-in, nothing personal on it — and not from anyone real. MEASURED 2026-09-13 on one real Windows 11 machine (build 26220, elevated scan): its Security channel carried four Microsoft-Windows-Eventlog records with event id 1100, and no 1102. Those agree with this rule on provider and channel and differ on the event id, so a Security log from a machine of that kind confronts this rule at two conditions of three with no clearing having happened. The expectation this row carried before is now a measurement, on one machine. DECIDED 2026-09-14 by the owner: no machine is built for this capture for now. What a baseline would have caught — the rule widened to match what an ordinary Security log holds — is covered instead by the negative fixture `an-ordinary-security-log.json`, whose shape (Microsoft-Windows-Eventlog 1100, and 1101, with no 1102) was measured on two ordinary Windows 11 machines; widening the rule to 1100 was tried and fails `cargo xtask check-rules`. This row stays because that fixture is a specification, not a baseline.
@@ -155,6 +158,8 @@
 - `bam/ephemeral/executed-program-missing-on-disk` — added 2026-10-17; resolved when: A baseline describes a machine where an ephemeral program or installer ran from Temp, Downloads, or a removable drive and was subsequently deleted, measured with this collector on a real Windows installation and carrying its PROVENANCE row. The rule's positive and negative fixtures cover both present and missing states meanwhile.
 - `fivem_dir/root-dlls/unsigned-root-proxy-dll` — added 2026-10-17; resolved when: A baseline's FiveM.app folder holds a proxy DLL measured on a real machine from a published release (such as a signed graphics mod or overlay placed in FiveM.app), with a PROVENANCE row saying where it came from, the date and the Windows build. Not a file invented to stand for a proxy DLL.
 - `usn/identity/digitalentitlements-file-deleted` — added 2026-10-17; resolved when: A baseline's `usn_journal:` block is rebuilt from a reading of a machine this project may publish taken with this collector, with its PROVENANCE row, listing DigitalEntitlements as identified — with no `deleted` record, which confronts this rule, or with one and a `known-fps.csv` row saying what produced it.
+- `bam/system-name/windows-name-outside-windows-folders` — added 2026-11-09; resolved when: A baseline describes a machine where BAM recorded a table name (such as `svchost.exe` or `explorer.exe`) run from its expected folder, measured with this collector on a real Windows installation and carrying its PROVENANCE row. The rule's positive and negative fixtures cover both states meanwhile.
+- `prefetch/system-name/windows-name-outside-windows-folders` — added 2026-11-09; resolved when: A baseline describes a machine whose Prefetch folder holds a record of a table name (such as `svchost.exe` or `explorer.exe`) run from its expected folder, measured with this collector on a real Windows installation and carrying its PROVENANCE row. The rule's positive and negative fixtures cover both states meanwhile.
 
 ### Collectors never measured (6)
 
@@ -165,7 +170,7 @@
 - `os_image`
 - `windows_start`
 
-### Collectors measured on only one build (9)
+### Collectors measured on only one build (10)
 
 - `autostart`
 - `defender_exclusion`
@@ -176,13 +181,14 @@
 - `posture`
 - `powershell_text`
 - `prefetch`
+- `process`
 
 ### Collectors never measured on a client edition (2)
 
 - `autostart`
 - `defender_exclusion`
 
-### Collectors never measured on Windows 10 (12)
+### Collectors never measured on Windows 10 (13)
 
 - `autostart`
 - `bam`
@@ -195,6 +201,7 @@
 - `posture`
 - `powershell_text`
 - `prefetch`
+- `process`
 - `usn`
 
 ### Collectors never measured without elevation (6)
@@ -206,7 +213,7 @@
 - `powershell_text`
 - `usn`
 
-### Collectors with no `rules/ages` file (13)
+### Collectors with no `rules/ages` file (14)
 
 - `antivirus_product`
 - `autostart`
@@ -220,6 +227,7 @@
 - `pci_device`
 - `posture`
 - `powershell_text`
+- `process`
 - `windows_start`
 
 ## Rules
@@ -229,6 +237,7 @@
 | `antivirus_product/registered/no-product-reports-on` | antivirus_product | evidence | posture | experimental | 2 / 1 | confronted | none | never | never |
 | `autostart/outside-windows/no-valid-embedded-signature` | autostart | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
 | `bam/ephemeral/executed-program-missing-on-disk` | bam | evidence | context | experimental | 2 / 2 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
+| `bam/system-name/windows-name-outside-windows-folders` | bam | evidence | context | experimental | 1 / 2 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-or-gta-v-by-name` | bam | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26100 server x64, 26220 client x64 |
 | `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
@@ -291,8 +300,10 @@
 | `powershell_text/history/trace-cleanup` | powershell_text | evidence | tamper | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
 | `powershell_text/timeline/download-then-execute-times` | powershell_text | timeline | context | experimental | 1 / 1 | unconfronted | none | never | 26220 client x64 |
 | `prefetch/file-attributes/prefetch-file-read-only` | prefetch | evidence | tamper | experimental | 2 / 2 | confronted | stated | never | 26220 client x64 |
+| `prefetch/system-name/windows-name-outside-windows-folders` | prefetch | evidence | context | experimental | 1 / 2 | unconfronted | stated | never | 26220 client x64 |
 | `prefetch/timeline/fivem-game-process-by-name` | prefetch | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26220 client x64 |
 | `prefetch/timeline/fivem-or-gta-v-by-name` | prefetch | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26220 client x64 |
+| `process/system-name/windows-name-outside-windows-folders` | process | evidence | context | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
 | `usn/enhanced-asi/files-deleted` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
 | `usn/enhanced-asi/files-renamed` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
 | `usn/identity/digitalentitlements-file-deleted` | usn | evidence | tamper | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |

@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 735c6a6f-ce81-4026-8849-bbcd5a2cfa22
+title: Prefetch recorded a program with a Windows program's name outside Windows' folders
+description: >-
+  Windows' Prefetch recorded a program that has the name of a Windows program, such as svchost.exe or
+  lsass.exe, but the executable it ran from is not in the folder Windows keeps that program in.
+  Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only
+  in System32. This row shows where the program ran from, not what it does. It is not proof of
+  anything on its own: an interrupted Windows update, a Windows installation on another drive, and a
+  tool that ships its own copy of a Windows program under the same name all produce it. The recorded
+  volume is not mapped to a drive, so it is compared as if it were on the Windows drive.
+status: experimental
+collector: prefetch
+strength: context
+# No `allow`: nothing is excused by name, hash or certificate. The expected folders are in the
+# collector, and this rule reports what differs from them (ADR 0094).
+match:
+  system_name_elsewhere: true
+retention: >-
+  Only the Prefetch files still in the folder, and only the most recent run each one records.
+  Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+unmeasured_when: [not_windows, not_admin, source_absent, service_disabled]
+falsepositives:
+  - An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+  - A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+  - A tool that ships its own copy of a Windows program under the same name
+  - A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
+references:
+  - https://attack.mitre.org/techniques/T1036/005/
+author: aeterna-rongroi contributors
+date: 2026-11-09
+tags: [prefetch, masquerading]

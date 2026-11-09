@@ -1,0 +1,11 @@
+{
+  "description": "A running svchost.exe whose path could not be read, so the collector omits system_name_elsewhere and the rule does not match it",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "svchost.exe"
+      }
+    }
+  ]
+}

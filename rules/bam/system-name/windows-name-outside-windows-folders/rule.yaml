@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: 2d2a6e08-f0db-43e9-b551-3b54b3b5f31c
+title: Program recorded by BAM has a Windows program's name outside Windows' folders
+description: >-
+  The Windows Background Activity Moderator (BAM) recorded execution of a program that has the name
+  of a Windows program, such as svchost.exe or lsass.exe, but the recorded file is not in the folder
+  Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most
+  of the other names are only in System32. This row shows where the program ran from, not what it
+  does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation
+  on another drive, and a tool that ships its own copy of a Windows program under the same name all
+  produce it. A path BAM recorded on a volume without a drive letter is compared as if it were on the
+  Windows drive.
+status: experimental
+collector: bam
+strength: context
+# No `allow`: nothing is excused by name, hash or certificate. The expected folders are in the
+# collector, and this rule reports what differs from them (ADR 0094).
+match:
+  system_name_elsewhere: true
+retention: >-
+  Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so
+  an older execution leaves no entry here.
+unmeasured_when: [not_windows, not_admin, source_absent]
+falsepositives:
+  - An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+  - A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+  - A tool that ships its own copy of a Windows program under the same name
+  - A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
+references:
+  - https://attack.mitre.org/techniques/T1036/005/
+author: aeterna-rongroi contributors
+date: 2026-11-09
+tags: [bam, masquerading]

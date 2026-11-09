@@ -228,7 +228,8 @@ fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
 
     for (host, rules) in [
         ("evtx-access-denied-elevated", 5),
-        ("prefetch-access-denied-elevated", 1),
+        // Rules `7d493537` and `735c6a6f` do not declare `access_denied` in `unmeasured_when`.
+        ("prefetch-access-denied-elevated", 2),
         // `secure-boot-disabled` and `secure-boot-firmware-disagrees`: the fixture denies the
         // registry's Secure Boot key.
         ("registry-access-denied", 2),
