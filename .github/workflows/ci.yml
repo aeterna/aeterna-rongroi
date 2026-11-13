@@ -308,9 +308,9 @@ jobs:
               exit 0
             fi
             changed=$(git diff --name-only HEAD^1 HEAD)
-            if ! grep -q -E '^(apps/desktop/|\.github/workflows/ci\.yml$)' <<<"$changed"; then
+            if ! grep -q -E '^(apps/desktop/|crates/rongroi-collectors/tests/snapshots/|\.github/workflows/ci\.yml$)' <<<"$changed"; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
-              echo "PR does not touch apps/desktop: fast-pass."
+              echo "PR does not touch apps/desktop or the report snapshots it reads: fast-pass."
               exit 0
             fi
           fi
