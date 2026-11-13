@@ -242,10 +242,13 @@ mod tests {
     #[test]
     fn the_verify_steps_name_the_desktop_app_not_the_sidecar() {
         let notes = notes_for("v2026.09.06-0.1.0");
-        let expected = "Get-FileHash .\\aeterna-rongroi-0.1.0-windows-x64.exe — the hash must";
+        let expected = "Get-FileHash .\\aeterna-rongroi-0.1.0-windows-x64.exe` — the hash must";
         assert!(notes.contains(expected), "{notes}");
         assert!(!notes.contains("Get-FileHash .\\rongroi-scan-"), "{notes}");
-        assert!(!notes.contains("attestation verify rongroi-scan-"), "{notes}");
+        assert!(
+            !notes.contains("attestation verify rongroi-scan-"),
+            "{notes}"
+        );
     }
 
     #[test]

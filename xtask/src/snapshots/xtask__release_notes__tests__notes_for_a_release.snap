@@ -15,6 +15,7 @@ Windows 10 22H2 or Windows 11, x64. There is no installer: download a file and r
 
 | File | What it is | SHA-256 |
 |---|---|---|
+| `rongroi-scan-0.1.0-windows-x64.exe` | Connect sidecar (Rongroi Connect starts it; do not run it by hand) | `dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd` |
 | `aeterna-rongroi-0.1.0-windows-x64.exe` | Desktop app (uses Microsoft WebView2) | `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` |
 | `aeterna-rongroi-cli-0.1.0-windows-x64.exe` | Command line (does not use WebView2) | `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` |
 
@@ -39,6 +40,7 @@ These files are not code-signed yet (see [GOVERNANCE.md](https://github.com/aete
 ## ภาษาไทย
 
 - โหลดไฟล์ exe แล้วเปิดได้เลย ไม่ต้องติดตั้ง · รุ่น CLI ไม่ใช้ WebView2
+- ไฟล์ `rongroi-scan` เป็นส่วนหนึ่งของ Rongroi Connect ไม่ต้องเปิดเอง
 - ตรวจไฟล์ก่อนใช้: `Get-FileHash` ต้องตรงกับ `SHA256SUMS` และต้องไม่มีป้าย **UNOFFICIAL BUILD** — ถ้าไม่ตรง อย่าเชื่อผลตรวจนั้น
 - ไฟล์ยังไม่ได้เซ็นโค้ด Windows SmartScreen อาจขึ้นเตือนตอนเปิด
 - ผลตรวจเป็นหลักฐานประกอบให้คนตัดสิน ไม่ใช่คำตัดสินว่าเครื่องนี้โกงหรือไม่
