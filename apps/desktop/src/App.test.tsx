@@ -455,17 +455,19 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
-    // Eighteen not-measured rules are hidden: the firmware reading needs administrator rights, which this
+    // Twenty not-measured rules are hidden: the firmware reading needs administrator rights, which this
     // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038);
     // the seven full-scan rules, because this was a standard scan, which every rule expects (ADR 0052,
     // ADR 0055, ADR 0064); the
     // seven `os_image` rules, because this fixture describes no `CurrentVersion` key for them to read
     // (ADR 0056); and three `install_marker` rules, because the fixture sets no environment variable
-    // for the folders they name (ADR 0057). The one unmatched observation is `install_marker`'s
-    // registry marker, which needs no environment variable and answered `present: false`.
+    // for the folders they name (ADR 0057). Since ADR 0094 the BAM rule for a Windows program's
+    // name outside Windows' folders is one more; its Prefetch and Process rules are listed as rows,
+    // since they are not expected. The one unmatched observation is `install_marker`'s registry
+    // marker, which needs no environment variable and answered `present: false`.
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 19 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
+        "Hidden in SS mode: 1 not found · 20 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
