@@ -89,7 +89,7 @@ never cancel each other. Every action is pinned by commit SHA, like the other wo
    `cargo build --release --locked -p rongroi-cli` and `pnpm -C apps/desktop tauri build --no-bundle -- --locked`.
 6. Copy the two executables to their release names.
 7. Run the CLI `scan --json` into `report.json`, then
-   `cargo run --locked -p xtask -- release-verify <tag> --report report.json --cli <exe> --desktop <exe> --commit <sha> --sums SHA256SUMS`
+   `cargo run --locked -p xtask -- release-verify <tag> --report report.json --cli <exe> --desktop <exe> --scan <exe> --commit <sha> --sums SHA256SUMS`
    checks the built files (gates below) and, only if they pass, writes `SHA256SUMS`.
 8. Write the three SBOM files.
 9. `cargo run --locked -p xtask -- release-notes <tag> --report report.json --sums SHA256SUMS --commit <sha> --run-url <url> --out notes.md`
@@ -125,6 +125,7 @@ Each gate stops the workflow; no release is created.
 | Build | `Cargo.lock` or `pnpm-lock.yaml` would change (every cargo command uses `--locked`, `pnpm install` uses `--frozen-lockfile`) |
 | CLI check (`xtask release-verify`) | `aeterna-rongroi-cli … scan --json` reports `provenance.official` not `true`, a version other than `X.Y.Z`, a commit other than the tag commit, or an `exe_sha256` different from `Get-FileHash` of the file |
 | Desktop app check (`xtask release-verify`) | the desktop executable does not contain the build marker `aeterna-rongroi build marker: official=1;commit=<tag commit SHA>;` (ADR 0007) — the text its report header is read from, so a desktop build that lacks either variable fails. The app cannot be started headless on the runner. This check must be shown to fail for desktop builds without `RONGROI_OFFICIAL_BUILD` and without `RONGROI_COMMIT` before the first real release. |
+| Connect sidecar check (`xtask release-verify`, added 2026-11-13) | `rongroi-scan-X.Y.Z-windows-x64.exe` does not contain the same build marker of the tag commit. Like the desktop app it cannot produce a report on its own (Connect drives it over a pipe), so the marker is what is checked; it is listed in `SHA256SUMS` and attested with its SBOM |
 | Publish | `sha256sum -c --strict` fails, an attached executable is not listed in `SHA256SUMS`, or the tag does not exist on the remote |
 
 The logic of `release-check` and `release-notes` is unit- and snapshot-tested, and those tests run in the
