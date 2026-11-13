@@ -122,7 +122,7 @@ fn render(notes: &Notes<'_>) -> String {
 
 ## Downloads
 
-Windows 10 22H2 or Windows 11, x64. There is no installer: download a file and run it.
+Windows 10 22H2 or Windows 11, x64. There is no installer: download the desktop app or the command line and run it.
 
 | File | What it is | SHA-256 |
 |---|---|---|
