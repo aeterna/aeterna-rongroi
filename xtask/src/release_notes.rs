@@ -109,7 +109,7 @@ fn render(notes: &Notes<'_>) -> String {
     let example = notes
         .files
         .iter()
-        .find(|file| !file.name.contains("-cli-"))
+        .find(|file| !file.name.contains("-cli-") && !file.name.starts_with("rongroi-scan-"))
         .or_else(|| notes.files.first())
         .map_or("<file>", |file| file.name.as_str());
 
@@ -148,6 +148,7 @@ These files are not code-signed yet (see [GOVERNANCE.md](https://github.com/{rep
 ## ภาษาไทย
 
 - โหลดไฟล์ exe แล้วเปิดได้เลย ไม่ต้องติดตั้ง · รุ่น CLI ไม่ใช้ WebView2
+- ไฟล์ `rongroi-scan` เป็นส่วนหนึ่งของ Rongroi Connect ไม่ต้องเปิดเอง
 - ตรวจไฟล์ก่อนใช้: `Get-FileHash` ต้องตรงกับ `SHA256SUMS` และต้องไม่มีป้าย **UNOFFICIAL BUILD** — ถ้าไม่ตรง อย่าเชื่อผลตรวจนั้น
 - ไฟล์ยังไม่ได้เซ็นโค้ด Windows SmartScreen อาจขึ้นเตือนตอนเปิด
 - ผลตรวจเป็นหลักฐานประกอบให้คนตัดสิน ไม่ใช่คำตัดสินว่าเครื่องนี้โกงหรือไม่
@@ -160,7 +161,9 @@ Built from commit [`{short_commit}`](https://github.com/{repo}/commit/{commit}) 
 }
 
 fn describe(name: &str) -> &'static str {
-    if name.contains("-cli-") {
+    if name.starts_with("rongroi-scan-") {
+        "Connect sidecar (Rongroi Connect starts it; do not run it by hand)"
+    } else if name.contains("-cli-") {
         "Command line (does not use WebView2)"
     } else {
         "Desktop app (uses Microsoft WebView2)"
@@ -172,7 +175,12 @@ mod tests {
     use super::*;
 
     fn files() -> Vec<Checksum> {
+        // The sidecar is listed first so the verify-step test proves it is skipped.
         vec![
+            Checksum {
+                sha256: "d".repeat(64),
+                name: "rongroi-scan-0.1.0-windows-x64.exe".to_owned(),
+            },
             Checksum {
                 sha256: "a".repeat(64),
                 name: "aeterna-rongroi-0.1.0-windows-x64.exe".to_owned(),
@@ -222,5 +230,28 @@ mod tests {
     #[test]
     fn a_release_does_not_mention_a_rehearsal() {
         assert!(!notes_for("v2026.09.06-0.1.0").contains("Rehearsal"));
+    }
+
+    #[test]
+    fn the_sidecar_row_says_connect_sidecar() {
+        let notes = notes_for("v2026.09.06-0.1.0");
+        let row = "| `rongroi-scan-0.1.0-windows-x64.exe` | Connect sidecar (Rongroi Connect starts it; do not run it by hand) |";
+        assert!(notes.contains(row), "{notes}");
+    }
+
+    #[test]
+    fn the_verify_steps_name_the_desktop_app_not_the_sidecar() {
+        let notes = notes_for("v2026.09.06-0.1.0");
+        let expected = "Get-FileHash .\\aeterna-rongroi-0.1.0-windows-x64.exe — the hash must";
+        assert!(notes.contains(expected), "{notes}");
+        assert!(!notes.contains("Get-FileHash .\\rongroi-scan-"), "{notes}");
+        assert!(!notes.contains("attestation verify rongroi-scan-"), "{notes}");
+    }
+
+    #[test]
+    fn the_thai_section_says_the_sidecar_is_started_by_connect() {
+        let notes = notes_for("v2026.09.06-0.1.0");
+        let bullet = "\n- ไฟล์ `rongroi-scan` เป็นส่วนหนึ่งของ Rongroi Connect ไม่ต้องเปิดเอง\n";
+        assert!(notes.contains(bullet), "{notes}");
     }
 }
