@@ -25,6 +25,9 @@ pub struct Args {
     /// The built desktop app, already under its release name.
     #[arg(long)]
     desktop: PathBuf,
+    /// The built Connect sidecar, already under its release name.
+    #[arg(long)]
+    scan: PathBuf,
     /// Full SHA of the tagged commit.
     #[arg(long)]
     commit: String,
@@ -44,6 +47,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     let report = read_report(&args.report)?;
     let cli = read(&args.cli)?;
     let desktop = read(&args.desktop)?;
+    let scan = read(&args.scan)?;
     let cli_sha256 = sha256_hex(&cli);
 
     let mut problems = provenance_problems(
@@ -52,8 +56,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         &args.commit,
         &cli_sha256,
     );
-    if let Some(problem) = desktop_problem(&desktop, &args.commit) {
+    if let Some(problem) = marker_problem(&desktop, &args.commit) {
         problems.push(format!("{}: {problem}", args.desktop.display()));
+    }
+    if let Some(problem) = marker_problem(&scan, &args.commit) {
+        problems.push(format!("{}: {problem}", args.scan.display()));
     }
     if !problems.is_empty() {
         for problem in &problems {
@@ -70,6 +77,10 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         Checksum {
             sha256: sha256_hex(&desktop),
             name: file_name(&args.desktop)?,
+        },
+        Checksum {
+            sha256: sha256_hex(&scan),
+            name: file_name(&args.scan)?,
         },
     ]);
     std::fs::write(&args.sums, &sums)
@@ -114,13 +125,14 @@ fn provenance_problems(
     problems
 }
 
-/// The desktop app cannot run headless on the runner, so it is checked for the build marker of an official
-/// build of this commit — the same text its report header is read from (ADR 0007).
-fn desktop_problem(desktop: &[u8], commit: &str) -> Option<String> {
+/// The desktop app and the Connect sidecar cannot run headless on the runner to produce a report, so both are
+/// checked for the build marker of an official build of this commit — the same text their report header is read
+/// from (ADR 0007).
+fn marker_problem(binary: &[u8], commit: &str) -> Option<String> {
     let marker = build_marker(Some("1"), Some(commit));
-    (!contains_bytes(desktop, marker.as_bytes())).then(|| {
+    (!contains_bytes(binary, marker.as_bytes())).then(|| {
         format!(
-            "does not contain `{marker}`: RONGROI_OFFICIAL_BUILD=1 or RONGROI_COMMIT did not reach the desktop build"
+            "does not contain `{marker}`: RONGROI_OFFICIAL_BUILD=1 or RONGROI_COMMIT did not reach this build"
         )
     })
 }
@@ -189,7 +201,7 @@ mod tests {
         let binary =
             |marker: String| [b"\x00\x01prefix".as_slice(), marker.as_bytes(), b"\xff"].concat();
         let official = binary(build_marker(Some("1"), Some(COMMIT)));
-        assert_eq!(desktop_problem(&official, COMMIT), None);
+        assert_eq!(marker_problem(&official, COMMIT), None);
 
         let other_commit = "1".repeat(40);
         let failing = [
@@ -208,7 +220,33 @@ mod tests {
             ("the commit alone", binary(COMMIT.to_owned())),
         ];
         for (case, desktop) in failing {
-            let problem = desktop_problem(&desktop, COMMIT);
+            let problem = marker_problem(&desktop, COMMIT);
+            assert!(
+                problem
+                    .as_deref()
+                    .is_some_and(|p| p.contains("RONGROI_OFFICIAL_BUILD=1")),
+                "{case}: {problem:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_sidecar_needs_the_official_marker_of_this_commit() {
+        let binary =
+            |marker: String| [b"\x00\x01prefix".as_slice(), marker.as_bytes(), b"\xff"].concat();
+        let official = binary(build_marker(Some("1"), Some(COMMIT)));
+        assert_eq!(marker_problem(&official, COMMIT), None);
+
+        let other_commit = "1".repeat(40);
+        let failing = [
+            ("no marker", b"\x00\x01prefix no marker here \xff".to_vec()),
+            (
+                "another commit",
+                binary(build_marker(Some("1"), Some(&other_commit))),
+            ),
+        ];
+        for (case, scan) in failing {
+            let problem = marker_problem(&scan, COMMIT);
             assert!(
                 problem
                     .as_deref()
