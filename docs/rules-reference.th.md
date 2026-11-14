@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 77 |
-| SHA-256 | `f8194b3e7299807c919d53c1a528f4883b5b52fa046479ad7f70dc95e1a1ef78` |
+| จำนวน rule | 81 |
+| SHA-256 | `a7772fc1752d577ae4f77ce8c13a28ce4602429765f313540194f383aef863f6` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -37,10 +37,13 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 
 ## สารบัญ
 
+- `antivirus_product`
+  - [Windows Security Center ไม่แสดงผลิตภัณฑ์แอนตี้ไวรัสที่รายงานว่าตัวเองเปิดอยู่](#rule-4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c) — `posture` · `experimental`
 - `autostart`
   - [โปรแกรมที่เริ่มทำงานเองไม่มีลายเซ็นฝังในไฟล์ที่ใช้ได้ และอยู่นอกโฟลเดอร์ Windows กับ Program Files](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
 - `bam`
   - [โปรแกรมที่ BAM บันทึกว่าเคยรันจากโฟลเดอร์ชั่วคราวหรือไดรฟ์ภายนอกไม่มีไฟล์อยู่บนดิสก์แล้ว](#rule-14afcc4e-5567-424d-8502-dae7b65a1af8) — `context` · `experimental`
+  - [Program recorded by BAM has a Windows program's name outside Windows' folders](#rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c) — `context` · `experimental`
 - `defender_exclusion`
   - [exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
@@ -104,6 +107,9 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [คำสั่งในประวัติ PowerShellล้าง log ประวัติ หรือ Prefetch](#rule-8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d) — `tamper` · `experimental`
 - `prefetch`
   - [มีไฟล์ Prefetch ถูกตั้งเป็นอ่านอย่างเดียว](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+  - [Prefetch recorded a program with a Windows program's name outside Windows' folders](#rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22) — `context` · `experimental`
+- `process`
+  - [Running program has a Windows program's name outside Windows' folders](#rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897) — `context` · `experimental`
 - `usn`
   - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
@@ -141,6 +147,53 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - `windows_start`
     - [Windows เริ่มทำงานหลังปิดเครื่องแบบ Fast Startup](#rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b) — `context` · `experimental`
     - [Windows เริ่มทำงานหลังปิดเครื่องแบบเต็มหรือรีสตาร์ต](#rule-fa3e721e-98f2-4007-bbd8-133208564682) — `context` · `experimental`
+
+## collector `antivirus_product`
+
+### `antivirus_product` / `registered`
+
+<a id="rule-4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c"></a>
+
+#### Windows Security Center ไม่แสดงผลิตภัณฑ์แอนตี้ไวรัสที่รายงานว่าตัวเองเปิดอยู่
+
+- ชื่อภาษาอังกฤษ: Windows Security Center lists no antivirus product that reports itself on
+- id: `4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c`
+- ไฟล์: [`rules/antivirus_product/registered/no-product-reports-on/rule.yaml`](../rules/antivirus_product/registered/no-product-reports-on/rule.yaml)
+- collector: `antivirus_product`
+- strength: `posture` — สถานะเครื่อง
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `posture`, `antivirus_product`
+- เขียนเมื่อ: 2026-11-05
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows Security Center ไม่แสดงผลิตภัณฑ์แอนตี้ไวรัสที่รายงานว่าตัวเองเปิดอยู่เลย ข้อนี้นับสถานะและไม่ระบุชื่อผลิตภัณฑ์ อีกด้านหนึ่งคือสิ่งที่สำคัญสำหรับเซิร์ฟเวอร์: \`not\_found\` ของข้อนี้หมายความเพียงว่ามีรายการลงทะเบียนบางรายการที่รายงานว่า เปิดอยู่ และรายการลงทะเบียนใดก็ตามที่รายงานว่าเปิดอยู่ รวมถึงรายการปลอมที่โปรแกรมหนึ่งสร้างขึ้นสำหรับตัวเอง ทำให้ข้อนี้เป็น \`not\_found\` เซิร์ฟเวอร์ที่อ่านข้อนี้จึงไม่ได้เรียนรู้อะไรเกี่ยวกับสิ่งที่ปกป้องเครื่องนี้จริง ๆ ข้อนี้ไม่ใช่หลักฐานว่าโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `products_on`: เป็น `0`
+
+**ย้อนดูได้**
+
+เป็นสถานะตอนนี้เท่านั้น บอกได้แค่ว่า Security Center แสดงอะไรตอนที่สแกน ไม่ได้บอกว่ามีอะไรลงทะเบียนไว้ก่อนหน้านั้น
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_on_this_os` — Windows รุ่นนี้ไม่ได้เก็บข้อมูลส่วนนี้
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- อิมเมจ Windows ที่ถอด Defender ออก
+- การสมัครสมาชิกของแอนตี้ไวรัสบุคคลที่สามที่หมดอายุแล้ว
+- แอนตี้ไวรัสที่ไม่ลงทะเบียนกับ Security Center
+- Security Center ที่ยังไม่ได้อัปเดตหลังลงชื่อเข้าใช้
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/iwscapi/nn-iwscapi-iwscproductlist>
 
 ## collector `autostart`
 
@@ -230,6 +283,49 @@ Windows Background Activity Moderator (BAM) บันทึกประวัต
 - ระบบล้างไฟล์ชั่วคราวของ Windows (Storage Sense) หรือเครื่องมือทำความสะอาดดิสก์ที่ลบไฟล์ใน Temp
 - โปรแกรมที่ถูกรันจากแฟลชไดรฟ์ USB หรือไดรฟ์ภายนอกที่ปัจจุบันไม่ได้เชื่อมต่ออยู่กับเครื่อง
 
+### `bam` / `system-name`
+
+<a id="rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c"></a>
+
+#### Program recorded by BAM has a Windows program's name outside Windows' folders *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `2d2a6e08-f0db-43e9-b551-3b54b3b5f31c`
+- ไฟล์: [`rules/bam/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/bam/system-name/windows-name-outside-windows-folders/rule.yaml)
+- collector: `bam`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `bam`, `masquerading`
+- เขียนเมื่อ: 2026-11-09
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+The Windows Background Activity Moderator (BAM) recorded execution of a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the recorded file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it. A path BAM recorded on a volume without a drive letter is compared as if it were on the Windows drive.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `system_name_elsewhere`: เป็น `true`
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older execution leaves no entry here.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+- A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
+
+**แหล่งอ้างอิง**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
+
 ## collector `defender_exclusion`
 
 ### `defender_exclusion` / `fivem`
@@ -244,7 +340,7 @@ Windows Background Activity Moderator (BAM) บันทึกประวัต
 - collector: `defender_exclusion`
 - strength: `posture` — สถานะเครื่อง
 - status: `experimental` — อยู่ระหว่างพัฒนา
-- tag: `defender_exclusion`, `posture`
+- tag: `defender_exclusion`, `posture`, `defender`
 - เขียนเมื่อ: 2026-09-30
 
 **เกี่ยวกับการตรวจนี้**
@@ -353,7 +449,7 @@ log ของ Microsoft Defender มีบันทึกว่าการป�
 
 - ผู้ผลิตเครื่อง ร้านคอม หรืออิมเมจ Windows ปิดการป้องกันแบบ real-time ไว้ก่อนส่งมอบเครื่อง ซึ่งวัดได้บนอิมเมจของ runner ที่ GitHub ให้บริการสองตัว แต่ละตัวมีบันทึกแบบนี้หนึ่งรายการจากก่อนที่จะมีใครใช้งาน
 - เจ้าของเครื่องปิดไว้ชั่วคราวเพื่อติดตั้งหรือรันสิ่งที่ Defender แจ้งเตือน ซึ่งมักเป็น mod เกม เทรนเนอร์ หรือเครื่องมือที่แชร์กันในฟอรัม และเป็นคำแนะนำที่พบบ่อยสำหรับโปรแกรมเหล่านั้นโดยเฉพาะ
-- การติดตั้งแอนตี้ไวรัสตัวอื่น ยังไม่รู้แน่ว่า Defender บันทึกเรื่องนี้ไว้หรือไม่ตอนที่หลีกทางให้ ข้อนี้จึงเป็นความเป็นไปได้ ไม่ใช่สาเหตุที่ยืนยันแล้ว
+- การติดตั้งแอนตี้ไวรัสตัวอื่น ยังไม่รู้แน่ว่า Defender บันทึกเรื่องนี้ไว้หรือไม่ตอนที่หลีกทางให้ ข้อนี้จึงเป็นความเป็นไปได้ ไม่ใช่สาเหตุที่ยืนยันแล้ว รายการแอนตี้ไวรัสในรายงานแสดงสิ่งที่ Security Center ระบุไว้ ผลิตภัณฑ์ที่แสดงอยู่ในรายการนั้น เป็นข้อเท็จจริงเกี่ยวกับสิ่งที่ลงทะเบียนไว้ ไม่ใช่หลักฐานว่ามันสแกน
 - การอัปเดต platform ของ Defender หรือเครื่องมือจัดการเครื่องหรือ group policy ของนายจ้างหรือโรงเรียน
 - การไล่แก้ปัญหาเครื่องช้าหรือเกมกระตุก ซึ่งคำแนะนำในฟอรัมมักเริ่มจากการปิดการสแกนแบบ real-time
 
@@ -1117,7 +1213,7 @@ Windows เคยตั้งค่าอุปกรณ์ HID นี้ไว�
 - collector: `install_marker`
 - strength: `posture` — สถานะเครื่อง
 - status: `experimental` — อยู่ระหว่างพัฒนา
-- tag: `posture`, `install_marker`
+- tag: `posture`, `install_marker`, `defender`
 - เขียนเมื่อ: 2026-09-21
 
 **เกี่ยวกับการตรวจนี้**
@@ -1328,7 +1424,7 @@ Settings แสดงผู้ผลิตเครื่องนี้ว่�
 - collector: `os_image`
 - strength: `posture` — สถานะเครื่อง
 - status: `experimental` — อยู่ระหว่างพัฒนา
-- tag: `posture`, `os_image`
+- tag: `posture`, `os_image`, `defender`
 - เขียนเมื่อ: 2026-09-20
 
 **เกี่ยวกับการตรวจนี้**
@@ -1350,7 +1446,7 @@ Settings แสดงผู้ผลิตเครื่องนี้ว่�
 
 **เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
 
-- แอนตี้ไวรัสของเจ้าอื่นทุกตัว ซึ่งปิดเซอร์วิสของ Defender ตอนติดตั้งตัวเอง
+- แอนตี้ไวรัสของเจ้าอื่นทุกตัว ซึ่งปิดเซอร์วิสของ Defender ตอนติดตั้งตัวเอง รายการแอนตี้ไวรัสในรายงานแสดงสิ่งที่ Security Center ระบุไว้ ผลิตภัณฑ์ที่แสดงอยู่ในรายการนั้นเป็นข้อเท็จจริงเกี่ยวกับสิ่งที่ลงทะเบียนไว้ ไม่ใช่หลักฐานว่ามันสแกน
 - เครื่องที่บริษัทหรือโรงเรียนดูแล และนโยบายสั่งปิด Defender
 - สคริปต์ปรับแต่งหรืออิมเมจ Windows ที่ถูกดัดแปลง ซึ่งเจ้าของเครื่องติดตั้งเองเพื่อความเร็ว
 
@@ -1368,7 +1464,7 @@ Settings แสดงผู้ผลิตเครื่องนี้ว่�
 - collector: `os_image`
 - strength: `posture` — สถานะเครื่อง
 - status: `experimental` — อยู่ระหว่างพัฒนา
-- tag: `posture`, `os_image`
+- tag: `posture`, `os_image`, `defender`
 - เขียนเมื่อ: 2026-09-20
 
 **เกี่ยวกับการตรวจนี้**
@@ -2412,6 +2508,93 @@ Windows ถูกสั่งให้ปิดการป้องกัน Sp
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
 
+### `prefetch` / `system-name`
+
+<a id="rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22"></a>
+
+#### Prefetch recorded a program with a Windows program's name outside Windows' folders *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `735c6a6f-ce81-4026-8849-bbcd5a2cfa22`
+- ไฟล์: [`rules/prefetch/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/prefetch/system-name/windows-name-outside-windows-folders/rule.yaml)
+- collector: `prefetch`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `prefetch`, `masquerading`
+- เขียนเมื่อ: 2026-11-09
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Windows' Prefetch recorded a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the executable it ran from is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it. The recorded volume is not mapped to a drive, so it is compared as if it were on the Windows drive.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `system_name_elsewhere`: เป็น `true`
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Only the Prefetch files still in the folder, and only the most recent run each one records. Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+- `service_disabled` — บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+- A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
+
+**แหล่งอ้างอิง**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
+
+## collector `process`
+
+### `process` / `system-name`
+
+<a id="rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897"></a>
+
+#### Running program has a Windows program's name outside Windows' folders *(แสดงข้อความภาษาอังกฤษ)*
+
+- id: `10ca3ec3-f0c0-426d-9430-39fcd09c6897`
+- ไฟล์: [`rules/process/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/process/system-name/windows-name-outside-windows-folders/rule.yaml)
+- collector: `process`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `process`, `masquerading`
+- เขียนเมื่อ: 2026-11-09
+
+**เกี่ยวกับการตรวจนี้** *(แสดงข้อความภาษาอังกฤษ)*
+
+A program running at the time of the scan has the name of a Windows program, such as svchost.exe or lsass.exe, but its file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program runs from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it.
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `system_name_elsewhere`: เป็น `true`
+
+**ย้อนดูได้** *(แสดงข้อความภาษาอังกฤษ)*
+
+Only the programs running at the moment of the scan. A program that has already exited is not listed, and nothing older is kept here.
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `access_denied` — Windows ไม่อนุญาตให้เปิดอ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน** *(แสดงข้อความภาษาอังกฤษ)*
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+
+**แหล่งอ้างอิง**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
+
 ## collector `usn`
 
 ### `usn` / `enhanced-asi`
@@ -2913,7 +3096,7 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - collector: `evtx`
 - strength: `context` — ข้อมูลประกอบ
 - status: `experimental` — อยู่ระหว่างพัฒนา
-- tag: `evtx`, `timeline`
+- tag: `evtx`, `timeline`, `defender`
 - เขียนเมื่อ: 2026-09-30
 
 **เกี่ยวกับการตรวจนี้**
@@ -2937,7 +3120,7 @@ timeline selector เขียนแบบเดียวกับ rule แต�
 - การตรวจผิดกับโปรแกรมใหม่หรือโปรแกรมที่ไม่มีลายเซ็น
 - ไฟล์ที่ดาวน์โหลดมาแต่ไม่เคยเปิด
 - การตรวจพบในไฟล์ที่ Defender ลบทิ้งทันที
-- การไม่มีเวลาในข้อนี้ไม่ได้แปลว่า Defender ไม่เคยตรวจพบอะไรก่อนบันทึกที่เก่าสุดของ log หรือว่าแอนตี้ไวรัสตัวอื่นไม่เคยตรวจพบ
+- การไม่มีเวลาในข้อนี้ไม่ได้แปลว่า Defender ไม่เคยตรวจพบอะไรก่อนบันทึกที่เก่าสุดของ log หรือว่าแอนตี้ไวรัสตัวอื่นไม่เคยตรวจพบ รายการแอนตี้ไวรัสในรายงานแสดงสิ่งที่ Security Center ระบุไว้ ผลิตภัณฑ์ที่แสดงอยู่ในรายการนั้นเป็นข้อเท็จจริงเกี่ยวกับสิ่งที่ลงทะเบียนไว้ ไม่ใช่หลักฐานว่ามันสแกน
 
 **แหล่งอ้างอิง**
 

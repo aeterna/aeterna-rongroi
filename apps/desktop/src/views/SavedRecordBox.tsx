@@ -104,6 +104,9 @@ export function SavedRecordBox({ saved }: { saved: SavedSummary }) {
         </p>
       )}
       <p>
+        {t("saved.visual_hash")} <strong className="visual-hash">{saved.visual_hash}</strong>
+      </p>
+      <p>
         {t("saved.digest")}{" "}
         <strong className="digest">
           <span className="digest-final">{finalDigest}</span>

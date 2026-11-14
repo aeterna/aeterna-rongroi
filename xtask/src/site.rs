@@ -564,7 +564,7 @@ mod tests {
                 selectors: 1,
                 experimental: 1,
                 test: 1,
-                stable: 0
+                stable: 0,
             }
         );
         write_rule(&dir, "bam/a/four", "retired", None);
@@ -681,5 +681,515 @@ mod tests {
         assert!(llms.contains("Latest release: 0.8.1 (2026-10-09)"));
         assert!(!llms.contains("{{"));
         std::fs::remove_dir_all(&out).unwrap();
+    }
+
+    const SCENE_LAST_TH: &str = "จบตรงนี้ ไม่มีคะแนน ไม่มีคำว่าผ่านหรือไม่ผ่าน คนเป็นผู้ตัดสิน";
+    const SCENE_LAST_EN: &str = "It ends here: no score, no pass or fail. A person decides.";
+    // REUSE-IgnoreStart
+    const SCENE_SCRIPT_HEADER: &str = concat!(
+        "// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors\n",
+        "// SPDX-License-Identifier: GPL-3.0-or-later\n",
+        "// Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.\n",
+    );
+    // REUSE-IgnoreEnd
+
+    fn site_root() -> &'static Path {
+        Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
+    }
+
+    /// Where the attribute `name` starts in one opening tag, if the tag carries it. A word inside a
+    /// quoted value is not an attribute, so `aria-label="x hidden"` does not carry `hidden`.
+    fn find_attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+        let mut quote = None;
+        for (at, c) in tag.char_indices() {
+            match quote {
+                Some(open) => {
+                    if c == open {
+                        quote = None;
+                    }
+                }
+                None => {
+                    if c == '"' || c == '\'' {
+                        quote = Some(c);
+                    } else if tag[at..].starts_with(name) {
+                        let before = tag[..at]
+                            .chars()
+                            .next_back()
+                            .is_none_or(char::is_whitespace);
+                        let after = &tag[at + name.len()..];
+                        let boundary = after.is_empty()
+                            || after.starts_with('=')
+                            || after
+                                .starts_with(|c: char| c.is_whitespace() || c == '>' || c == '/');
+                        if before && boundary {
+                            return Some(after);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn has_attribute(tag: &str, name: &str) -> bool {
+        find_attribute(tag, name).is_some()
+    }
+    fn attribute_value(tag: &str, name: &str) -> Option<String> {
+        let rest = find_attribute(tag, name)?.trim_start();
+        let rest = rest.strip_prefix('=')?.trim_start();
+        if let Some(quote) = rest.chars().next().filter(|c| *c == '"' || *c == '\'') {
+            let value = &rest[1..];
+            value.find(quote).map(|end| value[..end].to_owned())
+        } else {
+            let end = rest
+                .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+                .unwrap_or(rest.len());
+            Some(rest[..end].to_owned())
+        }
+    }
+
+    fn data_msg_names(root: &str) -> Vec<String> {
+        let mut names = Vec::new();
+        let mut rest = root;
+        while let Some(at) = rest.find("data-msg-") {
+            let after = &rest[at..];
+            let end = after
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+                .unwrap_or(after.len());
+            names.push(after[..end].to_owned());
+            rest = &after[end..];
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// Every opening tag in `text`; closing tags, comments and declarations are skipped.
+    fn opening_tags(text: &str) -> Vec<&str> {
+        let mut tags = Vec::new();
+        let mut rest = text;
+        while let Some(start) = rest.find('<') {
+            let after = &rest[start..];
+            if after.starts_with("</") || after.starts_with("<!") || after.starts_with("<?") {
+                let Some(end) = after.find('>') else {
+                    break;
+                };
+                rest = &after[end + 1..];
+                continue;
+            }
+            let Some(end) = after.find('>') else {
+                break;
+            };
+            tags.push(&after[..=end]);
+            rest = &after[end + 1..];
+        }
+        tags
+    }
+
+    fn tag_with<'a>(text: &'a str, name: &str) -> Result<&'a str, String> {
+        let mut found = opening_tags(text)
+            .into_iter()
+            .filter(|tag| has_attribute(tag, name));
+        let tag = found
+            .next()
+            .ok_or_else(|| format!("no element has `{name}`"))?;
+        if found.next().is_some() {
+            return Err(format!("more than one element has `{name}`"));
+        }
+        Ok(tag)
+    }
+
+    fn scene_root_tag(page: &str) -> Result<&str, String> {
+        let mut marks = page.match_indices("data-scan-scene");
+        let Some((at, _)) = marks.next() else {
+            return Err("no `data-scan-scene` root".to_owned());
+        };
+        if marks.next().is_some() {
+            return Err("more than one `data-scan-scene` root".to_owned());
+        }
+        let start = page[..at]
+            .rfind('<')
+            .ok_or_else(|| "the scene root is not a tag".to_owned())?;
+        let end = page[at..]
+            .find('>')
+            .ok_or_else(|| "the scene root never closes".to_owned())?
+            + at;
+        Ok(&page[start..=end])
+    }
+
+    fn scene_markup(page: &str) -> Result<&str, String> {
+        let root = scene_root_tag(page)?;
+        let start = page
+            .find(root)
+            .ok_or_else(|| "the scene root is missing".to_owned())?;
+        let end = page[start..]
+            .find("</figure>")
+            .ok_or_else(|| "the scene never closes its `<figure>`".to_owned())?
+            + start
+            + "</figure>".len();
+        Ok(&page[start..end])
+    }
+
+    fn attr_values(text: &str, name: &str) -> Vec<String> {
+        opening_tags(text)
+            .into_iter()
+            .filter_map(|tag| attribute_value(tag, name))
+            .collect()
+    }
+
+    fn squash(text: &str) -> String {
+        text.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
+    /// p1: one scene, after the three-states section, with the three rows and jumps, the tag, the closing
+    /// line, and a script tag for `scan.js`.
+    fn check_scene(page: &str, states_heading: &str) -> Result<(), String> {
+        let scene = scene_markup(page)?;
+        let heading = page
+            .find(states_heading)
+            .ok_or_else(|| format!("no `{states_heading}` section"))?;
+        let states_end = page[heading..]
+            .find("</section>")
+            .ok_or_else(|| format!("the `{states_heading}` section never closes"))?
+            + heading
+            + "</section>".len();
+        let scene_start = page
+            .find(scene)
+            .ok_or_else(|| "the scene is not in the page".to_owned())?;
+        if scene_start < states_end {
+            return Err("the scene comes before the three-states section".to_owned());
+        }
+        if page[states_end..scene_start].contains("</section>") {
+            return Err(
+                "another section sits between the three-states section and the scene".to_owned(),
+            );
+        }
+        let mut rows = attr_values(scene, "data-scan-row");
+        rows.sort();
+        if rows
+            .iter()
+            .map(String::as_str)
+            .ne(["found", "not_found", "unmeasured"])
+        {
+            return Err("the scene does not have the three result rows".to_owned());
+        }
+        let jump_tags: Vec<&str> = opening_tags(scene)
+            .into_iter()
+            .filter(|tag| has_attribute(tag, "data-scan-jump"))
+            .collect();
+        let mut jumps: Vec<String> = jump_tags
+            .iter()
+            .filter_map(|tag| attribute_value(tag, "data-scan-jump"))
+            .collect();
+        jumps.sort();
+        if jumps
+            .iter()
+            .map(String::as_str)
+            .ne(["found", "not_found", "unmeasured"])
+            || !jump_tags.iter().all(|tag| tag.starts_with("<button"))
+        {
+            return Err("the scene does not have the three jump buttons".to_owned());
+        }
+        let (tag, last_line) = if states_heading.contains("ผลมี") {
+            ("ตัวอย่าง", SCENE_LAST_TH)
+        } else {
+            ("Example", SCENE_LAST_EN)
+        };
+        if !scene.contains(tag) {
+            return Err(format!("the scene has no `{tag}` tag"));
+        }
+        let aria = attribute_value(scene_root_tag(page)?, "aria-label")
+            .ok_or_else(|| "the scene root has no `aria-label`".to_owned())?;
+        if !aria.contains(tag) {
+            return Err(format!(
+                "the scene's `aria-label` does not carry the `{tag}` tag"
+            ));
+        }
+        if !squash(scene).contains(last_line) {
+            return Err("the scene has no closing line".to_owned());
+        }
+        let script = opening_tags(page).into_iter().any(|tag| {
+            tag.starts_with("<script")
+                && attribute_value(tag, "src").is_some_and(|src| src.ends_with("scan.js"))
+        });
+        if !script {
+            return Err("the page has no script tag for `scan.js`".to_owned());
+        }
+        Ok(())
+    }
+
+    /// p2: play, slider and output are `hidden` in the HTML, the three jump buttons are `disabled`,
+    /// and the slider carries the contract's `type`, `min`, `max`, `value` and `data-reach`.
+    fn check_scene_controls(page: &str) -> Result<(), String> {
+        let play = tag_with(page, "data-scan-play")?;
+        let slider = tag_with(page, "data-scan-window")?;
+        let out = tag_with(page, "data-scan-window-out")?;
+        if !play.starts_with("<button")
+            || !slider.starts_with("<input")
+            || !out.starts_with("<output")
+        {
+            return Err("the scene controls are not a button, an input and an output".to_owned());
+        }
+        for (tag, hook) in [
+            (play, "data-scan-play"),
+            (slider, "data-scan-window"),
+            (out, "data-scan-window-out"),
+        ] {
+            if !has_attribute(tag, "hidden") {
+                return Err(format!("`{hook}` is not `hidden` in the HTML"));
+            }
+        }
+        for (name, expected) in [
+            ("type", "range"),
+            ("min", "0"),
+            ("max", "29"),
+            ("value", "23"),
+            ("data-reach", "16"),
+        ] {
+            if attribute_value(slider, name).as_deref() != Some(expected) {
+                return Err(format!("the scan slider's `{name}` is not `{expected}`"));
+            }
+        }
+        let jump_tags: Vec<&str> = opening_tags(page)
+            .into_iter()
+            .filter(|tag| has_attribute(tag, "data-scan-jump"))
+            .collect();
+        let mut jumps: Vec<String> = jump_tags
+            .iter()
+            .filter_map(|tag| attribute_value(tag, "data-scan-jump"))
+            .collect();
+        jumps.sort();
+        if jumps
+            .iter()
+            .map(String::as_str)
+            .ne(["found", "not_found", "unmeasured"])
+        {
+            return Err("the scene does not have the three jump buttons".to_owned());
+        }
+        if let Some(tag) = jump_tags.iter().find(|tag| !has_attribute(tag, "disabled")) {
+            let jump = attribute_value(tag, "data-scan-jump").unwrap_or_default();
+            return Err(format!(
+                "the `{jump}` jump button is not `disabled` in the HTML"
+            ));
+        }
+        Ok(())
+    }
+
+    /// p3: the `data-msg-*` names on the scene root, all of the contract's five included.
+    fn scene_messages(page: &str) -> Result<Vec<String>, String> {
+        let names = data_msg_names(scene_root_tag(page)?);
+        for required in [
+            "data-msg-in",
+            "data-msg-out",
+            "data-msg-play",
+            "data-msg-pause",
+            "data-msg-replay",
+        ] {
+            if !names.iter().any(|name| name == required) {
+                return Err(format!("the scene root has no `{required}`"));
+            }
+        }
+        Ok(names)
+    }
+
+    /// p4: no "clean", "safe" or "trusted" in any script, and "ผ่าน" / "pass" only in the closing line.
+    fn check_scene_words(scene: &str) -> Result<(), String> {
+        let text = squash(scene);
+        let lower = text.to_lowercase();
+        for word in ["clean", "safe", "trusted", "สะอาด", "ปลอดภัย", "✓", "✔"]
+        {
+            if lower.contains(word) {
+                return Err(format!("the scene says `{word}`"));
+            }
+        }
+        let last_line = if text.contains(SCENE_LAST_TH) {
+            SCENE_LAST_TH
+        } else if text.contains(SCENE_LAST_EN) {
+            SCENE_LAST_EN
+        } else {
+            return Err("the scene has no closing line".to_owned());
+        };
+        let rest = text.replacen(last_line, "", 1).to_lowercase();
+        for word in ["ผ่าน", "pass"] {
+            if rest.contains(word) {
+                return Err(format!("the scene says `{word}` outside its closing line"));
+            }
+        }
+        Ok(())
+    }
+
+    /// j1: the script starts with the neighbours' three header lines, has no Thai, and uses each of the
+    /// motion hooks the contract names.
+    fn check_scan_script(js: &str) -> Result<(), String> {
+        if !js.starts_with(SCENE_SCRIPT_HEADER) {
+            return Err("site/scan.js does not start with the three SPDX lines".to_owned());
+        }
+        if let Some((at, _)) = js
+            .char_indices()
+            .find(|(_, c)| ('\u{0E00}'..='\u{0E7F}').contains(c))
+        {
+            let line = js[..at].matches('\n').count() + 1;
+            return Err(format!("site/scan.js has Thai text on line {line}"));
+        }
+        for name in [
+            "prefers-reduced-motion",
+            "IntersectionObserver",
+            "visibilitychange",
+            "requestAnimationFrame",
+        ] {
+            if !js.contains(name) {
+                return Err(format!("site/scan.js never uses `{name}`"));
+            }
+        }
+        Ok(())
+    }
+
+    /// j2: no network, no randomness, and no markup or code built from strings.
+    fn check_scan_script_safety(js: &str) -> Result<(), String> {
+        for name in [
+            "fetch",
+            "XMLHttpRequest",
+            "WebSocket",
+            "EventSource",
+            "sendBeacon",
+            "Math.random",
+            "innerHTML",
+            "insertAdjacentHTML",
+            "eval",
+            "Function(",
+        ] {
+            if let Some(at) = js.find(name) {
+                let line = js[..at].matches('\n').count() + 1;
+                return Err(format!("site/scan.js uses `{name}` on line {line}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn each_page_has_one_scene_after_the_three_states() {
+        for (page, heading) in [
+            ("site/index.html", "ผลมี 3 แบบ"),
+            ("site/en/index.html", "Every result is one of three"),
+        ] {
+            let text = std::fs::read_to_string(site_root().join(page)).unwrap();
+            check_scene(&text, heading).unwrap_or_else(|reason| panic!("{page}: {reason}"));
+        }
+    }
+
+    #[test]
+    fn the_scene_controls_start_hidden_and_the_slider_matches_the_contract() {
+        for page in ["site/index.html", "site/en/index.html"] {
+            let text = std::fs::read_to_string(site_root().join(page)).unwrap();
+            check_scene_controls(&text).unwrap_or_else(|reason| panic!("{page}: {reason}"));
+        }
+    }
+
+    #[test]
+    fn both_pages_declare_the_same_scan_messages() {
+        let thai = std::fs::read_to_string(site_root().join("site/index.html")).unwrap();
+        let english = std::fs::read_to_string(site_root().join("site/en/index.html")).unwrap();
+        let thai =
+            scene_messages(&thai).unwrap_or_else(|reason| panic!("site/index.html: {reason}"));
+        let english = scene_messages(&english)
+            .unwrap_or_else(|reason| panic!("site/en/index.html: {reason}"));
+        assert_eq!(
+            thai, english,
+            "the two pages declare different data-msg-* names"
+        );
+    }
+
+    #[test]
+    fn the_scene_does_not_call_a_pc_clean_or_safe() {
+        for page in ["site/index.html", "site/en/index.html"] {
+            let text = std::fs::read_to_string(site_root().join(page)).unwrap();
+            let scene = scene_markup(&text).unwrap_or_else(|reason| panic!("{page}: {reason}"));
+            check_scene_words(scene).unwrap_or_else(|reason| panic!("{page}: {reason}"));
+        }
+    }
+
+    #[test]
+    fn the_scan_script_has_its_header_and_motion_hooks() {
+        let js = std::fs::read_to_string(site_root().join("site/scan.js"))
+            .expect("site/scan.js is missing");
+        check_scan_script(&js).unwrap_or_else(|reason| panic!("{reason}"));
+    }
+
+    #[test]
+    fn the_scan_script_has_no_network_or_injected_markup() {
+        let js = std::fs::read_to_string(site_root().join("site/scan.js"))
+            .expect("site/scan.js is missing");
+        check_scan_script_safety(&js).unwrap_or_else(|reason| panic!("{reason}"));
+    }
+
+    #[test]
+    fn a_scan_script_that_fetches_fails_the_safety_check() {
+        assert!(
+            check_scan_script_safety("fetch('/x')")
+                .unwrap_err()
+                .contains("fetch")
+        );
+    }
+
+    #[test]
+    fn a_scene_that_says_a_pc_is_clean_fails_the_word_check() {
+        assert!(check_scene_words("สะอาด").unwrap_err().contains("สะอาด"));
+    }
+
+    #[test]
+    fn a_jump_button_that_is_not_disabled_fails_the_control_check() {
+        let page = concat!(
+            "<button data-scan-play hidden></button>",
+            "<input type=\"range\" min=\"0\" max=\"29\" value=\"23\"",
+            " data-scan-window data-reach=\"16\" hidden>",
+            "<output data-scan-window-out hidden></output>",
+            "<button data-scan-jump=\"found\" disabled></button>",
+            "<button data-scan-jump=\"not_found\" disabled></button>",
+            "<button data-scan-jump=\"unmeasured\"></button>",
+        );
+        let error = check_scene_controls(page).unwrap_err();
+        assert!(
+            error.contains("`unmeasured` jump button is not `disabled`"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn both_pages_load_motion_and_the_styles_hold_no_looping_animation() {
+        for page in ["site/index.html", "site/en/index.html"] {
+            let text = std::fs::read_to_string(site_root().join(page)).unwrap();
+            let loads = opening_tags(&text).into_iter().any(|tag| {
+                tag.starts_with("<script")
+                    && attribute_value(tag, "src").is_some_and(|src| src.ends_with("motion.js"))
+            });
+            assert!(loads, "{page}: no script tag for motion.js");
+        }
+        let css = std::fs::read_to_string(site_root().join("site/styles.css")).unwrap();
+        assert!(
+            !css.contains("infinite"),
+            "site/styles.css keeps a looping animation"
+        );
+    }
+
+    #[test]
+    fn a_word_inside_a_quoted_attribute_value_is_not_a_hidden_attribute() {
+        // The second label also has a space after the word: a scan that ignores quotes takes that
+        // whitespace for an attribute boundary.
+        for label in ["x hidden", "x hidden "] {
+            let page = format!(
+                "<button data-scan-play hidden></button>\
+                 <input type=\"range\" min=\"0\" max=\"29\" value=\"23\" data-scan-window \
+                 data-reach=\"16\" aria-label=\"{label}\">\
+                 <output data-scan-window-out hidden></output>\
+                 <button data-scan-jump=\"found\" disabled></button>\
+                 <button data-scan-jump=\"not_found\" disabled></button>\
+                 <button data-scan-jump=\"unmeasured\" disabled></button>"
+            );
+            let error = check_scene_controls(&page).unwrap_err();
+            assert!(
+                error.contains("`data-scan-window` is not `hidden`"),
+                "{label}: {error}"
+            );
+        }
     }
 }

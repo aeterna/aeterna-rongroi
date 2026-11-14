@@ -1,0 +1,38 @@
+{
+  "kind": "rongroi-saved-report",
+  "schema": 2,
+  "case_code": "7K9M-2X4P",
+  "rongroi_version": "0.14.0",
+  "official_build": true,
+  "producer": {
+    "name": "rongroi-connect",
+    "version": "0.1.0",
+    "mode": "single-shot"
+  },
+  "binding": {
+    "server_origin": "http://203.0.113.10:30130",
+    "ticket": "9f82c4e1b07a412891d604e38a291bf0",
+    "nonce": "c4b82e91024a",
+    "issued_at": "2026-10-31T14:30:00Z",
+    "expires_at": "2026-10-31T14:35:00Z"
+  },
+  "policy": {
+    "profile": "posture",
+    "required_collectors": [
+      "posture",
+      "os_image",
+      "install_marker",
+      "defender_exclusion",
+      "net_config",
+      "driver_service"
+    ],
+    "require_elevation": true,
+    "server_name": "Example City",
+    "policy_hash": "94b51d336f083fe5"
+  },
+  "visual_hash": "5777137e45484779",
+  "view": {
+    "generated_at": "2026-10-31T14:30:00Z",
+    "schema_version": 2
+  }
+}

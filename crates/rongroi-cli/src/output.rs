@@ -13,6 +13,8 @@ use rongroi_core::model::{
 };
 use rongroi_core::view::{EntrySource, ReportView, RowBand, Timeline};
 
+use crate::trace_ages::Words;
+
 /// Output language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Lang {
@@ -275,7 +277,7 @@ fn scan_text(lang: Lang, key: &str) -> &'static str {
 ///
 /// Two rules, both borrowed and both about not letting a state read as an accusation (ADR 0030):
 /// name the thing that was not seen and never the person, and say it about the record or about this
-/// program rather than about the machine's owner. The same fourteen strings are in
+/// program rather than about the machine's owner. The same fifteen strings are in
 /// `apps/desktop/src/locales/<lang>/report.json` under `reason.*`; the CLI does not load those files,
 /// so the two are kept in step by `every_reason_has_a_word_in_both_languages` here and by
 /// `check-locales` there.
@@ -301,6 +303,12 @@ pub(crate) fn reason(lang: Lang, reason: UnmeasuredReason) -> &'static str {
             "the Windows service that writes this record is switched off"
         }
         (Lang::Th, UnmeasuredReason::ServiceDisabled) => "บริการของ Windows ที่เขียนข้อมูลนี้ถูกปิดอยู่",
+        (Lang::En, UnmeasuredReason::ServiceNotRunning) => {
+            "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it"
+        }
+        (Lang::Th, UnmeasuredReason::ServiceNotRunning) => {
+            "บริการของ Windows ที่ตอบเรื่องนี้ไม่ได้ทำงานอยู่ อาจกำลังเริ่มทำงาน การสแกนอีกครั้งภายหลังอาจอ่านได้"
+        }
         (Lang::En, UnmeasuredReason::SourceAbsent) => "this PC has no such record to read",
         (Lang::Th, UnmeasuredReason::SourceAbsent) => "เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน",
         (Lang::En, UnmeasuredReason::SourceEmpty) => {
@@ -353,6 +361,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - whether a Prefetch or event log file is marked read-only\n\
             \x20 - how many records the change journal of the Windows drive holds and when the oldest and newest were written, and for the Prefetch, event log and Program Compatibility Assistant folders, FiveM's plugin folders and the folder PowerShell keeps its command history in, how many records name each folder and how many of those created, deleted, renamed or changed a file, never a file name\n\
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
+            \x20 - the antivirus products Windows Security Center lists: each product's name, the state it reports (on, off, snoozed or expired), and, when its path is a file on a local drive, where that file is and its SHA-256 and signature (Authenticode)\n\
             \x20 - the PCI devices Windows remembers, present or not: the maker, device and subsystem numbers and the class Windows records, the driver bound to each, its problem code, and when Windows set it up, last saw it at a start of Windows and recorded it removed, never a serial number; these times can match two reports of this PC\n\
             \x20 - the mice, keyboards and other input devices (HID) Windows remembers, present or not: the maker and model numbers and the driver, and when Windows set each up, last saw it at a start of Windows and recorded it removed, never a serial number or a name\n\
             \x20 - how Windows started each time its System log remembers: one number per start that says whether it followed a full shutdown or a Fast Startup one, and nothing else of that event\n\
@@ -379,6 +388,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - ไฟล์ Prefetch หรือไฟล์ event log ถูกตั้งเป็นอ่านอย่างเดียวหรือไม่\n\
             \x20 - จำนวน record ใน change journal ของไดรฟ์ Windows และเวลาของ record เก่าสุดกับใหม่สุด และสำหรับโฟลเดอร์ Prefetch, event log, Program Compatibility Assistant โฟลเดอร์ plugin ของ FiveM และโฟลเดอร์ที่ PowerShell เก็บประวัติคำสั่ง ว่ามี record ที่อ้างถึงแต่ละโฟลเดอร์กี่รายการ และในนั้นเป็นการสร้าง ลบ เปลี่ยนชื่อ หรือแก้ไขไฟล์กี่รายการ โดยไม่เก็บชื่อไฟล์\n\
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
+            \x20 - โปรแกรมแอนตี้ไวรัสที่ Windows Security Center ระบุ: ชื่อของแต่ละโปรแกรม สถานะที่มันรายงาน (ทำงานอยู่ ปิดอยู่ พักชั่วคราว หรือหมดอายุ) และเมื่อ path ที่มันให้มาเป็นไฟล์บนไดรฟ์ภายในเครื่อง จะอ่านว่าไฟล์นั้นอยู่ที่ไหน พร้อม SHA-256 และลายเซ็น (Authenticode) ของไฟล์นั้น\n\
             \x20 - อุปกรณ์ PCI ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิต อุปกรณ์ และ subsystem กับ class ที่ Windows บันทึก ไดรเวอร์ที่ผูกกับแต่ละตัว problem code และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียล เวลาเหล่านี้ใช้จับคู่รายงานสองฉบับของเครื่องนี้ได้\n\
             \x20 - เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น (HID) ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิตและรุ่น ไดรเวอร์ และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียลหรือชื่อ\n\
             \x20 - Windows เริ่มทำงานแบบไหนในแต่ละครั้งที่ log System ยังจำไว้: ตัวเลขหนึ่งตัวต่อการเริ่มทำงาน ที่บอกว่าต่อจากการปิดเครื่องแบบเต็มหรือแบบ Fast Startup และไม่อ่านอย่างอื่นของ event นั้น\n\
@@ -837,11 +847,19 @@ fn timeline_section(timeline: &Timeline, bundle: &Bundle, lang: Lang) -> String 
             .text(id, lang.code())
             .map_or_else(|| id.to_owned(), |text| text.title)
     };
+    let words = Words::new(lang);
     let mut selectors: Vec<&str> = Vec::new();
     for entry in &timeline.entries {
         let what = match (&entry.source, entry.field.as_str()) {
             (EntrySource::Anchor, "generated_at") => text(lang, "scan_time").to_owned(),
             (EntrySource::Anchor, _) => text(lang, "boot_anchor").to_owned(),
+            // Its own label, in the session statement's words: the edition, then BAM's end.
+            (EntrySource::SessionEnd { edition }, _) => format!(
+                "{} {}: {}",
+                words.get("session.session", &[]),
+                words.get(&format!("session.edition.{edition}"), &[]),
+                words.get("session.end.bam", &[("at", entry.at.as_str())]),
+            ),
             (source, field) => {
                 let from = match source {
                     EntrySource::Evidence { rule_id } => format!(" ({})", title(rule_id)),
@@ -851,7 +869,10 @@ fn timeline_section(timeline: &Timeline, bundle: &Bundle, lang: Lang) -> String 
                         }
                         format!(" ({})", title(selector_id))
                     }
-                    EntrySource::Anchor | EntrySource::Observation => String::new(),
+                    // A session end is labelled above, and never reaches this arm.
+                    EntrySource::Anchor
+                    | EntrySource::SessionEnd { .. }
+                    | EntrySource::Observation => String::new(),
                 };
                 format!(
                     "[{}{}] {field}{from}",
@@ -1028,6 +1049,7 @@ mod tests {
                 sensitive_fields: std::collections::BTreeMap::new(),
                 age_fields: std::collections::BTreeMap::new(),
                 timeline_selectors: std::collections::BTreeMap::new(),
+                defender_rules: Vec::new(),
             },
             bundle,
         )
@@ -1099,6 +1121,60 @@ mod tests {
             "{text}"
         );
         assert!(text.contains(&selector.rule.falsepositives[0]), "{text}");
+    }
+
+    /// A session end is a time BAM recorded for an edition: it prints its own label in both languages,
+    /// never the label of the scan's boot anchor (ADR 0051, ADR 0062 section 5).
+    #[test]
+    fn a_session_end_prints_its_own_label_and_not_windows_started() {
+        let (_, bundle) = report(true);
+        // Read from its serialised form: a test that names the new `EntrySource` variant would not
+        // compile on the current code, and this one should fail on what it asserts.
+        let timeline: Timeline = serde_json::from_value(serde_json::json!({
+            "entries": [{
+                "at": "2026-01-10T10:30:00Z",
+                "collector": "bam",
+                "field": "last_run",
+                "place": null,
+                "source": { "kind": "session_end", "edition": "legacy" },
+                "subject": null
+            }],
+            "bands": [],
+            "unmeasured": []
+        }))
+        .expect("a session end is a timeline entry");
+        for (lang, label) in [(Lang::En, "ended"), (Lang::Th, "จบ")] {
+            let text = timeline_section(&timeline, &bundle, lang);
+            let line = text
+                .lines()
+                .find(|line| line.starts_with("    2026-01-10T10:30:00Z  "))
+                .unwrap_or_else(|| panic!("{text}"));
+            assert!(line.contains(label) && line.contains("(BAM)"), "{line}");
+            assert!(!line.contains(text_timeline(lang, "boot_anchor")), "{line}");
+            assert!(
+                !line.contains("Windows started") && !line.contains("Windows เริ่มทำงานครั้งล่าสุด"),
+                "{line}"
+            );
+        }
+        // Two editions' session ends read differently by edition name alone.
+        let enhanced: Timeline = serde_json::from_value(serde_json::json!({
+            "entries": [{
+                "at": "2026-01-10T10:30:00Z",
+                "collector": "bam",
+                "field": "last_run",
+                "place": null,
+                "source": { "kind": "session_end", "edition": "enhanced" },
+                "subject": null
+            }],
+            "bands": [],
+            "unmeasured": []
+        }))
+        .expect("a session end is a timeline entry");
+        let legacy_line = timeline_section(&timeline, &bundle, Lang::En);
+        let enhanced_line = timeline_section(&enhanced, &bundle, Lang::En);
+        assert!(legacy_line.contains("Legacy: ended"), "{legacy_line}");
+        assert!(enhanced_line.contains("Enhanced: ended"), "{enhanced_line}");
+        assert_ne!(legacy_line, enhanced_line);
     }
 
     #[test]
@@ -1197,6 +1273,7 @@ mod tests {
     /// agreed to without telling them.
     /// What the consent question says about each collector, in both languages (see the test below).
     const CONSENT_WORDS: &[(&str, &[&str])] = &[
+        ("antivirus_product", &["Security Center", "SHA-256"]),
         (
             "autostart",
             &["Run", "RunOnce", "scheduled task", "SHA-256"],

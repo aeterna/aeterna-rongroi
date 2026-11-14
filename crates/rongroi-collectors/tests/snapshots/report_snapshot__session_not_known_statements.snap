@@ -9,5 +9,10 @@ expression: "sessions_of(\"session-not-known\")"
     "session": "not_known",
     "prefetch": "not_admin",
     "bam": "not_admin"
+  },
+  {
+    "kind": "antivirus",
+    "products": [],
+    "not_read": "read_failed"
   }
 ]

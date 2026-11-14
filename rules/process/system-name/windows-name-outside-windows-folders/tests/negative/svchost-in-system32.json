@@ -1,0 +1,13 @@
+{
+  "description": "A running svchost.exe in System32, the folder the table expects for that name",
+  "observations": [
+    {
+      "collector": "process",
+      "fields": {
+        "name": "svchost.exe",
+        "path": "C:\\Windows\\System32\\svchost.exe",
+        "system_name_elsewhere": false
+      }
+    }
+  ]
+}

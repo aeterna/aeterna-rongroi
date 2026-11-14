@@ -50,7 +50,10 @@ jobs:
               exit 0
             fi
             changed=$(git diff --name-only HEAD^1 HEAD)
-            if ! grep -q -v -E '^(\.github/workflows/pages\.yml|\.github/ISSUE_TEMPLATE/|docs/|site/|LICENSES/|.*\.md$|_typos\.toml$)' <<<"$changed"; then
+            # docs/assets/ holds the README diagrams `cargo xtask readme-diagram --check` compares, so a
+            # change there is not docs-only.
+            if ! grep -q -E '^docs/assets/' <<<"$changed" && \
+               ! grep -q -v -E '^(\.github/workflows/pages\.yml|\.github/ISSUE_TEMPLATE/|docs/|site/|LICENSES/|.*\.md$|_typos\.toml$)' <<<"$changed"; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
               echo "PR changes only docs/site/text: fast-pass Rust compile and tests."
               exit 0
@@ -99,6 +102,12 @@ jobs:
       - name: Coverage table matches the rules and the ledger
         if: steps.scope.outputs.skip != 'true'
         run: cargo xtask coverage --check
+      # docs/assets/architecture-light.svg and -dark.svg are written from architecture.template.svg with the
+      # rule and LOLDrivers counts. A rule added or removed without rerunning `cargo xtask readme-diagram`
+      # fails here, so the README never shows a stale count.
+      - name: README architecture diagrams match the template and the counts
+        if: steps.scope.outputs.skip != 'true'
+        run: cargo xtask readme-diagram --check
       # The vulnerable-driver data file is rebuilt from LOLDrivers at the commit its PROVENANCE.md names and
       # compared with the committed file (ADR 0048). Only `yaml/` is fetched, one commit deep, and the step
       # fails if any other file lands on disk. A pull request fetches only when it changes the data file's
@@ -299,9 +308,9 @@ jobs:
               exit 0
             fi
             changed=$(git diff --name-only HEAD^1 HEAD)
-            if ! grep -q -E '^(apps/desktop/|\.github/workflows/ci\.yml$)' <<<"$changed"; then
+            if ! grep -q -E '^(apps/desktop/|crates/rongroi-collectors/tests/snapshots/|\.github/workflows/ci\.yml$)' <<<"$changed"; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
-              echo "PR does not touch apps/desktop: fast-pass."
+              echo "PR does not touch apps/desktop or the report snapshots it reads: fast-pass."
               exit 0
             fi
           fi

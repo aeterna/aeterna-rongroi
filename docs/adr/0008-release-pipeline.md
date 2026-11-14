@@ -55,9 +55,11 @@ version.
 |---|---|
 | `aeterna-rongroi-X.Y.Z-windows-x64.exe` | Desktop app (uses Microsoft WebView2). No installer. |
 | `aeterna-rongroi-cli-X.Y.Z-windows-x64.exe` | Command-line app (no WebView2). |
-| `SHA256SUMS` | SHA-256 of both executables, in `sha256sum` format. |
+| `rongroi-scan-X.Y.Z-windows-x64.exe` | Connect sidecar (added 2026-11-13): Rongroi Connect starts it; not run by hand. |
+| `SHA256SUMS` | SHA-256 of the three executables, in `sha256sum` format. |
 | `aeterna-rongroi-X.Y.Z-windows-x64.cdx.json` | CycloneDX SBOM of the desktop app's Rust crates (`cargo cyclonedx --describe binaries`). |
 | `aeterna-rongroi-cli-X.Y.Z-windows-x64.cdx.json` | CycloneDX SBOM of the CLI's Rust crates. |
+| `rongroi-scan-X.Y.Z-windows-x64.cdx.json` | CycloneDX SBOM of the sidecar's Rust crates. |
 | `aeterna-rongroi-X.Y.Z-ui.cdx.json` | CycloneDX SBOM of the npm packages built into the desktop app (`pnpm sbom --prod`). |
 
 GitHub adds source-code archives on its own.
@@ -86,12 +88,12 @@ never cancel each other. Every action is pinned by commit SHA, like the other wo
 4. `pnpm install --frozen-lockfile`. **No build caches** (`rust-cache`, `setup-node` cache): a cache written by
    another workflow must not reach an official build. Every cargo command in the job uses `--locked`.
 5. Build with `RONGROI_OFFICIAL_BUILD=1` and `RONGROI_COMMIT=<tag commit SHA>` set for the whole step:
-   `cargo build --release --locked -p rongroi-cli` and `pnpm -C apps/desktop tauri build --no-bundle -- --locked`.
-6. Copy the two executables to their release names.
+   `cargo build --release --locked -p rongroi-cli -p rongroi-scan` and `pnpm -C apps/desktop tauri build --no-bundle -- --locked`.
+6. Copy the three executables to their release names.
 7. Run the CLI `scan --json` into `report.json`, then
-   `cargo run --locked -p xtask -- release-verify <tag> --report report.json --cli <exe> --desktop <exe> --commit <sha> --sums SHA256SUMS`
+   `cargo run --locked -p xtask -- release-verify <tag> --report report.json --cli <exe> --desktop <exe> --scan <exe> --commit <sha> --sums SHA256SUMS`
    checks the built files (gates below) and, only if they pass, writes `SHA256SUMS`.
-8. Write the three SBOM files.
+8. Write the four SBOM files.
 9. `cargo run --locked -p xtask -- release-notes <tag> --report report.json --sums SHA256SUMS --commit <sha> --run-url <url> --out notes.md`
    writes the release notes.
 10. Upload the executables, `SHA256SUMS`, the SBOM files and `notes.md` as one workflow artifact, kept for one
@@ -105,7 +107,7 @@ that can sign.
 2. `sha256sum -c --strict SHA256SUMS`.
 3. `actions/attest`: one build-provenance attestation with `subject-checksums: SHA256SUMS`, and one SBOM
    attestation per SBOM file (`subject-path` + `sbom-path`); both desktop SBOMs — Rust and UI — are attested
-   against the desktop executable.
+   against the desktop executable, and the sidecar SBOM against the sidecar.
 
 **Job `publish`** — `ubuntu-latest`; needs `build` and `attest`; permission `contents: write` only. It does not
 check out or compile anything.
@@ -125,6 +127,7 @@ Each gate stops the workflow; no release is created.
 | Build | `Cargo.lock` or `pnpm-lock.yaml` would change (every cargo command uses `--locked`, `pnpm install` uses `--frozen-lockfile`) |
 | CLI check (`xtask release-verify`) | `aeterna-rongroi-cli … scan --json` reports `provenance.official` not `true`, a version other than `X.Y.Z`, a commit other than the tag commit, or an `exe_sha256` different from `Get-FileHash` of the file |
 | Desktop app check (`xtask release-verify`) | the desktop executable does not contain the build marker `aeterna-rongroi build marker: official=1;commit=<tag commit SHA>;` (ADR 0007) — the text its report header is read from, so a desktop build that lacks either variable fails. The app cannot be started headless on the runner. This check must be shown to fail for desktop builds without `RONGROI_OFFICIAL_BUILD` and without `RONGROI_COMMIT` before the first real release. |
+| Connect sidecar check (`xtask release-verify`, added 2026-11-13) | `rongroi-scan-X.Y.Z-windows-x64.exe` does not contain the same build marker of the tag commit. Like the desktop app it cannot produce a report on its own (Connect drives it over a pipe), so the marker is what is checked; it is listed in `SHA256SUMS` and attested with its SBOM |
 | Publish | `sha256sum -c --strict` fails, an attached executable is not listed in `SHA256SUMS`, or the tag does not exist on the remote |
 
 The logic of `release-check` and `release-notes` is unit- and snapshot-tested, and those tests run in the
@@ -155,7 +158,7 @@ a missing changelog section, and the CLI check against an unofficial build.
 Before the first release: merge the changelog pull request, push `vYYYY.MM.DD-0.1.0-rc.1`, inspect the draft,
 verify the downloaded files with
 `gh attestation verify <file> --repo aeterna/aeterna-rongroi --signer-workflow aeterna/aeterna-rongroi/.github/workflows/release.yml`,
-run both executables on a real Windows machine (hash matches, no UNOFFICIAL BUILD banner, desktop app starts
+run the desktop app and the CLI on a real Windows machine (hash matches, no UNOFFICIAL BUILD banner, desktop app starts
 under a standard-user token), and show that the desktop-app gate fails for desktop builds without
 `RONGROI_OFFICIAL_BUILD` and without `RONGROI_COMMIT` (build the desktop app for Windows without each variable
 and run `release-verify` against it).
@@ -174,7 +177,7 @@ Then delete the draft and the rehearsal tag, and push `vYYYY.MM.DD-0.1.0` on the
 - Results of the 0.1.0 rehearsal (2026-09-11, `v2026.09.11-0.1.0-rc.1`, then `v2026.09.11-0.1.0` on the same
   commit):
   - The SBOM step found the files `cargo cyclonedx` writes and `pnpm sbom` produced the UI SBOM on the Windows
-    runner; all three SBOM attestations verify with `--predicate-type https://cyclonedx.org/bom`.
+    runner; all four SBOM attestations verify with `--predicate-type https://cyclonedx.org/bom`.
   - The desktop-app gate passes the official build and fails desktop builds made without
     `RONGROI_OFFICIAL_BUILD` and without `RONGROI_COMMIT` (built for `x86_64-pc-windows-msvc` with
     `cargo-xwin`, then checked with `release-verify`).

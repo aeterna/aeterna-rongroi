@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 77
+      "rule_count": 81
     },
     "platform": "windows",
     "os_build": "26100",
@@ -70,6 +70,14 @@ expression: view
     ]
   },
   "evidence": [
+    {
+      "rule_id": "4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c",
+      "collector": "antivirus_product",
+      "strength": "posture",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
     {
       "rule_id": "72820eaf-1469-4ea7-bb0f-17f145d26dfc",
       "collector": "autostart",
@@ -279,6 +287,22 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "735c6a6f-ce81-4026-8849-bbcd5a2cfa22",
+      "collector": "prefetch",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
+      "rule_id": "10ca3ec3-f0c0-426d-9430-39fcd09c6897",
+      "collector": "process",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "read_failed",
+      "expected": false
+    },
+    {
       "rule_id": "1c73241b-b7f1-4f91-81d4-8de53db6d119",
       "collector": "usn",
       "strength": "context",
@@ -353,11 +377,11 @@ expression: view
   "listed": {
     "found": 2,
     "not_found": 8,
-    "unmeasured": 23
+    "unmeasured": 26
   },
   "hidden": {
     "not_found": 6,
-    "unmeasured_expected": 21,
+    "unmeasured_expected": 22,
     "unmeasured_unexpected": 0,
     "unmatched": 11
   },
@@ -427,6 +451,7 @@ expression: view
     "hid_device",
     "autostart",
     "defender_exclusion",
+    "antivirus_product",
     "fivem_dir",
     "fivem_servers",
     "net_config",
@@ -569,5 +594,12 @@ expression: view
         "reason": "read_failed"
       }
     ]
-  }
+  },
+  "cross_source": [
+    {
+      "kind": "antivirus",
+      "products": [],
+      "not_read": "read_failed"
+    }
+  ]
 }

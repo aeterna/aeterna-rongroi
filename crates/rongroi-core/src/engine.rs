@@ -88,6 +88,16 @@ pub fn evaluate(
             .or_default()
             .push(selector.id.clone());
     }
+    // A tag is not a match field: this list only tells the view which rules the antivirus statement
+    // belongs beside (ADR 0090 section 5).
+    let mut defender_rules: Vec<String> = bundle
+        .rules()
+        .iter()
+        .map(|sourced| &sourced.rule)
+        .filter(|rule| rule.tags.iter().any(|tag| tag == "defender"))
+        .map(|rule| rule.id.clone())
+        .collect();
+    defender_rules.sort();
     Report {
         header,
         evidence,
@@ -101,6 +111,7 @@ pub fn evaluate(
         sensitive_fields: std::collections::BTreeMap::new(),
         age_fields: BTreeMap::new(),
         timeline_selectors,
+        defender_rules,
     }
 }
 

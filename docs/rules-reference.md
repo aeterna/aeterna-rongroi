@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 77 |
-| SHA-256 | `f8194b3e7299807c919d53c1a528f4883b5b52fa046479ad7f70dc95e1a1ef78` |
+| Rules | 81 |
+| SHA-256 | `a7772fc1752d577ae4f77ce8c13a28ce4602429765f313540194f383aef863f6` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -41,10 +41,13 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 
 ## Contents
 
+- `antivirus_product`
+  - [Windows Security Center lists no antivirus product that reports itself on](#rule-4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c) — `posture` · `experimental`
 - `autostart`
   - [A program that starts by itself has no valid embedded signature and is outside the Windows and Program Files folders](#rule-72820eaf-1469-4ea7-bb0f-17f145d26dfc) — `posture` · `experimental`
 - `bam`
   - [Program recorded by BAM from temporary or removable path is missing from disk](#rule-14afcc4e-5567-424d-8502-dae7b65a1af8) — `context` · `experimental`
+  - [Program recorded by BAM has a Windows program's name outside Windows' folders](#rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c) — `context` · `experimental`
 - `defender_exclusion`
   - [A Microsoft Defender exclusion covers a FiveM folder](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
 - `driver_service`
@@ -108,6 +111,9 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [A command in the PowerShell history cleared a log, the history or Prefetch](#rule-8d4941c6-3ca2-4ff7-8fce-8d1d2fcc7c8d) — `tamper` · `experimental`
 - `prefetch`
   - [A Prefetch file is marked read-only](#rule-7d493537-7ecf-4f97-90a0-119e079d30d2) — `tamper` · `experimental`
+  - [Prefetch recorded a program with a Windows program's name outside Windows' folders](#rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22) — `context` · `experimental`
+- `process`
+  - [Running program has a Windows program's name outside Windows' folders](#rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897) — `context` · `experimental`
 - `usn`
   - [The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
@@ -145,6 +151,52 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - `windows_start`
     - [Windows started after a Fast Startup shutdown](#rule-fe57aa65-11b0-4e1f-b81c-a4fda597855b) — `context` · `experimental`
     - [Windows started after a full shutdown or a restart](#rule-fa3e721e-98f2-4007-bbd8-133208564682) — `context` · `experimental`
+
+## Collector `antivirus_product`
+
+### `antivirus_product` / `registered`
+
+<a id="rule-4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c"></a>
+
+#### Windows Security Center lists no antivirus product that reports itself on
+
+- Id: `4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c`
+- File: [`rules/antivirus_product/registered/no-product-reports-on/rule.yaml`](../rules/antivirus_product/registered/no-product-reports-on/rule.yaml)
+- Collector: `antivirus_product`
+- Strength: `posture`
+- Status: `experimental` — being developed
+- Tags: `posture`, `antivirus_product`
+- Written: 2026-11-05
+
+**About this check**
+
+Windows Security Center lists no antivirus product that reports itself on. It counts states and names no product. The other side is what matters for a server: \`not\_found\` here means only that some registration reports \`on\`, and any registration that reports \`on\` — a fake one a program made for itself included — makes this \`not\_found\`. A server that reads this rule therefore learns nothing about what actually protects the PC. It is not evidence of cheating.
+
+**Matches when all of these hold for one observation**
+
+- `products_on`: is `0`
+
+**Look-back**
+
+Current state only. It says what Security Center listed when the scan ran, not what was registered before then.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_on_this_os` — this version of Windows does not keep this record
+- `not_admin` — Windows would not show this without administrator rights
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- A Windows image that removed Defender
+- A lapsed third-party subscription
+- An antivirus that does not register with Security Center
+- Security Center not yet updated after sign-in
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows/win32/api/iwscapi/nn-iwscapi-iwscproductlist>
 
 ## Collector `autostart`
 
@@ -232,6 +284,49 @@ Only what BAM still holds. Windows removes BAM entries older than seven days whe
 - Temporary files cleaned up by Windows Storage Sense, disk cleanup tools, or browser cleaners
 - Executables run from a removable USB flash drive or portable disk that has since been unplugged
 
+### `bam` / `system-name`
+
+<a id="rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c"></a>
+
+#### Program recorded by BAM has a Windows program's name outside Windows' folders
+
+- Id: `2d2a6e08-f0db-43e9-b551-3b54b3b5f31c`
+- File: [`rules/bam/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/bam/system-name/windows-name-outside-windows-folders/rule.yaml)
+- Collector: `bam`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `bam`, `masquerading`
+- Written: 2026-11-09
+
+**About this check**
+
+The Windows Background Activity Moderator (BAM) recorded execution of a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the recorded file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it. A path BAM recorded on a volume without a drive letter is compared as if it were on the Windows drive.
+
+**Matches when all of these hold for one observation**
+
+- `system_name_elsewhere`: is `true`
+
+**Look-back**
+
+Only what BAM still holds. Windows removes BAM entries older than seven days when it starts, so an older execution leaves no entry here.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+- A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
+
+**References**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
+
 ## Collector `defender_exclusion`
 
 ### `defender_exclusion` / `fivem`
@@ -245,7 +340,7 @@ Only what BAM still holds. Windows removes BAM entries older than seven days whe
 - Collector: `defender_exclusion`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `defender_exclusion`, `posture`
+- Tags: `defender_exclusion`, `posture`, `defender`
 - Written: 2026-09-30
 
 **About this check**
@@ -352,7 +447,7 @@ Only switches still in the Defender log as it stands. It holds up to 16 MiB by d
 
 - The PC's maker, a shop or a Windows image turning real-time protection off before the PC was handed over — measured on two GitHub-hosted runner images, each of which carried one such record from before anyone used it
 - The owner switching it off for a while to install or run something Defender flagged, often a game mod, a trainer or a tool shared on a forum, which is common advice for exactly those programs
-- Installing another antivirus product. Whether Defender records this when it steps aside is not established, so this is a possibility, not a known cause
+- Installing another antivirus product. Whether Defender records this when it steps aside is not established, so this is a possibility, not a known cause. The report's antivirus list shows what Security Center lists; a product listed there is a fact about what is registered, not proof that it scans.
 - A Defender platform update, or a management tool or group policy of an employer or school
 - Troubleshooting a slow PC or a game that stutters, which forum advice often starts by disabling real-time scanning
 
@@ -1099,7 +1194,7 @@ Current state only. It says nothing about how the PC was set up in the past.
 - Collector: `install_marker`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `posture`, `install_marker`
+- Tags: `posture`, `install_marker`, `defender`
 - Written: 2026-09-21
 
 **About this check**
@@ -1305,7 +1400,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 - Collector: `os_image`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `posture`, `os_image`
+- Tags: `posture`, `os_image`, `defender`
 - Written: 2026-09-20
 
 **About this check**
@@ -1327,7 +1422,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 
 **Ordinary things that also produce this**
 
-- Any third-party antivirus, which disables Defender's service when it installs itself
+- Any third-party antivirus, which disables Defender's service when it installs itself. The report's antivirus list shows what Security Center lists; a product listed there is a fact about what is registered, not proof that it scans.
 - A PC managed by an employer or a school whose policy turns Defender off
 - A tweaking script or a pre-modified Windows image the owner installed for performance
 
@@ -1344,7 +1439,7 @@ Current setting only. It says nothing about how the PC was configured in the pas
 - Collector: `os_image`
 - Strength: `posture`
 - Status: `experimental` — being developed
-- Tags: `posture`, `os_image`
+- Tags: `posture`, `os_image`, `defender`
 - Written: 2026-09-20
 
 **About this check**
@@ -2364,6 +2459,93 @@ The attribute as it is at the moment of the scan, on the Prefetch files still in
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants>
 - <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy>
 
+### `prefetch` / `system-name`
+
+<a id="rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22"></a>
+
+#### Prefetch recorded a program with a Windows program's name outside Windows' folders
+
+- Id: `735c6a6f-ce81-4026-8849-bbcd5a2cfa22`
+- File: [`rules/prefetch/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/prefetch/system-name/windows-name-outside-windows-folders/rule.yaml)
+- Collector: `prefetch`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `prefetch`, `masquerading`
+- Written: 2026-11-09
+
+**About this check**
+
+Windows' Prefetch recorded a program that has the name of a Windows program, such as svchost.exe or lsass.exe, but the executable it ran from is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program ran from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it. The recorded volume is not mapped to a drive, so it is compared as if it were on the Windows drive.
+
+**Matches when all of these hold for one observation**
+
+- `system_name_elsewhere`: is `true`
+
+**Look-back**
+
+Only the Prefetch files still in the folder, and only the most recent run each one records. Windows removes Prefetch files itself, and a PC with Prefetch switched off has none.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+- `service_disabled` — the Windows service that writes this record is switched off
+
+**Ordinary things that also produce this**
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+- A Windows on ARM machine running a program from SysArm32 or SysChpe32, folders the measurement (x64) did not cover
+
+**References**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
+
+## Collector `process`
+
+### `process` / `system-name`
+
+<a id="rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897"></a>
+
+#### Running program has a Windows program's name outside Windows' folders
+
+- Id: `10ca3ec3-f0c0-426d-9430-39fcd09c6897`
+- File: [`rules/process/system-name/windows-name-outside-windows-folders/rule.yaml`](../rules/process/system-name/windows-name-outside-windows-folders/rule.yaml)
+- Collector: `process`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `process`, `masquerading`
+- Written: 2026-11-09
+
+**About this check**
+
+A program running at the time of the scan has the name of a Windows program, such as svchost.exe or lsass.exe, but its file is not in the folder Windows keeps that program in. Windows' own copy of svchost.exe is in System32 or SysWOW64, and most of the other names are only in System32. This row shows where the program runs from, not what it does. It is not proof of anything on its own: an interrupted Windows update, a Windows installation on another drive, and a tool that ships its own copy of a Windows program under the same name all produce it.
+
+**Matches when all of these hold for one observation**
+
+- `system_name_elsewhere`: is `true`
+
+**Look-back**
+
+Only the programs running at the moment of the scan. A program that has already exited is not listed, and nothing older is kept here.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `access_denied` — Windows refused to open this
+
+**Ordinary things that also produce this**
+
+- An interrupted Windows update or upgrade still running a copy of a Windows program from a folder the table does not list
+- A Windows installation on a second drive whose programs were run, so their folder is not the one the table expects on the system drive
+- A tool that ships its own copy of a Windows program under the same name
+
+**References**
+
+- <https://attack.mitre.org/techniques/T1036/005/>
+
 ## Collector `usn`
 
 ### `usn` / `enhanced-asi`
@@ -2853,7 +3035,7 @@ Only the records the Code Integrity log still holds. It keeps about 1 MB by defa
 - Collector: `evtx`
 - Strength: `context`
 - Status: `experimental` — being developed
-- Tags: `evtx`, `timeline`
+- Tags: `evtx`, `timeline`, `defender`
 - Written: 2026-09-30
 
 **About this check**
@@ -2877,7 +3059,7 @@ Only the records Defender's log still holds. It keeps up to 16 MiB by default an
 - A false positive on a new or unsigned program
 - A file that was downloaded and never run
 - A detection in a file Defender removed at once
-- No time here does not mean Defender detected nothing before the log's oldest record, or that another antivirus did not
+- No time here does not mean Defender detected nothing before the log's oldest record, or that another antivirus did not. The report's antivirus list shows what Security Center lists; a product listed there is a fact about what is registered, not proof that it scans.
 
 **References**
 

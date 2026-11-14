@@ -11,13 +11,14 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::{
-    AccountSource, BootTimeSource, ChannelConfig, ChannelConfigReader, CodeIntegrityOptions,
-    DeviceBus, DeviceProperty, DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap,
-    DriveMapEntry, EntryTimes, EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource,
-    FirmwareSecureBoot, FirmwareSource, Host, IommuTable, LinkKind, LinkTarget, Platform,
-    ProcessRecord, ProcessSource, RegistryData, RegistrySource, SignatureCheck, SignatureSource,
-    SourceError, SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource,
-    UsnJournalState, UsnReadEnd,
+    AccountSource, AntivirusList, AntivirusProductRecord, AntivirusProductSource, BootTimeSource,
+    ChannelConfig, ChannelConfigReader, CodeIntegrityOptions, DeviceBus, DeviceProperty,
+    DeviceRecord, DeviceSource, DirEntryInfo, DriveKind, DriveMap, DriveMapEntry, EntryTimes,
+    EnvironmentSource, EventLogConfigSource, FileId, FilesystemSource, FirmwareSecureBoot,
+    FirmwareSource, Host, IommuTable, LinkKind, LinkTarget, Platform, ProcessRecord, ProcessSource,
+    RegistryData, RegistrySource, SignatureCheck, SignatureSource, SourceError,
+    SystemIntegritySource, TpmInfo, TpmSource, UsnJournalRead, UsnJournalSource, UsnJournalState,
+    UsnReadEnd,
 };
 
 /// Why a fixture host could not be loaded.
@@ -62,6 +63,15 @@ struct HostFile {
     code_integrity: Option<FixtureCodeIntegrity>,
     #[serde(default)]
     tpm: Option<FixtureTpm>,
+    /// The antivirus products Windows Security Center lists (ADR 0090). Absent means the fixture never
+    /// modelled them, which the accessor reports as `Unsupported`; an empty list is the deliberate
+    /// claim that Security Center lists none.
+    #[serde(default)]
+    antivirus_products: Option<Vec<FixtureAntivirusProduct>>,
+    /// How the fixture says Security Center's list was not answered. When present it decides the
+    /// accessor, whatever `antivirus_products:` holds.
+    #[serde(default)]
+    antivirus_products_failure: Option<FixtureAntivirusProductsFailure>,
     #[serde(default)]
     firmware: Option<FixtureFirmware>,
     /// What the firmware's ACPI tables say about an IOMMU (ADR 0038, amendment of 2026-10-15). Absent
@@ -317,6 +327,55 @@ struct FixtureTpm {
     present: bool,
     #[serde(default)]
     spec_version: Option<String>,
+}
+
+/// One antivirus product a fixture describes as Windows Security Center lists it (ADR 0090).
+///
+/// `state` is the raw `WSC_SECURITY_PRODUCT_STATE` value and `remediation_path` is the string as
+/// given; the host carries both through without interpreting them.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FixtureAntivirusProduct {
+    display_name: String,
+    state: i32,
+    #[serde(default)]
+    remediation_path: String,
+}
+
+/// The ways Security Center's list is asked for and not answered (ADR 0090 section 4).
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureAntivirusProductsFailure {
+    AccessDenied,
+    ReadFailed,
+    /// The service that answers is not running, which may change without anything else changing.
+    ServiceNotRunning,
+}
+
+/// Turns every described antivirus product into the record a live host returns, carrying the state
+/// and remediation path through without interpreting them.
+fn antivirus_records(described: Vec<FixtureAntivirusProduct>) -> Vec<AntivirusProductRecord> {
+    described
+        .into_iter()
+        .map(|product| AntivirusProductRecord {
+            display_name: product.display_name,
+            state: product.state,
+            remediation_path: product.remediation_path,
+        })
+        .collect()
+}
+
+/// Turns what a fixture wrote for Security Center's list into the one answer the accessor gives: a
+/// failure wins whatever list sits beside it, and no block at all is `None`, never an empty list.
+fn antivirus_answer(
+    described: Option<Vec<FixtureAntivirusProduct>>,
+    failure: Option<FixtureAntivirusProductsFailure>,
+) -> Option<Result<AntivirusList, FixtureAntivirusProductsFailure>> {
+    match (described, failure) {
+        (_, Some(failure)) => Some(Err(failure)),
+        (Some(described), None) => Some(Ok(AntivirusList::Products(antivirus_records(described)))),
+        (None, None) => None,
+    }
 }
 
 /// The firmware a fixture describes (ADR 0038). Absent means the fixture never modelled it, which the
@@ -1220,6 +1279,9 @@ pub struct FixtureHost {
     access_denied: Vec<String>,
     code_integrity: Option<FixtureCodeIntegrity>,
     tpm: Option<FixtureTpm>,
+    /// Security Center's answer: the products it listed or the reason it did not answer, or `None`
+    /// when the fixture modelled neither.
+    antivirus: Option<Result<AntivirusList, FixtureAntivirusProductsFailure>>,
     firmware: Option<FixtureFirmware>,
     iommu_table: Option<FixtureIommuTable>,
     processes: Option<Vec<ProcessRecord>>,
@@ -1346,6 +1408,7 @@ impl FixtureHost {
                 .collect(),
             code_integrity: file.code_integrity,
             tpm: file.tpm,
+            antivirus: antivirus_answer(file.antivirus_products, file.antivirus_products_failure),
             firmware: file.firmware,
             iommu_table: file.iommu_table,
             processes: file
@@ -1789,6 +1852,35 @@ impl TpmSource for FixtureHost {
             present: described.present,
             spec_version: described.spec_version.clone(),
         })
+    }
+}
+
+impl AntivirusProductSource for FixtureHost {
+    /// The products the fixture lists, in file order.
+    ///
+    /// No `antivirus_products:` block is `Unsupported`, never an empty list: a fixture written before
+    /// this source existed never modelled Security Center's list, and an empty list is the deliberate
+    /// claim that Security Center lists no product (ADR 0090 section 4).
+    ///
+    /// An `antivirus_products_failure:` entry is the answer whatever `antivirus_products:` holds, so a
+    /// fixture can say the list was refused, could not be read, or that the service that answers was
+    /// not running.
+    fn antivirus_products(&self) -> Result<AntivirusList, SourceError> {
+        match self.antivirus.as_ref() {
+            Some(Err(FixtureAntivirusProductsFailure::AccessDenied)) => {
+                Err(SourceError::AccessDenied)
+            }
+            Some(Err(FixtureAntivirusProductsFailure::ReadFailed)) => Err(SourceError::Failed(
+                "this fixture host describes an antivirus read that failed".to_owned(),
+            )),
+            Some(Err(FixtureAntivirusProductsFailure::ServiceNotRunning)) => {
+                Ok(AntivirusList::ServiceNotRunning)
+            }
+            Some(Ok(products)) => Ok(products.clone()),
+            None => Err(SourceError::Unsupported(
+                "this fixture host does not describe antivirus products".to_owned(),
+            )),
+        }
     }
 }
 
@@ -2993,6 +3085,119 @@ processes:
         let host =
             FixtureHost::from_yaml_str("platform: windows\nprocesses: []\n", "inline").unwrap();
         assert_eq!(host.running_processes(), Ok(vec![]));
+    }
+
+    /// No `antivirus_products:` block never modelled Security Center's list, so it is `Unsupported`
+    /// rather than an empty list, which would claim the machine has none (ADR 0090 section 4).
+    #[test]
+    fn a_fixture_without_an_antivirus_products_block_is_unsupported() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        assert!(matches!(
+            host.antivirus_products(),
+            Err(SourceError::Unsupported(_))
+        ));
+    }
+
+    /// Writing the block with nothing in it is the deliberate claim that Security Center lists no
+    /// product, unlike leaving it out.
+    #[test]
+    fn an_explicitly_empty_antivirus_product_list_is_an_answer() {
+        let host =
+            FixtureHost::from_yaml_str("platform: windows\nantivirus_products: []\n", "inline")
+                .unwrap();
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(AntivirusList::Products(vec![]))
+        );
+    }
+
+    /// A fixture that says the list was refused answers with the refusal, whatever the list holds.
+    #[test]
+    fn a_refused_antivirus_product_list_says_it_was_not_answered() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nantivirus_products_failure: access_denied\nantivirus_products: []\n",
+            "inline",
+        )
+        .unwrap();
+        assert!(matches!(
+            host.antivirus_products(),
+            Err(SourceError::AccessDenied)
+        ));
+    }
+
+    /// A fixture that says the list could not be read answers with the failure, whatever the list
+    /// holds.
+    #[test]
+    fn a_failed_antivirus_product_list_says_it_was_not_answered() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nantivirus_products_failure: read_failed\nantivirus_products: []\n",
+            "inline",
+        )
+        .unwrap();
+        assert!(matches!(
+            host.antivirus_products(),
+            Err(SourceError::Failed(_))
+        ));
+    }
+
+    /// Security Center's service not running is its own answer, not a failed read and not an empty
+    /// list, whatever list the fixture wrote beside it (ADR 0090).
+    #[test]
+    fn a_service_not_running_antivirus_product_list_is_its_own_answer() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nantivirus_products_failure: service_not_running\nantivirus_products: []\n",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(AntivirusList::ServiceNotRunning)
+        );
+    }
+
+    /// The list keeps the order the fixture wrote, and every value reaches the caller unchanged:
+    /// `remediation_path` is as written, and empty when the fixture leaves it out.
+    #[test]
+    fn antivirus_products_keep_their_order_and_values() {
+        let host = FixtureHost::from_yaml_str(
+            r"
+platform: windows
+antivirus_products:
+  - display_name: 'Antivirus Microsoft Defender'
+    state: 0
+    remediation_path: 'windowsdefender://threat'
+  - display_name: 'Example Antivirus'
+    state: 1
+",
+            "inline",
+        )
+        .unwrap();
+        assert_eq!(
+            host.antivirus_products(),
+            Ok(AntivirusList::Products(vec![
+                AntivirusProductRecord {
+                    display_name: "Antivirus Microsoft Defender".to_owned(),
+                    state: 0,
+                    remediation_path: "windowsdefender://threat".to_owned(),
+                },
+                AntivirusProductRecord {
+                    display_name: "Example Antivirus".to_owned(),
+                    state: 1,
+                    remediation_path: String::new(),
+                },
+            ]))
+        );
+    }
+
+    /// Every fixture block refuses a key no host reads, and an antivirus product does too.
+    #[test]
+    fn an_antivirus_product_with_an_unknown_field_is_rejected() {
+        let error = FixtureHost::from_yaml_str(
+            "platform: windows\nantivirus_products:\n  - display_name: 'Example Antivirus'\n    state: 0\n    bogus: true\n",
+            "inline",
+        )
+        .unwrap_err();
+        assert!(matches!(error, FixtureError::Parse { .. }), "{error}");
     }
 
     #[test]

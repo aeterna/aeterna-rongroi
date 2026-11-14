@@ -25,4 +25,4 @@ references:
   - https://learn.microsoft.com/en-us/windows/win32/services/service-installation
 author: aeterna-rongroi contributors
 date: 2026-09-20
-tags: [posture, os_image]
+tags: [posture, os_image, defender]

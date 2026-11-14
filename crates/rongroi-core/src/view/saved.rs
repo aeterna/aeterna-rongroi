@@ -3,7 +3,8 @@
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
 //! A saved report: the SS view as it was on screen, the device list, and the case code the player typed
-//! (ADR 0073).
+//! (ADR 0073), and — since schema 2 (ADR 0089 §2) — which program produced it and, under a paired server,
+//! the binding and policy it produced it under.
 //!
 //! The record is serialised once, by [`SavedRecord::to_bytes`], and everything after that — the digest staff
 //! note from the screen and the file the player saves — is taken from those bytes. Nothing here signs anything:
@@ -15,13 +16,16 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use super::{ReportView, SsOptions, for_mode_with};
+use crate::canonical::{self, CanonicalError};
 use crate::model::{EvidenceState, Mode, Observation, Report};
 
 /// The `kind` every saved record carries, which a reader checks before anything else.
 pub const SAVED_RECORD_KIND: &str = "rongroi-saved-report";
 
-/// The saved record's own format version. Additive changes keep it (ADR 0073, DMA plan Q-R3).
-pub const SAVED_RECORD_SCHEMA: u32 = 1;
+/// The saved record's own format version. Additive changes keep it (ADR 0073, DMA plan Q-R3): a
+/// reader that finds none of the schema 2 members still reads a schema 1 record, and ADR 0089 §2
+/// makes every record this program builds now a schema 2 one.
+pub const SAVED_RECORD_SCHEMA: u32 = 2;
 
 /// The collectors whose every observation the record carries, matched by a rule or not (ADR 0073 §1).
 pub const DEVICE_COLLECTORS: [&str; 2] = ["pci_device", "hid_device"];
@@ -99,7 +103,109 @@ pub struct SavedTimes {
     pub saved_at: String,
 }
 
-/// One saved report (ADR 0073 §1). Field order is the order of the bytes.
+/// Which program produced a record (ADR 0089 §1): the offline tool of this repository, or the
+/// single-shot client of `aeterna-rongroi-connect`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProducerName {
+    /// The offline desktop app and the CLI of this repository.
+    RongroiOffline,
+    /// The standalone single-shot client of `aeterna-rongroi-connect`.
+    RongroiConnect,
+}
+
+/// How the program that produced a record ran (ADR 0089 §2). The producer writes it about itself,
+/// so a staff screen shows it as "the report says".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProducerMode {
+    /// The Offline app, where the player navigates freely.
+    Interactive,
+    /// Connect: one case per run, with consent and a Send button.
+    SingleShot,
+}
+
+/// The program that produced a record (ADR 0089 §2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Producer {
+    /// Which program it was.
+    pub name: ProducerName,
+    /// That program's own version, as its provenance carries it.
+    pub version: String,
+    /// How it ran.
+    pub mode: ProducerMode,
+}
+
+/// How the record is tied to the case a Server Kit opened (ADR 0089 §2, §5). Present only when the
+/// record was produced for a paired server; the Offline app and the CLI have none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Binding {
+    /// The exact `scheme://host:port` origin the record may be sent to; absent when the client did
+    /// not send it. A copy the report states about itself — the server decides by its own record of
+    /// the ticket (ADR 0089 §2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_origin: Option<String>,
+    /// The single-use ticket Server Kit issued (ADR 0089 §5).
+    pub ticket: String,
+    /// The value the player's pairing code carried, copied through Connect; it ties the record to
+    /// the case, not the scan it recorded (ADR 0089 §2).
+    pub nonce: String,
+    /// When the ticket's lifetime began; absent when the client did not send it. A copy the report
+    /// states about itself — the server decides by its own record of the ticket (ADR 0089 §2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issued_at: Option<String>,
+    /// When the ticket's lifetime ends; absent when the client did not send it. A copy the report
+    /// states about itself — the server decides expiry by its own record of the ticket (ADR 0089
+    /// §2, §5).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+}
+
+/// Which named profile a policy came under (ADR 0089 §2). Each name fixes what
+/// `required_collectors` may hold; the record carries the list that ran either way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Profile {
+    /// The collectors behind the rules marked `posture` (ADR 0089 §2, Q18).
+    Posture,
+    /// The same collectors the Offline app runs in a full scan of this `rongroi_version`.
+    Standard,
+    /// A list the server picked from what this `rongroi_version` knows.
+    Custom,
+}
+
+/// The policy a Server Kit issued for the scan (ADR 0089 §2, §5). Present only under a paired
+/// server; the Offline app grants its own scope and has none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Policy {
+    /// Which profile named what the server may require.
+    pub profile: Profile,
+    /// The collector IDs the server asked for and the player consented to.
+    pub required_collectors: Vec<String>,
+    /// Whether administrator elevation was required.
+    pub require_elevation: bool,
+    /// The name shown on the consent screen; inside the policy so
+    /// [`crate::canonical::policy_hash`] covers it (ADR 0089 §2).
+    pub server_name: String,
+    /// The digest the pairing code carried, of the policy without this member
+    /// ([`crate::canonical::policy_hash`]); Connect refuses a policy whose digest differs
+    /// (ADR 0089 §5).
+    pub policy_hash: String,
+}
+
+/// Why a saved record could not be built.
+#[derive(Debug, thiserror::Error)]
+pub enum SavedRecordError {
+    /// The record could not be serialised to JSON, to make its `visual_hash` from.
+    #[error("the saved record could not be serialised: {0}")]
+    Serialization(#[from] serde_json::Error),
+    /// The serialised record could not be canonicalised for its `visual_hash` (ADR 0089 §2): a bug
+    /// in the record model, which is meant to hold no fractional number.
+    #[error("the saved record could not be canonicalised: {0}")]
+    Canonicalisation(#[from] CanonicalError),
+}
+
+/// One saved report (ADR 0073 §1, ADR 0089 §2). Field order is the order of the bytes.
 #[derive(Debug, Clone, Serialize)]
 pub struct SavedRecord {
     /// Always [`SAVED_RECORD_KIND`].
@@ -113,6 +219,16 @@ pub struct SavedRecord {
     pub rongroi_version: String,
     /// Whether this is an official build (ADR 0007), from the header's provenance.
     pub official_build: bool,
+    /// Which program produced this record and how (ADR 0089 §2).
+    pub producer: Producer,
+    /// The case this record was produced for, when it was (ADR 0089 §2). Absent from an Offline
+    /// record, which the player did not make for one case.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binding: Option<Binding>,
+    /// The policy the scan ran under, when it was produced under one (ADR 0089 §2). Absent from an
+    /// Offline record, which runs its own scope.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy: Option<Policy>,
     /// The header's `generated_at`, taken just before the scan started.
     pub scan_started_at: String,
     /// When the scan returned.
@@ -123,6 +239,10 @@ pub struct SavedRecord {
     pub view: ReportView,
     /// Every observation of [`DEVICE_COLLECTORS`], matched by a rule or not, each once.
     pub devices: Vec<Observation>,
+    /// The record as [`crate::canonical::visual_hash`] makes it: the first 8 bytes of `SHA-256`
+    /// over the record without this member (ADR 0089 §2). Built last, after every other member —
+    /// it covers them and never itself.
+    pub visual_hash: String,
 }
 
 impl SavedRecord {
@@ -148,25 +268,48 @@ pub fn digest(bytes: &[u8]) -> String {
 }
 
 /// Builds the record of `report` as SS mode shows it with `options` (ADR 0073). Never the Self view.
+///
+/// `producer` says which program built it and how; `binding` and `policy` say under which case and
+/// policy, and are `None` for the Offline app and the CLI, which run themselves (ADR 0089 §2). The
+/// `visual_hash` is [`crate::canonical::visual_hash`] over the record as it is serialised here,
+/// computed after every other member is set (ADR 0089 §2).
+///
+/// # Errors
+///
+/// [`SavedRecordError`] when the record could not be serialised or canonicalised, which is a bug in
+/// the record model — it holds no fractional number — rather than something the player could change.
 pub fn saved_record(
     report: &Report,
     options: SsOptions,
     case_code: Option<String>,
+    producer: Producer,
+    binding: Option<Binding>,
+    policy: Option<Policy>,
     times: SavedTimes,
-) -> SavedRecord {
+) -> Result<SavedRecord, SavedRecordError> {
     let provenance = &report.header.provenance;
-    SavedRecord {
+    let mut record = SavedRecord {
         kind: SAVED_RECORD_KIND,
         schema: SAVED_RECORD_SCHEMA,
         case_code,
         rongroi_version: provenance.version.clone(),
         official_build: provenance.official,
+        producer,
+        binding,
+        policy,
         scan_started_at: report.header.generated_at.clone(),
         scan_finished_at: times.scan_finished_at,
         saved_at: times.saved_at,
         view: for_mode_with(report, Mode::Ss, options),
         devices: devices(report),
-    }
+        // Replaced below, from the record as it will be serialised. The value the empty member
+        // serialises to matters not: `canonical::visual_hash` removes the member before hashing
+        // (ADR 0089 §2), so a real value is only ever written afterwards.
+        visual_hash: String::new(),
+    };
+    let value = serde_json::to_value(&record)?;
+    record.visual_hash = canonical::visual_hash(&value)?;
+    Ok(record)
 }
 
 /// Every device observation the report holds, from matched evidence first and then the unmatched groups,
@@ -233,10 +376,92 @@ mod tests {
     }
 
     #[test]
+    fn the_schema_2_enums_are_serialised_with_the_names_adr_0089_gives_them() {
+        let spelled = [
+            serde_json::to_string(&ProducerName::RongroiOffline).unwrap(),
+            serde_json::to_string(&ProducerName::RongroiConnect).unwrap(),
+            serde_json::to_string(&ProducerMode::Interactive).unwrap(),
+            serde_json::to_string(&ProducerMode::SingleShot).unwrap(),
+            serde_json::to_string(&Profile::Posture).unwrap(),
+            serde_json::to_string(&Profile::Standard).unwrap(),
+            serde_json::to_string(&Profile::Custom).unwrap(),
+        ];
+        assert_eq!(
+            spelled,
+            [
+                "\"rongroi-offline\"",
+                "\"rongroi-connect\"",
+                "\"interactive\"",
+                "\"single-shot\"",
+                "\"posture\"",
+                "\"standard\"",
+                "\"custom\"",
+            ]
+        );
+    }
+
+    #[test]
     fn the_digest_is_sha256_in_lowercase_hex() {
         assert_eq!(
             digest(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn a_binding_with_only_ticket_and_nonce_serializes_to_those_two_members() {
+        let binding = Binding {
+            server_origin: None,
+            ticket: "9f82c4e1b07a412891d604e38a291bf0".to_owned(),
+            nonce: "c4b82e91024a".to_owned(),
+            issued_at: None,
+            expires_at: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&binding).unwrap(),
+            serde_json::json!({
+                "ticket": "9f82c4e1b07a412891d604e38a291bf0",
+                "nonce": "c4b82e91024a",
+            })
+        );
+    }
+
+    #[test]
+    fn a_binding_without_the_copied_members_changes_the_visual_hash() {
+        let minimal = Binding {
+            server_origin: None,
+            ticket: "9f82c4e1b07a412891d604e38a291bf0".to_owned(),
+            nonce: "c4b82e91024a".to_owned(),
+            issued_at: None,
+            expires_at: None,
+        };
+        let full = Binding {
+            server_origin: Some("http://203.0.113.10:30130".to_owned()),
+            ticket: "9f82c4e1b07a412891d604e38a291bf0".to_owned(),
+            nonce: "c4b82e91024a".to_owned(),
+            issued_at: Some("2026-10-31T14:30:00Z".to_owned()),
+            expires_at: Some("2026-10-31T14:35:00Z".to_owned()),
+        };
+        assert_eq!(
+            serde_json::to_value(&full).unwrap(),
+            serde_json::json!({
+                "server_origin": "http://203.0.113.10:30130",
+                "ticket": "9f82c4e1b07a412891d604e38a291bf0",
+                "nonce": "c4b82e91024a",
+                "issued_at": "2026-10-31T14:30:00Z",
+                "expires_at": "2026-10-31T14:35:00Z",
+            })
+        );
+        let record = |binding: &Binding| {
+            serde_json::json!({
+                "kind": SAVED_RECORD_KIND,
+                "schema": SAVED_RECORD_SCHEMA,
+                "binding": binding,
+            })
+        };
+        assert_ne!(
+            canonical::visual_hash(&record(&minimal)).unwrap(),
+            canonical::visual_hash(&record(&full)).unwrap()
         );
     }
 }

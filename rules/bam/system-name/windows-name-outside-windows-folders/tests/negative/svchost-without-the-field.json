@@ -1,0 +1,26 @@
+{
+  "description": "BAM recorded execution of a svchost.exe, a name in the table, with no system_name_elsewhere field: the rule has no value to match",
+  "observations": [
+    {
+      "collector": "bam",
+      "fields": {
+        "last_run": "2026-10-15T10:00:00Z",
+        "moderation_state": 0,
+        "name": "svchost.exe",
+        "path": "C:\\ProgramData\\x\\svchost.exe",
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "entries": 1,
+        "intact": true,
+        "metadata_values": 2,
+        "rejected": 0,
+        "sid_withheld": "per_user_identifier",
+        "users": 1
+      }
+    }
+  ]
+}

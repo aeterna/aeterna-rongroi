@@ -42,6 +42,7 @@
     "not_attempted": "this was not read — the scan did not open it",
     "access_denied": "Windows refused to open this",
     "service_disabled": "the Windows service that writes this record is switched off",
+    "service_not_running": "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it",
     "source_absent": "this PC has no such record to read",
     "source_empty": "the place this is kept is there and holds nothing",
     "partial": "part of this was read and part of it was not",
@@ -102,6 +103,7 @@
     "posture": "Security settings of this PC",
     "powershell_text": "PowerShell's commands, as kinds of words",
     "driver_service": "Drivers registered with Windows",
+    "antivirus_product": "Antivirus products Windows lists",
     "autostart": "Programs that start by themselves (services, Run, scheduled tasks)",
     "defender_exclusion": "Microsoft Defender exclusions",
     "fivem_dir": "FiveM files",
@@ -288,6 +290,20 @@
       "clock": "a clock that was changed, so that times from different sources are not on the same clock"
     }
   },
+  "antivirus": {
+    "title": "Antivirus products Windows Security Center lists",
+    "state": {
+      "on": "reports itself on",
+      "off": "reports itself off",
+      "snoozed": "reports itself snoozed",
+      "expired": "reports itself expired",
+      "other": "reports a state this program does not name ({{value}})"
+    },
+    "file_unread": "its file was not read ({{reason}})",
+    "none": "Security Center lists no antivirus product.",
+    "not_read": "The list could not be read: {{reason}}.",
+    "caveat": "A product listed here is what is registered with Windows, not proof that it scans."
+  },
   "session": {
     "title": "FiveM for GTA V {{edition}}: its last session, beside its own folders",
     "edition": {
@@ -368,6 +384,7 @@
   "saved": {
     "label": "Saved report",
     "case_code": "Case code:",
+    "visual_hash": "Visual check code",
     "digest": "Report SHA-256 — staff, note these 16:",
     "note": "This is the SHA-256 of the file Save writes: the view on this screen, the device list and the case code. A file whose SHA-256 starts the same is this report. It does not prove the screen was honest.",
     "button": "Save this report",

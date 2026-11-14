@@ -18,11 +18,13 @@ retention: Current setting only. It says nothing about how the PC was configured
 # `access_denied` removed (ADR 0057, amending ADR 0056): a limited-token measurement on 2026-09-21 read every value this rule needs, so a refusal is a machine nobody anticipated and belongs in front of a reviewer rather than in the scope line.
 unmeasured_when: [not_windows, source_absent]
 falsepositives:
-  - Any third-party antivirus, which disables Defender's service when it installs itself
+  - Any third-party antivirus, which disables Defender's service when it installs itself. The report's
+    antivirus list shows what Security Center lists; a product listed there is a fact about what is
+    registered, not proof that it scans.
   - A PC managed by an employer or a school whose policy turns Defender off
   - A tweaking script or a pre-modified Windows image the owner installed for performance
 references:
   - https://learn.microsoft.com/en-us/windows/win32/services/service-installation
 author: aeterna-rongroi contributors
 date: 2026-09-20
-tags: [posture, os_image]
+tags: [posture, os_image, defender]

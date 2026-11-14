@@ -18,9 +18,9 @@ pub use game::{
     TimeFact, WINDOW_SECONDS, WindowCounts, game_windows,
 };
 pub use saved::{
-    CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA,
-    SHOWN_DIGEST_LEN, SavedRecord, SavedTimes, canonical_case_code, digest, saved_record,
-    shown_case_code,
+    Binding, CASE_CODE_LEN, CaseCodeError, DEVICE_COLLECTORS, Policy, Producer, ProducerMode,
+    ProducerName, Profile, SAVED_RECORD_KIND, SAVED_RECORD_SCHEMA, SHOWN_DIGEST_LEN, SavedRecord,
+    SavedRecordError, SavedTimes, canonical_case_code, digest, saved_record, shown_case_code,
 };
 pub use session::{
     AnchorName, Comparison, Duration, DurationUnit, IndexBeside, LineState, Relation, SessionEnd,
@@ -36,7 +36,7 @@ use crate::model::{
 /// The order collectors are shown in, by both front ends: the rows of one collector together, and
 /// entries of the timeline that carry the same time (ADR 0045, ADR 0051). A collector not named here
 /// follows the named ones.
-pub const COLLECTOR_ORDER: [&str; 20] = [
+pub const COLLECTOR_ORDER: [&str; 21] = [
     "posture",
     "driver_service",
     "windows_start",
@@ -45,6 +45,7 @@ pub const COLLECTOR_ORDER: [&str; 20] = [
     "hid_device",
     "autostart",
     "defender_exclusion",
+    "antivirus_product",
     "fivem_dir",
     "fivem_servers",
     "net_config",
@@ -133,7 +134,9 @@ pub struct HiddenCounts {
     /// Rules that could not look for a reason the rule did not name. SS mode lists such a result,
     /// so the only ones counted here are the `not_admin` results the scope statement carries.
     pub unmeasured_unexpected: usize,
-    /// Unmatched observations. SS mode counts them instead of listing them (ADR 0014).
+    /// Unmatched observations. SS mode counts them instead of listing them (ADR 0014), except
+    /// `antivirus_product`, whose rows never change a count whether or not its statement shows
+    /// (ADR 0090 section 5, hard rule 9).
     pub unmatched: usize,
 }
 
@@ -234,7 +237,8 @@ pub struct ReportView {
     pub trace_ages: TraceAges,
     /// `FiveM`'s side beside Windows' records of programs that ran, when the readable sources reach
     /// back to `FiveM`'s last write (ADR 0061), at most one; then each edition's last session beside its
-    /// own folders (ADR 0062), at most one per edition. Not evidence and never counted. Additive.
+    /// own folders (ADR 0062), at most one per edition; then the antivirus products Windows lists
+    /// (ADR 0090 section 5). Not evidence and never counted. Additive.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cross_source: Vec<CrossSourceStatement>,
     /// The programs Windows recorded near the latest `FiveM` session, beside the ADR 0061 statement
@@ -282,6 +286,12 @@ pub enum EntrySource {
     Selector {
         /// The timeline selector, for its text and ordinary causes.
         selector_id: String,
+    },
+    /// The end of an edition's latest session, where BAM recorded it (ADR 0062 section 5). Not an
+    /// anchor: it is the session's own time, and the scan's times are left as they were.
+    SessionEnd {
+        /// `legacy` or `enhanced`.
+        edition: String,
     },
     /// An unmatched observation. Self mode only.
     Observation,
@@ -365,10 +375,10 @@ fn scope_notes(report: &Report) -> ScopeNotes {
 ///
 /// - `not_admin` and `not_attempted` are never a row. Each is one fact about the **scan** that
 ///   applies to every rule it stopped, and each is stated once in [`ScopeNotes`].
-/// - `partial`, `budget_spent` and `read_failed` are always a row, declared or not. Each says the
-///   artifact was reachable and that the read of it did not finish, which is not something a rule
-///   author could have anticipated about the machine and so is not theirs to declare away
-///   (ADR 0030, ADR 0032).
+/// - `partial`, `budget_spent`, `read_failed` and `service_not_running` are always a row, declared or
+///   not. Each says the artifact was reachable and that the read of it did not finish, which is not
+///   something a rule author could have anticipated about the machine and so is not theirs to
+///   declare away (ADR 0030, ADR 0032, ADR 0090).
 fn ss_lists(item: &Evidence) -> bool {
     match &item.state {
         EvidenceState::Found { .. } => true,
@@ -455,7 +465,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             collector_order: collector_order(),
             row_bands: row_bands(report, &report.evidence),
             trace_ages: trace_ages_of(report, mode),
-            cross_source: cross_source_of(report),
+            cross_source: cross_source_of(report, mode),
             game_windows: game_windows_of(report, mode),
         },
         Mode::Ss => {
@@ -485,9 +495,12 @@ fn build(report: &Report, mode: Mode) -> ReportView {
             // Counted, never listed. SS mode promises the person being screenshared that only what
             // matches a rule is shown; a raw listing of every file and process name a collector saw
             // would break that promise, and no redaction pass makes such a listing safe (ADR 0014).
+            // The antivirus products stay out of the count whether or not their statement shows, so
+            // that what is registered never changes a count (ADR 0090 section 5, hard rule 9).
             hidden.unmatched = report
                 .unmatched
                 .iter()
+                .filter(|group| group.collector != "antivirus_product")
                 .map(|group| group.observations.len())
                 .sum();
             let listed = listed_counts(&evidence);
@@ -509,7 +522,7 @@ fn build(report: &Report, mode: Mode) -> ReportView {
                 collector_order: collector_order(),
                 row_bands,
                 trace_ages: trace_ages_of(report, mode),
-                cross_source: cross_source_of(report),
+                cross_source: cross_source_of(report, mode),
                 game_windows: game_windows_of(report, mode),
             }
         }
@@ -633,9 +646,10 @@ pub struct FoldedLogs {
     pub not_read: u64,
 }
 
-/// Facts from different collectors printed together (ADR 0061 section 3, amended by ADR 0062 section 1)
-/// — not evidence: no state, no rule, no strength, never counted. There is at most one of the first
-/// kind and at most one session statement per edition; `kind` tells them apart.
+/// Facts from different collectors printed together (ADR 0061 section 3, amended by ADR 0062 section 1
+/// and ADR 0090 section 5) — not evidence: no state, no rule, no strength, never counted. There is at
+/// most one of the first kind, at most one session statement per edition and at most one antivirus
+/// statement; `kind` tells them apart.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CrossSourceStatement {
@@ -643,6 +657,43 @@ pub enum CrossSourceStatement {
     FivemAndRecords(RecordsStatement),
     /// One edition's last session beside its own folders (ADR 0062).
     Session(SessionStatement),
+    /// The antivirus products Windows Security Center lists (ADR 0090 section 5).
+    Antivirus(AntivirusStatement),
+}
+
+/// The antivirus products Windows Security Center lists, or why the list could not be read
+/// (ADR 0090 section 5).
+///
+/// Not evidence: no state, no rule id, never counted. It carries no path and no hash. A list that was
+/// read and held no product is the statement "lists none", with no [`Self::not_read`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AntivirusStatement {
+    /// The products Windows lists, in observation order.
+    pub products: Vec<AntivirusLine>,
+    /// Why the list could not be read; absent when it was read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub not_read: Option<UnmeasuredReason>,
+}
+
+/// One product Windows Security Center lists (ADR 0090 section 5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AntivirusLine {
+    /// The name the registering program gave.
+    pub display_name: String,
+    /// `on`, `off`, `snoozed`, `expired` or `other`.
+    pub state: String,
+    /// The raw state number, only when `state` is `other`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_value: Option<i64>,
+    /// The file's signature fact, when it was read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// The file's signer, when it was read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer: Option<String>,
+    /// Why the file was not opened or not fully read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_unread: Option<String>,
 }
 
 /// `FiveM`'s side beside Windows' records of programs that ran (ADR 0061, section 3).
@@ -747,11 +798,14 @@ pub fn trace_ages(report: &Report, mode: Mode) -> TraceAges {
     trace_ages_of(report, mode)
 }
 
-/// The cross-source statements: ADR 0061's, when its conditions hold, and one session statement per
-/// edition (ADR 0062). The same in both modes: they hold no path, no file name, no user name and no
-/// server name.
-pub fn cross_source(report: &Report, _mode: Mode) -> Vec<CrossSourceStatement> {
-    cross_source_of(report)
+/// The cross-source statements `mode` may show: ADR 0061's, when its conditions hold, one session
+/// statement per edition (ADR 0062), and ADR 0090's antivirus statement when the mode shows it.
+///
+/// The first two are the same in both modes: they hold no path, no file name, no user name and no
+/// server name. Self mode shows the antivirus statement always; SS mode shows it only beside a row
+/// the view lists from a rule tagged `defender`, and neither it nor its observations is counted.
+pub fn cross_source(report: &Report, mode: Mode) -> Vec<CrossSourceStatement> {
+    cross_source_of(report, mode)
 }
 
 /// Every observation of `collector` a trace age is read from — what a rule matched and what none did —
@@ -1170,15 +1224,131 @@ fn measure(
 }
 
 /// ADR 0061's statement, when its conditions hold, then one session statement per edition that has one
-/// (ADR 0062).
-fn cross_source_of(report: &Report) -> Vec<CrossSourceStatement> {
+/// (ADR 0062), then ADR 0090's antivirus statement when `mode` may show it.
+fn cross_source_of(report: &Report, mode: Mode) -> Vec<CrossSourceStatement> {
     let mut statements = records_statement(report);
     statements.extend(
         session::sessions(report)
             .into_iter()
             .map(CrossSourceStatement::Session),
     );
+    if let Some(statement) = antivirus_statement(report, mode) {
+        statements.push(CrossSourceStatement::Antivirus(statement));
+    }
     statements
+}
+
+/// ADR 0090's statement, when `mode` may show it and the report holds an answer: a list read with
+/// its products, or the reason it could not be read. `not_windows` and `not_on_this_os` are the two
+/// reasons the statement does not exist at all.
+fn antivirus_statement(report: &Report, mode: Mode) -> Option<AntivirusStatement> {
+    if mode == Mode::Ss && !lists_defender_row(report) {
+        return None;
+    }
+    if let Some(reason) = antivirus_unmeasured(report) {
+        return match reason {
+            UnmeasuredReason::NotWindows | UnmeasuredReason::NotOnThisOs => None,
+            reason => Some(AntivirusStatement {
+                products: Vec::new(),
+                not_read: Some(reason),
+            }),
+        };
+    }
+    let observations = observations_of(report, "antivirus_product");
+    if observations.is_empty() {
+        return None;
+    }
+    let text = |observation: &Observation, field: &str| {
+        observation
+            .fields
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+    };
+    let products = observations
+        .iter()
+        .filter_map(|observation| {
+            // The summary row names no product; everything else is one product.
+            let display_name = shown_display_name(&text(observation, "display_name")?);
+            Some(AntivirusLine {
+                display_name,
+                state: text(observation, "state").unwrap_or_default(),
+                state_value: observation
+                    .fields
+                    .get("state_value")
+                    .and_then(serde_json::Value::as_i64),
+                signature: text(observation, "signature"),
+                signer: text(observation, "signer"),
+                file_unread: text(observation, "file_unread"),
+            })
+        })
+        .collect();
+    Some(AntivirusStatement {
+        products,
+        not_read: None,
+    })
+}
+
+/// A product's registered name, safe to show: every control or format character becomes U+FFFD, then
+/// the name is cut to 128 characters with `…` when it was longer. A newline or a bidi override there
+/// could forge a line or reorder what a reader sees, and the registering program chooses the name.
+fn shown_display_name(name: &str) -> String {
+    let mut shown: String = name
+        .chars()
+        .map(|character| {
+            if character.is_control() || is_format_character(character) {
+                '\u{FFFD}'
+            } else {
+                character
+            }
+        })
+        .collect();
+    if shown.chars().count() > 128 {
+        shown = shown.chars().take(128).collect();
+        shown.push('…');
+    }
+    shown
+}
+
+/// The format characters a registered name must not keep: the invisible ones that can reorder or
+/// join text.
+fn is_format_character(character: char) -> bool {
+    matches!(
+        character,
+        '\u{00AD}'
+            | '\u{061C}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{FEFF}'
+    )
+}
+
+/// Why the antivirus list could not be read, from the evidence row of the rule that reads it.
+///
+/// A real scan fills `unmeasured_sources` only for collectors with timestamp fields, so the reason is
+/// not there for `antivirus_product`; the engine leaves it on the rule's evidence instead (ADR 0090
+/// section 5).
+fn antivirus_unmeasured(report: &Report) -> Option<UnmeasuredReason> {
+    report.evidence.iter().find_map(|item| {
+        if item.collector != "antivirus_product" {
+            return None;
+        }
+        match item.state {
+            EvidenceState::Unmeasured { reason, .. } => Some(reason),
+            _ => None,
+        }
+    })
+}
+
+/// Whether an SS view lists a row of a rule tagged `defender` (ADR 0090 section 5), by the same
+/// filter that decides every other row.
+fn lists_defender_row(report: &Report) -> bool {
+    report
+        .evidence
+        .iter()
+        .any(|item| report.defender_rules.contains(&item.rule_id) && ss_lists(item))
 }
 
 fn records_statement(report: &Report) -> Vec<CrossSourceStatement> {
@@ -1430,6 +1600,7 @@ fn timeline_of(report: &Report, mode: Mode) -> Timeline {
             });
         }
     }
+    entries.extend(bam_session_end_entries(report, redact));
     // Stable: entries with one time and one collector keep the order they were reached in.
     entries.sort_by_cached_key(|entry| {
         (
@@ -1443,6 +1614,38 @@ fn timeline_of(report: &Report, mode: Mode) -> Timeline {
         bands: bands(report, redact),
         unmeasured: report.unmeasured_sources.clone(),
     }
+}
+
+/// One entry per edition whose latest session BAM ended (ADR 0062 section 5), at BAM's time as the
+/// report holds it. The session logic picks the observation; the timeline only shows it. Read only
+/// where the report declares BAM's time field, as every other time is.
+fn bam_session_end_entries(
+    report: &Report,
+    redact: impl Fn(String) -> String,
+) -> Vec<TimelineEntry> {
+    let declared = report
+        .timestamp_fields
+        .get("bam")
+        .is_some_and(|fields| fields.iter().any(|field| field == session::LAST_RUN_FIELD));
+    if !declared {
+        return Vec::new();
+    }
+    session::bam_session_ends(report)
+        .into_iter()
+        .filter_map(|(edition, observation)| {
+            let at = time_of(observation, session::LAST_RUN_FIELD)?;
+            Some(TimelineEntry {
+                at: at.to_owned(),
+                collector: Some(observation.collector.clone()),
+                field: session::LAST_RUN_FIELD.to_owned(),
+                place: place_of(report, observation).map(&redact),
+                source: EntrySource::SessionEnd {
+                    edition: edition.to_owned(),
+                },
+                subject: subject_of(observation).map(&redact),
+            })
+        })
+        .collect()
 }
 
 /// Every observation `mode` may take times from, with where it came from, in the order that decides
@@ -1875,7 +2078,7 @@ mod tests {
 
     use super::*;
     use crate::bundle::BundleInfo;
-    use crate::model::{Observation, UnmatchedGroup, UnmeasuredReason};
+    use crate::model::{CollectorRun, Observation, UnmatchedGroup, UnmeasuredReason};
     use crate::provenance::Provenance;
 
     const USER: &str = "fixtureuser";
@@ -2437,6 +2640,7 @@ mod tests {
             sensitive_fields: BTreeMap::new(),
             age_fields: BTreeMap::new(),
             timeline_selectors: BTreeMap::new(),
+            defender_rules: Vec::new(),
         }
     }
 
@@ -2750,6 +2954,7 @@ mod tests {
             R::NotAttempted,
             R::AccessDenied,
             R::ServiceDisabled,
+            R::ServiceNotRunning,
             R::SourceAbsent,
             R::SourceEmpty,
             R::Partial,
@@ -2773,7 +2978,10 @@ mod tests {
             );
             assert_eq!(
                 listed,
-                matches!(reason, R::Partial | R::BudgetSpent | R::ReadFailed),
+                matches!(
+                    reason,
+                    R::Partial | R::BudgetSpent | R::ReadFailed | R::ServiceNotRunning
+                ),
                 "{}",
                 reason.as_str()
             );
@@ -3013,6 +3221,249 @@ mod tests {
                 .all(|entry| entry.source == EntrySource::Anchor),
             "{timeline:?}"
         );
+    }
+
+    // ---- ADR 0062 section 5 on the timeline: where a session ended ----
+    //
+    // A session's end that BAM recorded is one entry per edition, not an anchor. The session helpers
+    // (`session_report`, `prefetch_runs`, `bam_end`, `run`) are defined with the session tests below.
+
+    /// The session-end entries of `timeline`, each in its serialised form. Read this way the tests
+    /// build on the current `EntrySource`, and fail on its missing variant rather than on a compile.
+    fn session_end_entries(timeline: &Timeline) -> Vec<serde_json::Value> {
+        timeline
+            .entries
+            .iter()
+            .filter_map(|entry| serde_json::to_value(entry).ok())
+            .filter(|entry| entry["source"]["kind"] == "session_end")
+            .collect()
+    }
+
+    /// `report` with the time fields the real report declares for Prefetch and BAM: the timeline reads
+    /// a source's times only through what the report declares.
+    fn with_declared_session_times(mut report: Report) -> Report {
+        report.timestamp_fields = BTreeMap::from([
+            ("prefetch".to_owned(), vec!["last_run".to_owned()]),
+            ("bam".to_owned(), vec!["last_run".to_owned()]),
+        ]);
+        report
+    }
+
+    /// A Legacy session that BAM ended: one session-end entry, at BAM's time exactly as the report holds
+    /// it, from BAM, with its edition — in Self mode and in SS mode alike.
+    #[test]
+    fn a_session_bam_ended_is_one_timeline_entry_for_its_edition_in_both_modes() {
+        let report = with_declared_session_times(session_report(
+            vec![
+                prefetch_runs("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+                // Fractional seconds: the entry must keep the report's text, not a re-formatted time.
+                bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00.250Z"),
+            ],
+            &[],
+        ));
+        let sessions = sessions_of(&report);
+        let (_, end, _, _, _) = known(&sessions[0]);
+        // The session statement holds BAM's time to the second; the entry keeps the report's text.
+        assert_eq!(
+            *end,
+            SessionEnd::Bam {
+                at: "2026-01-10T10:30:00Z".to_owned()
+            }
+        );
+        for (label, mode) in [("self", Mode::SelfCheck), ("ss", Mode::Ss)] {
+            let ends = session_end_entries(&timeline(&report, mode));
+            assert_eq!(ends.len(), 1, "{label}: {ends:?}");
+            assert_eq!(ends[0]["at"], "2026-01-10T10:30:00.250Z", "{label}");
+            assert_eq!(ends[0]["collector"], "bam", "{label}");
+            assert_eq!(
+                ends[0]["source"],
+                serde_json::json!({"kind": "session_end", "edition": "legacy"}),
+                "{label}"
+            );
+        }
+    }
+
+    /// A session whose end is not BAM's time — still running, not recorded, not read — and no session
+    /// at all, has no session-end entry in either mode. Each case first checks the state the session
+    /// really holds, so the empty timeline is not an empty fixture.
+    #[test]
+    fn a_session_end_that_is_not_bams_time_has_no_timeline_entry() {
+        let cases: Vec<(&str, Report, Option<SessionEnd>)> = vec![
+            (
+                "still running",
+                session_report(
+                    vec![
+                        run(
+                            "process",
+                            "FiveM.exe",
+                            "legacy",
+                            "started_at",
+                            "2026-01-10T10:00:00Z",
+                        ),
+                        bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00Z"),
+                    ],
+                    &[],
+                ),
+                Some(SessionEnd::StillRunning),
+            ),
+            (
+                "BAM's time is before the start",
+                session_report(
+                    vec![
+                        prefetch_runs("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+                        bam_end("FiveM.exe", "legacy", "2026-01-10T09:00:00Z"),
+                    ],
+                    &[],
+                ),
+                Some(SessionEnd::NotRecorded),
+            ),
+            (
+                "BAM read and holding no time for the edition",
+                session_report(
+                    vec![prefetch_runs(
+                        "FiveM.exe",
+                        Some("legacy"),
+                        &["2026-01-10T10:00:00Z"],
+                    )],
+                    &[],
+                ),
+                Some(SessionEnd::NotRecorded),
+            ),
+            (
+                "BAM not read",
+                session_report(
+                    vec![prefetch_runs(
+                        "FiveM.exe",
+                        Some("legacy"),
+                        &["2026-01-10T10:00:00Z"],
+                    )],
+                    &[("bam", UnmeasuredReason::NotAdmin)],
+                ),
+                Some(SessionEnd::NotRead {
+                    reason: UnmeasuredReason::NotAdmin,
+                }),
+            ),
+            ("no session", session_report(Vec::new(), &[]), None),
+        ];
+        for (label, report, expected) in cases {
+            let report = with_declared_session_times(report);
+            let sessions = sessions_of(&report);
+            match expected {
+                Some(end) => {
+                    let [session] = sessions.as_slice() else {
+                        panic!("{label}: {sessions:?}");
+                    };
+                    assert_eq!(*known(session).1, end, "{label}");
+                }
+                None => assert!(sessions.is_empty(), "{label}: {sessions:?}"),
+            }
+            for mode in [Mode::SelfCheck, Mode::Ss] {
+                let ends = session_end_entries(&timeline(&report, mode));
+                assert!(ends.is_empty(), "{label}: {ends:?}");
+            }
+        }
+    }
+
+    /// Each edition whose session BAM ended gets its own entry, in time order, with its own edition.
+    #[test]
+    fn each_edition_with_a_bam_end_gets_its_own_entry() {
+        let report = with_declared_session_times(session_report(
+            vec![
+                prefetch_runs("FiveM.exe", Some("legacy"), &["2026-01-10T10:00:00Z"]),
+                bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00Z"),
+                prefetch_runs("FiveM.exe", Some("enhanced"), &["2026-01-10T11:00:00Z"]),
+                bam_end("FiveM.exe", "enhanced", "2026-01-10T11:20:00Z"),
+            ],
+            &[],
+        ));
+        let sessions = sessions_of(&report);
+        let [legacy, enhanced] = sessions.as_slice() else {
+            panic!("{sessions:?}");
+        };
+        assert_eq!(
+            *known(legacy).1,
+            SessionEnd::Bam {
+                at: "2026-01-10T10:30:00Z".to_owned()
+            }
+        );
+        assert_eq!(
+            *known(enhanced).1,
+            SessionEnd::Bam {
+                at: "2026-01-10T11:20:00Z".to_owned()
+            }
+        );
+        for (label, mode) in [("self", Mode::SelfCheck), ("ss", Mode::Ss)] {
+            let ends = session_end_entries(&timeline(&report, mode));
+            assert!(
+                ends.iter().all(|end| end["collector"] == "bam"),
+                "{label}: {ends:?}"
+            );
+            let got: Vec<(&str, serde_json::Value)> = ends
+                .iter()
+                .map(|end| {
+                    (
+                        end["at"].as_str().unwrap_or_default(),
+                        end["source"].clone(),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                got,
+                vec![
+                    (
+                        "2026-01-10T10:30:00Z",
+                        serde_json::json!({"kind": "session_end", "edition": "legacy"}),
+                    ),
+                    (
+                        "2026-01-10T11:20:00Z",
+                        serde_json::json!({"kind": "session_end", "edition": "enhanced"}),
+                    ),
+                ],
+                "{label}"
+            );
+        }
+    }
+
+    /// Beside a session end the scan's own times stay what they were: one `generated_at` and one
+    /// `boot_time`, both anchors, and the session end is a further entry, not a third anchor.
+    #[test]
+    fn a_session_end_is_added_beside_the_scans_own_anchors_which_stay_as_they_were() {
+        let mut report = aged_report();
+        report.header.boot_time = crate::model::BootTime::Measured {
+            booted_at: "2026-01-09T08:00:00Z".to_owned(),
+            seconds_since_boot: 100_800,
+        };
+        report.unmatched.push(UnmatchedGroup {
+            collector: "prefetch".to_owned(),
+            observations: vec![prefetch_runs(
+                "FiveM.exe",
+                Some("legacy"),
+                &["2026-01-10T10:00:00Z"],
+            )],
+        });
+        report.unmatched.push(UnmatchedGroup {
+            collector: "bam".to_owned(),
+            observations: vec![bam_end("FiveM.exe", "legacy", "2026-01-10T10:30:00Z")],
+        });
+        let report = with_declared_session_times(report);
+        for (label, mode) in [("self", Mode::SelfCheck), ("ss", Mode::Ss)] {
+            let timeline = timeline(&report, mode);
+            let anchors: Vec<(&str, &str)> = timeline
+                .entries
+                .iter()
+                .filter(|entry| entry.source == EntrySource::Anchor)
+                .map(|entry| (entry.field.as_str(), entry.at.as_str()))
+                .collect();
+            // In time order: Windows started before this scan ran.
+            assert_eq!(
+                anchors,
+                vec![
+                    ("boot_time", "2026-01-09T08:00:00Z"),
+                    ("generated_at", "2026-01-10T12:00:00Z"),
+                ]
+            );
+            assert_eq!(session_end_entries(&timeline).len(), 1, "{label}");
+        }
     }
 
     /// A band scoped to one place is read only from the observation about that place.
@@ -3866,13 +4317,14 @@ mod tests {
             .observations
     }
 
-    /// ADR 0061's statements among the cross-source statements, leaving out the session statements.
+    /// ADR 0061's statements among the cross-source statements, leaving out the session and antivirus
+    /// statements.
     fn records(report: &Report) -> Vec<RecordsStatement> {
         cross_source(report, Mode::SelfCheck)
             .into_iter()
             .filter_map(|statement| match statement {
                 CrossSourceStatement::FivemAndRecords(statement) => Some(statement),
-                CrossSourceStatement::Session(_) => None,
+                CrossSourceStatement::Session(_) | CrossSourceStatement::Antivirus(_) => None,
             })
             .collect()
     }
@@ -4051,6 +4503,503 @@ mod tests {
         }
     }
 
+    // ---- ADR 0090 section 5: the antivirus statement ----
+
+    const DEFENDER_RULE: &str = "defender-rule";
+    const DEFENDER_EXCLUSION_RULE: &str = "defender-exclusion-rule";
+    const NO_PRODUCT_REPORTS_ON: &str = "4f0b9c2e-6a1d-4e8f-9c3b-7d5a2e1f0b6c";
+
+    fn antivirus_product(
+        display_name: &str,
+        state: &str,
+        extra: &[(&str, serde_json::Value)],
+    ) -> Observation {
+        let mut fields = vec![
+            ("display_name", serde_json::Value::from(display_name)),
+            ("state", serde_json::Value::from(state)),
+        ];
+        fields.extend(extra.iter().cloned());
+        number_observation("antivirus_product", &fields)
+    }
+
+    /// A report holding an antivirus list: one summary row and `products`, or an unread list with
+    /// `not_read` and no observations at all.
+    fn antivirus_report(products: Vec<Observation>, not_read: Option<UnmeasuredReason>) -> Report {
+        use serde_json::json;
+        let mut report = report();
+        report.header.generated_at = "2026-01-10T12:00:00Z".to_owned();
+        report.evidence = Vec::new();
+        report.own_traces = Vec::new();
+        report.unmatched = Vec::new();
+        report.unmeasured_sources = Vec::new();
+        if let Some(reason) = not_read {
+            report.evidence = vec![Evidence {
+                rule_id: "antivirus-rule".to_owned(),
+                collector: "antivirus_product".to_owned(),
+                strength: Strength::Posture,
+                state: EvidenceState::Unmeasured {
+                    reason,
+                    expected: false,
+                },
+            }];
+            return report;
+        }
+        let on = products
+            .iter()
+            .filter(|product| {
+                product
+                    .fields
+                    .get("state")
+                    .and_then(serde_json::Value::as_str)
+                    == Some("on")
+            })
+            .count();
+        let mut observations = vec![number_observation(
+            "antivirus_product",
+            &[
+                ("products", json!(products.len())),
+                ("products_on", json!(on)),
+            ],
+        )];
+        observations.extend(products);
+        report.unmatched = vec![UnmatchedGroup {
+            collector: "antivirus_product".to_owned(),
+            observations,
+        }];
+        report
+    }
+
+    fn defender_row(rule_id: &str, collector: &str) -> Evidence {
+        Evidence {
+            rule_id: rule_id.to_owned(),
+            collector: collector.to_owned(),
+            strength: Strength::Context,
+            state: EvidenceState::Found {
+                observations: vec![observed(collector, &[("name", "a record")])],
+            },
+        }
+    }
+
+    /// A report with Defender rows listed in SS mode, and the bundle ids that tag them.
+    fn defender_report(products: Vec<Observation>) -> Report {
+        let mut report = antivirus_report(products, None);
+        report.defender_rules = vec![DEFENDER_RULE.to_owned(), DEFENDER_EXCLUSION_RULE.to_owned()];
+        report.evidence = vec![
+            defender_row(DEFENDER_RULE, "evtx"),
+            Evidence {
+                rule_id: DEFENDER_EXCLUSION_RULE.to_owned(),
+                collector: "defender_exclusion".to_owned(),
+                strength: Strength::Posture,
+                state: EvidenceState::Found {
+                    observations: vec![observed(
+                        "defender_exclusion",
+                        &[("path", r"C:\Users\fixtureuser\AppData\Local\FiveM")],
+                    )],
+                },
+            },
+        ];
+        report
+    }
+
+    fn antivirus_of(statements: &[CrossSourceStatement]) -> Option<&AntivirusStatement> {
+        statements.iter().find_map(|statement| match statement {
+            CrossSourceStatement::Antivirus(statement) => Some(statement),
+            _ => None,
+        })
+    }
+
+    /// Self mode shows the list even when no Defender row exists (ADR 0090 section 5).
+    #[test]
+    fn self_mode_shows_the_antivirus_statement_with_no_defender_row() {
+        let report = antivirus_report(
+            vec![antivirus_product("Antivirus Microsoft Defender", "on", &[])],
+            None,
+        );
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("Self mode shows the statement");
+        assert_eq!(statement.not_read, None);
+        let [line] = statement.products.as_slice() else {
+            panic!("{:?}", statement.products);
+        };
+        assert_eq!(line.display_name, "Antivirus Microsoft Defender");
+        assert_eq!(line.state, "on");
+        assert_eq!(line.state_value, None);
+        assert_eq!(line.signature, None);
+        assert_eq!(line.signer, None);
+        assert_eq!(line.file_unread, None);
+    }
+
+    /// SS mode hides it when it lists no Defender row.
+    #[test]
+    fn ss_mode_hides_the_antivirus_statement_with_no_defender_row() {
+        let report = antivirus_report(
+            vec![antivirus_product("Example Antivirus", "on", &[])],
+            None,
+        );
+        assert!(antivirus_of(&for_mode(&report, Mode::SelfCheck).cross_source).is_some());
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
+    /// SS mode shows it beside a row of a Defender-tagged rule that it lists.
+    #[test]
+    fn ss_mode_shows_the_antivirus_statement_beside_a_listed_defender_row() {
+        let report = defender_report(vec![antivirus_product("Example Antivirus", "on", &[])]);
+        let view = for_mode(&report, Mode::Ss);
+        let statement =
+            antivirus_of(&view.cross_source).expect("SS mode shows it beside a Defender row");
+        let [line] = statement.products.as_slice() else {
+            panic!("{:?}", statement.products);
+        };
+        assert_eq!(line.display_name, "Example Antivirus");
+        assert_eq!(statement.not_read, None);
+    }
+
+    /// A Defender-tagged rule that is only `not_found` and not listed for SS mode does not make the
+    /// statement show.
+    #[test]
+    fn ss_mode_hides_the_antivirus_statement_when_the_defender_rule_is_only_not_found() {
+        let mut report = antivirus_report(
+            vec![antivirus_product("Example Antivirus", "on", &[])],
+            None,
+        );
+        report.defender_rules = vec![DEFENDER_RULE.to_owned()];
+        report.evidence = vec![Evidence {
+            rule_id: DEFENDER_RULE.to_owned(),
+            collector: "evtx".to_owned(),
+            strength: Strength::Context,
+            state: EvidenceState::NotFound {
+                retention: "30 days".to_owned(),
+            },
+        }];
+        assert!(antivirus_of(&for_mode(&report, Mode::SelfCheck).cross_source).is_some());
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
+    /// A list that was read with no products says "lists none": an empty list and no `not_read`.
+    #[test]
+    fn a_measured_list_with_no_products_is_an_empty_statement_without_not_read() {
+        let report = antivirus_report(Vec::new(), None);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the list was read");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, None);
+        let json = serde_json::to_value(statement).unwrap();
+        assert!(json.get("not_read").is_none(), "{json}");
+    }
+
+    /// A list that could not be read carries the reason, and no products.
+    #[test]
+    fn a_list_that_could_not_be_read_carries_read_failed() {
+        let report = antivirus_report(Vec::new(), Some(UnmeasuredReason::ReadFailed));
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, Some(UnmeasuredReason::ReadFailed));
+    }
+
+    /// The service that answers Security Center's list not running is a reason the statement carries
+    /// as `not_read`, never an empty list (ADR 0090).
+    #[test]
+    fn a_list_whose_service_is_not_running_says_not_read() {
+        let report = antivirus_report(Vec::new(), Some(UnmeasuredReason::ServiceNotRunning));
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(
+            statement.not_read,
+            Some(UnmeasuredReason::ServiceNotRunning)
+        );
+        assert_eq!(
+            serde_json::to_value(statement).unwrap()["not_read"],
+            serde_json::Value::from("service_not_running")
+        );
+    }
+
+    /// A real scan puts the reason the list could not be read on the rule's evidence row, not in
+    /// `unmeasured_sources`, which holds only collectors with timestamp fields (ADR 0090 section 5).
+    #[test]
+    fn a_real_scan_states_read_failed_from_the_antivirus_evidence_row() {
+        let report = engine_report(UnmeasuredReason::ReadFailed);
+        assert!(report.unmeasured_sources.is_empty());
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, Some(UnmeasuredReason::ReadFailed));
+    }
+
+    /// The same for a scan without administrator rights: the reason reaches the statement from the
+    /// evidence row the rule gave it.
+    #[test]
+    fn a_real_scan_states_not_admin_from_the_antivirus_evidence_row() {
+        let report = engine_report(UnmeasuredReason::NotAdmin);
+        assert!(report.unmeasured_sources.is_empty());
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the reason is stated");
+        assert!(statement.products.is_empty());
+        assert_eq!(statement.not_read, Some(UnmeasuredReason::NotAdmin));
+    }
+
+    /// A report built through the engine from the rule `no-product-reports-on` and an unmeasured
+    /// `antivirus_product` run, as a real scan builds it.
+    fn engine_report(reason: UnmeasuredReason) -> Report {
+        let bundle = crate::bundle::Bundle::embedded().expect("the embedded bundle");
+        let report = crate::engine::evaluate(
+            &bundle,
+            &[CollectorRun::Unmeasured {
+                collector: "antivirus_product".to_owned(),
+                reason,
+            }],
+            header(),
+            &crate::engine::SelfIdentity::default(),
+        );
+        assert!(
+            report.evidence.iter().any(|item| {
+                item.rule_id == NO_PRODUCT_REPORTS_ON
+                    && matches!(
+                        item.state,
+                        EvidenceState::Unmeasured { reason: got, .. } if got == reason
+                    )
+            }),
+            "{reason:?} is not on the no-product-reports-on rule's evidence row"
+        );
+        report
+    }
+
+    /// A report from the real embedded bundle: one measured `antivirus_product` run holding
+    /// `products_on` third-party products that report themselves `on`, plus `os_image` saying the
+    /// Defender service is disabled when asked, so that a Defender-tagged rule is found in both modes.
+    /// Zero products is an empty list, never a product row.
+    fn engine_antivirus_report(products_on: usize, defender_service_disabled: bool) -> Report {
+        let products: Vec<(&str, &str)> = (0..products_on)
+            .map(|_| ("Example Antivirus", "on"))
+            .collect();
+        engine_antivirus_report_with(&products, defender_service_disabled)
+    }
+
+    /// The same report holding `products`, each a display name and state, so a test can ask for a
+    /// product that reports itself `off` without making the list hold one when it asked for none.
+    fn engine_antivirus_report_with(
+        products: &[(&str, &str)],
+        defender_service_disabled: bool,
+    ) -> Report {
+        let products_on = products.iter().filter(|(_, state)| *state == "on").count();
+        let mut observations = vec![number_observation(
+            "antivirus_product",
+            &[
+                ("products", serde_json::json!(products.len())),
+                ("products_on", serde_json::json!(products_on)),
+            ],
+        )];
+        observations.extend(
+            products
+                .iter()
+                .map(|(name, state)| antivirus_product(name, state, &[])),
+        );
+        let mut runs = vec![CollectorRun::Measured {
+            collector: "antivirus_product".to_owned(),
+            observations,
+            gaps: BTreeMap::new(),
+            discriminator_gaps: Vec::new(),
+        }];
+        if defender_service_disabled {
+            runs.push(CollectorRun::Measured {
+                collector: "os_image".to_owned(),
+                observations: vec![observed("os_image", &[("service_windefend", "disabled")])],
+                gaps: BTreeMap::new(),
+                discriminator_gaps: Vec::new(),
+            });
+        }
+        let mut report = crate::engine::evaluate(
+            &crate::bundle::Bundle::embedded().expect("the embedded bundle"),
+            &runs,
+            header(),
+            &crate::engine::SelfIdentity::default(),
+        );
+        // A rule whose collector is not in `runs` comes back `collector_unavailable`. These tests
+        // name their runs, so drop those rows rather than let one stand for a Defender row a real
+        // scan would have run and answered.
+        report.evidence.retain(|item| {
+            !matches!(
+                item.state,
+                EvidenceState::Unmeasured {
+                    reason: UnmeasuredReason::CollectorUnavailable,
+                    ..
+                }
+            )
+        });
+        report
+    }
+
+    /// A measured third-party product `on` makes `no-product-reports-on` `not_found`; it is not a
+    /// Defender row, so SS mode shows no statement while Self mode shows it (ADR 0090 section 5).
+    #[test]
+    fn a_measured_third_party_product_on_shows_the_statement_in_self_mode_only() {
+        let report = engine_antivirus_report(1, false);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("Self mode shows the statement");
+        assert_eq!(statement.products.len(), 1);
+        assert_eq!(statement.products[0].state, "on");
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
+    /// `products_on: 0` makes the rule `found`, but it is still not a Defender row: SS mode shows no
+    /// statement while Self mode shows it.
+    #[test]
+    fn a_measured_zero_products_on_shows_the_statement_in_self_mode_only() {
+        let report = engine_antivirus_report_with(&[("Example Antivirus", "off")], false);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("Self mode shows the statement");
+        assert_eq!(statement.products.len(), 1);
+        assert_eq!(statement.products[0].state, "off");
+        assert!(antivirus_of(&for_mode(&report, Mode::Ss).cross_source).is_none());
+    }
+
+    /// Neither reason that means this PC has no such list makes a statement.
+    #[test]
+    fn not_windows_and_not_on_this_os_give_no_antivirus_statement() {
+        for reason in [UnmeasuredReason::NotWindows, UnmeasuredReason::NotOnThisOs] {
+            let report = antivirus_report(Vec::new(), Some(reason));
+            assert!(
+                antivirus_of(&for_mode(&report, Mode::SelfCheck).cross_source).is_none(),
+                "{reason:?}"
+            );
+        }
+    }
+
+    /// A registered name can carry a bidi override or a newline, and a name too long is cut with an
+    /// ellipsis; none of those reaches a reader.
+    #[test]
+    fn a_registered_name_is_made_safe_and_cut() {
+        assert_eq!(shown_display_name("a\u{202E}b"), "a\u{FFFD}b");
+        assert_eq!(shown_display_name("a\nb"), "a\u{FFFD}b");
+        let long = "x".repeat(300);
+        let shown = shown_display_name(&long);
+        assert_eq!(shown.chars().count(), 129);
+        assert_eq!(shown.chars().take(128).collect::<String>(), "x".repeat(128));
+        assert!(shown.ends_with('…'));
+
+        // The statement uses it, while the observation stays as the collector read it.
+        let name = "a\u{202E}b\nc";
+        let report = antivirus_report(vec![antivirus_product(name, "on", &[])], None);
+        let view = for_mode(&report, Mode::SelfCheck);
+        let statement = antivirus_of(&view.cross_source).expect("the statement is shown");
+        assert_eq!(statement.products[0].display_name, "a\u{FFFD}b\u{FFFD}c");
+        assert_eq!(
+            report.unmatched[0].observations[1]
+                .fields
+                .get("display_name")
+                .and_then(serde_json::Value::as_str),
+            Some(name)
+        );
+    }
+
+    /// No field of the statement carries the product's path, in either mode (ADR 0090 section 5).
+    #[test]
+    fn the_antivirus_statement_never_holds_a_path() {
+        let product = antivirus_product(
+            "Example Antivirus",
+            "on",
+            &[
+                ("path", serde_json::Value::from(r"C:\Users\someone\av.exe")),
+                (
+                    "path_withheld",
+                    serde_json::Value::from("unredactable_form"),
+                ),
+                ("sha256", serde_json::Value::from("a".repeat(64))),
+            ],
+        );
+        let report = defender_report(vec![product]);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let view = for_mode(&report, mode);
+            let statement = antivirus_of(&view.cross_source).expect("the statement is shown");
+            let json = serde_json::to_string(statement).unwrap();
+            assert!(!json.contains("someone"), "{mode:?}: {json}");
+            assert!(!json.contains("Users"), "{mode:?}: {json}");
+            assert!(!json.contains("path"), "{mode:?}: {json}");
+            assert!(!json.contains("sha256"), "{mode:?}: {json}");
+        }
+    }
+
+    /// Rule 9 (ADR 0090 section 5): the same Defender rows found through the real bundle, once with
+    /// an empty list and once with a third-party product `on`, and a Defender row listed in both
+    /// modes. Every Defender row, every count and their order are the same; only the cross-source
+    /// statement differs.
+    #[test]
+    fn the_defender_rows_do_not_change_when_the_antivirus_list_changes() {
+        let without = engine_antivirus_report(0, true);
+        let with = engine_antivirus_report(1, true);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let empty = for_mode(&without, mode);
+            let listed = for_mode(&with, mode);
+            let defender_rows = |view: &ReportView| {
+                view.evidence
+                    .iter()
+                    .filter(|item| item.collector != "antivirus_product")
+                    .cloned()
+                    .collect::<Vec<Evidence>>()
+            };
+            let rows = defender_rows(&empty);
+            assert_eq!(rows, defender_rows(&listed), "{mode:?}");
+            assert_eq!(
+                listed_counts(&rows),
+                listed_counts(&defender_rows(&listed)),
+                "{mode:?}"
+            );
+            assert_eq!(empty.hidden, listed.hidden, "{mode:?}");
+            assert_eq!(empty.scope, listed.scope, "{mode:?}");
+            let order = |view: &ReportView| {
+                view.evidence
+                    .iter()
+                    .map(|item| item.rule_id.clone())
+                    .collect::<Vec<_>>()
+            };
+            // Only the no-product rule's own row moves between `found` and `not_found`.
+            let differing: Vec<&Evidence> = empty
+                .evidence
+                .iter()
+                .zip(&listed.evidence)
+                .filter(|(a, b)| a != b)
+                .map(|(a, _)| a)
+                .collect();
+            assert_eq!(differing.len(), 1, "{mode:?}");
+            assert_eq!(differing[0].collector, "antivirus_product", "{mode:?}");
+            assert_eq!(order(&empty), order(&listed), "{mode:?}");
+            assert_ne!(empty.cross_source, listed.cross_source, "{mode:?}");
+            assert!(
+                antivirus_of(&empty.cross_source)
+                    .expect("the empty list is a statement")
+                    .products
+                    .is_empty(),
+                "{mode:?}"
+            );
+            assert_eq!(
+                antivirus_of(&listed.cross_source)
+                    .expect("the third-party product is a statement")
+                    .products
+                    .len(),
+                1,
+                "{mode:?}"
+            );
+        }
+    }
+
+    /// The statement and its observations are never counted as listed or hidden.
+    #[test]
+    fn the_antivirus_statement_is_never_counted() {
+        let mut without = defender_report(Vec::new());
+        // No observations at all: no statement is made.
+        without.unmatched.clear();
+        let with = defender_report(vec![antivirus_product("Example Antivirus", "on", &[])]);
+        for mode in [Mode::SelfCheck, Mode::Ss] {
+            let absent = for_mode(&without, mode);
+            let present = for_mode(&with, mode);
+            assert!(antivirus_of(&absent.cross_source).is_none(), "{mode:?}");
+            assert!(antivirus_of(&present.cross_source).is_some(), "{mode:?}");
+            assert_eq!(absent.listed, present.listed, "{mode:?}");
+            assert_eq!(absent.hidden, present.hidden, "{mode:?}");
+        }
+    }
+
     // ---- ADR 0062: the session statement ----
 
     fn session_report(
@@ -4108,7 +5057,9 @@ mod tests {
             .into_iter()
             .filter_map(|statement| match statement {
                 CrossSourceStatement::Session(session) => Some(session),
-                CrossSourceStatement::FivemAndRecords(_) => None,
+                CrossSourceStatement::FivemAndRecords(_) | CrossSourceStatement::Antivirus(_) => {
+                    None
+                }
             })
             .collect()
     }

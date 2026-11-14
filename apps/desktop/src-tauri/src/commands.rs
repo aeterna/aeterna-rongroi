@@ -35,7 +35,7 @@ pub fn report_view(
     view::for_mode_with(&state.report, mode, options.unwrap_or_default())
 }
 
-/// What the window shows about a saved record once it is built (ADR 0073 §3).
+/// What the window shows about a saved record once it is built (ADR 0073 §3, ADR 0089 §5).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SavedSummary {
     /// The record's SHA-256, 64 lowercase hex characters; the window shows the first 16 large.
@@ -44,6 +44,8 @@ pub struct SavedSummary {
     pub size: usize,
     /// The case code as shown, `XXX-XXX`, when one was typed.
     pub case_code: Option<String>,
+    /// The record's `visual_hash`, the 16 characters staff compare with the screen (ADR 0089 §2).
+    pub visual_hash: String,
 }
 
 /// Builds the SS-mode saved record with `options` and the typed case code, keeps its bytes, and returns what
@@ -67,18 +69,32 @@ pub fn build_saved_record(
         scan_finished_at: state.scan_finished_at.clone(),
         saved_at: jiff::Timestamp::now().to_string(),
     };
-    let bytes = view::saved_record(
+    // This app is the Offline product: it produces its own records interactively and never for one
+    // paired server, so the record carries no binding and no policy (ADR 0089 §2).
+    let producer = view::Producer {
+        name: view::ProducerName::RongroiOffline,
+        version: state.report.header.provenance.version.clone(),
+        mode: view::ProducerMode::Interactive,
+    };
+    let record = view::saved_record(
         &state.report,
         options.unwrap_or_default(),
         code.clone(),
+        producer,
+        None,
+        None,
         times,
     )
-    .to_bytes()
     .map_err(|e| e.to_string())?;
+    // Kept from the record itself, so the value on screen is the one the saved bytes carry
+    // (ADR 0089 §2, §5).
+    let visual_hash = record.visual_hash.clone();
+    let bytes = record.to_bytes().map_err(|e| e.to_string())?;
     let summary = SavedSummary {
         digest: view::digest(&bytes),
         size: bytes.len(),
         case_code: code.as_deref().map(view::shown_case_code),
+        visual_hash,
     };
     *state
         .saved

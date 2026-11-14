@@ -1,0 +1,28 @@
+{
+  "description": "BAM recorded execution of a svchost.exe, a name in the table, whose file is under C:\\ProgramData\\x\\ rather than in System32 or SysWOW64",
+  "observations": [
+    {
+      "collector": "bam",
+      "fields": {
+        "last_run": "2026-10-15T12:00:00Z",
+        "moderation_state": 0,
+        "name": "svchost.exe",
+        "path": "C:\\ProgramData\\x\\svchost.exe",
+        "system_name_elsewhere": true,
+        "value_bytes": 24
+      }
+    },
+    {
+      "collector": "bam",
+      "fields": {
+        "entries": 1,
+        "intact": true,
+        "metadata_values": 2,
+        "rejected": 0,
+        "sid_withheld": "per_user_identifier",
+        "users": 1
+      }
+    }
+  ],
+  "expect_matches": 1
+}

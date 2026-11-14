@@ -83,6 +83,12 @@ Windows PC — never a "clean" verdict. The full rules are `AGENTS.md`, `CONVENT
 - Put exploit code in tests or comments.
 - Claim a test passed when you could not run it. Say which tests you did not run.
 
+## Known traps (review findings 2026-10-19 → 11-10 · Cross-Org K2)
+- Parsers treat bytes as hostile: check offsets, lengths, empty or zero fields and the full magic, with a test for each (#216 #220 #223 #243 #244).
+- A partial, cut or unreadable source is `Unmeasured` or partial, never false or 0; test the cut case (#218 #220 #221 #245 #246).
+- Build test fixtures from the shape the collector really emits; never invent a path or field (#215 #221).
+- Desktop UI changes must pass `pnpm typecheck` and Biome; for Windows-only Rust say clippy is unverified, because Q2 runs on macOS (#215–#263).
+
 ## Report
 End with: the files changed, each test id added and how it fails before the change, and what you could not
 verify (for example Windows-only code, which only the Windows CI job runs).

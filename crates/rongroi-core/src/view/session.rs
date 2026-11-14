@@ -27,6 +27,10 @@ pub(super) const EDITIONS: [&str; 2] = ["legacy", "enhanced"];
 /// The observation field `process`, `bam` and `prefetch` carry the edition in (ADR 0062).
 const EDITION_FIELD: &str = "fivem_edition";
 
+/// The field Prefetch's and BAM's last-run time for an edition is in. A session's end is BAM's value
+/// in this field (ADR 0062 section 5); Prefetch's value is read from it as an anchor, not as an end.
+pub(super) const LAST_RUN_FIELD: &str = "last_run";
+
 /// `fivem_dir`'s places this statement reads (ADR 0053).
 const LEGACY_LOGS: &str = "legacy_logs";
 const LEGACY_CACHE: &str = "legacy_cache";
@@ -316,13 +320,14 @@ pub(super) fn anchor_name(name: &str, edition: &str) -> Option<AnchorName> {
     }
 }
 
-/// `collector`'s observations of `edition`'s anchor names, with the time in `field`.
-fn anchors(
-    report: &Report,
+/// `collector`'s observations of `edition`'s anchor names, with the time in `field`, and the
+/// observation each came from.
+fn anchors<'r>(
+    report: &'r Report,
     collector: &str,
     edition: &str,
     field: &str,
-) -> Vec<(jiff::Timestamp, String, AnchorName)> {
+) -> Vec<(jiff::Timestamp, String, AnchorName, &'r Observation)> {
     observations_of(report, collector)
         .into_iter()
         .filter(|observation| text(observation, EDITION_FIELD) == Some(edition))
@@ -332,7 +337,7 @@ fn anchors(
             // To the second, as the timeline shows FiveM's selectors (ADR 0051); Prefetch and BAM keep
             // 100-nanosecond fractions the statement does not print.
             let time = jiff::Timestamp::from_second(time.as_second()).ok()?;
-            Some((time, time.to_string(), name))
+            Some((time, time.to_string(), name, observation))
         })
         .collect()
 }
@@ -365,12 +370,14 @@ fn fivem_exe_present(report: &Report, edition: &str) -> bool {
 }
 
 /// A session's start and end as the records give them, with the times compared against.
-struct Anchors {
+struct Anchors<'r> {
     start: SessionStart,
     start_time: Option<jiff::Timestamp>,
     end: SessionEnd,
     end_time: Option<jiff::Timestamp>,
     running: bool,
+    /// The BAM observation the end was taken from, when BAM gave it.
+    end_observation: Option<&'r Observation>,
 }
 
 /// One edition's latest session as ADR 0062 finds it: its start, and its end when BAM recorded one.
@@ -380,6 +387,18 @@ pub(super) fn session_times(
 ) -> Option<(jiff::Timestamp, Option<jiff::Timestamp>)> {
     let anchors = session_anchors(report, edition).ok()?;
     Some((anchors.start_time?, anchors.end_time))
+}
+
+/// Each edition's session end that BAM recorded, with the BAM observation it came from (ADR 0062
+/// section 5). Taken from the same anchors as the statement, so the timeline cannot disagree with it.
+pub(super) fn bam_session_ends(report: &Report) -> Vec<(&'static str, &Observation)> {
+    EDITIONS
+        .iter()
+        .filter_map(|edition| {
+            let anchors = session_anchors(report, edition).ok()?;
+            Some((*edition, anchors.end_observation?))
+        })
+        .collect()
 }
 
 fn session(report: &Report, edition: &str) -> Option<SessionStatement> {
@@ -397,7 +416,10 @@ fn session(report: &Report, edition: &str) -> Option<SessionStatement> {
 /// and no record attributes a run to it — "not known" when neither record was read and the edition's
 /// `FiveM.exe` is present, and no statement otherwise: read and holding nothing of it, ADR 0061's
 /// statement is the one that speaks.
-fn session_anchors(report: &Report, edition: &str) -> Result<Anchors, Option<SessionState>> {
+fn session_anchors<'r>(
+    report: &'r Report,
+    edition: &str,
+) -> Result<Anchors<'r>, Option<SessionState>> {
     let prefetch_reason = unmeasured_reason(report, "prefetch", None);
     let bam_reason = unmeasured_reason(report, "bam", None);
     let running = observations_of(report, "process")
@@ -411,13 +433,13 @@ fn session_anchors(report: &Report, edition: &str) -> Result<Anchors, Option<Ses
     let prefetch = if prefetch_reason == Some(UnmeasuredReason::ServiceDisabled) {
         None
     } else {
-        anchors(report, "prefetch", edition, "last_run")
+        anchors(report, "prefetch", edition, LAST_RUN_FIELD)
             .into_iter()
-            .max_by_key(|(time, _, _)| *time)
+            .max_by_key(|(time, _, _, _)| *time)
     };
-    let bam = anchors(report, "bam", edition, "last_run")
+    let bam = anchors(report, "bam", edition, LAST_RUN_FIELD)
         .into_iter()
-        .max_by_key(|(time, _, _)| *time);
+        .max_by_key(|(time, _, _, _)| *time);
     let prefetch_unread = match prefetch_reason {
         Some(UnmeasuredReason::ServiceDisabled) => prefetch_reason,
         reason => not_read(reason),
@@ -433,30 +455,30 @@ fn session_anchors(report: &Report, edition: &str) -> Result<Anchors, Option<Ses
     let earliest = if running {
         anchors(report, "process", edition, "started_at")
             .into_iter()
-            .min_by_key(|(time, _, _)| *time)
+            .min_by_key(|(time, _, _, _)| *time)
     } else {
         None
     };
     // A running process whose creation time could not be read leaves the start to Prefetch, as when
     // nothing runs.
     let (start, start_time) = match (earliest, prefetch) {
-        (Some((time, at, name)), _) => (SessionStart::Process { at, name }, Some(time)),
-        (None, Some((time, at, name))) => (SessionStart::Prefetch { at, name }, Some(time)),
+        (Some((time, at, name, _)), _) => (SessionStart::Process { at, name }, Some(time)),
+        (None, Some((time, at, name, _))) => (SessionStart::Prefetch { at, name }, Some(time)),
         (None, None) => match (prefetch_reason, prefetch_unread) {
             (Some(UnmeasuredReason::ServiceDisabled), _) => (SessionStart::SwitchedOff, None),
             (_, Some(reason)) => (SessionStart::NotRead { reason }, None),
             (_, None) => (SessionStart::NotRecorded, None),
         },
     };
-    let (end, end_time) = match bam {
-        _ if running => (SessionEnd::StillRunning, None),
-        Some((time, _, _)) if start_time.is_some_and(|start| time < start) => {
-            (SessionEnd::NotRecorded, None)
+    let (end, end_time, end_observation) = match bam {
+        _ if running => (SessionEnd::StillRunning, None, None),
+        Some((time, _, _, _)) if start_time.is_some_and(|start| time < start) => {
+            (SessionEnd::NotRecorded, None, None)
         }
-        Some((time, at, _)) => (SessionEnd::Bam { at }, Some(time)),
+        Some((time, at, _, observation)) => (SessionEnd::Bam { at }, Some(time), Some(observation)),
         None => match not_read(bam_reason) {
-            Some(reason) => (SessionEnd::NotRead { reason }, None),
-            None => (SessionEnd::NotRecorded, None),
+            Some(reason) => (SessionEnd::NotRead { reason }, None, None),
+            None => (SessionEnd::NotRecorded, None, None),
         },
     };
     Ok(Anchors {
@@ -465,17 +487,19 @@ fn session_anchors(report: &Report, edition: &str) -> Result<Anchors, Option<Ses
         end,
         end_time,
         running,
+        end_observation,
     })
 }
 
 /// The statement of a session with anchors: its lines and causes.
-fn known(report: &Report, edition: &str, anchors: Anchors) -> SessionState {
+fn known(report: &Report, edition: &str, anchors: Anchors<'_>) -> SessionState {
     let Anchors {
         start,
         start_time,
         end,
         end_time,
         running,
+        end_observation: _,
     } = anchors;
     let before_scan = scan_time(report)
         .zip(end_time.or(if running { None } else { start_time }))

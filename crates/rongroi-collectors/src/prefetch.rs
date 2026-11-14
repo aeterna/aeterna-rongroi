@@ -39,6 +39,10 @@
 //! program's name — is below one of `FiveM`'s two program folders (ADR 0062, owner decision 6 of
 //! 2026-10-02; `crate::fivem_edition`). It is omitted for every other file.
 //!
+//! One boolean is read from the same entry the same way: `system_name_elsewhere`, whether a table
+//! name ran outside the folders Windows keeps it in. It is omitted when the name is not in the table
+//! or its entries disagree, and no entry's path is emitted (ADR 0094; `crate::system_name`).
+//!
 //! # The configuration, beside the records
 //!
 //! Since ADR 0037 each run that could look also says two things about Prefetch's own setup, as one
@@ -58,7 +62,7 @@ use rongroi_parsers::error::ParseError;
 use rongroi_parsers::prefetch::{self, PrefetchRecord};
 
 use crate::failure::{read_failure, reason_for};
-use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition};
+use crate::{Age, AgeCount, AgeRows, Collector, Field, fivem_edition, system_name};
 
 /// Environment variable holding the Windows directory.
 ///
@@ -113,8 +117,9 @@ const REASONS: [UnmeasuredReason; 9] = [
 /// Every field this collector can emit.
 ///
 /// A folder it could not list is a gap in all of them. One `.pf` file it could not read is not: see
-/// the comment on [`Prefetch::collect`].
-const FIELDS: [Field; 20] = [
+/// the comment on [`Prefetch::collect`]. `system_name_elsewhere` is omitted on the same terms as
+/// `fivem_edition`: the executable's name is outside the table, or its entries disagree (ADR 0094).
+const FIELDS: [Field; 21] = [
     Field::number("enable_prefetcher"),
     Field::number("entries"),
     Field::number("files"),
@@ -134,6 +139,7 @@ const FIELDS: [Field; 20] = [
     Field::number("run_count"),
     Field::timestamp_list("run_times"),
     Field::number("scca_version"),
+    Field::boolean(system_name::FIELD),
     Field::text("volumes_withheld"),
 ];
 
@@ -143,7 +149,7 @@ const FIELDS: [Field; 20] = [
 /// all describe a folder this collector **did** read, so gapping `files`, `entries`, `rejected` or
 /// `intact` — which were measured — would claim it had not. The reasons that describe a folder
 /// nothing was read from keep gapping every field (ADR 0030).
-const RECORD_FIELDS: [&str; 10] = [
+const RECORD_FIELDS: [&str; 11] = [
     fivem_edition::FIELD,
     "last_run",
     "loaded_outside",
@@ -154,6 +160,7 @@ const RECORD_FIELDS: [&str; 10] = [
     "run_count",
     "run_times",
     "scca_version",
+    system_name::FIELD,
 ];
 
 /// The fields of the configuration observation, which a reason about the folder's **contents** never
@@ -225,6 +232,8 @@ impl Collector for Prefetch {
             };
         };
 
+        let system_root = host.env_var(SYSTEM_ROOT);
+
         // Read before the folder is interpreted. A machine whose `EnablePrefetcher` says Windows is
         // not writing application-launch records has no such record to be missing, so the folder's
         // state is not the answer to "did this program run" on it either way (ADR 0030).
@@ -291,7 +300,12 @@ impl Collector for Prefetch {
                 Ok(Some(bytes)) => match prefetch::parse(&bytes) {
                     Ok(record) => {
                         parsed += 1;
-                        observations.push(execution(&path, &record, read_only));
+                        observations.push(execution_with_root(
+                            &path,
+                            &record,
+                            read_only,
+                            system_root.as_deref(),
+                        ));
                     }
                     // A `.pf` this parser cannot decode — an older Windows's version, a payload that
                     // does not decompress, bytes that are not a Prefetch file at all. Each is a
@@ -442,7 +456,12 @@ fn prefetch_files(entries: Vec<rongroi_host::DirEntryInfo>) -> Vec<String> {
 }
 
 /// One program Prefetch recorded, from one `.pf` file that decoded.
-fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Observation {
+fn execution_with_root(
+    path: &str,
+    record: &PrefetchRecord,
+    read_only: Option<bool>,
+    system_root: Option<&str>,
+) -> Observation {
     let mut fields = BTreeMap::new();
     if let Some(read_only) = read_only {
         fields.insert("read_only".to_owned(), serde_json::Value::from(read_only));
@@ -457,6 +476,17 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
         fields.insert(
             fivem_edition::FIELD.to_owned(),
             serde_json::Value::from(edition.as_str()),
+        );
+    }
+    // From the same entry in the string table: one boolean, and the entry itself still does not
+    // reach the observation (ADR 0094).
+    if let Some(system_root) = system_root
+        && let Some(elsewhere) =
+            system_name::of_prefetch(&record.executable, &record.loaded_files, system_root)
+    {
+        fields.insert(
+            system_name::FIELD.to_owned(),
+            serde_json::Value::from(elsewhere),
         );
     }
     // Only for the programs ADR 0082 names. The count is derived from `loaded_files`, and nothing
@@ -511,6 +541,11 @@ fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Ob
         collector: ID.to_owned(),
         fields,
     }
+}
+
+#[cfg(test)]
+fn execution(path: &str, record: &PrefetchRecord, read_only: Option<bool>) -> Observation {
+    execution_with_root(path, record, read_only, None)
 }
 
 /// How many of a program's loaded files are executable and sit outside the folders Windows and the
@@ -685,7 +720,7 @@ fn executable_name(executable: &str) -> Option<String> {
 mod tests {
     use std::path::PathBuf;
 
-    use rongroi_host::{FixtureHost, NonWindowsHost};
+    use rongroi_host::{EnvironmentSource, FixtureHost, NonWindowsHost};
     use rongroi_parsers::prefetch::PrefetchRun;
 
     use super::*;
@@ -753,6 +788,18 @@ mod tests {
             .iter()
             .filter(|observation| observation.fields.contains_key("read"))
             .collect()
+    }
+
+    /// The `system_name_elsewhere` one record's observation carries, read from the machine's
+    /// `%SystemRoot%` as the collector reads it.
+    fn system_name_of(host: &FixtureHost, record: &PrefetchRecord) -> Option<bool> {
+        let observation = execution_with_root(
+            r"C:\Windows\Prefetch\SVCHOST.EXE-11111111.pf",
+            record,
+            None,
+            host.env_var(SYSTEM_ROOT).as_deref(),
+        );
+        field(&observation, system_name::FIELD).and_then(serde_json::Value::as_bool)
     }
 
     #[test]
@@ -981,6 +1028,41 @@ mod tests {
                 "{leaked} reached an observation: {json}"
             );
         }
+    }
+
+    /// The boolean comes from the executable's own entry in the string table, compared below the
+    /// machine's `%SystemRoot%`; a name outside the table has none (ADR 0094).
+    #[test]
+    fn a_prefetch_record_says_whether_a_table_name_ran_outside_its_windows_folders() {
+        let host = FixtureHost::from_yaml_str(
+            "platform: windows\nenv:\n  SystemRoot: 'C:\\Windows'\n",
+            "inline",
+        )
+        .unwrap();
+        let elsewhere = record_loading(
+            "SVCHOST.EXE",
+            vec![format!(r"{VOLUME}\PROGRAMDATA\X\SVCHOST.EXE")],
+        );
+        let expected = record_loading(
+            "SVCHOST.EXE",
+            vec![format!(r"{VOLUME}\WINDOWS\SYSTEM32\SVCHOST.EXE")],
+        );
+        let other = record_loading("CMD.EXE", vec![format!(r"{VOLUME}\PROGRAMDATA\X\CMD.EXE")]);
+        assert_eq!(system_name_of(&host, &elsewhere), Some(true));
+        assert_eq!(system_name_of(&host, &expected), Some(false));
+        assert_eq!(system_name_of(&host, &other), None);
+    }
+
+    /// Without `%SystemRoot%` there is nothing to compare the string table with, so the field is
+    /// omitted rather than compared with an assumed `C:\Windows` (ADR 0094).
+    #[test]
+    fn a_prefetch_record_omits_the_system_name_without_a_system_root() {
+        let host = FixtureHost::from_yaml_str("platform: windows\n", "inline").unwrap();
+        let record = record_loading(
+            "SVCHOST.EXE",
+            vec![format!(r"{VOLUME}\PROGRAMDATA\X\SVCHOST.EXE")],
+        );
+        assert_eq!(system_name_of(&host, &record), None);
     }
 
     fn configuration_of(observations: &[Observation]) -> &Observation {
@@ -1388,6 +1470,8 @@ mod tests {
     const SYSTEM: &str = r"\VOLUME{01d0000000000000-aaaaaaaa}";
     /// The device prefix of a second volume on the same machine.
     const OTHER: &str = r"\VOLUME{01d0000000000000-bbbbbbbb}";
+    /// The device prefix the Prefetch system-name tests spell their string-table entries with.
+    const VOLUME: &str = r"\VOLUME{01d00000000000000-0000abcd}";
 
     /// `ntdll.dll` in `\Windows\System32` on the given volume: the entry that names the system volume.
     fn ntdll_on(volume: &str) -> String {

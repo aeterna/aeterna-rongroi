@@ -72,6 +72,7 @@ let clipboardWrites: string[] = [];
 let savedArgs: Record<string, unknown>[] = [];
 let saveAnswer: string | null = "C:\\Users\\player\\Documents\\rongroi-K7Q-2MX-3f9a1c2e.json";
 const DIGEST = "3f9a1c2e7b4d5a60918273645f0e1d2c3b4a5968778695a4b3c2d1e0f9a8b7c6";
+const VISUAL_HASH = "9c4d7e2a1b3f5068";
 const REPOSITORY = "https://github.com/aeterna/aeterna-rongroi";
 const COMMIT = "2c673c54aeb084cd3773057efbb9ed3b98fd2dbc";
 // Carried fix (d): the real descriptor before any test stubs it, so it can be restored afterwards
@@ -150,7 +151,12 @@ beforeEach(async () => {
         if (typed === "K7Q-2MU") {
           throw "a case code cannot hold 'U'";
         }
-        return { digest: DIGEST, size: 163_000, case_code: typed ? "K7Q-2MX" : null };
+        return {
+          digest: DIGEST,
+          size: 163_000,
+          case_code: typed ? "K7Q-2MX" : null,
+          visual_hash: VISUAL_HASH,
+        };
       }
       case "save_saved_record":
         return saveAnswer;
@@ -449,17 +455,19 @@ describe("App", () => {
     expect(await screen.findByText("Check: Secure Boot is turned off")).toBeTruthy();
     // One not-found rule is hidden: `tpm-absent` is `context` strength, and SS mode lists a context
     // rule only when it matches, while posture rules are listed whatever their state (ADR 0011).
-    // Eighteen not-measured rules are hidden: the firmware reading needs administrator rights, which this
+    // Twenty not-measured rules are hidden: the firmware reading needs administrator rights, which this
     // fixture's scan did not have, so it is said once in the scope line rather than as a row (ADR 0038);
     // the seven full-scan rules, because this was a standard scan, which every rule expects (ADR 0052,
     // ADR 0055, ADR 0064); the
     // seven `os_image` rules, because this fixture describes no `CurrentVersion` key for them to read
     // (ADR 0056); and three `install_marker` rules, because the fixture sets no environment variable
-    // for the folders they name (ADR 0057). The one unmatched observation is `install_marker`'s
-    // registry marker, which needs no environment variable and answered `present: false`.
+    // for the folders they name (ADR 0057). Since ADR 0094 the BAM rule for a Windows program's
+    // name outside Windows' folders is one more; its Prefetch and Process rules are listed as rows,
+    // since they are not expected. The one unmatched observation is `install_marker`'s registry
+    // marker, which needs no environment variable and answered `present: false`.
     expect(
       screen.getByText(
-        "Hidden in SS mode: 1 not found · 19 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
+        "Hidden in SS mode: 1 not found · 20 not measured (expected) · 0 not measured (not expected) · 1 unmatched observations",
       ),
     ).toBeTruthy();
     expect(calls).toContain("report_view");
@@ -473,6 +481,8 @@ describe("App", () => {
     expect(await screen.findByText("3f9a 1c2e 7b4d 5a60")).toBeTruthy();
     expect(screen.getByText("K7Q-2MX")).toBeTruthy();
     expect(screen.getByText(DIGEST)).toBeTruthy();
+    expect(screen.getByText(VISUAL_HASH)).toBeTruthy();
+    expect(screen.getByText(/Visual check code/)).toBeTruthy();
     expect(savedArgs).toEqual([
       {
         options: { server_identity: false, account_identifier: false, download_host: false },
@@ -887,12 +897,16 @@ describe("App", () => {
     expect(statements[0]?.textContent).toContain("not a finding about this PC");
   });
 
-  // Each of the fourteen reasons reaches a reader as a sentence, never as its identifier: a row
+  // Each of the fifteen reasons reaches a reader as a sentence, never as its identifier: a row
   // reading `source_empty` is a row that says nothing to the person it is about (ADR 0030).
   it.each([
     ["not_on_this_os", "this version of Windows does not keep this record"],
     ["not_attempted", "the scan did not open it"],
     ["service_disabled", "the Windows service that writes this record is switched off"],
+    [
+      "service_not_running",
+      "the Windows service that answers this is not running; it may still be starting, so scanning again later may read it",
+    ],
     ["source_absent", "this PC has no such record to read"],
     ["source_empty", "the place this is kept is there and holds nothing"],
     ["partial", "part of this was read and part of it was not"],
@@ -1011,7 +1025,7 @@ describe("App", () => {
       if (cmd === "build_saved_record") {
         // The record is built with the same answer the view is (ADR 0073).
         seen.push((args as Record<string, unknown>).options);
-        return { digest: DIGEST, size: 1, case_code: null };
+        return { digest: DIGEST, size: 1, case_code: null, visual_hash: VISUAL_HASH };
       }
       return selfView.header;
     });

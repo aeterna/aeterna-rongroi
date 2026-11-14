@@ -515,6 +515,44 @@ pub trait TpmSource {
     fn tpm_info(&self) -> Result<TpmInfo, SourceError>;
 }
 
+/// One antivirus product Windows Security Center lists (ADR 0090).
+///
+/// The host reports what Security Center says and interprets nothing: `state` is the raw
+/// `WSC_SECURITY_PRODUCT_STATE` value and `remediation_path` is the string as given, possibly empty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AntivirusProductRecord {
+    /// `ProductName`, as Security Center gives it.
+    pub display_name: String,
+    /// The raw `WSC_SECURITY_PRODUCT_STATE` value, never decoded by the host (ADR 0090 section 2).
+    pub state: i32,
+    /// `RemediationPath` as Security Center gives it, possibly empty.
+    pub remediation_path: String,
+}
+
+/// What Security Center answered about the antivirus products it lists (ADR 0090).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AntivirusList {
+    /// The products Security Center lists, in the order it lists them.
+    Products(Vec<AntivirusProductRecord>),
+    /// The service that answers the question is not running, so there is no list to read.
+    ///
+    /// Measured on the lab machine 75 s after boot, while the service was still starting; the same
+    /// question listed the product once it had started. An empty [`Self::Products`] list is the
+    /// different answer that Security Center lists none (ADR 0090).
+    ServiceNotRunning,
+}
+
+/// Read-only access to the antivirus products Windows Security Center lists (ADR 0090).
+pub trait AntivirusProductSource {
+    /// Every antivirus product Security Center lists, in the order it lists them.
+    ///
+    /// An empty [`AntivirusList::Products`] list is an answer: Security Center lists no product.
+    /// [`AntivirusList::ServiceNotRunning`] says the service that answers is not running, which may
+    /// change without anything on the machine changing. A host that cannot ask answers
+    /// [`SourceError::Unsupported`], never an empty list, which would claim the machine has none.
+    fn antivirus_products(&self) -> Result<AntivirusList, SourceError>;
+}
+
 /// What the platform firmware itself says about UEFI Secure Boot (ADR 0038).
 ///
 /// A second reading, independent of the `UEFISecureBootEnabled` registry value: this one is the UEFI
@@ -1203,6 +1241,7 @@ pub trait Host:
     + EnvironmentSource
     + SystemIntegritySource
     + TpmSource
+    + AntivirusProductSource
     + FirmwareSource
     + ProcessSource
     + BootTimeSource
@@ -1371,6 +1410,14 @@ impl TpmSource for NonWindowsHost {
     fn tpm_info(&self) -> Result<TpmInfo, SourceError> {
         Err(SourceError::Unsupported(
             "no TPM base services on this platform".to_owned(),
+        ))
+    }
+}
+
+impl AntivirusProductSource for NonWindowsHost {
+    fn antivirus_products(&self) -> Result<AntivirusList, SourceError> {
+        Err(SourceError::Unsupported(
+            "no Windows Security Center on this platform".to_owned(),
         ))
     }
 }

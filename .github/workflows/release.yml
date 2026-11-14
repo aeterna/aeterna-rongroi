@@ -64,7 +64,7 @@ jobs:
         run: |
           $env:RONGROI_OFFICIAL_BUILD = '1'
           $env:RONGROI_COMMIT = (git rev-parse HEAD)
-          cargo build --release --locked -p rongroi-cli
+          cargo build --release --locked -p rongroi-cli -p rongroi-scan
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm -C apps/desktop tauri build --no-bundle -- --locked
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -75,6 +75,7 @@ jobs:
           New-Item -ItemType Directory -Force out | Out-Null
           Copy-Item target/release/aeterna-rongroi-cli.exe "out/aeterna-rongroi-cli-$env:VERSION-windows-x64.exe"
           Copy-Item target/release/aeterna-rongroi.exe "out/aeterna-rongroi-$env:VERSION-windows-x64.exe"
+          Copy-Item target/release/rongroi-scan.exe "out/rongroi-scan-$env:VERSION-windows-x64.exe"
       - name: Scan this runner with the built CLI
         env:
           VERSION: ${{ steps.check.outputs.version }}
@@ -88,6 +89,7 @@ jobs:
           cargo run --locked --quiet -p xtask -- release-verify "$env:GITHUB_REF_NAME" --report report.json `
             --cli "out/aeterna-rongroi-cli-$env:VERSION-windows-x64.exe" `
             --desktop "out/aeterna-rongroi-$env:VERSION-windows-x64.exe" `
+            --scan "out/rongroi-scan-$env:VERSION-windows-x64.exe" `
             --commit (git rev-parse HEAD) --sums out/SHA256SUMS
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Write the SBOMs
@@ -98,6 +100,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Move-Item apps/desktop/src-tauri/aeterna-rongroi_bin.cdx.json "out/aeterna-rongroi-$env:VERSION-windows-x64.cdx.json"
           Move-Item crates/rongroi-cli/aeterna-rongroi-cli_bin.cdx.json "out/aeterna-rongroi-cli-$env:VERSION-windows-x64.cdx.json"
+          Move-Item crates/rongroi-scan/rongroi-scan_bin.cdx.json "out/rongroi-scan-$env:VERSION-windows-x64.cdx.json"
           pnpm -C apps/desktop sbom --sbom-format cyclonedx --prod --out "$PWD/out/aeterna-rongroi-$env:VERSION-ui.cdx.json"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Write the release notes
@@ -131,7 +134,7 @@ jobs:
       - name: Check the hashes before signing
         working-directory: out
         run: sha256sum -c --strict SHA256SUMS
-      - name: Attest build provenance of both executables
+      - name: Attest build provenance of the three executables
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: out/SHA256SUMS
@@ -150,6 +153,11 @@ jobs:
         with:
           subject-path: out/aeterna-rongroi-cli-${{ needs.build.outputs.version }}-windows-x64.exe
           sbom-path: out/aeterna-rongroi-cli-${{ needs.build.outputs.version }}-windows-x64.cdx.json
+      - name: Attest the Connect sidecar's SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: out/rongroi-scan-${{ needs.build.outputs.version }}-windows-x64.exe
+          sbom-path: out/rongroi-scan-${{ needs.build.outputs.version }}-windows-x64.cdx.json
 
   publish:
     name: draft release

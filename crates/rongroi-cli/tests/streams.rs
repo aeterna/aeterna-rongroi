@@ -97,6 +97,39 @@ fn a_case_code_prints_a_saved_record_whose_digest_is_on_standard_error() {
     );
 }
 
+/// ADR 0089 §5: a saved schema 2 file prints its `visual_hash` on the line after its digest, so staff
+/// can compare it with what the screen shows.
+#[test]
+fn a_case_code_prints_the_visual_hash_on_the_line_after_the_digest() {
+    let output = run(
+        &[
+            "scan",
+            "--mode",
+            "ss",
+            "--json",
+            "--yes",
+            "--case-code",
+            "k7q-2mx",
+        ],
+        "",
+    );
+    assert!(output.status.success(), "{}", text(&output.stderr));
+    let record: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("standard output is only the saved record");
+    let visual_hash = record["visual_hash"]
+        .as_str()
+        .expect("the saved record carries a visual_hash");
+    let digest = rongroi_core::view::digest(&output.stdout);
+    let stderr = text(&output.stderr);
+    let expected = format!("visual_hash: {visual_hash}");
+    let digest_at = stderr.find(&digest).expect("the digest is printed");
+    let after = &stderr[digest_at + digest.len()..];
+    assert!(
+        after.starts_with(&format!("\n{expected}")),
+        "the visual hash follows the digest on its own line: {stderr}"
+    );
+}
+
 #[test]
 fn a_case_code_is_refused_before_anything_is_read_outside_ss_json_or_when_malformed() {
     for args in [
