@@ -5,10 +5,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-13
+
 ### Added
 - The landing page shows one example scan end in three kinds of evidence and no verdict, with a slider that shows what "not found" can and cannot say. With JavaScript off or reduced motion the finished picture stands.
 - The `antivirus_product` collector lists the antivirus products Windows Security Center reports, each product's self-reported state, and, when its path is a local file, that file's SHA-256 and signature (ADR 0090).
 - Each release also carries `rongroi-scan-<version>-windows-x64.exe`, the sidecar Rongroi Connect starts. It is built in the same official build, checked for the build marker of the tagged commit, listed in `SHA256SUMS`, attested, and has its own SBOM.
+- `rongroi-scan`, the sidecar Rongroi Connect starts: it scans only the Standard-tier collectors a server's policy names and writes a schema 2 record back over a named pipe; a full-tier collector in a policy is refused (ADR 0089).
+- Process, BAM and Prefetch entries say when a program carries the name of a Windows program but ran from outside Windows' own folders (ADR 0094).
+- Self mode shows an antivirus statement that lists what Windows Security Center lists, and the experimental posture rule `antivirus_product/registered/no-product-reports-on` reports when no registered product says it is on (ADR 0090).
+- The timeline shows one session-end entry per FiveM edition, at the time Windows recorded in BAM, so device times can be read beside the session (ADR 0072; ADR 0051 amended).
 
 ### Changed
 - The landing page's sample leans with the scroll and the pointer instead of floating on a loop, and the promise cards take a soft light under the pointer; both are off when the visitor asks for less motion.
