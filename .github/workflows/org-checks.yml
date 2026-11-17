@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 # AETERNA org checks (AGENTS.md §7.1 §11.1 §12.4) — reusable workflow from aeterna/.github, pinned by sha.
 # Plan "Rules → Checks" W2 · no root-level paths filter (§11.1).
 name: org-checks
