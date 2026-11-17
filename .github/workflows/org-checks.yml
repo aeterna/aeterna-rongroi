@@ -1,0 +1,19 @@
+# AETERNA org checks (AGENTS.md §7.1 §11.1 §12.4) — reusable workflow from aeterna/.github, pinned by sha.
+# Plan "Rules → Checks" W2 · no root-level paths filter (§11.1).
+name: org-checks
+
+on:
+  pull_request:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+jobs:
+  org-checks:
+    uses: aeterna/.github/.github/workflows/org-checks.yml@df42d4396ebf3e33467452e059e9313b8f1ff598
+    with:
+      public: true
+      paths-allowlist: "pages.yml"
+      claude-md-max: 150
