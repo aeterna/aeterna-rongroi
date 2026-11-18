@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: e641494e-a337-4e4d-bf44-887b5cf1442b
+title: Windows recorded bug check 0xE6
+description: >-
+  Windows Error Reporting recorded bug check 0xE6 (DRIVER_VERIFIER_DMA_VIOLATION) in the System log.
+  This bug check is triggered when Driver Verifier detects an illegal DMA operation attempted by a driver
+  or device. This describes what Windows recorded and does not say a device was used to cheat.
+status: experimental
+collector: windows_start
+strength: context
+match:
+  record: bug_check
+  bug_check_code: "0xE6"
+retention: >-
+  As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+unmeasured_when: [not_windows, not_admin, source_absent]
+falsepositives:
+  - Driver Verifier turned on
+  - A faulty driver
+  - Faulty hardware
+references:
+  - https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-0xe6--driver-verifier-dma-violation
+author: aeterna-rongroi contributors
+date: 2026-11-18
+tags: [windows_start, dma]
