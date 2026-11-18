@@ -12,6 +12,18 @@
       "plan": "dma-traces-r1",
       "acquired": "2026-11-18T13:56:10Z",
       "expires": "2026-11-18T17:56:10Z"
+    },
+    {
+      "id": "r1-l3-d72d208e",
+      "repo": "aeterna-rongroi",
+      "lane": "r1-l3",
+      "host": "win",
+      "scope": [
+        "crates/rongroi-parsers/src/evtx.rs,crates/rongroi-collectors/src/windows_start.rs,rules/windows_start/dma/bug-check-e6/*,rules/i18n/th.yaml,rules/unconfronted.csv"
+      ],
+      "plan": "dma-traces-r1",
+      "acquired": "2026-11-18T13:56:13Z",
+      "expires": "2026-11-18T17:56:13Z"
     }
   ]
 }
