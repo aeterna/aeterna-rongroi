@@ -227,7 +227,7 @@ fn a_refusal_no_rule_expects_is_listed_in_ss_mode() {
     use rongroi_core::model::{EvidenceState, UnmeasuredReason};
 
     for (host, rules) in [
-        ("evtx-access-denied-elevated", 5),
+        ("evtx-access-denied-elevated", 6),
         // Rules `7d493537` and `735c6a6f` do not declare `access_denied` in `unmeasured_when`.
         ("prefetch-access-denied-elevated", 2),
         // `secure-boot-disabled` and `secure-boot-firmware-disagrees`: the fixture denies the
