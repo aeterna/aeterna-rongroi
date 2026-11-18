@@ -17,7 +17,7 @@ its bridges and its devices. Each record's `EventData` has a `Message` field, fo
 `[PDO] (0x0000.0x06.0x00): Begin state transition from UNINITIALIZED to STARTED`. A message names a position, not a
 vendor, a model, a serial number or a person.
 
-This ADR decides what is read from that log, three facts added to `pci_device`, and one kind of bug check. It does not
+This ADR decides what is read from that log, the facts added to `pci_device`, and one kind of bug check. It does not
 decide USB, display or Bluetooth devices. Those are separate ADRs.
 
 ## Measured before code
@@ -114,7 +114,7 @@ log that begins in the middle of a change.
 No timeline selector. A position present at every start would add one line per position with nothing to ask about, and a
 selector would show them in SS mode.
 
-### 3. Three more facts on `pci_device`
+### 3. More facts on `pci_device`
 
 `pci_device` gains `bus_class`, `bus_subclass`, `link_speed`, `link_width`, `max_link_speed`, `max_link_width` and
 `child_count`. A value Windows does not give is absent. `child_count` counts `DEVPKEY_Device_Children`; the children's ids
@@ -125,8 +125,8 @@ keys and cites the header. No Microsoft Learn page was found. ADR 0069 §4 is th
 was measured.
 
 **No rule uses these fields.** On the measured PC a link below its maximum is ordinary, and a network controller has no
-child device. An expected-result table would also be a list of what counts as normal, which hard rule 9 refuses as a
-source of comfort. A person reads the facts beside the device.
+child device. An expected-result table would also be a list of what counts as normal, which hard rule 9 does not allow. A person
+reads the facts beside the device.
 
 `pci_device` does not gain a position. The history collector says whether a position was at the newest start, so the
 device list need not be joined to the log.
