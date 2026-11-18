@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 82 |
-| SHA-256 | `0b0ddcf6003f97182e45fcbe3337324f10a376e46fd916a916b209ab71887873` |
+| SHA-256 | `b931ca0ffe703933d9c2b6271bf494ca953666c1920a7d81ebbd883af602ad46` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -2931,7 +2931,7 @@ Only the span the change journal still held when the scan read it, shown beside 
 
 **About this check**
 
-Windows Error Reporting recorded bug check 0xE6 (DRIVER\_VERIFIER\_DMA\_VIOLATION) in the System log. This bug check indicates an illegal DMA operation attempted by a driver or device, and can occur even without Driver Verifier enabled. This describes what Windows recorded and does not say a device was used to cheat.
+Windows Error Reporting recorded bug check 0xE6 (DRIVER\_VERIFIER\_DMA\_VIOLATION) in the System log. Microsoft documents this code for DMA verification violations and says it can be observed without Driver Verifier enabled. This describes what Windows recorded and does not say a device was used to cheat.
 
 **Matches when all of these hold for one observation**
 
