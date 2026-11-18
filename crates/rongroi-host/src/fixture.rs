@@ -189,7 +189,6 @@ enum FixtureDeviceProperty {
     LinkWidth,
     MaxLinkSpeed,
     MaxLinkWidth,
-    #[serde(alias = "children")]
     ChildCount,
 }
 

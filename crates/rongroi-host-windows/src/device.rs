@@ -44,15 +44,21 @@ mod live {
 
     // Keys defined in Windows SDK `pciprop.h` (property set GUID {3AB22E31-8264-4B4E-9AF5-A8D2D8E33E62}),
     // not present in the `windows` crate bindings (ADR 0095 section 3).
-    const DEVPKEY_PciDevice: windows::core::GUID = windows::core::GUID::from_values(
+    const DEVPKEY_PCI_DEVICE: windows::core::GUID = windows::core::GUID::from_values(
         0x3ab2_2e31, 0x8264, 0x4b4e, [0x9a, 0xf5, 0xa8, 0xd2, 0xd8, 0xe3, 0x3e, 0x62],
     );
-    const DEVPKEY_PciDevice_BaseClass: DEVPROPKEY = DEVPROPKEY { fmtid: DEVPKEY_PciDevice, pid: 3 };
-    const DEVPKEY_PciDevice_SubClass: DEVPROPKEY = DEVPROPKEY { fmtid: DEVPKEY_PciDevice, pid: 4 };
-    const DEVPKEY_PciDevice_CurrentLinkSpeed: DEVPROPKEY = DEVPROPKEY { fmtid: DEVPKEY_PciDevice, pid: 9 };
-    const DEVPKEY_PciDevice_CurrentLinkWidth: DEVPROPKEY = DEVPROPKEY { fmtid: DEVPKEY_PciDevice, pid: 10 };
-    const DEVPKEY_PciDevice_MaxLinkSpeed: DEVPROPKEY = DEVPROPKEY { fmtid: DEVPKEY_PciDevice, pid: 11 };
-    const DEVPKEY_PciDevice_MaxLinkWidth: DEVPROPKEY = DEVPROPKEY { fmtid: DEVPKEY_PciDevice, pid: 12 };
+    const DEVPKEY_PCI_DEVICE_BASE_CLASS: DEVPROPKEY =
+        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 3 };
+    const DEVPKEY_PCI_DEVICE_SUB_CLASS: DEVPROPKEY =
+        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 4 };
+    const DEVPKEY_PCI_DEVICE_CURRENT_LINK_SPEED: DEVPROPKEY =
+        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 9 };
+    const DEVPKEY_PCI_DEVICE_CURRENT_LINK_WIDTH: DEVPROPKEY =
+        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 10 };
+    const DEVPKEY_PCI_DEVICE_MAX_LINK_SPEED: DEVPROPKEY =
+        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 11 };
+    const DEVPKEY_PCI_DEVICE_MAX_LINK_WIDTH: DEVPROPKEY =
+        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 12 };
 
     /// Most UTF-16 units a device id list may take: far above the few hundred devices of a PC
     /// (235 ids, about 20 000 units, on the PC ADR 0069 measured), and a bound on what one answer can
@@ -172,6 +178,69 @@ mod live {
         Some(u64::from_le_bytes(raw))
     }
 
+    fn read_pci_facts(
+        devinst: u32,
+        present: bool,
+        record: &mut DeviceRecord,
+        missing: &mut Vec<DeviceProperty>,
+    ) {
+        match read(
+            devinst,
+            &DEVPKEY_Device_CompatibleIds,
+            DEVPROP_TYPE_STRING_LIST,
+            |b| Some(super::multi_sz(&units(b))),
+        ) {
+            Ok(ids) => record.class_code = ids.and_then(|ids| pci_class_code(&ids)),
+            Err(()) => missing.push(DeviceProperty::CompatibleIds),
+        }
+        if !present {
+            return;
+        }
+        for (key, property) in [
+            (&DEVPKEY_PCI_DEVICE_BASE_CLASS, DeviceProperty::BusClass),
+            (&DEVPKEY_PCI_DEVICE_SUB_CLASS, DeviceProperty::BusSubclass),
+            (
+                &DEVPKEY_PCI_DEVICE_CURRENT_LINK_SPEED,
+                DeviceProperty::LinkSpeed,
+            ),
+            (
+                &DEVPKEY_PCI_DEVICE_CURRENT_LINK_WIDTH,
+                DeviceProperty::LinkWidth,
+            ),
+            (
+                &DEVPKEY_PCI_DEVICE_MAX_LINK_SPEED,
+                DeviceProperty::MaxLinkSpeed,
+            ),
+            (&DEVPKEY_PCI_DEVICE_MAX_LINK_WIDTH, DeviceProperty::MaxLinkWidth),
+        ] {
+            match read(
+                devinst,
+                key,
+                DEVPROP_TYPE_UINT32,
+                |b| Some(u32::from_le_bytes(b.get(..4)?.try_into().ok()?)),
+            ) {
+                Ok(val) => match property {
+                    DeviceProperty::BusClass => record.bus_class = val,
+                    DeviceProperty::BusSubclass => record.bus_subclass = val,
+                    DeviceProperty::LinkSpeed => record.link_speed = val,
+                    DeviceProperty::LinkWidth => record.link_width = val,
+                    DeviceProperty::MaxLinkSpeed => record.max_link_speed = val,
+                    _ => record.max_link_width = val,
+                },
+                Err(()) => missing.push(property),
+            }
+        }
+        match read(
+            devinst,
+            &DEVPKEY_Device_Children,
+            DEVPROP_TYPE_STRING_LIST,
+            |b| u32::try_from(super::multi_sz(&units(b)).len()).ok(),
+        ) {
+            Ok(count) => record.child_count = count,
+            Err(()) => missing.push(DeviceProperty::ChildCount),
+        }
+    }
+
     #[allow(unsafe_code)]
     fn record(bus: DeviceBus, id: &str, present: bool) -> Option<DeviceRecord> {
         let model_id = device_model_id(bus, id)?;
@@ -230,15 +299,7 @@ mod live {
         }
         let mut missing = Vec::new();
         if bus == DeviceBus::Pci {
-            match read(
-                devinst,
-                &DEVPKEY_Device_CompatibleIds,
-                DEVPROP_TYPE_STRING_LIST,
-                |b| Some(super::multi_sz(&units(b))),
-            ) {
-                Ok(ids) => record.class_code = ids.and_then(|ids| pci_class_code(&ids)),
-                Err(()) => missing.push(DeviceProperty::CompatibleIds),
-            }
+            read_pci_facts(devinst, present, &mut record, &mut missing);
         }
         match read(devinst, &DEVPKEY_Device_Service, DEVPROP_TYPE_STRING, |b| {
             super::multi_sz(&units(b)).into_iter().next()
@@ -275,42 +336,6 @@ mod live {
                     }
                 }
                 Err(()) => missing.push(property),
-            }
-        }
-        if bus == DeviceBus::Pci && present {
-            for (key, property) in [
-                (&DEVPKEY_PciDevice_BaseClass, DeviceProperty::BusClass),
-                (&DEVPKEY_PciDevice_SubClass, DeviceProperty::BusSubclass),
-                (&DEVPKEY_PciDevice_CurrentLinkSpeed, DeviceProperty::LinkSpeed),
-                (&DEVPKEY_PciDevice_CurrentLinkWidth, DeviceProperty::LinkWidth),
-                (&DEVPKEY_PciDevice_MaxLinkSpeed, DeviceProperty::MaxLinkSpeed),
-                (&DEVPKEY_PciDevice_MaxLinkWidth, DeviceProperty::MaxLinkWidth),
-            ] {
-                match read(
-                    devinst,
-                    key,
-                    DEVPROP_TYPE_UINT32,
-                    |b| Some(u32::from_le_bytes(b.get(..4)?.try_into().ok()?)),
-                ) {
-                    Ok(val) => match property {
-                        DeviceProperty::BusClass => record.bus_class = val,
-                        DeviceProperty::BusSubclass => record.bus_subclass = val,
-                        DeviceProperty::LinkSpeed => record.link_speed = val,
-                        DeviceProperty::LinkWidth => record.link_width = val,
-                        DeviceProperty::MaxLinkSpeed => record.max_link_speed = val,
-                        _ => record.max_link_width = val,
-                    },
-                    Err(()) => missing.push(property),
-                }
-            }
-            match read(
-                devinst,
-                &DEVPKEY_Device_Children,
-                DEVPROP_TYPE_STRING_LIST,
-                |b| u32::try_from(super::multi_sz(&units(b)).len()).ok(),
-            ) {
-                Ok(count) => record.child_count = count,
-                Err(()) => missing.push(DeviceProperty::ChildCount),
             }
         }
         record.unreadable = missing;

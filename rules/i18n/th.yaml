@@ -1172,7 +1172,7 @@ e641494e-a337-4e4d-bf44-887b5cf1442b:
   title: Windows บันทึก bug check 0xE6
   description: >-
     Windows Error Reporting บันทึก bug check 0xE6 (DRIVER_VERIFIER_DMA_VIOLATION) ลงใน log System
-    bug check นี้เกิดขึ้นเมื่อเปิดใช้งาน Driver Verifier แล้วตรวจพบว่าไดรเวอร์หรืออุปกรณ์พยายามทำ DMA ที่ไม่ได้รับอนุญาต
+    bug check นี้เกิดขึ้นเมื่อตรวจพบว่าไดรเวอร์หรืออุปกรณ์พยายามทำ DMA ที่ไม่ได้รับอนุญาต และอาจเกิดขึ้นได้แม้ไม่ได้เปิดใช้งาน Driver Verifier
     ข้อนี้รายงานสิ่งที่ Windows บันทึกไว้และไม่ได้บอกว่ามีการใช้อุปกรณ์เพื่อโกง
   retention: ตราบที่ log System ยังเก็บ record ไว้ ค่าเริ่มต้นคือเขียนทับ record เก่าสุดเมื่อเต็มขนาด
   falsepositives:
