@@ -19,7 +19,7 @@
 
 | status | count |
 | --- | ---: |
-| experimental | 70 |
+| experimental | 71 |
 | test | 5 |
 | stable | 6 |
 | deprecated | 0 |
@@ -30,7 +30,7 @@
 | --- | ---: |
 | confronted | 46 |
 | known fp | 2 |
-| unconfronted | 33 |
+| unconfronted | 34 |
 | known fp; unconfronted | 0 |
 
 ### Rules by retention
@@ -39,14 +39,14 @@
 | --- | ---: |
 | documented | 18 |
 | stated | 19 |
-| none | 44 |
+| none | 45 |
 
 ### Rules seen found
 
 | seen | count |
 | --- | ---: |
 | found | 16 |
-| never | 65 |
+| never | 66 |
 
 ### Ledger rows by kind
 
@@ -57,7 +57,7 @@
 
 ## Gaps
 
-### Rules never seen found outside a fixture (65)
+### Rules never seen found outside a fixture (66)
 
 - `antivirus_product/registered/no-product-reports-on`
 - `bam/ephemeral/executed-program-missing-on-disk`
@@ -122,10 +122,11 @@
 - `usn/psreadline/files-deleted`
 - `usn/psreadline/files-renamed`
 - `usn/timeline/watched-folder-record-times`
+- `windows_start/dma/bug-check-e6`
 - `windows_start/timeline/fast-startup-start`
 - `windows_start/timeline/full-start`
 
-### Rules on the unconfronted list (33)
+### Rules on the unconfronted list (34)
 
 - `evtx/log-clearing/event-log-file-cleared` — added 2026-09-13; resolved when: A baseline carries a System channel captured under the same conditions as the rule above, with its PROVENANCE row. MEASURED 2026-09-13 on one real Windows 11 machine (build 26220, elevated scan): across 156 record groups on its System channel, NOT ONE was written by Microsoft-Windows-Eventlog. The doubt this row carried is settled in the unhelpful direction — an ordinary System log does not appear to confront this rule, so vendoring one would not close this row and might show that nothing can. Before capturing anything, check a second machine: if that also holds no Microsoft-Windows-Eventlog record on System, the question to answer is whether this rule can be confronted at all, not which fixture to add. UPDATED 2026-09-14: a second ordinary Windows 11 machine (build 26200, elevated scan) DID hold a Microsoft-Windows-Eventlog record on System — event 30, once — so an ordinary System log can confront this rule at two conditions of three, and the question above of whether it can be confronted at all is answered yes. DECIDED 2026-09-14 by the owner: no machine is built for the capture for now; the negative fixture `an-ordinary-system-log.json` carries that measured shape, and widening the rule to event 30 was tried and fails `cargo xtask check-rules`.
 - `evtx/log-clearing/security-audit-log-cleared` — added 2026-09-13; resolved when: A baseline carries a Security channel whose records this project is allowed to publish. fixtures/evtx/PROVENANCE.md forbids capturing from a player machine and says why: a Security record routinely carries a user name, a host name, a source IP, a SID and a command line, records cannot be redacted in place because each is checksummed within its chunk, and both the rendered-record and raw-string scans must be run before anything is vendored. So the capture has to come from a Windows 11 installation made for this purpose — throwaway local account, no network sign-in, nothing personal on it — and not from anyone real. MEASURED 2026-09-13 on one real Windows 11 machine (build 26220, elevated scan): its Security channel carried four Microsoft-Windows-Eventlog records with event id 1100, and no 1102. Those agree with this rule on provider and channel and differ on the event id, so a Security log from a machine of that kind confronts this rule at two conditions of three with no clearing having happened. The expectation this row carried before is now a measurement, on one machine. DECIDED 2026-09-14 by the owner: no machine is built for this capture for now. What a baseline would have caught — the rule widened to match what an ordinary Security log holds — is covered instead by the negative fixture `an-ordinary-security-log.json`, whose shape (Microsoft-Windows-Eventlog 1100, and 1101, with no 1102) was measured on two ordinary Windows 11 machines; widening the rule to 1100 was tried and fails `cargo xtask check-rules`. This row stays because that fixture is a specification, not a baseline.
@@ -160,6 +161,7 @@
 - `usn/identity/digitalentitlements-file-deleted` — added 2026-10-17; resolved when: A baseline's `usn_journal:` block is rebuilt from a reading of a machine this project may publish taken with this collector, with its PROVENANCE row, listing DigitalEntitlements as identified — with no `deleted` record, which confronts this rule, or with one and a `known-fps.csv` row saying what produced it.
 - `bam/system-name/windows-name-outside-windows-folders` — added 2026-11-09; resolved when: A baseline describes a machine where BAM recorded a table name (such as `svchost.exe` or `explorer.exe`) run from its expected folder, measured with this collector on a real Windows installation and carrying its PROVENANCE row. The rule's positive and negative fixtures cover both states meanwhile.
 - `prefetch/system-name/windows-name-outside-windows-folders` — added 2026-11-09; resolved when: A baseline describes a machine whose Prefetch folder holds a record of a table name (such as `svchost.exe` or `explorer.exe`) run from its expected folder, measured with this collector on a real Windows installation and carrying its PROVENANCE row. The rule's positive and negative fixtures cover both states meanwhile.
+- `windows_start/dma/bug-check-e6` — added 2026-11-18; resolved when: A baseline carries a System log this project is allowed to publish — captured on a Windows installation made for the purpose, as the Security-log row above describes — or an .evtx fixture is built from the parser's own records. The rule's positive and negative fixtures cover this rule meanwhile (ADR 0095 section 4).
 
 ### Collectors never measured (6)
 
@@ -313,5 +315,6 @@
 | `usn/psreadline/files-deleted` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
 | `usn/psreadline/files-renamed` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
 | `usn/timeline/watched-folder-record-times` | usn | timeline | context | test | 1 / 1 | confronted | documented | never | 26100 server x64, 26220 client x64 |
+| `windows_start/dma/bug-check-e6` | windows_start | evidence | context | experimental | 1 / 1 | unconfronted | none | never | never |
 | `windows_start/timeline/fast-startup-start` | windows_start | timeline | context | experimental | 1 / 1 | unconfronted | none | never | never |
 | `windows_start/timeline/full-start` | windows_start | timeline | context | experimental | 1 / 1 | unconfronted | none | never | never |
