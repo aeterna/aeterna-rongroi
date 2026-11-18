@@ -117,8 +117,8 @@ selector would show them in SS mode.
 ### 3. More facts on `pci_device`
 
 `pci_device` gains `bus_class`, `bus_subclass`, `link_speed`, `link_width`, `max_link_speed`, `max_link_width` and
-`child_count`. A value Windows does not give is absent. `child_count` counts `DEVPKEY_Device_Children`; the children's ids
-are not kept.
+`child_count`. A value Windows does not give is absent. `child_count` counts `DEVPKEY_Device_Children`; a present device for
+which Windows holds no list has `0`. The children's ids are not kept.
 
 `DEVPKEY_PciDevice_*` is declared by `pciprop.h` and is not in the `windows` 0.62.2 bindings, so `device.rs` defines those
 keys and cites the header. No Microsoft Learn page was found. ADR 0069 §4 is the precedent: a declared key, read as what
