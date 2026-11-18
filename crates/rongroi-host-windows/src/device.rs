@@ -45,20 +45,35 @@ mod live {
     // Keys defined in Windows SDK `pciprop.h` (property set GUID {3AB22E31-8264-4B4E-9AF5-A8D2D8E33E62}),
     // not present in the `windows` crate bindings (ADR 0095 section 3).
     const DEVPKEY_PCI_DEVICE: windows::core::GUID = windows::core::GUID::from_values(
-        0x3ab2_2e31, 0x8264, 0x4b4e, [0x9a, 0xf5, 0xa8, 0xd2, 0xd8, 0xe3, 0x3e, 0x62],
+        0x3ab2_2e31,
+        0x8264,
+        0x4b4e,
+        [0x9a, 0xf5, 0xa8, 0xd2, 0xd8, 0xe3, 0x3e, 0x62],
     );
-    const DEVPKEY_PCI_DEVICE_BASE_CLASS: DEVPROPKEY =
-        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 3 };
-    const DEVPKEY_PCI_DEVICE_SUB_CLASS: DEVPROPKEY =
-        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 4 };
-    const DEVPKEY_PCI_DEVICE_CURRENT_LINK_SPEED: DEVPROPKEY =
-        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 9 };
-    const DEVPKEY_PCI_DEVICE_CURRENT_LINK_WIDTH: DEVPROPKEY =
-        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 10 };
-    const DEVPKEY_PCI_DEVICE_MAX_LINK_SPEED: DEVPROPKEY =
-        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 11 };
-    const DEVPKEY_PCI_DEVICE_MAX_LINK_WIDTH: DEVPROPKEY =
-        DEVPROPKEY { fmtid: DEVPKEY_PCI_DEVICE, pid: 12 };
+    const DEVPKEY_PCI_DEVICE_BASE_CLASS: DEVPROPKEY = DEVPROPKEY {
+        fmtid: DEVPKEY_PCI_DEVICE,
+        pid: 3,
+    };
+    const DEVPKEY_PCI_DEVICE_SUB_CLASS: DEVPROPKEY = DEVPROPKEY {
+        fmtid: DEVPKEY_PCI_DEVICE,
+        pid: 4,
+    };
+    const DEVPKEY_PCI_DEVICE_CURRENT_LINK_SPEED: DEVPROPKEY = DEVPROPKEY {
+        fmtid: DEVPKEY_PCI_DEVICE,
+        pid: 9,
+    };
+    const DEVPKEY_PCI_DEVICE_CURRENT_LINK_WIDTH: DEVPROPKEY = DEVPROPKEY {
+        fmtid: DEVPKEY_PCI_DEVICE,
+        pid: 10,
+    };
+    const DEVPKEY_PCI_DEVICE_MAX_LINK_SPEED: DEVPROPKEY = DEVPROPKEY {
+        fmtid: DEVPKEY_PCI_DEVICE,
+        pid: 11,
+    };
+    const DEVPKEY_PCI_DEVICE_MAX_LINK_WIDTH: DEVPROPKEY = DEVPROPKEY {
+        fmtid: DEVPKEY_PCI_DEVICE,
+        pid: 12,
+    };
 
     /// Most UTF-16 units a device id list may take: far above the few hundred devices of a PC
     /// (235 ids, about 20 000 units, on the PC ADR 0069 measured), and a bound on what one answer can
@@ -211,14 +226,14 @@ mod live {
                 &DEVPKEY_PCI_DEVICE_MAX_LINK_SPEED,
                 DeviceProperty::MaxLinkSpeed,
             ),
-            (&DEVPKEY_PCI_DEVICE_MAX_LINK_WIDTH, DeviceProperty::MaxLinkWidth),
+            (
+                &DEVPKEY_PCI_DEVICE_MAX_LINK_WIDTH,
+                DeviceProperty::MaxLinkWidth,
+            ),
         ] {
-            match read(
-                devinst,
-                key,
-                DEVPROP_TYPE_UINT32,
-                |b| Some(u32::from_le_bytes(b.get(..4)?.try_into().ok()?)),
-            ) {
+            match read(devinst, key, DEVPROP_TYPE_UINT32, |b| {
+                Some(u32::from_le_bytes(b.get(..4)?.try_into().ok()?))
+            }) {
                 Ok(val) => match property {
                     DeviceProperty::BusClass => record.bus_class = val,
                     DeviceProperty::BusSubclass => record.bus_subclass = val,

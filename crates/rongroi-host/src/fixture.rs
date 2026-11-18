@@ -231,20 +231,27 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         DeviceBus::Pci => crate::pci_class_code(&device.compatible_ids),
         DeviceBus::Hid => None,
     };
-    let (bus_class, bus_subclass, link_speed, link_width, max_link_speed, max_link_width, child_count) =
-        if bus == DeviceBus::Pci {
-            (
-                device.bus_class,
-                device.bus_subclass,
-                device.link_speed,
-                device.link_width,
-                device.max_link_speed,
-                device.max_link_width,
-                device.child_count,
-            )
-        } else {
-            (None, None, None, None, None, None, None)
-        };
+    let (
+        bus_class,
+        bus_subclass,
+        link_speed,
+        link_width,
+        max_link_speed,
+        max_link_width,
+        child_count,
+    ) = if bus == DeviceBus::Pci {
+        (
+            device.bus_class,
+            device.bus_subclass,
+            device.link_speed,
+            device.link_width,
+            device.max_link_speed,
+            device.max_link_width,
+            device.child_count,
+        )
+    } else {
+        (None, None, None, None, None, None, None)
+    };
     Ok(DeviceRecord {
         bus,
         model_id,

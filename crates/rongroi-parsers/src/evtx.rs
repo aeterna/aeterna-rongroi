@@ -1686,11 +1686,7 @@ mod start_tests {
     fn only_wer_1001_on_system_is_a_bug_check() {
         let data = json!({ "param1": "0x000000e6 (0x0000000000000026, 0x0, 0x0, 0x0)" });
         for (provider, channel, id) in [
-            (
-                "Some-Other-Provider",
-                "System",
-                json!(1001),
-            ),
+            ("Some-Other-Provider", "System", json!(1001)),
             (
                 "Microsoft-Windows-WER-SystemErrorReporting",
                 "Application",
@@ -1701,11 +1697,7 @@ mod start_tests {
                 "System",
                 json!(1002),
             ),
-            (
-                "Microsoft-Windows-Kernel-Boot",
-                "System",
-                json!(1001),
-            ),
+            ("Microsoft-Windows-Kernel-Boot", "System", json!(1001)),
         ] {
             assert_eq!(
                 wer_bug_check(&rendered(provider, channel, &id, &data)),
