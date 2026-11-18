@@ -40,12 +40,19 @@ const REASONS: [UnmeasuredReason; 3] = [
 ];
 
 /// Every field this collector can emit, sorted by name.
-const FIELDS: [Field; 11] = [
+const FIELDS: [Field; 18] = [
+    Field::number("bus_class"),
+    Field::number("bus_subclass"),
+    Field::number("child_count"),
     Field::text("class_code"),
     Field::text("device_id"),
     Field::timestamp("first_install_at"),
     Field::timestamp("last_arrival_at"),
     Field::timestamp("last_removal_at"),
+    Field::number("link_speed"),
+    Field::number("link_width"),
+    Field::number("max_link_speed"),
+    Field::number("max_link_width"),
     Field::text("name"),
     Field::boolean("present"),
     Field::number("problem_code"),
@@ -125,6 +132,13 @@ fn fields_of(property: DeviceProperty) -> &'static [&'static str] {
         DeviceProperty::FirstInstall => &["first_install_at"],
         DeviceProperty::LastArrival => &["last_arrival_at"],
         DeviceProperty::LastRemoval => &["last_removal_at"],
+        DeviceProperty::BusClass => &["bus_class"],
+        DeviceProperty::BusSubclass => &["bus_subclass"],
+        DeviceProperty::LinkSpeed => &["link_speed"],
+        DeviceProperty::LinkWidth => &["link_width"],
+        DeviceProperty::MaxLinkSpeed => &["max_link_speed"],
+        DeviceProperty::MaxLinkWidth => &["max_link_width"],
+        DeviceProperty::ChildCount => &["child_count"],
     }
 }
 
@@ -172,6 +186,19 @@ fn observation(device: &DeviceRecord) -> Observation {
     ] {
         if let Some(time) = time {
             fields.insert(name.to_owned(), serde_json::Value::from(time.to_string()));
+        }
+    }
+    for (name, value) in [
+        ("bus_class", device.bus_class),
+        ("bus_subclass", device.bus_subclass),
+        ("child_count", device.child_count),
+        ("link_speed", device.link_speed),
+        ("link_width", device.link_width),
+        ("max_link_speed", device.max_link_speed),
+        ("max_link_width", device.max_link_width),
+    ] {
+        if let Some(value) = value {
+            fields.insert(name.to_owned(), serde_json::Value::from(value));
         }
     }
     Observation {
@@ -316,5 +343,63 @@ devices:
         );
         assert_eq!(model_field(r"PCI\VEN_10DE", "DEV_"), None);
         assert_eq!(model_field("PCI", "VEN_"), None);
+    }
+
+    #[test]
+    fn pci_device_emits_each_field_from_a_fixture_device_and_omits_absent_ones() {
+        let run = PciDevice.collect(&host(
+            r"platform: windows
+devices:
+  - id: 'PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10\4&c580b9d&0&0020'
+    present: true
+    bus_class: 6
+    bus_subclass: 4
+    link_speed: 1
+    link_width: 16
+    max_link_speed: 3
+    max_link_width: 16
+    child_count: 0
+  - id: 'PCI\VEN_8086&DEV_1234\3&0'
+    present: true
+",
+        ));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(observations.len(), 2);
+        let fields0 = &observations[0].fields;
+        let num = |fields: &BTreeMap<String, serde_json::Value>, name: &str| {
+            fields.get(name).and_then(serde_json::Value::as_u64)
+        };
+        for (field, expected) in [
+            ("bus_class", 6),
+            ("bus_subclass", 4),
+            ("child_count", 0),
+            ("link_speed", 1),
+            ("link_width", 16),
+            ("max_link_speed", 3),
+            ("max_link_width", 16),
+        ] {
+            assert_eq!(num(fields0, field), Some(expected));
+            assert_eq!(observations[1].fields.get(field), None);
+        }
+    }
+
+    #[test]
+    fn an_unreadable_new_property_gives_a_gap_on_the_matching_field_only() {
+        let run = PciDevice.collect(&host(
+            r"platform: windows
+devices:
+  - id: 'PCI\VEN_8086&DEV_1234\3&0'
+    present: true
+    unreadable: [bus_class, max_link_width, child_count]
+",
+        ));
+        let (observations, gaps) = measured(&run);
+        assert_eq!(observations.len(), 1);
+        assert_eq!(
+            gaps.keys().map(String::as_str).collect::<Vec<_>>(),
+            ["bus_class", "child_count", "max_link_width"]
+        );
+        assert!(gaps.values().all(|r| *r == UnmeasuredReason::ReadFailed));
     }
 }
