@@ -1167,3 +1167,15 @@ f934b261-18f8-4c4e-b3b3-1163d644cf0e:
     - การสมัครสมาชิกของแอนตี้ไวรัสบุคคลที่สามที่หมดอายุแล้ว
     - แอนตี้ไวรัสที่ไม่ลงทะเบียนกับ Security Center
     - Security Center ที่ยังไม่ได้อัปเดตหลังลงชื่อเข้าใช้
+
+e641494e-a337-4e4d-bf44-887b5cf1442b:
+  title: Windows บันทึก bug check 0xE6
+  description: >-
+    Windows Error Reporting บันทึก bug check 0xE6 (DRIVER_VERIFIER_DMA_VIOLATION) ลงใน log System
+    Microsoft ระบุในเอกสารว่ารหัสนี้มีไว้สำหรับ DMA verification violations และบอกว่าอาจพบได้แม้ไม่ได้เปิดใช้งาน Driver Verifier
+    ข้อนี้รายงานสิ่งที่ Windows บันทึกไว้และไม่ได้บอกว่ามีการใช้อุปกรณ์เพื่อโกง
+  retention: ตราบที่ log System ยังเก็บ record ไว้ ค่าเริ่มต้นคือเขียนทับ record เก่าสุดเมื่อเต็มขนาด
+  falsepositives:
+    - Driver Verifier เปิดใช้งานอยู่
+    - ไดรเวอร์ทำงานผิดพลาด
+    - ฮาร์ดแวร์มีปัญหา

@@ -1,6 +1,6 @@
 # ADR 0095 — The PCI positions Windows started, one start at a time
 
-- Status: accepted — the owner decided the questions below on 2026-11-18, each as recommended. Not implemented yet
+- Status: accepted — the owner decided the questions below on 2026-11-18, each as recommended. Sections 3 and 4 are built ("As built"); section 1 waits for a physical PC and other Windows builds
 - Date: 2026-11-18
 - Amends: ADR 0018 (two more kinds of event whose payload is read), ADR 0069 (a device's position is read, from a log
   and not from the device list), ADR 0070 (`pci_device` gains fields), ADR 0071 (`windows_start` gains a second kind of
@@ -117,8 +117,8 @@ selector would show them in SS mode.
 ### 3. More facts on `pci_device`
 
 `pci_device` gains `bus_class`, `bus_subclass`, `link_speed`, `link_width`, `max_link_speed`, `max_link_width` and
-`child_count`. A value Windows does not give is absent. `child_count` counts `DEVPKEY_Device_Children`; the children's ids
-are not kept.
+`child_count`. A value Windows does not give is absent. `child_count` counts `DEVPKEY_Device_Children`; a present device for
+which Windows holds no list has `0`. The children's ids are not kept.
 
 `DEVPKEY_PciDevice_*` is declared by `pciprop.h` and is not in the `windows` 0.62.2 bindings, so `device.rs` defines those
 keys and cites the header. No Microsoft Learn page was found. ADR 0069 §4 is the precedent: a declared key, read as what
@@ -188,6 +188,12 @@ Decided on 2026-11-18: all as recommended.
 | 2 | Allow PCI positions, and tell the reader that reports can be matched through them? | Yes |
 | 3 | Read payload from this log and the `0xE6` bug check only? | Yes |
 | 4 | Keep Connect out until Offline has shipped? | Yes |
+
+## As built (2026-11-18)
+
+- Section 3: `pci_device` carries the seven fields; they are read for present devices only, and no rule uses them.
+- Section 4: `windows_start` declares `record`; `windows_start/dma/bug-check-e6` is in `rules/unconfronted.csv`, because no baseline host carries a System log.
+- Sections 1 and 2 are not built.
 
 ## Consequences
 

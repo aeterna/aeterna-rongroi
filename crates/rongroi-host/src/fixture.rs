@@ -155,6 +155,20 @@ struct FixtureDevice {
     last_arrival: Option<String>,
     #[serde(default)]
     last_removal: Option<String>,
+    #[serde(default)]
+    bus_class: Option<u32>,
+    #[serde(default)]
+    bus_subclass: Option<u32>,
+    #[serde(default)]
+    link_speed: Option<u32>,
+    #[serde(default)]
+    link_width: Option<u32>,
+    #[serde(default)]
+    max_link_speed: Option<u32>,
+    #[serde(default)]
+    max_link_width: Option<u32>,
+    #[serde(default)]
+    child_count: Option<u32>,
     /// Properties a live host could not read for this device.
     #[serde(default)]
     unreadable: Vec<FixtureDeviceProperty>,
@@ -169,6 +183,13 @@ enum FixtureDeviceProperty {
     FirstInstall,
     LastArrival,
     LastRemoval,
+    BusClass,
+    BusSubclass,
+    LinkSpeed,
+    LinkWidth,
+    MaxLinkSpeed,
+    MaxLinkWidth,
+    ChildCount,
 }
 
 /// Turns one described device into the record a live host returns. A device whose id belongs to
@@ -193,9 +214,43 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
             "device `{id}` is absent but has a problem code; a live host reads one only for a present device"
         )));
     }
+    if !device.present
+        && (device.bus_class.is_some()
+            || device.bus_subclass.is_some()
+            || device.link_speed.is_some()
+            || device.link_width.is_some()
+            || device.max_link_speed.is_some()
+            || device.max_link_width.is_some()
+            || device.child_count.is_some())
+    {
+        return Err(fail(format!(
+            "device `{id}` is absent but has a PCI property; a live host reads them only for a present device"
+        )));
+    }
     let class_code = match bus {
         DeviceBus::Pci => crate::pci_class_code(&device.compatible_ids),
         DeviceBus::Hid => None,
+    };
+    let (
+        bus_class,
+        bus_subclass,
+        link_speed,
+        link_width,
+        max_link_speed,
+        max_link_width,
+        child_count,
+    ) = if bus == DeviceBus::Pci {
+        (
+            device.bus_class,
+            device.bus_subclass,
+            device.link_speed,
+            device.link_width,
+            device.max_link_speed,
+            device.max_link_width,
+            device.child_count,
+        )
+    } else {
+        (None, None, None, None, None, None, None)
     };
     Ok(DeviceRecord {
         bus,
@@ -207,6 +262,13 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         first_install: listed_time_of(device.first_install.as_deref(), id, origin)?,
         last_arrival: listed_time_of(device.last_arrival.as_deref(), id, origin)?,
         last_removal: listed_time_of(device.last_removal.as_deref(), id, origin)?,
+        bus_class,
+        bus_subclass,
+        link_speed,
+        link_width,
+        max_link_speed,
+        max_link_width,
+        child_count,
         unreadable: device
             .unreadable
             .into_iter()
@@ -217,6 +279,13 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
                 FixtureDeviceProperty::FirstInstall => DeviceProperty::FirstInstall,
                 FixtureDeviceProperty::LastArrival => DeviceProperty::LastArrival,
                 FixtureDeviceProperty::LastRemoval => DeviceProperty::LastRemoval,
+                FixtureDeviceProperty::BusClass => DeviceProperty::BusClass,
+                FixtureDeviceProperty::BusSubclass => DeviceProperty::BusSubclass,
+                FixtureDeviceProperty::LinkSpeed => DeviceProperty::LinkSpeed,
+                FixtureDeviceProperty::LinkWidth => DeviceProperty::LinkWidth,
+                FixtureDeviceProperty::MaxLinkSpeed => DeviceProperty::MaxLinkSpeed,
+                FixtureDeviceProperty::MaxLinkWidth => DeviceProperty::MaxLinkWidth,
+                FixtureDeviceProperty::ChildCount => DeviceProperty::ChildCount,
             })
             .collect(),
     })
@@ -2156,6 +2225,8 @@ devices:
         for yaml in [
             "platform: windows\ndevices:\n  - { id: 'USB\\VID_0627&PID_0001\\1', present: true }\n",
             "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, problem_code: 28 }\n",
+            "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, bus_class: 6 }\n",
+            "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, child_count: 0 }\n",
             "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: true, first_install: '2026-10-15T11:32:36.5Z' }\n",
         ] {
             assert!(
@@ -2163,6 +2234,44 @@ devices:
                 "{yaml}"
             );
         }
+    }
+
+    #[test]
+    fn fixture_yaml_accepts_new_pci_fields_and_unreadable_properties() {
+        let host = FixtureHost::from_yaml_str(
+            r"platform: windows
+devices:
+  - id: 'PCI\VEN_1234&DEV_11E8&SUBSYS_11001AF4&REV_10\4&c580b9d&0&0020'
+    present: true
+    bus_class: 6
+    bus_subclass: 4
+    link_speed: 1
+    link_width: 16
+    max_link_speed: 3
+    max_link_width: 16
+    child_count: 2
+    unreadable: [bus_class, link_speed, child_count]
+",
+            "inline",
+        )
+        .unwrap();
+        let pci = host.devices(DeviceBus::Pci).unwrap();
+        assert_eq!(pci.len(), 1);
+        assert_eq!(pci[0].bus_class, Some(6));
+        assert_eq!(pci[0].bus_subclass, Some(4));
+        assert_eq!(pci[0].link_speed, Some(1));
+        assert_eq!(pci[0].link_width, Some(16));
+        assert_eq!(pci[0].max_link_speed, Some(3));
+        assert_eq!(pci[0].max_link_width, Some(16));
+        assert_eq!(pci[0].child_count, Some(2));
+        assert_eq!(
+            pci[0].unreadable,
+            vec![
+                DeviceProperty::BusClass,
+                DeviceProperty::LinkSpeed,
+                DeviceProperty::ChildCount,
+            ]
+        );
     }
 
     #[test]

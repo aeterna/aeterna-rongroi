@@ -45,8 +45,9 @@
 //! straight to [`crate::powershell_text::classify`], which keeps kinds and at most a host, never the text.
 //! [`records`] is unchanged and still reads no payload; only a full scan's collector calls the other.
 //!
-//! **A second, by ADR 0071:** [`windows_starts`] reads one number, `BootType`, of the one event Windows
-//! writes at each start, and no other value of that event or of any other.
+//! **A second, by ADR 0071 and ADR 0095 section 4:** [`windows_starts`] reads `BootType` of the event
+//! Windows writes at each start, and bug checks with code 0xE6 (keeping their code and first parameter),
+//! and no other value of those events or of any other.
 //!
 //! **Three more, by ADR 0081 section 1:** [`system_fields`], [`security_fields`] and [`refused_images`]
 //! read a few named fields of four events, each recognised by provider, channel and id together (ADR
@@ -592,11 +593,15 @@ fn walk_strings(value: &Value, f: &mut dyn FnMut(&str)) {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// How Windows started, one number of one event (ADR 0071, widening ADR 0018 for a third kind of event)
+// How Windows started and bug check 0xE6 (ADR 0071, ADR 0095 section 4)
 // ---------------------------------------------------------------------------------------------------
 
 /// The provider, channel and event id Windows writes once at each start, with `BootType` in its data.
 const KERNEL_BOOT_START: (&str, &str, u32) = ("Microsoft-Windows-Kernel-Boot", "System", 27);
+
+/// The provider, channel and event id Windows Error Reporting writes for a bug check.
+const WER_BUG_CHECK: (&str, &str, u32) =
+    ("Microsoft-Windows-WER-SystemErrorReporting", "System", 1001);
 
 /// One start of Windows as [`windows_starts`] reads it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -608,18 +613,31 @@ pub struct WindowsStart {
     pub boot_type: Option<u8>,
 }
 
+/// One bug check with code 0xE6 as [`windows_starts`] reads it (ADR 0095 section 4).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BugCheck {
+    /// When the record was written.
+    pub written: Timestamp,
+    /// Bug check code in upper-case hex (`"0xE6"`).
+    pub code: String,
+    /// First parameter formatted as upper-case hex with no leading zeros.
+    pub parameter_1: String,
+}
+
 /// What [`windows_starts`] read from one log.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct WindowsStarts {
     /// One per start, in the order the records were read.
     pub starts: Vec<WindowsStart>,
+    /// Bug checks with code 0xE6, in the order the records were read (ADR 0095 section 4).
+    pub bug_checks: Vec<BugCheck>,
     /// Chunks or records that did not parse, as [`records`] reports them.
     pub rejected: Vec<RejectedRecord>,
 }
 
-/// Reads `BootType` of every start Windows recorded in one log, and nothing else of any record (ADR
-/// 0071). A start is 27 from `Microsoft-Windows-Kernel-Boot` on `System`, recognised by provider, channel
-/// and id together (ADR 0031). Its other data, `LoadOptions` among them, is not read.
+/// Reads `BootType` of every start Windows recorded in one log (ADR 0071), and bug checks with code 0xE6
+/// (ADR 0095 section 4). `LoadOptions`, `param2`, `param3`, the other bug check parameters and every other
+/// code are not read.
 ///
 /// # Errors
 ///
@@ -636,7 +654,10 @@ pub fn windows_starts(bytes: &[u8]) -> Result<WindowsStarts, ParseError> {
     let mut out = WindowsStarts::default();
     for outcome in parser.records_json_value() {
         match outcome {
-            Ok(parsed) => out.starts.extend(windows_start(&parsed)),
+            Ok(parsed) => {
+                out.starts.extend(windows_start(&parsed));
+                out.bug_checks.extend(wer_bug_check(&parsed));
+            }
             Err(error) => out.rejected.push(RejectedRecord {
                 chunk_number: failed_chunk(&error),
                 record_id: failed_record(&error),
@@ -668,6 +689,54 @@ fn windows_start(parsed: &SerializedEvtxRecord<Value>) -> Option<WindowsStart> {
         written: parsed.timestamp,
         boot_type,
     })
+}
+
+fn wer_bug_check(parsed: &SerializedEvtxRecord<Value>) -> Option<BugCheck> {
+    let identity = record(parsed);
+    let (provider, channel, id) = WER_BUG_CHECK;
+    if identity.provider.as_deref() != Some(provider)
+        || identity.channel.as_deref() != Some(channel)
+        || identity.event_id != Some(id)
+    {
+        return None;
+    }
+    let data = parsed
+        .data
+        .get("Event")
+        .and_then(|event| event.get("EventData"));
+    let param1_str = data_text(data, "param1")?;
+    let (code, p1) = parse_bug_check_param1(&param1_str)?;
+    if code != 0xe6 {
+        return None;
+    }
+    Some(BugCheck {
+        written: parsed.timestamp,
+        code: "0xE6".to_owned(),
+        parameter_1: format!("0x{p1:X}"),
+    })
+}
+
+fn parse_bug_check_param1(param1: &str) -> Option<(u64, u64)> {
+    let s = param1.trim();
+    let (code_str, rest) = s.split_once('(')?;
+    let hex_code = code_str
+        .trim()
+        .strip_prefix("0x")
+        .or_else(|| code_str.trim().strip_prefix("0X"))?;
+    if hex_code.is_empty() {
+        return None;
+    }
+    let code = u64::from_str_radix(hex_code, 16).ok()?;
+    let inside = rest.trim_end().strip_suffix(')')?;
+    let first_param = inside.split(',').next()?.trim();
+    let p1_hex = first_param
+        .strip_prefix("0x")
+        .or_else(|| first_param.strip_prefix("0X"))?;
+    if p1_hex.is_empty() {
+        return None;
+    }
+    let p1 = u64::from_str_radix(p1_hex, 16).ok()?;
+    Some((code, p1))
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1466,7 +1535,7 @@ mod start_tests {
     use jiff::Timestamp;
     use serde_json::{Value, json};
 
-    use super::{WindowsStart, windows_start, windows_starts};
+    use super::{BugCheck, WindowsStart, wer_bug_check, windows_start, windows_starts};
 
     const LANGUAGE_PACK: &[u8] =
         include_bytes!("../../../fixtures/evtx/languagepacksetup-operational.evtx");
@@ -1556,7 +1625,131 @@ mod start_tests {
     fn a_log_with_no_start_reads_as_none_and_short_bytes_are_refused() {
         let read = windows_starts(LANGUAGE_PACK).unwrap();
         assert!(read.starts.is_empty());
+        assert!(read.bug_checks.is_empty());
         assert!(windows_starts(&LANGUAGE_PACK[..100]).is_err());
+    }
+
+    #[test]
+    fn bug_check_keeps_e6_regardless_of_hex_case() {
+        for param1 in [
+            "0x000000e6 (0x0000000000000026, 0x0, 0x0, 0x0)",
+            "0x000000E6 (0x0000000000000026, 0x0, 0x0, 0x0)",
+            "0xe6 (0x26, 0x0, 0x0, 0x0)",
+            "0xE6 (0x26, 0x0, 0x0, 0x0)",
+            "0x000000e6 (0x26)",
+        ] {
+            let data = json!({ "param1": param1 });
+            let bc = wer_bug_check(&rendered(
+                "Microsoft-Windows-WER-SystemErrorReporting",
+                "System",
+                &json!(1001),
+                &data,
+            ));
+            assert_eq!(
+                bc,
+                Some(BugCheck {
+                    written: Timestamp::from_second(1_791_000_000).unwrap(),
+                    code: "0xE6".to_owned(),
+                    parameter_1: "0x26".to_owned(),
+                }),
+                "failed for param1: {param1}"
+            );
+        }
+    }
+
+    #[test]
+    fn bug_check_ignores_other_code_and_malformed_param1() {
+        for param1 in [
+            "0x0000003b (0x0000000000000026, 0x0, 0x0, 0x0)",
+            "0x00000000 (0x0000000000000026, 0x0, 0x0, 0x0)",
+            "0x000000e7 (0x0000000000000026, 0x0, 0x0, 0x0)",
+            "not a bug check",
+            "0xe6",
+            "0xe6 (0x26",
+            "0xe6 ()",
+            "0xe6 (nothex, 0x0)",
+            "0x (0x26)",
+            "0xe6 (0x)",
+        ] {
+            let data = json!({ "param1": param1 });
+            let bc = wer_bug_check(&rendered(
+                "Microsoft-Windows-WER-SystemErrorReporting",
+                "System",
+                &json!(1001),
+                &data,
+            ));
+            assert_eq!(bc, None, "expected None for param1: {param1}");
+        }
+    }
+
+    #[test]
+    fn only_wer_1001_on_system_is_a_bug_check() {
+        let data = json!({ "param1": "0x000000e6 (0x0000000000000026, 0x0, 0x0, 0x0)" });
+        for (provider, channel, id) in [
+            ("Some-Other-Provider", "System", json!(1001)),
+            (
+                "Microsoft-Windows-WER-SystemErrorReporting",
+                "Application",
+                json!(1001),
+            ),
+            (
+                "Microsoft-Windows-WER-SystemErrorReporting",
+                "System",
+                json!(1002),
+            ),
+            ("Microsoft-Windows-Kernel-Boot", "System", json!(1001)),
+        ] {
+            assert_eq!(
+                wer_bug_check(&rendered(provider, channel, &id, &data)),
+                None
+            );
+        }
+        assert!(
+            wer_bug_check(&rendered(
+                "Microsoft-Windows-WER-SystemErrorReporting",
+                "System",
+                &json!(1001),
+                &data,
+            ))
+            .is_some()
+        );
+    }
+
+    #[test]
+    fn bug_check_never_exposes_param2_or_param3() {
+        let data = json!({
+            "param1": "0x000000e6 (0x0000000000000026, 0x11112222, 0x33334444, 0x55556666)",
+            "param2": "C:\\Windows\\MEMORY.DMP",
+            "param3": "WER-REPORT-GUID-9999",
+        });
+        let bc = wer_bug_check(&rendered(
+            "Microsoft-Windows-WER-SystemErrorReporting",
+            "System",
+            &json!(1001),
+            &data,
+        ))
+        .expect("should parse 0xE6");
+        let repr = format!("{bc:?}");
+        assert!(!repr.contains("MEMORY.DMP"));
+        assert!(!repr.contains("WER-REPORT-GUID-9999"));
+        assert!(!repr.contains("11112222"));
+        assert!(!repr.contains("33334444"));
+        assert!(!repr.contains("55556666"));
+        assert_eq!(bc.code, "0xE6");
+        assert_eq!(bc.parameter_1, "0x26");
+    }
+
+    #[test]
+    fn bug_check_formats_parameter_1_as_upper_case_hex() {
+        let data = json!({ "param1": "0x000000e6 (0x00000000000000ab, 0x0, 0x0, 0x0)" });
+        let bc = wer_bug_check(&rendered(
+            "Microsoft-Windows-WER-SystemErrorReporting",
+            "System",
+            &json!(1001),
+            &data,
+        ))
+        .expect("should parse 0xE6");
+        assert_eq!(bc.parameter_1, "0xAB");
     }
 }
 

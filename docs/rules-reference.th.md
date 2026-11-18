@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 81 |
-| SHA-256 | `a7772fc1752d577ae4f77ce8c13a28ce4602429765f313540194f383aef863f6` |
+| จำนวน rule | 82 |
+| SHA-256 | `b931ca0ffe703933d9c2b6271bf494ca953666c1920a7d81ebbd883af602ad46` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -119,6 +119,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ plugin ของ FiveM](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
   - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ประวัติคำสั่งของ PowerShell](#rule-926b3863-8f4f-4d18-aab6-26b77934466e) — `context` · `experimental`
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ประวัติคำสั่งของ PowerShell](#rule-8a39617a-30d6-4fc0-9b20-cb4f899985d5) — `context` · `experimental`
+- `windows_start`
+  - [Windows บันทึก bug check 0xE6](#rule-e641494e-a337-4e4d-bf44-887b5cf1442b) — `context` · `experimental`
 - timeline selector
   - `bam`
     - [เวลาที่ BAM บันทึกโปรแกรมที่ชื่อเหมือน process เกมของ FiveM](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
@@ -2967,6 +2969,52 @@ NTFS change journal มี record อย่างน้อยหนึ่งร�
 
 - <https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline>
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
+## collector `windows_start`
+
+### `windows_start` / `dma`
+
+<a id="rule-e641494e-a337-4e4d-bf44-887b5cf1442b"></a>
+
+#### Windows บันทึก bug check 0xE6
+
+- ชื่อภาษาอังกฤษ: Windows recorded bug check 0xE6
+- id: `e641494e-a337-4e4d-bf44-887b5cf1442b`
+- ไฟล์: [`rules/windows_start/dma/bug-check-e6/rule.yaml`](../rules/windows_start/dma/bug-check-e6/rule.yaml)
+- collector: `windows_start`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `windows_start`, `dma`
+- เขียนเมื่อ: 2026-11-18
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows Error Reporting บันทึก bug check 0xE6 (DRIVER\_VERIFIER\_DMA\_VIOLATION) ลงใน log System Microsoft ระบุในเอกสารว่ารหัสนี้มีไว้สำหรับ DMA verification violations และบอกว่าอาจพบได้แม้ไม่ได้เปิดใช้งาน Driver Verifier ข้อนี้รายงานสิ่งที่ Windows บันทึกไว้และไม่ได้บอกว่ามีการใช้อุปกรณ์เพื่อโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `bug_check_code`: เป็น `0xE6` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+- `record`: เป็น `bug_check` (ข้อความ ไม่สนตัวพิมพ์เล็กใหญ่ของอักษร ASCII)
+
+**ย้อนดูได้**
+
+ตราบที่ log System ยังเก็บ record ไว้ ค่าเริ่มต้นคือเขียนทับ record เก่าสุดเมื่อเต็มขนาด
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- Driver Verifier เปิดใช้งานอยู่
+- ไดรเวอร์ทำงานผิดพลาด
+- ฮาร์ดแวร์มีปัญหา
+
+**แหล่งอ้างอิง**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-0xe6--driver-verifier-dma-violation>
 
 ## timeline selector
 

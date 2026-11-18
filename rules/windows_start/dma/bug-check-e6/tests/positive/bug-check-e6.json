@@ -1,0 +1,15 @@
+{
+  "description": "Windows recorded bug check 0xE6",
+  "observations": [
+    {
+      "collector": "windows_start",
+      "fields": {
+        "record": "bug_check",
+        "bug_check_code": "0xE6",
+        "bug_check_parameter_1": "0x26",
+        "bug_check_at": "2026-11-18T12:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 1
+}

@@ -699,6 +699,20 @@ pub enum DeviceProperty {
     LastArrival,
     /// `DEVPKEY_Device_LastRemovalDate`.
     LastRemoval,
+    /// `DEVPKEY_PciDevice_BaseClass` (ADR 0095 section 3).
+    BusClass,
+    /// `DEVPKEY_PciDevice_SubClass` (ADR 0095 section 3).
+    BusSubclass,
+    /// `DEVPKEY_PciDevice_CurrentLinkSpeed` (ADR 0095 section 3).
+    LinkSpeed,
+    /// `DEVPKEY_PciDevice_CurrentLinkWidth` (ADR 0095 section 3).
+    LinkWidth,
+    /// `DEVPKEY_PciDevice_MaxLinkSpeed` (ADR 0095 section 3).
+    MaxLinkSpeed,
+    /// `DEVPKEY_PciDevice_MaxLinkWidth` (ADR 0095 section 3).
+    MaxLinkWidth,
+    /// `DEVPKEY_Device_Children` (ADR 0095 section 3).
+    ChildCount,
 }
 
 /// One device Windows remembers, present or not (ADR 0069).
@@ -728,6 +742,20 @@ pub struct DeviceRecord {
     /// `DEVPKEY_Device_LastRemovalDate`, in whole seconds. Not written at a full shutdown (ADR 0069,
     /// measured).
     pub last_removal: Option<jiff::Timestamp>,
+    /// `DEVPKEY_PciDevice_BaseClass`, for present PCI devices only (ADR 0095 section 3).
+    pub bus_class: Option<u32>,
+    /// `DEVPKEY_PciDevice_SubClass`, for present PCI devices only (ADR 0095 section 3).
+    pub bus_subclass: Option<u32>,
+    /// `DEVPKEY_PciDevice_CurrentLinkSpeed`, for present PCI devices only (ADR 0095 section 3).
+    pub link_speed: Option<u32>,
+    /// `DEVPKEY_PciDevice_CurrentLinkWidth`, for present PCI devices only (ADR 0095 section 3).
+    pub link_width: Option<u32>,
+    /// `DEVPKEY_PciDevice_MaxLinkSpeed`, for present PCI devices only (ADR 0095 section 3).
+    pub max_link_speed: Option<u32>,
+    /// `DEVPKEY_PciDevice_MaxLinkWidth`, for present PCI devices only (ADR 0095 section 3).
+    pub max_link_width: Option<u32>,
+    /// Number of children in `DEVPKEY_Device_Children`, for present PCI devices only (ADR 0095 section 3).
+    pub child_count: Option<u32>,
     /// The properties that could not be read, so that a collector can make each one a gap rather
     /// than read its `None` as "Windows holds no value".
     pub unreadable: Vec<DeviceProperty>,
