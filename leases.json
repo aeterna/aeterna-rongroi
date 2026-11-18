@@ -1,17 +1,4 @@
 {
   "version": 1,
-  "leases": [
-    {
-      "id": "r1-int-74fe2dd2",
-      "repo": "aeterna-rongroi",
-      "lane": "r1-int",
-      "host": "win",
-      "scope": [
-        "crates/*,rules/*,apps/desktop/src/locales/*,docs/*,PRIVACY.md,CHANGELOG.md"
-      ],
-      "plan": "dma-traces-r1",
-      "acquired": "2026-11-18T14:31:34Z",
-      "expires": "2026-11-18T18:31:34Z"
-    }
-  ]
+  "leases": []
 }
