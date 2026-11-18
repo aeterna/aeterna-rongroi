@@ -1738,6 +1738,19 @@ mod start_tests {
         assert_eq!(bc.code, "0xE6");
         assert_eq!(bc.parameter_1, "0x26");
     }
+
+    #[test]
+    fn bug_check_formats_parameter_1_as_upper_case_hex() {
+        let data = json!({ "param1": "0x000000e6 (0x00000000000000ab, 0x0, 0x0, 0x0)" });
+        let bc = wer_bug_check(&rendered(
+            "Microsoft-Windows-WER-SystemErrorReporting",
+            "System",
+            &json!(1001),
+            &data,
+        ))
+        .expect("should parse 0xE6");
+        assert_eq!(bc.parameter_1, "0xAB");
+    }
 }
 
 #[cfg(test)]
