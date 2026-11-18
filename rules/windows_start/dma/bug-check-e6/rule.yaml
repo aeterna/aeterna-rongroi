@@ -5,9 +5,9 @@ id: e641494e-a337-4e4d-bf44-887b5cf1442b
 title: Windows recorded bug check 0xE6
 description: >-
   Windows Error Reporting recorded bug check 0xE6 (DRIVER_VERIFIER_DMA_VIOLATION) in the System log.
-  This bug check indicates an illegal DMA operation attempted by a driver or device, and can occur
-  even without Driver Verifier enabled. This describes what Windows recorded and does not say a device
-  was used to cheat.
+  Microsoft documents this code for DMA verification violations and says it can be observed without
+  Driver Verifier enabled. This describes what Windows recorded and does not say a device was used to
+  cheat.
 status: experimental
 collector: windows_start
 strength: context

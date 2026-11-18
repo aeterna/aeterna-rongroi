@@ -251,7 +251,7 @@ mod live {
             DEVPROP_TYPE_STRING_LIST,
             |b| u32::try_from(super::multi_sz(&units(b)).len()).ok(),
         ) {
-            Ok(count) => record.child_count = count,
+            Ok(count) => record.child_count = count.or(Some(0)),
             Err(()) => missing.push(DeviceProperty::ChildCount),
         }
     }
@@ -298,7 +298,7 @@ mod live {
                 DeviceProperty::LastArrival,
                 DeviceProperty::LastRemoval,
             ];
-            if bus == DeviceBus::Pci {
+            if bus == DeviceBus::Pci && present {
                 unreadable.extend([
                     DeviceProperty::BusClass,
                     DeviceProperty::BusSubclass,
