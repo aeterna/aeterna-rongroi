@@ -5,6 +5,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `pci_device` reports class numbers from the bus, current and maximum link speed and width, and the number of child devices for present PCI devices.
+- `windows_start` reports bug check 0xE6 with its first parameter and time, and the experimental context rule `windows_start/dma/bug-check-e6` shows it.
+
 ## [0.15.0] - 2026-11-13
 
 ### Added
