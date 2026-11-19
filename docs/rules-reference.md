@@ -18,7 +18,7 @@ beside every Found row the program shows the ordinary things that also produce i
 |---|---|
 | Rule format | 4 |
 | Rules | 85 |
-| SHA-256 | `3a32986db43c4d3623c687d6b4e4219a146e2bcd29cd374bf85c5f64332deda4` |
+| SHA-256 | `dd26076a3a99c074968ccbe93f81d009add8ba17f380c8e23e3fa2f3ec251e58` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -408,9 +408,9 @@ Devices Windows still remembers. Windows keeps a device it has set up after the 
 
 **Ordinary things that also produce this**
 
-- a monitor or TV replaced, or switched off in a way that disconnects it
-- a second screen, projector or TV connected once
-- a dock or adapter that reports the display differently
+- A monitor or TV replaced, or switched off in a way that disconnects it
+- A second screen, projector or TV connected once
+- A dock or adapter that reports the display differently
 - Windows moved to another PC
 
 ## Collector `driver_service`
@@ -2670,9 +2670,9 @@ Devices Windows still remembers. Windows keeps a device it has set up after the 
 
 **Ordinary things that also produce this**
 
-- a drive, phone, headset or game controller used once and put away
-- a dock, KVM switch or capture device
-- a device plugged into another port, which Windows can set up again as another device
+- A drive, phone, headset or game controller used once and put away
+- A dock, KVM switch or capture device
+- A device plugged into another port, which Windows can set up again as another device
 - Windows moved to another PC
 
 ## Collector `usn`
