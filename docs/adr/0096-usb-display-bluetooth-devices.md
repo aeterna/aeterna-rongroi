@@ -1,6 +1,6 @@
 # ADR 0096 — USB, display and Bluetooth devices Windows remembers, and device facts before the scan
 
-- Status: proposed — five questions for the owner below
+- Status: accepted — the owner decided the five questions below on 2026-11-19, each as recommended
 - Date: 2026-11-19
 - Amends: ADR 0069 (three more enumerators; `USB` is read after all), ADR 0070 and ADR 0072 (device times are counted
   in the "before the scan" window), ADR 0078 (that window gains device counts), ADR 0062 (whose "never the scan's
@@ -147,7 +147,9 @@ upload consent text names them.
 
 ## Decisions for the owner
 
-| # | Question | Recommended |
+Decided on 2026-11-19: all as recommended.
+
+| # | Question | Decided |
 |---|---|---|
 | 1 | Read Bluetooth devices from the device store (`BTHENUM`) instead of the Bluetooth API, changing that part of plan question 1? | **Yes**: the address shape is dropped whole, and the same code and times as PCI and HID |
 | 2 | A `context` rule for an absent USB device and for an absent display, and no Bluetooth rule? | **Yes** |
