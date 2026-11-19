@@ -1,7 +1,7 @@
 diff --git a/crates/rongroi-core/src/lib.rs b/crates/rongroi-core/src/lib.rs
 --- a/crates/rongroi-core/src/lib.rs
 +++ b/crates/rongroi-core/src/lib.rs
-@@ -23,3 +23,9 @@
+@@ -23,3 +23,8 @@
  /// [`bundle::Bundle::embedded`] and cannot load rules from anywhere else.
  #[cfg(feature = "source-tree")]
  pub mod source_tree;
