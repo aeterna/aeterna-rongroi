@@ -1,4 +1,17 @@
 {
   "version": 1,
-  "leases": []
+  "leases": [
+    {
+      "id": "r1-l2-d900c829",
+      "repo": "aeterna-rongroi",
+      "lane": "r1-l2",
+      "host": "win",
+      "scope": [
+        "crates/rongroi-parsers/src/evtx.rs,crates/rongroi-collectors/src/pci_start_history.rs,crates/rongroi-collectors/src/lib.rs,crates/rongroi-core/src/view.rs,crates/rongroi-scan/src/request/tests.rs,crates/rongroi-cli/src/output.rs,xtask/src/check_rules.rs,fuzz/fuzz_targets/fuzz_evtx.rs,apps/desktop/src/locales/en/common.json,apps/desktop/src/locales/th/common.json,apps/desktop/src/locales/en/report.json,apps/desktop/src/locales/th/report.json,rules/pci_start_history/partial/not-every-start/*,rules/i18n/th.yaml,rules/unconfronted.csv"
+      ],
+      "plan": "dma-traces-r1",
+      "acquired": "2026-11-19T03:37:06Z",
+      "expires": "2026-11-19T07:37:06Z"
+    }
+  ]
 }
