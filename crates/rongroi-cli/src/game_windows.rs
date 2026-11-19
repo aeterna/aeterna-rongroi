@@ -1256,7 +1256,7 @@ mod tests {
     }
 
     /// (ADR 0096 section 4) CLI: the line appears with a count, and does not appear when all counts
-    /// are zero or before_scan_devices is None.
+    /// are zero or `before_scan_devices` is `None`.
     #[test]
     fn before_scan_devices_line_appears_with_count_and_omitted_when_zero() {
         let mut view = view_with_one_candidate();
