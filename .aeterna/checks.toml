@@ -21,12 +21,14 @@ name = "format"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo fmt --all --check'
 timeout = 120
 deps = ["rustfmt.toml", "rust-toolchain.toml"]
+prove = ".aeterna/prove/format.patch"
 
 [[checks]]
 name = "clippy"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo clippy --all-targets --locked -- -D warnings'
 timeout = 600
 deps = ["clippy.toml", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
+prove = ".aeterna/prove/clippy.patch"
 
 # `cargo insta test` with the nextest runner and unreferenced snapshots rejected: a stale snapshot fails.
 [[checks]]
@@ -34,6 +36,7 @@ name = "tests"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo insta test --unreferenced reject --test-runner nextest'
 timeout = 600
 deps = [".config/nextest.toml", "Cargo.toml", "crates/**/snapshots/*.snap", "fixtures/**", "rules/**"]
+prove = ".aeterna/prove/tests.patch"
 
 # The rule gates. Each compares or validates rules/ and fixtures/ against the code, and two of them read the generated
 # docs/rules-reference*.md and docs/coverage.md. The order here differs from CI's `rust` job, which runs check-baseline
@@ -43,6 +46,7 @@ name = "rule-gates"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-rules && cargo xtask check-baseline && cargo xtask rules-reference --check && cargo xtask coverage --check && cargo xtask readme-diagram --check'
 timeout = 600
 deps = [".cargo/config.toml", "docs/coverage.md", "docs/rules-reference.md", "docs/rules-reference.th.md", "docs/assets/**", "fixtures/**", "rules/**", "xtask/**"]
+prove = ".aeterna/prove/rule-gates.patch"
 
 # The repo gates. check-unicode scans every text file in the tree, so any text change is in scope for it.
 [[checks]]
@@ -50,6 +54,7 @@ name = "repo-gates"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo xtask check-locales && cargo xtask check-unicode && cargo xtask check-versions'
 timeout = 600
 deps = ["README.md", "README.th.md", "apps/desktop/package.json", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/src/locales/**", "docs/screenshare-guide*.md", "xtask/**"]
+prove = ".aeterna/prove/repo-gates.patch"
 
 # Bans, licenses and sources only. `--offline` keeps cargo-deny from fetching anything.
 [[checks]]
@@ -57,6 +62,7 @@ name = "deny"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo deny --offline check bans licenses sources'
 timeout = 120
 deps = ["Cargo.lock", "deny.toml"]
+prove = ".aeterna/prove/deny.patch"
 
 # The CI `rust` job's spell check. It reads _typos.toml and runs offline.
 [[checks]]
@@ -64,3 +70,4 @@ name = "typos"
 cmd = 'typos'
 timeout = 120
 deps = ["_typos.toml"]
+prove = ".aeterna/prove/typos.patch"

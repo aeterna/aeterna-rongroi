@@ -1,0 +1,12 @@
+diff --git a/deny.toml b/deny.toml
+--- a/deny.toml
++++ b/deny.toml
+@@ -58,7 +58,8 @@
+ multiple-versions = "allow"
+ wildcards = "deny"
+ allow-wildcard-paths = true
+ deny = [
++  { crate = "serde", reason = "prove deny check fails" },
+   { crate = "reqwest", reason = "offline-only: no HTTP clients (ADR 0003)" },
+   { crate = "hyper", reason = "offline-only: no HTTP stacks (ADR 0003)" },
+   { crate = "ureq", reason = "offline-only: no HTTP clients (ADR 0003)" },

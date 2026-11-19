@@ -1,0 +1,12 @@
+diff --git a/crates/rongroi-core/src/lib.rs b/crates/rongroi-core/src/lib.rs
+--- a/crates/rongroi-core/src/lib.rs
++++ b/crates/rongroi-core/src/lib.rs
+@@ -17,7 +17,7 @@
+ pub mod model;
+ pub mod provenance;
+ pub mod rules;
+-pub mod view;
++pub  mod  view;
+ 
+ /// Reads the rules source tree from disk. Enabled only for `cargo xtask`; shipped binaries use
+ /// [`bundle::Bundle::embedded`] and cannot load rules from anywhere else.

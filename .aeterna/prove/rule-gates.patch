@@ -1,0 +1,8 @@
+diff --git a/rules/posture/boot/secure-boot-disabled/tests/positive/prove_fail.json b/rules/posture/boot/secure-boot-disabled/tests/positive/prove_fail.json
+new file mode 100644
+--- /dev/null
++++ b/rules/posture/boot/secure-boot-disabled/tests/positive/prove_fail.json
+@@ -0,0 +1,3 @@
++{
++  "observations": []
++}

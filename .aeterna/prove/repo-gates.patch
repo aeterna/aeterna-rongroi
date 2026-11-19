@@ -1,0 +1,6 @@
+diff --git a/apps/desktop/src/locales/th/prove_fail.json b/apps/desktop/src/locales/th/prove_fail.json
+new file mode 100644
+--- /dev/null
++++ b/apps/desktop/src/locales/th/prove_fail.json
+@@ -0,0 +1 @@
++{}
