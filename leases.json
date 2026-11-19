@@ -12,6 +12,18 @@
       "plan": "dma-traces-r2",
       "acquired": "2026-11-19T06:50:31Z",
       "expires": "2026-11-19T10:50:31Z"
+    },
+    {
+      "id": "r2-l7-ded2026d",
+      "repo": "aeterna-rongroi",
+      "lane": "r2-l7",
+      "host": "win",
+      "scope": [
+        "crates/rongroi-core/src/view/game.rs,crates/rongroi-cli/src/game_windows.rs,apps/desktop/src/types.ts,apps/desktop/src/views/GameWindows.tsx,apps/desktop/src/views/GameWindows.test.tsx,apps/desktop/src/locales/en/report.json,apps/desktop/src/locales/th/report.json"
+      ],
+      "plan": "dma-traces-r2",
+      "acquired": "2026-11-19T06:50:34Z",
+      "expires": "2026-11-19T10:50:34Z"
     }
   ]
 }
