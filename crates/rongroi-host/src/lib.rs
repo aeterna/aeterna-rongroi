@@ -846,15 +846,13 @@ pub fn device_model_id(bus: DeviceBus, instance_id: &str) -> Option<String> {
                 .split('&')
                 .filter_map(|field| {
                     let upper = field.to_ascii_uppercase();
-                    if matches!(upper.as_str(), "ROOT_HUB" | "ROOT_HUB20" | "ROOT_HUB30") {
-                        Some(upper)
-                    } else if (upper.starts_with("VID_")
-                        || upper.starts_with("PID_")
-                        || upper.starts_with("REV_"))
-                        && is_hex_digits(&upper[4..], 4)
+                    if matches!(upper.as_str(), "ROOT_HUB" | "ROOT_HUB20" | "ROOT_HUB30")
+                        || ((upper.starts_with("VID_")
+                            || upper.starts_with("PID_")
+                            || upper.starts_with("REV_"))
+                            && is_hex_digits(&upper[4..], 4))
+                        || (upper.starts_with("MI_") && is_hex_digits(&upper[3..], 2))
                     {
-                        Some(upper)
-                    } else if upper.starts_with("MI_") && is_hex_digits(&upper[3..], 2) {
                         Some(upper)
                     } else {
                         None
@@ -883,9 +881,9 @@ pub fn device_model_id(bus: DeviceBus, instance_id: &str) -> Option<String> {
             let mut kept = vec![first.to_ascii_uppercase()];
             for token in tokens {
                 let upper = token.to_ascii_uppercase();
-                if upper.starts_with("VID&") && is_hex_digits(&upper[4..], 8) {
-                    kept.push(upper);
-                } else if upper.starts_with("PID&") && is_hex_digits(&upper[4..], 4) {
+                if (upper.starts_with("VID&") && is_hex_digits(&upper[4..], 8))
+                    || (upper.starts_with("PID&") && is_hex_digits(&upper[4..], 4))
+                {
                     kept.push(upper);
                 }
             }

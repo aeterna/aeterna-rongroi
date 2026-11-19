@@ -473,7 +473,8 @@ export interface GameWindows {
   /** Per window, in SS mode: the counts with no names. */
   unnamed?: WindowCounts;
   unmatched_installs?: { before: number; during: number; after: number };
-  before_scan_devices?: BeforeScanDevices;
+  /** null means the window is not known. */
+  before_scan_devices?: BeforeScanDevices | null;
   clock?: {
     changes: { changed_at: string; old_time?: string | null; new_time?: string | null }[];
     history: "known" | "not_known";

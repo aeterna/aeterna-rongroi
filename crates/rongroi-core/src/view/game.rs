@@ -3711,8 +3711,8 @@ mod tests {
         }
     }
 
-    /// ADR 0096 section 4: a windows_start with record: start inside counts; one with
-    /// record: bug_check does not, nor one before the session end.
+    /// ADR 0096 section 4: a `windows_start` with `record: start` inside counts; one with
+    /// record: `bug_check` does not, nor one before the session end.
     #[test]
     fn before_scan_devices_counts_windows_start_inside_window() {
         let mut records = base_records();
@@ -3727,7 +3727,7 @@ mod tests {
         assert_eq!(devices.windows_starts, 1);
     }
 
-    /// ADR 0096 section 4: before_scan_devices is None when the latest session has no end,
+    /// ADR 0096 section 4: `before_scan_devices` is `None` when the latest session has no end,
     /// and when the scan time is missing.
     #[test]
     fn before_scan_devices_is_none_when_session_end_or_scan_time_missing() {
@@ -3741,7 +3741,7 @@ mod tests {
         assert_eq!(windows.before_scan_devices, None);
     }
 
-    /// ADR 0096 section 4: before_scan_devices is Some with zeros when nothing falls in the window.
+    /// ADR 0096 section 4: `before_scan_devices` is `Some` with zeros when nothing falls in the window.
     #[test]
     fn before_scan_devices_is_some_with_zeros_when_nothing_in_window() {
         let report = report_of(base_records());
@@ -3757,7 +3757,7 @@ mod tests {
         }
     }
 
-    /// ADR 0096 section 4: before_scan_devices produces the same counts in SS mode.
+    /// ADR 0096 section 4: `before_scan_devices` produces the same counts in SS mode.
     #[test]
     fn before_scan_devices_is_same_in_ss_mode() {
         let mut records = base_records();
