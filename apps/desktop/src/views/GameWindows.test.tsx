@@ -4,8 +4,8 @@
 
 // Component tests for GameWindowsSection, including before-the-scan device counts (ADR 0096).
 
-import { render, screen } from "@testing-library/react";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import i18n, { initI18n } from "../i18n";
 import type { GameWindows, ReportView } from "../types";
 import { GameWindowsSection } from "./GameWindows";
@@ -58,6 +58,10 @@ describe("GameWindowsSection before_scan_devices", () => {
 
   beforeEach(async () => {
     await i18n.changeLanguage("en");
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("does not render before_scan device line when before_scan_devices is undefined", () => {
