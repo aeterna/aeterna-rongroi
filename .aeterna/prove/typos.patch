@@ -1,0 +1,9 @@
+diff --git a/docs/prove_typos.txt b/docs/prove_typos.txt
+new file mode 100644
+--- /dev/null
++++ b/docs/prove_typos.txt
+@@ -0,0 +1,4 @@
++# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
++# SPDX-License-Identifier: GPL-3.0-or-later
++
++teh

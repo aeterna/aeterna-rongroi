@@ -1,0 +1,12 @@
+diff --git a/crates/rongroi-core/tests/prove_clippy.rs b/crates/rongroi-core/tests/prove_clippy.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/rongroi-core/tests/prove_clippy.rs
+@@ -0,0 +1,7 @@
++// SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
++// SPDX-License-Identifier: GPL-3.0-or-later
++
++#[test]
++fn prove_clippy() {
++    let _ = dbg!(1);
++}
