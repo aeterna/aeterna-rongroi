@@ -26,7 +26,7 @@ pub fn multi_sz(buffer: &[u16]) -> Vec<String> {
 mod live {
     use rongroi_host::{
         DeviceBus, DeviceProperty, DeviceRecord, SourceError, device_model_id, device_time,
-        pci_class_code,
+        pci_class_code, usb_class,
     };
     use windows::Win32::Devices::DeviceAndDriverInstallation::{
         CM_GETIDLIST_FILTER_ENUMERATOR, CM_GETIDLIST_FILTER_PRESENT, CM_Get_DevNode_PropertyW,
@@ -256,6 +256,28 @@ mod live {
         }
     }
 
+    fn read_usb_facts(
+        devinst: u32,
+        record: &mut DeviceRecord,
+        missing: &mut Vec<DeviceProperty>,
+    ) {
+        match read(
+            devinst,
+            &DEVPKEY_Device_CompatibleIds,
+            DEVPROP_TYPE_STRING_LIST,
+            |b| Some(super::multi_sz(&units(b))),
+        ) {
+            Ok(ids) => {
+                if let Some((class, subclass, protocol)) = ids.as_deref().and_then(usb_class) {
+                    record.usb_class = Some(class);
+                    record.usb_subclass = Some(subclass);
+                    record.usb_protocol = Some(protocol);
+                }
+            }
+            Err(()) => missing.push(DeviceProperty::CompatibleIds),
+        }
+    }
+
     #[allow(unsafe_code)]
     fn record(bus: DeviceBus, id: &str, present: bool) -> Option<DeviceRecord> {
         let model_id = device_model_id(bus, id)?;
@@ -263,6 +285,9 @@ mod live {
             bus,
             model_id,
             class_code: None,
+            usb_class: None,
+            usb_subclass: None,
+            usb_protocol: None,
             service: None,
             problem_code: None,
             present,
@@ -315,6 +340,8 @@ mod live {
         let mut missing = Vec::new();
         if bus == DeviceBus::Pci {
             read_pci_facts(devinst, present, &mut record, &mut missing);
+        } else if bus == DeviceBus::Usb {
+            read_usb_facts(devinst, &mut record, &mut missing);
         }
         match read(devinst, &DEVPKEY_Device_Service, DEVPROP_TYPE_STRING, |b| {
             super::multi_sz(&units(b)).into_iter().next()
@@ -381,8 +408,8 @@ mod tests {
         text.encode_utf16().collect()
     }
 
-    /// Run by the Windows CI job (ADR 0069). Asserts the shape a live list must have, never what the
-    /// runner's devices are, and prints only counts.
+    /// Run by the Windows CI job (ADR 0069, ADR 0096). Asserts the shape a live list must have,
+    /// never what the runner's devices are, and prints only counts.
     #[cfg(windows)]
     #[test]
     #[ignore = "reads this machine's device list; run by the Windows CI job"]
@@ -390,7 +417,13 @@ mod tests {
         use rongroi_host::{DeviceBus, DeviceSource as _};
 
         let host = crate::LiveHost;
-        for bus in [DeviceBus::Pci, DeviceBus::Hid] {
+        for bus in [
+            DeviceBus::Pci,
+            DeviceBus::Hid,
+            DeviceBus::Usb,
+            DeviceBus::Display,
+            DeviceBus::Bluetooth,
+        ] {
             let devices = host.devices(bus).unwrap();
             let present = devices.iter().filter(|device| device.present).count();
             let unreadable = devices.iter().filter(|d| !d.unreadable.is_empty()).count();
@@ -410,7 +443,7 @@ mod tests {
                     device.model_id
                 );
                 assert!(device.present || device.problem_code.is_none());
-                if bus == DeviceBus::Hid {
+                if bus != DeviceBus::Pci {
                     assert_eq!(device.class_code, None);
                     assert_eq!(device.bus_class, None);
                     assert_eq!(device.bus_subclass, None);
@@ -420,6 +453,30 @@ mod tests {
                     assert_eq!(device.max_link_width, None);
                     assert_eq!(device.child_count, None);
                 }
+                if bus != DeviceBus::Usb {
+                    assert_eq!(device.usb_class, None);
+                    assert_eq!(device.usb_subclass, None);
+                    assert_eq!(device.usb_protocol, None);
+                }
+                let mut without_guid = String::new();
+                let mut in_brace = false;
+                for ch in device.model_id.chars() {
+                    if ch == '{' {
+                        in_brace = true;
+                    } else if ch == '}' {
+                        in_brace = false;
+                    } else if !in_brace {
+                        without_guid.push(ch);
+                    }
+                }
+                assert!(
+                    !without_guid
+                        .as_bytes()
+                        .windows(12)
+                        .any(|w| w.iter().all(u8::is_ascii_hexdigit)),
+                    "{}",
+                    device.model_id
+                );
             }
         }
     }

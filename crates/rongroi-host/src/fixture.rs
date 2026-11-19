@@ -201,14 +201,20 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         message,
     };
     let id = &device.id;
-    let (bus, model_id) = [DeviceBus::Pci, DeviceBus::Hid]
-        .into_iter()
-        .find_map(|bus| crate::device_model_id(bus, id).map(|model| (bus, model)))
-        .ok_or_else(|| {
-            fail(format!(
-                "device `{id}` is neither a PCI nor a HID instance id"
-            ))
-        })?;
+    let (bus, model_id) = [
+        DeviceBus::Pci,
+        DeviceBus::Hid,
+        DeviceBus::Usb,
+        DeviceBus::Display,
+        DeviceBus::Bluetooth,
+    ]
+    .into_iter()
+    .find_map(|bus| crate::device_model_id(bus, id).map(|model| (bus, model)))
+    .ok_or_else(|| {
+        fail(format!(
+            "device `{id}` is not an instance id of any supported enumerator"
+        ))
+    })?;
     if !device.present && device.problem_code.is_some() {
         return Err(fail(format!(
             "device `{id}` is absent but has a problem code; a live host reads one only for a present device"
@@ -229,7 +235,13 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
     }
     let class_code = match bus {
         DeviceBus::Pci => crate::pci_class_code(&device.compatible_ids),
-        DeviceBus::Hid => None,
+        _ => None,
+    };
+    let (usb_class, usb_subclass, usb_protocol) = match bus {
+        DeviceBus::Usb => crate::usb_class(&device.compatible_ids)
+            .map(|(c, s, p)| (Some(c), Some(s), Some(p)))
+            .unwrap_or((None, None, None)),
+        _ => (None, None, None),
     };
     let (
         bus_class,
@@ -256,6 +268,9 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         bus,
         model_id,
         class_code,
+        usb_class,
+        usb_subclass,
+        usb_protocol,
         service: device.service,
         problem_code: device.problem_code,
         present: device.present,
@@ -2223,7 +2238,7 @@ devices:
     #[test]
     fn a_fixture_device_a_live_host_could_not_report_fails_to_load() {
         for yaml in [
-            "platform: windows\ndevices:\n  - { id: 'USB\\VID_0627&PID_0001\\1', present: true }\n",
+            "platform: windows\ndevices:\n  - { id: 'UNKNOWN\\VID_0627&PID_0001\\1', present: true }\n",
             "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, problem_code: 28 }\n",
             "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, bus_class: 6 }\n",
             "platform: windows\ndevices:\n  - { id: 'PCI\\VEN_1234&DEV_11E8\\1', present: false, child_count: 0 }\n",
@@ -2234,6 +2249,43 @@ devices:
                 "{yaml}"
             );
         }
+    }
+
+    #[test]
+    fn fixture_host_returns_devices_for_each_new_bus() {
+        let yaml = r"platform: windows
+devices:
+  - id: 'USB\VID_046D&PID_C52B&REV_1234&MI_02\1234567890AB'
+    present: true
+    compatible_ids: ['USB\Class_03&SubClass_01&Prot_02']
+  - id: 'DISPLAY\ABC1234\4&c580b9d&0&UID0'
+    present: true
+  - id: 'BTHENUM\{00001124-0000-1000-8000-00805F9B34FB}_VID&0002046D_PID&B023\1'
+    present: true
+";
+        let host = FixtureHost::from_yaml_str(yaml, "inline").unwrap();
+        let usb = host.devices(DeviceBus::Usb).unwrap();
+        assert_eq!(usb.len(), 1);
+        assert_eq!(
+            usb[0].model_id,
+            r"USB\VID_046D&PID_C52B&REV_1234&MI_02"
+        );
+        assert_eq!(usb[0].usb_class.as_deref(), Some("03"));
+        assert_eq!(usb[0].usb_subclass.as_deref(), Some("01"));
+        assert_eq!(usb[0].usb_protocol.as_deref(), Some("02"));
+
+        let display = host.devices(DeviceBus::Display).unwrap();
+        assert_eq!(display.len(), 1);
+        assert_eq!(display[0].model_id, r"DISPLAY\ABC1234");
+        assert_eq!(display[0].usb_class, None);
+
+        let bt = host.devices(DeviceBus::Bluetooth).unwrap();
+        assert_eq!(bt.len(), 1);
+        assert_eq!(
+            bt[0].model_id,
+            r"BTHENUM\{00001124-0000-1000-8000-00805F9B34FB}_VID&0002046D_PID&B023"
+        );
+        assert_eq!(bt[0].usb_class, None);
     }
 
     #[test]
