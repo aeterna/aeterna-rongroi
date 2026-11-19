@@ -281,14 +281,23 @@ devices:
     }
 
     #[test]
-    fn non_windows_is_unmeasured() {
-        let run = BluetoothDevice.collect(&NonWindowsHost);
+    fn a_list_that_cannot_be_read_is_unmeasured_and_non_windows_is_not_windows() {
         assert_eq!(
-            run,
-            CollectorRun::Unmeasured {
-                collector: ID.to_owned(),
-                reason: UnmeasuredReason::NotWindows,
-            }
+            BluetoothDevice.collect(&host("platform: windows\n")),
+            unmeasured(UnmeasuredReason::ReadFailed)
         );
+        assert_eq!(
+            BluetoothDevice.collect(&NonWindowsHost),
+            unmeasured(UnmeasuredReason::NotWindows)
+        );
+        assert_eq!(
+            reason_for(&SourceError::AccessDenied),
+            UnmeasuredReason::AccessDenied
+        );
+    }
+
+    #[test]
+    fn tier_is_full() {
+        assert_eq!(BluetoothDevice.tier(), ScanTier::Full);
     }
 }

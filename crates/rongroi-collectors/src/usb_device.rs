@@ -160,10 +160,6 @@ fn observation(device: &DeviceRecord) -> Observation {
     if let Some(service) = device.service.as_deref().filter(|s| !s.is_empty()) {
         text("service", service);
     }
-    fields.insert(
-        "present".to_owned(),
-        serde_json::Value::from(device.present),
-    );
     if let Some(ref class) = device.usb_class {
         text("usb_class", class);
     }
@@ -173,6 +169,10 @@ fn observation(device: &DeviceRecord) -> Observation {
     if let Some(ref subclass) = device.usb_subclass {
         text("usb_subclass", subclass);
     }
+    fields.insert(
+        "present".to_owned(),
+        serde_json::Value::from(device.present),
+    );
     for (name, time) in [
         ("first_install_at", device.first_install),
         ("last_arrival_at", device.last_arrival),
@@ -302,14 +302,41 @@ devices:
     }
 
     #[test]
-    fn non_windows_is_unmeasured() {
-        let run = UsbDevice.collect(&NonWindowsHost);
+    fn a_usb_device_with_no_class_compatible_id_has_no_usb_class_subclass_or_protocol() {
+        let run = UsbDevice.collect(&host(
+            r"platform: windows
+devices:
+  - id: 'USB\VID_046D&PID_C52B\1&2'
+    present: true
+",
+        ));
+        let (observations, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
+        assert_eq!(observations.len(), 1);
+        let fields = &observations[0].fields;
+        assert!(!fields.contains_key("usb_class"));
+        assert!(!fields.contains_key("usb_subclass"));
+        assert!(!fields.contains_key("usb_protocol"));
+    }
+
+    #[test]
+    fn a_list_that_cannot_be_read_is_unmeasured_and_non_windows_is_not_windows() {
         assert_eq!(
-            run,
-            CollectorRun::Unmeasured {
-                collector: ID.to_owned(),
-                reason: UnmeasuredReason::NotWindows,
-            }
+            UsbDevice.collect(&host("platform: windows\n")),
+            unmeasured(UnmeasuredReason::ReadFailed)
         );
+        assert_eq!(
+            UsbDevice.collect(&NonWindowsHost),
+            unmeasured(UnmeasuredReason::NotWindows)
+        );
+        assert_eq!(
+            reason_for(&SourceError::AccessDenied),
+            UnmeasuredReason::AccessDenied
+        );
+    }
+
+    #[test]
+    fn tier_is_full() {
+        assert_eq!(UsbDevice.tier(), ScanTier::Full);
     }
 }

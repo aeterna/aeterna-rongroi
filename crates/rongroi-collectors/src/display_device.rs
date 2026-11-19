@@ -128,9 +128,10 @@ fn fields_of(property: DeviceProperty) -> &'static [&'static str] {
 /// after `DISPLAY\`.
 fn display_ids(model_id: &str) -> Option<(&str, &str, &str)> {
     let (_, rest) = model_id.split_once('\\')?;
-    if rest.len() == 7
-        && rest[..3].bytes().all(|b| b.is_ascii_alphabetic())
-        && rest[3..].bytes().all(|b| b.is_ascii_hexdigit())
+    let bytes = rest.as_bytes();
+    if bytes.len() == 7
+        && bytes[..3].iter().all(u8::is_ascii_alphabetic)
+        && bytes[3..].iter().all(u8::is_ascii_hexdigit)
     {
         Some((model_id, &rest[..3], &rest[3..7]))
     } else {
@@ -217,6 +218,7 @@ devices:
 
     #[test]
     fn non_matching_display_id_omits_name_and_numbers() {
+        assert_eq!(display_ids("DISPLAY\\จอ1234"), None);
         let run = DisplayDevice.collect(&host(
             r"platform: windows
 devices:
@@ -253,14 +255,23 @@ devices:
     }
 
     #[test]
-    fn non_windows_is_unmeasured() {
-        let run = DisplayDevice.collect(&NonWindowsHost);
+    fn a_list_that_cannot_be_read_is_unmeasured_and_non_windows_is_not_windows() {
         assert_eq!(
-            run,
-            CollectorRun::Unmeasured {
-                collector: ID.to_owned(),
-                reason: UnmeasuredReason::NotWindows,
-            }
+            DisplayDevice.collect(&host("platform: windows\n")),
+            unmeasured(UnmeasuredReason::ReadFailed)
         );
+        assert_eq!(
+            DisplayDevice.collect(&NonWindowsHost),
+            unmeasured(UnmeasuredReason::NotWindows)
+        );
+        assert_eq!(
+            reason_for(&SourceError::AccessDenied),
+            UnmeasuredReason::AccessDenied
+        );
+    }
+
+    #[test]
+    fn tier_is_full() {
+        assert_eq!(DisplayDevice.tier(), ScanTier::Full);
     }
 }

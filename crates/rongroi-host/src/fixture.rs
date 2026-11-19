@@ -192,6 +192,37 @@ enum FixtureDeviceProperty {
     ChildCount,
 }
 
+fn usb_classes(
+    bus: DeviceBus,
+    compatible_ids: &[String],
+) -> (Option<String>, Option<String>, Option<String>) {
+    match bus {
+        DeviceBus::Usb => crate::usb_class(compatible_ids)
+            .map_or((None, None, None), |(c, s, p)| {
+                (Some(c), Some(s), Some(p))
+            }),
+        _ => (None, None, None),
+    }
+}
+
+fn device_property(property: FixtureDeviceProperty) -> DeviceProperty {
+    match property {
+        FixtureDeviceProperty::CompatibleIds => DeviceProperty::CompatibleIds,
+        FixtureDeviceProperty::Service => DeviceProperty::Service,
+        FixtureDeviceProperty::ProblemCode => DeviceProperty::ProblemCode,
+        FixtureDeviceProperty::FirstInstall => DeviceProperty::FirstInstall,
+        FixtureDeviceProperty::LastArrival => DeviceProperty::LastArrival,
+        FixtureDeviceProperty::LastRemoval => DeviceProperty::LastRemoval,
+        FixtureDeviceProperty::BusClass => DeviceProperty::BusClass,
+        FixtureDeviceProperty::BusSubclass => DeviceProperty::BusSubclass,
+        FixtureDeviceProperty::LinkSpeed => DeviceProperty::LinkSpeed,
+        FixtureDeviceProperty::LinkWidth => DeviceProperty::LinkWidth,
+        FixtureDeviceProperty::MaxLinkSpeed => DeviceProperty::MaxLinkSpeed,
+        FixtureDeviceProperty::MaxLinkWidth => DeviceProperty::MaxLinkWidth,
+        FixtureDeviceProperty::ChildCount => DeviceProperty::ChildCount,
+    }
+}
+
 /// Turns one described device into the record a live host returns. A device whose id belongs to
 /// neither enumerator, or a problem code on an absent device, is a mistake in the fixture: a live
 /// host lists by enumerator and reads a problem code only for a present device.
@@ -237,12 +268,8 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         DeviceBus::Pci => crate::pci_class_code(&device.compatible_ids),
         _ => None,
     };
-    let (usb_class, usb_subclass, usb_protocol) = match bus {
-        DeviceBus::Usb => crate::usb_class(&device.compatible_ids)
-            .map(|(c, s, p)| (Some(c), Some(s), Some(p)))
-            .unwrap_or((None, None, None)),
-        _ => (None, None, None),
-    };
+    let (usb_class, usb_subclass, usb_protocol) =
+        usb_classes(bus, &device.compatible_ids);
     let (
         bus_class,
         bus_subclass,
@@ -287,21 +314,7 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         unreadable: device
             .unreadable
             .into_iter()
-            .map(|property| match property {
-                FixtureDeviceProperty::CompatibleIds => DeviceProperty::CompatibleIds,
-                FixtureDeviceProperty::Service => DeviceProperty::Service,
-                FixtureDeviceProperty::ProblemCode => DeviceProperty::ProblemCode,
-                FixtureDeviceProperty::FirstInstall => DeviceProperty::FirstInstall,
-                FixtureDeviceProperty::LastArrival => DeviceProperty::LastArrival,
-                FixtureDeviceProperty::LastRemoval => DeviceProperty::LastRemoval,
-                FixtureDeviceProperty::BusClass => DeviceProperty::BusClass,
-                FixtureDeviceProperty::BusSubclass => DeviceProperty::BusSubclass,
-                FixtureDeviceProperty::LinkSpeed => DeviceProperty::LinkSpeed,
-                FixtureDeviceProperty::LinkWidth => DeviceProperty::LinkWidth,
-                FixtureDeviceProperty::MaxLinkSpeed => DeviceProperty::MaxLinkSpeed,
-                FixtureDeviceProperty::MaxLinkWidth => DeviceProperty::MaxLinkWidth,
-                FixtureDeviceProperty::ChildCount => DeviceProperty::ChildCount,
-            })
+            .map(device_property)
             .collect(),
     })
 }

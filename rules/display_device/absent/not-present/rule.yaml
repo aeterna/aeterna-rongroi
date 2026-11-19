@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: CC-BY-SA-4.0
 # Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 id: e99a0f02-a8d6-4752-9e67-044ec22166c3
-title: A display device Windows set up earlier is not present now
+title: A display Windows set up earlier is not connected now
 description: >-
   Windows set this display device up at some time and it is not connected to the PC now. The row shows when Windows first
   set it up, the last start of Windows at which it was present, and — only when Windows recorded one — a
@@ -20,8 +20,9 @@ retention: >-
   device is uninstalled or Windows is installed again.
 unmeasured_when: [not_windows]
 falsepositives:
-  - A monitor or TV replaced, disconnected or powered off
-  - A dock, KVM switch or capture device
+  - a monitor or TV replaced, or switched off in a way that disconnects it
+  - a second screen, projector or TV connected once
+  - a dock or adapter that reports the display differently
   - Windows moved to another PC
 author: aeterna-rongroi contributors
 date: 2026-11-19
