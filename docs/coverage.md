@@ -19,7 +19,7 @@
 
 | status | count |
 | --- | ---: |
-| experimental | 72 |
+| experimental | 74 |
 | test | 5 |
 | stable | 6 |
 | deprecated | 0 |
@@ -28,7 +28,7 @@
 
 | baseline | count |
 | --- | ---: |
-| confronted | 46 |
+| confronted | 48 |
 | known fp | 2 |
 | unconfronted | 35 |
 | known fp; unconfronted | 0 |
@@ -39,14 +39,14 @@
 | --- | ---: |
 | documented | 18 |
 | stated | 19 |
-| none | 46 |
+| none | 48 |
 
 ### Rules seen found
 
 | seen | count |
 | --- | ---: |
 | found | 16 |
-| never | 67 |
+| never | 69 |
 
 ### Ledger rows by kind
 
@@ -57,13 +57,14 @@
 
 ## Gaps
 
-### Rules never seen found outside a fixture (67)
+### Rules never seen found outside a fixture (69)
 
 - `antivirus_product/registered/no-product-reports-on`
 - `bam/ephemeral/executed-program-missing-on-disk`
 - `bam/system-name/windows-name-outside-windows-folders`
 - `bam/timeline/fivem-game-process-by-name`
 - `bam/timeline/fivem-or-gta-v-by-name`
+- `display_device/absent/not-present`
 - `evtx/defender/defender-real-time-protection-turned-off`
 - `evtx/log-file/event-log-not-at-configured-path`
 - `evtx/timeline/code-integrity-blocked-image`
@@ -114,6 +115,7 @@
 - `prefetch/timeline/fivem-game-process-by-name`
 - `prefetch/timeline/fivem-or-gta-v-by-name`
 - `process/system-name/windows-name-outside-windows-folders`
+- `usb_device/absent/not-present`
 - `usn/enhanced-asi/files-deleted`
 - `usn/enhanced-asi/files-renamed`
 - `usn/identity/digitalentitlements-file-deleted`
@@ -165,14 +167,16 @@
 - `windows_start/dma/bug-check-e6` — added 2026-11-18; resolved when: A baseline carries a System log this project is allowed to publish — captured on a Windows installation made for the purpose, as the Security-log row above describes — or an .evtx fixture is built from the parser's own records. The rule's positive and negative fixtures cover this rule meanwhile (ADR 0095 section 4).
 - `pci_start_history/partial/not-every-start` — added 2026-11-19; resolved when: A baseline carries a PCI operational log from a machine this project may publish, with both scans fixtures/evtx/PROVENANCE.md requires run first and a PROVENANCE row. Its log holds more than one start, so the rule's field is measured there. The rule's positive and negative fixtures cover both states meanwhile.
 
-### Collectors never measured (7)
+### Collectors never measured (9)
 
 - `antivirus_product`
+- `display_device`
 - `fivem_dir`
 - `install_marker`
 - `net_config`
 - `os_image`
 - `pci_start_history`
+- `usb_device`
 - `windows_start`
 
 ### Collectors measured on only one build (10)
@@ -218,11 +222,12 @@
 - `powershell_text`
 - `usn`
 
-### Collectors with no `rules/ages` file (15)
+### Collectors with no `rules/ages` file (17)
 
 - `antivirus_product`
 - `autostart`
 - `defender_exclusion`
+- `display_device`
 - `driver_service`
 - `fivem_servers`
 - `hid_device`
@@ -234,6 +239,7 @@
 - `posture`
 - `powershell_text`
 - `process`
+- `usb_device`
 - `windows_start`
 
 ## Rules
@@ -247,6 +253,7 @@
 | `bam/timeline/fivem-game-process-by-name` | bam | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26100 server x64, 26220 client x64 |
 | `bam/timeline/fivem-or-gta-v-by-name` | bam | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26100 server x64, 26220 client x64 |
 | `defender_exclusion/fivem/fivem-folder-excluded` | defender_exclusion | evidence | posture | experimental | 1 / 1 | known fp | none | lab-vm-arm64 26300 | 26100 server x64 |
+| `display_device/absent/not-present` | display_device | evidence | context | experimental | 1 / 1 | confronted | none | never | never |
 | `driver_service/vulnerable-driver/loldrivers-listed` | driver_service | evidence | posture | test | 1 / 1 | confronted | none | owner-pc 26220 | 26100 server x64, 26220 client x64 |
 | `evtx/defender/defender-real-time-protection-turned-off` | evtx | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 20348 server x64, 26100 server x64, 26220 client x64 |
 | `evtx/log-clearing/event-log-file-cleared` | evtx | evidence | tamper | experimental | 2 / 3 | unconfronted | documented | gha-windows-latest 26100, lab-vm-arm64 26300 | 20348 server x64, 26100 server x64, 26220 client x64 |
@@ -311,6 +318,7 @@
 | `prefetch/timeline/fivem-game-process-by-name` | prefetch | timeline | context | experimental | 1 / 1 | unconfronted | stated | never | 26220 client x64 |
 | `prefetch/timeline/fivem-or-gta-v-by-name` | prefetch | timeline | context | experimental | 1 / 1 | confronted | stated | never | 26220 client x64 |
 | `process/system-name/windows-name-outside-windows-folders` | process | evidence | context | experimental | 1 / 2 | confronted | none | never | 26220 client x64 |
+| `usb_device/absent/not-present` | usb_device | evidence | context | experimental | 1 / 1 | confronted | none | never | never |
 | `usn/enhanced-asi/files-deleted` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
 | `usn/enhanced-asi/files-renamed` | usn | evidence | context | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |
 | `usn/identity/digitalentitlements-file-deleted` | usn | evidence | tamper | experimental | 1 / 1 | unconfronted | documented | never | 26100 server x64, 26220 client x64 |

@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 83 |
-| SHA-256 | `0b27063043c7f6a8e7ceaf7ad9f08f67ee0657ad36a839f6d26e9b5ee0bae9b0` |
+| จำนวน rule | 85 |
+| SHA-256 | `3a32986db43c4d3623c687d6b4e4219a146e2bcd29cd374bf85c5f64332deda4` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -46,6 +46,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [Program recorded by BAM has a Windows program's name outside Windows' folders](#rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c) — `context` · `experimental`
 - `defender_exclusion`
   - [exclusion ของ Microsoft Defender ครอบโฟลเดอร์ของ FiveM](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
+- `display_device`
+  - [จอแสดงผลที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้ต่ออยู่](#rule-e99a0f02-a8d6-4752-9e67-044ec22166c3) — `context` · `experimental`
 - `driver_service`
   - [ไดรเวอร์ที่ลงทะเบียนไว้อยู่ในรายชื่อไดรเวอร์มีช่องโหว่ของ LOLDrivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
@@ -112,6 +114,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
   - [Prefetch recorded a program with a Windows program's name outside Windows' folders](#rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22) — `context` · `experimental`
 - `process`
   - [Running program has a Windows program's name outside Windows' folders](#rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897) — `context` · `experimental`
+- `usb_device`
+  - [อุปกรณ์ USB ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้เสียบอยู่](#rule-ee943af1-f816-4f19-9aef-f8b01e57584d) — `context` · `experimental`
 - `usn`
   - [change journal มีบันทึกการลบไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [change journal มีบันทึกการเปลี่ยนชื่อไฟล์ในโฟลเดอร์ asi ของ FiveM for GTA V Enhanced](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
@@ -369,6 +373,46 @@ exclusion ของ Defender ตามที่เป็นอยู่ตอน
 - ตัวติดตั้งหรือ launcher ของเกมและ mod ที่เพิ่ม exclusion ของตัวเอง
 - นักพัฒนาและเครื่องที่ใช้ build โปรแกรมซึ่งยกเว้นทั้งไดรฟ์เพื่อให้ build เร็วขึ้น เหมือนอิมเมจของ runner ที่ GitHub ดูแลซึ่งยกเว้นไดรฟ์ C และ D
 - โปรแกรมความปลอดภัยตัวอื่น หรือผู้ดูแลระบบ ที่จัดการการตั้งค่าของ Defender
+
+## collector `display_device`
+
+### `display_device` / `absent`
+
+<a id="rule-e99a0f02-a8d6-4752-9e67-044ec22166c3"></a>
+
+#### จอแสดงผลที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้ต่ออยู่
+
+- ชื่อภาษาอังกฤษ: A display Windows set up earlier is not connected now
+- id: `e99a0f02-a8d6-4752-9e67-044ec22166c3`
+- ไฟล์: [`rules/display_device/absent/not-present/rule.yaml`](../rules/display_device/absent/not-present/rule.yaml)
+- collector: `display_device`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `display_device`, `hardware`
+- เขียนเมื่อ: 2026-11-19
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows เคยตั้งค่าจอแสดงผลนี้ไว้ และตอนนี้มันไม่ได้ต่ออยู่กับเครื่อง แถวนี้แสดงเวลาที่ Windows ตั้งค่ามันครั้งแรก เวลาที่ Windows เริ่มทำงานครั้งล่าสุดที่มันยังอยู่ และเวลาถอด เฉพาะเมื่อ Windows บันทึกไว้ Windows บันทึกเวลาถอดเมื่ออุปกรณ์ออกไปตอน Windows ทำงานอยู่ และเมื่อปิดแบบ Fast Startup ("Shut down" ปกติ) จะบันทึกเป็นเวลาที่ Windows กลับมาทำงาน ส่วนการปิดเครื่องแบบเต็มจะไม่บันทึกเลย การไม่มีเวลาถอดจึงไม่ได้บอกว่าอุปกรณ์ออกไปเมื่อไร แถวนี้ไม่เคยบอกว่าอุปกรณ์ออกไปอย่างไรหรือเพราะอะไร หรือเป็นอะไรนอกจาก id ที่ Windows บันทึกไว้
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `present`: เป็น `false`
+
+**ย้อนดูได้**
+
+อุปกรณ์ที่ Windows ยังจำไว้ Windows เก็บอุปกรณ์ที่เคยตั้งค่าไว้หลังมันออกไปแล้ว จนกว่าจะถอนการติดตั้งอุปกรณ์หรือติดตั้ง Windows ใหม่
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- เปลี่ยนจอภาพหรือทีวี หรือปิดสวิตช์ในลักษณะที่ตัดการเชื่อมต่อ
+- จอที่สอง โปรเจกเตอร์ หรือทีวีที่ต่อครั้งเดียว
+- dock หรือ adapter ที่รายงานจอแสดงผลต่างไป
+- ย้าย Windows ไปเครื่องอื่น
 
 ## collector `driver_service`
 
@@ -2642,6 +2686,46 @@ Only the programs running at the moment of the scan. A program that has already 
 **แหล่งอ้างอิง**
 
 - <https://attack.mitre.org/techniques/T1036/005/>
+
+## collector `usb_device`
+
+### `usb_device` / `absent`
+
+<a id="rule-ee943af1-f816-4f19-9aef-f8b01e57584d"></a>
+
+#### อุปกรณ์ USB ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่ได้เสียบอยู่
+
+- ชื่อภาษาอังกฤษ: A USB device Windows set up earlier is not present now
+- id: `ee943af1-f816-4f19-9aef-f8b01e57584d`
+- ไฟล์: [`rules/usb_device/absent/not-present/rule.yaml`](../rules/usb_device/absent/not-present/rule.yaml)
+- collector: `usb_device`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `usb_device`, `hardware`
+- เขียนเมื่อ: 2026-11-19
+
+**เกี่ยวกับการตรวจนี้**
+
+Windows เคยตั้งค่าอุปกรณ์ USB นี้ไว้ และตอนนี้มันไม่ได้เสียบอยู่กับเครื่อง แถวนี้แสดงเวลาที่ Windows ตั้งค่ามันครั้งแรก เวลาที่ Windows เริ่มทำงานครั้งล่าสุดที่มันยังอยู่ และเวลาถอด เฉพาะเมื่อ Windows บันทึกไว้ Windows บันทึกเวลาถอดเมื่ออุปกรณ์ออกไปตอน Windows ทำงานอยู่ และเมื่อปิดแบบ Fast Startup ("Shut down" ปกติ) จะบันทึกเป็นเวลาที่ Windows กลับมาทำงาน ส่วนการปิดเครื่องแบบเต็มจะไม่บันทึกเลย การไม่มีเวลาถอดจึงไม่ได้บอกว่าอุปกรณ์ออกไปเมื่อไร แถวนี้มีหมายเลข class, subclass และ protocol ที่บอกชนิดของอุปกรณ์ เช่น ที่เก็บข้อมูล เสียง หรืออินพุต และไม่บอกอะไรมากกว่านั้น แถวนี้ไม่เคยบอกว่าอุปกรณ์ออกไปอย่างไรหรือเพราะอะไร หรือเป็นอะไรนอกจาก id ที่ Windows บันทึกไว้
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `present`: เป็น `false`
+
+**ย้อนดูได้**
+
+อุปกรณ์ที่ Windows ยังจำไว้ Windows เก็บอุปกรณ์ที่เคยตั้งค่าไว้หลังมันออกไปแล้ว จนกว่าจะถอนการติดตั้งอุปกรณ์หรือติดตั้ง Windows ใหม่
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- แฟลชไดรฟ์ โทรศัพท์ หูฟัง หรือจอยเกมที่เคยใช้ครั้งเดียวแล้วเก็บไป
+- dock, สวิตช์ KVM หรืออุปกรณ์ capture
+- อุปกรณ์ที่เสียบคนละช่อง ซึ่ง Windows อาจตั้งค่าเป็นอุปกรณ์อีกตัว
+- ย้าย Windows ไปเครื่องอื่น
 
 ## collector `usn`
 
