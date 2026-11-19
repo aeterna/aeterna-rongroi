@@ -585,13 +585,18 @@
       "installed": "Windows บันทึกการติดตั้งไฟล์นี้เมื่อ {{at}}",
       "code_integrity": "Code Integrity เคยปฏิเสธไฟล์ที่ path เดียวกันบนไดรฟ์ใดไดรฟ์หนึ่ง",
       "unmatched_installs": "มีการติดตั้ง service หรือ driver {{count}} รายการในช่วงนี้ ซึ่ง path ไม่ตรงกับโปรแกรมใดในรายการ",
-      "pci_device": "อุปกรณ์ PCI บันทึกว่าถูกถอดออก {{count}} รายการ",
-      "hid_device": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น บันทึกว่าถูกถอดออก {{count}} รายการ",
-      "usb_device": "อุปกรณ์ USB บันทึกว่าถูกถอดออก {{count}} รายการ",
-      "display_device": "จอภาพ บันทึกว่าถูกถอดออก {{count}} รายการ",
-      "bluetooth_device": "อุปกรณ์ Bluetooth บันทึกว่าถูกถอดออก {{count}} รายการ",
-      "windows_starts": "Windows เริ่มทำงาน {{count}} ครั้ง",
-      "windows_start": "Windows เริ่มทำงาน {{count}} ครั้ง"
+      "pci_device_one": "อุปกรณ์ PCI บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "pci_device_other": "อุปกรณ์ PCI บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "hid_device_one": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "hid_device_other": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "usb_device_one": "อุปกรณ์ USB บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "usb_device_other": "อุปกรณ์ USB บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "display_device_one": "จอภาพ บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "display_device_other": "จอภาพ บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "bluetooth_device_one": "อุปกรณ์ Bluetooth บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "bluetooth_device_other": "อุปกรณ์ Bluetooth บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "windows_starts_one": "Windows เริ่มทำงาน {{count}} ครั้ง",
+      "windows_starts_other": "Windows เริ่มทำงาน {{count}} ครั้ง"
     }
   },
   "presenter": {

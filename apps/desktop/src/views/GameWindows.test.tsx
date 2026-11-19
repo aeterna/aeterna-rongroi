@@ -102,7 +102,7 @@ describe("GameWindowsSection before_scan_devices", () => {
     );
     render(<GameWindowsSection view={view} mode="self" />);
     expect(screen.getByText(/before this scan:/)).toBeInTheDocument();
-    expect(screen.getByText(/1 PCI devices recorded as removed/)).toBeInTheDocument();
+    expect(screen.getByText(/1 PCI device recorded as removed/)).toBeInTheDocument();
     expect(screen.getByText(/2 starts of Windows/)).toBeInTheDocument();
   });
 

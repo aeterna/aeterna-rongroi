@@ -80,15 +80,17 @@ pub fn section(view: Option<&GameWindows>, mode: Mode, lang: Lang) -> String {
         for collector in BEFORE_SCAN_DEVICE_COLLECTORS {
             let count = devices.removed.get(collector).copied().unwrap_or(0);
             if count > 0 {
+                let plural = if count == 1 { "one" } else { "other" };
                 notes.push(words.get(
-                    &format!("game.note.{collector}"),
+                    &format!("game.note.{collector}_{plural}"),
                     &[("count", &count.to_string())],
                 ));
             }
         }
         if devices.windows_starts > 0 {
+            let plural = if devices.windows_starts == 1 { "one" } else { "other" };
             notes.push(words.get(
-                "game.note.windows_starts",
+                &format!("game.note.windows_starts_{plural}"),
                 &[("count", &devices.windows_starts.to_string())],
             ));
         }
@@ -1144,12 +1146,18 @@ mod tests {
         "game.window.before_scan",
         "game.ss_counts",
         "game.note.unmatched_installs",
-        "game.note.pci_device",
-        "game.note.hid_device",
-        "game.note.usb_device",
-        "game.note.display_device",
-        "game.note.bluetooth_device",
-        "game.note.windows_starts",
+        "game.note.pci_device_one",
+        "game.note.pci_device_other",
+        "game.note.hid_device_one",
+        "game.note.hid_device_other",
+        "game.note.usb_device_one",
+        "game.note.usb_device_other",
+        "game.note.display_device_one",
+        "game.note.display_device_other",
+        "game.note.bluetooth_device_one",
+        "game.note.bluetooth_device_other",
+        "game.note.windows_starts_one",
+        "game.note.windows_starts_other",
         "game.note.installed",
         "game.note.code_integrity",
         "game.clock.changed",
@@ -1288,11 +1296,17 @@ mod tests {
             "missing before_scan prefix in\n{text}"
         );
         assert!(
-            text.contains("1 PCI devices recorded as removed"),
+            text.contains("1 PCI device recorded as removed"),
             "missing removal note in\n{text}"
         );
         assert!(
             text.contains("2 starts of Windows"),
+            "missing windows starts in\n{text}"
+        );
+        view.before_scan_devices.as_mut().unwrap().windows_starts = 1;
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(
+            text.contains("1 start of Windows"),
             "missing windows starts in\n{text}"
         );
     }
