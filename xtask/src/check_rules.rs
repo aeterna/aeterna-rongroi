@@ -1171,6 +1171,7 @@ date: 2026-09-11
                     "install_marker",
                     "net_config",
                     "pca",
+                    "pci_start_history",
                     "powershell_text",
                     "prefetch",
                     "recorded_files",

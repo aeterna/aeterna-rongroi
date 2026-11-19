@@ -49,6 +49,9 @@
 //! Windows writes at each start, and bug checks with code 0xE6 (keeping their code and first parameter),
 //! and no other value of those events or of any other.
 //!
+//! **A third, by ADR 0095 sections 1 and 2:** [`pci_log_lines`] reads `Message` of the PCI state-change
+//! record, keeping the position or root bus a line names and nothing else of the payload.
+//!
 //! **Three more, by ADR 0081 section 1:** [`system_fields`], [`security_fields`] and [`refused_images`]
 //! read a few named fields of four events, each recognised by provider, channel and id together (ADR
 //! 0031): `ImagePath` and `ServiceType` of a service install (7045); `OldTime`, `NewTime`, `Reason` and
@@ -737,6 +740,282 @@ fn parse_bug_check_param1(param1: &str) -> Option<(u64, u64)> {
     }
     let p1 = u64::from_str_radix(p1_hex, 16).ok()?;
     Some((code, p1))
+}
+
+// ---------------------------------------------------------------------------------------------------
+// The PCI positions Windows started (ADR 0095 sections 1 and 2)
+// ---------------------------------------------------------------------------------------------------
+
+/// The provider, channel and event id of the PCI state-change record (ADR 0095 section 1).
+const PCI_STATE_CHANGE: (&str, &str, u32) = (
+    "Microsoft-Windows-PCI",
+    "Microsoft-Windows-PCI/Operational",
+    1,
+);
+
+/// What one PCI state-change line says about a position or the root bus.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PciLineKind {
+    /// A root bus began a start of Windows, with its bus number in lower-case `0x` form.
+    RootStart {
+        /// The root bus number, e.g. `0x0`.
+        bus: String,
+    },
+    /// A device at this position finished starting.
+    DeviceStarted {
+        /// The position in the log's `0xBBBB.0xDD.0xFF` form, lower-cased.
+        position: String,
+    },
+    /// A device at this position finished stopping.
+    DeviceStopped {
+        /// The position in the log's `0xBBBB.0xDD.0xFF` form, lower-cased.
+        position: String,
+    },
+    /// A device at this position was removed.
+    DeviceRemoved {
+        /// The position in the log's `0xBBBB.0xDD.0xFF` form, lower-cased.
+        position: String,
+    },
+}
+
+/// One line [`pci_log_lines`] kept, with the time of the record that held it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PciLogLine {
+    /// When the record was written.
+    pub written: Timestamp,
+    /// What the record's message said.
+    pub kind: PciLineKind,
+}
+
+/// What [`pci_log_lines`] read from one log.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PciLog {
+    /// The lines this function understands, sorted by record id.
+    pub lines: Vec<PciLogLine>,
+    /// Messages of the PCI record that are missing, outside the known shapes, or name an invalid
+    /// position. The text is not kept.
+    pub unrecognised: usize,
+    /// Chunks or records that did not parse, as [`records`] reports them.
+    pub rejected: Vec<RejectedRecord>,
+}
+
+/// How one PCI message was read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum PciRead {
+    /// A line this function keeps.
+    Line(PciLineKind),
+    /// A known shape this function does not keep, or another provider, channel or event id.
+    Ignored,
+    /// A PCI message outside the known shapes or with an invalid position. Its text is dropped.
+    Unrecognised,
+}
+
+/// Which half of a state transition a message describes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PciDirection {
+    Begin,
+    Finish,
+}
+
+/// Reads the PCI log's state-change lines, keeping each line's time, its kind and a position or root
+/// bus and nothing else of the payload (ADR 0095 sections 1 and 2).
+///
+/// Only `Message` of provider `Microsoft-Windows-PCI`, channel `Microsoft-Windows-PCI/Operational`
+/// and event id 1 is read. `Category`, `Rid`, `Secondary`, `PreciseTime`, `Qpc`, `Computer` and the
+/// message text itself are not kept.
+///
+/// # Errors
+///
+/// As [`records`].
+pub fn pci_log_lines(bytes: &[u8]) -> Result<PciLog, ParseError> {
+    if bytes.len() < FILE_HEADER_LEN {
+        return Err(ParseError::Truncated {
+            expected: FILE_HEADER_LEN,
+            found: bytes.len(),
+        });
+    }
+    let mut parser = EvtxParser::from_read_seek(Cursor::new(bytes))
+        .map_err(|error| to_parse_error(&error, Stage::Header))?;
+    let mut found = Vec::new();
+    let mut unrecognised = 0;
+    let mut rejected = Vec::new();
+    for outcome in parser.records_json_value() {
+        match outcome {
+            Ok(parsed) => match read_pci_record(&parsed) {
+                PciRead::Line(kind) => found.push((
+                    parsed.event_record_id,
+                    PciLogLine {
+                        written: parsed.timestamp,
+                        kind,
+                    },
+                )),
+                PciRead::Ignored => {}
+                PciRead::Unrecognised => unrecognised += 1,
+            },
+            Err(error) => rejected.push(RejectedRecord {
+                chunk_number: failed_chunk(&error),
+                record_id: failed_record(&error),
+                reason: to_parse_error(&error, Stage::Record),
+            }),
+        }
+    }
+    Ok(PciLog {
+        lines: by_record_id(found),
+        unrecognised,
+        rejected,
+    })
+}
+
+/// Sorts the lines the parser understood by the record id that held each one.
+fn by_record_id(mut found: Vec<(u64, PciLogLine)>) -> Vec<PciLogLine> {
+    found.sort_by_key(|(record_id, _)| *record_id);
+    found.into_iter().map(|(_, line)| line).collect()
+}
+
+/// Reads one rendered record, recognising the PCI identity and then its message.
+fn read_pci_record(parsed: &SerializedEvtxRecord<Value>) -> PciRead {
+    if !is_triple(&record(parsed), PCI_STATE_CHANGE) {
+        return PciRead::Ignored;
+    }
+    let Some(message) = data_text(event_data(parsed), "Message") else {
+        return PciRead::Unrecognised;
+    };
+    pci_message(&message)
+}
+
+/// Classifies one PCI message. The text is consumed here and only the fixed fields it names leave.
+fn pci_message(message: &str) -> PciRead {
+    if let Some(rest) = message.strip_prefix("[ROOT] (Bus ") {
+        return pci_root_message(rest);
+    }
+    if let Some(rest) = message.strip_prefix("[FDO] (") {
+        return pci_fdo_message(rest);
+    }
+    if let Some(rest) = message.strip_prefix("[PDO] (") {
+        return pci_pdo_message(rest);
+    }
+    PciRead::Unrecognised
+}
+
+/// A root bus line: `[ROOT] (Bus 0xH): …`.
+fn pci_root_message(rest: &str) -> PciRead {
+    let Some((bus_hex, rest)) = rest.split_once("): ") else {
+        return PciRead::Unrecognised;
+    };
+    let Some(bus) = pci_root_bus(bus_hex) else {
+        return PciRead::Unrecognised;
+    };
+    match pci_transition(rest) {
+        Some((PciDirection::Begin, "UNINITIALIZED", "STARTED")) => {
+            PciRead::Line(PciLineKind::RootStart { bus })
+        }
+        Some(_) => PciRead::Ignored,
+        None => PciRead::Unrecognised,
+    }
+}
+
+/// An FDO line: `[FDO] (POS) (Bus 0xH): …`. Its position is validated and then not kept.
+fn pci_fdo_message(rest: &str) -> PciRead {
+    let Some((position, rest)) = rest.split_once(") (Bus ") else {
+        return PciRead::Unrecognised;
+    };
+    if pci_position(position).is_none() {
+        return PciRead::Unrecognised;
+    }
+    let Some((bus_hex, rest)) = rest.split_once("): ") else {
+        return PciRead::Unrecognised;
+    };
+    if pci_root_bus(bus_hex).is_none() {
+        return PciRead::Unrecognised;
+    }
+    if pci_transition(rest).is_some() {
+        PciRead::Ignored
+    } else {
+        PciRead::Unrecognised
+    }
+}
+
+/// A PDO line: `[PDO] (POS): …`.
+fn pci_pdo_message(rest: &str) -> PciRead {
+    let Some((position, rest)) = rest.split_once("): ") else {
+        return PciRead::Unrecognised;
+    };
+    let Some(position) = pci_position(position) else {
+        return PciRead::Unrecognised;
+    };
+    match pci_transition(rest) {
+        Some((PciDirection::Finish, _, "STARTED")) => {
+            PciRead::Line(PciLineKind::DeviceStarted { position })
+        }
+        Some((PciDirection::Finish, _, "UNINITIALIZED")) => {
+            PciRead::Line(PciLineKind::DeviceStopped { position })
+        }
+        Some((PciDirection::Finish, _, "REMOVED")) => {
+            PciRead::Line(PciLineKind::DeviceRemoved { position })
+        }
+        Some(_) => PciRead::Ignored,
+        None => PciRead::Unrecognised,
+    }
+}
+
+/// The begin or finish half of a transition, with the state names when the shape is known.
+fn pci_transition(rest: &str) -> Option<(PciDirection, &str, &str)> {
+    if let Some(states) = rest.strip_prefix("Begin state transition from ") {
+        let (from, to) = states.split_once(" to ")?;
+        Some((PciDirection::Begin, pci_state(from)?, pci_state(to)?))
+    } else if let Some(state) = rest.strip_prefix("Finish state transition to ") {
+        Some((PciDirection::Finish, "", pci_state(state)?))
+    } else {
+        None
+    }
+}
+
+/// A state name is upper-case ASCII letters and underscores, as the provider writes it.
+fn pci_state(state: &str) -> Option<&str> {
+    (!state.is_empty()
+        && state
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte == b'_'))
+    .then_some(state)
+}
+
+/// Reads a `0xH` root-bus number of one to four hex digits into its lower-case `0x` form.
+fn pci_root_bus(bus: &str) -> Option<String> {
+    let digits = bus.strip_prefix("0x")?;
+    if digits.is_empty() || digits.len() > 4 || !digits.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return None;
+    }
+    let value = u16::from_str_radix(digits, 16).ok()?;
+    Some(format!("0x{value:x}"))
+}
+
+/// Reads `0xBBBB.0xDD.0xFF` and returns the same three numbers lower-cased.
+///
+/// The bus is at most `0xFF`, the device at most `0x1F` and the function at most 7. The digit counts
+/// are fixed, so a shorter or longer part is not this shape.
+fn pci_position(position: &str) -> Option<String> {
+    let mut parts = position.split('.');
+    let bus = parts.next()?;
+    let device = parts.next()?;
+    let function = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    let bus = pci_hex_part(bus, 4, 0xff)?;
+    let device = pci_hex_part(device, 2, 0x1f)?;
+    let function = pci_hex_part(function, 2, 0x7)?;
+    Some(format!("0x{bus:04x}.0x{device:02x}.0x{function:02x}"))
+}
+
+/// One `0x`-prefixed, fixed-width hex part with a maximum value.
+fn pci_hex_part(part: &str, digits: usize, maximum: u16) -> Option<u16> {
+    let part = part.strip_prefix("0x")?;
+    if part.len() != digits || !part.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let value = u16::from_str_radix(part, 16).ok()?;
+    (value <= maximum).then_some(value)
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1750,6 +2029,235 @@ mod start_tests {
         ))
         .expect("should parse 0xE6");
         assert_eq!(bc.parameter_1, "0xAB");
+    }
+}
+
+#[cfg(test)]
+mod pci_tests {
+    use evtx::SerializedEvtxRecord;
+    use jiff::Timestamp;
+    use serde_json::{Value, json};
+
+    use super::{PciLineKind, PciLogLine, PciRead, by_record_id, pci_log_lines, read_pci_record};
+
+    const LANGUAGE_PACK: &[u8] =
+        include_bytes!("../../../fixtures/evtx/languagepacksetup-operational.evtx");
+
+    fn rendered(
+        provider: &str,
+        channel: &str,
+        event_id: &Value,
+        data: &Value,
+    ) -> SerializedEvtxRecord<Value> {
+        SerializedEvtxRecord {
+            event_record_id: 7,
+            timestamp: Timestamp::from_second(1_791_000_000).unwrap_or(Timestamp::UNIX_EPOCH),
+            data: json!({ "Event": {
+                "System": {
+                    "Provider": { "#attributes": { "Name": provider } },
+                    "EventID": event_id.clone(), "Level": 4, "Channel": channel,
+                    "Computer": "WORKSTATION-7"
+                },
+                "EventData": data.clone()
+            }}),
+        }
+    }
+
+    fn read(message: &str) -> PciRead {
+        read_pci_record(&rendered(
+            "Microsoft-Windows-PCI",
+            "Microsoft-Windows-PCI/Operational",
+            &json!(1),
+            &json!({ "Message": message }),
+        ))
+    }
+
+    fn line(kind: PciLineKind, second: i64) -> PciLogLine {
+        PciLogLine {
+            written: Timestamp::from_second(second).unwrap(),
+            kind,
+        }
+    }
+
+    fn position(value: &str) -> PciLineKind {
+        PciLineKind::DeviceStarted {
+            position: value.to_owned(),
+        }
+    }
+
+    /// Each known shape maps to the line it describes, and the hex in a position is normalized to
+    /// lower case in the same fixed-width form.
+    #[test]
+    fn each_known_shape_maps_to_its_line() {
+        for (message, expected) in [
+            (
+                "[ROOT] (Bus 0x0): Begin state transition from UNINITIALIZED to STARTED",
+                PciLineKind::RootStart {
+                    bus: "0x0".to_owned(),
+                },
+            ),
+            (
+                "[ROOT] (Bus 0x00A): Begin state transition from UNINITIALIZED to STARTED",
+                PciLineKind::RootStart {
+                    bus: "0xa".to_owned(),
+                },
+            ),
+            (
+                "[PDO] (0x0000.0x06.0x00): Finish state transition to STARTED",
+                position("0x0000.0x06.0x00"),
+            ),
+            (
+                "[PDO] (0x000A.0x1F.0x07): Finish state transition to STARTED",
+                position("0x000a.0x1f.0x07"),
+            ),
+            (
+                "[PDO] (0x000A.0x1F.0x07): Finish state transition to UNINITIALIZED",
+                PciLineKind::DeviceStopped {
+                    position: "0x000a.0x1f.0x07".to_owned(),
+                },
+            ),
+            (
+                "[PDO] (0x000A.0x1F.0x07): Finish state transition to REMOVED",
+                PciLineKind::DeviceRemoved {
+                    position: "0x000a.0x1f.0x07".to_owned(),
+                },
+            ),
+        ] {
+            assert_eq!(read(message), PciRead::Line(expected), "{message}");
+        }
+    }
+
+    /// FDO lines and the other states of the known shapes are recognised and then ignored: they add
+    /// no line and no unrecognised count.
+    #[test]
+    fn fdo_lines_and_other_states_make_no_line_and_no_count() {
+        for message in [
+            "[FDO] (0x0000.0x06.0x00) (Bus 0x0): Begin state transition from UNINITIALIZED to STARTED",
+            "[FDO] (0x0000.0x06.0x00) (Bus 0x0): Finish state transition to STARTED",
+            "[ROOT] (Bus 0x0): Finish state transition to STARTED",
+            "[ROOT] (Bus 0x0): Begin state transition from STARTED to UNINITIALIZED",
+            "[PDO] (0x0000.0x06.0x00): Begin state transition from UNINITIALIZED to STARTED",
+            "[PDO] (0x0000.0x06.0x00): Finish state transition to OTHER_STATE",
+        ] {
+            assert_eq!(read(message), PciRead::Ignored, "{message}");
+        }
+    }
+
+    /// Provider, channel and event id are one identity (ADR 0031): any other combination is passed
+    /// over without being counted.
+    #[test]
+    fn another_provider_channel_or_event_id_is_ignored() {
+        let message = "[PDO] (0x0000.0x06.0x00): Finish state transition to STARTED";
+        for (provider, channel, id) in [
+            (
+                "Microsoft-Windows-PCI",
+                "Microsoft-Windows-PCI/Operational",
+                json!(2),
+            ),
+            ("Microsoft-Windows-PCI", "System", json!(1)),
+            (
+                "Some-Other-Provider",
+                "Microsoft-Windows-PCI/Operational",
+                json!(1),
+            ),
+        ] {
+            assert_eq!(
+                read_pci_record(&rendered(
+                    provider,
+                    channel,
+                    &id,
+                    &json!({ "Message": message })
+                )),
+                PciRead::Ignored
+            );
+        }
+        assert!(matches!(read(message), PciRead::Line(_)));
+    }
+
+    /// A missing message, a message outside the known shapes and a position outside the allowed bus,
+    /// device or function range are all `Unrecognised`, and no text of them is kept.
+    #[test]
+    fn malformed_messages_and_bad_positions_are_unrecognised_and_keep_no_text() {
+        let missing = read_pci_record(&rendered(
+            "Microsoft-Windows-PCI",
+            "Microsoft-Windows-PCI/Operational",
+            &json!(1),
+            &json!({ "Other": "C:\\Users\\alex\\PRIVATE-MESSAGE" }),
+        ));
+        assert_eq!(missing, PciRead::Unrecognised);
+
+        for message in [
+            "C:\\Users\\alex\\PRIVATE-MESSAGE",
+            "[PDO] (0x0100.0x06.0x00): Finish state transition to STARTED",
+            "[PDO] (0x0000.0x20.0x00): Finish state transition to STARTED",
+            "[PDO] (0x0000.0x06.0x08): Finish state transition to STARTED",
+            "[PDO] (0x000.0x06.0x00): Finish state transition to STARTED",
+            "[PDO] (0x0000.0x6.0x00): Finish state transition to STARTED",
+            "[PDO] (0xZZZZ.0x06.0x00): Finish state transition to STARTED",
+            "[PDO] (0x0000.0x06.0x00): Finish state transition to",
+            "[PDO] (0x0000.0x06.0x00): Finish state transition to STARTED extra",
+        ] {
+            let read = read(message);
+            assert_eq!(read, PciRead::Unrecognised, "{message}");
+            assert!(!format!("{read:?}").contains("PRIVATE-MESSAGE"), "{read:?}");
+        }
+    }
+
+    /// The lines are returned in record-id order, whatever order the file's chunks were read in.
+    #[test]
+    fn lines_come_back_in_record_id_order() {
+        let ordered = by_record_id(vec![
+            (
+                9,
+                line(
+                    PciLineKind::DeviceRemoved {
+                        position: "0x0000.0x03.0x00".to_owned(),
+                    },
+                    3,
+                ),
+            ),
+            (
+                2,
+                line(
+                    PciLineKind::RootStart {
+                        bus: "0x0".to_owned(),
+                    },
+                    1,
+                ),
+            ),
+            (
+                5,
+                line(
+                    PciLineKind::DeviceStarted {
+                        position: "0x0000.0x02.0x00".to_owned(),
+                    },
+                    2,
+                ),
+            ),
+        ]);
+        let kinds: Vec<PciLineKind> = ordered.into_iter().map(|line| line.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                PciLineKind::RootStart {
+                    bus: "0x0".to_owned()
+                },
+                PciLineKind::DeviceStarted {
+                    position: "0x0000.0x02.0x00".to_owned()
+                },
+                PciLineKind::DeviceRemoved {
+                    position: "0x0000.0x03.0x00".to_owned()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_log_with_no_pci_record_reads_as_none_and_short_bytes_are_refused() {
+        let read = pci_log_lines(LANGUAGE_PACK).unwrap();
+        assert!(read.lines.is_empty());
+        assert_eq!(read.unrecognised, 0);
+        assert!(pci_log_lines(&LANGUAGE_PACK[..100]).is_err());
     }
 }
 
