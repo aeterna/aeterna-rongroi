@@ -198,9 +198,7 @@ fn usb_classes(
 ) -> (Option<String>, Option<String>, Option<String>) {
     match bus {
         DeviceBus::Usb => crate::usb_class(compatible_ids)
-            .map_or((None, None, None), |(c, s, p)| {
-                (Some(c), Some(s), Some(p))
-            }),
+            .map_or((None, None, None), |(c, s, p)| (Some(c), Some(s), Some(p))),
         _ => (None, None, None),
     }
 }
@@ -268,8 +266,7 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         DeviceBus::Pci => crate::pci_class_code(&device.compatible_ids),
         _ => None,
     };
-    let (usb_class, usb_subclass, usb_protocol) =
-        usb_classes(bus, &device.compatible_ids);
+    let (usb_class, usb_subclass, usb_protocol) = usb_classes(bus, &device.compatible_ids);
     let (
         bus_class,
         bus_subclass,
@@ -311,11 +308,7 @@ fn device_record(device: FixtureDevice, origin: &str) -> Result<DeviceRecord, Fi
         max_link_speed,
         max_link_width,
         child_count,
-        unreadable: device
-            .unreadable
-            .into_iter()
-            .map(device_property)
-            .collect(),
+        unreadable: device.unreadable.into_iter().map(device_property).collect(),
     })
 }
 
