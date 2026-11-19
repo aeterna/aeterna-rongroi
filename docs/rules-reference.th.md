@@ -16,8 +16,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 | rules bundle | |
 |---|---|
 | รูปแบบ rule | 4 |
-| จำนวน rule | 82 |
-| SHA-256 | `b931ca0ffe703933d9c2b6271bf494ca953666c1920a7d81ebbd883af602ad46` |
+| จำนวน rule | 83 |
+| SHA-256 | `0b27063043c7f6a8e7ceaf7ad9f08f67ee0657ad36a839f6d26e9b5ee0bae9b0` |
 
 ส่วนหัวของรายงานแสดงจำนวน rule และ SHA-256 ของ bundle ถ้า SHA-256 ในรายงานไม่ตรงกับค่านี้ แปลว่าโปรแกรมนั้นมี
 ชุด rule ต่างจากที่หน้านี้อธิบาย ให้อ่านหน้านี้ที่ commit ที่โปรแกรมนั้น build มา
@@ -84,6 +84,8 @@ rule ไม่เคยตัดสินว่าใครโกง ผลแ�
 - `pci_device`
   - [อุปกรณ์ PCI ที่ Windows เคยตั้งค่าไว้ ตอนนี้ไม่อยู่ในเครื่อง](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `stable`
   - [อุปกรณ์ PCI ที่ไม่มีไดรเวอร์ติดตั้ง](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `stable`
+- `pci_start_history`
+  - [Windows ไม่ได้เริ่มอุปกรณ์ที่ตำแหน่ง PCI นี้ในทุกครั้งที่ log เก็บไว้](#rule-b1ae579c-4305-43d8-9d33-e9b1a3b034e4) — `context` · `experimental`
 - `posture`
   - [Secure Boot ถูกปิดอยู่](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [เฟิร์มแวร์รายงานว่า Secure Boot ปิด แต่ Windows รายงานว่าเปิด](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -1658,6 +1660,50 @@ Windows พบอุปกรณ์ PCI นี้และไม่ได้ต�
 **แหล่งอ้างอิง**
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-install>
+
+## collector `pci_start_history`
+
+### `pci_start_history` / `partial`
+
+<a id="rule-b1ae579c-4305-43d8-9d33-e9b1a3b034e4"></a>
+
+#### Windows ไม่ได้เริ่มอุปกรณ์ที่ตำแหน่ง PCI นี้ในทุกครั้งที่ log เก็บไว้
+
+- ชื่อภาษาอังกฤษ: Windows did not start a device at this PCI position at every start the log holds
+- id: `b1ae579c-4305-43d8-9d33-e9b1a3b034e4`
+- ไฟล์: [`rules/pci_start_history/partial/not-every-start/rule.yaml`](../rules/pci_start_history/partial/not-every-start/rule.yaml)
+- collector: `pci_start_history`
+- strength: `context` — ข้อมูลประกอบ
+- status: `experimental` — อยู่ระหว่างพัฒนา
+- tag: `pci_start_history`, `dma`
+- เขียนเมื่อ: 2026-11-19
+
+**เกี่ยวกับการตรวจนี้**
+
+log PCI ของ Windows บันทึกการเริ่มอุปกรณ์ที่ตำแหน่งนี้ในบางครั้งที่เปิดเครื่องตามที่ log ยังเก็บไว้ แต่ไม่ใช่ทุกครั้ง อุปกรณ์ที่เริ่มภายหลังในระหว่างการเปิดเครื่อง เช่น อุปกรณ์ที่ถูกเปิดใช้งานหลังจาก Windows เริ่มทำงานแล้ว ก็นับว่าเริ่มในครั้งนั้นด้วย ข้อนี้รายงานเฉพาะสิ่งที่ log บันทึกไว้ ไม่ได้บอกว่า อุปกรณ์นั้นคืออะไร อยู่ที่นั่นเพราะอะไร ออกจากไปอย่างไร หรือมีใครโกง
+
+**ตรงเมื่อทุกข้อต่อไปนี้เป็นจริงกับสิ่งที่เห็นชิ้นเดียวกัน**
+
+- `in_every_start`: เป็น `false`
+
+**ย้อนดูได้**
+
+log PCI เป็น log แบบวน (circular) จึงเก็บเฉพาะการเปิดเครื่องครั้งล่าสุด และเขียนทับ record เก่าสุด เมื่อเต็มขนาด
+
+**ยังไม่ได้วัด ในกรณีที่ rule ระบุไว้ว่าเป็นเรื่องปกติของบางเครื่อง**
+
+- `not_windows` — ไม่ได้รันบน Windows
+- `not_admin` — ต้องมีสิทธิ์ผู้ดูแลระบบ Windows จึงจะให้อ่าน
+- `source_absent` — เครื่องนี้ไม่มีข้อมูลส่วนนี้ให้อ่าน
+
+**เรื่องปกติที่ทำให้เกิดผลแบบนี้ได้เหมือนกัน**
+
+- มีการเพิ่ม เปลี่ยน หรือย้ายชิ้นส่วน
+- การตั้งค่าเฟิร์มแวร์ที่เปลี่ยนสิ่งที่เมนบอร์ดแสดง
+- อุปกรณ์ถูกปิดหรือเปิดใช้งานใน Windows
+- อุปกรณ์ PCIe หรือ Thunderbolt ภายนอก
+- ตำแหน่งเปลี่ยนเพราะอุปกรณ์อื่น
+- log เริ่มต้นอยู่กลางการเปลี่ยนแปลง
 
 ## collector `posture`
 
