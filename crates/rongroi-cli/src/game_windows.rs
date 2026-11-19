@@ -17,6 +17,14 @@ use rongroi_core::view::{
 use crate::output::Lang;
 use crate::trace_ages::Words;
 
+const BEFORE_SCAN_DEVICE_COLLECTORS: [&str; 5] = [
+    "pci_device",
+    "hid_device",
+    "usb_device",
+    "display_device",
+    "bluetooth_device",
+];
+
 /// The game-window section (ADR 0078, P6 decisions 3 to 7): its title and intro, each session, the
 /// window counts, the clock and install notes, then each candidate with its facts. Nothing when there
 /// is no view.
@@ -64,6 +72,32 @@ pub fn section(view: Option<&GameWindows>, mode: Mode, lang: Lang) -> String {
                 out,
                 "  {}: {note}",
                 words.get(&format!("game.window.{window}"), &[])
+            );
+        }
+    }
+    if let Some(devices) = &view.before_scan_devices {
+        let mut notes = Vec::new();
+        for collector in BEFORE_SCAN_DEVICE_COLLECTORS {
+            let count = devices.removed.get(collector).copied().unwrap_or(0);
+            if count > 0 {
+                notes.push(words.get(
+                    &format!("game.note.{collector}"),
+                    &[("count", &count.to_string())],
+                ));
+            }
+        }
+        if devices.windows_starts > 0 {
+            notes.push(words.get(
+                "game.note.windows_starts",
+                &[("count", &devices.windows_starts.to_string())],
+            ));
+        }
+        if !notes.is_empty() {
+            let _ = writeln!(
+                out,
+                "  {}: {}",
+                words.get("game.window.before_scan", &[]),
+                notes.join(", ")
             );
         }
     }
@@ -1110,6 +1144,12 @@ mod tests {
         "game.window.before_scan",
         "game.ss_counts",
         "game.note.unmatched_installs",
+        "game.note.pci_device",
+        "game.note.hid_device",
+        "game.note.usb_device",
+        "game.note.display_device",
+        "game.note.bluetooth_device",
+        "game.note.windows_starts",
         "game.note.installed",
         "game.note.code_integrity",
         "game.clock.changed",
@@ -1201,5 +1241,59 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// (ADR 0096 section 4) CLI: the line appears with a count, and does not appear when all counts
+    /// are zero or before_scan_devices is None.
+    #[test]
+    fn before_scan_devices_line_appears_with_count_and_omitted_when_zero() {
+        let mut view = view_with_one_candidate();
+        // 1. None: does not print the line
+        view.before_scan_devices = None;
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(!text.contains("before this scan:"));
+
+        // 2. Some with all zeros: does not print the line
+        view.before_scan_devices = serde_json::from_value(serde_json::json!({
+            "removed": {
+                "pci_device": 0,
+                "hid_device": 0,
+                "usb_device": 0,
+                "display_device": 0,
+                "bluetooth_device": 0
+            },
+            "windows_starts": 0
+        }))
+        .unwrap();
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        assert!(!text.contains("before this scan:"));
+
+        // 3. Some with count above zero: prints one line naming the collectors and windows starts
+        view.before_scan_devices = serde_json::from_value(serde_json::json!({
+            "removed": {
+                "pci_device": 1,
+                "hid_device": 0,
+                "usb_device": 0,
+                "display_device": 0,
+                "bluetooth_device": 0
+            },
+            "windows_starts": 2
+        }))
+        .unwrap();
+        let text = section(Some(&view), Mode::SelfCheck, Lang::En);
+        let words = Words::new(Lang::En);
+        let expected_prefix = format!("  {}:", words.get("game.window.before_scan", &[]));
+        assert!(
+            text.contains(&expected_prefix),
+            "missing before_scan prefix in\n{text}"
+        );
+        assert!(
+            text.contains("1 PCI devices recorded as removed"),
+            "missing removal note in\n{text}"
+        );
+        assert!(
+            text.contains("2 starts of Windows"),
+            "missing windows starts in\n{text}"
+        );
     }
 }

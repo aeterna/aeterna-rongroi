@@ -584,7 +584,14 @@
     "note": {
       "installed": "Windows recorded an install of this file at {{at}}.",
       "code_integrity": "Code Integrity refused a file at the same path on some drive.",
-      "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed."
+      "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed.",
+      "pci_device": "{{count}} PCI devices recorded as removed",
+      "hid_device": "{{count}} mice, keyboards and other input devices recorded as removed",
+      "usb_device": "{{count}} USB devices recorded as removed",
+      "display_device": "{{count}} displays recorded as removed",
+      "bluetooth_device": "{{count}} Bluetooth devices recorded as removed",
+      "windows_starts": "{{count}} starts of Windows",
+      "windows_start": "{{count}} starts of Windows"
     }
   },
   "presenter": {
