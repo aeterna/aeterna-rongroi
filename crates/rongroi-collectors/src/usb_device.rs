@@ -147,8 +147,7 @@ fn observation(device: &DeviceRecord) -> Observation {
     let rest = device
         .model_id
         .split_once('\\')
-        .map(|(_, r)| r)
-        .unwrap_or("");
+        .map_or("", |(_, r)| r);
     if !rest.is_empty() {
         text("name", &device.model_id);
         for (name, prefix) in [("vendor_id", "VID_"), ("product_id", "PID_")] {

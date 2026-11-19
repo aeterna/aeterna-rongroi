@@ -148,8 +148,7 @@ fn observation(device: &DeviceRecord) -> Observation {
     let rest = device
         .model_id
         .split_once('\\')
-        .map(|(_, r)| r)
-        .unwrap_or("");
+        .map_or("", |(_, r)| r);
     if !rest.is_empty() {
         text("name", &device.model_id);
         let mut tokens = rest.split('_');
@@ -157,14 +156,16 @@ fn observation(device: &DeviceRecord) -> Observation {
             text("bluetooth_service", first);
         }
         for token in tokens {
-            if let Some(vid) = token.strip_prefix("VID&") {
-                if vid.len() == 8 && vid.bytes().all(|b| b.is_ascii_hexdigit()) {
-                    text("vendor_id", vid);
-                }
-            } else if let Some(pid) = token.strip_prefix("PID&") {
-                if pid.len() == 4 && pid.bytes().all(|b| b.is_ascii_hexdigit()) {
-                    text("product_id", pid);
-                }
+            if let Some(vid) = token.strip_prefix("VID&")
+                && vid.len() == 8
+                && vid.bytes().all(|b| b.is_ascii_hexdigit())
+            {
+                text("vendor_id", vid);
+            } else if let Some(pid) = token.strip_prefix("PID&")
+                && pid.len() == 4
+                && pid.bytes().all(|b| b.is_ascii_hexdigit())
+            {
+                text("product_id", pid);
             }
         }
     }

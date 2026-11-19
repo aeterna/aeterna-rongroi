@@ -20,9 +20,9 @@ retention: >-
   device is uninstalled or Windows is installed again.
 unmeasured_when: [not_windows]
 falsepositives:
-  - a monitor or TV replaced, or switched off in a way that disconnects it
-  - a second screen, projector or TV connected once
-  - a dock or adapter that reports the display differently
+  - A monitor or TV replaced, or switched off in a way that disconnects it
+  - A second screen, projector or TV connected once
+  - A dock or adapter that reports the display differently
   - Windows moved to another PC
 author: aeterna-rongroi contributors
 date: 2026-11-19

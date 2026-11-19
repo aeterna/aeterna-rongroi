@@ -21,9 +21,9 @@ retention: >-
   device is uninstalled or Windows is installed again.
 unmeasured_when: [not_windows]
 falsepositives:
-  - a drive, phone, headset or game controller used once and put away
-  - a dock, KVM switch or capture device
-  - a device plugged into another port, which Windows can set up again as another device
+  - A drive, phone, headset or game controller used once and put away
+  - A dock, KVM switch or capture device
+  - A device plugged into another port, which Windows can set up again as another device
   - Windows moved to another PC
 author: aeterna-rongroi contributors
 date: 2026-11-19
