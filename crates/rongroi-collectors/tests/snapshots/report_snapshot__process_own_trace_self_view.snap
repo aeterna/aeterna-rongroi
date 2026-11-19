@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 83
+      "rule_count": 85
     },
     "platform": "windows",
     "os_build": "26100",
@@ -108,6 +108,14 @@ expression: view
       "strength": "posture",
       "state": "not_found",
       "retention": "Defender's exclusions as they were when the scan ran. An exclusion removed before the scan is not seen."
+    },
+    {
+      "rule_id": "e99a0f02-a8d6-4752-9e67-044ec22166c3",
+      "collector": "display_device",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
     },
     {
       "rule_id": "98f6e2b8-6d23-4202-bc7f-06587ebdd2f3",
@@ -518,6 +526,14 @@ expression: view
       "retention": "Only the programs running at the moment of the scan. A program that has already exited is not listed, and nothing older is kept here."
     },
     {
+      "rule_id": "ee943af1-f816-4f19-9aef-f8b01e57584d",
+      "collector": "usb_device",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "not_consented",
+      "expected": true
+    },
+    {
       "rule_id": "1c73241b-b7f1-4f91-81d4-8de53db6d119",
       "collector": "usn",
       "strength": "context",
@@ -659,12 +675,12 @@ expression: view
   "scope": {
     "not_admin": 0,
     "not_attempted": 0,
-    "not_consented": 7
+    "not_consented": 9
   },
   "listed": {
     "found": 0,
     "not_found": 9,
-    "unmeasured": 57
+    "unmeasured": 59
   },
   "hidden": {
     "not_found": 0,
@@ -745,6 +761,9 @@ expression: view
     "pci_device",
     "pci_start_history",
     "hid_device",
+    "usb_device",
+    "display_device",
+    "bluetooth_device",
     "autostart",
     "defender_exclusion",
     "antivirus_product",
@@ -976,6 +995,7 @@ expression: view
     "clock": {
       "changes": [],
       "history": "not_known"
-    }
+    },
+    "before_scan_devices": null
   }
 }

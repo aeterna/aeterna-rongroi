@@ -119,6 +119,9 @@
     "pci_device": "PCI devices Windows remembers",
     "pci_start_history": "PCI positions Windows started",
     "hid_device": "Mice, keyboards and other input devices Windows remembers",
+    "usb_device": "USB devices Windows remembers",
+    "display_device": "Displays Windows remembers",
+    "bluetooth_device": "Bluetooth devices Windows remembers",
     "windows_start": "How Windows started",
     "event_fields": "Service installs, clock changes and refused files from the event logs",
     "usn": "NTFS change journal",
@@ -584,7 +587,19 @@
     "note": {
       "installed": "Windows recorded an install of this file at {{at}}.",
       "code_integrity": "Code Integrity refused a file at the same path on some drive.",
-      "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed."
+      "unmatched_installs": "{{count}} service or driver installs in this window; their paths are not among the programs listed.",
+      "pci_device_one": "{{count}} PCI device recorded as removed",
+      "pci_device_other": "{{count}} PCI devices recorded as removed",
+      "hid_device_one": "{{count}} mouse, keyboard or other input device recorded as removed",
+      "hid_device_other": "{{count}} mice, keyboards and other input devices recorded as removed",
+      "usb_device_one": "{{count}} USB device recorded as removed",
+      "usb_device_other": "{{count}} USB devices recorded as removed",
+      "display_device_one": "{{count}} display recorded as removed",
+      "display_device_other": "{{count}} displays recorded as removed",
+      "bluetooth_device_one": "{{count}} Bluetooth device recorded as removed",
+      "bluetooth_device_other": "{{count}} Bluetooth devices recorded as removed",
+      "windows_starts_one": "{{count}} start of Windows",
+      "windows_starts_other": "{{count}} starts of Windows"
     }
   },
   "presenter": {

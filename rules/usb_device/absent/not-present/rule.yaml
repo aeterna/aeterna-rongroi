@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: ee943af1-f816-4f19-9aef-f8b01e57584d
+title: A USB device Windows set up earlier is not present now
+description: >-
+  Windows set this USB device up at some time and it is not plugged into the PC now. The row shows when Windows first
+  set it up, the last start of Windows at which it was present, and — only when Windows recorded one — a
+  removal time. Windows records a removal time when a device leaves while Windows is running and, in a
+  Fast Startup shutdown (the default "Shut down"), at the moment Windows resumes; after a full shutdown it
+  records none, so a missing removal time says nothing about when the device left. The row's class, subclass and
+  protocol numbers show the kind of device, such as storage, audio or input, and nothing more about it. The row never
+  says how or why the device left, or what it was beyond the ids Windows recorded.
+status: experimental
+collector: usb_device
+strength: context
+match:
+  present: false
+retention: >-
+  Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the
+  device is uninstalled or Windows is installed again.
+unmeasured_when: [not_windows]
+falsepositives:
+  - A drive, phone, headset or game controller used once and put away
+  - A dock, KVM switch or capture device
+  - A device plugged into another port, which Windows can set up again as another device
+  - Windows moved to another PC
+author: aeterna-rongroi contributors
+date: 2026-11-19
+tags: [usb_device, hardware]

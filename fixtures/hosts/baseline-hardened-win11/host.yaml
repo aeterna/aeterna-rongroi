@@ -114,3 +114,7 @@ devices:
 # product ids.
   - { id: 'HID\VID_0627&PID_A111\7&6f708192&0&0000', present: true, service: mouhid, first_install: '2026-04-20T10:02:11Z', last_arrival: '2026-10-08T07:30:02Z' }
   - { id: 'HID\VID_0627&PID_A112\7&708192a3&0&0000', present: true, service: kbdhid, first_install: '2026-04-20T10:02:12Z', last_arrival: '2026-10-08T07:30:02Z' }
+# The USB devices Windows remembers (ADR 0096): one present device.
+  - { id: 'USB\VID_0627&PID_A111\6&6f708192&0&1', present: true, service: usbccgp, compatible_ids: ['USB\Class_03&SubClass_01&Prot_01'], first_install: '2026-04-20T10:02:11Z', last_arrival: '2026-10-08T07:30:02Z' }
+# The display devices Windows remembers (ADR 0096): one monitor, present.
+  - { id: 'DISPLAY\DEL4123\4&2c3b4a59&0&0019', present: true, service: monitor, first_install: '2026-04-20T10:02:11Z', last_arrival: '2026-10-08T07:30:02Z' }

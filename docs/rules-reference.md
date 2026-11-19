@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 83 |
-| SHA-256 | `0b27063043c7f6a8e7ceaf7ad9f08f67ee0657ad36a839f6d26e9b5ee0bae9b0` |
+| Rules | 85 |
+| SHA-256 | `dd26076a3a99c074968ccbe93f81d009add8ba17f380c8e23e3fa2f3ec251e58` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -50,6 +50,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Program recorded by BAM has a Windows program's name outside Windows' folders](#rule-2d2a6e08-f0db-43e9-b551-3b54b3b5f31c) — `context` · `experimental`
 - `defender_exclusion`
   - [A Microsoft Defender exclusion covers a FiveM folder](#rule-d7191cf3-ce56-480b-8501-66a198f83e08) — `posture` · `experimental`
+- `display_device`
+  - [A display Windows set up earlier is not connected now](#rule-e99a0f02-a8d6-4752-9e67-044ec22166c3) — `context` · `experimental`
 - `driver_service`
   - [A registered driver is on LOLDrivers' list of vulnerable drivers](#rule-98f6e2b8-6d23-4202-bc7f-06587ebdd2f3) — `posture` · `test`
 - `evtx`
@@ -116,6 +118,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [Prefetch recorded a program with a Windows program's name outside Windows' folders](#rule-735c6a6f-ce81-4026-8849-bbcd5a2cfa22) — `context` · `experimental`
 - `process`
   - [Running program has a Windows program's name outside Windows' folders](#rule-10ca3ec3-f0c0-426d-9430-39fcd09c6897) — `context` · `experimental`
+- `usb_device`
+  - [A USB device Windows set up earlier is not present now](#rule-ee943af1-f816-4f19-9aef-f8b01e57584d) — `context` · `experimental`
 - `usn`
   - [The change journal holds a deletion in FiveM for GTA V Enhanced's asi folder](#rule-1c73241b-b7f1-4f91-81d4-8de53db6d119) — `context` · `experimental`
   - [The change journal holds a rename in FiveM for GTA V Enhanced's asi folder](#rule-7996285e-8ccf-4b2d-8fec-339a32b95931) — `context` · `experimental`
@@ -369,6 +373,45 @@ Defender's exclusions as they were when the scan ran. An exclusion removed befor
 - Game and mod installers and launchers that add their own exclusion
 - Developers and build machines that exclude a whole drive for build speed, as a GitHub-hosted runner image excludes its C and D drives
 - Another security product, or an administrator, managing Defender's settings
+
+## Collector `display_device`
+
+### `display_device` / `absent`
+
+<a id="rule-e99a0f02-a8d6-4752-9e67-044ec22166c3"></a>
+
+#### A display Windows set up earlier is not connected now
+
+- Id: `e99a0f02-a8d6-4752-9e67-044ec22166c3`
+- File: [`rules/display_device/absent/not-present/rule.yaml`](../rules/display_device/absent/not-present/rule.yaml)
+- Collector: `display_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `display_device`, `hardware`
+- Written: 2026-11-19
+
+**About this check**
+
+Windows set this display device up at some time and it is not connected to the PC now. The row shows when Windows first set it up, the last start of Windows at which it was present, and — only when Windows recorded one — a removal time. Windows records a removal time when a device leaves while Windows is running and, in a Fast Startup shutdown (the default "Shut down"), at the moment Windows resumes; after a full shutdown it records none, so a missing removal time says nothing about when the device left. The row never says how or why the device left, or what it was beyond the ids Windows recorded.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `false`
+
+**Look-back**
+
+Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the device is uninstalled or Windows is installed again.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- A monitor or TV replaced, or switched off in a way that disconnects it
+- A second screen, projector or TV connected once
+- A dock or adapter that reports the display differently
+- Windows moved to another PC
 
 ## Collector `driver_service`
 
@@ -2592,6 +2635,45 @@ Only the programs running at the moment of the scan. A program that has already 
 **References**
 
 - <https://attack.mitre.org/techniques/T1036/005/>
+
+## Collector `usb_device`
+
+### `usb_device` / `absent`
+
+<a id="rule-ee943af1-f816-4f19-9aef-f8b01e57584d"></a>
+
+#### A USB device Windows set up earlier is not present now
+
+- Id: `ee943af1-f816-4f19-9aef-f8b01e57584d`
+- File: [`rules/usb_device/absent/not-present/rule.yaml`](../rules/usb_device/absent/not-present/rule.yaml)
+- Collector: `usb_device`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `usb_device`, `hardware`
+- Written: 2026-11-19
+
+**About this check**
+
+Windows set this USB device up at some time and it is not plugged into the PC now. The row shows when Windows first set it up, the last start of Windows at which it was present, and — only when Windows recorded one — a removal time. Windows records a removal time when a device leaves while Windows is running and, in a Fast Startup shutdown (the default "Shut down"), at the moment Windows resumes; after a full shutdown it records none, so a missing removal time says nothing about when the device left. The row's class, subclass and protocol numbers show the kind of device, such as storage, audio or input, and nothing more about it. The row never says how or why the device left, or what it was beyond the ids Windows recorded.
+
+**Matches when all of these hold for one observation**
+
+- `present`: is `false`
+
+**Look-back**
+
+Devices Windows still remembers. Windows keeps a device it has set up after the device leaves, until the device is uninstalled or Windows is installed again.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+
+**Ordinary things that also produce this**
+
+- A drive, phone, headset or game controller used once and put away
+- A dock, KVM switch or capture device
+- A device plugged into another port, which Windows can set up again as another device
+- Windows moved to another PC
 
 ## Collector `usn`
 

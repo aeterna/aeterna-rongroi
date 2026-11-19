@@ -283,6 +283,35 @@ pub struct InstallCounts {
     /// Installs with a time in an after window.
     pub after: usize,
 }
+/// The collectors whose removal times are counted in the before-the-scan window (ADR 0096 section 4).
+pub const BEFORE_SCAN_DEVICE_COLLECTORS: [&str; 5] = [
+    "pci_device",
+    "hid_device",
+    "usb_device",
+    "display_device",
+    "bluetooth_device",
+];
+/// Device removals and Windows starts in the before-the-scan window (ADR 0096 section 4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BeforeScanDevices {
+    /// For each of `pci_device`, `hid_device`, `usb_device`, `display_device` and
+    /// `bluetooth_device`, how many observations of that collector have a `last_removal_at` in the
+    /// window. Every one of the five keys is present, zero included.
+    pub removed: BTreeMap<String, usize>,
+    /// How many `windows_start` observations with `record: start` have a `started_at` in the window.
+    pub windows_starts: usize,
+}
+impl Default for BeforeScanDevices {
+    fn default() -> Self {
+        Self {
+            removed: BEFORE_SCAN_DEVICE_COLLECTORS
+                .into_iter()
+                .map(|collector| (collector.to_owned(), 0))
+                .collect(),
+            windows_starts: 0,
+        }
+    }
+}
 /// One clock change the event logs recorded inside the compared span (ADR 0081 section 3). It says
 /// when the change happened and the clock's times either side of it, never why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -335,6 +364,9 @@ pub struct GameWindows {
     /// section 3). A note: it moves no candidate, order or count.
     #[serde(default)]
     pub clock: ClockTrust,
+    /// Device removals and Windows starts in the before-the-scan window (ADR 0096 section 4).
+    #[serde(default)]
+    pub before_scan_devices: Option<BeforeScanDevices>,
 }
 
 /// The game-windows view for `mode` (ADR 0078): every candidate in Self mode; in SS mode only those
@@ -349,6 +381,7 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
     let counts = counts_of(&candidates, &sessions, scan);
     let events = EventRecords::of(report);
     let unmatched_installs = unmatched_installs_of(&candidates, &events, &sessions, scan);
+    let before_scan_devices = before_scan_devices_of(report, &sessions, scan);
     let found = sessions.len();
     let oldest = oldest_by_source(report);
     let files = RecordedFiles::of(report);
@@ -401,6 +434,7 @@ pub fn game_windows(report: &Report, mode: Mode) -> GameWindows {
         unnamed,
         unmatched_installs,
         clock: clock_of(report, &sessions),
+        before_scan_devices,
     }
 }
 
@@ -596,6 +630,50 @@ fn unmatched_installs_of(
         counts.after += usize::from(hit.after);
     }
     counts
+}
+
+/// Counts of device removals and Windows starts in the before-the-scan window (ADR 0096 section 4).
+/// `None` when no latest session has a recorded end, or when the scan time is not known.
+fn before_scan_devices_of(
+    report: &Report,
+    sessions: &[TimedSession],
+    scan: Option<jiff::Timestamp>,
+) -> Option<BeforeScanDevices> {
+    let scan = scan?;
+    let latest_sessions: Vec<&TimedSession> = sessions.iter().filter(|s| s.latest).collect();
+    if latest_sessions.is_empty() || latest_sessions.iter().any(|s| s.end.is_none()) {
+        return None;
+    }
+    let mut devices = BeforeScanDevices::default();
+    for &collector in &BEFORE_SCAN_DEVICE_COLLECTORS {
+        for observation in observations_of(report, collector) {
+            let hit = time_of(observation, "last_removal_at")
+                .and_then(parse_time)
+                .is_some_and(|time| {
+                    sessions
+                        .iter()
+                        .any(|s| hits(s, time, Some(scan)).before_scan)
+                });
+            if hit {
+                *devices.removed.entry(collector.to_owned()).or_default() += 1;
+            }
+        }
+    }
+    for observation in observations_of(report, "windows_start") {
+        let is_start = session::text(observation, "record") == Some("start");
+        let hit = is_start
+            && time_of(observation, "started_at")
+                .and_then(parse_time)
+                .is_some_and(|time| {
+                    sessions
+                        .iter()
+                        .any(|s| hits(s, time, Some(scan)).before_scan)
+                });
+        if hit {
+            devices.windows_starts += 1;
+        }
+    }
+    Some(devices)
 }
 /// A session with the times its windows are measured from.
 struct TimedSession {
@@ -3596,5 +3674,110 @@ mod tests {
             serde_json::to_value(IdentityNotKnownReason::JournalOtherDrive).unwrap(),
             serde_json::json!({"reason": "journal_other_drive"})
         );
+    }
+
+    fn device_removal(collector: &str, last_removal_at: &str) -> Observation {
+        Observation {
+            collector: collector.to_owned(),
+            fields: BTreeMap::from([(
+                "last_removal_at".to_owned(),
+                serde_json::Value::from(last_removal_at),
+            )]),
+        }
+    }
+
+    fn windows_start_record(record: &str, started_at: &str) -> Observation {
+        Observation {
+            collector: "windows_start".to_owned(),
+            fields: BTreeMap::from([
+                ("record".to_owned(), serde_json::Value::from(record)),
+                ("started_at".to_owned(), serde_json::Value::from(started_at)),
+            ]),
+        }
+    }
+
+    /// ADR 0096 section 4: one removal of each collector inside the before-the-scan window counts;
+    /// one before the session end and one after the scan do not.
+    #[test]
+    fn before_scan_devices_counts_one_removal_per_collector_inside_window() {
+        let mut records = base_records();
+        for collector in BEFORE_SCAN_DEVICE_COLLECTORS {
+            records.push(device_removal(collector, "2026-01-10T11:00:00Z"));
+            records.push(device_removal(collector, "2026-01-10T10:20:00Z"));
+            records.push(device_removal(collector, "2026-01-10T12:05:00Z"));
+        }
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+        let devices = windows
+            .before_scan_devices
+            .expect("before_scan_devices should be Some");
+        for collector in BEFORE_SCAN_DEVICE_COLLECTORS {
+            assert_eq!(
+                devices.removed.get(collector).copied(),
+                Some(1),
+                "removal count for {collector}"
+            );
+        }
+    }
+
+    /// ADR 0096 section 4: a `windows_start` with `record: start` inside counts; one with
+    /// record: `bug_check` does not, nor one before the session end.
+    #[test]
+    fn before_scan_devices_counts_windows_start_inside_window() {
+        let mut records = base_records();
+        records.push(windows_start_record("start", "2026-01-10T11:00:00Z"));
+        records.push(windows_start_record("bug_check", "2026-01-10T11:00:00Z"));
+        records.push(windows_start_record("start", "2026-01-10T10:20:00Z"));
+
+        let windows = game_windows(&report_of(records), Mode::SelfCheck);
+        let devices = windows
+            .before_scan_devices
+            .expect("before_scan_devices should be Some");
+        assert_eq!(devices.windows_starts, 1);
+    }
+
+    /// ADR 0096 section 4: `before_scan_devices` is `None` when the latest session has no end,
+    /// and when the scan time is missing.
+    #[test]
+    fn before_scan_devices_is_none_when_session_end_or_scan_time_missing() {
+        let report = report_of(vec![fivem_record("prefetch", "2026-01-10T10:00:00Z")]);
+        let windows = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(windows.before_scan_devices, None);
+
+        let mut report = report_of(base_records());
+        report.header.generated_at = String::new();
+        let windows = game_windows(&report, Mode::SelfCheck);
+        assert_eq!(windows.before_scan_devices, None);
+    }
+
+    /// ADR 0096 section 4: `before_scan_devices` is `Some` with zeros when nothing falls in the window.
+    #[test]
+    fn before_scan_devices_is_some_with_zeros_when_nothing_in_window() {
+        let report = report_of(base_records());
+        let windows = game_windows(&report, Mode::SelfCheck);
+        let devices = windows
+            .before_scan_devices
+            .expect("before_scan_devices should be Some");
+        assert_eq!(devices, BeforeScanDevices::default());
+        assert_eq!(devices.windows_starts, 0);
+        assert_eq!(devices.removed.len(), 5);
+        for count in devices.removed.values() {
+            assert_eq!(*count, 0);
+        }
+    }
+
+    /// ADR 0096 section 4: `before_scan_devices` produces the same counts in SS mode.
+    #[test]
+    fn before_scan_devices_is_same_in_ss_mode() {
+        let mut records = base_records();
+        records.push(device_removal("pci_device", "2026-01-10T11:00:00Z"));
+        records.push(device_removal("usb_device", "2026-01-10T11:15:00Z"));
+        records.push(windows_start_record("start", "2026-01-10T11:30:00Z"));
+        let report = report_of(records);
+
+        let self_view = game_windows(&report, Mode::SelfCheck);
+        let ss_view = game_windows(&report, Mode::Ss);
+
+        assert_eq!(self_view.before_scan_devices, ss_view.before_scan_devices);
+        assert!(self_view.before_scan_devices.is_some());
     }
 }

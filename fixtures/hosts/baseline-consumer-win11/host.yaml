@@ -150,3 +150,7 @@ devices:
   - { id: 'HID\VID_0627&PID_A102&MI_01&COL01\7&4d5e6f70&0&0000', present: true, first_install: '2026-03-02T09:14:26Z', last_arrival: '2026-10-09T08:46:16Z' }
   - { id: 'HID\VID_0627&PID_A102&MI_01&COL02\7&4d5e6f70&0&0001', present: true, service: kbdhid, first_install: '2026-03-02T09:14:26Z', last_arrival: '2026-10-09T08:46:16Z' }
   - { id: 'HID\VID_0627&PID_A103&MI_03\7&5e6f7081&0&0000', present: true, first_install: '2026-05-11T19:02:44Z', last_arrival: '2026-10-09T08:46:16Z' }
+# The USB devices Windows remembers (ADR 0096): one present device, QEMU's vendor id with invented product id.
+  - { id: 'USB\VID_0627&PID_A101\6&1a2b3c4d&0&1', present: true, service: usbccgp, compatible_ids: ['USB\Class_03&SubClass_01&Prot_01'], first_install: '2026-03-02T09:14:25Z', last_arrival: '2026-10-09T08:46:16Z' }
+# The display devices Windows remembers (ADR 0096): one monitor, present.
+  - { id: 'DISPLAY\DEL4123\4&2c3b4a59&0&0019', present: true, service: monitor, first_install: '2026-03-02T09:22:03Z', last_arrival: '2026-10-09T08:46:15Z' }

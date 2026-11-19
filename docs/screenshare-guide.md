@@ -234,6 +234,8 @@ need by hand, and compare it with the report yourself.
 | Windows recorded bug check 0xE6 | context | `experimental` | Driver Verifier turned on, a faulty driver, faulty hardware |
 | Windows did not start a device at a PCI position at every start its PCI log holds | context | `experimental` | a part added, replaced or moved, a firmware setting, a device disabled or enabled in Windows, an external PCIe or Thunderbolt device, another device moving positions, a log that begins in the middle of a change |
 | A mouse, keyboard or other input device Windows set up earlier is not present now | context | `experimental` | a mouse, keyboard, headset or game controller used once and put away (most PCs have several), a wireless receiver moved to another port, a tablet or dock, Windows moved to another PC |
+| A USB device Windows set up earlier is not present now (full scan only) | context | `experimental` | a drive, phone, headset or game controller used once and put away, a dock, KVM switch or capture device, a device plugged into another port, Windows moved to another PC |
+| A display Windows set up earlier is not connected now (full scan only) | context | `experimental` | a monitor or TV replaced or switched off, a second screen, projector or TV connected once, a dock or adapter that reports the display differently, Windows moved to another PC |
 | FiveM for GTA V Enhanced keeps a cache folder for a server (full scan only) | context | `experimental` | joining any server with FiveM for GTA V Enhanced, a folder kept from a server joined long ago or by another person on the same Windows account |
 | The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
 | The registered organisation names a Windows-modification playbook | posture | `experimental` | anyone who applied Atlas or ReviOS for privacy, battery life or an old PC; a second-hand PC that came with it; a name typed in by hand |
@@ -346,7 +348,7 @@ Three things to know about the vulnerable-driver rule:
   to load. This program does not read whether that list is on, and a driver on LOLDrivers' list is not
   necessarily on Microsoft's.
 
-Three things to know about a full scan (ADR 0052, ADR 0055):
+Four things to know about a full scan (ADR 0052, ADR 0055, ADR 0096):
 
 - **The player chooses it before the scan starts**, in the program that reads: `scan --full` asks and only
   `yes` starts it; in the desktop app, "Full scan" restarts the program and a Windows dialog asks before
@@ -358,6 +360,12 @@ Three things to know about a full scan (ADR 0052, ADR 0055):
   a folder on your own PC.
 - **Its absence says nothing.** A player who never used GTA V Enhanced, reinstalled it, or deleted the
   folder has none.
+- **The USB, display and Bluetooth rows are model numbers, a type and times.** They never hold a serial
+  number, name, address or EDID. A USB row's class shows the kind of device — a drive, a phone, an audio or
+  input device — and nothing about what it held or did. SS mode lists the USB devices and displays that are
+  not present now and counts the rest; no Bluetooth device is listed by name. The game-window section also
+  counts, between the latest session's end and the scan, the devices Windows recorded as removed and the
+  starts of Windows: what was recorded, never why.
 
 Four things to know about the full scan's PowerShell rows (ADR 0064):
 

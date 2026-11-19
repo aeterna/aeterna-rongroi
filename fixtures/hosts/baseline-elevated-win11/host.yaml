@@ -4934,3 +4934,7 @@ processes:
 # job's runner listed one PCI device (2026-10-15, read without a gap); its class and device id are invented.
 devices:
   - { id: 'PCI\VEN_1414&DEV_A0FA&SUBSYS_00000000&REV_00\5&1a2b3c4d&0&0', present: true, compatible_ids: ['PCI\CC_010802', 'PCI\CC_0108'], service: stornvme, problem_code: 0, first_install: '2026-09-01T00:10:00Z', last_arrival: '2026-10-15T15:02:11Z' }
+# The USB devices Windows remembers (ADR 0096): one present device.
+  - { id: 'USB\VID_0627&PID_A001\6&1a2b3c4d&0&1', present: true, service: usbccgp, compatible_ids: ['USB\Class_03&SubClass_01&Prot_01'], first_install: '2026-09-01T00:10:00Z', last_arrival: '2026-10-15T15:02:11Z' }
+# The display devices Windows remembers (ADR 0096): one monitor, present.
+  - { id: 'DISPLAY\DEL4123\4&1a2b3c4d&0&0001', present: true, service: monitor, first_install: '2026-09-01T00:10:00Z', last_arrival: '2026-10-15T15:02:11Z' }

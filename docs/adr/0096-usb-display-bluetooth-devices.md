@@ -157,9 +157,26 @@ Decided on 2026-11-19: all as recommended.
 | 4 | Keep the three collectors out of the saved record and Connect until an upload consent names them? | **Yes** |
 | 5 | Check in the lab virtual machine before release: a USB device and a display added, removed while running, removed while off? | **Yes** |
 
+## As built (2026-11-19)
+
+- Section 1: the display model id is cut from the instance id, as for every bus, so it reads `DISPLAY\AAAhhhh`, not
+  the hardware id's `MONITOR\AAAhhhh`; the kept shape is the same. A USB root hub keeps `ROOT_HUB`, `ROOT_HUB20` or
+  `ROOT_HUB30`. A model id that keeps nothing is `<enumerator>\` inside the host, and none of the three collectors
+  emits a `name` for it.
+- Section 2: `usb_device`, `display_device` and `bluetooth_device`, each `ScanTier::Full`. A display's `vendor_id` is
+  its three letters and `product_id` its four digits. The Connect sidecar already refuses every full-tier collector,
+  so none of the three can be requested through it; none is in `DEVICE_COLLECTORS`.
+- Section 3: both rules are confronted by a present USB device and a present display added to the three baseline
+  hosts that list devices.
+- Section 4: `GameWindows::before_scan_devices`, `null` when the window is not known, with every one of the five
+  collectors present in `removed`, zero included. Both front ends print one line after the install lines, under the
+  window's name, only when a count is above zero.
+- Section 5: `PRIVACY.md`, both consent texts (the full-scan list and the SS "shows" text) and both screenshare
+  guides.
+
 ## Consequences
 
-- Three collectors, two context rules, one amended session statement, and three more `DeviceBus` values.
+- Three collectors, two context rules, two counts in the game-window view, and three more `DeviceBus` values.
 - `COLLECTOR_ORDER`, fixtures, baselines, snapshots, translations, the rules reference, the coverage table, the consent
   texts, PRIVACY.md, the guides and `docs/architecture.md` change with the code.
 - The rules stay `experimental` until three real PCs have been measured, as ADR 0095's do.

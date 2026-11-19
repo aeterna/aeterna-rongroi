@@ -64,8 +64,8 @@ subsystem numbers and the class Windows records (`PCI\VEN_…&DEV_…&SUBSYS_…
 its problem code when it is present, whether it is present, and three times Windows stores beside it — when
 Windows first set it up, the last start of Windows at which it was present, and when Windows recorded it
 removed. For a present device it also reads the class numbers from the bus, the link speed and width, current and
-maximum, and how many child devices Windows lists: the count, never their ids (ADR 0095). It never reads a serial number, a name you gave a device, or any
-USB device, phone, camera or drive. The list names some of your hardware, as the driver list does. The first-
+maximum, and how many child devices Windows lists: the count, never their ids (ADR 0095). It never reads a serial number or a name you gave a device; USB
+devices, displays and Bluetooth devices are read only in a full scan (below). The list names some of your hardware, as the driver list does. The first-
 set-up times of a PC's devices are close to unique to one Windows installation, so **two reports of the same
 PC can be matched through them**, as file times can (ADR 0050); this tool sends nothing, but whoever receives
 two of your reports can make that match. SS mode shows the device rows a rule matched — a device with no
@@ -342,6 +342,17 @@ What a full scan reads today:
   or by the file's own number with that file. For a match, only whether it was a deletion or a rename and
   when are kept, and those times are shown with the file's details. No other name in the journal is kept, and
   no journal or file number is reported. A file on another drive is not looked for.
+- **The USB devices, displays and Bluetooth devices Windows remembers** (ADR 0096), present now or set up
+  earlier and gone, through the same device list as the PCI and input devices: the model numbers Windows
+  records (`USB\VID_…&PID_…` with `REV_` and `MI_`, a display's three letters and four digits, a Bluetooth
+  service's id with its `VID&` and `PID&` numbers), a USB device's class, subclass and protocol, the driver,
+  whether it is present, and the same three times. Each part of a model id is kept only when it has one fixed
+  shape; anything else is dropped whole. It never reads a serial number, a name, a Bluetooth address, which
+  port a device used, a display's EDID, or what is on a drive. **The class shows which kinds of device were
+  plugged in**, such as a drive, a phone or a camera, and the first-set-up times, like the PCI ones, **can
+  match two reports of this PC**. SS mode shows the USB devices and displays that are not present now and
+  only a count of the rest; it shows no Bluetooth device by name. These devices are not in a saved report's
+  device list.
 
 A full scan reads more, not differently: nothing here changes what the standard scan reads, and no scan
 reads a browser's history, a messenger's storage, or anything that holds a password or a token.
@@ -403,6 +414,7 @@ itself (ADR 0050).
 | How far back each source reaches | shown | shown — [below](#how-far-back-the-traces-reach) |
 | Each FiveM edition's last session beside its folders | shown | shown — [below](#how-far-back-the-traces-reach) |
 | Programs recorded near a game session (ADR 0078) | every program with a recorded time in the 30 minutes before a FiveM session, during it, the 30 minutes after it, or between it and the scan, with its facts and their ordinary causes, which of Windows' records recorded it, and, after a full scan, its file's details (hash, signature and signer, what kind of file it is, the name in its version information, its download zone and the website it came from, and when the change journal recorded it deleted or renamed); your user name is hidden in paths | **named only when a fact about its file holds** (it is no longer where it ran from, it has no signature that verifies, its name does not match what it is, it ran from Temp or Downloads, it loaded a program file from outside the usual folders, or the change journal recorded it being deleted or renamed near the latest session), with the same facts and file details, the website shown as `%DOWNLOAD_HOST%` unless you agree to show websites (ADR 0064); every other program is **a count per window**. Before ADR 0078, SS mode showed no Prefetch, BAM or Program Compatibility Assistant record by name (ADR 0034) |
+| Devices removed and Windows starts before the scan (ADR 0096) | between the latest game session's end and the scan: how many PCI, input, USB, display and Bluetooth devices Windows recorded as removed, and how many times Windows started; counts only, and none when that span is not known | shown, the same counts |
 | Timeline | every time the report holds | the times of the evidence it shows, and the times listed [below](#the-timeline) |
 
 ### The timeline
