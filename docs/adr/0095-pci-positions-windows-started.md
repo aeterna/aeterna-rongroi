@@ -1,6 +1,6 @@
 # ADR 0095 — The PCI positions Windows started, one start at a time
 
-- Status: accepted — the owner decided the questions below on 2026-11-18, each as recommended. Sections 3 and 4 are built ("As built"); section 1 waits for a physical PC and other Windows builds
+- Status: accepted — the owner decided the questions below on 2026-11-18, each as recommended. Sections 3 and 4 are built ("As built"); sections 1 and 2 are amended by the 2026-11-19 measurements below
 - Date: 2026-11-18
 - Amends: ADR 0018 (two more kinds of event whose payload is read), ADR 0069 (a device's position is read, from a log
   and not from the device list), ADR 0070 (`pci_device` gains fields), ADR 0071 (`windows_start` gains a second kind of
@@ -66,6 +66,34 @@ With a Medium-integrity token in the same machine:
 | The channel through `Get-WinEvent` | allowed |
 | `Microsoft-Windows-PCI%4Operational.evtx` and `System.evtx` as files | denied |
 
+### Device off and back on (2026-11-19)
+
+On the development PC the owner turned the board's HD Audio controller off in the firmware settings, started Windows,
+turned it on again and started Windows again.
+
+| Start | Positions | `0x000a.0x00.0x04` |
+|---|---|---|
+| Before | 39 | started |
+| Controller off | 38 | not started; nothing else changed |
+| Controller on | 39 | started |
+
+This is a function of the processor, not a separate card. No separate PCIe card and no position new to the PC was tried
+on physical hardware.
+
+In the lab virtual machine, an NVMe device behind root port 1 was disabled in Windows and enabled again on a throwaway disk:
+
+| Step | Latest start's positions | Log lines for the device |
+|---|---|---|
+| Before disabling | 6 | started |
+| Disabled during that start | 6 | `[PDO] … from STARTED to UNINITIALIZED`, then finish |
+| Next start, before enabling | 5 | none |
+| Enabled during that same start | 6 | started, at the time of enabling |
+
+So a device disabled in Windows looks like one that was not there, and a position can be started after a start has begun.
+
+The development PC's log has event id 1, provider `Microsoft-Windows-PCI`, and the `EventData` fields `Category`, `Rid`,
+`Secondary`, `PreciseTime`, `Qpc` and `Message`. Device starts at boot finished 0.05 to 14.68 s after the root start.
+
 ### The bug check record
 
 `Microsoft-Windows-WER-SystemErrorReporting` event 1001 in `System` holds `param1`, `param2` and `param3`. On the one
@@ -81,12 +109,18 @@ Standard tier. It reads `Microsoft-Windows-PCI%4Operational.evtx` through the sa
 `windows_start` (ADR 0071). A denied read without an elevated token is `not_admin`; a PC without the file is
 `source_absent`.
 
-The parser keeps only: the record time, whether the message is a root start, a device start or a device removal, and the
-position written in the fixed form above. **Every other part of the payload is dropped**, including any message it does
-not recognise, which is counted as a gap.
+The parser reads only provider `Microsoft-Windows-PCI`, channel `Microsoft-Windows-PCI/Operational`, event id 1, and only
+`EventData.Message`. It keeps: the record time, whether the message is a root start, a device start, a device stop or a
+device removal, and the position in the fixed form above. **Every other part of the payload is dropped.** A message in the
+log's known shape with another state is ignored. A message outside that shape is counted as a gap and its text is not kept.
 
-A new start begins at a root-start line whose root bus number was already seen in the current start. That keeps two root
-buses in one start together and does not depend on the time between starts.
+Records are taken in record-id order. A new start begins at a root-start line whose root bus number was already seen in the
+current start. That keeps two root buses in one start together and does not depend on the time between starts. Lines
+before the first root start belong to no start.
+
+A position counts at a start when a device-start line for it finished at any time during that start, once however many
+such lines there are. The log gives no line that separates boot from later, and no fixed number of seconds is used: a
+position started later in a start counts at that start.
 
 One observation per position:
 
@@ -98,6 +132,7 @@ One observation per position:
 | `in_every_start` | boolean | `starts_seen == starts_total` |
 | `in_latest_start` | boolean | listed at the newest start |
 | `first_started_at`, `last_started_at` | timestamp | first and last time it was listed as started |
+| `stop_recorded_at` | timestamp | newest line saying the started device was stopped, when there is one |
 | `removal_recorded_at` | timestamp | newest removal line for that position, when there is one |
 
 The rule engine reads one observation at a time, so the comparison across starts is made here.
@@ -108,8 +143,8 @@ The rule engine reads one observation at a time, so the comparison across starts
 
 The row says Windows started a device at this position at N of the M starts the log holds. It does not say what the
 device was, why it was there or how it left. False positives to name: a part added, replaced or moved; a firmware setting
-that changes what the board shows; an external PCIe or Thunderbolt device; a position change caused by another device; a
-log that begins in the middle of a change.
+that changes what the board shows; a device disabled or enabled in Windows; an external PCIe or Thunderbolt device; a
+position change caused by another device; a log that begins in the middle of a change.
 
 No timeline selector. A position present at every start would add one line per position with nothing to ask about, and a
 selector would show them in SS mode.
@@ -154,6 +189,8 @@ out until a Connect decision says otherwise.
 ## What this does not do
 
 - It does not say what a device was, what it did, or whether it read memory.
+- It does not tell a device that was removed from one disabled in Windows or in the firmware.
+- It does not say a position was started at boot: one started later in that start counts too.
 - It does not list a device Windows did not start. A present device with no driver remains the concern of
   `pci_device/no-driver/problem-28`.
 - It cannot speak for starts the circular log no longer holds. The report states how far back it reaches.
@@ -172,7 +209,8 @@ out until a Connect decision says otherwise.
 
 ## What is unverified
 
-- A physical PC with a card added, removed or moved. The virtual machine runs Windows on Arm.
+- A separate PCIe card added, removed or moved on a physical PC, and a position new to a physical PC. The virtual machine
+  runs Windows on Arm; the physical test turned one function of the processor off and on.
 - Whether the channel exists and is enabled on older supported Windows builds.
 - How often positions change on ordinary PCs. One PC was measured, with none.
 - Why the development PC has one device start beyond 39 per start.
