@@ -1,0 +1,14 @@
+{
+  "observations": [
+    {
+      "collector": "display_device",
+      "fields": {
+        "name": "DISPLAY\\DEL4123",
+        "vendor_id": "DEL",
+        "product_id": "4123",
+        "present": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}
