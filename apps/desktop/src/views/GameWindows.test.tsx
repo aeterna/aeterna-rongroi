@@ -62,8 +62,9 @@ describe("GameWindowsSection before_scan_devices", () => {
 
   it("does not render before_scan device line when before_scan_devices is undefined", () => {
     const view = mockReportView(mockGameWindows());
-    const { container } = render(<GameWindowsSection view={view} mode="self" />);
-    expect(container.textContent).not.toContain("before this scan:");
+    render(<GameWindowsSection view={view} mode="self" />);
+    expect(screen.queryByText(/recorded as removed/)).toBeNull();
+    expect(screen.queryByText(/starts? of Windows/)).toBeNull();
   });
 
   it("does not render before_scan device line when all counts are zero", () => {
@@ -81,8 +82,9 @@ describe("GameWindowsSection before_scan_devices", () => {
         },
       }),
     );
-    const { container } = render(<GameWindowsSection view={view} mode="self" />);
-    expect(container.textContent).not.toContain("before this scan:");
+    render(<GameWindowsSection view={view} mode="self" />);
+    expect(screen.queryByText(/recorded as removed/)).toBeNull();
+    expect(screen.queryByText(/starts? of Windows/)).toBeNull();
   });
 
   it("renders before_scan device line when removal count or windows_starts is above zero", () => {
@@ -101,9 +103,10 @@ describe("GameWindowsSection before_scan_devices", () => {
       }),
     );
     render(<GameWindowsSection view={view} mode="self" />);
-    expect(screen.getByText(/before this scan:/)).toBeInTheDocument();
-    expect(screen.getByText(/1 PCI device recorded as removed/)).toBeInTheDocument();
-    expect(screen.getByText(/2 starts of Windows/)).toBeInTheDocument();
+    const line = screen.getByText(/1 PCI device recorded as removed/);
+    expect(line).toBeTruthy();
+    expect(line.textContent?.startsWith("before this scan: ")).toBe(true);
+    expect(screen.getByText(/2 starts of Windows/)).toBeTruthy();
   });
 
   it("renders before_scan device line in Thai when language is th", async () => {
@@ -123,9 +126,10 @@ describe("GameWindowsSection before_scan_devices", () => {
       }),
     );
     render(<GameWindowsSection view={view} mode="self" />);
-    expect(screen.getByText(/ก่อนสแกน:/)).toBeInTheDocument();
-    expect(screen.getByText(/อุปกรณ์ PCI บันทึกว่าถูกถอดออก 1 รายการ/)).toBeInTheDocument();
-    expect(screen.getByText(/อุปกรณ์ USB บันทึกว่าถูกถอดออก 2 รายการ/)).toBeInTheDocument();
-    expect(screen.getByText(/Windows เริ่มทำงาน 1 ครั้ง/)).toBeInTheDocument();
+    const line = screen.getByText(/อุปกรณ์ PCI บันทึกว่าถูกถอดออก 1 รายการ/);
+    expect(line).toBeTruthy();
+    expect(line.textContent?.startsWith("ก่อนสแกน: ")).toBe(true);
+    expect(screen.getByText(/อุปกรณ์ USB บันทึกว่าถูกถอดออก 2 รายการ/)).toBeTruthy();
+    expect(screen.getByText(/Windows เริ่มทำงาน 1 ครั้ง/)).toBeTruthy();
   });
 });
