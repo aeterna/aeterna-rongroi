@@ -22,6 +22,8 @@ path = [
   "apps/desktop/pnpm-lock.yaml",
   "apps/desktop/pnpm-workspace.yaml",
   "apps/desktop/src-tauri/icons/**",
+  # Prove patches for aeterna-delegate checks-prove.
+  ".aeterna/prove/*.patch",
 ]
 precedence = "closest"
 SPDX-FileCopyrightText = "2026 aeterna-rongroi contributors"
