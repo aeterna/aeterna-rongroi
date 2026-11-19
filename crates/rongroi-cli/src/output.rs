@@ -363,6 +363,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - the drivers registered with Windows: each driver service's name and start setting, where its file is, and that file's SHA-256\n\
             \x20 - the antivirus products Windows Security Center lists: each product's name, the state it reports (on, off, snoozed or expired), and, when its path is a file on a local drive, where that file is and its SHA-256 and signature (Authenticode)\n\
             \x20 - the PCI devices Windows remembers, present or not: the maker, device and subsystem numbers and the class Windows records, class numbers from the bus, link speed and width, and the number of child devices, the driver bound to each, its problem code, and when Windows set it up, last saw it at a start of Windows and recorded it removed, never a serial number, and no child id; these times can match two reports of this PC\n\
+            \x20 - the PCI positions Windows started at each start its PCI log still holds, and when a device at a position was stopped or removed: these are numbers and times, with no device name or id, and two reports from one PC can be matched through these positions\n\
             \x20 - the mice, keyboards and other input devices (HID) Windows remembers, present or not: the maker and model numbers and the driver, and when Windows set each up, last saw it at a start of Windows and recorded it removed, never a serial number or a name\n\
             \x20 - how Windows started each time its System log remembers: one number per start that says whether it followed a full shutdown or a Fast Startup one, and bug check 0xE6 with its code, first parameter and time, no dump path\n\
             \x20 - what Windows starts by itself: each program service's name and start setting, each Run and RunOnce value's name, and each scheduled task's name, whether it is on and what starts it, with the file each one starts — where it is, its SHA-256 and signature (Authenticode); never the arguments a program is given\n\
@@ -390,6 +391,7 @@ pub fn consent(lang: Lang) -> String {
             \x20 - ไดรเวอร์ที่ลงทะเบียนไว้กับ Windows: ชื่อและการตั้งค่าการเริ่มทำงานของ driver service แต่ละตัว ตำแหน่งไฟล์ และ SHA-256 ของไฟล์นั้น\n\
             \x20 - โปรแกรมแอนตี้ไวรัสที่ Windows Security Center ระบุ: ชื่อของแต่ละโปรแกรม สถานะที่มันรายงาน (ทำงานอยู่ ปิดอยู่ พักชั่วคราว หรือหมดอายุ) และเมื่อ path ที่มันให้มาเป็นไฟล์บนไดรฟ์ภายในเครื่อง จะอ่านว่าไฟล์นั้นอยู่ที่ไหน พร้อม SHA-256 และลายเซ็น (Authenticode) ของไฟล์นั้น\n\
             \x20 - อุปกรณ์ PCI ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิต อุปกรณ์ และ subsystem กับ class ที่ Windows บันทึก หมายเลข class จาก bus ความเร็วและความกว้างของ link และจำนวนอุปกรณ์ลูก ไดรเวอร์ที่ผูกกับแต่ละตัว problem code และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียล และไม่มี child id เวลาเหล่านี้ใช้จับคู่รายงานสองฉบับของเครื่องนี้ได้\n\
+            \x20 - ตำแหน่ง (position) PCI ที่ Windows เริ่มใช้งานในแต่ละครั้งที่เปิดเครื่องตามที่ log PCI ยังเก็บไว้ และเวลาที่อุปกรณ์ตำแหน่งนั้นถูกหยุดหรือถอด เป็นตัวเลขและเวลา ไม่มีชื่อหรือรหัสอุปกรณ์ รายงานสองฉบับจาก PC เครื่องเดียวกันจับคู่กันได้จากตำแหน่งเหล่านี้\n\
             \x20 - เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น (HID) ที่ Windows จำไว้ ทั้งที่ต่ออยู่และไม่อยู่แล้ว: หมายเลขผู้ผลิตและรุ่น ไดรเวอร์ และเวลาที่ Windows ตั้งค่ามัน เห็นมันล่าสุดตอน Windows เริ่มทำงาน และบันทึกการถอด ไม่มีหมายเลขซีเรียลหรือชื่อ\n\
             \x20 - Windows เริ่มทำงานแบบไหนในแต่ละครั้งที่ log System ยังจำไว้: ตัวเลขหนึ่งตัวต่อการเริ่มทำงาน ที่บอกว่าต่อจากการปิดเครื่องแบบเต็มหรือแบบ Fast Startup และ bug check 0xE6 พร้อม code, parameter แรก และเวลา ไม่มี dump path\n\
             \x20 - สิ่งที่ Windows เริ่มเอง: ชื่อและการตั้งค่าการเริ่มทำงานของ service แต่ละตัว ชื่อค่าใน Run และ RunOnce แต่ละค่า และชื่อ scheduled task แต่ละตัว ว่าเปิดอยู่หรือไม่และอะไรทำให้มันเริ่ม พร้อมไฟล์ที่แต่ละรายการเริ่ม — ตำแหน่ง SHA-256 และลายเซ็น (Authenticode) โดยไม่อ่าน argument ที่โปรแกรมได้รับเลย\n\
@@ -1311,6 +1313,7 @@ mod tests {
         ("os_image", &["Defender", "Windows Update", "Event Log"]),
         ("pca", &["Program Compatibility Assistant"]),
         ("pci_device", &["PCI", "Windows"]),
+        ("pci_start_history", &["position"]),
         (
             "posture",
             &["Secure Boot", "memory integrity", "PowerShell"],

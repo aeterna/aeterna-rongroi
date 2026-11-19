@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 82 |
-| SHA-256 | `b931ca0ffe703933d9c2b6271bf494ca953666c1920a7d81ebbd883af602ad46` |
+| Rules | 83 |
+| SHA-256 | `0b27063043c7f6a8e7ceaf7ad9f08f67ee0657ad36a839f6d26e9b5ee0bae9b0` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -88,6 +88,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `pci_device`
   - [A PCI device Windows set up earlier is not present now](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `stable`
   - [A PCI device has no driver installed](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `stable`
+- `pci_start_history`
+  - [Windows did not start a device at this PCI position at every start the log holds](#rule-b1ae579c-4305-43d8-9d33-e9b1a3b034e4) — `context` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -1629,6 +1631,49 @@ The devices present when the scan ran, with the problem code Windows held for ea
 **References**
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-install>
+
+## Collector `pci_start_history`
+
+### `pci_start_history` / `partial`
+
+<a id="rule-b1ae579c-4305-43d8-9d33-e9b1a3b034e4"></a>
+
+#### Windows did not start a device at this PCI position at every start the log holds
+
+- Id: `b1ae579c-4305-43d8-9d33-e9b1a3b034e4`
+- File: [`rules/pci_start_history/partial/not-every-start/rule.yaml`](../rules/pci_start_history/partial/not-every-start/rule.yaml)
+- Collector: `pci_start_history`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pci_start_history`, `dma`
+- Written: 2026-11-19
+
+**About this check**
+
+Windows' PCI operational log records a device start at this position at some of the starts it still holds, but not at all of them. A position started later in a start, such as a device enabled after Windows began, counts at that start. This says only what the log records: it does not say what the device was, why it was there, how it left, or that anyone cheated.
+
+**Matches when all of these hold for one observation**
+
+- `in_every_start`: is `false`
+
+**Look-back**
+
+The PCI operational log is circular: it holds only recent starts, and overwrites its oldest records when it reaches its size.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A part added, replaced or moved
+- A firmware setting that changes what the board shows
+- A device disabled or enabled in Windows
+- An external PCIe or Thunderbolt device
+- A position change caused by another device
+- A log that begins in the middle of a change
 
 ## Collector `posture`
 

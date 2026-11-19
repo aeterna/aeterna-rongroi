@@ -117,6 +117,7 @@
     "pca": "Program Compatibility Assistant",
     "userassist": "Programs opened through the Windows shell (UserAssist)",
     "pci_device": "PCI devices Windows remembers",
+    "pci_start_history": "PCI positions Windows started",
     "hid_device": "Mice, keyboards and other input devices Windows remembers",
     "windows_start": "How Windows started",
     "event_fields": "Service installs, clock changes and refused files from the event logs",

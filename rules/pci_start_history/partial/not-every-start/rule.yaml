@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 aeterna-rongroi contributors
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
+id: b1ae579c-4305-43d8-9d33-e9b1a3b034e4
+title: Windows did not start a device at this PCI position at every start the log holds
+description: >-
+  Windows' PCI operational log records a device start at this position at some of the starts it still
+  holds, but not at all of them. A position started later in a start, such as a device enabled after
+  Windows began, counts at that start. This says only what the log records: it does not say what the
+  device was, why it was there, how it left, or that anyone cheated.
+status: experimental
+collector: pci_start_history
+strength: context
+match:
+  in_every_start: false
+retention: >-
+  The PCI operational log is circular: it holds only recent starts, and overwrites its oldest records
+  when it reaches its size.
+unmeasured_when: [not_windows, not_admin, source_absent]
+falsepositives:
+  - A part added, replaced or moved
+  - A firmware setting that changes what the board shows
+  - A device disabled or enabled in Windows
+  - An external PCIe or Thunderbolt device
+  - A position change caused by another device
+  - A log that begins in the middle of a change
+author: aeterna-rongroi contributors
+date: 2026-11-19
+tags: [pci_start_history, dma]

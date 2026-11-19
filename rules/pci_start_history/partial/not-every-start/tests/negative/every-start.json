@@ -1,0 +1,18 @@
+{
+  "description": "A position started at every start the log holds",
+  "observations": [
+    {
+      "collector": "pci_start_history",
+      "fields": {
+        "position": "0x0000.0x06.0x00",
+        "starts_seen": 3,
+        "starts_total": 3,
+        "in_every_start": true,
+        "in_latest_start": true,
+        "first_started_at": "2026-11-17T20:00:00Z",
+        "last_started_at": "2026-11-19T20:00:00Z"
+      }
+    }
+  ],
+  "expect_matches": 0
+}

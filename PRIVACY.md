@@ -64,7 +64,7 @@ subsystem numbers and the class Windows records (`PCI\VEN_…&DEV_…&SUBSYS_…
 its problem code when it is present, whether it is present, and three times Windows stores beside it — when
 Windows first set it up, the last start of Windows at which it was present, and when Windows recorded it
 removed. For a present device it also reads the class numbers from the bus, the link speed and width, current and
-maximum, and how many child devices Windows lists: the count, never their ids (ADR 0095). It never reads a serial number, a device's position on the board, a name you gave a device, or any
+maximum, and how many child devices Windows lists: the count, never their ids (ADR 0095). It never reads a serial number, a name you gave a device, or any
 USB device, phone, camera or drive. The list names some of your hardware, as the driver list does. The first-
 set-up times of a PC's devices are close to unique to one Windows installation, so **two reports of the same
 PC can be matched through them**, as file times can (ADR 0050); this tool sends nothing, but whoever receives
@@ -73,6 +73,14 @@ driver, a device that is not present now — and only a count of the rest. Besid
 started each time its System log remembers, one number per start (see the event logs below), because a
 device taken out before a full shutdown has no removal time and one taken out during a Fast Startup
 shutdown has one.
+
+From the **PCI log** (`Microsoft-Windows-PCI/Operational`, ADR 0095) it reads, when the scan has administrator
+rights, which PCI positions Windows started at each start the log still holds, and when a device at a position was
+stopped or removed. A position is three numbers (bus, device and function). The log names no device, maker or serial
+number, and the rest of each record's text is dropped. A PC's positions change little, so **two reports of the same
+PC can be matched through them**, as the first-set-up times can. SS mode shows the positions the rule matched, those
+not started at every start the log holds, and only a count of the rest. The log is circular and holds recent starts
+only.
 
 Of the **mice, keyboards and other input devices Windows remembers** (HID devices, ADR 0072), present now or set up
 earlier and gone, it reads the same kind of thing: the maker and model numbers (`HID\VID_…&PID_…`), the driver
