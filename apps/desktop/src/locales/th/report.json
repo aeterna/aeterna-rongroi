@@ -119,6 +119,9 @@
     "pci_device": "อุปกรณ์ PCI ที่ Windows จำไว้",
     "pci_start_history": "ตำแหน่ง PCI ที่ Windows เริ่มใช้งาน",
     "hid_device": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่นที่ Windows จำไว้",
+    "usb_device": "อุปกรณ์ USB ที่ Windows จำไว้",
+    "display_device": "จอแสดงผลที่ Windows จำไว้",
+    "bluetooth_device": "อุปกรณ์ Bluetooth ที่ Windows จำไว้",
     "windows_start": "Windows เริ่มทำงานแบบไหน",
     "event_fields": "การติดตั้ง service การเปลี่ยนนาฬิกา และไฟล์ที่ถูกปฏิเสธ จาก event log",
     "usn": "บันทึกการเปลี่ยนแปลงไฟล์ของ NTFS (USN journal)",
@@ -584,7 +587,19 @@
     "note": {
       "installed": "Windows บันทึกการติดตั้งไฟล์นี้เมื่อ {{at}}",
       "code_integrity": "Code Integrity เคยปฏิเสธไฟล์ที่ path เดียวกันบนไดรฟ์ใดไดรฟ์หนึ่ง",
-      "unmatched_installs": "มีการติดตั้ง service หรือ driver {{count}} รายการในช่วงนี้ ซึ่ง path ไม่ตรงกับโปรแกรมใดในรายการ"
+      "unmatched_installs": "มีการติดตั้ง service หรือ driver {{count}} รายการในช่วงนี้ ซึ่ง path ไม่ตรงกับโปรแกรมใดในรายการ",
+      "pci_device_one": "อุปกรณ์ PCI บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "pci_device_other": "อุปกรณ์ PCI บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "hid_device_one": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "hid_device_other": "เมาส์ คีย์บอร์ด และอุปกรณ์อินพุตอื่น บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "usb_device_one": "อุปกรณ์ USB บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "usb_device_other": "อุปกรณ์ USB บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "display_device_one": "จอภาพ บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "display_device_other": "จอภาพ บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "bluetooth_device_one": "อุปกรณ์ Bluetooth บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "bluetooth_device_other": "อุปกรณ์ Bluetooth บันทึกว่าถูกถอดออก {{count}} รายการ",
+      "windows_starts_one": "Windows เริ่มทำงาน {{count}} ครั้ง",
+      "windows_starts_other": "Windows เริ่มทำงาน {{count}} ครั้ง"
     }
   },
   "presenter": {

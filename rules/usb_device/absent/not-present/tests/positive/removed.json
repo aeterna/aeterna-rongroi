@@ -1,0 +1,14 @@
+{
+  "observations": [
+    {
+      "collector": "usb_device",
+      "fields": {
+        "name": "USB\\VID_046D&PID_C52B",
+        "vendor_id": "046D",
+        "product_id": "C52B",
+        "present": false
+      }
+    }
+  ],
+  "expect_matches": 1
+}

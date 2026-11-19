@@ -459,6 +459,12 @@ export interface GameCandidate {
   file?: FileDetails;
 }
 
+/** Device removals and Windows starts in the before-the-scan window (ADR 0096 section 4). */
+export interface BeforeScanDevices {
+  removed: Record<string, number>;
+  windows_starts: number;
+}
+
 /** The game-window section of the report (ADR 0078). Absent when no session was found. */
 export interface GameWindows {
   sessions: GameSession[];
@@ -467,6 +473,8 @@ export interface GameWindows {
   /** Per window, in SS mode: the counts with no names. */
   unnamed?: WindowCounts;
   unmatched_installs?: { before: number; during: number; after: number };
+  /** null means the window is not known. */
+  before_scan_devices?: BeforeScanDevices | null;
   clock?: {
     changes: { changed_at: string; old_time?: string | null; new_time?: string | null }[];
     history: "known" | "not_known";

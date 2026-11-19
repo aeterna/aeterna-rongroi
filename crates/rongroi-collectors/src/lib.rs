@@ -8,7 +8,9 @@
 pub mod antivirus_product;
 pub mod autostart;
 pub mod bam;
+pub mod bluetooth_device;
 pub mod defender_exclusion;
+pub mod display_device;
 pub mod driver_service;
 pub mod event_fields;
 pub mod evtx;
@@ -31,6 +33,7 @@ pub mod process;
 pub mod recorded_files;
 pub mod scan;
 pub mod system_name;
+pub mod usb_device;
 pub mod userassist;
 pub mod usn;
 pub mod windows_start;
@@ -335,6 +338,9 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(pci_device::PciDevice),
         Box::new(pci_start_history::PciStartHistory),
         Box::new(hid_device::HidDevice),
+        Box::new(usb_device::UsbDevice),
+        Box::new(display_device::DisplayDevice),
+        Box::new(bluetooth_device::BluetoothDevice),
         Box::new(posture::Posture),
         Box::new(powershell_text::PowershellText),
         Box::new(prefetch::Prefetch),

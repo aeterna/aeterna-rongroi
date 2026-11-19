@@ -663,14 +663,19 @@ pub trait BootTimeSource {
     fn since_boot(&self) -> Result<std::time::Duration, SourceError>;
 }
 
-/// The device enumerator a [`DeviceRecord`] was listed under (ADR 0069 section 2). Only these two are
-/// read; storage, phones, cameras and every other enumerator are not.
+/// The device enumerator a [`DeviceRecord`] was listed under (ADR 0069 section 2, ADR 0096 section 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DeviceBus {
     /// `PCI`: cards, controllers and the board's own bridges.
     Pci,
     /// `HID`: mice, keyboards and other human-interface devices.
     Hid,
+    /// `USB`: USB devices and root hubs (ADR 0096 section 1).
+    Usb,
+    /// `DISPLAY`: display monitors (ADR 0096 section 1).
+    Display,
+    /// `BTHENUM`: Bluetooth devices and services (ADR 0096 section 1).
+    Bluetooth,
 }
 
 impl DeviceBus {
@@ -679,6 +684,9 @@ impl DeviceBus {
         match self {
             Self::Pci => "PCI",
             Self::Hid => "HID",
+            Self::Usb => "USB",
+            Self::Display => "DISPLAY",
+            Self::Bluetooth => "BTHENUM",
         }
     }
 }
@@ -728,6 +736,12 @@ pub struct DeviceRecord {
     pub model_id: String,
     /// For a PCI device, the four hex digits of `PCI\CC_xxxx` in its compatible ids, upper case.
     pub class_code: Option<String>,
+    /// For a USB device, the two hex digits of `Class_hh` in its compatible ids, upper case (ADR 0096 section 1).
+    pub usb_class: Option<String>,
+    /// For a USB device, the two hex digits of `SubClass_hh` in its compatible ids, upper case (ADR 0096 section 1).
+    pub usb_subclass: Option<String>,
+    /// For a USB device, the two hex digits of `Prot_hh` in its compatible ids, upper case (ADR 0096 section 1).
+    pub usb_protocol: Option<String>,
     /// The driver service bound to the device; `None` when none is.
     pub service: Option<String>,
     /// Windows' problem code, read for present devices only; `None` for an absent one.
@@ -771,15 +785,31 @@ pub trait DeviceSource {
     fn devices(&self, bus: DeviceBus) -> Result<Vec<DeviceRecord>, SourceError>;
 }
 
-/// The model part of a device instance id (ADR 0069 section 3), or `None` when `instance_id` is not
-/// one of `bus`'s.
+fn is_hex_digits(s: &str, count: usize) -> bool {
+    s.len() == count && s.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn is_braced_guid(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.len() != 38 || bytes[0] != b'{' || bytes[37] != b'}' {
+        return false;
+    }
+    if bytes[9] != b'-' || bytes[14] != b'-' || bytes[19] != b'-' || bytes[24] != b'-' {
+        return false;
+    }
+    let hex_ranges = [1..9, 10..14, 15..19, 20..24, 25..37];
+    hex_ranges
+        .iter()
+        .all(|range| bytes[range.clone()].iter().all(u8::is_ascii_hexdigit))
+}
+
+/// The model part of a device instance id (ADR 0069 section 3, ADR 0096 section 1), or `None` when
+/// `instance_id` is not one of `bus`'s.
 ///
 /// An instance id is `<enumerator>\<device id>\<instance>`. The instance part is dropped: for a
 /// device behind USB it is often the device's serial number, for a PCI device a position on the
-/// board. Of the device id, only the `&`-separated fields that name a model are kept — `VEN_`,
-/// `DEV_`, `SUBSYS_` and `REV_` for PCI; `VID_`, `PID_`, `REV_`, `MI_` and `COL` for HID — in the
-/// order Windows wrote them, upper case. Anything else in the device id is dropped rather than kept
-/// unread.
+/// board. Of the device id, only the fields that name a model are kept, in the order Windows wrote
+/// them, upper case. Anything else in the device id is dropped rather than kept unread.
 pub fn device_model_id(bus: DeviceBus, instance_id: &str) -> Option<String> {
     let mut parts = instance_id.split('\\');
     let enumerator = parts.next()?;
@@ -787,26 +817,79 @@ pub fn device_model_id(bus: DeviceBus, instance_id: &str) -> Option<String> {
         return None;
     }
     let device = parts.next()?;
-    let wanted: &[&str] = match bus {
-        DeviceBus::Pci => &["VEN_", "DEV_", "SUBSYS_", "REV_"],
-        DeviceBus::Hid => &["VID_", "PID_", "REV_", "MI_", "COL"],
-    };
-    let kept: Vec<String> = device
-        .split('&')
-        .map(str::to_ascii_uppercase)
-        .filter(|field| wanted.iter().any(|prefix| field.starts_with(prefix)))
-        .filter(|field| {
-            field
-                .split_once('_')
-                .map_or(field.len() > 3, |(_, value)| !value.is_empty())
-        })
-        .filter(|field| {
-            field
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-        })
-        .collect();
-    Some(format!("{}\\{}", bus.enumerator(), kept.join("&")))
+    match bus {
+        DeviceBus::Pci | DeviceBus::Hid => {
+            let wanted: &[&str] = match bus {
+                DeviceBus::Pci => &["VEN_", "DEV_", "SUBSYS_", "REV_"],
+                DeviceBus::Hid => &["VID_", "PID_", "REV_", "MI_", "COL"],
+                _ => unreachable!(),
+            };
+            let kept: Vec<String> = device
+                .split('&')
+                .map(str::to_ascii_uppercase)
+                .filter(|field| wanted.iter().any(|prefix| field.starts_with(prefix)))
+                .filter(|field| {
+                    field
+                        .split_once('_')
+                        .map_or(field.len() > 3, |(_, value)| !value.is_empty())
+                })
+                .filter(|field| {
+                    field
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                })
+                .collect();
+            Some(format!("{}\\{}", bus.enumerator(), kept.join("&")))
+        }
+        DeviceBus::Usb => {
+            let kept: Vec<String> = device
+                .split('&')
+                .filter_map(|field| {
+                    let upper = field.to_ascii_uppercase();
+                    if matches!(upper.as_str(), "ROOT_HUB" | "ROOT_HUB20" | "ROOT_HUB30")
+                        || ((upper.starts_with("VID_")
+                            || upper.starts_with("PID_")
+                            || upper.starts_with("REV_"))
+                            && is_hex_digits(&upper[4..], 4))
+                        || (upper.starts_with("MI_") && is_hex_digits(&upper[3..], 2))
+                    {
+                        Some(upper)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            Some(format!("{}\\{}", bus.enumerator(), kept.join("&")))
+        }
+        DeviceBus::Display => {
+            let is_display = device.len() == 7
+                && device[..3].bytes().all(|b| b.is_ascii_alphabetic())
+                && device[3..].bytes().all(|b| b.is_ascii_hexdigit());
+            let kept = if is_display {
+                device.to_ascii_uppercase()
+            } else {
+                String::new()
+            };
+            Some(format!("{}\\{kept}", bus.enumerator()))
+        }
+        DeviceBus::Bluetooth => {
+            let mut tokens = device.split('_');
+            let first = tokens.next()?;
+            if !is_braced_guid(first) {
+                return Some(format!("{}\\", bus.enumerator()));
+            }
+            let mut kept = vec![first.to_ascii_uppercase()];
+            for token in tokens {
+                let upper = token.to_ascii_uppercase();
+                if (upper.starts_with("VID&") && is_hex_digits(&upper[4..], 8))
+                    || (upper.starts_with("PID&") && is_hex_digits(&upper[4..], 4))
+                {
+                    kept.push(upper);
+                }
+            }
+            Some(format!("{}\\{}", bus.enumerator(), kept.join("_")))
+        }
+    }
 }
 
 /// The class code of a PCI device: the first four hex digits after `PCI\CC_` in its compatible ids,
@@ -824,6 +907,40 @@ pub fn pci_class_code<S: AsRef<str>>(compatible_ids: &[S]) -> Option<String> {
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit())
             .then(|| digits.to_ascii_uppercase())
+    })
+}
+
+/// The USB class, subclass and protocol from the first compatible id that is exactly
+/// `USB\Class_hh&SubClass_hh&Prot_hh`, case-insensitive, as uppercase hex (ADR 0096 section 1).
+pub fn usb_class<S: AsRef<str>>(compatible_ids: &[S]) -> Option<(String, String, String)> {
+    compatible_ids.iter().find_map(|id| {
+        let id = id.as_ref();
+        if id.len() != 32 {
+            return None;
+        }
+        if !id[..10].eq_ignore_ascii_case(r"USB\Class_") {
+            return None;
+        }
+        if !is_hex_digits(&id[10..12], 2) {
+            return None;
+        }
+        if !id[12..22].eq_ignore_ascii_case("&SubClass_") {
+            return None;
+        }
+        if !is_hex_digits(&id[22..24], 2) {
+            return None;
+        }
+        if !id[24..30].eq_ignore_ascii_case("&Prot_") {
+            return None;
+        }
+        if !is_hex_digits(&id[30..32], 2) {
+            return None;
+        }
+        Some((
+            id[10..12].to_ascii_uppercase(),
+            id[22..24].to_ascii_uppercase(),
+            id[30..32].to_ascii_uppercase(),
+        ))
     })
 }
 
@@ -1605,6 +1722,94 @@ mod tests {
         assert_eq!(pci_class_code(&[r"PCI\CC_06"]), None);
         assert_eq!(pci_class_code(&[r"PCI\CC_ZZZZ"]), None);
         assert_eq!(pci_class_code::<&str>(&[]), None);
+    }
+
+    #[test]
+    fn a_usb_instance_id_keeps_model_fields_and_drops_serial_and_wrong_widths() {
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Usb,
+                r"USB\VID_046D&PID_C52B&REV_1234&MI_02\1234567890AB"
+            )
+            .as_deref(),
+            Some(r"USB\VID_046D&PID_C52B&REV_1234&MI_02")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Usb, r"USB\VID_046D&PID_123&REV_12345&MI_002\1").as_deref(),
+            Some(r"USB\VID_046D")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Usb, r"USB\ROOT_HUB\4&1234567&0").as_deref(),
+            Some(r"USB\ROOT_HUB")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Usb, r"USB\ROOT_HUB20\4&1234567&0").as_deref(),
+            Some(r"USB\ROOT_HUB20")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Usb, r"USB\ROOT_HUB30\4&1234567&0").as_deref(),
+            Some(r"USB\ROOT_HUB30")
+        );
+    }
+
+    #[test]
+    fn a_display_instance_id_keeps_three_letters_and_four_hex_digits() {
+        assert_eq!(
+            device_model_id(DeviceBus::Display, r"DISPLAY\ABC1234\4&1234567&0&UID0").as_deref(),
+            Some(r"DISPLAY\ABC1234")
+        );
+        assert_eq!(
+            device_model_id(
+                DeviceBus::Display,
+                r"DISPLAY\Default_Monitor\4&1234567&0&UID0"
+            )
+            .as_deref(),
+            Some(r"DISPLAY\")
+        );
+        assert_eq!(
+            device_model_id(DeviceBus::Display, r"DISPLAY\ABC12345\4&1234567&0&UID0").as_deref(),
+            Some(r"DISPLAY\")
+        );
+    }
+
+    #[test]
+    fn a_bluetooth_instance_id_keeps_guid_and_vid_pid_and_drops_dev_address() {
+        let with_vid_pid =
+            r"BTHENUM\{00001124-0000-1000-8000-00805f9b34fb}_VID&0002046d_PID&b023\8&1234567&0";
+        assert_eq!(
+            device_model_id(DeviceBus::Bluetooth, with_vid_pid).as_deref(),
+            Some(r"BTHENUM\{00001124-0000-1000-8000-00805F9B34FB}_VID&0002046D_PID&B023")
+        );
+        let with_localmfg =
+            r"BTHENUM\{00001124-0000-1000-8000-00805f9b34fb}_LOCALMFG&0002\8&1234567&0";
+        assert_eq!(
+            device_model_id(DeviceBus::Bluetooth, with_localmfg).as_deref(),
+            Some(r"BTHENUM\{00001124-0000-1000-8000-00805F9B34FB}")
+        );
+        let dev_addr = r"BTHENUM\Dev_001122334455\8&1234567&0";
+        let dev_result = device_model_id(DeviceBus::Bluetooth, dev_addr);
+        assert_eq!(dev_result.as_deref(), Some(r"BTHENUM\"));
+        assert!(!dev_result.unwrap().contains("001122334455"));
+    }
+
+    #[test]
+    fn usb_class_finds_exact_shape_and_ignores_others() {
+        let ids = [
+            r"USB\COMPOSITE",
+            r"USB\Class_03&SubClass_01&Prot_02",
+            r"USB\Class_03&SubClass_01",
+        ];
+        assert_eq!(
+            usb_class(&ids),
+            Some(("03".to_owned(), "01".to_owned(), "02".to_owned()))
+        );
+        assert_eq!(
+            usb_class(&[r"usb\class_e0&subclass_0a&prot_ff"]),
+            Some(("E0".to_owned(), "0A".to_owned(), "FF".to_owned()))
+        );
+        assert_eq!(usb_class(&[r"USB\Class_03"]), None);
+        assert_eq!(usb_class(&[r"USB\Class_ZZ&SubClass_01&Prot_01"]), None);
+        assert_eq!(usb_class::<&str>(&[]), None);
     }
 
     #[test]

@@ -14,6 +14,13 @@ type WindowKey = "before" | "during" | "after" | "before_scan";
 const WINDOW_KEYS: WindowKey[] = ["before", "during", "after", "before_scan"];
 // Unmatched installs are counted for the three windows around a session, not for the scan's own span.
 const INSTALL_WINDOW_KEYS: ("before" | "during" | "after")[] = ["before", "during", "after"];
+const BEFORE_SCAN_DEVICE_COLLECTORS = [
+  "pci_device",
+  "hid_device",
+  "usb_device",
+  "display_device",
+  "bluetooth_device",
+] as const;
 type IdentityKey = "i1" | "i2" | "i3" | "i4" | "i5" | "l1";
 type TimeKey = "t1" | "t2" | "t3" | "t4";
 
@@ -91,6 +98,31 @@ export function GameWindowsSection({ view, mode }: { view: ReportView; mode: Mod
             </p>
           ) : null;
         })}
+
+      {(() => {
+        const devices = windows.before_scan_devices;
+        if (!devices) {
+          return null;
+        }
+        const notes: string[] = [];
+        for (const collector of BEFORE_SCAN_DEVICE_COLLECTORS) {
+          const count = devices.removed?.[collector] ?? 0;
+          if (count > 0) {
+            notes.push(t(`game.note.${collector}`, { count }));
+          }
+        }
+        if (devices.windows_starts > 0) {
+          notes.push(t("game.note.windows_starts", { count: devices.windows_starts }));
+        }
+        if (notes.length === 0) {
+          return null;
+        }
+        return (
+          <p key="before_scan_devices" className="muted">
+            {`${t("game.window.before_scan")}: ${notes.join(", ")}`}
+          </p>
+        );
+      })()}
 
       {windows.clock?.changes.map((change) => (
         <p key={change.changed_at}>
