@@ -1,6 +1,6 @@
 # ADR 0095 — The PCI positions Windows started, one start at a time
 
-- Status: accepted — the owner decided the questions below on 2026-11-18, each as recommended. Sections 3 and 4 are built ("As built"); sections 1 and 2 are amended by the 2026-11-19 measurements below
+- Status: accepted — the owner decided the questions below on 2026-11-18, each as recommended. All five sections are built ("As built"); sections 1 and 2 follow the 2026-11-19 measurements below
 - Date: 2026-11-18
 - Amends: ADR 0018 (two more kinds of event whose payload is read), ADR 0069 (a device's position is read, from a log
   and not from the device list), ADR 0070 (`pci_device` gains fields), ADR 0071 (`windows_start` gains a second kind of
@@ -231,7 +231,7 @@ Decided on 2026-11-18: all as recommended.
 
 - Section 3: `pci_device` carries the seven fields; they are read for present devices only, and no rule uses them.
 - Section 4: `windows_start` declares `record`; `windows_start/dma/bug-check-e6` is in `rules/unconfronted.csv`, because no baseline host carries a System log.
-- Sections 1 and 2 are not built.
+- Sections 1 and 2 (2026-11-19): `pci_start_history` and `pci_start_history/partial/not-every-start`, in `rules/unconfronted.csv` because no baseline host carries the PCI log. Section 5: `PRIVACY.md`, both consent texts and both screenshare guides name the positions; the collector is not in `DEVICE_COLLECTORS`, and Connect requests it only by naming it.
 
 ## Consequences
 
