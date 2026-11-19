@@ -142,8 +142,9 @@ upload consent text names them.
 - Bluetooth LE devices: the measured PC has none, so `BTHLEDEVICE` is not read until one is measured.
 - Older supported Windows builds.
 - How many absent USB devices an ordinary PC remembers. One PC was measured, with 2.
-- Whether a removal time is written for USB and display devices taken out while the PC is off. ADR 0069 measured
-  this for PCI only.
+- Whether a removal time is written for a display taken out while the PC is off. The lab check below measured it
+  for a USB device only.
+- A display with its own model id being added and removed: the lab VM has one generic monitor only.
 
 ## Decisions for the owner
 
@@ -173,6 +174,30 @@ Decided on 2026-11-19: all as recommended.
   window's name, only when a count is above zero.
 - Section 5: `PRIVACY.md`, both consent texts (the full-scan list and the SS "shows" text) and both screenshare
   guides.
+
+## Lab VM check (2026-11-19)
+
+Decision 5, run on the rongroi DMA lab VM (Windows 11 ARM64 build 26300 under QEMU, on an overlay disk), with the
+CLI built from `ff8792f8` and `scan --full --json`. The test device was a QEMU `usb-serial`
+(`USB\VID_0403&PID_6001`, no driver installed), plugged and unplugged by the host. Scripts and results:
+`.claude/probes/r2-vm-2026-11-19/`, kept outside git.
+
+| Step | What happened | `usb_device` row for the test device | Rule |
+|---|---|---|---|
+| s0b | Booted with the device | `present: true`, class `FF/FF/FF`, `first_install_at` and `last_arrival_at` at that boot, no instance part | not this row |
+| s1 | Booted with it, unplugged while Windows ran | `present: false`, `last_removal_at` at the unplug (18:45:38) | found |
+| s2, s3 | Booted with it, full shutdown, booted without it | `present: false`, **no** `last_removal_at`; the earlier removal time was cleared when the device arrived again | found |
+| s4, s5 | Booted with it, Fast Startup shutdown, booted without it | `present: false`, `last_removal_at` at the resume (19:01:51) | found |
+
+This matches what ADR 0069 measured for PCI: a removal time is written while Windows runs and at a Fast Startup
+resume, and none after a full shutdown, so a missing removal time says nothing about when a device left. The rule's
+text already says so.
+
+The other rows of the same scans were read as designed: `USB\ROOT_HUB30` with no vendor or product, the USB storage
+the lab uses (class `08/06/50`), absent HID-class USB devices from earlier lab runs, which the rule listed, and their
+removal times. The VM's one monitor is `DISPLAY\DEFAULT_MONITOR`, which keeps nothing: the row has `present`,
+`service` and its times but no `name`, `vendor_id` or `product_id`, and the display rule stayed not found. The VM has
+no Bluetooth device: Windows listed no `BTHENUM` entry and the report lists none.
 
 ## Consequences
 
