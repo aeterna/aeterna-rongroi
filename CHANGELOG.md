@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-19
+
 ### Added
 - A full scan reads the USB devices, displays and Bluetooth devices Windows remembers (`usb_device`, `display_device`, `bluetooth_device`): model numbers kept only in fixed shapes, a USB device's class, the driver, presence and times, never a serial number, name, address or EDID. The experimental context rules `usb_device/absent/not-present` and `display_device/absent/not-present` show a USB device or display that is not present now (ADR 0096).
 - The game-window section counts, between the latest session's end and the scan, the devices Windows recorded as removed and the starts of Windows, in both modes (ADR 0096).
