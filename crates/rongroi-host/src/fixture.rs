@@ -2266,10 +2266,7 @@ devices:
         let host = FixtureHost::from_yaml_str(yaml, "inline").unwrap();
         let usb = host.devices(DeviceBus::Usb).unwrap();
         assert_eq!(usb.len(), 1);
-        assert_eq!(
-            usb[0].model_id,
-            r"USB\VID_046D&PID_C52B&REV_1234&MI_02"
-        );
+        assert_eq!(usb[0].model_id, r"USB\VID_046D&PID_C52B&REV_1234&MI_02");
         assert_eq!(usb[0].usb_class.as_deref(), Some("03"));
         assert_eq!(usb[0].usb_subclass.as_deref(), Some("01"));
         assert_eq!(usb[0].usb_protocol.as_deref(), Some("02"));

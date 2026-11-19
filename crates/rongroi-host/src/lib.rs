@@ -1735,11 +1735,7 @@ mod tests {
             Some(r"USB\VID_046D&PID_C52B&REV_1234&MI_02")
         );
         assert_eq!(
-            device_model_id(
-                DeviceBus::Usb,
-                r"USB\VID_046D&PID_123&REV_12345&MI_002\1"
-            )
-            .as_deref(),
+            device_model_id(DeviceBus::Usb, r"USB\VID_046D&PID_123&REV_12345&MI_002\1").as_deref(),
             Some(r"USB\VID_046D")
         );
         assert_eq!(
@@ -1763,8 +1759,11 @@ mod tests {
             Some(r"DISPLAY\ABC1234")
         );
         assert_eq!(
-            device_model_id(DeviceBus::Display, r"DISPLAY\Default_Monitor\4&1234567&0&UID0")
-                .as_deref(),
+            device_model_id(
+                DeviceBus::Display,
+                r"DISPLAY\Default_Monitor\4&1234567&0&UID0"
+            )
+            .as_deref(),
             Some(r"DISPLAY\")
         );
         assert_eq!(
@@ -1775,12 +1774,14 @@ mod tests {
 
     #[test]
     fn a_bluetooth_instance_id_keeps_guid_and_vid_pid_and_drops_dev_address() {
-        let with_vid_pid = r"BTHENUM\{00001124-0000-1000-8000-00805f9b34fb}_VID&0002046d_PID&b023\8&1234567&0";
+        let with_vid_pid =
+            r"BTHENUM\{00001124-0000-1000-8000-00805f9b34fb}_VID&0002046d_PID&b023\8&1234567&0";
         assert_eq!(
             device_model_id(DeviceBus::Bluetooth, with_vid_pid).as_deref(),
             Some(r"BTHENUM\{00001124-0000-1000-8000-00805F9B34FB}_VID&0002046D_PID&B023")
         );
-        let with_localmfg = r"BTHENUM\{00001124-0000-1000-8000-00805f9b34fb}_LOCALMFG&0002\8&1234567&0";
+        let with_localmfg =
+            r"BTHENUM\{00001124-0000-1000-8000-00805f9b34fb}_LOCALMFG&0002\8&1234567&0";
         assert_eq!(
             device_model_id(DeviceBus::Bluetooth, with_localmfg).as_deref(),
             Some(r"BTHENUM\{00001124-0000-1000-8000-00805F9B34FB}")

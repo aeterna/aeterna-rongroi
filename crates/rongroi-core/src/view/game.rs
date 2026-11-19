@@ -649,7 +649,11 @@ fn before_scan_devices_of(
         for observation in observations_of(report, collector) {
             let hit = time_of(observation, "last_removal_at")
                 .and_then(parse_time)
-                .is_some_and(|time| sessions.iter().any(|s| hits(s, time, Some(scan)).before_scan));
+                .is_some_and(|time| {
+                    sessions
+                        .iter()
+                        .any(|s| hits(s, time, Some(scan)).before_scan)
+                });
             if hit {
                 *devices.removed.entry(collector.to_owned()).or_default() += 1;
             }
@@ -660,7 +664,11 @@ fn before_scan_devices_of(
         let hit = is_start
             && time_of(observation, "started_at")
                 .and_then(parse_time)
-                .is_some_and(|time| sessions.iter().any(|s| hits(s, time, Some(scan)).before_scan));
+                .is_some_and(|time| {
+                    sessions
+                        .iter()
+                        .any(|s| hits(s, time, Some(scan)).before_scan)
+                });
         if hit {
             devices.windows_starts += 1;
         }

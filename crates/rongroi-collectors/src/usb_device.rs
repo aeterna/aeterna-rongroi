@@ -225,10 +225,7 @@ devices:
         assert_eq!(observations.len(), 1);
         let fields = &observations[0].fields;
         let text = |name: &str| fields.get(name).and_then(serde_json::Value::as_str);
-        assert_eq!(
-            text("name"),
-            Some(r"USB\VID_046D&PID_C52B&REV_2401&MI_00")
-        );
+        assert_eq!(text("name"), Some(r"USB\VID_046D&PID_C52B&REV_2401&MI_00"));
         assert_eq!(text("vendor_id"), Some("046D"));
         assert_eq!(text("product_id"), Some("C52B"));
         assert_eq!(text("service"), Some("usbccgp"));
@@ -293,10 +290,7 @@ devices:
 ",
         ));
         let (_, gaps) = measured(&run);
-        assert_eq!(
-            gaps.get("usb_class"),
-            Some(&UnmeasuredReason::ReadFailed)
-        );
+        assert_eq!(gaps.get("usb_class"), Some(&UnmeasuredReason::ReadFailed));
         assert_eq!(
             gaps.get("usb_protocol"),
             Some(&UnmeasuredReason::ReadFailed)

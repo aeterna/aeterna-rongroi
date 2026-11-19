@@ -88,7 +88,11 @@ pub fn section(view: Option<&GameWindows>, mode: Mode, lang: Lang) -> String {
             }
         }
         if devices.windows_starts > 0 {
-            let plural = if devices.windows_starts == 1 { "one" } else { "other" };
+            let plural = if devices.windows_starts == 1 {
+                "one"
+            } else {
+                "other"
+            };
             notes.push(words.get(
                 &format!("game.note.windows_starts_{plural}"),
                 &[("count", &devices.windows_starts.to_string())],

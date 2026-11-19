@@ -256,11 +256,7 @@ mod live {
         }
     }
 
-    fn read_usb_facts(
-        devinst: u32,
-        record: &mut DeviceRecord,
-        missing: &mut Vec<DeviceProperty>,
-    ) {
+    fn read_usb_facts(devinst: u32, record: &mut DeviceRecord, missing: &mut Vec<DeviceProperty>) {
         match read(
             devinst,
             &DEVPKEY_Device_CompatibleIds,
