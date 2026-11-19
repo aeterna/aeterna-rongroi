@@ -144,10 +144,7 @@ fn observation(device: &DeviceRecord) -> Observation {
     let mut text = |name: &str, value: &str| {
         fields.insert(name.to_owned(), serde_json::Value::from(value));
     };
-    let rest = device
-        .model_id
-        .split_once('\\')
-        .map_or("", |(_, r)| r);
+    let rest = device.model_id.split_once('\\').map_or("", |(_, r)| r);
     if !rest.is_empty() {
         text("name", &device.model_id);
         for (name, prefix) in [("vendor_id", "VID_"), ("product_id", "PID_")] {
