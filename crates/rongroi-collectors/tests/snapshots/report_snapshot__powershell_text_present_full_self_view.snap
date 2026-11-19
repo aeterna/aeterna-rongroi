@@ -15,7 +15,7 @@ expression: view
     "rules_bundle": {
       "schema_version": 4,
       "sha256": "[bundle sha256]",
-      "rule_count": 81
+      "rule_count": 83
     },
     "platform": "windows",
     "os_build": "26100",
@@ -335,6 +335,14 @@ expression: view
       "expected": false
     },
     {
+      "rule_id": "b1ae579c-4305-43d8-9d33-e9b1a3b034e4",
+      "collector": "pci_start_history",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
+    },
+    {
       "rule_id": "7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7",
       "collector": "posture",
       "strength": "posture",
@@ -630,6 +638,14 @@ expression: view
       "state": "unmeasured",
       "reason": "read_failed",
       "expected": false
+    },
+    {
+      "rule_id": "e641494e-a337-4e4d-bf44-887b5cf1442b",
+      "collector": "windows_start",
+      "strength": "context",
+      "state": "unmeasured",
+      "reason": "source_absent",
+      "expected": true
     }
   ],
   "own_traces": [],
@@ -952,7 +968,7 @@ expression: view
   "listed": {
     "found": 3,
     "not_found": 15,
-    "unmeasured": 46
+    "unmeasured": 48
   },
   "hidden": {
     "not_found": 0,
@@ -1141,6 +1157,10 @@ expression: view
         "reason": "read_failed"
       },
       {
+        "collector": "pci_start_history",
+        "reason": "source_absent"
+      },
+      {
         "collector": "hid_device",
         "reason": "read_failed"
       },
@@ -1173,6 +1193,7 @@ expression: view
     "windows_start",
     "event_fields",
     "pci_device",
+    "pci_start_history",
     "hid_device",
     "autostart",
     "defender_exclusion",

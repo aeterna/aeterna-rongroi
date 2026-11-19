@@ -1,7 +1,7 @@
 # Screenshare guide
 
 For server staff checking a player's PC over a screenshare (an SS, also called a PC check), and for the player. It covers
-aeterna-rongroi **0.15.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
+aeterna-rongroi **0.16.0**. อ่านภาษาไทย: [screenshare-guide.th.md](screenshare-guide.th.md)
 
 > ⚠️ **Pre-alpha.** Seventy-seven rules ship in 0.11.0, and seventy-two of them are `experimental`. Do not ban anyone
 > because of what this tool shows, or clear anyone because of it.
@@ -85,7 +85,7 @@ read-only, and the one about an event log file that is not the file Windows writ
   than PowerShell, for the reason in §2.
   `--elevate` runs the scan in a **new** console window instead. In 0.3.0 that window stayed open
   until Enter was pressed ([ADR 0012](adr/0012-elevation-relaunch.md)) — not re-measured for 0.4.0, whose
-  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2, 0.9.0, 0.10.0, 0.11.0, 0.12.0, 0.13.0, 0.14.0 and 0.15.0 — but the report from
+  full-scan work touched that code, or for 0.5.0, 0.6.0, 0.7.0, 0.8.0, 0.8.1, 0.8.2, 0.9.0, 0.10.0, 0.11.0, 0.12.0, 0.13.0, 0.14.0, 0.15.0 and 0.16.0 — but the report from
   `--elevate` stays in that window and never reaches a file redirected with `>`. With 0.2.0, do not
   use `--elevate`: Windows closes that window the moment the scan finishes, taking the report with it
   (measured on a real Windows 11 machine).
@@ -105,7 +105,7 @@ change the results. The consent screen decides what is shown.
 **CLI** (in the Command Prompt from §3):
 
 ```bat
-.\aeterna-rongroi-cli-0.15.0-windows-x64.exe scan --mode ss
+.\aeterna-rongroi-cli-0.16.0-windows-x64.exe scan --mode ss
 ```
 
 Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player** answers it.
@@ -120,7 +120,7 @@ Add `--lang th` for Thai. The program asks `Continue? [y/N]`, and **the player**
 ### The header
 
 ```
-aeterna-rongroi 0.15.0
+aeterna-rongroi 0.16.0
 official build
 mode: ss · windows <build> · administrator · rules: <n> (<bundle hash>)
 exe sha256: <hash>
@@ -231,6 +231,8 @@ need by hand, and compare it with the report yourself.
 | A registered driver is on LOLDrivers' list of vulnerable drivers | posture | `test` | overclocking, fan and RGB control, and hardware-monitoring utilities (LOLDrivers' `RTCore64.sys` entry is MSI Afterburner's driver), a driver service left registered after its program was uninstalled |
 | A PCI device has no driver installed | presence | `experimental` | Windows installed again before the chipset or device drivers, a capture, sound or expansion card whose driver was never installed, hardware newer or older than Windows' drivers, a virtual machine |
 | A PCI device Windows set up earlier is not present now | context | `experimental` | a graphics card, SSD or network card replaced or moved, a BIOS update or setting, an external PCIe device unplugged, Windows moved to another PC |
+| Windows recorded bug check 0xE6 | context | `experimental` | Driver Verifier turned on, a faulty driver, faulty hardware |
+| Windows did not start a device at a PCI position at every start its PCI log holds | context | `experimental` | a part added, replaced or moved, a firmware setting, a device disabled or enabled in Windows, an external PCIe or Thunderbolt device, another device moving positions, a log that begins in the middle of a change |
 | A mouse, keyboard or other input device Windows set up earlier is not present now | context | `experimental` | a mouse, keyboard, headset or game controller used once and put away (most PCs have several), a wireless receiver moved to another port, a tablet or dock, Windows moved to another PC |
 | FiveM for GTA V Enhanced keeps a cache folder for a server (full scan only) | context | `experimental` | joining any server with FiveM for GTA V Enhanced, a folder kept from a server joined long ago or by another person on the same Windows account |
 | The hosts file gives a FiveM or Rockstar name an address | posture | `experimental` | ad, tracking and telemetry blocklists, guides that block the Rockstar launcher's update or sign-in servers, software that writes its own hosts entries (a VPN, a security suite, a development tool) |
@@ -524,12 +526,12 @@ modes, lists what it saw of itself. It is not evidence about the PC.
   above it on the screen:
 
   ```bat
-  .\aeterna-rongroi-cli-0.15.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
+  .\aeterna-rongroi-cli-0.16.0-windows-x64.exe scan --mode ss --json --case-code K7Q-2MX > report.json
   ```
 - **The CLI** can write the SS view as JSON, redacted the same way as the screen:
 
   ```bat
-  .\aeterna-rongroi-cli-0.15.0-windows-x64.exe scan --mode ss --json > report.json
+  .\aeterna-rongroi-cli-0.16.0-windows-x64.exe scan --mode ss --json > report.json
   ```
 
   The consent question stays on screen, the player answers it there, and the file holds only the JSON.

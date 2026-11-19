@@ -112,7 +112,15 @@ fn reason_for(error: &SourceError) -> UnmeasuredReason {
 /// reported for HID devices (ADR 0072), so their properties leave nothing unknown.
 fn fields_of(property: DeviceProperty) -> &'static [&'static str] {
     match property {
-        DeviceProperty::CompatibleIds | DeviceProperty::ProblemCode => &[],
+        DeviceProperty::CompatibleIds
+        | DeviceProperty::ProblemCode
+        | DeviceProperty::BusClass
+        | DeviceProperty::BusSubclass
+        | DeviceProperty::LinkSpeed
+        | DeviceProperty::LinkWidth
+        | DeviceProperty::MaxLinkSpeed
+        | DeviceProperty::MaxLinkWidth
+        | DeviceProperty::ChildCount => &[],
         DeviceProperty::Service => &["service"],
         DeviceProperty::FirstInstall => &["first_install_at"],
         DeviceProperty::LastArrival => &["last_arrival_at"],
@@ -210,6 +218,31 @@ devices:
         assert_eq!(text("first_install_at"), Some("2026-10-15T11:32:36Z"));
         assert!(!fields.contains_key("problem_code"));
         assert!(!fields.contains_key("class_code"));
+        for field in [
+            "bus_class",
+            "bus_subclass",
+            "child_count",
+            "link_speed",
+            "link_width",
+            "max_link_speed",
+            "max_link_width",
+        ] {
+            assert!(!fields.contains_key(field), "HID must not contain {field}");
+        }
+    }
+
+    #[test]
+    fn unreadable_pci_properties_on_hid_produce_no_gaps() {
+        let run = HidDevice.collect(&host(
+            r"platform: windows
+devices:
+  - id: 'HID\VID_0627&PID_0001\7&3&0&0000'
+    present: true
+    unreadable: [bus_class, max_link_width, child_count]
+",
+        ));
+        let (_, gaps) = measured(&run);
+        assert!(gaps.is_empty(), "{gaps:?}");
     }
 
     #[test]

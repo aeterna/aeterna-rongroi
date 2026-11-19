@@ -17,8 +17,8 @@ beside every Found row the program shows the ordinary things that also produce i
 | Rules bundle | |
 |---|---|
 | Rule format | 4 |
-| Rules | 81 |
-| SHA-256 | `a7772fc1752d577ae4f77ce8c13a28ce4602429765f313540194f383aef863f6` |
+| Rules | 83 |
+| SHA-256 | `0b27063043c7f6a8e7ceaf7ad9f08f67ee0657ad36a839f6d26e9b5ee0bae9b0` |
 
 A report header shows its rule count and bundle SHA-256. A report with a different SHA-256 came from a
 program with a different set of rules: read this page at the commit that program was built from.
@@ -88,6 +88,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
 - `pci_device`
   - [A PCI device Windows set up earlier is not present now](#rule-ae2f3bb9-a3ee-4175-bf89-982b9fbbbe08) — `context` · `stable`
   - [A PCI device has no driver installed](#rule-fc74cf1c-a134-45f1-83bd-db42a4dab748) — `presence` · `stable`
+- `pci_start_history`
+  - [Windows did not start a device at this PCI position at every start the log holds](#rule-b1ae579c-4305-43d8-9d33-e9b1a3b034e4) — `context` · `experimental`
 - `posture`
   - [Secure Boot is turned off](#rule-7c1f3a52-9d4e-4b8a-a6f2-3e5d9b0c41e7) — `posture` · `test`
   - [The firmware reports Secure Boot off while Windows reports it on](#rule-5ec56c3d-da70-4acc-99d6-2c41c0b75d71) — `posture` · `experimental`
@@ -123,6 +125,8 @@ screenshare: [screenshare-guide.md](screenshare-guide.md).
   - [The change journal holds a rename in FiveM's plugin folder](#rule-7d7adb92-2c47-4ff5-94ec-dd8a2f9e453d) — `context` · `experimental`
   - [The change journal holds a deletion in PowerShell's command history folder](#rule-926b3863-8f4f-4d18-aab6-26b77934466e) — `context` · `experimental`
   - [The change journal holds a rename in PowerShell's command history folder](#rule-8a39617a-30d6-4fc0-9b20-cb4f899985d5) — `context` · `experimental`
+- `windows_start`
+  - [Windows recorded bug check 0xE6](#rule-e641494e-a337-4e4d-bf44-887b5cf1442b) — `context` · `experimental`
 - Timeline selectors
   - `bam`
     - [When BAM recorded a program named like FiveM's game process](#rule-bf213176-ed26-4c02-935e-99925abc7db7) — `context` · `experimental`
@@ -1628,6 +1632,49 @@ The devices present when the scan ran, with the problem code Windows held for ea
 
 - <https://learn.microsoft.com/en-us/windows-hardware/drivers/install/cm-prob-failed-install>
 
+## Collector `pci_start_history`
+
+### `pci_start_history` / `partial`
+
+<a id="rule-b1ae579c-4305-43d8-9d33-e9b1a3b034e4"></a>
+
+#### Windows did not start a device at this PCI position at every start the log holds
+
+- Id: `b1ae579c-4305-43d8-9d33-e9b1a3b034e4`
+- File: [`rules/pci_start_history/partial/not-every-start/rule.yaml`](../rules/pci_start_history/partial/not-every-start/rule.yaml)
+- Collector: `pci_start_history`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `pci_start_history`, `dma`
+- Written: 2026-11-19
+
+**About this check**
+
+Windows' PCI operational log records a device start at this position at some of the starts it still holds, but not at all of them. A position started later in a start, such as a device enabled after Windows began, counts at that start. This says only what the log records: it does not say what the device was, why it was there, how it left, or that anyone cheated.
+
+**Matches when all of these hold for one observation**
+
+- `in_every_start`: is `false`
+
+**Look-back**
+
+The PCI operational log is circular: it holds only recent starts, and overwrites its oldest records when it reaches its size.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- A part added, replaced or moved
+- A firmware setting that changes what the board shows
+- A device disabled or enabled in Windows
+- An external PCIe or Thunderbolt device
+- A position change caused by another device
+- A log that begins in the middle of a change
+
 ## Collector `posture`
 
 ### `posture` / `boot`
@@ -2910,6 +2957,51 @@ Only the span the change journal still held when the scan read it, shown beside 
 
 - <https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline>
 - <https://learn.microsoft.com/en-us/windows/win32/fileio/change-journal-records>
+
+## Collector `windows_start`
+
+### `windows_start` / `dma`
+
+<a id="rule-e641494e-a337-4e4d-bf44-887b5cf1442b"></a>
+
+#### Windows recorded bug check 0xE6
+
+- Id: `e641494e-a337-4e4d-bf44-887b5cf1442b`
+- File: [`rules/windows_start/dma/bug-check-e6/rule.yaml`](../rules/windows_start/dma/bug-check-e6/rule.yaml)
+- Collector: `windows_start`
+- Strength: `context`
+- Status: `experimental` — being developed
+- Tags: `windows_start`, `dma`
+- Written: 2026-11-18
+
+**About this check**
+
+Windows Error Reporting recorded bug check 0xE6 (DRIVER\_VERIFIER\_DMA\_VIOLATION) in the System log. Microsoft documents this code for DMA verification violations and says it can be observed without Driver Verifier enabled. This describes what Windows recorded and does not say a device was used to cheat.
+
+**Matches when all of these hold for one observation**
+
+- `bug_check_code`: is `0xE6` (text, ASCII case ignored)
+- `record`: is `bug_check` (text, ASCII case ignored)
+
+**Look-back**
+
+As long as the System log keeps its records: by default it overwrites the oldest when it reaches its size.
+
+**Not measured, and named by the rule as ordinary on some machines**
+
+- `not_windows` — not running on Windows
+- `not_admin` — Windows would not show this without administrator rights
+- `source_absent` — this PC has no such record to read
+
+**Ordinary things that also produce this**
+
+- Driver Verifier turned on
+- A faulty driver
+- Faulty hardware
+
+**References**
+
+- <https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-0xe6--driver-verifier-dma-violation>
 
 ## Timeline selectors
 

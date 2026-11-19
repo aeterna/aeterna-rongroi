@@ -236,7 +236,7 @@ fn known_collector_ids_are_exactly_the_built_collectors_sorted() {
     let expected: Vec<&str> = concat!(
         "antivirus_product autostart bam defender_exclusion driver_service event_fields ",
         "evtx fivem_dir fivem_servers hid_device install_marker net_config os_image pca ",
-        "pci_device posture powershell_text prefetch process ",
+        "pci_device pci_start_history posture powershell_text prefetch process ",
         "recorded_files userassist usn windows_start",
     )
     .split(' ')

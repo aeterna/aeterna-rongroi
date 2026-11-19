@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Part of aeterna-rongroi, a cheat-detection tool. Using it to evade detection is out of scope — see AGENTS.md.
 
-//! How Windows started, each time its `System` log remembers (ADR 0071).
+//! How Windows started, each time its `System` log remembers (ADR 0071), and bug check 0xE6 (ADR 0095 section 4).
 //!
 //! One observation per start: when Windows wrote it (`started_at`) and the number Windows gave the way
 //! it started (`boot_type`), read by `rongroi_parsers::evtx::windows_starts` from 27 of
-//! `Microsoft-Windows-Kernel-Boot`. No other value of that event, or of any other event, is read.
+//! `Microsoft-Windows-Kernel-Boot`, and bug checks with code 0xE6 from 1001 of
+//! `Microsoft-Windows-WER-SystemErrorReporting`. No other value of those events, or of any other event, is read.
 //!
 //! **This module gives the number no meaning**; the rules that select on it do (ADR 0002). What was
 //! measured, in a virtual machine (ADR 0071): 0 after a full shutdown or a restart, 1 after a Fast
@@ -33,7 +34,14 @@ const ID: &str = "windows_start";
 /// The `System` log's file name in the Event Log folder.
 pub const SYSTEM_LOG: &str = "System.evtx";
 
-const FIELDS: [Field; 2] = [Field::number("boot_type"), Field::timestamp("started_at")];
+const FIELDS: [Field; 6] = [
+    Field::number("boot_type"),
+    Field::timestamp("bug_check_at"),
+    Field::text("bug_check_code"),
+    Field::text("bug_check_parameter_1"),
+    Field::text("record"),
+    Field::timestamp("started_at"),
+];
 
 const REASONS: [UnmeasuredReason; 6] = [
     UnmeasuredReason::NotWindows,
@@ -60,6 +68,10 @@ impl Collector for WindowsStart {
 
     fn unmeasured_reasons(&self) -> &'static [UnmeasuredReason] {
         &REASONS
+    }
+
+    fn discriminator(&self) -> Option<&'static str> {
+        Some("record")
     }
 
     fn collect(&self, host: &dyn Host) -> CollectorRun {
@@ -110,26 +122,44 @@ fn unmeasured(reason: UnmeasuredReason) -> CollectorRun {
     }
 }
 
-/// One observation per start. A start whose `boot_type` was not a number is kept without it.
+/// One observation per start and per bug check 0xE6.
 fn measured(starts: &WindowsStarts) -> CollectorRun {
-    let observations = starts
-        .starts
-        .iter()
-        .map(|start| {
-            let mut fields = BTreeMap::new();
-            fields.insert(
-                "started_at".to_owned(),
-                Value::from(start.written.to_string()),
-            );
-            if let Some(boot_type) = start.boot_type {
-                fields.insert("boot_type".to_owned(), Value::from(boot_type));
-            }
-            Observation {
-                collector: ID.to_owned(),
-                fields,
-            }
-        })
-        .collect();
+    let mut observations = Vec::with_capacity(starts.starts.len() + starts.bug_checks.len());
+    for start in &starts.starts {
+        let mut fields = BTreeMap::new();
+        fields.insert("record".to_owned(), Value::from("start"));
+        fields.insert(
+            "started_at".to_owned(),
+            Value::from(start.written.to_string()),
+        );
+        if let Some(boot_type) = start.boot_type {
+            fields.insert("boot_type".to_owned(), Value::from(boot_type));
+        }
+        observations.push(Observation {
+            collector: ID.to_owned(),
+            fields,
+        });
+    }
+    for bug_check in &starts.bug_checks {
+        let mut fields = BTreeMap::new();
+        fields.insert("record".to_owned(), Value::from("bug_check"));
+        fields.insert(
+            "bug_check_code".to_owned(),
+            Value::from(bug_check.code.as_str()),
+        );
+        fields.insert(
+            "bug_check_parameter_1".to_owned(),
+            Value::from(bug_check.parameter_1.as_str()),
+        );
+        fields.insert(
+            "bug_check_at".to_owned(),
+            Value::from(bug_check.written.to_string()),
+        );
+        observations.push(Observation {
+            collector: ID.to_owned(),
+            fields,
+        });
+    }
     CollectorRun::Measured {
         collector: ID.to_owned(),
         observations,
@@ -164,18 +194,55 @@ mod tests {
                     boot_type: None,
                 },
             ],
+            bug_checks: Vec::new(),
             rejected: Vec::new(),
         });
         let CollectorRun::Measured { observations, .. } = run else {
             panic!("expected a measured run");
         };
         assert_eq!(observations.len(), 2);
+        assert_eq!(observations[0].fields["record"], Value::from("start"));
         assert_eq!(observations[0].fields["boot_type"], Value::from(0));
         assert_eq!(
             observations[0].fields["started_at"],
             Value::from(at(1_791_000_000).to_string())
         );
+        assert_eq!(observations[1].fields["record"], Value::from("start"));
         assert!(!observations[1].fields.contains_key("boot_type"));
+    }
+
+    #[test]
+    fn windows_start_declares_record_discriminator() {
+        assert_eq!(WindowsStart.discriminator(), Some("record"));
+    }
+
+    #[test]
+    fn bug_check_carries_four_fields() {
+        use rongroi_parsers::evtx::BugCheck;
+
+        let at = |s: i64| Timestamp::from_second(s).unwrap();
+        let run = measured(&WindowsStarts {
+            starts: Vec::new(),
+            bug_checks: vec![BugCheck {
+                written: at(1_791_000_500),
+                code: "0xE6".to_owned(),
+                parameter_1: "0x26".to_owned(),
+            }],
+            rejected: Vec::new(),
+        });
+        let CollectorRun::Measured { observations, .. } = run else {
+            panic!("expected a measured run");
+        };
+        assert_eq!(observations.len(), 1);
+        let obs = &observations[0];
+        assert_eq!(obs.fields.len(), 4);
+        assert_eq!(obs.fields["record"], Value::from("bug_check"));
+        assert_eq!(obs.fields["bug_check_code"], Value::from("0xE6"));
+        assert_eq!(obs.fields["bug_check_parameter_1"], Value::from("0x26"));
+        assert_eq!(
+            obs.fields["bug_check_at"],
+            Value::from(at(1_791_000_500).to_string())
+        );
     }
 
     #[test]

@@ -1,0 +1,13 @@
+{
+  "description": "A normal Windows start record without bug check",
+  "observations": [
+    {
+      "collector": "windows_start",
+      "fields": {
+        "record": "start",
+        "boot_type": 0,
+        "started_at": "2026-11-18T12:00:00Z"
+      }
+    }
+  ]
+}

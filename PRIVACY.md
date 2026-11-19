@@ -63,7 +63,8 @@ set up earlier and gone — it reads, through Windows' device list (ADR 0069, AD
 subsystem numbers and the class Windows records (`PCI\VEN_…&DEV_…&SUBSYS_…&REV_…`), the driver bound to each,
 its problem code when it is present, whether it is present, and three times Windows stores beside it — when
 Windows first set it up, the last start of Windows at which it was present, and when Windows recorded it
-removed. It never reads a serial number, a device's position on the board, a name you gave a device, or any
+removed. For a present device it also reads the class numbers from the bus, the link speed and width, current and
+maximum, and how many child devices Windows lists: the count, never their ids (ADR 0095). It never reads a serial number, a name you gave a device, or any
 USB device, phone, camera or drive. The list names some of your hardware, as the driver list does. The first-
 set-up times of a PC's devices are close to unique to one Windows installation, so **two reports of the same
 PC can be matched through them**, as file times can (ADR 0050); this tool sends nothing, but whoever receives
@@ -72,6 +73,14 @@ driver, a device that is not present now — and only a count of the rest. Besid
 started each time its System log remembers, one number per start (see the event logs below), because a
 device taken out before a full shutdown has no removal time and one taken out during a Fast Startup
 shutdown has one.
+
+From the **PCI log** (`Microsoft-Windows-PCI/Operational`, ADR 0095) it reads, when the scan has administrator
+rights, which PCI positions Windows started at each start the log still holds, and when a device at a position was
+stopped or removed. A position is three numbers (bus, device and function). The log names no device, maker or serial
+number, and the rest of each record's text is dropped. A PC's positions change little, so **two reports of the same
+PC can be matched through them**, as the first-set-up times can. SS mode shows the positions the rule matched, those
+not started at every start the log holds, and only a count of the rest. The log is circular and holds recent starts
+only.
 
 Of the **mice, keyboards and other input devices Windows remembers** (HID devices, ADR 0072), present now or set up
 earlier and gone, it reads the same kind of thing: the maker and model numbers (`HID\VID_…&PID_…`), the driver
@@ -197,7 +206,9 @@ all**: an event's own text is where user names, PC names, addresses, account ide
 lines live, and none of it survives the step that reads the file. **One number is the exception** (ADR 0071):
 of the event Windows writes to its System log each time it starts, the tool reads `BootType`, which says
 whether that start followed a full shutdown or a Fast Startup one, and the time of the event. Nothing else of
-that event is read. **Four more kinds of event are read for a few named fields** (ADR 0081), and their text
+that event is read. **Bug check 0xE6 is a second exception** (ADR 0095): from Windows Error Reporting's System log
+record, the tool keeps the code, its first parameter and the time, and drops the dump path, the report id and every
+other bug check. **Four more kinds of event are read for a few named fields** (ADR 0081), and their text
 never reaches the report:
 - when a service or driver was installed (System log, 7045), whether it is a driver or a program, and a
   **fingerprint** of its file's path — a SHA-256 of the path, which matches only the same path. The path,

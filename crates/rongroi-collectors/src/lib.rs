@@ -23,6 +23,7 @@ pub mod os_image;
 pub mod paths;
 pub mod pca;
 pub mod pci_device;
+pub mod pci_start_history;
 pub mod posture;
 pub mod powershell_text;
 pub mod prefetch;
@@ -332,6 +333,7 @@ pub fn all() -> Vec<Box<dyn Collector>> {
         Box::new(pca::Pca),
         Box::new(userassist::UserAssist),
         Box::new(pci_device::PciDevice),
+        Box::new(pci_start_history::PciStartHistory),
         Box::new(hid_device::HidDevice),
         Box::new(posture::Posture),
         Box::new(powershell_text::PowershellText),
