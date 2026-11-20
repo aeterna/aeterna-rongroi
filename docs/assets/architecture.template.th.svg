@@ -71,7 +71,7 @@
     <rect class="a-src" x="18" y="162" width="222" height="46" rx="12"/><text class="d-lab" x="34" y="183">Authenticode</text><text class="d-sub" x="34" y="200">ลายเซ็นไฟล์ FiveM</text>
     <rect class="a-src" x="18" y="226" width="222" height="46" rx="12"/><text class="d-lab" x="34" y="247">LOLDrivers</text><text class="d-sub" x="34" y="264">{{LOLDRIVERS}} hashes</text>
     <rect class="a-src" x="18" y="290" width="222" height="46" rx="12"/><text class="d-lab" x="34" y="311">Event Logs</text><text class="d-sub" x="34" y="328">Security · CodeIntegrity · System</text>
-    <rect class="a-src" x="18" y="354" width="222" height="46" rx="12"/><text class="d-lab" x="34" y="375">HID</text><text class="d-sub" x="34" y="392">เมาส์ · คีย์บอร์ด</text>
+    <rect class="a-src" x="18" y="354" width="222" height="46" rx="12"/><text class="d-lab" x="34" y="375">อุปกรณ์ · PCI · USB</text><text class="d-sub" x="34" y="392">HID · จอ · Bluetooth</text>
   </g>
   <!-- the vanishing file: chip inside the Prefetch/BAM card -->
   <g class="a-ghost"><rect x="178" y="123" width="54" height="17" rx="5" fill="var(--found-ground)" stroke="var(--found-mark)" stroke-width="1.2"/><text class="d-mono" x="205" y="135.5" text-anchor="middle" style="fill:var(--found)">x.exe</text></g>
