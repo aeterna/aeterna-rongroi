@@ -16,6 +16,29 @@
 # - cargo xtask loldrivers: fetches the LOLDrivers repository.
 # - fuzz smoke: needs a nightly toolchain and a 30-second run per target; it is not part of the rust job.
 
+# shuffle: none — cargo test has no stable order shuffle (U12b)
+
+# Files an engineer run must never edit (protected)
+protected = [
+    ".aeterna/*",
+    ".github/*",
+    "NOTICE",
+    "REUSE.toml",
+    "LICENSES/*",
+    "third_party/*/LICENSE*",
+]
+
+# Package manager lockfiles and committed files written by xtask generators (generated)
+generated = [
+    "Cargo.lock",
+    "fuzz/Cargo.lock",
+    "apps/desktop/pnpm-lock.yaml",
+    "docs/rules-reference.md",
+    "docs/rules-reference.th.md",
+    "docs/coverage.md",
+    "docs/assets/architecture-*.svg",
+]
+
 [[checks]]
 name = "format"
 cmd = 'export CARGO_HOME="/Users/${USER}/.cargo" RUSTUP_HOME="/Users/${USER}/.rustup" CARGO_NET_OFFLINE=true; cargo fmt --all --check'
