@@ -1,17 +1,4 @@
 {
   "version": 1,
-  "leases": [
-    {
-      "id": "u12b-eb4270ee",
-      "repo": "aeterna-rongroi",
-      "lane": "u12b",
-      "host": "mac",
-      "scope": [
-        ".aeterna/checks.toml"
-      ],
-      "plan": "delegate-upgrade-r5",
-      "acquired": "2026-11-20T10:40:55Z",
-      "expires": "2026-11-20T14:40:55Z"
-    }
-  ]
+  "leases": []
 }
