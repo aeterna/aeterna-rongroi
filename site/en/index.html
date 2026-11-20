@@ -53,7 +53,7 @@
       { "@type": "Question", "name": "Does it send anything from my PC?", "acceptedAnswer": { "@type": "Answer", "text": "The program's own code sends nothing. The window version uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The command-line (CLI) version does not use WebView2. Details: <a href=\"https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md\">PRIVACY.md</a>" } },
       { "@type": "Question", "name": "Why does Windows warn when I open it?", "acceptedAnswer": { "@type": "Answer", "text": "Releases are not code-signed yet. Always check the hash first (step 2), and do not turn SmartScreen off for the whole PC." } },
       { "@type": "Question", "name": "Does it need administrator rights?", "acceptedAnswer": { "@type": "Answer", "text": "No. It scans without them, but some checks then read \"not measured\", and the report says how many." } },
-      { "@type": "Question", "name": "Does it catch every cheat?", "acceptedAnswer": { "@type": "Answer", "text": "No. It shows the traces left on the PC. Cheats on a second PC (DMA) and menus hidden from screen capture are out of its sight." } },
+      { "@type": "Question", "name": "Does it catch every cheat?", "acceptedAnswer": { "@type": "Answer", "text": "No. It shows the traces left on the PC. Cheats on a second PC (DMA) and menus hidden from screen capture are out of its sight. It can show traces the hardware leaves on this PC, never the cheat itself." } },
       { "@type": "Question", "name": "Can it tell me a PC is clean?", "acceptedAnswer": { "@type": "Answer", "text": "No, and it never will. Finding nothing does not mean there is nothing." } },
       { "@type": "Question", "name": "Which Windows does it run on?", "acceptedAnswer": { "@type": "Answer", "text": "64-bit Windows (x64). The measurements recorded in the project were made on Windows 11." } },
       { "@type": "Question", "name": "I found a way around a check. Where do I report it?", "acceptedAnswer": { "@type": "Answer", "text": "Privately, as <a href=\"https://github.com/aeterna/aeterna-rongroi/blob/dev/SECURITY.md\">SECURITY.md</a> describes. Please do not post it publicly." } }
@@ -328,7 +328,8 @@
         <tr><td>Deleted or renamed files</td><td>In FiveM's add-on folders</td></tr>
         <tr><td>Modified Windows</td><td>Windows versions that come with protections removed, such as Atlas or ReviOS<small>A person may run whatever Windows they like; this row only says which one it is</small></td></tr>
         <tr><td>Other settings</td><td>Unsigned programs that start by themselves, and a hosts file that redirects FiveM or Rockstar</td></tr>
-        <tr><td>PowerShell</td><td>Whether a command downloaded something and ran it, told Microsoft Defender to look away, or cleared a log — kept as kinds of words, never the command<span class="new">NEW</span><small>Full scan only, with the player's agreement</small></td></tr>
+        <tr><td>PowerShell</td><td>Whether a command downloaded something and ran it, told Microsoft Defender to look away, or cleared a log — kept as kinds of words, never the command<small>Full scan only, with the player's agreement</small></td></tr>
+        <tr><td>Hardware and devices</td><td>The PCI devices Windows remembers and which PCI positions it started at each start of Windows, mice and keyboards, and in a full scan USB devices, displays and Bluetooth devices — model numbers, type and times, never a serial number, name or address<span class="new">NEW</span><small>Traces a device leaves, such as a card Windows set up that is gone now — not the cheat itself</small></td></tr>
         <tr><td>How far back it can see</td><td>So that "not found" is never read as "never happened"</td></tr>
       </tbody>
     </table></div>
@@ -358,7 +359,7 @@
         <tr><td>A machine-setting row</td><td>Anything about the person</td></tr>
       </tbody>
     </table></div>
-    <p class="blind"><strong>It cannot see:</strong> cheats running on a second PC (DMA), menus hidden from screen capture, or a Windows modified to fool the programs running on it.</p>
+    <p class="blind"><strong>It cannot see:</strong> cheats running on a second PC (DMA) — only traces the hardware leaves on this PC, such as a card Windows set up and no longer sees — menus hidden from screen capture, or a Windows modified to fool the programs running on it.</p>
   </section>
 
   <section>
@@ -367,7 +368,7 @@
     <details><summary>Does it send anything from my PC?</summary><p>The program's own code sends nothing. The window version uses Microsoft WebView2, a Windows component that may send Windows diagnostic data according to your Windows settings. The command-line (CLI) version does not use WebView2. Details: <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/PRIVACY.md">PRIVACY.md</a></p></details>
     <details><summary>Why does Windows warn when I open it?</summary><p>Releases are not code-signed yet. Always check the hash first (step 2), and do not turn SmartScreen off for the whole PC.</p></details>
     <details><summary>Does it need administrator rights?</summary><p>No. It scans without them, but some checks then read "not measured", and the report says how many.</p></details>
-    <details><summary>Does it catch every cheat?</summary><p>No. It shows the traces left on the PC. Cheats on a second PC (DMA) and menus hidden from screen capture are out of its sight.</p></details>
+    <details><summary>Does it catch every cheat?</summary><p>No. It shows the traces left on the PC. Cheats on a second PC (DMA) and menus hidden from screen capture are out of its sight. It can show traces the hardware leaves on this PC, never the cheat itself.</p></details>
     <details><summary>Can it tell me a PC is clean?</summary><p>No, and it never will. Finding nothing does not mean there is nothing.</p></details>
     <details><summary>Which Windows does it run on?</summary><p>64-bit Windows (x64). The measurements recorded in the project were made on Windows 11.</p></details>
     <details><summary>I found a way around a check. Where do I report it?</summary><p>Privately, as <a href="https://github.com/aeterna/aeterna-rongroi/blob/dev/SECURITY.md">SECURITY.md</a> describes. Please do not post it publicly.</p></details>

@@ -9,7 +9,7 @@ What it does and does not do:
 - Every result is Found, Not found (with how far back the source reaches) or Not measured (with a reason). There is no score and no pass/fail summary.
 - It reads local Windows artifacts (Prefetch, BAM, PCA, event logs, registry, files) and never writes, deletes or moves anything on the scanned PC.
 - The program's own code has no network code; CI fails the build if any is added.
-- It cannot see cheats running on a second PC (DMA) or menus hidden from screen capture. Finding nothing does not mean there is nothing.
+- It cannot see cheats running on a second PC (DMA) or menus hidden from screen capture; it can show traces the hardware leaves on this PC, never the cheat itself. Finding nothing does not mean there is nothing.
 - Windows x64 only. Releases are not code-signed yet; check the download against `SHA256SUMS` on the release page.
 - Code is GPL-3.0-or-later; rules are CC-BY-SA-4.0. Free to use.
 
