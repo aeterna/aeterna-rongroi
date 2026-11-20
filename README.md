@@ -9,21 +9,21 @@
 **Shows evidence — never gives a "clean" verdict.**
 
 [![Release](https://img.shields.io/badge/Release-0.17.0-0869b0?style=flat-square&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
-[![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=flat-square)](docs/rules-reference.md)
+[![Rules](https://img.shields.io/badge/Forensic_Rules-85-6a4fe0?style=flat-square)](docs/rules-reference.md)
 [![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=flat-square)](PRIVACY.md)
 [![License](https://img.shields.io/badge/License-GPL--3.0-f4c430?style=flat-square)](LICENSE)
 [![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=flat-square)](docs/adr/0002-no-clean-verdict.md)
 
-**[Official Website](https://aeterna.github.io/aeterna-rongroi/) · [Screenshare Guide](docs/screenshare-guide.md) · [77 Rules Reference](docs/rules-reference.md) · [Privacy Policy](PRIVACY.md) · [Discord](https://discord.gg/eZ8CNrGe2b)**
+**[Official Website](https://aeterna.github.io/aeterna-rongroi/) · [Screenshare Guide](docs/screenshare-guide.md) · [85 Rules Reference](docs/rules-reference.md) · [Privacy Policy](PRIVACY.md) · [Discord](https://discord.gg/eZ8CNrGe2b)**
 
-[Quick start](#quick-start) · [What it is](#what-it-is--and-what-it-is-not) · [Forensic Architecture](#forensic-architecture) · [3-Layer Evidence Model](#the-3-layer-evidence-model-adr-0045) · [77 Rules](#what-it-inspects-77-rules-across-12-collectors) · [Verification](#verifying-a-download)
+[Quick start](#quick-start) · [What it is](#what-it-is--and-what-it-is-not) · [Forensic Architecture](#forensic-architecture) · [3-Layer Evidence Model](#the-3-layer-evidence-model-adr-0045) · [85 Rules](#what-it-inspects-85-rules-across-27-collectors) · [Verification](#verifying-a-download)
 
 <code>aeterna-rongroi-cli-0.17.0-windows-x64.exe scan --mode ss</code>
 
 </div>
 
 > [!WARNING]
-> **Pre-alpha.** The scanner currently implements 77 rules across 12 collector sources. Most rules are experimental and calibrated for research and testing. Never ban a player solely based on these results, and never proclaim a machine is "clean".
+> **Pre-alpha.** The scanner currently implements 85 rules across 27 collectors. Most rules are experimental and calibrated for research and testing. Never ban a player solely based on these results, and never proclaim a machine is "clean".
 
 **Latest release: [0.17.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.11.19-0.17.0)**, 19 November 2026.
 
@@ -85,12 +85,12 @@ flowchart TD
         AUTH["Authenticode Verification (FiveM Root DLLs)"]
         LOLD["1,847 Vulnerable Drivers (LOLDrivers Hashes)"]
         EVTX["Windows Event Logs (System / Security / CI)"]
-        PERIPH["Input Hardware Telemetry (HID Devices)"]
+        PERIPH["Device Store (PCI, HID, USB, Display, Bluetooth)"]
     end
 
     subgraph Core["Rongroi Core Engine (Offline Rust Core)"]
         COLLECT["Local Collectors (Read-only)"]
-        RULES["77 Deterministic Rules Engine"]
+        RULES["85 Deterministic Rules Engine"]
         TIME["Trace Horizon & Session Timeline"]
     end
 
@@ -153,7 +153,7 @@ Details: [PRIVACY.md](PRIVACY.md).
 
 ---
 
-## 🔎 What It Inspects (77 Rules across 12 Collectors)
+## 🔎 What It Inspects (85 Rules across 27 Collectors)
 
 | Inspection Area | Technical Scope & Forensic Depth |
 |---|---|
@@ -163,7 +163,8 @@ Details: [PRIVACY.md](PRIVACY.md).
 | **System Security Posture** | Microsoft Defender real-time status, tamper protection, exclusions, UEFI Secure Boot, TPM 2.0, HVCI memory integrity, and test-signing mode. |
 | **Vulnerable Drivers** | Compares all registered Windows kernel drivers against **1,847 verified LOLDrivers hashes** (Bring Your Own Vulnerable Driver / BYOVD attacks). |
 | **Code Integrity** | Microsoft-Windows-CodeIntegrity Event ID 3033 (blocked driver) and 3077 (revoked driver load) telemetry. |
-| **Hardware Telemetry** | Input device connection timestamps (mice and keyboards) mapped to session chronology. |
+| **Hardware & Devices** | The PCI devices Windows remembers, with bus class and link facts; which PCI positions Windows started at each start its PCI log holds; bug check 0xE6; mice and keyboards. A full scan adds USB devices, displays and Bluetooth devices. Model numbers, type and set-up, arrival and removal times only, never a serial number, name or address. It shows traces a device leaves, such as a card Windows set up that is gone now, not the cheat itself. |
+| **Before the Scan** | Between the latest game session and the scan: how many devices Windows recorded as removed and how many times Windows started. Counts only. |
 | **Modified Windows Builds** | Detection of stripped/tweaked Windows distributions (AtlasOS, ReviOS) with disabled security subsystems. |
 | **Temporal Look-Back Horizon** | Maps trace horizon bounds so "not found" is never confused with "never occurred". |
 

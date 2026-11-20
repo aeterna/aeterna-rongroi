@@ -9,21 +9,21 @@
 **แสดงหลักฐานตามจริง — ไม่มีวันบอกว่าเครื่อง "สะอาด"**
 
 [![Release](https://img.shields.io/badge/Release-0.17.0-0869b0?style=flat-square&logo=windows)](https://github.com/aeterna/aeterna-rongroi/releases)
-[![Rules](https://img.shields.io/badge/Forensic_Rules-77_Verified-6a4fe0?style=flat-square)](docs/rules-reference.th.md)
+[![Rules](https://img.shields.io/badge/Forensic_Rules-85-6a4fe0?style=flat-square)](docs/rules-reference.th.md)
 [![Privacy](https://img.shields.io/badge/Network_Code-0%25_Offline-166534?style=flat-square)](PRIVACY.md)
 [![License](https://img.shields.io/badge/License-GPL--3.0-f4c430?style=flat-square)](LICENSE)
 [![Invariants](https://img.shields.io/badge/Anti--Verdict-ADR_0002_Enforced-b45309?style=flat-square)](docs/adr/0002-no-clean-verdict.md)
 
-**[เว็บไซต์ทางการ](https://aeterna.github.io/aeterna-rongroi/) · [คู่มือตรวจแชร์จอ (SS)](docs/screenshare-guide.th.md) · [คู่มืออ้างอิง 77 Rules](docs/rules-reference.th.md) · [นโยบายความเป็นส่วนตัว](PRIVACY.md) · [Discord](https://discord.gg/eZ8CNrGe2b)**
+**[เว็บไซต์ทางการ](https://aeterna.github.io/aeterna-rongroi/) · [คู่มือตรวจแชร์จอ (SS)](docs/screenshare-guide.th.md) · [คู่มืออ้างอิง 85 Rules](docs/rules-reference.th.md) · [นโยบายความเป็นส่วนตัว](PRIVACY.md) · [Discord](https://discord.gg/eZ8CNrGe2b)**
 
-[เริ่มต้นใช้งาน](#เริ่มต้นใช้งานด่วน) · [คืออะไร / ไม่ใช่อะไร](#คืออะไร--และไม่ใช่อะไร) · [สถาปัตยกรรมนิติวิทยาศาสตร์](#สถาปัตยกรรมนิติวิทยาศาสตร์) · [โมเดลหลักฐาน 3 ชั้น](#โมเดลหลักฐาน-3-ชั้น-adr-0045) · [77 Rules](#ตรวจอะไรบ้าง-77-rules-จาก-12-สายข้อมูล) · [ตรวจสอบไฟล์](#การตรวจสอบความถูกต้องของไฟล์ที่ดาวน์โหลด)
+[เริ่มต้นใช้งาน](#เริ่มต้นใช้งานด่วน) · [คืออะไร / ไม่ใช่อะไร](#คืออะไร--และไม่ใช่อะไร) · [สถาปัตยกรรมนิติวิทยาศาสตร์](#สถาปัตยกรรมนิติวิทยาศาสตร์) · [โมเดลหลักฐาน 3 ชั้น](#โมเดลหลักฐาน-3-ชั้น-adr-0045) · [85 Rules](#ขอบเขตการตรวจ-85-rules-จาก-27-collectors) · [ตรวจสอบไฟล์](#การตรวจสอบความถูกต้องของไฟล์ที่ดาวน์โหลด)
 
 <code>aeterna-rongroi-cli-0.17.0-windows-x64.exe scan --mode ss --lang th</code>
 
 </div>
 
 > [!WARNING]
-> **ยังเป็นรุ่นทดลอง (pre-alpha)** ตอนนี้โปรแกรมตรวจด้วย rule ทั้งหมด 77 ตัว จากแหล่งข้อมูล 12 สาย เกือบทั้งหมดยังอยู่ในสถานะทดลอง (experimental) และยังไม่ได้ผ่านการสอบทานกับเครื่องจริงมากพอ ห้ามแบนผู้เล่นโดยอาศัยรายงานนี้เพียงอย่างเดียว และห้ามใช้โปรแกรมนี้เพื่อรับรองว่าเครื่อง "สะอาด"
+> **ยังเป็นรุ่นทดลอง (pre-alpha)** ตอนนี้โปรแกรมตรวจด้วย rule ทั้งหมด 85 ตัว จาก collector 27 ตัว เกือบทั้งหมดยังอยู่ในสถานะทดลอง (experimental) และยังไม่ได้ผ่านการสอบทานกับเครื่องจริงมากพอ ห้ามแบนผู้เล่นโดยอาศัยรายงานนี้เพียงอย่างเดียว และห้ามใช้โปรแกรมนี้เพื่อรับรองว่าเครื่อง "สะอาด"
 
 **รุ่นล่าสุด: [0.17.0](https://github.com/aeterna/aeterna-rongroi/releases/tag/v2026.11.19-0.17.0)**, 19 พฤศจิกายน 2026.
 
@@ -85,12 +85,12 @@ flowchart TD
         AUTH["Authenticode Verification (FiveM Root DLLs)"]
         LOLD["1,847 Vulnerable Drivers (LOLDrivers Hashes)"]
         EVTX["Windows Event Logs (System / Security / CI)"]
-        PERIPH["Input Hardware Telemetry (HID Devices)"]
+        PERIPH["Device Store (PCI, HID, USB, Display, Bluetooth)"]
     end
 
     subgraph Core["Rongroi Core Engine (Offline Rust Core)"]
         COLLECT["Local Collectors (Read-only)"]
-        RULES["77 Deterministic Rules Engine"]
+        RULES["85 Deterministic Rules Engine"]
         TIME["Trace Horizon & Session Timeline"]
     end
 
@@ -153,7 +153,7 @@ flowchart TD
 
 ---
 
-## 🔎 ขอบเขตการตรวจ (77 Rules จาก 12 Collectors)
+## 🔎 ขอบเขตการตรวจ (85 Rules จาก 27 Collectors)
 
 | หัวข้อการตรวจ | ขอบเขตทางเทคนิคและหลักฐานที่อ่าน |
 |---|---|
@@ -163,7 +163,8 @@ flowchart TD
 | **การป้องกันของ Windows** | ตรวจสอบสถานะ Microsoft Defender, การยกเว้นโฟลเดอร์ (Exclusions), UEFI Secure Boot, TPM 2.0, HVCI (Memory Integrity), และโหมด Test-signing |
 | **ไดรเวอร์อันตราย** | เปรียบเทียบไดรเวอร์ทั้งหมดที่ลงทะเบียนไว้กับฐานข้อมูล **1,847 แฮชไดรเวอร์อันตรายของ LOLDrivers** (การโจมตีแบบ BYOVD) |
 | **ความสมบูรณ์ของโค้ดระบบ** | ตรวจสอบ Event ID 3033 (ไดรเวอร์ถูกบล็อก) และ 3077 (เพิกถอนสิทธิ์ไดรเวอร์) จาก Code Integrity Log |
-| **อุปกรณ์เชื่อมต่อ (HID)** | ประวัติและเวลาการเชื่อมต่อเมาส์และคีย์บอร์ดบน Timeline เทียบกับช่วงเวลาเล่นเกม |
+| **ฮาร์ดแวร์และอุปกรณ์** | อุปกรณ์ PCI ที่ Windows จำไว้ พร้อม class และความเร็ว link จาก bus ตำแหน่ง PCI ที่ Windows เริ่มใช้งานในแต่ละครั้งที่ log PCI ยังเก็บไว้ bug check 0xE6 และเมาส์กับคีย์บอร์ด การสแกนแบบ Full อ่านอุปกรณ์ USB จอ และ Bluetooth เพิ่ม เก็บแค่หมายเลขรุ่น ชนิด และเวลาที่ตั้งค่า ต่อ และถอด ไม่มีหมายเลขซีเรียล ชื่อ หรือที่อยู่ สิ่งที่เห็นคือร่องรอยที่อุปกรณ์ทิ้งไว้ เช่น การ์ดที่ Windows เคยตั้งค่าแล้วตอนนี้หายไป ไม่ใช่ตัวโปร |
+| **ช่วงก่อนสแกน** | ระหว่างเซสชันเกมล่าสุดจนถึงการสแกน Windows บันทึกการถอดอุปกรณ์กี่ตัว และเริ่มทำงานกี่ครั้ง เป็นจำนวนเท่านั้น |
 | **Windows ที่ถูกดัดแปลง** | ตรวจจับ Windows ปรับแต่งที่ตัดระบบความปลอดภัยออก (เช่น AtlasOS, ReviOS) |
 | **กรอบเวลาย้อนหลัง** | ระบุขอบเขตเวลาที่บันทึกยังหลงเหลืออยู่ชัดเจน เพื่อไม่ให้ "ไม่เจอ" ถูกเข้าใจผิดว่า "ไม่เคยเกิดขึ้น" |
 
