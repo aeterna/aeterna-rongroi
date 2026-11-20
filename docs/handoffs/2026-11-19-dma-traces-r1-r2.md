@@ -28,6 +28,16 @@ SPDX-License-Identifier: CC-BY-SA-4.0
   - shutdown เต็มแล้วถอด: ไม่มีเวลาถอด
   - Fast Startup แล้วถอด: มีเวลาถอด เป็นเวลาตอนที่ Windows กลับมาทำงาน
 
+### Pilot (2026-11-20)
+
+0.17.0 คือตัว pilot ไม่ต้อง release ใหม่ เพราะ README แสดงจาก `dev` และเว็บ deploy เองเมื่อ `site/` บน `dev` เปลี่ยน
+
+- **#308:** README ทั้งสองภาษาขึ้น 85 rules จาก 27 collectors และมีแถว Hardware & Devices กับแถวช่วงก่อนสแกน
+  - เว็บมีแถว "ฮาร์ดแวร์และอุปกรณ์" ในตาราง "ตรวจอะไรบ้าง"
+  - ประโยคเรื่อง DMA บอกว่าแสดงได้แค่ร่องรอยที่ฮาร์ดแวร์ทิ้งไว้ ไม่ใช่ตัวโปร
+- **#309:** กล่อง source ใน diagram สถาปัตยกรรมเปลี่ยนเป็น "Devices · PCI · USB / HID · displays · Bluetooth"
+- **Feedback จาก pilot:** รับผ่าน GitHub issue template ได้แก่ false positive, false negative, bug และขอ rule ใหม่
+
 ## 2. ยังไม่ได้ทำ
 
 - **วัดเครื่องจริงให้ครบ 3 เครื่อง:** ต้องทำก่อนเลื่อน rule ใหม่จาก `experimental` ตอนนี้วัดแล้วเครื่องเดียวคือ PC ของ Pik
