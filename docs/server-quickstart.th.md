@@ -26,10 +26,13 @@ AETERNA ไม่ได้รัน relay ให้ relay เป็นของ�
    ensure nakara_rongroi
    add_ace group.admin nakara_rongroi.staff allow
    set rongroi_public_origin "http://<IP หรือชื่อสาธารณะ>:<พอร์ตเกม>"
+   set rongroi_server_name "<ชื่อเซิร์ฟเวอร์>"
    ```
-   ใช้ `set` ห้ามใช้ `setr`
+   ใช้ `set` ห้ามใช้ `setr` ผู้เล่นจะเห็นชื่อเซิร์ฟเวอร์ใน Connect ก่อนกดยินยอม ถ้าไม่ตั้ง `rongroi_server_name` Kit จะใช้
+   `sv_projectName` แทน ทีมงานเปลี่ยนชื่อได้ที่หน้า Policy ในแผงควบคุม
 3. เปิดเซิร์ฟเวอร์แล้วพิมพ์ `rongroi doctor` ใน console ทุกบรรทัดจะบอก `ok` หรือ `FAIL` พร้อมเหตุผล
-4. ในเกม ทีมงานพิมพ์ `/rongroi` เปิดเคสให้ผู้เล่น ผู้เล่นจะเห็นรหัสไปวางใน Connect
+4. ในเกม ทีมงานพิมพ์ `/rongroi` ใส่ server id ของผู้เล่นแล้วกด **Open case** แผงจะแสดงรหัสจับคู่ ผู้เล่นนำรหัสไปวางใน Connect
+   (หรือใน launcher)
 
 ## FiveM แบบใช้ Rongroi Relay
 
@@ -42,6 +45,7 @@ AETERNA ไม่ได้รัน relay ให้ relay เป็นของ�
    set rongroi_relay_url "https://relay.example.org"
    set rongroi_relay_id "my-server"
    set rongroi_relay_key "<จาก keygen>"
+   set rongroi_server_name "<ชื่อเซิร์ฟเวอร์>"
    ```
 3. `rongroi doctor` ตรวจว่า relay ตอบ และ key เป็นของ `my-server`
 

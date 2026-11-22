@@ -27,10 +27,13 @@ AETERNA runs no relay for you. A relay is yours, like your game server.
    ensure nakara_rongroi
    add_ace group.admin nakara_rongroi.staff allow
    set rongroi_public_origin "http://<your public IP or name>:<game port>"
+   set rongroi_server_name "<your server name>"
    ```
-   Use `set`, never `setr`.
+   Use `set`, never `setr`. Players see the server name in Connect before they agree. Without
+   `rongroi_server_name` the Kit uses `sv_projectName`; staff can change the name on the panel's Policy screen.
 3. Start the server and run `rongroi doctor` in the console. Each line says `ok` or `FAIL` with the reason.
-4. In game, staff type `/rongroi`, open a case for a player, and the player sees a code to paste into Connect.
+4. In game, staff type `/rongroi`, enter the player's server id and press **Open case**. The panel shows a pairing
+   code; the player pastes it into Connect (or the launcher).
 
 ## FiveM: with a Rongroi Relay
 
@@ -43,6 +46,7 @@ AETERNA runs no relay for you. A relay is yours, like your game server.
    set rongroi_relay_url "https://relay.example.org"
    set rongroi_relay_id "my-server"
    set rongroi_relay_key "<from keygen>"
+   set rongroi_server_name "<your server name>"
    ```
 3. `rongroi doctor` checks that the relay answers and that the key is the one for `my-server`.
 
